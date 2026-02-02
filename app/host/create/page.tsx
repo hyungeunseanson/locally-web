@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+// ✅ React를 명시적으로 가져와야 'React.FormEvent'를 쓸 수 있습니다.
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
