@@ -2,22 +2,20 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { User, DollarSign, Clock, LayoutDashboard, Calendar, List, MessageSquare, BarChart3, Plus } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
-// ✅ 방금 만든 "서버용 도구" 가져오기
 import { createClient } from '@/app/utils/supabase/server';
 
+// ✅ [핵심] 이 페이지는 캐싱하지 말고, 들어올 때마다 실시간으로 로그인 검사해라!
+export const dynamic = 'force-dynamic';
+
 export default async function HostDashboard() {
-  // 1. 진짜 서버용 클라이언트 생성
   const supabase = await createClient();
 
-  // 2. 로그인 체크 (이제 문지기가 검사한 도장을 확실히 확인합니다)
   const { data: { user }, error } = await supabase.auth.getUser();
   
-  // 로그인이 안 되어 있으면 메인으로 쫓아냄
   if (error || !user) {
     redirect('/');
   }
 
-  // 3. 데이터 가져오기
   const { data: myExperiences } = await supabase
     .from('experiences')
     .select(`
@@ -32,8 +30,6 @@ export default async function HostDashboard() {
       <SiteHeader />
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
-        
-        {/* 사이드바 (PC 전용) */}
         <aside className="w-64 hidden md:block shrink-0">
            <div className="sticky top-24 space-y-2">
               <div className="px-4 py-3 bg-slate-100 text-black font-bold rounded-xl flex items-center gap-3">
@@ -48,12 +44,11 @@ export default async function HostDashboard() {
            </div>
         </aside>
 
-        {/* 메인 컨텐츠 */}
         <main className="flex-1">
           <div className="flex justify-between items-end mb-8">
             <div>
               <h1 className="text-2xl md:text-3xl font-black text-slate-900">호스트 대시보드</h1>
-              <p className="text-slate-500 mt-2 text-sm md:text-base">내 체험과 예약 현황을 관리하세요.</p>
+              <p className="text-slate-500 mt-2 text-sm md:text-base">등록한 체험과 예약 현황을 한눈에 관리하세요.</p>
             </div>
             <Link href="/host/create">
               <button className="bg-slate-900 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg flex items-center gap-2 text-sm md:text-base">
