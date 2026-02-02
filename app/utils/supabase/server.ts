@@ -1,4 +1,3 @@
-// app/utils/supabase/server.ts
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
@@ -19,7 +18,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // 서버 컴포넌트에서 쿠키를 설정하려 할 때 발생하는 무해한 에러 무시
+            // 서버 컴포넌트에서 쿠키를 설정할 때 생기는 무해한 에러 무시
           }
         },
       },

@@ -2,17 +2,17 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { User, DollarSign, Clock, LayoutDashboard, Calendar, List, MessageSquare, BarChart3, Plus } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
-// ✅ 방금 만든 서버용 클라이언트 도구 가져오기
+// ✅ 방금 만든 "서버용 도구" 가져오기
 import { createClient } from '@/app/utils/supabase/server';
 
 export default async function HostDashboard() {
-  // 1. 간편해진 서버 클라이언트 생성
+  // 1. 진짜 서버용 클라이언트 생성
   const supabase = await createClient();
 
-  // 2. 로그인 체크 (이제 확실하게 동작함)
+  // 2. 로그인 체크 (이제 문지기가 검사한 도장을 확실히 확인합니다)
   const { data: { user }, error } = await supabase.auth.getUser();
   
-  // 로그인이 안 되어 있거나 에러가 나면 메인으로 보냄
+  // 로그인이 안 되어 있으면 메인으로 쫓아냄
   if (error || !user) {
     redirect('/');
   }
@@ -33,7 +33,7 @@ export default async function HostDashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
         
-        {/* 사이드바 메뉴 */}
+        {/* 사이드바 (PC 전용) */}
         <aside className="w-64 hidden md:block shrink-0">
            <div className="sticky top-24 space-y-2">
               <div className="px-4 py-3 bg-slate-100 text-black font-bold rounded-xl flex items-center gap-3">
@@ -45,12 +45,6 @@ export default async function HostDashboard() {
               <div className="px-4 py-3 text-slate-500 hover:bg-slate-50 hover:text-black rounded-xl flex items-center gap-3 cursor-pointer transition-colors">
                  <List size={20}/> 내 체험 관리
               </div>
-              <div className="px-4 py-3 text-slate-500 hover:bg-slate-50 hover:text-black rounded-xl flex items-center gap-3 cursor-pointer transition-colors">
-                 <MessageSquare size={20}/> 메시지함
-              </div>
-              <div className="px-4 py-3 text-slate-500 hover:bg-slate-50 hover:text-black rounded-xl flex items-center gap-3 cursor-pointer transition-colors">
-                 <BarChart3 size={20}/> 정산 및 통계
-              </div>
            </div>
         </aside>
 
@@ -59,7 +53,7 @@ export default async function HostDashboard() {
           <div className="flex justify-between items-end mb-8">
             <div>
               <h1 className="text-2xl md:text-3xl font-black text-slate-900">호스트 대시보드</h1>
-              <p className="text-slate-500 mt-2 text-sm md:text-base">등록한 체험과 예약 현황을 한눈에 관리하세요.</p>
+              <p className="text-slate-500 mt-2 text-sm md:text-base">내 체험과 예약 현황을 관리하세요.</p>
             </div>
             <Link href="/host/create">
               <button className="bg-slate-900 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg flex items-center gap-2 text-sm md:text-base">
