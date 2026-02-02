@@ -1,86 +1,133 @@
 'use client';
 
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Chrome, MessageCircle } from 'lucide-react';
+// 🚨 중요: 여기서 반드시 utils의 createClient를 가져와야 쿠키가 구워집니다!
 import { createClient } from '@/app/utils/supabase/client';
+import { useRouter } from 'next/navigation';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess?: () => void; // 선택적 props
+  onLoginSuccess?: () => void;
 }
 
-export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
+export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
+  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  
+  // ✅ 컴포넌트 안에서 클라이언트 생성
   const supabase = createClient();
-
-  // 소셜 로그인 (구글, 카카오 등)
-  const handleSocialLogin = async (provider: 'google' | 'kakao') => {
-    setLoading(true);
-    // ✅ 로그인 끝나면 아까 만든 '도장 찍는 곳(callback)'으로 보내라!
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) {
-      console.error(error);
-      alert('로그인에 실패했습니다.');
-      setLoading(false);
-    }
-    // 성공하면 Supabase가 알아서 리다이렉트 하므로 setLoading(false) 불필요
-  };
 
   if (!isOpen) return null;
 
+  // 🔹 이메일 로그인/회원가입
+  const handleAuth = async () => {
+    setLoading(true);
+    try {
+      if (mode === 'SIGNUP') {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('회원가입 성공! 이메일 확인 후 로그인해주세요.');
+        setMode('LOGIN');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        
+        // 로그인 성공 시
+        onClose();
+        if (onLoginSuccess) onLoginSuccess();
+        router.refresh(); // ✅ 중요: 새로고침해야 헤더가 로그인 상태를 인식함
+      }
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔹 소셜 로그인 (구글/카카오)
+  const handleSocialLogin = async (provider: 'google' | 'kakao') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        // 로그인 후 콜백 라우트를 통해 쿠키를 굽도록 설정
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    
+    if (error) alert(error.message);
+  };
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      {/* 배경 클릭시 닫힘 */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
-      
-      {/* 모달 창 */}
-      <div className="relative bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-black text-slate-900">로그인 또는 회원가입</h2>
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-              <X size={20} />
-            </button>
-          </div>
 
-          <div className="space-y-4">
-            {/* 카카오 로그인 */}
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative z-10 animate-in fade-in zoom-in duration-200">
+        {/* 헤더 */}
+        <div className="h-14 border-b border-slate-100 flex items-center justify-between px-6">
+          <span className="font-bold text-sm text-slate-500">{mode === 'LOGIN' ? '로그인' : '회원가입'}</span>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20} /></button>
+        </div>
+
+        {/* 바디 */}
+        <div className="p-8">
+          <h2 className="text-2xl font-black mb-2 text-slate-900">Locally에 오신 것을<br/>환영합니다 👋</h2>
+          <p className="text-slate-500 text-sm mb-8">현지인처럼 여행하는 가장 쉬운 방법</p>
+          
+          <div className="space-y-3 mb-8">
+            {/* 카카오 */}
             <button 
               onClick={() => handleSocialLogin('kakao')}
-              disabled={loading}
-              className="w-full bg-[#FEE500] hover:bg-[#FDD835] text-[#000000] font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02]"
+              className="w-full h-12 bg-[#FEE500] hover:bg-[#FDD835] rounded-xl flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] text-[#391B1B] font-bold"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 3C5.373 3 0 6.603 0 11.05c0 2.923 2.317 5.485 5.894 6.84-.25.923-.902 3.364-.93 3.518-.046.262.095.257.2.17.135-.112 3.194-2.158 4.453-3.03.774.113 1.576.176 2.383.176 6.627 0 12-3.603 12-8.05S18.627 3 12 3z"/>
-              </svg>
-              {loading ? '연결 중...' : '카카오로 3초 만에 시작하기'}
+              <MessageCircle size={20} fill="currentColor" className="border-none"/>
+              카카오로 3초 만에 시작하기
             </button>
 
-            {/* 구글 로그인 */}
+            {/* 구글 */}
             <button 
               onClick={() => handleSocialLogin('google')}
-              disabled={loading}
-              className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02]"
+              className="w-full h-12 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] text-slate-700 font-bold"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-              </svg>
-              구글로 계속하기
+              <Chrome size={20}/>
+              Google로 계속하기
             </button>
           </div>
 
-          <div className="mt-8 text-center text-xs text-slate-400">
-            계속 진행하면 <span className="underline cursor-pointer">이용약관</span> 및 <span className="underline cursor-pointer">개인정보처리방침</span>에 동의하게 됩니다.
+          <div className="relative py-2 mb-6">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-slate-400 font-bold">또는 이메일로</span></div>
+          </div>
+
+          <div className="space-y-3">
+            <input 
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="이메일 주소" 
+              className="w-full h-12 pl-4 bg-slate-50 border border-transparent rounded-xl focus:bg-white focus:border-black focus:outline-none transition-all font-medium"
+            />
+            <input 
+              type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              placeholder="비밀번호" 
+              className="w-full h-12 pl-4 bg-slate-50 border border-transparent rounded-xl focus:bg-white focus:border-black focus:outline-none transition-all font-medium"
+            />
+          </div>
+
+          <button 
+            onClick={handleAuth} disabled={loading}
+            className="w-full bg-slate-900 text-white font-bold h-14 rounded-xl mt-6 hover:scale-[1.02] transition-all disabled:opacity-50 shadow-lg shadow-slate-200"
+          >
+            {loading ? '처리 중...' : (mode === 'LOGIN' ? '로그인하기' : '가입하기')}
+          </button>
+
+          <div className="mt-6 text-center text-sm">
+             <span className="text-slate-500">{mode === 'LOGIN' ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}</span>
+             <button onClick={() => setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN')} className="font-bold text-slate-900 ml-2 hover:underline decoration-2 underline-offset-4">
+               {mode === 'LOGIN' ? '회원가입' : '로그인'}
+             </button>
           </div>
         </div>
       </div>
