@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase } from 'lucide-react';
-// ✅ 헤더도 반드시 utils의 createClient 사용
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter } from 'next/navigation';
@@ -21,11 +20,10 @@ export default function SiteHeader() {
     };
     checkUser();
 
-    // 로그인 상태 변경 감지 (실시간 반영)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
-        router.refresh(); // 상태 바뀌면 페이지 새로고침 효과
+        router.refresh();
       }
     });
 
@@ -42,7 +40,6 @@ export default function SiteHeader() {
     <>
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
       
-      {/* z-index 100으로 최상위 보장 */}
       <header className="sticky top-0 z-[100] bg-white border-b border-slate-100">
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex-1 flex items-center z-[101]">
@@ -50,12 +47,13 @@ export default function SiteHeader() {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            {/* 호스트 모드 버튼 */}
-            <Link href="/host/dashboard">
-              <button className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200">
-                 <Briefcase size={18} className="md:hidden" />
-                 <span className="hidden md:inline">호스트 모드로 전환</span>
-              </button>
+            {/* ✅ 수정됨: button 태그 제거 -> Link 자체가 버튼처럼 동작하게 변경 */}
+            <Link 
+              href="/host/dashboard" 
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
+            >
+               <Briefcase size={18} className="md:hidden" />
+               <span className="hidden md:inline">호스트 모드로 전환</span>
             </Link>
 
             <button className="p-2 hover:bg-slate-50 rounded-full hidden sm:block">
@@ -71,7 +69,6 @@ export default function SiteHeader() {
                   </div>
                 </div>
                 
-                {/* 드롭다운 메뉴 (z-index 아주 높게) */}
                 <div className="absolute top-full right-0 mt-2 w-60 bg-white border border-slate-100 rounded-xl shadow-xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-[200]">
                   <div className="px-4 py-3 border-b border-slate-100 mb-1">
                     <p className="font-bold text-sm truncate">{user.user_metadata.full_name || '게스트'}</p>
