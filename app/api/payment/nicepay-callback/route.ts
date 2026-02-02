@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -14,7 +14,12 @@ export async function POST(request: Request) {
 
     // 1. 결제 성공(0000) 확인
     if (resCode === '0000') {
-      const supabase = createRouteHandlerClient({ cookies });
+      // 상단에서 가져온 createServerClient의 문법에 맞게 수정
+const supabase = createServerClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  { cookies: await cookies() } // Next.js 15/16에서는 cookies() 앞에 await를 붙여야 합니다.
+);
       
       // 현재 로그인한 유저 정보 가져오기
       const { data: { user } } = await supabase.auth.getUser();
