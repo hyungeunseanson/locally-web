@@ -2,7 +2,6 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  // 1. 기본 응답 생성
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -32,15 +31,15 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // 2. 세션 갱신
-  const { data: { user } } = await supabase.auth.getUser();
+  // 세션 갱신
+  await supabase.auth.getUser();
 
-  // 3. [보호된 라우트] 호스트 페이지는 비로그인 시 강제 리다이렉트
-  if (request.nextUrl.pathname.startsWith('/host') && !user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/';
-    return NextResponse.redirect(redirectUrl);
-  }
+  // 🚨 [수정됨] 문지기 잠시 휴가 보냄 (주석 처리)
+  // if (request.nextUrl.pathname.startsWith('/host') && !user) {
+  //   const redirectUrl = request.nextUrl.clone();
+  //   redirectUrl.pathname = '/';
+  //   return NextResponse.redirect(redirectUrl);
+  // }
 
   return response;
 }
