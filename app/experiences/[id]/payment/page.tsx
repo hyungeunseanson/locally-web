@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, CreditCard, Loader2, Calendar, Users } from 'lucide-react';
 import Script from 'next/script';
 
-export default function NicepayPaymentPage({ params }: { params: Promise<{ id: string }> }) {
+// 상단 import에 { use }는 제거해도 됩니다.
+export default function NicepayPaymentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const resolvedParams = use(params); // ✅ params 언래핑
-  const experienceId = resolvedParams.id;
+  const experienceId = params.id; // ✅ 1번 코드와 동일한 방식으로 통일
 
   const [mounted, setMounted] = useState(false);
   
