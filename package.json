@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.93.3",
     "@tosspayments/payment-widget-sdk": "^0.12.1",
     "lucide-react": "^0.563.0",
