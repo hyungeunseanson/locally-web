@@ -1,35 +1,23 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { User, DollarSign, Clock, LayoutDashboard, Calendar, List, MessageSquare, BarChart3, Plus } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
+// ✅ 방금 만든 서버용 클라이언트 도구 가져오기
+import { createClient } from '@/app/utils/supabase/server';
 
 export default async function HostDashboard() {
-  const cookieStore = await cookies();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // 1. 간편해진 서버 클라이언트 생성
+  const supabase = await createClient();
 
-  if (!supabaseUrl || !supabaseKey) {
-    return (
-      <div className="min-h-screen bg-white text-slate-900">
-        <SiteHeader />
-        <div className="flex justify-center items-center h-[60vh]">
-          <p className="text-slate-500">Vercel 환경 변수 설정이 필요합니다.</p>
-        </div>
-      </div>
-    );
+  // 2. 로그인 체크 (이제 확실하게 동작함)
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  // 로그인이 안 되어 있거나 에러가 나면 메인으로 보냄
+  if (error || !user) {
+    redirect('/');
   }
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseKey,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/');
-
+  // 3. 데이터 가져오기
   const { data: myExperiences } = await supabase
     .from('experiences')
     .select(`
@@ -45,7 +33,7 @@ export default async function HostDashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
         
-        {/* 사이드바 메뉴 (PC에서만 보임) */}
+        {/* 사이드바 메뉴 */}
         <aside className="w-64 hidden md:block shrink-0">
            <div className="sticky top-24 space-y-2">
               <div className="px-4 py-3 bg-slate-100 text-black font-bold rounded-xl flex items-center gap-3">
@@ -66,7 +54,7 @@ export default async function HostDashboard() {
            </div>
         </aside>
 
-        {/* 메인 컨텐츠 영역 */}
+        {/* 메인 컨텐츠 */}
         <main className="flex-1">
           <div className="flex justify-between items-end mb-8">
             <div>
