@@ -1,4 +1,3 @@
-// middleware.ts
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -32,7 +31,7 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // 세션 갱신 (로그인 유지의 핵심!)
+  // 세션 갱신 (매우 중요!)
   await supabase.auth.getUser();
 
   return response;
