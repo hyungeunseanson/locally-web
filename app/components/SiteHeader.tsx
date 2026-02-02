@@ -40,6 +40,7 @@ export default function SiteHeader() {
     <>
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
       
+      {/* z-index 100으로 최상위 보장 */}
       <header className="sticky top-0 z-[100] bg-white border-b border-slate-100">
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex-1 flex items-center z-[101]">
@@ -47,7 +48,7 @@ export default function SiteHeader() {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            {/* ✅ 수정됨: button 태그 제거 -> Link 자체가 버튼처럼 동작하게 변경 */}
+            {/* ✅ [수정됨] button 태그 삭제! Link가 직접 버튼 역할을 합니다. */}
             <Link 
               href="/host/dashboard" 
               className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
@@ -74,6 +75,7 @@ export default function SiteHeader() {
                     <p className="font-bold text-sm truncate">{user.user_metadata.full_name || '게스트'}</p>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
+                  {/* 모바일 메뉴에서도 호스트 대시보드 링크 추가 */}
                   <Link href="/host/dashboard" className="block md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">호스트 대시보드</Link>
                   <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">나의 여행</Link>
                   <div className="border-t border-slate-100 my-1"></div>
