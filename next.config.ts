@@ -1,14 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* 여기에 있던 eslint 관련 설정을 모두 지우세요 */
-  typescript: {
-    // 빌드 시 타입 에러를 무시하고 진행 (일단 배포를 위해)
-    ignoreBuildErrors: true,
-  },
+  // 빌드 시 ESLint 검사를 건너뛰어 에러 발생을 방지합니다.
   eslint: {
-    // 빌드 시 ESLint 에러를 무시하고 진행
     ignoreDuringBuilds: true,
+  },
+  // 빌드 시 타입 체크 에러가 있어도 배포를 진행합니다.
+  typescript: {
+    ignoreBuildErrors: true,
   },
 };
 
