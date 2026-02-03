@@ -3,13 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, Star, MapPin, Search, Globe, SlidersHorizontal, 
-  ChevronLeft, ChevronRight 
+  TentTree, ConciergeBell, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 
-// 🏙️ 도시 카테고리 (컬러 아이콘)
+// 🏙️ 도시 카테고리 (상단 탭용 - 컬러 아이콘 유지)
 const CATEGORIES = [
   { id: 'all', label: '전체', icon: '🌏' },
   { id: 'tokyo', label: '도쿄', icon: '🗼' },
@@ -74,9 +74,7 @@ export default function HomePage() {
     const fetchExperiences = async () => {
       try {
         let query = supabase.from('experiences').select('*').order('created_at', { ascending: false });
-        if (selectedCategory !== 'all') {
-           // 실제 구현 시: query = query.ilike('location', `%${CATEGORIES.find(c=>c.id===selectedCategory)?.label}%`);
-        }
+        // 실제 구현 시: if (selectedCategory !== 'all') query = query.ilike('location', ...);
         const { data, error } = await query;
         if (error) throw error;
         if (data) setExperiences(data);
@@ -97,14 +95,12 @@ export default function HomePage() {
 
   // ✨ 애니메이션 스타일
   const progress = Math.min(scrollY / 50, 1);
-  const headerHeight = 80; // SiteHeader 높이 가정
   
-  // 스크롤 시 검색바가 헤더 안으로 빨려들어가도록 조정
   const expandedSearchStyle = {
     opacity: 1 - progress * 2,
     transform: `scale(${1 - progress * 0.2}) translateY(${progress * -20}px)`,
     pointerEvents: isScrolled ? 'none' : 'auto',
-    display: progress > 0.8 ? 'none' : 'flex', // 완전히 사라지면 숨김
+    display: progress > 0.8 ? 'none' : 'flex',
   };
 
   const collapsedSearchStyle = {
@@ -134,7 +130,6 @@ export default function HomePage() {
       </div>
 
       {/* 2. Big Search Area (Scrolls away) */}
-      {/* 헤더 높이만큼 띄우고 시작 */}
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
@@ -190,18 +185,20 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 🔽 드롭다운: 여행지 */}
+            {/* 🔽 드롭다운: 여행지 (수정됨: 이모지 제거, 스르륵 애니메이션, 깔끔한 리스트) */}
             {activeSearchField === 'location' && (
-              <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
                 <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
                 <div className="grid grid-cols-1 gap-1">
                   {CATEGORIES.filter(c => c.id !== 'all').map((city) => (
                     <button 
                       key={city.id}
                       onClick={() => { setLocationInput(city.label); setActiveSearchField('date'); setSelectedCategory(city.id); }}
-                      className="flex items-center gap-4 p-3 hover:bg-slate-100 rounded-xl transition-colors text-left"
+                      className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group"
                     >
-                      <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-2xl">{city.icon}</div>
+                      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all">
+                        <MapPin size={20} />
+                      </div>
                       <span className="font-bold text-slate-700">{city.label}</span>
                     </button>
                   ))}
@@ -209,9 +206,9 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* 📅 드롭다운: 달력 */}
+            {/* 📅 드롭다운: 달력 (스르륵 애니메이션 적용) */}
             {activeSearchField === 'date' && (
-              <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
                 <DatePicker 
                   selectedRange={dateRange} 
                   onChange={(range) => {
@@ -226,8 +223,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 3. Category Filter (스크롤 시 사라지지 않음 -> 사용자가 원한건 스크롤 따라오지 않게 = Static) */}
-      {/* Sticky 제거하여 자연스럽게 올라가도록 함 */}
+      {/* 3. Category Filter (도시 목록) */}
       {activeTab === 'experience' && (
         <div className="bg-white pb-6 pt-2 border-b border-slate-100">
           <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex justify-center">
@@ -275,7 +271,7 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Footer */}
+      {/* Footer (복구됨) */}
       <footer className="border-t border-slate-100 bg-slate-50 mt-20">
         <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
@@ -286,7 +282,23 @@ export default function HomePage() {
                 <li><Link href="/admin/dashboard" className="hover:underline font-bold text-slate-800">관리자 페이지</Link></li>
               </ul>
             </div>
-            {/* ... 나머지 푸터 내용 ... */}
+            <div>
+              <h5 className="font-bold text-black mb-4">호스팅</h5>
+              <ul className="space-y-3">
+                <li><Link href="/host/register" className="hover:underline">호스트 되기</Link></li>
+                <li><Link href="#" className="hover:underline">호스트 추천하기</Link></li>
+                <li><Link href="#" className="hover:underline">책임 보험</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h5 className="font-bold text-black mb-4">지원</h5>
+              <ul className="space-y-3">
+                <li><Link href="#" className="hover:underline">도움말 센터</Link></li>
+                <li><Link href="#" className="hover:underline">안전 센터</Link></li>
+                <li><Link href="#" className="hover:underline">예약 취소 옵션</Link></li>
+                <li><Link href="#" className="hover:underline">장애인 지원</Link></li>
+              </ul>
+            </div>
             <div>
                <div className="flex gap-4 font-bold text-slate-900 mb-6">
                  <button className="flex items-center gap-1 hover:underline"><Globe size={16}/> 한국어 (KR)</button>
@@ -301,7 +313,7 @@ export default function HomePage() {
   );
 }
 
-// 🗓️ 커스텀 달력 컴포넌트 (심플 구현)
+// 🗓️ 커스텀 달력 컴포넌트
 function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange: (range: any) => void }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -312,10 +324,8 @@ function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange:
     const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
-      // 시작일 선택 (새로운 범위 시작)
       onChange({ start: clickedDate, end: null });
     } else {
-      // 종료일 선택
       if (clickedDate < selectedRange.start) {
         onChange({ start: clickedDate, end: selectedRange.start });
       } else {
