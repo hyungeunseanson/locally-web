@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, LayoutDashboard, MapPin, Trash2, Search,
-  CheckCircle2, BarChart3, ChevronRight, Mail, Phone, Calendar
+  CheckCircle2, BarChart3, ChevronRight, Mail, Phone, Calendar, DollarSign
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 
@@ -19,33 +19,37 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState({ users: 0, experiences: 0, bookings: 0 });
   const supabase = createClient();
 
+  // 데이터 로딩
   const fetchData = async () => {
-    // 통계
+    // 1. 통계
     const { count: uCount } = await supabase.from('host_applications').select('*', { count: 'exact', head: true });
     const { count: eCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true });
     const { count: bCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
     setStats({ users: uCount || 0, experiences: eCount || 0, bookings: bCount || 0 });
 
-    // 지원서 (모든 필드 포함)
+    // 2. 지원서 (최신순)
     const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
     if (appData) setApps(appData);
 
-    // 체험 (호스트 정보 포함)
+    // 3. 체험 (❗수정됨: host 정보 join 제거하여 에러 방지)
     const { data: expData } = await supabase
       .from('experiences')
-      .select('*, host:host_id(*)') // 호스트 유저 정보 JOIN
+      .select('*') 
       .order('created_at', { ascending: false });
+      
     if (expData) setExps(expData);
   };
 
   useEffect(() => { fetchData(); }, []);
 
+  // 승인/거절 로직
   const handleAppStatus = async (id: string, status: 'approved' | 'rejected') => {
     if (!confirm(`${status === 'approved' ? '승인' : '거절'} 하시겠습니까?`)) return;
     await supabase.from('host_applications').update({ status }).eq('id', id);
     fetchData(); setSelectedApp(null);
   };
 
+  // 체험 삭제 로직
   const handleDeleteExp = async (id: number) => {
     if (!confirm("이 체험을 삭제하시겠습니까? (복구 불가)")) return;
     await supabase.from('experiences').delete().eq('id', id);
@@ -111,10 +115,15 @@ export default function AdminDashboardPage() {
                 exps.map(exp => (
                   <div key={exp.id} onClick={() => setSelectedExp(exp)} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${selectedExp?.id === exp.id ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100'}`}>
                     <div className="flex gap-3">
-                       <img src={exp.image_url} className="w-12 h-12 rounded-lg object-cover bg-slate-200"/>
+                       {/* 이미지 없을 때 대비 */}
+                       {exp.image_url ? (
+                         <img src={exp.image_url} className="w-12 h-12 rounded-lg object-cover bg-slate-200"/>
+                       ) : (
+                         <div className="w-12 h-12 rounded-lg bg-slate-200 flex items-center justify-center text-xs">No Img</div>
+                       )}
                        <div>
                          <div className="font-bold line-clamp-1">{exp.title}</div>
-                         <div className="text-xs text-slate-500">₩{exp.price.toLocaleString()}</div>
+                         <div className="text-xs text-slate-500">₩{Number(exp.price).toLocaleString()}</div>
                        </div>
                     </div>
                   </div>
@@ -123,7 +132,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* 2. 상세 보기 영역 (스크롤 가능) */}
+          {/* 2. 상세 보기 영역 */}
           <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col relative shadow-lg">
             
             {/* A. 지원서 상세 */}
@@ -175,27 +184,18 @@ export default function AdminDashboardPage() {
             {activeTab === 'EXPS' && selectedExp && (
               <div className="flex-1 overflow-y-auto p-8 space-y-8">
                 <div className="aspect-video bg-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                  <img src={selectedExp.image_url} className="w-full h-full object-cover"/>
+                  {selectedExp.image_url ? (
+                    <img src={selectedExp.image_url} className="w-full h-full object-cover"/>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">이미지 없음</div>
+                  )}
                 </div>
                 
                 <div className="border-b pb-6">
                   <h2 className="text-2xl font-black mb-2">{selectedExp.title}</h2>
                   <div className="flex gap-4 text-sm text-slate-500">
                     <span className="flex items-center gap-1"><MapPin size={14}/> {selectedExp.location}</span>
-                    <span className="flex items-center gap-1 font-bold">₩{selectedExp.price.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="font-bold">호스트 정보</h3>
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
-                    <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden">
-                       <img src={selectedExp.host?.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"} className="w-full h-full object-cover"/>
-                    </div>
-                    <div>
-                        <div className="font-bold text-sm">{selectedExp.host?.user_metadata?.full_name || 'Host'}</div>
-                        <div className="text-xs text-slate-500">{selectedExp.host?.email}</div>
-                    </div>
+                    <span className="flex items-center gap-1 font-bold">₩{Number(selectedExp.price).toLocaleString()}</span>
                   </div>
                 </div>
 
