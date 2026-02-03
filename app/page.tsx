@@ -12,7 +12,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 // 카테고리 데이터
 const CATEGORIES = [
   { id: 'all', label: '전체', icon: '🌍' },
-  { id: 'culture', label: '문화/예술', icon: '🎨' },
+  { id: 'culture', label: '도쿄', icon: '🗼' },
   { id: 'food', label: '음식/투어', icon: '🍳' },
   { id: 'nature', label: '자연/야외', icon: '🌲' },
   { id: 'night', label: '나이트라이프', icon: '🍸' },
