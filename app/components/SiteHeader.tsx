@@ -6,13 +6,12 @@ import { Menu, Globe, User, LogOut, Briefcase, ArrowRightLeft, Check } from 'luc
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
-import { useLanguage } from '@/app/context/LanguageContext'; // ✅ 번역 사용
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
-  const [isPending, setIsPending] = useState(false); // 승인 대기 상태
   
   // 🌍 언어
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -26,6 +25,7 @@ export default function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
 
+  // 초기 상태 체크
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -37,20 +37,20 @@ export default function SiteHeader() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (session?.user) checkHostStatus(session.user.id);
-      else { setIsHost(false); setIsPending(false); }
     });
 
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  // ✅ 호스트 상태 확인 (핵심 로직)
+  // 호스트 여부 확인
   const checkHostStatus = async (userId: string) => {
-    // 1. 신청서 상태 확인
+    // 1. 신청서 승인 확인
     const { data: app } = await supabase
       .from('host_applications')
       .select('status')
       .eq('user_id', userId)
-      .maybeSingle(); // 한 건만 조회
+      .eq('status', 'approved')
+      .maybeSingle();
     
     // 2. 체험 등록 여부 확인
     const { count } = await supabase
@@ -58,15 +58,8 @@ export default function SiteHeader() {
       .select('*', { count: 'exact', head: true })
       .eq('host_id', userId);
 
-    if (app?.status === 'approved' || (count && count > 0)) {
+    if (app || (count && count > 0)) {
       setIsHost(true);
-      setIsPending(false);
-    } else if (app?.status === 'pending') {
-      setIsHost(false);
-      setIsPending(true); // "승인 대기중" 표시용
-    } else {
-      setIsHost(false);
-      setIsPending(false);
     }
   };
 
@@ -76,33 +69,45 @@ export default function SiteHeader() {
     window.location.reload();
   };
 
+  // ✅ 버튼 클릭 로직 (단순화: 일단 이동 시도)
   const handleModeSwitch = async () => {
+    // 1. 이미 호스트 페이지면 -> 메인으로
     if (pathname?.startsWith('/host')) {
       router.push('/');
       return;
     }
+    // 2. 로그인 안 했으면 -> 로그인 모달
     if (!user) {
       setIsLoginModalOpen(true);
       return;
     }
-    await checkHostStatus(user.id); // 최신 상태 갱신
 
-    if (isPending) {
-      alert("현재 호스트 승인 대기 중입니다. 관리자 승인을 기다려주세요.");
+    // 3. 호스트인지 다시 한 번 체크 (클릭 순간 최신 상태 반영)
+    let currentIsHost = isHost;
+    if (!currentIsHost) {
+        // DB 한번 더 찔러보기
+        const { data: app } = await supabase
+          .from('host_applications')
+          .select('status')
+          .eq('user_id', user.id)
+          .eq('status', 'approved')
+          .maybeSingle();
+        if (app) currentIsHost = true;
+    }
+
+    // 4. 호스트가 아니면 -> 등록 페이지
+    if (!currentIsHost) {
+      router.push('/host/register');
       return;
     }
 
-    if (!isHost) {
-      router.push('/host/register'); // 신청서로 이동
-      return;
-    }
-    router.push('/host/dashboard'); // 대시보드로 이동
+    // 5. 호스트면 -> 대시보드
+    router.push('/host/dashboard');
   };
 
   const getButtonLabel = () => {
     if (pathname?.startsWith('/host')) return t('guest_mode');
     if (!user) return t('become_host');
-    if (isPending) return t('host_pending'); // "승인 대기중"
     if (!isHost) return t('become_host');
     return t('host_mode');
   };
@@ -119,18 +124,16 @@ export default function SiteHeader() {
 
           <div className="flex items-center justify-end gap-2 z-[101]">
             
-            {/* 1. 호스트 버튼 */}
+            {/* ✅ 버튼: disabled 속성 제거하여 무조건 눌리게 함 */}
             <button 
               onClick={handleModeSwitch}
-              className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition-colors border cursor-pointer ${
-                isPending ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'hover:bg-slate-50 text-slate-900 border-transparent hover:border-slate-200'
-              }`}
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
             >
                {pathname?.startsWith('/host') ? <ArrowRightLeft size={18} className="md:hidden"/> : <Briefcase size={18} className="md:hidden" />}
                <span className="hidden md:inline">{getButtonLabel()}</span>
             </button>
 
-            {/* 2. 🌍 언어 선택 버튼 */}
+            {/* 언어 선택 */}
             <div className="relative hidden sm:block">
               <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
                 <Globe size={18} />
@@ -146,7 +149,7 @@ export default function SiteHeader() {
               )}
             </div>
 
-            {/* 3. 유저 메뉴 */}
+            {/* 유저 메뉴 */}
             {user ? (
               <div className="relative group">
                 <div className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white">
@@ -160,7 +163,10 @@ export default function SiteHeader() {
                     <p className="font-bold text-sm truncate">{user.user_metadata.full_name || 'User'}</p>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
-                  <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">{getButtonLabel()}</button>
+                  {/* 모바일용 메뉴 추가 */}
+                  <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">
+                    {getButtonLabel()}
+                  </button>
                   <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">{t('my_trips')}</Link>
                   <div className="border-t border-slate-100 my-1"></div>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-red-500 font-semibold flex gap-2"><LogOut size={14}/> {t('logout')}</button>
