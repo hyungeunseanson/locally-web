@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // ✅ 라우터 가져오기
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const supabase = createClient();
-  const router = useRouter();
+  const router = useRouter(); // ✅ 라우터 사용
 
   useEffect(() => {
     const checkUser = async () => {
@@ -36,11 +36,15 @@ export default function SiteHeader() {
     window.location.reload();
   };
 
+  // ✅ [핵심] 호스트 모드 이동 함수 (진짜 버튼용)
+  const handleHostMode = () => {
+    router.push('/host/dashboard');
+  };
+
   return (
     <>
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
       
-      {/* z-index 100으로 최상위 보장 */}
       <header className="sticky top-0 z-[100] bg-white border-b border-slate-100">
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex-1 flex items-center z-[101]">
@@ -48,14 +52,15 @@ export default function SiteHeader() {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            {/* ✅ [수정됨] button 태그 삭제! Link가 직접 버튼 역할을 합니다. */}
-            <Link 
-              href="/host/dashboard" 
+            
+            {/* ✅ [수정완료] Link 태그 제거! 순수 button + onClick 사용 */}
+            <button 
+              onClick={handleHostMode}
               className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
             >
                <Briefcase size={18} className="md:hidden" />
                <span className="hidden md:inline">호스트 모드로 전환</span>
-            </Link>
+            </button>
 
             <button className="p-2 hover:bg-slate-50 rounded-full hidden sm:block">
               <Globe size={18} />
@@ -75,8 +80,10 @@ export default function SiteHeader() {
                     <p className="font-bold text-sm truncate">{user.user_metadata.full_name || '게스트'}</p>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
-                  {/* 모바일 메뉴에서도 호스트 대시보드 링크 추가 */}
-                  <Link href="/host/dashboard" className="block md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">호스트 대시보드</Link>
+                  {/* 모바일 메뉴용 호스트 버튼도 수정 */}
+                  <button onClick={handleHostMode} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">
+                    호스트 대시보드
+                  </button>
                   <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">나의 여행</Link>
                   <div className="border-t border-slate-100 my-1"></div>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-red-500 font-semibold flex items-center gap-2"><LogOut size={14}/> 로그아웃</button>
