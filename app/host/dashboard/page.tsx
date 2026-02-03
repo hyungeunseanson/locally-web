@@ -1,119 +1,115 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { User, DollarSign, Clock, LayoutDashboard, Calendar, List, MessageSquare, BarChart3, Plus } from 'lucide-react';
+import { LayoutDashboard, Calendar, List, MessageSquare, BarChart3, Plus, Edit, Settings } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
-// ✅ 서버용 도구 사용 (없으면 client 버전을 쓰면 안됨!)
-import { createClient } from '@/app/utils/supabase/server';
+import { createClient } from '@/app/utils/supabase/client';
+import { useRouter } from 'next/navigation';
 
-// ✅ [핵심] 캐싱 끄기: 로그인 상태 실시간 확인
-export const dynamic = 'force-dynamic';
+export default function HostDashboard() {
+  const supabase = createClient();
+  const router = useRouter();
+  const [experiences, setExperiences] = useState<any[]>([]);
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('experiences'); // experiences | inquiries
 
-export default async function HostDashboard() {
-  const supabase = await createClient();
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/'); return; }
 
-  // 1. 로그인 체크
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  // 2. 로그인 안 했으면 -> 메인으로 쫓아냄
-  if (!user) {
-    redirect('/');
-  }
+      // 내 체험 가져오기
+      const { data: expData } = await supabase
+        .from('experiences')
+        .select('*, bookings(count)')
+        .eq('host_id', user.id)
+        .order('created_at', { ascending: false });
+      if (expData) setExperiences(expData);
 
-  // 3. 데이터 로딩
-  const { data: myExperiences } = await supabase
-    .from('experiences')
-    .select(`
-      id, title, price, image_url,
-      bookings ( id, user_id, amount, status, created_at )
-    `)
-    .eq('host_id', user.id)
-    .order('created_at', { ascending: false });
+      // 내게 온 문의 가져오기
+      const { data: inqData } = await supabase
+        .from('inquiries')
+        .select('*, experiences(title)')
+        .eq('host_id', user.id)
+        .order('created_at', { ascending: false });
+      if (inqData) setInquiries(inqData);
+    };
+    fetchData();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
         
         {/* 사이드바 */}
         <aside className="w-64 hidden md:block shrink-0">
            <div className="sticky top-24 space-y-2">
-              <div className="px-4 py-3 bg-slate-100 text-black font-bold rounded-xl flex items-center gap-3">
-                 <LayoutDashboard size={20}/> 홈
-              </div>
-              <div className="px-4 py-3 text-slate-500 hover:bg-slate-50 hover:text-black rounded-xl flex items-center gap-3 cursor-pointer transition-colors">
-                 <Calendar size={20}/> 달력
-              </div>
-              <div className="px-4 py-3 text-slate-500 hover:bg-slate-50 hover:text-black rounded-xl flex items-center gap-3 cursor-pointer transition-colors">
+              <button onClick={() => setActiveTab('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>
                  <List size={20}/> 내 체험 관리
-              </div>
+              </button>
+              <button onClick={() => setActiveTab('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}>
+                 <MessageSquare size={20}/> 문의함 ({inquiries.length})
+              </button>
            </div>
         </aside>
 
         {/* 메인 */}
         <main className="flex-1">
           <div className="flex justify-between items-end mb-8">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900">호스트 대시보드</h1>
-              <p className="text-slate-500 mt-2 text-sm md:text-base">등록한 체험과 예약 현황을 한눈에 관리하세요.</p>
-            </div>
-            <Link href="/host/create">
-              <button className="bg-slate-900 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg flex items-center gap-2 text-sm md:text-base">
-                <Plus size={18} /> <span className="hidden md:inline">새 체험 등록</span><span className="md:hidden">등록</span>
-              </button>
-            </Link>
-          </div>
-          {/* 리스트 영역 */}
-           <div className="grid gap-6">
-            {(!myExperiences || myExperiences.length === 0) ? (
-              <div className="text-center py-24 bg-slate-50 rounded-3xl border border-slate-100">
-                <p className="text-slate-500 mb-6">아직 등록한 체험이 없습니다.</p>
-                <Link href="/host/create">
-                  <button className="text-slate-900 font-bold underline underline-offset-4 hover:text-blue-600">
-                    첫 번째 체험을 등록해보세요!
-                  </button>
-                </Link>
-              </div>
-            ) : (
-              myExperiences.map((exp) => (
-                <div key={exp.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                  <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
-                    <h2 className="font-bold text-lg flex items-center gap-2 text-slate-900 truncate">
-                      🏷️ {exp.title}
-                    </h2>
-                    <span className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shrink-0">
-                      예약 {exp.bookings.length}건
-                    </span>
-                  </div>
-                  
-                  <div className="p-0">
-                    {exp.bookings.length === 0 ? (
-                      <div className="p-12 text-center text-slate-400 text-sm">
-                        아직 들어온 예약이 없습니다.
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-slate-100">
-                        {exp.bookings.map((booking: any) => (
-                          <div key={booking.id} className="p-6 flex flex-col md:flex-row justify-between items-center hover:bg-slate-50 transition-colors">
-                             <div className="flex gap-4 items-center w-full">
-                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 shrink-0"><User size={18}/></div>
-                                <div>
-                                  <div className="font-bold text-slate-900 text-sm">게스트 ({booking.user_id.slice(0,4)}..)</div>
-                                  <div className="text-xs text-slate-500 mt-1 flex gap-2 items-center">
-                                    <span className="flex items-center gap-1"><Clock size={10}/> {new Date(booking.created_at).toLocaleDateString()}</span>
-                                    <span className="font-bold flex items-center gap-1"><DollarSign size={10}/> ₩{booking.amount.toLocaleString()}</span>
-                                  </div>
-                                </div>
-                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
+            <h1 className="text-3xl font-black">{activeTab === 'experiences' ? '내 체험 관리' : '도착한 문의'}</h1>
+            {activeTab === 'experiences' && (
+              <Link href="/host/create">
+                <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2">
+                  <Plus size={18} /> 새 체험 등록
+                </button>
+              </Link>
             )}
           </div>
+
+          {activeTab === 'experiences' ? (
+            <div className="grid gap-6">
+              {experiences.map((exp) => (
+                <div key={exp.id} className="bg-white border rounded-2xl p-6 flex justify-between items-center shadow-sm">
+                  <div className="flex gap-4 items-center">
+                    <img src={exp.image_url} className="w-16 h-16 rounded-lg object-cover bg-slate-100" />
+                    <div>
+                      <h2 className="font-bold text-lg">{exp.title}</h2>
+                      <p className="text-sm text-slate-500">₩{exp.price.toLocaleString()} · 예약 {exp.bookings[0].count}건</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/host/experiences/${exp.id}/dates`}>
+                      <button className="px-4 py-2 border rounded-lg text-sm font-bold hover:bg-slate-50 flex items-center gap-2">
+                        <Calendar size={16}/> 일정 관리
+                      </button>
+                    </Link>
+                    <Link href={`/host/experiences/${exp.id}/edit`}>
+                      <button className="px-4 py-2 border rounded-lg text-sm font-bold hover:bg-slate-50 flex items-center gap-2">
+                        <Edit size={16}/> 수정
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {inquiries.length === 0 ? <p className="text-slate-400">아직 문의가 없습니다.</p> : inquiries.map((inq) => (
+                <div key={inq.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-xs font-bold text-blue-600">[{inq.experiences?.title}] 문의</span>
+                    <span className="text-xs text-slate-400">{new Date(inq.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <p className="font-medium text-slate-800 mb-4">"{inq.content}"</p>
+                  <button className="text-sm font-bold underline text-slate-500" onClick={()=> alert('답장 기능은 이메일 연동 후 제공됩니다. (현재 준비중)')}>
+                    이메일로 답장하기
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </main>
       </div>
     </div>
