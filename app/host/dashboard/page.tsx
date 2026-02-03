@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Calendar, List, MessageSquare, BarChart3, Plus, Edit, Settings } from 'lucide-react';
+import { List, MessageSquare, Plus, Calendar, Edit, Send } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -12,31 +12,51 @@ export default function HostDashboard() {
   const router = useRouter();
   const [experiences, setExperiences] = useState<any[]>([]);
   const [inquiries, setInquiries] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState('experiences'); // experiences | inquiries
+  const [activeTab, setActiveTab] = useState('experiences');
+  const [user, setUser] = useState<any>(null);
+
+  // 채팅 관련 상태
+  const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [replyText, setReplyText] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
+      setUser(user);
 
-      // 내 체험 가져오기
-      const { data: expData } = await supabase
-        .from('experiences')
-        .select('*, bookings(count)')
-        .eq('host_id', user.id)
-        .order('created_at', { ascending: false });
+      // 내 체험
+      const { data: expData } = await supabase.from('experiences').select('*, bookings(count)').eq('host_id', user.id).order('created_at', { ascending: false });
       if (expData) setExperiences(expData);
 
-      // 내게 온 문의 가져오기
-      const { data: inqData } = await supabase
-        .from('inquiries')
-        .select('*, experiences(title)')
-        .eq('host_id', user.id)
-        .order('created_at', { ascending: false });
+      // 문의 내역
+      const { data: inqData } = await supabase.from('inquiries').select('*, experiences(title), sender:user_id(email)').eq('host_id', user.id).order('created_at', { ascending: false });
       if (inqData) setInquiries(inqData);
     };
     fetchData();
   }, []);
+
+  // 채팅 불러오기
+  const loadChat = async (inq: any) => {
+    setSelectedInquiry(inq);
+    const { data } = await supabase.from('inquiry_messages').select('*').eq('inquiry_id', inq.id).order('created_at', { ascending: true });
+    setChatMessages(data || []);
+  };
+
+  // 답장 보내기
+  const handleSendReply = async () => {
+    if (!replyText.trim()) return;
+    const { error } = await supabase.from('inquiry_messages').insert([{
+      inquiry_id: selectedInquiry.id,
+      sender_id: user.id,
+      content: replyText
+    }]);
+    if (!error) {
+      setReplyText('');
+      loadChat(selectedInquiry); // 채팅 새로고침
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -58,56 +78,93 @@ export default function HostDashboard() {
         {/* 메인 */}
         <main className="flex-1">
           <div className="flex justify-between items-end mb-8">
-            <h1 className="text-3xl font-black">{activeTab === 'experiences' ? '내 체험 관리' : '도착한 문의'}</h1>
+            <h1 className="text-3xl font-black">{activeTab === 'experiences' ? '내 체험 관리' : '문의 메시지'}</h1>
             {activeTab === 'experiences' && (
               <Link href="/host/create">
-                <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2">
-                  <Plus size={18} /> 새 체험 등록
-                </button>
+                <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform"><Plus size={18} /> 새 체험 등록</button>
               </Link>
             )}
           </div>
 
           {activeTab === 'experiences' ? (
             <div className="grid gap-6">
+              {experiences.length === 0 && <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">등록된 체험이 없습니다.</div>}
               {experiences.map((exp) => (
-                <div key={exp.id} className="bg-white border rounded-2xl p-6 flex justify-between items-center shadow-sm">
+                <div key={exp.id} className="bg-white border rounded-2xl p-6 flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex gap-4 items-center">
                     <img src={exp.image_url} className="w-16 h-16 rounded-lg object-cover bg-slate-100" />
                     <div>
                       <h2 className="font-bold text-lg">{exp.title}</h2>
-                      <p className="text-sm text-slate-500">₩{exp.price.toLocaleString()} · 예약 {exp.bookings[0].count}건</p>
+                      <p className="text-sm text-slate-500">₩{Number(exp.price).toLocaleString()} · 예약 {exp.bookings[0].count}건</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Link href={`/host/experiences/${exp.id}/dates`}>
-                      <button className="px-4 py-2 border rounded-lg text-sm font-bold hover:bg-slate-50 flex items-center gap-2">
-                        <Calendar size={16}/> 일정 관리
-                      </button>
-                    </Link>
-                    <Link href={`/host/experiences/${exp.id}/edit`}>
-                      <button className="px-4 py-2 border rounded-lg text-sm font-bold hover:bg-slate-50 flex items-center gap-2">
-                        <Edit size={16}/> 수정
-                      </button>
-                    </Link>
+                    <Link href={`/host/experiences/${exp.id}/dates`}><button className="px-4 py-2 border rounded-lg text-sm font-bold hover:bg-slate-50 flex items-center gap-2"><Calendar size={16}/> 일정</button></Link>
+                    <Link href={`/host/experiences/${exp.id}/edit`}><button className="px-4 py-2 border rounded-lg text-sm font-bold hover:bg-slate-50 flex items-center gap-2"><Edit size={16}/> 수정</button></Link>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="space-y-4">
-              {inquiries.length === 0 ? <p className="text-slate-400">아직 문의가 없습니다.</p> : inquiries.map((inq) => (
-                <div key={inq.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-xs font-bold text-blue-600">[{inq.experiences?.title}] 문의</span>
-                    <span className="text-xs text-slate-400">{new Date(inq.created_at).toLocaleDateString()}</span>
+            <div className="flex gap-6 h-[600px]">
+              {/* 왼쪽: 문의 목록 */}
+              <div className="w-1/3 border-r border-slate-200 pr-4 overflow-y-auto">
+                {inquiries.length === 0 && <p className="text-slate-400 text-sm">문의 내역이 없습니다.</p>}
+                {inquiries.map((inq) => (
+                  <div 
+                    key={inq.id} 
+                    onClick={() => loadChat(inq)}
+                    className={`p-4 rounded-xl cursor-pointer mb-2 ${selectedInquiry?.id === inq.id ? 'bg-slate-100 border-black' : 'hover:bg-slate-50'} border border-transparent`}
+                  >
+                    <div className="text-xs font-bold text-slate-500 mb-1">{inq.experiences?.title}</div>
+                    <div className="font-bold text-sm truncate">{inq.content}</div>
+                    <div className="text-xs text-slate-400 mt-2">{new Date(inq.created_at).toLocaleDateString()} · {inq.sender?.email}</div>
                   </div>
-                  <p className="font-medium text-slate-800 mb-4">"{inq.content}"</p>
-                  <button className="text-sm font-bold underline text-slate-500" onClick={()=> alert('답장 기능은 이메일 연동 후 제공됩니다. (현재 준비중)')}>
-                    이메일로 답장하기
-                  </button>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              {/* 오른쪽: 채팅창 */}
+              <div className="flex-1 flex flex-col bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+                {selectedInquiry ? (
+                  <>
+                    <div className="p-4 border-b border-slate-200 bg-white font-bold">
+                      {selectedInquiry.experiences?.title} - 문의 대화
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {/* 첫 문의 내용 */}
+                      <div className="flex justify-start">
+                        <div className="bg-white border border-slate-200 p-3 rounded-xl rounded-tl-none max-w-[80%] text-sm shadow-sm">
+                          <p className="font-bold text-xs text-slate-400 mb-1">Guest</p>
+                          {selectedInquiry.content}
+                        </div>
+                      </div>
+                      
+                      {/* 이어지는 대화 */}
+                      {chatMessages.map((msg) => (
+                        <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`p-3 rounded-xl max-w-[80%] text-sm shadow-sm ${msg.sender_id === user.id ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none'}`}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4 bg-white border-t border-slate-200 flex gap-2">
+                      <input 
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="답장을 입력하세요..."
+                        className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black"
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendReply()}
+                      />
+                      <button onClick={handleSendReply} className="bg-black text-white p-2.5 rounded-xl hover:scale-105 transition-transform">
+                        <Send size={18}/>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-slate-400">문의를 선택하세요.</div>
+                )}
+              </div>
             </div>
           )}
         </main>
