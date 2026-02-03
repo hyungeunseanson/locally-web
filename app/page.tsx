@@ -1,15 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, Menu, Globe, User, Heart, Star, 
-  MapPin, SlidersHorizontal, LogOut 
-} from 'lucide-react';
+import { Heart, Star, MapPin, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import LoginModal from './components/LoginModal';
 import { supabase } from './lib/supabase';
+// ✅ 우리가 만든 '똑똑한 헤더' 가져오기
+import SiteHeader from '@/app/components/SiteHeader';
 
-// 카테고리 (디자인 유지)
 const CATEGORIES = [
   { id: 'all', label: '전체', icon: '🌍' },
   { id: 'culture', label: '문화/예술', icon: '🎨' },
@@ -21,26 +18,11 @@ const CATEGORIES = [
 
 export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  
-  // ✅ 변경점: 가짜 데이터 삭제하고, state로 관리
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 데이터 불러오기 로직 (그대로 유지)
   useEffect(() => {
-    // 1. 유저 세션 체크
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-    };
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
-
-    // 2. ✅ 실제 DB 데이터 가져오기 (여기가 핵심!)
     const fetchExperiences = async () => {
       try {
         let query = supabase
@@ -48,7 +30,6 @@ export default function HomePage() {
           .select('*')
           .order('created_at', { ascending: false });
         
-        // 카테고리 필터 (선택 시 작동)
         if (selectedCategory !== 'all') {
           query = query.eq('category', selectedCategory);
         }
@@ -64,92 +45,15 @@ export default function HomePage() {
     };
 
     fetchExperiences();
-
-    return () => subscription.unsubscribe();
-  }, [selectedCategory]); // 카테고리 바뀔 때마다 다시 불러옴
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    alert('로그아웃 되었습니다.');
-    window.location.reload();
-  };
+  }, [selectedCategory]);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
-      <LoginModal 
-        isOpen={isLoginModalOpen} 
-        onClose={() => setIsLoginModalOpen(false)}
-        onLoginSuccess={() => setIsLoginModalOpen(false)}
-      />
+      
+      {/* ✅ [수정 완료] 옛날 헤더 삭제하고, 기능 완벽한 SiteHeader 장착! */}
+      <SiteHeader />
 
-      {/* Header (디자인 유지) */}
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-100">
-        <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
-          <Link href="/" className="flex-1 flex items-center">
-            <h1 className="text-2xl font-black tracking-tighter cursor-pointer text-slate-900">Locally</h1>
-          </Link>
-
-          <div className="flex-1 max-w-2xl hidden md:flex items-center justify-between bg-white border border-slate-300 rounded-full shadow-sm hover:shadow-md transition-shadow py-2.5 pl-6 pr-2 cursor-pointer">
-            <div className="flex divide-x divide-slate-300 w-full text-sm">
-              <button className="px-4 font-semibold text-slate-900 truncate">어디로 떠나세요?</button>
-              <button className="px-4 font-semibold text-slate-900 truncate">날짜</button>
-              <button className="px-4 text-slate-500 truncate">게스트 추가</button>
-            </div>
-            <div className="bg-black p-2.5 rounded-full text-white">
-              <Search size={16} strokeWidth={3} />
-            </div>
-          </div>
-
-          <div className="flex-1 flex items-center justify-end gap-2">
-            <Link href="/host/dashboard">
-              <button className="text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors hidden md:block text-slate-900">
-                호스트 모드로 전환
-              </button>
-            </Link>
-            <button className="p-2 hover:bg-slate-50 rounded-full">
-              <Globe size={18} />
-            </button>
-
-            {user ? (
-              <div className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 relative group">
-                <Menu size={18} className="ml-2"/>
-                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-200">
-                  <img 
-                    src={user.user_metadata.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"} 
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    alt="profile"
-                  />
-                </div>
-                <div className="absolute top-12 right-0 w-60 bg-white border border-slate-100 rounded-xl shadow-xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all">
-                  <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                    <p className="font-bold text-sm truncate">{user.user_metadata.full_name || '게스트'}</p>
-                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                  </div>
-                  <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">나의 여행</Link>
-                  <Link href="/guest/inbox" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">메시지함</Link>
-                  <div className="border-t border-slate-100 my-1"></div>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-red-500 font-semibold flex items-center gap-2">
-                    <LogOut size={14}/> 로그아웃
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div 
-                onClick={() => setIsLoginModalOpen(true)}
-                className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-3 hover:shadow-md transition-shadow cursor-pointer ml-1"
-              >
-                <Menu size={18} />
-                <div className="bg-slate-500 rounded-full p-1 text-white">
-                  <User size={18} fill="currentColor" />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Category Filter (디자인 유지) */}
+      {/* 2. Category Filter */}
       <div className="bg-white pt-6 pb-4 sticky top-20 z-40 shadow-sm md:shadow-none">
         <div className="max-w-[1760px] mx-auto px-6 flex items-center gap-8 overflow-x-auto no-scrollbar">
           {CATEGORIES.map((cat) => (
@@ -172,7 +76,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Main Content (실제 데이터 렌더링) */}
+      {/* 3. Main Content */}
       <main className="max-w-[1760px] mx-auto px-6 py-8">
         {loading ? (
           <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-black"></div></div>
@@ -219,7 +123,7 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Footer (디자인 유지) */}
+      {/* Footer */}
       <footer className="border-t border-slate-100 bg-slate-50 mt-20 py-10 px-6">
         <div className="max-w-[1760px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-500">
           <div className="flex gap-4">
