@@ -337,4 +337,4 @@ function ServiceCard({ item }: any) {
       <div className="mt-1 font-bold text-slate-900 px-1">₩{item.price.toLocaleString()}부터</div>
     </div>
   )
-}
+} //ㅇㅇ//
