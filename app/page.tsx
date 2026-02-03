@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, Star, MapPin, Search, Globe, SlidersHorizontal, 
-  ChevronLeft, ChevronRight, Tent, ConciergeBell 
+  TentTree, ConciergeBell, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
@@ -48,12 +48,14 @@ export default function HomePage() {
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
-      if (window.scrollY > 20) setActiveSearchField(null); // 스크롤 시 드롭다운 닫기
+      // 스크롤이 발생하면 열려있던 드롭다운 닫기
+      if (window.scrollY > 10) setActiveSearchField(null);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -64,13 +66,12 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // 데이터 로딩
   useEffect(() => {
     const fetchExperiences = async () => {
       try {
         let query = supabase.from('experiences').select('*').order('created_at', { ascending: false });
-        if (selectedCategory !== 'all') {
-           // 실제 구현 시 필터링 로직 추가
-        }
+        // 실제 구현 시 필터 로직 추가
         const { data, error } = await query;
         if (error) throw error;
         if (data) setExperiences(data);
@@ -86,87 +87,83 @@ export default function HomePage() {
     return '';
   };
 
-  // ✨ 애니메이션 계산 (0 ~ 1)
-  // 60px 스크롤하면 큰 검색바가 완전히 사라지고 작은 검색바가 나타남
-  const progress = Math.min(scrollY / 60, 1);
+  // ✨ 애니메이션 변수 계산 (0 ~ 1)
+  // 스크롤 0~50px 구간에서 애니메이션 진행
+  const progress = Math.min(scrollY / 50, 1);
   
-  // 큰 검색바 영역 높이 (100px -> 0px)
-  const bigSearchHeight = 100 * (1 - progress); 
-  
-  // 작은 검색바 스타일 (헤더 중앙에 위치)
+  // 1. 헤더 (고정)
+  // 2. 작은 검색바 (헤더 내부): 처음엔 안 보이다가 스크롤 내리면 등장
   const smallSearchStyle = {
-    opacity: progress < 0.5 ? 0 : (progress - 0.5) * 2, // 늦게 나타남
-    transform: `translate(-50%, -50%) scale(${0.8 + progress * 0.2})`, // 커지면서 등장
-    pointerEvents: progress > 0.8 ? 'auto' : 'none',
+    opacity: progress, // 0 -> 1
+    transform: `scale(${0.8 + (progress * 0.2)}) translateY(${20 * (1 - progress)}px)`, // 아래에서 위로 올라오며 커짐
+    pointerEvents: progress > 0.9 ? 'auto' : 'none', // 완전히 나타나야 클릭 가능
+    display: progress === 0 ? 'none' : 'flex',
   };
 
-  // 큰 검색바 스타일
-  const bigSearchStyle = {
-    opacity: 1 - progress * 1.5, // 빨리 사라짐
-    transform: `scale(${1 - progress * 0.1}) translateY(${progress * -10}px)`,
-    pointerEvents: progress > 0.5 ? 'none' : 'auto',
+  // 3. 큰 검색바 & 탭 (본문 상단): 스크롤 내리면 흐려지고 사라짐
+  const bigSearchContainerStyle = {
+    opacity: 1 - progress, // 1 -> 0
+    transform: `scale(${1 - (progress * 0.1)}) translateY(-${progress * 20}px)`, // 위로 올라가며 작아짐
+    pointerEvents: progress > 0.1 ? 'none' : 'auto', // 조금이라도 스크롤되면 클릭 방지
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
       
-      {/* ✅ Sticky Header Wrapper 
-        헤더와 검색바를 하나의 sticky 컨테이너로 묶어서 
-        스크롤 시 띠 현상 없이 자연스럽게 따라오게 만듦 
-      */}
-      <div className="sticky top-0 z-50 bg-white border-b border-slate-100 transition-shadow" 
-           style={{ boxShadow: progress > 0.8 ? '0 4px 20px rgba(0,0,0,0.05)' : 'none' }}>
-        
-        {/* 1. Logo & Profile Header (높이 80px 고정) */}
-        <div className="h-20 relative z-20 bg-white">
+      {/* 🟢 [1] Fixed Header (항상 상단 고정) */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white h-20 transition-all border-b border-slate-100 shadow-sm">
+        <div className="relative h-full max-w-[1760px] mx-auto">
           <SiteHeader />
           
-          {/* 🔍 축소된 검색바 (헤더 정중앙에 위치, 스크롤 내리면 등장) */}
-          <div 
-            className="absolute top-1/2 left-1/2 flex items-center bg-white border border-slate-300 rounded-full shadow-sm hover:shadow-md transition-all h-12 px-2 cursor-pointer"
-            style={smallSearchStyle as any}
-            onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setActiveSearchField('location'); }}
-          >
-            <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">어디든지</div>
-            <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">언제든지</div>
-            <div className="px-4 text-sm font-bold text-slate-500">검색</div>
-            <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
-              <Search size={14} strokeWidth={3}/>
-            </button>
+          {/* 🔍 축소된 검색바 (헤더 중앙에 절대 위치) */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div 
+              className="flex items-center bg-white border border-slate-300 rounded-full shadow-sm hover:shadow-md transition-all h-12 px-2 cursor-pointer"
+              style={smallSearchStyle as any}
+              onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setActiveSearchField('location'); }}
+            >
+              <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">어디든지</div>
+              <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">언제든지</div>
+              <div className="px-4 text-sm font-bold text-slate-500">검색</div>
+              <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
+                <Search size={14} strokeWidth={3}/>
+              </button>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* 2. Big Search Area (스크롤 내리면 높이가 줄어들며 사라짐) */}
-        <div className="relative z-10 bg-white overflow-hidden origin-top" style={{ height: `${bigSearchHeight}px` }}>
-          <div className="flex flex-col items-center w-full absolute top-0" style={bigSearchStyle as any}>
+      {/* 🟢 [2] Main Layout with Padding for Header */}
+      <div className="pt-24"> {/* 헤더 높이만큼 띄움 */}
+        
+        {/* 🅰️ Big Search & Tabs Area (스크롤하면 사라짐) */}
+        {/* height를 고정하지 않고 padding으로 자연스럽게 공간 차지 */}
+        <div className="px-6 pb-6 relative z-40" style={{ marginBottom: `-${progress * 100}px` }}> {/* 스크롤 시 공간 축소 효과 */}
+          <div className="flex flex-col items-center origin-top" style={bigSearchContainerStyle as any} ref={searchRef}>
             
-            {/* 탭 (🎈체험 | 🛎️서비스) - 컬러풀한 아이콘 적용 */}
-            <div className="flex gap-8 mb-4">
+            {/* 탭 */}
+            <div className="flex gap-8 mb-6">
               <button 
                 onClick={() => setActiveTab('experience')} 
                 className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'experience' ? 'border-black text-black' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
               >
-                <div className={`p-1.5 rounded-full ${activeTab === 'experience' ? 'bg-slate-100' : ''}`}>
-                  <Tent className={activeTab === 'experience' ? 'text-[#FF385C] fill-[#FF385C]' : 'text-slate-500'} size={20} />
-                </div>
+                <TentTree size={20} className={activeTab === 'experience' ? 'text-[#FF385C]' : 'text-slate-500'} />
                 체험
               </button>
               <button 
                 onClick={() => setActiveTab('service')} 
                 className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'service' ? 'border-black text-black' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
               >
-                <div className={`p-1.5 rounded-full ${activeTab === 'service' ? 'bg-slate-100' : ''}`}>
-                  <ConciergeBell className={activeTab === 'service' ? 'text-[#FF385C] fill-[#FF385C]' : 'text-slate-500'} size={20} />
-                </div>
+                <ConciergeBell size={20} className={activeTab === 'service' ? 'text-[#FF385C]' : 'text-slate-500'} />
                 서비스
               </button>
             </div>
 
-            {/* 큰 검색바 (드롭다운 포함) */}
-            <div className="relative w-full max-w-3xl h-[66px]" ref={searchRef}>
+            {/* 큰 검색바 */}
+            <div className="relative w-full max-w-3xl h-[66px]">
               <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-slate-300 bg-slate-100' : 'border-slate-200'} rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] transition-all`}>
                 
-                {/* 여행지 */}
+                {/* 여행지 입력 */}
                 <div 
                   className={`flex-[1.5] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'location' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
                   onClick={() => setActiveSearchField('location')}
@@ -175,7 +172,7 @@ export default function HomePage() {
                   <input type="text" placeholder="도시나 명소로 검색" value={locationInput} readOnly className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold cursor-pointer truncate"/>
                 </div>
 
-                {/* 날짜 */}
+                {/* 날짜 입력 */}
                 <div 
                   className={`flex-[1] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'date' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
                   onClick={() => setActiveSearchField('date')}
@@ -194,7 +191,7 @@ export default function HomePage() {
 
               {/* 🔽 드롭다운: 여행지 (이모지 제거, 깔끔한 디자인, 스르륵 애니메이션) */}
               <div 
-                className={`absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.15)] p-6 z-50 overflow-hidden transition-all duration-300 ease-out origin-top ${activeSearchField === 'location' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-4 pointer-events-none'}`}
+                className={`absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.15)] p-6 z-50 overflow-hidden transition-all duration-300 ease-out origin-top ${activeSearchField === 'location' ? 'opacity-100 scale-100 translate-y-0 visible' : 'opacity-0 scale-95 -translate-y-2 invisible'}`}
               >
                 <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
                 <div className="grid grid-cols-1 gap-1">
@@ -204,7 +201,7 @@ export default function HomePage() {
                       onClick={() => { setLocationInput(city.label); setActiveSearchField('date'); setSelectedCategory(city.id); }}
                       className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group"
                     >
-                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:text-black group-hover:shadow-sm transition-all">
+                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-slate-200 group-hover:text-black transition-all">
                         <MapPin size={20} />
                       </div>
                       <span className="font-semibold text-slate-700 group-hover:text-black">{city.label}</span>
@@ -215,7 +212,7 @@ export default function HomePage() {
 
               {/* 📅 드롭다운: 달력 */}
               <div 
-                className={`absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.15)] p-6 z-50 transition-all duration-300 ease-out origin-top ${activeSearchField === 'date' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-4 pointer-events-none'}`}
+                className={`absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.15)] p-6 z-50 transition-all duration-300 ease-out origin-top ${activeSearchField === 'date' ? 'opacity-100 scale-100 translate-y-0 visible' : 'opacity-0 scale-95 -translate-y-2 invisible'}`}
               >
                 <DatePicker 
                   selectedRange={dateRange} 
@@ -228,94 +225,94 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 3. Category Filter (Static - 따라오지 않음) */}
-      {activeTab === 'experience' && (
-        <div className="bg-white pt-10 pb-4">
-          <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex justify-center">
-            <div className="flex items-center gap-12 overflow-x-auto no-scrollbar pb-2">
-              {CATEGORIES.map((cat) => (
-                <button 
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex flex-col items-center gap-3 min-w-fit pb-2 transition-all border-b-2 cursor-pointer group ${
-                    selectedCategory === cat.id 
-                      ? 'border-black opacity-100' 
-                      : 'border-transparent opacity-60 hover:opacity-100 hover:border-slate-200'
-                  }`}
-                >
-                  <span className="text-3xl transition-transform group-hover:scale-110">{cat.icon}</span>
-                  <span className={`text-xs font-bold whitespace-nowrap ${selectedCategory === cat.id ? 'text-black' : 'text-slate-600'}`}>{cat.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Main Content */}
-      <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
+        {/* 🅱️ Category Filter (스크롤해도 따라오지 않음 - Static) */}
         {activeTab === 'experience' && (
-          loading ? (
-            <div className="flex justify-center py-40"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div></div>
-          ) : experiences.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-40 text-center">
-              <div className="text-4xl mb-4">🌏</div>
-              <h3 className="text-lg font-bold text-slate-900">아직 등록된 체험이 없습니다.</h3>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-              {experiences.map((item) => <ExperienceCard key={item.id} item={item} />)}
-            </div>
-          )
-        )}
-
-        {activeTab === 'service' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
-            {LOCALLY_SERVICES.map((item) => <ServiceCard key={item.id} item={item} />)}
-          </div>
-        )}
-      </main>
-
-      {/* Footer (복구됨) */}
-      <footer className="border-t border-slate-100 bg-slate-50 mt-20">
-        <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
-            <div>
-              <h5 className="font-bold text-black mb-4">Locally</h5>
-              <ul className="space-y-3">
-                <li><Link href="#" className="hover:underline">회사 소개</Link></li>
-                <li><Link href="/admin/dashboard" className="hover:underline font-bold text-slate-800">관리자 페이지</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="font-bold text-black mb-4">호스팅</h5>
-              <ul className="space-y-3">
-                <li><Link href="/host/register" className="hover:underline">호스트 되기</Link></li>
-                <li><Link href="#" className="hover:underline">호스트 추천하기</Link></li>
-                <li><Link href="#" className="hover:underline">책임 보험</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="font-bold text-black mb-4">지원</h5>
-              <ul className="space-y-3">
-                <li><Link href="#" className="hover:underline">도움말 센터</Link></li>
-                <li><Link href="#" className="hover:underline">안전 센터</Link></li>
-                <li><Link href="#" className="hover:underline">예약 취소 옵션</Link></li>
-                <li><Link href="#" className="hover:underline">장애인 지원</Link></li>
-              </ul>
-            </div>
-            <div>
-               <div className="flex gap-4 font-bold text-slate-900 mb-6">
-                 <button className="flex items-center gap-1 hover:underline"><Globe size={16}/> 한국어 (KR)</button>
-                 <button className="hover:underline">₩ KRW</button>
-               </div>
-               <p className="text-xs">© 2026 Locally, Inc.</p>
+          <div className="bg-white pb-6 pt-2 border-b border-slate-100">
+            <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex justify-center">
+              <div className="flex items-center gap-12 overflow-x-auto no-scrollbar pb-2">
+                {CATEGORIES.map((cat) => (
+                  <button 
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`flex flex-col items-center gap-3 min-w-fit pb-2 transition-all border-b-2 cursor-pointer group ${
+                      selectedCategory === cat.id 
+                        ? 'border-black opacity-100' 
+                        : 'border-transparent opacity-60 hover:opacity-100 hover:border-slate-200'
+                    }`}
+                  >
+                    <span className="text-3xl transition-transform group-hover:scale-110">{cat.icon}</span>
+                    <span className={`text-xs font-bold whitespace-nowrap ${selectedCategory === cat.id ? 'text-black' : 'text-slate-600'}`}>{cat.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </footer>
+        )}
+
+        {/* 4. Main Content */}
+        <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
+          {activeTab === 'experience' && (
+            loading ? (
+              <div className="flex justify-center py-40"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div></div>
+            ) : experiences.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-40 text-center">
+                <div className="text-4xl mb-4">🌏</div>
+                <h3 className="text-lg font-bold text-slate-900">아직 등록된 체험이 없습니다.</h3>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
+                {experiences.map((item) => <ExperienceCard key={item.id} item={item} />)}
+              </div>
+            )
+          )}
+
+          {activeTab === 'service' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
+              {LOCALLY_SERVICES.map((item) => <ServiceCard key={item.id} item={item} />)}
+            </div>
+          )}
+        </main>
+
+        {/* Footer (완벽 복구) */}
+        <footer className="border-t border-slate-100 bg-slate-50 mt-20">
+          <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
+              <div>
+                <h5 className="font-bold text-black mb-4">Locally</h5>
+                <ul className="space-y-3">
+                  <li><Link href="#" className="hover:underline">회사 소개</Link></li>
+                  <li><Link href="/admin/dashboard" className="hover:underline font-bold text-slate-800">관리자 페이지</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-bold text-black mb-4">호스팅</h5>
+                <ul className="space-y-3">
+                  <li><Link href="/host/register" className="hover:underline">호스트 되기</Link></li>
+                  <li><Link href="#" className="hover:underline">호스트 추천하기</Link></li>
+                  <li><Link href="#" className="hover:underline">책임 보험</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-bold text-black mb-4">지원</h5>
+                <ul className="space-y-3">
+                  <li><Link href="#" className="hover:underline">도움말 센터</Link></li>
+                  <li><Link href="#" className="hover:underline">안전 센터</Link></li>
+                  <li><Link href="#" className="hover:underline">예약 취소 옵션</Link></li>
+                  <li><Link href="#" className="hover:underline">장애인 지원</Link></li>
+                </ul>
+              </div>
+              <div>
+                 <div className="flex gap-4 font-bold text-slate-900 mb-6">
+                   <button className="flex items-center gap-1 hover:underline"><Globe size={16}/> 한국어 (KR)</button>
+                   <button className="hover:underline">₩ KRW</button>
+                 </div>
+                 <p className="text-xs">© 2026 Locally, Inc.</p>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
