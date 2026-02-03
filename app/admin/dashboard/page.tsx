@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, LayoutDashboard, MapPin, Trash2, Search,
-  CheckCircle2, BarChart3, ChevronRight 
+  CheckCircle2, BarChart3, ChevronRight, Mail, Phone, Calendar
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 
@@ -19,33 +19,33 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState({ users: 0, experiences: 0, bookings: 0 });
   const supabase = createClient();
 
-  // 데이터 로딩
   const fetchData = async () => {
-    // 1. 통계
+    // 통계
     const { count: uCount } = await supabase.from('host_applications').select('*', { count: 'exact', head: true });
     const { count: eCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true });
     const { count: bCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
     setStats({ users: uCount || 0, experiences: eCount || 0, bookings: bCount || 0 });
 
-    // 2. 지원서 (최신순)
+    // 지원서 (모든 필드 포함)
     const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
     if (appData) setApps(appData);
 
-    // 3. 체험 (최신순)
-    const { data: expData } = await supabase.from('experiences').select('*, host:host_id(email)').order('created_at', { ascending: false });
+    // 체험 (호스트 정보 포함)
+    const { data: expData } = await supabase
+      .from('experiences')
+      .select('*, host:host_id(*)') // 호스트 유저 정보 JOIN
+      .order('created_at', { ascending: false });
     if (expData) setExps(expData);
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // 승인/거절 로직
   const handleAppStatus = async (id: string, status: 'approved' | 'rejected') => {
     if (!confirm(`${status === 'approved' ? '승인' : '거절'} 하시겠습니까?`)) return;
     await supabase.from('host_applications').update({ status }).eq('id', id);
     fetchData(); setSelectedApp(null);
   };
 
-  // 체험 삭제 로직
   const handleDeleteExp = async (id: number) => {
     if (!confirm("이 체험을 삭제하시겠습니까? (복구 불가)")) return;
     await supabase.from('experiences').delete().eq('id', id);
@@ -75,17 +75,15 @@ export default function AdminDashboardPage() {
 
       {/* 메인 */}
       <main className="flex-1 ml-0 md:ml-64 p-8">
-        
-        {/* 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-           <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">총 지원서</p><h2 className="text-3xl font-black">{stats.users}</h2></div>
-           <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">등록된 체험</p><h2 className="text-3xl font-black">{stats.experiences}</h2></div>
-           <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">완료된 예약</p><h2 className="text-3xl font-black">{stats.bookings}</h2></div>
+           <StatCard label="총 지원서" value={stats.users} />
+           <StatCard label="등록된 체험" value={stats.experiences} />
+           <StatCard label="완료된 예약" value={stats.bookings} />
         </div>
 
-        <div className="flex gap-8 h-[75vh]">
+        <div className="flex gap-8 h-[80vh]">
           
-          {/* 리스트 영역 */}
+          {/* 1. 리스트 영역 */}
           <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
               <span className="font-bold">{activeTab === 'APPS' ? '지원서 목록' : '체험 목록'}</span>
@@ -125,30 +123,49 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* 상세 보기 영역 */}
+          {/* 2. 상세 보기 영역 (스크롤 가능) */}
           <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col relative shadow-lg">
             
             {/* A. 지원서 상세 */}
             {activeTab === 'APPS' && selectedApp && (
-              <div className="flex-1 overflow-y-auto p-8">
-                <h2 className="text-2xl font-black mb-1">{selectedApp.name}</h2>
-                <div className="text-sm text-slate-500 mb-6">{selectedApp.email} · {selectedApp.phone}</div>
-                <div className="space-y-6 text-sm">
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <h3 className="font-bold text-lg mb-4">🗺️ 투어 기획안</h3>
-                    <div className="space-y-2">
-                      <p><strong>컨셉:</strong> {selectedApp.tour_concept}</p>
-                      <p><strong>지역:</strong> {selectedApp.tour_location}</p>
-                      <p><strong>가격:</strong> {selectedApp.tour_price}</p>
-                      <div className="mt-2 pt-2 border-t border-slate-200"><p className="whitespace-pre-wrap">{selectedApp.tour_course}</p></div>
-                    </div>
+              <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                <div className="border-b pb-6">
+                  <h2 className="text-3xl font-black mb-2">{selectedApp.name}</h2>
+                  <div className="flex gap-4 text-sm text-slate-500">
+                    <span className="flex items-center gap-1"><Mail size={14}/> {selectedApp.email}</span>
+                    <span className="flex items-center gap-1"><Phone size={14}/> {selectedApp.phone}</span>
                   </div>
-                  <div><h3 className="font-bold mb-1">자기소개</h3><p className="whitespace-pre-wrap text-slate-600">{selectedApp.self_intro}</p></div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                   <InfoBox label="인스타그램" value={selectedApp.instagram} />
+                   <InfoBox label="MBTI / 생년월일" value={`${selectedApp.mbti} / ${selectedApp.birthdate}`} />
+                   <InfoBox label="한국어 실력" value={`${selectedApp.korean_level} (${selectedApp.korean_cert || '자격증 없음'})`} />
+                   <InfoBox label="활동 가능 지역" value={selectedApp.tour_location} />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">자기소개 & 지원동기</label>
+                  <p className="bg-slate-50 p-4 rounded-xl text-slate-700 whitespace-pre-wrap">{selectedApp.self_intro}</p>
+                  <p className="bg-slate-50 p-4 rounded-xl text-slate-700 whitespace-pre-wrap">{selectedApp.motivation}</p>
+                </div>
+
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2">🗺️ 투어 기획안</h3>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <InfoBox label="컨셉/제목" value={selectedApp.tour_concept} />
+                        <InfoBox label="희망 가격" value={`₩${selectedApp.tour_price}`} />
+                    </div>
+                    <InfoBox label="상세 코스" value={selectedApp.tour_course} />
+                    <InfoBox label="만나는 장소" value={selectedApp.tour_meeting} />
+                  </div>
+                </div>
+
                 {selectedApp.status === 'pending' && (
-                  <div className="sticky bottom-0 bg-white pt-4 pb-4 mt-8 border-t flex gap-4">
-                    <button onClick={() => handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-3 border border-slate-300 rounded-xl font-bold hover:bg-slate-50">거절</button>
-                    <button onClick={() => handleAppStatus(selectedApp.id, 'approved')} className="flex-1 py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800">승인하기</button>
+                  <div className="flex gap-4 pt-4">
+                    <button onClick={() => handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-4 border border-slate-300 rounded-xl font-bold hover:bg-slate-50">거절</button>
+                    <button onClick={() => handleAppStatus(selectedApp.id, 'approved')} className="flex-1 py-4 bg-black text-white rounded-xl font-bold hover:bg-slate-800">승인하기</button>
                   </div>
                 )}
               </div>
@@ -156,16 +173,37 @@ export default function AdminDashboardPage() {
 
             {/* B. 체험 상세 */}
             {activeTab === 'EXPS' && selectedExp && (
-              <div className="flex-1 overflow-y-auto p-8">
-                <div className="aspect-video bg-slate-100 rounded-xl mb-6 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                <div className="aspect-video bg-slate-100 rounded-2xl overflow-hidden shadow-sm">
                   <img src={selectedExp.image_url} className="w-full h-full object-cover"/>
                 </div>
-                <h2 className="text-2xl font-black mb-2">{selectedExp.title}</h2>
-                <div className="flex gap-4 text-sm text-slate-500 mb-6 border-b pb-4">
-                  <span className="flex items-center gap-1"><MapPin size={14}/> {selectedExp.location}</span>
-                  <span className="flex items-center gap-1">₩{selectedExp.price.toLocaleString()}</span>
+                
+                <div className="border-b pb-6">
+                  <h2 className="text-2xl font-black mb-2">{selectedExp.title}</h2>
+                  <div className="flex gap-4 text-sm text-slate-500">
+                    <span className="flex items-center gap-1"><MapPin size={14}/> {selectedExp.location}</span>
+                    <span className="flex items-center gap-1 font-bold">₩{selectedExp.price.toLocaleString()}</span>
+                  </div>
                 </div>
-                <p className="whitespace-pre-wrap text-slate-700 leading-relaxed mb-8">{selectedExp.description}</p>
+
+                <div className="space-y-2">
+                  <h3 className="font-bold">호스트 정보</h3>
+                  <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
+                    <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden">
+                       <img src={selectedExp.host?.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"} className="w-full h-full object-cover"/>
+                    </div>
+                    <div>
+                        <div className="font-bold text-sm">{selectedExp.host?.user_metadata?.full_name || 'Host'}</div>
+                        <div className="text-xs text-slate-500">{selectedExp.host?.email}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-bold mb-2">체험 설명</h3>
+                  <p className="whitespace-pre-wrap text-slate-700 leading-relaxed text-sm">{selectedExp.description}</p>
+                </div>
+                
                 <button onClick={() => handleDeleteExp(selectedExp.id)} className="w-full py-4 border border-red-200 text-red-600 font-bold rounded-xl hover:bg-red-50 flex items-center justify-center gap-2">
                   <Trash2 size={18}/> 체험 강제 삭제
                 </button>
@@ -174,7 +212,7 @@ export default function AdminDashboardPage() {
 
             {!selectedApp && !selectedExp && (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                <Search size={48} className="mb-4 opacity-20"/><p>왼쪽 목록에서 항목을 선택하세요.</p>
+                <Search size={48} className="mb-4 opacity-20"/><p>항목을 선택하세요.</p>
               </div>
             )}
           </div>
@@ -182,4 +220,24 @@ export default function AdminDashboardPage() {
       </main>
     </div>
   );
+}
+
+function StatCard({ label, value }: any) {
+  return (
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">{label}</p>
+      <h2 className="text-3xl font-black">{value}</h2>
+    </div>
+  )
+}
+
+function InfoBox({ label, value }: any) {
+  return (
+    <div>
+      <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">{label}</label>
+      <div className="bg-white border border-slate-100 p-3 rounded-lg text-slate-900 shadow-sm text-sm whitespace-pre-wrap">
+        {value || '-'}
+      </div>
+    </div>
+  )
 }
