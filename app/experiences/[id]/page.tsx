@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
-import { createClient } from '@/app/utils/supabase/client'; // ✅ 통합된 클라이언트 사용
+import { createClient } from '@/app/utils/supabase/client'; // ✅ 통합 클라이언트 사용
 import SiteHeader from '@/app/components/SiteHeader';
 
 export default function ExperienceDetailPage() {
@@ -23,7 +23,7 @@ export default function ExperienceDetailPage() {
   const [guestCount, setGuestCount] = useState(1);
   const [selectedDate, setSelectedDate] = useState("");
   
-  // ✅ [수정 완료] 에러의 원인이었던 변수 선언 추가!
+  // ✅ [수정 완료] 에러의 원인이었던 변수 선언을 여기에 추가했습니다!
   const [inquiryText, setInquiryText] = useState('');
 
   // 초기 데이터 로딩
@@ -64,7 +64,7 @@ export default function ExperienceDetailPage() {
 
     if (!error) {
       alert('호스트에게 메시지를 보냈습니다!');
-      setInquiryText('');
+      setInquiryText(''); // 입력창 초기화
     } else {
       alert('전송 실패');
     }
@@ -79,7 +79,7 @@ export default function ExperienceDetailPage() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center">Loading...</div>;
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
 
-  const SERVICE_FEE = 0; // 수수료 (필요시 추가)
+  const SERVICE_FEE = 0; 
   const totalPrice = (Number(experience.price) * guestCount) + SERVICE_FEE;
 
   return (
@@ -150,7 +150,7 @@ export default function ExperienceDetailPage() {
               <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{experience.description}</p>
             </div>
 
-            {/* ✅ 문의하기 섹션 (이제 에러 안 남) */}
+            {/* ✅ 문의하기 섹션 */}
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
               <h3 className="text-xl font-bold mb-2">호스트에게 문의하기</h3>
               <p className="text-sm text-slate-500 mb-4">체험에 대해 궁금한 점이 있다면 언제든 물어보세요.</p>
