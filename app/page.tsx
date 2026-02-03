@@ -22,7 +22,6 @@ const CATEGORIES = [
   { id: 'jeju', label: '제주', icon: '🏔️' },
 ];
 
-// 로컬리 자체 서비스
 const LOCALLY_SERVICES = [
   { id: 1, title: '일본 식당 전화 예약 대행', price: 5000, image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b', desc: '한국어 대응 불가 식당, 대신 예약해드립니다.' },
   { id: 2, title: '일본 전세 버스 대절 서비스', price: 350000, image: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e', desc: '단체 여행을 위한 쾌적한 버스 대절.' },
@@ -52,14 +51,9 @@ export default function HomePage() {
     const fetchExperiences = async () => {
       try {
         let query = supabase.from('experiences').select('*').order('created_at', { ascending: false });
-        // 도시 필터링 로직 (실제로는 DB에 city 컬럼이 있거나 location에서 like 검색을 해야 함. 여기서는 임시로 category 필드 사용)
-        // 만약 실제 도시 필터링을 원하시면 DB 쿼리를 .ilike('location', `%${selectedCategory}%`) 등으로 바꾸면 됩니다.
         if (selectedCategory !== 'all') {
-           // 임시: 카테고리가 '도시'라면 location 검색, 아니면 category 검색 등 유연하게 처리
-           // 여기서는 기존 로직 유지하되, 추후 수정 가능
-           // query = query.ilike('location', `%${CATEGORIES.find(c=>c.id===selectedCategory)?.label}%`); 
+           // 실제로는 여기서 도시 필터링 쿼리를 넣어야 함
         }
-        
         const { data, error } = await query;
         if (error) throw error;
         if (data) setExperiences(data);
@@ -73,61 +67,65 @@ export default function HomePage() {
   }, [selectedCategory]);
 
   // 애니메이션 스타일 계산
-  const progress = Math.min(scrollY / 80, 1);
+  // 스크롤을 내리면 높이가 줄어들고, 위치가 상단으로 붙음
+  const progress = Math.min(scrollY / 60, 1); // 60px 스크롤하면 완료
+  
   const searchContainerStyle = {
-    height: `${180 - progress * 100}px`,
+    height: `${160 - progress * 80}px`, // 160px -> 80px로 축소
     boxShadow: isScrolled ? '0 4px 20px rgba(0,0,0,0.05)' : 'none',
+    borderBottom: isScrolled ? '1px solid #e2e8f0' : 'none',
   };
   
   const expandedSearchStyle = {
-    opacity: 1 - progress * 1.5,
-    transform: `scale(${1 - progress * 0.1}) translateY(${progress * 20}px)`,
+    opacity: 1 - progress * 2, // 빠르게 사라짐
+    transform: `scale(${1 - progress * 0.2}) translateY(${progress * 10}px)`,
     pointerEvents: progress > 0.5 ? 'none' : 'auto',
   };
 
   const collapsedSearchStyle = {
-    opacity: progress < 0.3 ? 0 : (progress - 0.3) * 2,
-    transform: `scale(${0.8 + progress * 0.2}) translateY(${20 - progress * 20}px)`,
+    opacity: progress < 0.5 ? 0 : (progress - 0.5) * 2, // 늦게 나타남
+    transform: `scale(${0.9 + progress * 0.1}) translateY(0px)`,
     pointerEvents: progress > 0.5 ? 'auto' : 'none',
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       
-      {/* 1. Header */}
+      {/* 1. Header (로고 등) */}
       <div className="bg-white z-50 relative">
         <SiteHeader />
       </div>
 
-      {/* 2. Search & Tabs Area (애니메이션 적용) */}
+      {/* 2. Dynamic Search & Tabs Area */}
+      {/* sticky top-0으로 변경하여 스크롤 시 상단에 딱 붙게 함 */}
       <div 
-        className="sticky top-[80px] z-40 bg-white border-b border-slate-100 transition-all duration-200 ease-out"
+        className="sticky top-0 z-40 bg-white transition-all duration-200 ease-out origin-top"
         style={searchContainerStyle}
       >
-        <div className="flex flex-col items-center h-full relative">
+        <div className="flex flex-col items-center h-full relative justify-end pb-4">
           
-          {/* 상단 탭 (체험 | 서비스) */}
-          <div className={`flex gap-8 mt-4 transition-all duration-200 ${isScrolled ? 'opacity-0 translate-y-[-20px]' : 'opacity-100'}`}>
+          {/* 상단 탭 (스크롤 시 사라짐) */}
+          <div className={`flex gap-8 mb-4 transition-all duration-200 absolute top-4 ${isScrolled ? 'opacity-0 -translate-y-4 pointer-events-none' : 'opacity-100'}`}>
             <button 
               onClick={() => setActiveTab('experience')}
-              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'experience' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 px-3 rounded-t-lg border-b-[3px] border-transparent'}`}
+              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'experience' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              체험
+              <TentTree size={18} /> 체험
             </button>
             <button 
               onClick={() => setActiveTab('service')}
-              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'service' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 px-3 rounded-t-lg border-b-[3px] border-transparent'}`}
+              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'service' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              서비스
+              <ConciergeBell size={18} /> 서비스
             </button>
           </div>
 
           {/* 검색바 컨테이너 */}
-          <div className="absolute w-full flex justify-center bottom-6 px-6">
+          <div className="w-full flex justify-center items-center relative h-16">
             
             {/* A. 펼쳐진 검색바 (큰 버전) */}
             <div 
-              className="flex items-center bg-white border border-slate-200 rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)] transition-shadow w-full max-w-3xl h-[66px] origin-center divide-x divide-slate-200"
+              className="absolute flex items-center bg-white border border-slate-200 rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)] transition-shadow w-full max-w-3xl h-[66px] divide-x divide-slate-200"
               style={expandedSearchStyle as any}
             >
               <div className="flex-[1.5] px-8 h-full flex flex-col justify-center hover:bg-slate-100 rounded-l-full cursor-pointer group">
@@ -145,9 +143,9 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* B. 축소된 검색바 (작은 버전) */}
+            {/* B. 축소된 검색바 (작은 버전) - 상단 고정 시 나타남 */}
             <div 
-              className="absolute flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition-all h-12 px-2 origin-center cursor-pointer top-1/2 -translate-y-1/2"
+              className="absolute flex items-center bg-white border border-slate-300 rounded-full shadow-sm hover:shadow-md transition-all h-12 px-2 cursor-pointer mt-2"
               style={collapsedSearchStyle as any}
             >
               <div className="px-4 text-sm font-semibold text-slate-900 border-r border-slate-300">
@@ -157,7 +155,7 @@ export default function HomePage() {
                 언제든지
               </div>
               <div className="px-4 text-sm font-semibold text-slate-500">
-                검색
+                게스트 추가
               </div>
               <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
                 <Search size={14} strokeWidth={3}/>
@@ -168,11 +166,13 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 3. Category Filter (도시 목록) */}
+      {/* 3. Category Filter (도시 목록) - 중앙 정렬 적용 */}
       {activeTab === 'experience' && (
-        <div className="bg-white pt-6 pb-2">
-          <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex items-center gap-4">
-            <div className="flex-1 flex items-center gap-10 overflow-x-auto no-scrollbar pb-2">
+        <div className={`bg-white pt-6 pb-2 transition-all ${isScrolled ? 'pt-4' : 'pt-6'}`}>
+          <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex items-center justify-center gap-4">
+            
+            {/* 중앙 정렬: justify-center 추가 */}
+            <div className="flex items-center gap-10 overflow-x-auto no-scrollbar pb-2 justify-center w-full">
               {CATEGORIES.map((cat) => (
                 <button 
                   key={cat.id}
@@ -183,12 +183,14 @@ export default function HomePage() {
                       : 'border-transparent text-slate-500 opacity-60 hover:opacity-100 hover:border-slate-300'
                   }`}
                 >
-                  <span className="text-2xl group-hover:scale-110 transition-transform filter grayscale group-hover:grayscale-0">{cat.icon}</span>
+                  {/* grayscale 제거, hover시 확대 */}
+                  <span className="text-2xl transition-transform group-hover:scale-110">{cat.icon}</span>
                   <span className="text-xs font-bold whitespace-nowrap">{cat.label}</span>
                 </button>
               ))}
             </div>
-            <button className="hidden md:flex items-center gap-2 border border-slate-300 rounded-xl px-4 py-3 text-xs font-bold hover:border-black hover:bg-slate-50 transition-colors shrink-0">
+
+            <button className="hidden md:flex items-center gap-2 border border-slate-300 rounded-xl px-4 py-3 text-xs font-bold hover:border-black hover:bg-slate-50 transition-colors shrink-0 absolute right-12">
               <SlidersHorizontal size={16} /> 필터
             </button>
           </div>
@@ -228,7 +230,7 @@ export default function HomePage() {
 
       </main>
 
-      {/* Footer (관리자 링크 복구) */}
+      {/* Footer */}
       <footer className="border-t border-slate-100 bg-slate-50 mt-20">
         <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
@@ -267,12 +269,10 @@ export default function HomePage() {
   );
 }
 
-// 📌 체험 카드 (4:5 비율, 1080x1350)
 function ExperienceCard({ item }: any) {
   return (
     <Link href={`/experiences/${item.id}`} className="block group">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
-        {/* 이미지: 꽉 차게 */}
         <img 
           src={item.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989"} 
           alt={item.title} 
@@ -302,7 +302,6 @@ function ExperienceCard({ item }: any) {
   )
 }
 
-// 📌 서비스 카드
 function ServiceCard({ item }: any) {
   return (
     <div className="block group cursor-pointer">
