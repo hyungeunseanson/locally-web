@@ -2,26 +2,37 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, Globe, User, LogOut, Briefcase } from 'lucide-react';
+import { Menu, Globe, User, LogOut, Briefcase, ArrowRightLeft } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
-import { useRouter } from 'next/navigation'; // ✅ 라우터 가져오기
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isHost, setIsHost] = useState(false); // 호스트 여부 체크
   const supabase = createClient();
-  const router = useRouter(); // ✅ 라우터 사용
+  const router = useRouter();
+  const pathname = usePathname(); // 현재 페이지 위치 확인
 
+  // 1. 유저 정보 & 호스트 여부 확인
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
+      if (session?.user) {
+        checkIsHost(session.user.id);
+      }
     };
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      if (session?.user) {
+        checkIsHost(session.user.id);
+      } else {
+        setIsHost(false);
+      }
       if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
         router.refresh();
       }
@@ -30,15 +41,54 @@ export default function SiteHeader() {
     return () => subscription.unsubscribe();
   }, [supabase, router]);
 
+  // DB에서 이 사람이 체험을 등록했는지 확인
+  const checkIsHost = async (userId: string) => {
+    const { count } = await supabase
+      .from('experiences')
+      .select('*', { count: 'exact', head: true })
+      .eq('host_id', userId);
+    
+    // 체험이 1개라도 있으면 호스트로 인정
+    if (count && count > 0) {
+      setIsHost(true);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     alert('로그아웃 되었습니다.');
     window.location.reload();
   };
 
-  // ✅ [핵심] 호스트 모드 이동 함수 (진짜 버튼용)
-  const handleHostMode = () => {
+  // ✅ [핵심] 상황별 버튼 동작 로직
+  const handleModeSwitch = () => {
+    // 1. 현재 호스트 페이지에 있다면 -> 게스트(메인)로 가기
+    if (pathname?.startsWith('/host')) {
+      router.push('/');
+      return;
+    }
+
+    // 2. 로그인이 안 되어 있다면 -> 로그인 창 띄우기 (이동 X)
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    // 3. 로그인은 했는데 호스트가 아니라면 -> 체험 등록하러 가기
+    if (!isHost) {
+      router.push('/host/create');
+      return;
+    }
+
+    // 4. 호스트라면 -> 대시보드로 가기
     router.push('/host/dashboard');
+  };
+
+  // 버튼 텍스트 결정
+  const getButtonLabel = () => {
+    if (pathname?.startsWith('/host')) return '게스트 모드로 전환';
+    if (!user || !isHost) return '호스트 되기'; // 비로그인 or 일반 유저
+    return '호스트 모드로 전환'; // 호스트 유저
   };
 
   return (
@@ -53,13 +103,13 @@ export default function SiteHeader() {
 
           <div className="flex items-center justify-end gap-2 z-[101]">
             
-            {/* ✅ [수정완료] Link 태그 제거! 순수 button + onClick 사용 */}
+            {/* ✅ 상황별 만능 버튼 */}
             <button 
-              onClick={handleHostMode}
+              onClick={handleModeSwitch}
               className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
             >
-               <Briefcase size={18} className="md:hidden" />
-               <span className="hidden md:inline">호스트 모드로 전환</span>
+               {pathname?.startsWith('/host') ? <ArrowRightLeft size={18} className="md:hidden"/> : <Briefcase size={18} className="md:hidden" />}
+               <span className="hidden md:inline">{getButtonLabel()}</span>
             </button>
 
             <button className="p-2 hover:bg-slate-50 rounded-full hidden sm:block">
@@ -80,10 +130,12 @@ export default function SiteHeader() {
                     <p className="font-bold text-sm truncate">{user.user_metadata.full_name || '게스트'}</p>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
-                  {/* 모바일 메뉴용 호스트 버튼도 수정 */}
-                  <button onClick={handleHostMode} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">
-                    호스트 대시보드
+                  
+                  {/* 모바일 메뉴에서도 똑같이 동작 */}
+                  <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">
+                    {getButtonLabel()}
                   </button>
+
                   <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">나의 여행</Link>
                   <div className="border-t border-slate-100 my-1"></div>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-red-500 font-semibold flex items-center gap-2"><LogOut size={14}/> 로그아웃</button>
