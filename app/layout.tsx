@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Inter } from "next/font/google"; // ✅ 파일 필요 없는 구글 폰트 사용
 import "./globals.css";
-import { LanguageProvider } from '@/app/context/LanguageContext'; // ✅ 추가
+import { LanguageProvider } from '@/app/context/LanguageContext';
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
+// ✅ Inter 폰트 설정 (GeistVF 대체)
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Locally",
@@ -21,8 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={`${geistSans.variable} antialiased`}>
-        {/* ✅ Provider로 감싸기 */}
+      <body className={inter.className}> {/* ✅ 폰트 적용 */}
         <LanguageProvider>
           {children}
         </LanguageProvider>
