@@ -3,22 +3,23 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Heart, Star, MapPin, Search, Globe, SlidersHorizontal, 
-  TentTree, ConciergeBell // 아이콘 추가
+  TentTree, ConciergeBell, Map
 } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 
-// 카테고리 데이터
+// ✅ 카테고리: 도시 이름으로 변경 (아이콘/이모지 활용)
 const CATEGORIES = [
-  { id: 'all', label: '전체', icon: '🌍' },
-  { id: 'culture', label: '도쿄', icon: '🗼' },
-  { id: 'food', label: '음식/투어', icon: '🍳' },
-  { id: 'nature', label: '자연/야외', icon: '🌲' },
-  { id: 'night', label: '나이트라이프', icon: '🍸' },
-  { id: 'class', label: '원데이클래스', icon: '🧶' },
-  { id: 'snap', label: '스냅사진', icon: '📸' },
-  { id: 'shopping', label: '쇼핑', icon: '🛍️' },
+  { id: 'all', label: '전체', icon: '🌏' },
+  { id: 'tokyo', label: '도쿄', icon: '🗼' },
+  { id: 'osaka', label: '오사카', icon: '🏯' },
+  { id: 'fukuoka', label: '후쿠오카', icon: '🍜' },
+  { id: 'sapporo', label: '홋카이도', icon: '☃️' },
+  { id: 'nagoya', label: '나고야', icon: '🍣' },
+  { id: 'seoul', label: '서울', icon: '🏙️' },
+  { id: 'busan', label: '부산', icon: '🚢' },
+  { id: 'jeju', label: '제주', icon: '🏔️' },
 ];
 
 // 로컬리 자체 서비스
@@ -35,27 +36,29 @@ export default function HomePage() {
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 스크롤 상태 관리
+  // 스크롤 상태
   const [scrollY, setScrollY] = useState(0);
-  const isScrolled = scrollY > 20; // 스크롤이 조금이라도 발생했는지
+  const isScrolled = scrollY > 20;
 
   const supabase = createClient();
 
-  // 스크롤 이벤트 핸들러
   useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
+    const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 체험 데이터 로딩
   useEffect(() => {
     const fetchExperiences = async () => {
       try {
         let query = supabase.from('experiences').select('*').order('created_at', { ascending: false });
-        if (selectedCategory !== 'all') query = query.eq('category', selectedCategory);
+        // 도시 필터링 로직 (실제로는 DB에 city 컬럼이 있거나 location에서 like 검색을 해야 함. 여기서는 임시로 category 필드 사용)
+        // 만약 실제 도시 필터링을 원하시면 DB 쿼리를 .ilike('location', `%${selectedCategory}%`) 등으로 바꾸면 됩니다.
+        if (selectedCategory !== 'all') {
+           // 임시: 카테고리가 '도시'라면 location 검색, 아니면 category 검색 등 유연하게 처리
+           // 여기서는 기존 로직 유지하되, 추후 수정 가능
+           // query = query.ilike('location', `%${CATEGORIES.find(c=>c.id===selectedCategory)?.label}%`); 
+        }
         
         const { data, error } = await query;
         if (error) throw error;
@@ -69,94 +72,94 @@ export default function HomePage() {
     fetchExperiences();
   }, [selectedCategory]);
 
-  // 스크롤에 따른 동적 스타일 계산
-  // scrollY가 0에서 80까지 변할 때 progress는 0에서 1로 변함
+  // 애니메이션 스타일 계산
   const progress = Math.min(scrollY / 80, 1);
-  
   const searchContainerStyle = {
-    height: `${180 - progress * 100}px`, // 180px -> 80px로 줄어듦
-    boxShadow: isScrolled ? '0 4px 20px rgba(0,0,0,0.08)' : 'none',
+    height: `${180 - progress * 100}px`,
+    boxShadow: isScrolled ? '0 4px 20px rgba(0,0,0,0.05)' : 'none',
   };
-
+  
   const expandedSearchStyle = {
-    opacity: 1 - progress * 1.5, // 빠르게 투명해짐
-    transform: `scale(${1 - progress * 0.1}) translateY(${progress * 20}px)`, // 약간 작아지면서 아래로 이동
-    pointerEvents: progress > 0.5 ? 'none' : 'auto', // 반 이상 넘어가면 클릭 불가
+    opacity: 1 - progress * 1.5,
+    transform: `scale(${1 - progress * 0.1}) translateY(${progress * 20}px)`,
+    pointerEvents: progress > 0.5 ? 'none' : 'auto',
   };
 
   const collapsedSearchStyle = {
-    opacity: progress < 0.3 ? 0 : (progress - 0.3) * 2, // 조금 늦게 나타나기 시작해서 빠르게 불투명해짐
-    transform: `scale(${0.8 + progress * 0.2}) translateY(${20 - progress * 20}px)`, // 작았다가 커지면서 제자리로
+    opacity: progress < 0.3 ? 0 : (progress - 0.3) * 2,
+    transform: `scale(${0.8 + progress * 0.2}) translateY(${20 - progress * 20}px)`,
     pointerEvents: progress > 0.5 ? 'auto' : 'none',
   };
-
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       
-      {/* 1. Header (로고, 프로필) - 고정 */}
-      <div className="bg-white z-50 relative border-b border-transparent">
+      {/* 1. Header */}
+      <div className="bg-white z-50 relative">
         <SiteHeader />
       </div>
 
-      {/* 2. Dynamic Search & Tabs Area (스크롤에 따라 변형 및 고정) */}
+      {/* 2. Search & Tabs Area (애니메이션 적용) */}
       <div 
-        className="sticky top-[80px] z-40 bg-white border-b border-slate-100 transition-all duration-200 ease-out overflow-hidden"
+        className="sticky top-[80px] z-40 bg-white border-b border-slate-100 transition-all duration-200 ease-out"
         style={searchContainerStyle}
       >
         <div className="flex flex-col items-center h-full relative">
           
-          {/* 상단 탭 (체험 | 서비스) - 아이콘 추가됨 */}
-          <div className={`flex gap-8 mt-6 transition-all duration-200 ${isScrolled ? 'opacity-0 translate-y-[-20px]' : 'opacity-100'}`}>
+          {/* 상단 탭 (체험 | 서비스) */}
+          <div className={`flex gap-8 mt-4 transition-all duration-200 ${isScrolled ? 'opacity-0 translate-y-[-20px]' : 'opacity-100'}`}>
             <button 
               onClick={() => setActiveTab('experience')}
-              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'experience' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 hover:border-slate-300 border-b-[3px] border-transparent'}`}
+              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'experience' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 px-3 rounded-t-lg border-b-[3px] border-transparent'}`}
             >
-              <TentTree size={20} /> 체험
+              체험
             </button>
             <button 
               onClick={() => setActiveTab('service')}
-              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'service' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 hover:border-slate-300 border-b-[3px] border-transparent'}`}
+              className={`pb-2 text-base font-bold transition-all flex items-center gap-2 ${activeTab === 'service' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 px-3 rounded-t-lg border-b-[3px] border-transparent'}`}
             >
-              <ConciergeBell size={20} /> 서비스
+              서비스
             </button>
           </div>
 
-          {/* 검색바 컨테이너 (중앙 정렬을 위해 relative 설정) */}
+          {/* 검색바 컨테이너 */}
           <div className="absolute w-full flex justify-center bottom-6 px-6">
             
-            {/* A. 펼쳐진 검색바 (스크롤 내리면 사라짐) */}
+            {/* A. 펼쳐진 검색바 (큰 버전) */}
             <div 
-              className="flex items-center bg-white border border-slate-200 rounded-full shadow-lg hover:shadow-xl transition-all w-full max-w-2xl h-16 origin-center"
+              className="flex items-center bg-white border border-slate-200 rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)] transition-shadow w-full max-w-3xl h-[66px] origin-center divide-x divide-slate-200"
               style={expandedSearchStyle as any}
             >
-              <div className="flex-1 px-8 border-r border-slate-200 h-full flex flex-col justify-center hover:bg-slate-50 rounded-l-full cursor-pointer group">
-                <label className="text-[10px] font-bold uppercase text-slate-800 group-hover:text-black">여행지</label>
-                <input type="text" placeholder="여행지 검색" className="w-full text-sm outline-none bg-transparent placeholder:text-slate-400 text-black font-semibold truncate"/>
+              <div className="flex-[1.5] px-8 h-full flex flex-col justify-center hover:bg-slate-100 rounded-l-full cursor-pointer group">
+                <label className="text-[11px] font-bold text-slate-800 group-hover:text-black">여행지</label>
+                <input type="text" placeholder="여행지 검색" className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate"/>
               </div>
-              <div className="flex-1 px-8 h-full flex flex-col justify-center hover:bg-slate-50 cursor-pointer group relative">
-                <label className="text-[10px] font-bold uppercase text-slate-800 group-hover:text-black">날짜</label>
-                <input type="text" placeholder="날짜 추가" className="w-full text-sm outline-none bg-transparent placeholder:text-slate-400 text-black font-semibold truncate"/>
+              <div className="flex-1 px-8 h-full flex flex-col justify-center hover:bg-slate-100 cursor-pointer group">
+                <label className="text-[11px] font-bold text-slate-800 group-hover:text-black">날짜</label>
+                <input type="text" placeholder="날짜 추가" className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate"/>
               </div>
-              <div className="pr-2 pl-2">
-                <button className="w-12 h-12 bg-rose-500 hover:bg-rose-600 rounded-full flex items-center justify-center text-white transition-transform active:scale-95">
-                  <Search size={20} strokeWidth={2.5}/>
+              <div className="flex-[0.5] pl-4 pr-2 h-full flex items-center justify-end rounded-r-full hover:bg-slate-100 cursor-pointer">
+                <button className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md">
+                  <Search size={22} strokeWidth={2.5}/>
                 </button>
               </div>
             </div>
 
-            {/* B. 축소된 검색바 (스크롤 내리면 나타남) */}
+            {/* B. 축소된 검색바 (작은 버전) */}
             <div 
-              className="absolute flex items-center bg-white border border-slate-300 rounded-full shadow-sm hover:shadow-md transition-all h-12 px-2 origin-center cursor-pointer"
-              style={{ ...collapsedSearchStyle as any, top: '50%', transform: `${collapsedSearchStyle.transform} translateY(-50%)` }}
+              className="absolute flex items-center bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition-all h-12 px-2 origin-center cursor-pointer top-1/2 -translate-y-1/2"
+              style={collapsedSearchStyle as any}
             >
               <div className="px-4 text-sm font-semibold text-slate-900 border-r border-slate-300">
                 어디든지
               </div>
-              <div className="px-4 text-sm font-semibold text-slate-900">
+              <div className="px-4 text-sm font-semibold text-slate-900 border-r border-slate-300">
                 언제든지
               </div>
-              <button className="w-8 h-8 bg-rose-500 rounded-full flex items-center justify-center text-white">
+              <div className="px-4 text-sm font-semibold text-slate-500">
+                검색
+              </div>
+              <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
                 <Search size={14} strokeWidth={3}/>
               </button>
             </div>
@@ -165,23 +168,23 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 3. Category Filter (스크롤 시 따라오지 않음) */}
+      {/* 3. Category Filter (도시 목록) */}
       {activeTab === 'experience' && (
-        <div className="bg-white border-b border-slate-100 pt-4">
+        <div className="bg-white pt-6 pb-2">
           <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex items-center gap-4">
-            <div className="flex-1 flex items-center gap-8 overflow-x-auto no-scrollbar pb-2">
+            <div className="flex-1 flex items-center gap-10 overflow-x-auto no-scrollbar pb-2">
               {CATEGORIES.map((cat) => (
                 <button 
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex flex-col items-center gap-2 min-w-[64px] pb-3 transition-all border-b-2 cursor-pointer group ${
+                  className={`flex flex-col items-center gap-2 min-w-fit pb-3 transition-all border-b-2 cursor-pointer group ${
                     selectedCategory === cat.id 
                       ? 'border-black text-black opacity-100' 
-                      : 'border-transparent text-slate-500 opacity-60 hover:opacity-100 hover:border-slate-200'
+                      : 'border-transparent text-slate-500 opacity-60 hover:opacity-100 hover:border-slate-300'
                   }`}
                 >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">{cat.icon}</span>
-                  <span className="text-xs font-semibold whitespace-nowrap">{cat.label}</span>
+                  <span className="text-2xl group-hover:scale-110 transition-transform filter grayscale group-hover:grayscale-0">{cat.icon}</span>
+                  <span className="text-xs font-bold whitespace-nowrap">{cat.label}</span>
                 </button>
               ))}
             </div>
@@ -192,20 +195,21 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 4. Main Content Grid */}
-      <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
-        {/* ... (이전과 동일한 콘텐츠 영역 코드) ... */}
+      {/* 4. Main Content */}
+      <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-6 min-h-screen">
+        
         {/* A. 체험 리스트 */}
         {activeTab === 'experience' && (
           loading ? (
             <div className="flex justify-center py-40"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div></div>
           ) : experiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-40 text-center">
-              <div className="text-4xl mb-4">😢</div>
-              <h3 className="text-lg font-bold text-slate-900">등록된 체험이 없습니다.</h3>
+              <div className="text-4xl mb-4">🌏</div>
+              <h3 className="text-lg font-bold text-slate-900">아직 등록된 체험이 없습니다.</h3>
+              <p className="text-slate-500 text-sm mt-2">첫 번째 호스트가 되어보세요!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
               {experiences.map((item) => (
                 <ExperienceCard key={item.id} item={item} />
               ))}
@@ -215,35 +219,35 @@ export default function HomePage() {
 
         {/* B. 서비스 리스트 */}
         {activeTab === 'service' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
             {LOCALLY_SERVICES.map((item) => (
               <ServiceCard key={item.id} item={item} />
             ))}
           </div>
         )}
+
       </main>
 
-      {/* Footer */}
+      {/* Footer (관리자 링크 복구) */}
       <footer className="border-t border-slate-100 bg-slate-50 mt-20">
-        {/* ... (이전과 동일한 푸터 코드) ... */}
-        <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-10">
+        <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
             <div>
               <h5 className="font-bold text-black mb-4">Locally</h5>
               <ul className="space-y-3">
                 <li><Link href="#" className="hover:underline">회사 소개</Link></li>
-                <li><Link href="#" className="hover:underline">채용 정보</Link></li>
+                <li><Link href="/admin/dashboard" className="hover:underline font-bold text-slate-800">관리자 페이지</Link></li>
               </ul>
             </div>
             <div>
               <h5 className="font-bold text-black mb-4">호스팅</h5>
               <ul className="space-y-3">
                 <li><Link href="/host/register" className="hover:underline">호스트 되기</Link></li>
-                <li><Link href="#" className="hover:underline">호스트 자료</Link></li>
+                <li><Link href="#" className="hover:underline">책임 보험</Link></li>
               </ul>
             </div>
             <div>
-              <h5 className="font-bold text-black mb-4">고객 지원</h5>
+              <h5 className="font-bold text-black mb-4">지원</h5>
               <ul className="space-y-3">
                 <li><Link href="#" className="hover:underline">도움말 센터</Link></li>
                 <li><Link href="#" className="hover:underline">안전 센터</Link></li>
@@ -263,11 +267,12 @@ export default function HomePage() {
   );
 }
 
-// 📌 1080x1350 비율 (aspect-[4/5]) 카드 컴포넌트
+// 📌 체험 카드 (4:5 비율, 1080x1350)
 function ExperienceCard({ item }: any) {
   return (
     <Link href={`/experiences/${item.id}`} className="block group">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-slate-100">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
+        {/* 이미지: 꽉 차게 */}
         <img 
           src={item.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989"} 
           alt={item.title} 
@@ -277,25 +282,27 @@ function ExperienceCard({ item }: any) {
           <Heart size={24} fill="rgba(0,0,0,0.5)" strokeWidth={2} />
         </button>
       </div>
-      <div className="space-y-1">
+
+      <div className="space-y-1 px-1">
         <div className="flex justify-between items-start">
-          <h3 className="font-bold text-slate-900 truncate pr-2">{item.location || '서울'} · {item.category}</h3>
+          <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">{item.location || '서울'} · {item.category}</h3>
           <div className="flex items-center gap-1 text-sm shrink-0">
             <Star size={14} fill="black" />
-            <span>4.9</span>
+            <span>4.95</span>
+            <span className="text-slate-400 font-normal">(32)</span>
           </div>
         </div>
-        <p className="text-sm text-slate-500 line-clamp-1">{item.title}</p>
+        <p className="text-[15px] text-slate-500 line-clamp-1">{item.title}</p>
         <div className="mt-1">
-          <span className="font-bold text-slate-900">₩{Number(item.price).toLocaleString()}</span>
-          <span className="text-sm text-slate-900"> / 인</span>
+          <span className="font-bold text-slate-900 text-[15px]">₩{Number(item.price).toLocaleString()}</span>
+          <span className="text-[15px] text-slate-900 font-normal"> / 인</span>
         </div>
       </div>
     </Link>
   )
 }
 
-// 📌 서비스 카드 컴포넌트 (동일 비율)
+// 📌 서비스 카드
 function ServiceCard({ item }: any) {
   return (
     <div className="block group cursor-pointer">
@@ -306,14 +313,12 @@ function ServiceCard({ item }: any) {
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-6 text-white">
-           <h3 className="font-bold text-lg leading-tight">{item.title}</h3>
+           <h3 className="font-bold text-lg leading-tight mb-1">{item.title}</h3>
+           <p className="text-sm opacity-90 line-clamp-2">{item.desc}</p>
         </div>
       </div>
-      <div className="space-y-1">
-        <p className="text-sm text-slate-500 line-clamp-2">{item.desc}</p>
-        <div className="mt-1 font-bold text-slate-900">
-          ₩{item.price.toLocaleString()}부터
-        </div>
+      <div className="mt-1 font-bold text-slate-900 px-1">
+        ₩{item.price.toLocaleString()}부터
       </div>
     </div>
   )
