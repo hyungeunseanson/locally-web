@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, Globe, User, LogOut, Briefcase, ArrowRightLeft } from 'lucide-react';
+import { Menu, Globe, User, LogOut, Briefcase, ArrowRightLeft, Check } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
@@ -10,12 +10,22 @@ import { useRouter, usePathname } from 'next/navigation';
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [isHost, setIsHost] = useState(false); // 호스트 여부 체크
+  const [isHost, setIsHost] = useState(false);
+  
+  // 🌍 언어 선택 상태
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const [currentLang, setCurrentLang] = useState('한국어 (KR)');
+  const languages = [
+    { label: '한국어 (KR)', value: 'ko' },
+    { label: 'English (US)', value: 'en' },
+    { label: '中文 (CN)', value: 'zh' },
+    { label: '日本語 (JP)', value: 'ja' }
+  ];
+
   const supabase = createClient();
   const router = useRouter();
-  const pathname = usePathname(); // 현재 페이지 위치 확인
+  const pathname = usePathname();
 
-  // 1. 유저 정보 & 호스트 여부 확인
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -33,22 +43,18 @@ export default function SiteHeader() {
       } else {
         setIsHost(false);
       }
-      if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
-        router.refresh();
-      }
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, router]);
+  }, [supabase]);
 
-  // DB에서 이 사람이 체험을 등록했는지 확인
   const checkIsHost = async (userId: string) => {
+    // 체험이 있거나, 이미 호스트 신청을 한 경우 체크
     const { count } = await supabase
       .from('experiences')
       .select('*', { count: 'exact', head: true })
       .eq('host_id', userId);
     
-    // 체험이 1개라도 있으면 호스트로 인정
     if (count && count > 0) {
       setIsHost(true);
     }
@@ -60,35 +66,29 @@ export default function SiteHeader() {
     window.location.reload();
   };
 
-  // ✅ [핵심] 상황별 버튼 동작 로직
+  // ✅ [핵심] 버튼 로직 업데이트
   const handleModeSwitch = () => {
-    // 1. 현재 호스트 페이지에 있다면 -> 게스트(메인)로 가기
     if (pathname?.startsWith('/host')) {
       router.push('/');
       return;
     }
-
-    // 2. 로그인이 안 되어 있다면 -> 로그인 창 띄우기 (이동 X)
     if (!user) {
       setIsLoginModalOpen(true);
       return;
     }
-
-    // 3. 로그인은 했는데 호스트가 아니라면 -> 체험 등록하러 가기
+    // 🚨 호스트가 아니면 -> 신청서 페이지로 이동 (UX 개선)
     if (!isHost) {
-      router.push('/host/create');
+      router.push('/host/register');
       return;
     }
-
-    // 4. 호스트라면 -> 대시보드로 가기
     router.push('/host/dashboard');
   };
 
-  // 버튼 텍스트 결정
   const getButtonLabel = () => {
     if (pathname?.startsWith('/host')) return '게스트 모드로 전환';
-    if (!user || !isHost) return '호스트 되기'; // 비로그인 or 일반 유저
-    return '호스트 모드로 전환'; // 호스트 유저
+    if (!user) return '호스트 되기'; 
+    if (!isHost) return '호스트 등록하기'; // 텍스트 변경
+    return '호스트 모드로 전환'; 
   };
 
   return (
@@ -103,7 +103,7 @@ export default function SiteHeader() {
 
           <div className="flex items-center justify-end gap-2 z-[101]">
             
-            {/* ✅ 상황별 만능 버튼 */}
+            {/* 1. 호스트 버튼 */}
             <button 
               onClick={handleModeSwitch}
               className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
@@ -112,10 +112,37 @@ export default function SiteHeader() {
                <span className="hidden md:inline">{getButtonLabel()}</span>
             </button>
 
-            <button className="p-2 hover:bg-slate-50 rounded-full hidden sm:block">
-              <Globe size={18} />
-            </button>
+            {/* 2. 🌍 언어 선택 버튼 (드롭다운 추가) */}
+            <div className="relative hidden sm:block">
+              <button 
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="p-2 hover:bg-slate-50 rounded-full transition-colors"
+              >
+                <Globe size={18} />
+              </button>
 
+              {/* 언어 드롭다운 메뉴 */}
+              {isLangOpen && (
+                <div className="absolute top-12 right-0 w-48 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] animate-in fade-in zoom-in duration-200">
+                  <div className="px-4 py-2 text-xs font-bold text-slate-400">언어 선택</div>
+                  {languages.map((lang) => (
+                    <button 
+                      key={lang.value}
+                      onClick={() => {
+                        setCurrentLang(lang.label);
+                        setIsLangOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 flex justify-between items-center"
+                    >
+                      {lang.label}
+                      {currentLang === lang.label && <Check size={14} className="text-black"/>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 3. 유저 메뉴 */}
             {user ? (
               <div className="relative group">
                 <div className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white">
@@ -131,7 +158,7 @@ export default function SiteHeader() {
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
                   
-                  {/* 모바일 메뉴에서도 똑같이 동작 */}
+                  {/* 모바일 메뉴용 */}
                   <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">
                     {getButtonLabel()}
                   </button>
