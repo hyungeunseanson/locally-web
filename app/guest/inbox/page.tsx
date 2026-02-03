@@ -17,17 +17,38 @@ export default function GuestInboxPage() {
 
   useEffect(() => {
     const fetchInquiries = async () => {
-      const { data: { user } } = await supabase.auth.getSession().then(({data}) => data);
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
       setUser(user);
 
-      const { data } = await supabase
+      // ✅ 수정: 쿼리를 단순화하고 안전하게 가져옴
+      const { data, error } = await supabase
         .from('inquiries')
-        .select(`*, experiences (title, image_url)`)
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          host_id,
+          experience_id,
+          experiences (
+            title,
+            image_url
+          )
+        `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
-      if (data) setInquiries(data);
+      if (error) {
+        console.error("데이터 로딩 실패:", error);
+      } else {
+        // 체험 정보가 없는(삭제된) 경우도 처리
+        const safeData = data?.map(item => ({
+          ...item,
+          experiences: item.experiences || { title: '삭제된 체험', image_url: null }
+        })) || [];
+        setInquiries(safeData);
+      }
     };
     fetchInquiries();
   }, []);
@@ -53,11 +74,13 @@ export default function GuestInboxPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
+      
       <main className="max-w-6xl mx-auto px-6 py-8 h-[calc(100vh-80px)] flex flex-col">
         <h1 className="text-3xl font-black mb-6">메시지함</h1>
+        
         <div className="flex-1 flex gap-8 border border-slate-200 rounded-2xl overflow-hidden shadow-lg bg-white">
           
-          {/* 목록 */}
+          {/* 왼쪽: 목록 */}
           <div className="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50">
             {inquiries.length === 0 && <div className="p-8 text-center text-slate-400">보낸 메시지가 없습니다.</div>}
             {inquiries.map((inq) => (
@@ -68,10 +91,14 @@ export default function GuestInboxPage() {
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                    {inq.experiences?.image_url && <img src={inq.experiences.image_url} className="w-full h-full object-cover"/>}
+                    {inq.experiences?.image_url ? (
+                      <img src={inq.experiences.image_url} className="w-full h-full object-cover"/>
+                    ) : (
+                      <div className="w-full h-full bg-slate-300"/>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate">{inq.experiences?.title || '체험 정보 없음'}</div>
+                    <div className="font-bold text-sm truncate">{inq.experiences?.title}</div>
                     <div className="text-xs text-slate-500">{new Date(inq.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
@@ -80,14 +107,14 @@ export default function GuestInboxPage() {
             ))}
           </div>
 
-          {/* 채팅창 */}
+          {/* 오른쪽: 채팅창 */}
           <div className="flex-1 flex flex-col bg-white">
             {selectedInquiry ? (
               <>
                 <div className="p-4 border-b border-slate-100 font-bold text-lg">{selectedInquiry.experiences?.title}</div>
+                
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-                  
-                  {/* 첫 문의 메시지 (나 -> 호스트) */}
+                  {/* 첫 문의 (내가 보낸 거니까 오른쪽) */}
                   <div className="flex justify-end">
                     <div className="bg-black text-white p-3 rounded-2xl rounded-tr-none max-w-[70%] text-sm shadow-sm">
                       {selectedInquiry.content}
@@ -95,28 +122,28 @@ export default function GuestInboxPage() {
                   </div>
 
                   {/* 이어지는 대화 */}
-                  {messages.map((msg) => {
-                    const isMe = msg.sender_id === user.id;
-                    return (
-                      <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                        {!isMe && (
-                          <div className="w-8 h-8 bg-slate-200 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
-                            <User size={16}/>
-                          </div>
-                        )}
-                        <div className={`p-3 rounded-2xl max-w-[70%] text-sm shadow-sm 
-                          ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none'}`}>
-                          {msg.content}
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
+                      {msg.sender_id !== user.id && (
+                        <div className="w-8 h-8 bg-slate-200 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
+                          <User size={16}/>
                         </div>
+                      )}
+                      <div className={`p-3 rounded-2xl max-w-[70%] text-sm shadow-sm 
+                        ${msg.sender_id === user.id 
+                          ? 'bg-black text-white rounded-tr-none' 
+                          : 'bg-white border border-slate-200 rounded-tl-none'}`
+                      }>
+                        {msg.content}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
 
                 <div className="p-4 border-t border-slate-100 flex gap-3 bg-white">
                   <input 
                     className="flex-1 bg-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-black"
-                    placeholder="메시지 입력..."
+                    placeholder="메시지를 입력하세요..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
