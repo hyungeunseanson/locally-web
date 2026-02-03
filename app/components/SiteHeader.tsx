@@ -6,20 +6,20 @@ import { Menu, Globe, User, LogOut, Briefcase, ArrowRightLeft, Check } from 'luc
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
+import { useLanguage } from '@/app/context/LanguageContext'; // ✅ 번역 사용
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
+  const [isPending, setIsPending] = useState(false); // 승인 대기 상태
   
-  // 🌍 언어 선택 상태
+  // 🌍 언어
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const [currentLang, setCurrentLang] = useState('한국어 (KR)');
+  const { lang, setLang, t } = useLanguage();
   const languages = [
-    { label: '한국어 (KR)', value: 'ko' },
-    { label: 'English (US)', value: 'en' },
-    { label: '中文 (CN)', value: 'zh' },
-    { label: '日本語 (JP)', value: 'ja' }
+    { label: '한국어', value: 'ko' }, { label: 'English', value: 'en' },
+    { label: '中文', value: 'zh' }, { label: '日本語', value: 'ja' }
   ];
 
   const supabase = createClient();
@@ -30,44 +30,53 @@ export default function SiteHeader() {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
-      if (session?.user) {
-        checkIsHost(session.user.id);
-      }
+      if (session?.user) checkHostStatus(session.user.id);
     };
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      if (session?.user) {
-        checkIsHost(session.user.id);
-      } else {
-        setIsHost(false);
-      }
+      if (session?.user) checkHostStatus(session.user.id);
+      else { setIsHost(false); setIsPending(false); }
     });
 
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const checkIsHost = async (userId: string) => {
-    // 체험이 있거나, 이미 호스트 신청을 한 경우 체크
+  // ✅ 호스트 상태 확인 (핵심 로직)
+  const checkHostStatus = async (userId: string) => {
+    // 1. 신청서 상태 확인
+    const { data: app } = await supabase
+      .from('host_applications')
+      .select('status')
+      .eq('user_id', userId)
+      .maybeSingle(); // 한 건만 조회
+    
+    // 2. 체험 등록 여부 확인
     const { count } = await supabase
       .from('experiences')
       .select('*', { count: 'exact', head: true })
       .eq('host_id', userId);
-    
-    if (count && count > 0) {
+
+    if (app?.status === 'approved' || (count && count > 0)) {
       setIsHost(true);
+      setIsPending(false);
+    } else if (app?.status === 'pending') {
+      setIsHost(false);
+      setIsPending(true); // "승인 대기중" 표시용
+    } else {
+      setIsHost(false);
+      setIsPending(false);
     }
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    alert('로그아웃 되었습니다.');
+    alert(t('logout'));
     window.location.reload();
   };
 
-  // ✅ [핵심] 버튼 로직 업데이트
-  const handleModeSwitch = () => {
+  const handleModeSwitch = async () => {
     if (pathname?.startsWith('/host')) {
       router.push('/');
       return;
@@ -76,19 +85,26 @@ export default function SiteHeader() {
       setIsLoginModalOpen(true);
       return;
     }
-    // 🚨 호스트가 아니면 -> 신청서 페이지로 이동 (UX 개선)
-    if (!isHost) {
-      router.push('/host/register');
+    await checkHostStatus(user.id); // 최신 상태 갱신
+
+    if (isPending) {
+      alert("현재 호스트 승인 대기 중입니다. 관리자 승인을 기다려주세요.");
       return;
     }
-    router.push('/host/dashboard');
+
+    if (!isHost) {
+      router.push('/host/register'); // 신청서로 이동
+      return;
+    }
+    router.push('/host/dashboard'); // 대시보드로 이동
   };
 
   const getButtonLabel = () => {
-    if (pathname?.startsWith('/host')) return '게스트 모드로 전환';
-    if (!user) return '호스트 되기'; 
-    if (!isHost) return '호스트 등록하기'; // 텍스트 변경
-    return '호스트 모드로 전환'; 
+    if (pathname?.startsWith('/host')) return t('guest_mode');
+    if (!user) return t('become_host');
+    if (isPending) return t('host_pending'); // "승인 대기중"
+    if (!isHost) return t('become_host');
+    return t('host_mode');
   };
 
   return (
@@ -106,36 +122,24 @@ export default function SiteHeader() {
             {/* 1. 호스트 버튼 */}
             <button 
               onClick={handleModeSwitch}
-              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
+              className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition-colors border cursor-pointer ${
+                isPending ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'hover:bg-slate-50 text-slate-900 border-transparent hover:border-slate-200'
+              }`}
             >
                {pathname?.startsWith('/host') ? <ArrowRightLeft size={18} className="md:hidden"/> : <Briefcase size={18} className="md:hidden" />}
                <span className="hidden md:inline">{getButtonLabel()}</span>
             </button>
 
-            {/* 2. 🌍 언어 선택 버튼 (드롭다운 추가) */}
+            {/* 2. 🌍 언어 선택 버튼 */}
             <div className="relative hidden sm:block">
-              <button 
-                onClick={() => setIsLangOpen(!isLangOpen)}
-                className="p-2 hover:bg-slate-50 rounded-full transition-colors"
-              >
+              <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
                 <Globe size={18} />
               </button>
-
-              {/* 언어 드롭다운 메뉴 */}
               {isLangOpen && (
-                <div className="absolute top-12 right-0 w-48 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] animate-in fade-in zoom-in duration-200">
-                  <div className="px-4 py-2 text-xs font-bold text-slate-400">언어 선택</div>
-                  {languages.map((lang) => (
-                    <button 
-                      key={lang.value}
-                      onClick={() => {
-                        setCurrentLang(lang.label);
-                        setIsLangOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm font-semibold hover:bg-slate-50 flex justify-between items-center"
-                    >
-                      {lang.label}
-                      {currentLang === lang.label && <Check size={14} className="text-black"/>}
+                <div className="absolute top-12 right-0 w-40 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200]">
+                  {languages.map((l) => (
+                    <button key={l.value} onClick={() => { setLang(l.value); setIsLangOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex justify-between">
+                      {l.label} {lang === l.value && <Check size={14}/>}
                     </button>
                   ))}
                 </div>
@@ -151,21 +155,15 @@ export default function SiteHeader() {
                     <img src={user.user_metadata.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                 </div>
-                
-                <div className="absolute top-full right-0 mt-2 w-60 bg-white border border-slate-100 rounded-xl shadow-xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-[200]">
+                <div className="absolute top-full right-0 mt-2 w-60 bg-white border border-slate-100 rounded-xl shadow-xl py-2 invisible group-hover:visible opacity-0 z-[200]">
                   <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                    <p className="font-bold text-sm truncate">{user.user_metadata.full_name || '게스트'}</p>
+                    <p className="font-bold text-sm truncate">{user.user_metadata.full_name || 'User'}</p>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
-                  
-                  {/* 모바일 메뉴용 */}
-                  <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">
-                    {getButtonLabel()}
-                  </button>
-
-                  <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">나의 여행</Link>
+                  <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">{getButtonLabel()}</button>
+                  <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">{t('my_trips')}</Link>
                   <div className="border-t border-slate-100 my-1"></div>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-red-500 font-semibold flex items-center gap-2"><LogOut size={14}/> 로그아웃</button>
+                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-red-500 font-semibold flex gap-2"><LogOut size={14}/> {t('logout')}</button>
                 </div>
               </div>
             ) : (
