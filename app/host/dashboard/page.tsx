@@ -30,15 +30,10 @@ export default function HostDashboard() {
       const { data: expData } = await supabase.from('experiences').select('*, bookings(count)').eq('host_id', user.id).order('created_at', { ascending: false });
       if (expData) setExperiences(expData);
 
-      // 2. 문의 내역 (JOIN 문법을 안전하게 수정)
-      // sender 정보를 가져오되, 없어도 에러 안나게 처리
-      const { data: inqData, error } = await supabase
+      // 2. 문의 내역 (✅ 수정: sender join 제거)
+      const { data: inqData } = await supabase
         .from('inquiries')
-        .select(`
-          *,
-          experiences (title),
-          sender:user_id (email)
-        `)
+        .select(`*, experiences (title)`)
         .eq('host_id', user.id)
         .order('created_at', { ascending: false });
       
@@ -117,7 +112,7 @@ export default function HostDashboard() {
                     <div className="text-xs font-bold text-slate-500 mb-1">{inq.experiences?.title || '삭제된 체험'}</div>
                     <div className="font-bold text-sm truncate">{inq.content}</div>
                     <div className="text-xs text-slate-400 mt-2 flex justify-between">
-                       <span>{inq.sender?.email || 'Guest'}</span>
+                       <span>Guest</span>
                        <span>{new Date(inq.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>

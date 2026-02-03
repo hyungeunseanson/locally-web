@@ -21,13 +21,12 @@ export default function GuestInboxPage() {
       if (!user) { router.push('/'); return; }
       setUser(user);
 
-      // 내가 보낸 문의 조회 (JOIN 문법 수정)
-      const { data, error } = await supabase
+      // ✅ 수정: 호스트 이메일 join 제거 (에러 방지) -> 체험 정보만 가져옴
+      const { data } = await supabase
         .from('inquiries')
         .select(`
           *,
-          experiences (title, image_url),
-          host:host_id (email)
+          experiences (title, image_url)
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -58,13 +57,9 @@ export default function GuestInboxPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      
       <main className="max-w-6xl mx-auto px-6 py-8 h-[calc(100vh-80px)] flex flex-col">
         <h1 className="text-3xl font-black mb-6">메시지함</h1>
-        
         <div className="flex-1 flex gap-8 border border-slate-200 rounded-2xl overflow-hidden shadow-lg bg-white">
-          
-          {/* 목록 */}
           <div className="w-1/3 border-r border-slate-200 overflow-y-auto bg-slate-50">
             {inquiries.length === 0 && <div className="p-8 text-center text-slate-400">보낸 메시지가 없습니다.</div>}
             {inquiries.map((inq) => (
@@ -75,26 +70,21 @@ export default function GuestInboxPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-sm truncate">{inq.experiences?.title || '체험 정보 없음'}</div>
-                    <div className="text-xs text-slate-500">Host: {inq.host?.email || 'Unknown'}</div>
+                    <div className="text-xs text-slate-500">문의 날짜: {new Date(inq.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
                 <p className="text-sm text-slate-600 line-clamp-1">"{inq.content}"</p>
-                <p className="text-xs text-slate-400 mt-2 text-right">{new Date(inq.created_at).toLocaleDateString()}</p>
               </div>
             ))}
           </div>
-
-          {/* 채팅창 */}
           <div className="flex-1 flex flex-col bg-white">
             {selectedInquiry ? (
               <>
                 <div className="p-4 border-b border-slate-100 font-bold text-lg">{selectedInquiry.experiences?.title}</div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-                  {/* 첫 문의 (내 메시지) */}
                   <div className="flex justify-end">
                     <div className="bg-black text-white p-3 rounded-2xl rounded-tr-none max-w-[70%] text-sm shadow-sm">{selectedInquiry.content}</div>
                   </div>
-                  {/* 대화 */}
                   {messages.map((msg) => (
                     <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
                       {msg.sender_id !== user.id && <div className="w-8 h-8 bg-slate-200 rounded-full mr-2 flex items-center justify-center flex-shrink-0"><User size={16}/></div>}

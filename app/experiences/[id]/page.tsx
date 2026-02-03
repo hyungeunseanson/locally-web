@@ -17,16 +17,13 @@ export default function ExperienceDetailPage() {
   
   const [user, setUser] = useState<any>(null);
   const [experience, setExperience] = useState<any>(null);
-  const [hostProfile, setHostProfile] = useState<any>(null); // 호스트 추가 정보
+  const [hostProfile, setHostProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   
-  // 예약 폼 상태
   const [guestCount, setGuestCount] = useState(1);
   const [selectedDate, setSelectedDate] = useState(""); 
   const [inquiryText, setInquiryText] = useState('');
-  
-  // 달력 UI
   const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
@@ -35,30 +32,17 @@ export default function ExperienceDetailPage() {
       setUser(user);
 
       // 1. 체험 정보
-      const { data: exp, error } = await supabase
-        .from('experiences')
-        .select('*') // JOIN 없이 가져옴 (에러 방지)
-        .eq('id', params.id)
-        .single();
-
+      const { data: exp, error } = await supabase.from('experiences').select('*').eq('id', params.id).single();
       if (error) { console.error(error); } 
       else {
         setExperience(exp);
-        
         // 2. 예약 가능일
         const { data: dates } = await supabase.from('experience_availability').select('date').eq('experience_id', exp.id).eq('is_booked', false);
         if (dates) setAvailableDates(dates.map((d: any) => d.date));
-
-        // 3. 호스트 정보 (지원서에서 자기소개 가져오기 - Airbnb 스타일)
-        const { data: hostApp } = await supabase
-          .from('host_applications')
-          .select('self_intro, motivation, name, instagram')
-          .eq('user_id', exp.host_id)
-          .single();
         
-        // 유저 메타데이터(사진) + 지원서 내용 합치기
-        // (주의: getUserById는 클라이언트에서 안되므로, 편의상 user_metadata가 있다고 가정하거나 fallback 이미지 사용)
-        setHostProfile(hostApp); 
+        // 3. 호스트 정보 (지원서 내용만 사용)
+        const { data: hostApp } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).maybeSingle();
+        setHostProfile(hostApp || { name: 'Locally Host', self_intro: '안녕하세요!' }); 
       }
       setLoading(false);
     };
