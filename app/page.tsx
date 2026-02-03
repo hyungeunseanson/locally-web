@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Heart, Star, MapPin, SlidersHorizontal } from 'lucide-react';
+// ✅ [수정완료] Globe 추가했습니다!
+import { Heart, Star, MapPin, SlidersHorizontal, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from './lib/supabase';
-// ✅ 우리가 만든 '똑똑한 헤더' 가져오기
 import SiteHeader from '@/app/components/SiteHeader';
 
 const CATEGORIES = [
@@ -21,7 +21,6 @@ export default function HomePage() {
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 데이터 불러오기 로직 (그대로 유지)
   useEffect(() => {
     const fetchExperiences = async () => {
       try {
@@ -50,10 +49,10 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       
-      {/* ✅ [수정 완료] 옛날 헤더 삭제하고, 기능 완벽한 SiteHeader 장착! */}
+      {/* 헤더 (SiteHeader 사용) */}
       <SiteHeader />
 
-      {/* 2. Category Filter */}
+      {/* 카테고리 필터 */}
       <div className="bg-white pt-6 pb-4 sticky top-20 z-40 shadow-sm md:shadow-none">
         <div className="max-w-[1760px] mx-auto px-6 flex items-center gap-8 overflow-x-auto no-scrollbar">
           {CATEGORIES.map((cat) => (
@@ -76,7 +75,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 3. Main Content */}
+      {/* 메인 컨텐츠 */}
       <main className="max-w-[1760px] mx-auto px-6 py-8">
         {loading ? (
           <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-black"></div></div>
