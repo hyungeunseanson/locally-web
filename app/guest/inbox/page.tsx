@@ -21,34 +21,13 @@ export default function GuestInboxPage() {
       if (!user) { router.push('/'); return; }
       setUser(user);
 
-      // ✅ 수정: 쿼리를 단순화하고 안전하게 가져옴
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('inquiries')
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          host_id,
-          experience_id,
-          experiences (
-            title,
-            image_url
-          )
-        `)
+        .select(`*, experiences (title, image_url)`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error("데이터 로딩 실패:", error);
-      } else {
-        // 체험 정보가 없는(삭제된) 경우도 처리
-        const safeData = data?.map(item => ({
-          ...item,
-          experiences: item.experiences || { title: '삭제된 체험', image_url: null }
-        })) || [];
-        setInquiries(safeData);
-      }
+      if (data) setInquiries(data);
     };
     fetchInquiries();
   }, []);
@@ -91,14 +70,10 @@ export default function GuestInboxPage() {
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                    {inq.experiences?.image_url ? (
-                      <img src={inq.experiences.image_url} className="w-full h-full object-cover"/>
-                    ) : (
-                      <div className="w-full h-full bg-slate-300"/>
-                    )}
+                    {inq.experiences?.image_url && <img src={inq.experiences.image_url} className="w-full h-full object-cover"/>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate">{inq.experiences?.title}</div>
+                    <div className="font-bold text-sm truncate">{inq.experiences?.title || '체험 정보 없음'}</div>
                     <div className="text-xs text-slate-500">{new Date(inq.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
@@ -114,7 +89,8 @@ export default function GuestInboxPage() {
                 <div className="p-4 border-b border-slate-100 font-bold text-lg">{selectedInquiry.experiences?.title}</div>
                 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-                  {/* 첫 문의 (내가 보낸 거니까 오른쪽) */}
+                  
+                  {/* 첫 문의 메시지 (무조건 내가 보낸 것 -> 오른쪽) */}
                   <div className="flex justify-end">
                     <div className="bg-black text-white p-3 rounded-2xl rounded-tr-none max-w-[70%] text-sm shadow-sm">
                       {selectedInquiry.content}
@@ -122,22 +98,30 @@ export default function GuestInboxPage() {
                   </div>
 
                   {/* 이어지는 대화 */}
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                      {msg.sender_id !== user.id && (
-                        <div className="w-8 h-8 bg-slate-200 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
-                          <User size={16}/>
+                  {messages.map((msg) => {
+                    // ✅ 로직 수정: sender_id가 내 아이디와 같으면 '나(Me)'
+                    const isMe = msg.sender_id === user?.id; 
+                    
+                    return (
+                      <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        {/* 상대방일 때만 프로필 아이콘 표시 */}
+                        {!isMe && (
+                          <div className="w-8 h-8 bg-slate-200 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
+                            <User size={16}/>
+                          </div>
+                        )}
+                        
+                        {/* 말풍선 스타일 분기 */}
+                        <div className={`p-3 rounded-2xl max-w-[70%] text-sm shadow-sm 
+                          ${isMe 
+                            ? 'bg-black text-white rounded-tr-none' // 나: 검정색, 오른쪽 꼬리 없음
+                            : 'bg-white border border-slate-200 text-slate-900 rounded-tl-none' // 상대: 흰색, 왼쪽 꼬리 없음
+                          }`}>
+                          {msg.content}
                         </div>
-                      )}
-                      <div className={`p-3 rounded-2xl max-w-[70%] text-sm shadow-sm 
-                        ${msg.sender_id === user.id 
-                          ? 'bg-black text-white rounded-tr-none' 
-                          : 'bg-white border border-slate-200 rounded-tl-none'}`
-                      }>
-                        {msg.content}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="p-4 border-t border-slate-100 flex gap-3 bg-white">
