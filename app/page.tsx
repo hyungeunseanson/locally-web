@@ -3,13 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, Star, MapPin, Search, Globe, SlidersHorizontal, 
-  TentTree, ConciergeBell, ChevronLeft, ChevronRight 
+  ChevronLeft, ChevronRight, Tent, ConciergeBell 
 } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 
-// 🏙️ 도시 카테고리 (상단 탭용 - 컬러 아이콘 유지)
+// 🏙️ 도시 카테고리
 const CATEGORIES = [
   { id: 'all', label: '전체', icon: '🌏' },
   { id: 'tokyo', label: '도쿄', icon: '🗼' },
@@ -22,7 +22,6 @@ const CATEGORIES = [
   { id: 'jeju', label: '제주', icon: '🍊' },
 ];
 
-// 로컬리 서비스
 const LOCALLY_SERVICES = [
   { id: 1, title: '일본 식당 전화 예약 대행', price: 5000, image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b', desc: '한국어 대응 불가 식당, 대신 예약해드립니다.' },
   { id: 2, title: '일본 전세 버스 대절 서비스', price: 350000, image: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e', desc: '단체 여행을 위한 쾌적한 버스 대절.' },
@@ -36,7 +35,7 @@ export default function HomePage() {
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 🔍 검색바 상태 관리
+  // 검색바 상태
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | null>(null);
   const [locationInput, setLocationInput] = useState('');
   const [dateRange, setDateRange] = useState<{start: Date | null, end: Date | null}>({ start: null, end: null });
@@ -44,21 +43,17 @@ export default function HomePage() {
 
   // 스크롤 상태
   const [scrollY, setScrollY] = useState(0);
-  const isScrolled = scrollY > 20;
-
   const supabase = createClient();
 
-  // 스크롤 감지
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
-      if (window.scrollY > 50) setActiveSearchField(null); // 스크롤하면 드롭다운 닫기
+      if (window.scrollY > 20) setActiveSearchField(null); // 스크롤 시 드롭다운 닫기
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 외부 클릭 시 검색 드롭다운 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -69,12 +64,13 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 데이터 로딩
   useEffect(() => {
     const fetchExperiences = async () => {
       try {
         let query = supabase.from('experiences').select('*').order('created_at', { ascending: false });
-        // 실제 구현 시: if (selectedCategory !== 'all') query = query.ilike('location', ...);
+        if (selectedCategory !== 'all') {
+           // 실제 구현 시 필터링 로직 추가
+        }
         const { data, error } = await query;
         if (error) throw error;
         if (data) setExperiences(data);
@@ -84,110 +80,122 @@ export default function HomePage() {
     fetchExperiences();
   }, [selectedCategory]);
 
-  // 📅 날짜 포맷팅 함수
   const formatDateRange = () => {
-    if (dateRange.start && dateRange.end) {
-      return `${dateRange.start.getMonth()+1}월 ${dateRange.start.getDate()}일 - ${dateRange.end.getMonth()+1}월 ${dateRange.end.getDate()}일`;
-    }
+    if (dateRange.start && dateRange.end) return `${dateRange.start.getMonth()+1}월 ${dateRange.start.getDate()}일 - ${dateRange.end.getMonth()+1}월 ${dateRange.end.getDate()}일`;
     if (dateRange.start) return `${dateRange.start.getMonth()+1}월 ${dateRange.start.getDate()}일`;
     return '';
   };
 
-  // ✨ 애니메이션 스타일
-  const progress = Math.min(scrollY / 50, 1);
+  // ✨ 애니메이션 계산 (0 ~ 1)
+  // 60px 스크롤하면 큰 검색바가 완전히 사라지고 작은 검색바가 나타남
+  const progress = Math.min(scrollY / 60, 1);
   
-  const expandedSearchStyle = {
-    opacity: 1 - progress * 2,
-    transform: `scale(${1 - progress * 0.2}) translateY(${progress * -20}px)`,
-    pointerEvents: isScrolled ? 'none' : 'auto',
-    display: progress > 0.8 ? 'none' : 'flex',
+  // 큰 검색바 영역 높이 (100px -> 0px)
+  const bigSearchHeight = 100 * (1 - progress); 
+  
+  // 작은 검색바 스타일 (헤더 중앙에 위치)
+  const smallSearchStyle = {
+    opacity: progress < 0.5 ? 0 : (progress - 0.5) * 2, // 늦게 나타남
+    transform: `translate(-50%, -50%) scale(${0.8 + progress * 0.2})`, // 커지면서 등장
+    pointerEvents: progress > 0.8 ? 'auto' : 'none',
   };
 
-  const collapsedSearchStyle = {
-    opacity: progress < 0.5 ? 0 : (progress - 0.5) * 2,
-    transform: `scale(${0.8 + progress * 0.2}) translateY(0)`,
-    pointerEvents: isScrolled ? 'auto' : 'none',
+  // 큰 검색바 스타일
+  const bigSearchStyle = {
+    opacity: 1 - progress * 1.5, // 빨리 사라짐
+    transform: `scale(${1 - progress * 0.1}) translateY(${progress * -10}px)`,
+    pointerEvents: progress > 0.5 ? 'none' : 'auto',
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
       
-      {/* 1. Header (Fixed) */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm h-20 transition-shadow">
-        <SiteHeader />
+      {/* ✅ Sticky Header Wrapper 
+        헤더와 검색바를 하나의 sticky 컨테이너로 묶어서 
+        스크롤 시 띠 현상 없이 자연스럽게 따라오게 만듦 
+      */}
+      <div className="sticky top-0 z-50 bg-white border-b border-slate-100 transition-shadow" 
+           style={{ boxShadow: progress > 0.8 ? '0 4px 20px rgba(0,0,0,0.05)' : 'none' }}>
         
-        {/* B. 축소된 검색바 (스크롤 시 헤더 중앙에 등장) */}
-        <div 
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center bg-white border border-slate-300 rounded-full shadow-sm hover:shadow-md transition-all h-12 px-2 cursor-pointer z-50"
-          style={collapsedSearchStyle as any}
-          onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setActiveSearchField('location'); }}
-        >
-          <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">어디든지</div>
-          <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">언제든지</div>
-          <div className="px-4 text-sm font-bold text-slate-500">검색</div>
-          <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2"><Search size={14} strokeWidth={3}/></button>
-        </div>
-      </div>
-
-      {/* 2. Big Search Area (Scrolls away) */}
-      <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
-        <div className="flex flex-col items-center relative">
+        {/* 1. Logo & Profile Header (높이 80px 고정) */}
+        <div className="h-20 relative z-20 bg-white">
+          <SiteHeader />
           
-          {/* 탭 (🎈체험 | 🛎️서비스) */}
-          <div className={`flex gap-8 mb-4 transition-all duration-300 ${isScrolled ? 'opacity-0 -translate-y-10' : 'opacity-100'}`}>
-            <button onClick={() => setActiveTab('experience')} className={`pb-2 text-base font-bold flex items-center gap-2 transition-all ${activeTab === 'experience' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 border-b-[3px] border-transparent'}`}>
-              <span className="text-xl">🎈</span> 체험
-            </button>
-            <button onClick={() => setActiveTab('service')} className={`pb-2 text-base font-bold flex items-center gap-2 transition-all ${activeTab === 'service' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 border-b-[3px] border-transparent'}`}>
-              <span className="text-xl">🛎️</span> 서비스
+          {/* 🔍 축소된 검색바 (헤더 정중앙에 위치, 스크롤 내리면 등장) */}
+          <div 
+            className="absolute top-1/2 left-1/2 flex items-center bg-white border border-slate-300 rounded-full shadow-sm hover:shadow-md transition-all h-12 px-2 cursor-pointer"
+            style={smallSearchStyle as any}
+            onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setActiveSearchField('location'); }}
+          >
+            <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">어디든지</div>
+            <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">언제든지</div>
+            <div className="px-4 text-sm font-bold text-slate-500">검색</div>
+            <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
+              <Search size={14} strokeWidth={3}/>
             </button>
           </div>
+        </div>
 
-          {/* A. 펼쳐진 검색바 (큰 버전) */}
-          <div className="relative w-full max-w-3xl h-[66px]" style={expandedSearchStyle as any}>
-            <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100' : 'border-slate-200'} rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] transition-all`}>
-              
-              {/* 여행지 입력 */}
-              <div 
-                className={`flex-[1.5] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'location' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
-                onClick={() => setActiveSearchField('location')}
+        {/* 2. Big Search Area (스크롤 내리면 높이가 줄어들며 사라짐) */}
+        <div className="relative z-10 bg-white overflow-hidden origin-top" style={{ height: `${bigSearchHeight}px` }}>
+          <div className="flex flex-col items-center w-full absolute top-0" style={bigSearchStyle as any}>
+            
+            {/* 탭 (🎈체험 | 🛎️서비스) - 컬러풀한 아이콘 적용 */}
+            <div className="flex gap-8 mb-4">
+              <button 
+                onClick={() => setActiveTab('experience')} 
+                className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'experience' ? 'border-black text-black' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
               >
-                <label className="text-[11px] font-bold text-slate-800">여행지</label>
-                <input 
-                  type="text" 
-                  placeholder="도시나 명소로 검색" 
-                  value={locationInput}
-                  readOnly
-                  className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
-                />
-              </div>
-
-              {/* 날짜 입력 */}
-              <div 
-                className={`flex-[1] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'date' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
-                onClick={() => setActiveSearchField('date')}
+                <div className={`p-1.5 rounded-full ${activeTab === 'experience' ? 'bg-slate-100' : ''}`}>
+                  <Tent className={activeTab === 'experience' ? 'text-[#FF385C] fill-[#FF385C]' : 'text-slate-500'} size={20} />
+                </div>
+                체험
+              </button>
+              <button 
+                onClick={() => setActiveTab('service')} 
+                className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'service' ? 'border-black text-black' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
               >
-                <label className="text-[11px] font-bold text-slate-800">날짜</label>
-                <input 
-                  type="text" 
-                  placeholder="날짜 선택" 
-                  value={formatDateRange()}
-                  readOnly
-                  className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
-                />
-              </div>
-
-              {/* 검색 버튼 */}
-              <div className="pl-4 pr-2 h-full flex items-center justify-end rounded-full z-10">
-                <button className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md">
-                  <Search size={22} strokeWidth={2.5}/>
-                </button>
-              </div>
+                <div className={`p-1.5 rounded-full ${activeTab === 'service' ? 'bg-slate-100' : ''}`}>
+                  <ConciergeBell className={activeTab === 'service' ? 'text-[#FF385C] fill-[#FF385C]' : 'text-slate-500'} size={20} />
+                </div>
+                서비스
+              </button>
             </div>
 
-            {/* 🔽 드롭다운: 여행지 (수정됨: 이모지 제거, 스르륵 애니메이션, 깔끔한 리스트) */}
-            {activeSearchField === 'location' && (
-              <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
+            {/* 큰 검색바 (드롭다운 포함) */}
+            <div className="relative w-full max-w-3xl h-[66px]" ref={searchRef}>
+              <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-slate-300 bg-slate-100' : 'border-slate-200'} rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] transition-all`}>
+                
+                {/* 여행지 */}
+                <div 
+                  className={`flex-[1.5] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'location' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
+                  onClick={() => setActiveSearchField('location')}
+                >
+                  <label className="text-[11px] font-bold text-slate-800">여행지</label>
+                  <input type="text" placeholder="도시나 명소로 검색" value={locationInput} readOnly className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold cursor-pointer truncate"/>
+                </div>
+
+                {/* 날짜 */}
+                <div 
+                  className={`flex-[1] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'date' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
+                  onClick={() => setActiveSearchField('date')}
+                >
+                  <label className="text-[11px] font-bold text-slate-800">날짜</label>
+                  <input type="text" placeholder="날짜 선택" value={formatDateRange()} readOnly className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold cursor-pointer truncate"/>
+                </div>
+
+                {/* 검색 버튼 */}
+                <div className="pl-4 pr-2 h-full flex items-center justify-end rounded-full z-10">
+                  <button className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md">
+                    <Search size={22} strokeWidth={2.5}/>
+                  </button>
+                </div>
+              </div>
+
+              {/* 🔽 드롭다운: 여행지 (이모지 제거, 깔끔한 디자인, 스르륵 애니메이션) */}
+              <div 
+                className={`absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.15)] p-6 z-50 overflow-hidden transition-all duration-300 ease-out origin-top ${activeSearchField === 'location' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-4 pointer-events-none'}`}
+              >
                 <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
                 <div className="grid grid-cols-1 gap-1">
                   {CATEGORIES.filter(c => c.id !== 'all').map((city) => (
@@ -196,43 +204,42 @@ export default function HomePage() {
                       onClick={() => { setLocationInput(city.label); setActiveSearchField('date'); setSelectedCategory(city.id); }}
                       className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group"
                     >
-                      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all">
+                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:text-black group-hover:shadow-sm transition-all">
                         <MapPin size={20} />
                       </div>
-                      <span className="font-bold text-slate-700">{city.label}</span>
+                      <span className="font-semibold text-slate-700 group-hover:text-black">{city.label}</span>
                     </button>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* 📅 드롭다운: 달력 (스르륵 애니메이션 적용) */}
-            {activeSearchField === 'date' && (
-              <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
+              {/* 📅 드롭다운: 달력 */}
+              <div 
+                className={`absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.15)] p-6 z-50 transition-all duration-300 ease-out origin-top ${activeSearchField === 'date' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-4 pointer-events-none'}`}
+              >
                 <DatePicker 
                   selectedRange={dateRange} 
                   onChange={(range) => {
                     setDateRange(range);
-                    if (range.start && range.end) setActiveSearchField(null); // 둘 다 선택하면 닫기
+                    if (range.start && range.end) setActiveSearchField(null);
                   }} 
                 />
               </div>
-            )}
-
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 3. Category Filter (도시 목록) */}
+      {/* 3. Category Filter (Static - 따라오지 않음) */}
       {activeTab === 'experience' && (
-        <div className="bg-white pb-6 pt-2 border-b border-slate-100">
+        <div className="bg-white pt-10 pb-4">
           <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex justify-center">
             <div className="flex items-center gap-12 overflow-x-auto no-scrollbar pb-2">
               {CATEGORIES.map((cat) => (
                 <button 
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex flex-col items-center gap-2 min-w-fit pb-2 transition-all border-b-2 cursor-pointer group ${
+                  className={`flex flex-col items-center gap-3 min-w-fit pb-2 transition-all border-b-2 cursor-pointer group ${
                     selectedCategory === cat.id 
                       ? 'border-black opacity-100' 
                       : 'border-transparent opacity-60 hover:opacity-100 hover:border-slate-200'
@@ -313,7 +320,7 @@ export default function HomePage() {
   );
 }
 
-// 🗓️ 커스텀 달력 컴포넌트
+// 🗓️ 커스텀 달력
 function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange: (range: any) => void }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -322,7 +329,6 @@ function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange:
 
   const handleDateClick = (day: number) => {
     const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-    
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
       onChange({ start: clickedDate, end: null });
     } else {
@@ -340,27 +346,14 @@ function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange:
     const daysCount = getDaysInMonth(year, month);
     const startBlank = getFirstDay(year, month);
     const days = [];
-
     for (let i = 0; i < startBlank; i++) days.push(<div key={`empty-${i}`} />);
-    
     for (let d = 1; d <= daysCount; d++) {
       const date = new Date(year, month, d);
       const isStart = selectedRange.start?.getTime() === date.getTime();
       const isEnd = selectedRange.end?.getTime() === date.getTime();
       const isInRange = selectedRange.start && selectedRange.end && date > selectedRange.start && date < selectedRange.end;
-      
       days.push(
-        <button 
-          key={d} 
-          onClick={() => handleDateClick(d)}
-          className={`h-10 w-10 rounded-full text-sm font-bold flex items-center justify-center transition-all
-            ${isStart || isEnd ? 'bg-black text-white' : ''}
-            ${isInRange ? 'bg-slate-100' : ''}
-            ${!isStart && !isEnd && !isInRange ? 'hover:border border-black' : ''}
-          `}
-        >
-          {d}
-        </button>
+        <button key={d} onClick={() => handleDateClick(d)} className={`h-10 w-10 rounded-full text-sm font-bold flex items-center justify-center transition-all ${isStart || isEnd ? 'bg-black text-white' : ''} ${isInRange ? 'bg-slate-100' : ''} ${!isStart && !isEnd && !isInRange ? 'hover:border border-black' : ''}`}>{d}</button>
       );
     }
     return days;
@@ -373,12 +366,8 @@ function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange:
         <span className="font-bold">{currentDate.getFullYear()}년 {currentDate.getMonth()+1}월</span>
         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}><ChevronRight size={20}/></button>
       </div>
-      <div className="grid grid-cols-7 text-center gap-y-1 text-xs font-bold text-slate-500 mb-2">
-        {['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}
-      </div>
-      <div className="grid grid-cols-7 gap-y-1 justify-items-center">
-        {renderDays()}
-      </div>
+      <div className="grid grid-cols-7 text-center gap-y-1 text-xs font-bold text-slate-500 mb-2">{['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}</div>
+      <div className="grid grid-cols-7 gap-y-1 justify-items-center">{renderDays()}</div>
     </div>
   );
 }
@@ -387,29 +376,16 @@ function ExperienceCard({ item }: any) {
   return (
     <Link href={`/experiences/${item.id}`} className="block group">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
-        <img 
-          src={item.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989"} 
-          alt={item.title} 
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-        <button className="absolute top-3 right-3 text-white/70 hover:text-white hover:scale-110 transition-all z-10">
-          <Heart size={24} fill="rgba(0,0,0,0.5)" strokeWidth={2} />
-        </button>
+        <img src={item.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989"} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+        <button className="absolute top-3 right-3 text-white/70 hover:text-white hover:scale-110 transition-all z-10"><Heart size={24} fill="rgba(0,0,0,0.5)" strokeWidth={2} /></button>
       </div>
       <div className="space-y-1 px-1">
         <div className="flex justify-between items-start">
           <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">{item.location || '서울'} · {item.category}</h3>
-          <div className="flex items-center gap-1 text-sm shrink-0">
-            <Star size={14} fill="black" />
-            <span>4.95</span>
-            <span className="text-slate-400 font-normal">(32)</span>
-          </div>
+          <div className="flex items-center gap-1 text-sm shrink-0"><Star size={14} fill="black" /><span>4.95</span><span className="text-slate-400 font-normal">(32)</span></div>
         </div>
         <p className="text-[15px] text-slate-500 line-clamp-1">{item.title}</p>
-        <div className="mt-1">
-          <span className="font-bold text-slate-900 text-[15px]">₩{Number(item.price).toLocaleString()}</span>
-          <span className="text-[15px] text-slate-900 font-normal"> / 인</span>
-        </div>
+        <div className="mt-1"><span className="font-bold text-slate-900 text-[15px]">₩{Number(item.price).toLocaleString()}</span><span className="text-[15px] text-slate-900 font-normal"> / 인</span></div>
       </div>
     </Link>
   )
@@ -419,19 +395,10 @@ function ServiceCard({ item }: any) {
   return (
     <div className="block group cursor-pointer">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3">
-        <img 
-          src={item.image} 
-          alt={item.title} 
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-6 text-white">
-           <h3 className="font-bold text-lg leading-tight mb-1">{item.title}</h3>
-           <p className="text-sm opacity-90 line-clamp-2">{item.desc}</p>
-        </div>
+        <img src={item.image} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-6 text-white"><h3 className="font-bold text-lg leading-tight mb-1">{item.title}</h3><p className="text-sm opacity-90 line-clamp-2">{item.desc}</p></div>
       </div>
-      <div className="mt-1 font-bold text-slate-900 px-1">
-        ₩{item.price.toLocaleString()}부터
-      </div>
+      <div className="mt-1 font-bold text-slate-900 px-1">₩{item.price.toLocaleString()}부터</div>
     </div>
   )
 }
