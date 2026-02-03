@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase, ArrowRightLeft, Check } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
@@ -12,9 +12,13 @@ export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   
-  // 🌍 언어
+  // ✅ 메뉴 상태 관리 (여기가 핵심)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const { lang, setLang, t } = useLanguage();
   const languages = [
     { label: '한국어', value: 'ko' }, { label: 'English', value: 'en' },
@@ -25,7 +29,18 @@ export default function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 초기 상태 체크
+  // 외부 클릭 시 메뉴 닫기
+  useEffect(() => {
+    function handleClickOutside(event: any) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+        setIsLangOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -37,78 +52,36 @@ export default function SiteHeader() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (session?.user) checkHostStatus(session.user.id);
+      else { setIsHost(false); setIsPending(false); }
     });
 
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  // 호스트 여부 확인
   const checkHostStatus = async (userId: string) => {
-    // 1. 신청서 승인 확인
-    const { data: app } = await supabase
-      .from('host_applications')
-      .select('status')
-      .eq('user_id', userId)
-      .eq('status', 'approved')
-      .maybeSingle();
-    
-    // 2. 체험 등록 여부 확인
-    const { count } = await supabase
-      .from('experiences')
-      .select('*', { count: 'exact', head: true })
-      .eq('host_id', userId);
+    const { data: app } = await supabase.from('host_applications').select('status').eq('user_id', userId).eq('status', 'approved').maybeSingle();
+    const { count } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('host_id', userId);
 
-    if (app || (count && count > 0)) {
-      setIsHost(true);
-    }
+    if (app || (count && count > 0)) { setIsHost(true); setIsPending(false); }
+    else { setIsHost(false); }
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    alert(t('logout'));
     window.location.reload();
   };
 
-  // ✅ 버튼 클릭 로직 (단순화: 일단 이동 시도)
   const handleModeSwitch = async () => {
-    // 1. 이미 호스트 페이지면 -> 메인으로
-    if (pathname?.startsWith('/host')) {
-      router.push('/');
-      return;
-    }
-    // 2. 로그인 안 했으면 -> 로그인 모달
-    if (!user) {
-      setIsLoginModalOpen(true);
-      return;
-    }
-
-    // 3. 호스트인지 다시 한 번 체크 (클릭 순간 최신 상태 반영)
-    let currentIsHost = isHost;
-    if (!currentIsHost) {
-        // DB 한번 더 찔러보기
-        const { data: app } = await supabase
-          .from('host_applications')
-          .select('status')
-          .eq('user_id', user.id)
-          .eq('status', 'approved')
-          .maybeSingle();
-        if (app) currentIsHost = true;
-    }
-
-    // 4. 호스트가 아니면 -> 등록 페이지
-    if (!currentIsHost) {
-      router.push('/host/register');
-      return;
-    }
-
-    // 5. 호스트면 -> 대시보드
+    if (pathname?.startsWith('/host')) { router.push('/'); return; }
+    if (!user) { setIsLoginModalOpen(true); return; }
+    if (isPending) { alert("승인 대기 중입니다."); return; }
+    if (!isHost) { router.push('/host/register'); return; }
     router.push('/host/dashboard');
   };
 
   const getButtonLabel = () => {
     if (pathname?.startsWith('/host')) return t('guest_mode');
-    if (!user) return t('become_host');
-    if (!isHost) return t('become_host');
+    if (!user || !isHost) return t('become_host');
     return t('host_mode');
   };
 
@@ -116,19 +89,14 @@ export default function SiteHeader() {
     <>
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
       
-      <header className="sticky top-0 z-[100] bg-white border-b border-slate-100">
+      <header className="sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex-1 flex items-center z-[101]">
             <h1 className="text-2xl font-black tracking-tighter cursor-pointer text-slate-900">Locally</h1>
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            
-            {/* ✅ 버튼: disabled 속성 제거하여 무조건 눌리게 함 */}
-            <button 
-              onClick={handleModeSwitch}
-              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer"
-            >
+            <button onClick={handleModeSwitch} className="flex items-center gap-2 text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 border border-transparent hover:border-slate-200 cursor-pointer">
                {pathname?.startsWith('/host') ? <ArrowRightLeft size={18} className="md:hidden"/> : <Briefcase size={18} className="md:hidden" />}
                <span className="hidden md:inline">{getButtonLabel()}</span>
             </button>
@@ -149,35 +117,36 @@ export default function SiteHeader() {
               )}
             </div>
 
-            {/* 유저 메뉴 */}
-            {user ? (
-              <div className="relative group">
-                <div className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white">
-                  <Menu size={18} className="ml-2"/>
-                  <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-200">
-                    <img src={user.user_metadata.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  </div>
+            {/* ✅ 유저 메뉴 (클릭 방식) */}
+            <div className="relative">
+              <div 
+                onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
+                className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white"
+              >
+                <Menu size={18} className="ml-2"/>
+                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-200 flex items-center justify-center text-slate-500">
+                  {user ? (
+                    <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <User size={18} fill="currentColor" />
+                  )}
                 </div>
-                <div className="absolute top-full right-0 mt-2 w-60 bg-white border border-slate-100 rounded-xl shadow-xl py-2 invisible group-hover:visible opacity-0 z-[200]">
+              </div>
+
+              {/* 드롭다운 메뉴 */}
+              {user && isMenuOpen && (
+                <div className="absolute top-full right-0 mt-2 w-60 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200]">
                   <div className="px-4 py-3 border-b border-slate-100 mb-1">
                     <p className="font-bold text-sm truncate">{user.user_metadata.full_name || 'User'}</p>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
-                  {/* 모바일용 메뉴 추가 */}
-                  <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">
-                    {getButtonLabel()}
-                  </button>
+                  <button onClick={handleModeSwitch} className="w-full text-left md:hidden px-4 py-2 hover:bg-slate-50 text-sm font-semibold text-rose-600">{getButtonLabel()}</button>
                   <Link href="/guest/trips" className="block px-4 py-2 hover:bg-slate-50 text-sm font-semibold">{t('my_trips')}</Link>
                   <div className="border-t border-slate-100 my-1"></div>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm text-red-500 font-semibold flex gap-2"><LogOut size={14}/> {t('logout')}</button>
                 </div>
-              </div>
-            ) : (
-              <div onClick={() => setIsLoginModalOpen(true)} className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-3 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white relative z-[101]">
-                <Menu size={18} />
-                <div className="bg-slate-500 rounded-full p-1 text-white"><User size={18} fill="currentColor" /></div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </header>
