@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react'; // ✅ use 추가
+import React, { useEffect, useState } from 'react'; // 'use' 제거
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, CreditCard, Loader2, Calendar, Users } from 'lucide-react';
+import { ChevronLeft, CreditCard, Loader2, Calendar, Users, ShieldCheck } from 'lucide-react';
 import Script from 'next/script';
 
-// 상단 import에 { use }는 제거해도 됩니다.
+// params 타입을 직접 지정하여 use() 없이 사용 가능하도록 변경
 export default function NicepayPaymentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const experienceId = params.id; // ✅ 1번 코드와 동일한 방식으로 통일
+  const experienceId = params.id; 
 
   const [mounted, setMounted] = useState(false);
   
@@ -53,8 +53,8 @@ export default function NicepayPaymentPage({ params }: { params: { id: string } 
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600" />
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="animate-spin text-black" />
       </div>
     );
   }
@@ -66,49 +66,52 @@ export default function NicepayPaymentPage({ params }: { params: { id: string } 
         strategy="afterInteractive"
       />
 
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-lg overflow-hidden border border-slate-100">
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden border border-slate-100">
         {/* 헤더 */}
-        <div className="h-14 border-b border-slate-100 flex items-center px-4 gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-slate-50 rounded-full">
-            <ChevronLeft size={20}/>
+        <div className="h-16 border-b border-slate-100 flex items-center px-4 gap-4 bg-white sticky top-0 z-10">
+          <button onClick={() => router.back()} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
+            <ChevronLeft size={24}/>
           </button>
-          <span className="font-bold">결제 확인</span>
+          <span className="font-black text-lg">결제 확인</span>
         </div>
 
         {/* 상품 요약 정보 */}
-        <div className="p-6 border-b border-slate-50">
-          <h2 className="text-lg font-bold mb-4">{bookingInfo.title}</h2>
-          <div className="space-y-3 text-slate-600 text-sm">
+        <div className="p-8 border-b border-slate-50">
+          <span className="bg-rose-50 text-rose-600 text-[10px] font-bold px-2 py-1 rounded-full mb-2 inline-block">체험 예약</span>
+          <h2 className="text-xl font-bold mb-6 leading-snug">{bookingInfo.title}</h2>
+          
+          <div className="space-y-4 text-slate-700 text-sm bg-slate-50 p-5 rounded-2xl">
             <div className="flex items-center gap-3">
-              <Calendar size={16} className="text-slate-400" />
-              <span>{bookingInfo.date}</span>
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-400 shadow-sm"><Calendar size={16}/></div>
+              <span className="font-semibold">{bookingInfo.date}</span>
             </div>
             <div className="flex items-center gap-3">
-              <Users size={16} className="text-slate-400" />
-              <span>게스트 {bookingInfo.guests}명</span>
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-400 shadow-sm"><Users size={16}/></div>
+              <span className="font-semibold">게스트 {bookingInfo.guests}명</span>
             </div>
           </div>
         </div>
 
         {/* 결제 금액 섹션 */}
-        <div className="p-6 text-center bg-slate-50/50">
-          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-            <CreditCard size={24} />
-          </div>
-          <p className="text-slate-500 text-sm mb-1">최종 결제 금액</p>
-          <div className="text-3xl font-black text-blue-600 mb-6">
+        <div className="p-8 text-center bg-white">
+          <p className="text-slate-400 text-xs font-bold mb-2 uppercase tracking-wider">Total Payment</p>
+          <div className="text-4xl font-black text-slate-900 mb-8">
             ₩{bookingInfo.totalPrice.toLocaleString()}
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mb-8 bg-slate-50 py-2 rounded-lg">
+             <ShieldCheck size={14}/> 안전 결제 시스템으로 보호됩니다
           </div>
 
           <button 
             onClick={handleNicepay}
-            className="w-full h-14 rounded-xl font-bold text-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-95 transition-all"
+            className="w-full h-14 rounded-2xl font-bold text-lg bg-black text-white hover:bg-slate-800 shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
           >
-            결제하기
+            <CreditCard size={20}/> 결제하기
           </button>
-          <p className="mt-4 text-[11px] text-slate-400 leading-tight">
-            버튼을 누르면 나이스페이먼츠 보안 결제창으로 연결됩니다.<br/>
-            결제 완료 시 이용약관 및 개인정보 처리방침에 동의하는 것으로 간주됩니다.
+          
+          <p className="mt-6 text-[10px] text-slate-300 leading-tight">
+            (주)로컬리는 통신판매중개자로서 통신판매의 당사자가 아니며 상품의 예약, 이용 및 환불 등과 관련한 의무와 책임은 각 판매자에게 있습니다.
           </p>
         </div>
       </div>
