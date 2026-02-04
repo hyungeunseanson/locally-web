@@ -203,7 +203,7 @@ export default function ExperienceDetailPage() {
                  <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
                     {/* 단순하고 깔끔한 3D/벡터 스타일 지도 이미지 (Mapbox/Google 스타일) */}
                     <img 
-                      src="https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=2674&auto=format&fit=crop" // 3D 지도 느낌의 이미지 예시
+                      src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" // 3D 지도 느낌의 이미지 예시
                       className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-700"
                       style={{filter: 'grayscale(20%) contrast(110%)'}} 
                     />
