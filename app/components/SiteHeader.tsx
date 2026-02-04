@@ -147,9 +147,9 @@ export default function SiteHeader() {
                     <Link href="/guest/trips" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
                        <Briefcase size={18}/> 여행
                     </Link>
-                    <button className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                       <Heart size={18}/> 위시리스트
-                    </button>
+                    <Link href="/guest/wishlists" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+   <Heart size={18}/> 위시리스트
+</Link>
                   </div>
 
                   {/* 계정 설정 */}
