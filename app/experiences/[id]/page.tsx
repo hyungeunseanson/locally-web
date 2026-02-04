@@ -177,16 +177,74 @@ export default function ExperienceDetailPage() {
             <div className="border-b border-slate-200 pb-8"><h3 className="text-xl font-bold mb-4">체험 소개</h3><p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p></div>
 
             <div id="reviews" className="border-b border-slate-200 pb-8 scroll-mt-24">
-               <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Star size={20} fill="black"/> 4.98 · 후기 15개</h3>
+               {/* ✨ 수정된 후기 섹션 시작 */}
+            <div id="reviews" className="border-b border-slate-200 pb-8 scroll-mt-24">
+               <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                 <Star size={20} fill="black"/> 4.98 · 후기 15개
+               </h3>
+               
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                  {(isReviewsExpanded ? [1,2,3,4,5,6,7,8] : [1,2,3,4]).map(i => (
+                  {[1,2,3,4].map(i => (
                     <div key={i} className="space-y-3">
-                       <div className="flex items-center gap-3"><div className="w-10 h-10 bg-slate-200 rounded-full bg-cover bg-center" style={{backgroundImage: `url('https://i.pravatar.cc/150?u=${i}')`}}></div><div><div className="font-bold text-sm text-slate-900">Guest {i}</div><div className="text-xs text-slate-500">2026년 1월</div></div></div>
-                       <p className="text-sm text-slate-600 leading-relaxed">호스트님이 정말 친절하셨고, 코스도 완벽했습니다. 현지인만 아는 맛집을 알게 되어 너무 좋았어요!</p>
+                       <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-slate-200 rounded-full bg-cover bg-center" style={{backgroundImage: `url('https://i.pravatar.cc/150?u=${i}')`}}></div>
+                          <div><div className="font-bold text-sm text-slate-900">Guest {i}</div><div className="text-xs text-slate-500">2026년 1월</div></div>
+                       </div>
+                       <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
+                         호스트님이 정말 친절하셨고, 코스도 완벽했습니다. 현지인만 아는 맛집을 알게 되어 너무 좋았어요! 사진도 예쁘게 찍어주셔서 인생샷 건졌습니다.
+                       </p>
                     </div>
                   ))}
                </div>
-               <button onClick={() => setIsReviewsExpanded(!isReviewsExpanded)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors">{isReviewsExpanded ? '후기 접기' : '후기 15개 모두 보기'}</button>
+               
+               <button 
+                 onClick={() => setIsReviewsExpanded(true)} // 여기서 모달 열림
+                 className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors"
+               >
+                 후기 15개 모두 보기
+               </button>
+
+               {/* ✨ 후기 전체보기 모달 (사진 갤러리 포함) */}
+               {isReviewsExpanded && (
+                 <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>
+                   <div className="bg-white w-full max-w-4xl h-[80vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                     
+                     <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                       <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> 4.98 (후기 15개)</h3>
+                       <button onClick={() => setIsReviewsExpanded(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
+                     </div>
+
+                     <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         {[1,2,3,4,5,6,7,8].map(i => (
+                           <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 break-inside-avoid">
+                             <div className="flex items-center gap-3">
+                               <div className="w-10 h-10 bg-slate-200 rounded-full bg-cover bg-center" style={{backgroundImage: `url('https://i.pravatar.cc/150?u=${i}')`}}></div>
+                               <div><div className="font-bold text-sm text-slate-900">Guest {i}</div><div className="text-xs text-slate-500">2026년 1월</div></div>
+                             </div>
+                             <p className="text-sm text-slate-600 leading-relaxed">
+                               정말 잊지 못할 경험이었습니다. 호스트님이 너무 친절하게 대해주셔서 편안하게 여행할 수 있었어요. 다음에도 꼭 다시 이용하고 싶습니다!
+                             </p>
+                             {/* 사진 있는 후기 예시 (짝수번만) */}
+                             {i % 2 === 0 && (
+                               <div className="flex gap-2 mt-3">
+                                 <div className="w-20 h-20 rounded-lg bg-slate-200 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(`https://picsum.photos/500/500?random=${i}`, '_blank')}>
+                                   <img src={`https://picsum.photos/200/200?random=${i}`} className="w-full h-full object-cover"/>
+                                 </div>
+                                 <div className="w-20 h-20 rounded-lg bg-slate-200 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(`https://picsum.photos/500/500?random=${i+10}`, '_blank')}>
+                                   <img src={`https://picsum.photos/200/200?random=${i+10}`} className="w-full h-full object-cover"/>
+                                 </div>
+                               </div>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               )}
+            </div>
+            {/* ✨ 수정된 후기 섹션 끝 */}
             </div>
 
             <div className="border-b border-slate-200 pb-8">

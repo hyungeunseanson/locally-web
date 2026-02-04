@@ -3,23 +3,29 @@
 import React, { useState } from 'react';
 import { 
   Calendar, MapPin, MoreHorizontal, MessageSquare, 
-  CheckCircle2, Receipt, Star, X, PenTool 
+  CheckCircle2, Receipt, Star, X, PenTool, Image as ImageIcon, Camera 
 } from 'lucide-react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 
 export default function GuestTripsPage() {
-  // 후기 모달 상태
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  
+  // 예약 메뉴 상태 (점 3개)
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
   const handleOpenReview = (trip: any) => {
     setSelectedTrip(trip);
     setIsReviewModalOpen(true);
   };
 
+  const toggleMenu = (id: number) => {
+    setActiveMenuId(activeMenuId === id ? null : id);
+  };
+
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans">
+    <div className="min-h-screen bg-white text-slate-900 font-sans" onClick={() => setActiveMenuId(null)}>
       <SiteHeader />
 
       <main className="max-w-5xl mx-auto px-6 py-12">
@@ -28,12 +34,27 @@ export default function GuestTripsPage() {
         {/* 예정된 예약 */}
         <section className="mb-16">
           <h2 className="text-xl font-bold mb-6">예정된 예약</h2>
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow flex flex-col md:flex-row">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow flex flex-col md:flex-row relative">
             <div className="p-8 flex-1 flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-start mb-4">
                    <span className="bg-black text-white text-xs font-bold px-3 py-1 rounded-full">D-3</span>
-                   <button className="text-slate-400 hover:text-black"><MoreHorizontal/></button>
+                   
+                   {/* 점 3개 메뉴 */}
+                   <div className="relative">
+                     <button 
+                       onClick={(e) => { e.stopPropagation(); toggleMenu(999); }} 
+                       className="text-slate-400 hover:text-black p-1 rounded-full hover:bg-slate-100 transition-colors"
+                     >
+                       <MoreHorizontal/>
+                     </button>
+                     {activeMenuId === 999 && (
+                       <div className="absolute right-0 top-8 w-40 bg-white border border-slate-100 rounded-xl shadow-xl z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                         <button className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 font-medium">예약 상세 보기</button>
+                         <button className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 text-red-500 font-medium">예약 취소 요청</button>
+                       </div>
+                     )}
+                   </div>
                 </div>
                 <h3 className="text-2xl font-bold mb-2">현지인과 함께하는 시부야 이자카야 탐방</h3>
                 <p className="text-slate-500 mb-6">호스트: Kenji</p>
@@ -87,11 +108,10 @@ export default function GuestTripsPage() {
               title="홋카이도 설국 스키 레슨" 
               date="2025년 1월" 
               host="Yuki"
-              isReviewed={true} // 이미 작성한 경우
+              isReviewed={true}
               onReviewClick={handleOpenReview}
             />
             
-            {/* 빈 카드 (탐색 유도) */}
             <div className="border border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center p-6 text-slate-400 hover:border-slate-400 hover:bg-slate-50 transition-colors cursor-pointer min-h-[300px]">
                <span className="font-bold mb-1">다음 여행을 떠나보세요</span>
                <Link href="/" className="text-sm underline text-black">체험 둘러보기</Link>
@@ -111,7 +131,6 @@ export default function GuestTripsPage() {
   );
 }
 
-// 🎟️ 지난 여행 카드 컴포넌트
 function TripCard({ id, image, title, date, host, isReviewed, onReviewClick }: any) {
   return (
     <div className="border border-slate-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
@@ -145,26 +164,38 @@ function TripCard({ id, image, title, date, host, isReviewed, onReviewClick }: a
   );
 }
 
-// ⭐ 별점 및 리뷰 작성 모달
+// ⭐ 후기 모달 (사진 첨부 기능 추가)
 function ReviewModal({ trip, onClose }: any) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      if (images.length >= 2) return alert("사진은 최대 2장까지 첨부 가능합니다.");
+      const file = e.target.files[0];
+      const imageUrl = URL.createObjectURL(file);
+      setImages([...images, imageUrl]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = () => {
     if (rating === 0) return alert("별점을 선택해주세요!");
     if (reviewText.length < 10) return alert("후기는 10자 이상 작성해주세요.");
     
-    // TODO: 실제 Supabase 저장 로직 연결
     alert("소중한 후기가 등록되었습니다! 적립금이 지급되었습니다.");
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         
-        {/* 헤더 */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-lg">후기 작성</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -173,7 +204,6 @@ function ReviewModal({ trip, onClose }: any) {
         </div>
 
         <div className="p-8">
-          {/* 상품 정보 */}
           <div className="flex items-center gap-4 mb-8">
             <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0">
               <img src={trip.image} className="w-full h-full object-cover"/>
@@ -184,8 +214,7 @@ function ReviewModal({ trip, onClose }: any) {
             </div>
           </div>
 
-          {/* 별점 입력 */}
-          <div className="flex justify-center gap-2 mb-8">
+          <div className="flex justify-center gap-2 mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
@@ -194,33 +223,43 @@ function ReviewModal({ trip, onClose }: any) {
                 onClick={() => setRating(star)}
                 className="transition-transform hover:scale-110 p-1"
               >
-                <Star 
-                  size={32} 
-                  fill={(hoverRating || rating) >= star ? "#FBBF24" : "none"} 
-                  className={(hoverRating || rating) >= star ? "text-amber-400" : "text-slate-300"}
-                />
+                <Star size={32} fill={(hoverRating || rating) >= star ? "#FBBF24" : "none"} className={(hoverRating || rating) >= star ? "text-amber-400" : "text-slate-300"} />
               </button>
             ))}
           </div>
-          <p className="text-center text-sm font-bold text-slate-700 mb-6">
-            {rating === 5 ? "최고였어요! 😍" : 
-             rating === 4 ? "좋았어요! 😊" :
-             rating === 3 ? "보통이에요 🙂" : 
-             rating === 2 ? "아쉬웠어요 🙁" : 
-             rating === 1 ? "별로였어요 😫" : "별점을 눌러 평가해주세요"}
+          <p className="text-center text-sm font-bold text-slate-700 mb-8">
+            {rating === 5 ? "최고였어요! 😍" : rating === 4 ? "좋았어요! 😊" : rating === 3 ? "보통이에요 🙂" : rating === 2 ? "아쉬웠어요 🙁" : rating === 1 ? "별로였어요 😫" : "별점을 눌러 평가해주세요"}
           </p>
 
-          {/* 텍스트 입력 */}
           <textarea 
-            className="w-full h-32 p-4 border border-slate-300 rounded-xl resize-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm"
-            placeholder="다른 게스트들에게 도움이 되도록 솔직한 후기를 남겨주세요. (최소 10자 이상)"
+            className="w-full h-32 p-4 border border-slate-300 rounded-xl resize-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm mb-4"
+            placeholder="솔직한 후기를 남겨주세요. (최소 10자 이상)"
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
           />
 
+          {/* 사진 첨부 */}
+          <div className="flex gap-3 mb-6">
+            {images.map((img, idx) => (
+              <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group">
+                <img src={img} className="w-full h-full object-cover"/>
+                <button onClick={() => removeImage(idx)} className="absolute top-0 right-0 bg-black/50 text-white p-0.5 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X size={12}/>
+                </button>
+              </div>
+            ))}
+            {images.length < 2 && (
+              <label className="w-16 h-16 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-slate-500 hover:text-slate-600 transition-colors">
+                <Camera size={20}/>
+                <span className="text-[10px] mt-1">사진 추가</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload}/>
+              </label>
+            )}
+          </div>
+
           <button 
             onClick={handleSubmit}
-            className="w-full bg-black text-white font-bold py-4 rounded-xl mt-6 hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={rating === 0 || reviewText.length < 10}
           >
             후기 등록하기
