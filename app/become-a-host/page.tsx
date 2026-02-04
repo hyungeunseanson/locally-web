@@ -8,15 +8,16 @@ import {
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
+import LoginModal from '@/app/components/LoginModal'; // ✅ LoginModal import 추가
 
 export default function BecomeHostPage() {
   const [hasApplication, setHasApplication] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); // ✅ 모달 상태 추가
   const supabase = createClient();
 
-  // ✅ 유저의 신청 이력 확인 (버튼 링크 결정을 위해)
   useEffect(() => {
     const checkStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getSession().then(({ data }) => data); // getSession 사용 권장
       if (!user) return;
 
       const { data } = await supabase
@@ -32,9 +33,30 @@ export default function BecomeHostPage() {
     checkStatus();
   }, []);
 
+  // ✅ 버튼 클릭 핸들러 (로그인 체크 로직)
+  const handleStartClick = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // 1. 비로그인 상태 -> 로그인 모달 띄우기
+    if (!session) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    // 2. 로그인 상태 -> 신청 이력에 따라 이동
+    if (hasApplication) {
+      window.location.href = "/host/dashboard";
+    } else {
+      window.location.href = "/host/register";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
+      
+      {/* ✅ 로그인 모달 추가 */}
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
       <main>
         {/* 1. 히어로 섹션 */}
@@ -49,16 +71,17 @@ export default function BecomeHostPage() {
               독특한 로컬리 체험을 만들어 보세요.
             </p>
             <div className="pt-4">
-              {/* ✅ 스마트 버튼: 신청 이력이 있으면 대시보드, 없으면 등록 페이지 */}
-              <Link href={hasApplication ? "/host/dashboard" : "/host/register"}>
-                <button className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300">
-                  {hasApplication ? "내 신청 현황 확인" : "시작하기"}
-                </button>
-              </Link>
+              {/* ✅ 수정된 버튼: Link 대신 onClick 사용 */}
+              <button 
+                onClick={handleStartClick}
+                className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
+              >
+                {hasApplication ? "내 신청 현황 확인" : "시작하기"}
+              </button>
             </div>
           </div>
           
-          {/* 아이폰 목업 */}
+          {/* 아이폰 목업 (디자인 유지) */}
           <div className="flex-1 flex justify-center md:justify-end relative">
              <div className="relative w-[340px] h-[680px] bg-black rounded-[60px] border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
@@ -97,23 +120,10 @@ export default function BecomeHostPage() {
             <h2 className="text-4xl md:text-5xl font-black text-center mb-24 leading-tight">
               어디서도 만나볼 수 없는<br/>독특한 체험을 호스팅하세요
             </h2>
-            
             <div className="grid md:grid-cols-3 gap-x-8 gap-y-16">
-              <FeatureItem 
-                icon={<Globe className="w-10 h-10"/>}
-                title="내가 사는 도시의 매력 소개"
-                desc="랜드마크, 박물관, 문화 명소를 둘러보는 특별한 일정을 준비해 보세요."
-              />
-              <FeatureItem 
-                icon={<Heart className="w-10 h-10"/>}
-                title="좋아하는 것으로 수익 창출"
-                desc="맛집 탐방, 등산, 쇼핑 등 평소 즐기던 활동을 하며 쏠쏠한 부수입을 만드세요."
-              />
-              <FeatureItem 
-                icon={<Calendar className="w-10 h-10"/>}
-                title="내 일정에 맞춘 자유로운 활동"
-                desc="주말, 평일 저녁, 혹은 한 달에 한 번. 내가 원하는 시간에만 투어를 오픈하세요."
-              />
+              <FeatureItem icon={<Globe className="w-10 h-10"/>} title="내가 사는 도시의 매력 소개" desc="랜드마크, 박물관, 문화 명소를 둘러보는 특별한 일정을 준비해 보세요." />
+              <FeatureItem icon={<Heart className="w-10 h-10"/>} title="좋아하는 것으로 수익 창출" desc="맛집 탐방, 등산, 쇼핑 등 평소 즐기던 활동을 하며 쏠쏠한 부수입을 만드세요." />
+              <FeatureItem icon={<Calendar className="w-10 h-10"/>} title="내 일정에 맞춘 자유로운 활동" desc="주말, 평일 저녁, 혹은 한 달에 한 번. 내가 원하는 시간에만 투어를 오픈하세요." />
             </div>
           </div>
         </section>
@@ -121,6 +131,7 @@ export default function BecomeHostPage() {
         {/* 3. 모바일 목업 섹션 */}
         <section className="bg-slate-50 py-32">
           <div className="max-w-[1440px] mx-auto px-6">
+            {/* ... (기존 모바일 목업 내용 유지) ... */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-20 mb-32">
                <div className="flex-1 order-2 md:order-1 flex justify-center">
                   <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-6 border border-slate-100 transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
@@ -128,44 +139,27 @@ export default function BecomeHostPage() {
                         <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden"><img src="https://i.pravatar.cc/150?u=a042581f4e29026024d" className="w-full h-full object-cover"/></div>
                         <div><div className="font-bold text-sm">Alexi 님</div><div className="text-xs text-slate-500">예약 완료 · 5월 22일</div></div>
                      </div>
-                     <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-sm text-slate-600 mb-4">
-                        안녕하세요! 이번 주말 투어 정말 기대돼요. 혹시 채식 메뉴 추천도 가능할까요? 🥗
-                     </div>
-                     <div className="bg-rose-500 text-white p-4 rounded-2xl rounded-tr-none text-sm self-end ml-auto w-fit shadow-lg shadow-rose-200">
-                        물론이죠! 비건 옵션이 훌륭한 식당 리스트를 이미 준비해뒀습니다 :)
-                     </div>
+                     <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-sm text-slate-600 mb-4">안녕하세요! 이번 주말 투어 정말 기대돼요. 혹시 채식 메뉴 추천도 가능할까요? 🥗</div>
+                     <div className="bg-rose-500 text-white p-4 rounded-2xl rounded-tr-none text-sm self-end ml-auto w-fit shadow-lg shadow-rose-200">물론이죠! 비건 옵션이 훌륭한 식당 리스트를 이미 준비해뒀습니다 :)</div>
                   </div>
                </div>
                <div className="flex-1 order-1 md:order-2">
                   <h3 className="text-3xl font-black mb-6">게스트와 간편한 소통</h3>
-                  <p className="text-xl text-slate-500 leading-relaxed font-medium">
-                     앱 내 채팅 기능을 통해 전 세계 게스트와 실시간으로 대화하세요.<br/>
-                     개인 연락처 노출 걱정 없이 안전하게 소통할 수 있습니다.
-                  </p>
+                  <p className="text-xl text-slate-500 leading-relaxed font-medium">앱 내 채팅 기능을 통해 전 세계 게스트와 실시간으로 대화하세요.<br/>개인 연락처 노출 걱정 없이 안전하게 소통할 수 있습니다.</p>
                </div>
             </div>
-
             <div className="flex flex-col md:flex-row items-center justify-between gap-20">
                <div className="flex-1">
                   <h3 className="text-3xl font-black mb-6">투명하고 신속한 정산</h3>
-                  <p className="text-xl text-slate-500 leading-relaxed font-medium">
-                     체험이 완료되면 다음 달 바로 입금됩니다.<br/>
-                     복잡한 절차 없이 수익을 확인하고 관리하세요.
-                  </p>
+                  <p className="text-xl text-slate-500 leading-relaxed font-medium">체험이 완료되면 다음 달 바로 입금됩니다.<br/>복잡한 절차 없이 수익을 확인하고 관리하세요.</p>
                </div>
                <div className="flex-1 flex justify-center">
                   <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-8 border border-slate-100 transform rotate-[2deg] hover:rotate-0 transition-transform duration-500 text-center">
                      <div className="text-slate-500 font-bold mb-2">5월 정산 예정 금액</div>
                      <div className="text-5xl font-black mb-8 tracking-tight">₩499,784</div>
                      <div className="space-y-4">
-                        <div className="flex justify-between text-sm border-b border-slate-100 pb-4">
-                           <span className="text-slate-500">지급 계좌</span>
-                           <span className="font-bold">카카오뱅크 **** 1234</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                           <span className="text-slate-500">다음 지급일</span>
-                           <span className="font-bold text-green-600">내일</span>
-                        </div>
+                        <div className="flex justify-between text-sm border-b border-slate-100 pb-4"><span className="text-slate-500">지급 계좌</span><span className="font-bold">카카오뱅크 **** 1234</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-slate-500">다음 지급일</span><span className="font-bold text-green-600">내일</span></div>
                      </div>
                   </div>
                </div>
@@ -187,24 +181,13 @@ export default function BecomeHostPage() {
                 <h2 className="text-4xl md:text-5xl font-black mb-8">지금 바로 시작해보세요</h2>
                 <p className="text-slate-400 text-lg mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
                 
-{/* ✅ 수정된 CTA 버튼 영역 (교체용) */}
-<div className="pt-4">
-              <button 
-                onClick={async () => {
-                  const { data: { user } } = await supabase.auth.getUser();
-                  if (!user) {
-                    alert("호스트 등록을 위해 먼저 로그인해 주세요.");
-                    window.location.href = '/login'; // 로그인 페이지 또는 모달로 유도
-                    return;
-                  }
-                  // 신청 이력이 있으면 대시보드, 없으면 등록 페이지
-                  window.location.href = hasApplication ? "/host/dashboard" : "/host/register";
-                }}
-                className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
-              >
-                {hasApplication ? "내 신청 현황 확인" : "시작하기"}
-              </button>
-            </div>
+                {/* ✅ 하단 버튼도 수정된 핸들러 연결 */}
+                <button 
+                  onClick={handleStartClick}
+                  className="bg-white text-black px-12 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform flex items-center gap-2 mx-auto"
+                >
+                  {hasApplication ? "내 신청 현황 확인" : "호스트 등록하기"} <ArrowRight size={20}/>
+                </button>
              </div>
              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-800 to-black z-0"></div>
              <div className="absolute -top-24 -right-24 w-96 h-96 bg-rose-600 rounded-full blur-[100px] opacity-30"></div>
@@ -215,6 +198,7 @@ export default function BecomeHostPage() {
   );
 }
 
+// ... FeatureItem, FAQItem 컴포넌트 유지 ...
 function FeatureItem({ icon, title, desc }: any) {
   return (
     <div className="flex flex-col items-start group">

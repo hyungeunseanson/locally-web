@@ -85,26 +85,35 @@ export default function SiteHeader() {
     window.location.reload();
   };
 
-// ✅ 수정된 handleModeSwitch 함수 (교체용)
-const handleModeSwitch = async () => {
-  // 1. 현재 호스트 페이지들(대시보드, 등록폼 등)에 있다면 -> 게스트 홈으로 나가기
-  if (pathname?.startsWith('/host')) { 
-    router.push('/'); 
-    return; 
-  }
-  
-  // 2. 그 외 모든 경우 (비로그인, 일반 유저, 승인된 호스트 모두) -> 설명 페이지로 이동
-  router.push('/become-a-host');
-};
+  // 1. [메인 헤더 버튼용] 무조건 설명 페이지로 이동
+  const handleMainHeaderButtonClick = () => {
+    if (pathname?.startsWith('/host')) { 
+      router.push('/'); 
+    } else {
+      router.push('/become-a-host');
+    }
+  };
 
-// ✅ 수정된 버튼 라벨 함수 (교체용)
-const getButtonLabel = () => {
-  // 현재 호스트 페이지에 있다면 '게스트 모드'
-  if (pathname?.startsWith('/host')) return '게스트 모드';
-  
-  // 그 외엔(호스트 승인 여부와 상관없이) 무조건 '호스트 등록하기'로 표시
-  return '호스트 등록하기';
-};
+  // 2. [드롭다운 메뉴용] 호스트는 대시보드, 일반 유저는 설명 페이지로
+  const handleDropdownMenuClick = () => {
+    if (pathname?.startsWith('/host')) { 
+      router.push('/'); // 호스트 페이지에선 '게스트 모드' 역할
+      return;
+    }
+
+    if (applicationStatus || isHost) {
+      router.push('/host/dashboard'); // 호스트/신청자는 대시보드로
+    } else {
+      router.push('/become-a-host'); // 일반 유저는 설명 페이지로
+    }
+  };
+
+  // 버튼 라벨
+  const getButtonLabel = () => {
+    if (pathname?.startsWith('/host')) return '게스트 모드';
+    // 메인 버튼은 로그인/호스트 여부와 상관없이 항상 '호스트 등록하기'
+    return '호스트 등록하기';
+  };
 
   const getAvatarUrl = () => user?.user_metadata?.avatar_url || null;
 
@@ -119,9 +128,9 @@ const getButtonLabel = () => {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            {/* 상단 메인 버튼 */}
+            {/* 상단 메인 버튼 (설명 페이지로 이동) */}
             <button 
-              onClick={handleModeSwitch} 
+              onClick={handleMainHeaderButtonClick} 
               className="hidden md:block text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 cursor-pointer"
             >
                {getButtonLabel()}
@@ -177,8 +186,8 @@ const getButtonLabel = () => {
                     <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <User size={18}/> 프로필 및 계정
                     </Link>
-                    {/* 드롭다운 메뉴에서도 '호스트 소개' 페이지로 이동 */}
-                    <button onClick={handleModeSwitch} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                    {/* ✅ 드롭다운의 버튼은 '스마트'하게 대시보드로 이동 */}
+                    <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <Settings size={18}/> {pathname?.startsWith('/host') ? '게스트 모드' : '호스트 모드'}
                     </button>
                   </div>
@@ -199,4 +208,4 @@ const getButtonLabel = () => {
       </header>
     </>
   );
-} 
+}
