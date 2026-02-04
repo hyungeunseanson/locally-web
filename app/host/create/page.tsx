@@ -2,56 +2,60 @@
 
 import React, { useState } from 'react';
 import { 
-  ChevronLeft, ChevronRight, Upload, Camera, Check, 
-  Globe, ShieldCheck, MapPin, DollarSign, Image as ImageIcon, X 
+  ChevronRight, Camera, Globe, MapPin, X, User, Instagram, Calendar, Clock
 } from 'lucide-react';
 import Link from 'next/link';
-import SiteHeader from '@/app/components/SiteHeader'; // 헤더가 있다면 사용, 없으면 제거 가능
 
 export default function CreateExperiencePage() {
   const [step, setStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 4; // 단계를 4개로 압축하여 효율성 증대
 
   // 입력 데이터 상태
   const [formData, setFormData] = useState({
-    category: '',
-    koreanLevel: 3, // 1~5
-    languages: [] as string[],
-    certificate: null as File | null,
-    idCard: null as File | null,
-    title: '',
+    // Step 1: 개인정보
+    name: '',
+    phone: '',
+    dob: '',
+    email: '',
+    instagram: '',
+    source: '', // 알게 된 계기
+    
+    // Step 2: 언어 & 프로필
+    japaneseLevel: 2, // 1:초급, 2:중급, 3:상급, 4:원어민
+    japaneseCert: '',
+    selfIntro: '',
+    profilePhoto1: null as string | null,
+    profilePhoto2: null as string | null,
+
+    // Step 3: 투어 정보
+    location: '',
+    spots: '',
+    meetingPoint: '',
+    duration: 3,
     description: '',
-    photos: [] as string[],
+
+    // Step 4: 가격 & 일정
     price: 30000,
-    meetingPoint: ''
+    availability: '' // 가능 일정 텍스트
   });
 
-  // 다음 단계로 이동
-  const nextStep = () => {
-    if (step < totalSteps) setStep(step + 1);
-  };
+  const nextStep = () => { if (step < totalSteps) setStep(step + 1); };
+  const prevStep = () => { if (step > 1) setStep(step - 1); };
 
-  // 이전 단계로 이동
-  const prevStep = () => {
-    if (step > 1) setStep(step - 1);
-  };
-
-  // 데이터 변경 핸들러
   const updateData = (key: string, value: any) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
-  // 사진 업로드 (미리보기용 가짜 URL 생성)
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newPhotos = Array.from(e.target.files).map(file => URL.createObjectURL(file));
-      updateData('photos', [...formData.photos, ...newPhotos]);
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, key: 'profilePhoto1' | 'profilePhoto2') => {
+    if (e.target.files && e.target.files[0]) {
+      const url = URL.createObjectURL(e.target.files[0]);
+      updateData(key, url);
     }
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
-      {/* 1. 상단 진행바 (Progress Bar) */}
+      {/* 1. 상단 진행바 */}
       <header className="h-20 px-6 flex items-center justify-between border-b border-slate-100 sticky top-0 bg-white z-50">
         <div className="flex items-center gap-4">
           <Link href="/host/dashboard" className="p-2 hover:bg-slate-50 rounded-full">
@@ -60,251 +64,250 @@ export default function CreateExperiencePage() {
           <div className="flex flex-col">
             <span className="text-xs font-bold text-slate-400">Step {step} of {totalSteps}</span>
             <div className="w-32 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
-              <div 
-                className="h-full bg-black transition-all duration-500 ease-out" 
-                style={{ width: `${(step / totalSteps) * 100}%` }}
-              />
+              <div className="h-full bg-black transition-all duration-500 ease-out" style={{ width: `${(step / totalSteps) * 100}%` }}/>
             </div>
           </div>
         </div>
         <button className="text-sm font-bold text-slate-400 hover:text-black underline decoration-1 underline-offset-4">
-          저장하고 나가기
+          임시 저장
         </button>
       </header>
 
-      {/* 2. 메인 컨텐츠 영역 (Wizard Body) */}
-      <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* 2. 메인 컨텐츠 */}
+      <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* STEP 1: 카테고리 & 언어 능력 */}
+        {/* STEP 1: 호스트 기본 정보 */}
         {step === 1 && (
           <div className="w-full space-y-8">
             <div className="text-center space-y-2">
-              <span className="bg-rose-50 text-rose-600 font-bold px-3 py-1 rounded-full text-xs">Step 1. 기본 정보</span>
-              <h1 className="text-3xl md:text-4xl font-black">어떤 친구가 되어주실 건가요?</h1>
-              <p className="text-slate-500">게스트가 호스트님을 더 잘 알 수 있도록 언어 능력을 알려주세요.</p>
+              <span className="bg-slate-100 text-slate-600 font-bold px-3 py-1 rounded-full text-xs">Step 1. 기본 정보</span>
+              <h1 className="text-3xl font-black">호스트님에 대해 알려주세요</h1>
+              <p className="text-slate-500">연락을 위한 기본적인 정보가 필요합니다.</p>
             </div>
 
-            {/* 한국어 레벨 슬라이더 */}
-            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-200">
-              <label className="block text-lg font-bold mb-4 flex items-center gap-2">
-                <Globe size={20}/> 한국어 실력은 어느 정도인가요?
-              </label>
-              <input 
-                type="range" min="1" max="5" step="1" 
-                value={formData.koreanLevel}
-                onChange={(e) => updateData('koreanLevel', Number(e.target.value))}
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-black mb-4"
-              />
-              <div className="flex justify-between text-xs font-bold text-slate-400 px-1">
-                <span>Lv.1<br/>초급</span>
-                <span>Lv.2<br/>기초</span>
-                <span className={`text-black scale-110`}>Lv.3<br/>일상회화</span>
-                <span>Lv.4<br/>비즈니스</span>
-                <span>Lv.5<br/>원어민</span>
-              </div>
-              <div className="mt-6 bg-white p-4 rounded-xl border border-slate-200 text-center">
-                <span className="text-sm font-bold text-slate-900">
-                  {formData.koreanLevel === 1 && "👋 간단한 인사말 정도만 알아요."}
-                  {formData.koreanLevel === 2 && "🗣️ 천천히 말하면 이해할 수 있어요."}
-                  {formData.koreanLevel === 3 && "💬 일상적인 대화는 문제없어요!"}
-                  {formData.koreanLevel === 4 && "💼 복잡한 내용도 설명할 수 있어요."}
-                  {formData.koreanLevel === 5 && "🇰🇷 한국인처럼 자연스럽게 말해요!"}
-                </span>
-              </div>
-            </div>
-
-            {/* 카테고리 선택 */}
-            <div className="grid grid-cols-3 gap-4">
-              {['맛집 탐방', '산책/투어', '액티비티', '나이트라이프', '쇼핑', '문화 체험'].map((cat) => (
-                <button 
-                  key={cat}
-                  onClick={() => updateData('category', cat)}
-                  className={`p-4 rounded-2xl border-2 font-bold text-sm transition-all ${formData.category === cat ? 'border-black bg-black text-white shadow-lg scale-105' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: 신뢰와 인증 (ID & 자격증) */}
-        {step === 2 && (
-          <div className="w-full space-y-8">
-            <div className="text-center space-y-2">
-              <span className="bg-blue-50 text-blue-600 font-bold px-3 py-1 rounded-full text-xs">Step 2. 신뢰와 안전</span>
-              <h1 className="text-3xl md:text-4xl font-black">신원을 인증해 주세요</h1>
-              <p className="text-slate-500">안전한 로컬리 커뮤니티를 위해 신분증과 자격증을 확인합니다.<br/>(이 정보는 게스트에게 공개되지 않습니다)</p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* 신분증 업로드 */}
-              <div className="border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-white group-hover:shadow-md transition-all">
-                  <ShieldCheck size={32} className="text-slate-400 group-hover:text-black"/>
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1">성함 (실명)</label>
+                  <input type="text" placeholder="홍길동" value={formData.name} onChange={(e)=>updateData('name', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black"/>
                 </div>
-                <h3 className="font-bold text-lg mb-2">신분증 등록</h3>
-                <p className="text-xs text-slate-400 mb-4">여권, 운전면허증, 주민등록증 중 택 1</p>
-                <button className="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm font-bold shadow-sm">파일 찾기</button>
-              </div>
-
-              {/* 어학 성적 증명서 */}
-              <div className="border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-white group-hover:shadow-md transition-all">
-                  <Globe size={32} className="text-slate-400 group-hover:text-black"/>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1">생년월일</label>
+                  <input type="text" placeholder="YYYY.MM.DD" value={formData.dob} onChange={(e)=>updateData('dob', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black"/>
                 </div>
-                <h3 className="font-bold text-lg mb-2">어학 능력 증빙 (선택)</h3>
-                <p className="text-xs text-slate-400 mb-4">TOPIK, JLPT 등 자격증이 있다면 올려주세요.</p>
-                <button className="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm font-bold shadow-sm">파일 찾기</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: 체험 상세 내용 */}
-        {step === 3 && (
-          <div className="w-full space-y-8">
-            <div className="text-center space-y-2">
-              <span className="bg-amber-50 text-amber-600 font-bold px-3 py-1 rounded-full text-xs">Step 3. 체험 소개</span>
-              <h1 className="text-3xl md:text-4xl font-black">어떤 경험을 제공하나요?</h1>
-              <p className="text-slate-500">매력적인 제목과 설명으로 게스트의 마음을 사로잡으세요.</p>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold mb-2 ml-1">체험 제목</label>
-                <input 
-                  type="text" 
-                  placeholder="예) 일본 현지인과 퇴근 후 막걸리 한 잔! 🍶" 
-                  value={formData.title}
-                  onChange={(e) => updateData('title', e.target.value)}
-                  className="w-full p-4 text-xl font-bold border-b-2 border-slate-200 focus:border-black outline-none placeholder:text-slate-300 transition-colors bg-transparent"
-                />
               </div>
               
               <div>
-                <label className="block text-sm font-bold mb-2 ml-1">상세 설명</label>
-                <textarea 
-                  placeholder="이 체험의 매력 포인트, 진행 코스, 포함 사항 등을 자유롭게 적어주세요." 
-                  value={formData.description}
-                  onChange={(e) => updateData('description', e.target.value)}
-                  className="w-full p-4 h-48 rounded-2xl bg-slate-50 border border-slate-200 focus:border-black focus:bg-white outline-none resize-none transition-all"
-                />
+                <label className="text-xs font-bold text-slate-500 ml-1">전화번호</label>
+                <input type="tel" placeholder="010-1234-5678" value={formData.phone} onChange={(e)=>updateData('phone', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black"/>
               </div>
 
               <div>
-                <label className="block text-sm font-bold mb-2 ml-1">만남 장소</label>
-                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <MapPin size={20} className="text-slate-400"/>
-                  <input 
-                    type="text" 
-                    placeholder="예) 신주쿠역 동쪽 출구, 스타벅스 앞" 
-                    value={formData.meetingPoint}
-                    onChange={(e) => updateData('meetingPoint', e.target.value)}
-                    className="flex-1 bg-transparent outline-none font-medium"
-                  />
+                <label className="text-xs font-bold text-slate-500 ml-1">이메일 주소</label>
+                <input type="email" placeholder="example@gmail.com" value={formData.email} onChange={(e)=>updateData('email', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black"/>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1 flex items-center gap-1"><Instagram size={12}/> Instagram ID</label>
+                  <input type="text" placeholder="@locally.host" value={formData.instagram} onChange={(e)=>updateData('instagram', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black"/>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1">알게 된 계기</label>
+                  <input type="text" placeholder="예) 인스타 릴스, 지인 추천" value={formData.source} onChange={(e)=>updateData('source', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black"/>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 4: 사진 업로드 */}
-        {step === 4 && (
+        {/* STEP 2: 언어 능력 & 프로필 */}
+        {step === 2 && (
           <div className="w-full space-y-8">
             <div className="text-center space-y-2">
-              <span className="bg-purple-50 text-purple-600 font-bold px-3 py-1 rounded-full text-xs">Step 4. 시각 자료</span>
-              <h1 className="text-3xl md:text-4xl font-black">멋진 사진을 보여주세요</h1>
-              <p className="text-slate-500">현장감이 느껴지는 사진 5장 이상을 추천합니다.</p>
+              <span className="bg-blue-50 text-blue-600 font-bold px-3 py-1 rounded-full text-xs">Step 2. 언어 & 프로필</span>
+              <h1 className="text-3xl font-black">일본어 실력을 보여주세요</h1>
+              <p className="text-slate-500">게스트와 소통하기 위한 중요한 정보입니다.</p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* 업로드 버튼 */}
-              <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all">
-                <Camera size={32} className="text-slate-400 mb-2"/>
-                <span className="text-xs font-bold text-slate-500">사진 추가하기</span>
-                <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload}/>
-              </label>
+            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+              <label className="block font-bold mb-4 flex items-center gap-2"><Globe size={18}/> 일본어 구사 수준</label>
+              <input 
+                type="range" min="1" max="4" step="1" 
+                value={formData.japaneseLevel}
+                onChange={(e) => updateData('japaneseLevel', Number(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-black mb-4"
+              />
+              <div className="flex justify-between text-xs font-bold text-slate-400">
+                <span className={formData.japaneseLevel===1 ? 'text-black':''}>초급</span>
+                <span className={formData.japaneseLevel===2 ? 'text-black':''}>중급</span>
+                <span className={formData.japaneseLevel===3 ? 'text-black':''}>상급</span>
+                <span className={formData.japaneseLevel===4 ? 'text-black':''}>원어민</span>
+              </div>
+              <div className="mt-4 text-center text-sm font-medium text-slate-700 bg-white p-3 rounded-xl border border-slate-100">
+                {formData.japaneseLevel === 1 && "간단한 자기소개 가능 (번역기 활용)"}
+                {formData.japaneseLevel === 2 && "간단한 문장 대화 가능 (부분 번역기)"}
+                {formData.japaneseLevel === 3 && "기본적인 회화 문제 없음"}
+                {formData.japaneseLevel === 4 && "복잡한 내용 및 문화적 표현 이해 가능"}
+              </div>
+              
+              <input type="text" placeholder="자격증이 있다면 기재해주세요 (선택)" value={formData.japaneseCert} onChange={(e)=>updateData('japaneseCert', e.target.value)} className="w-full mt-4 p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none"/>
+            </div>
 
-              {/* 업로드된 사진 미리보기 */}
-              {formData.photos.map((url, idx) => (
-                <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative group shadow-sm">
-                  <img src={url} className="w-full h-full object-cover"/>
-                  <button 
-                    onClick={() => updateData('photos', formData.photos.filter((_, i) => i !== idx))}
-                    className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X size={14}/>
-                  </button>
-                  {idx === 0 && <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded-lg">대표 사진</span>}
+            <div>
+              <label className="font-bold block mb-2">자기소개</label>
+              <textarea placeholder="게스트에게 나를 소개해 주세요." value={formData.selfIntro} onChange={(e)=>updateData('selfIntro', e.target.value)} className="w-full p-4 h-32 bg-slate-50 rounded-xl outline-none resize-none"/>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {['profilePhoto1', 'profilePhoto2'].map((key, idx) => (
+                <div key={key}>
+                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">프로필 사진 {idx + 1}</label>
+                  <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all relative overflow-hidden">
+                    {formData[key as keyof typeof formData] ? (
+                      <img src={formData[key as keyof typeof formData] as string} className="w-full h-full object-cover"/>
+                    ) : (
+                      <>
+                        <Camera size={24} className="text-slate-400 mb-1"/>
+                        <span className="text-[10px] text-slate-400">사진 추가</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(e, key as any)}/>
+                  </label>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* STEP 5: 요금 설정 (마지막) */}
-        {step === 5 && (
+        {/* STEP 3: 투어 상세 정보 */}
+        {step === 3 && (
+          <div className="w-full space-y-6">
+            <div className="text-center space-y-2">
+              <span className="bg-rose-50 text-rose-600 font-bold px-3 py-1 rounded-full text-xs">Step 3. 투어 정보</span>
+              <h1 className="text-3xl font-black">어디로 떠나볼까요?</h1>
+              <p className="text-slate-500">매력적인 투어 코스를 자세히 적어주세요.</p>
+            </div>
+
+            <div>
+              <label className="font-bold block mb-2">개최 지역</label>
+              <div className="flex gap-2 flex-wrap">
+                {['서울', '인천', '경기도', '부산', '기타'].map(loc => (
+                  <button key={loc} onClick={() => updateData('location', loc)} className={`px-4 py-2 rounded-full border text-sm font-bold transition-all ${formData.location === loc ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'}`}>
+                    {loc}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="font-bold block mb-1">방문 장소 (구체적으로)</label>
+              <input type="text" placeholder="예) 용리단길, 광장시장, 보쌈식당" value={formData.spots} onChange={(e)=>updateData('spots', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none"/>
+              <p className="text-[10px] text-slate-400 mt-1 ml-1">※ 단순 지역명이 아닌 실제 방문할 장소를 적어주세요.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-bold block mb-1">미팅 장소</label>
+                <div className="flex items-center gap-2 bg-slate-50 p-4 rounded-xl">
+                  <MapPin size={18} className="text-slate-400"/>
+                  <input type="text" placeholder="명동역 5번 출구" value={formData.meetingPoint} onChange={(e)=>updateData('meetingPoint', e.target.value)} className="bg-transparent outline-none w-full text-sm"/>
+                </div>
+              </div>
+              <div>
+                <label className="font-bold block mb-1">소요 시간</label>
+                <div className="flex items-center gap-2 bg-slate-50 p-4 rounded-xl">
+                  <Clock size={18} className="text-slate-400"/>
+                  <input type="number" placeholder="4" value={formData.duration} onChange={(e)=>updateData('duration', e.target.value)} className="bg-transparent outline-none w-full text-sm"/>
+                  <span className="text-sm text-slate-500 whitespace-nowrap">시간</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="font-bold block mb-1">투어 소개글</label>
+              <textarea 
+                placeholder={`예시) "서촌과 인왕산의 매력을 소개합니다!"\n서촌은 서울의 전통과 현대가 어우러진 곳으로...`}
+                value={formData.description} 
+                onChange={(e)=>updateData('description', e.target.value)} 
+                className="w-full p-4 h-48 bg-slate-50 rounded-xl outline-none resize-none text-sm leading-relaxed"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: 가격 및 일정 */}
+        {step === 4 && (
           <div className="w-full space-y-8">
             <div className="text-center space-y-2">
-              <span className="bg-green-50 text-green-600 font-bold px-3 py-1 rounded-full text-xs">Step 5. 요금 설정</span>
-              <h1 className="text-3xl md:text-4xl font-black">얼마나 받을까요?</h1>
-              <p className="text-slate-500">게스트 1인당 요금을 설정해 주세요.</p>
+              <span className="bg-green-50 text-green-600 font-bold px-3 py-1 rounded-full text-xs">Step 4. 가격 및 일정</span>
+              <h1 className="text-3xl font-black">마지막 단계입니다!</h1>
             </div>
 
             <div className="flex flex-col items-center">
-              <div className="relative w-full max-w-xs">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl font-black text-slate-300">₩</span>
+              <label className="font-bold mb-4">1인당 투어 가격</label>
+              <div className="relative w-full max-w-xs mb-2">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-400">₩</span>
                 <input 
                   type="number" 
                   value={formData.price}
                   onChange={(e) => updateData('price', Number(e.target.value))}
-                  className="w-full pl-12 pr-4 py-4 text-4xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"
+                  className="w-full pl-10 pr-4 py-3 text-3xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"
                 />
               </div>
-              <p className="mt-4 text-sm text-slate-500">
-                비슷한 체험의 평균 요금은 <strong>₩35,000</strong> 입니다.
-              </p>
+              <p className="text-xs text-slate-400 mb-8">권장 가격대: 30,000원 ~ 50,000원</p>
 
-              <div className="mt-12 bg-slate-50 p-6 rounded-2xl w-full max-w-sm border border-slate-100">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-slate-500">게스트 결제 금액</span>
-                  <span className="font-bold">₩{formData.price.toLocaleString()}</span>
+              {/* 정산 시뮬레이션 카드 */}
+              <div className="bg-slate-50 p-6 rounded-2xl w-full max-w-sm border border-slate-100">
+                <div className="flex justify-between text-sm mb-2 text-slate-500">
+                  <span>게스트 결제 금액 (플랫폼 수수료 별도)</span>
+                  <span>₩{formData.price.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-sm mb-4">
-                  <span className="text-slate-500">서비스 수수료 (10%)</span>
-                  <span className="font-bold text-rose-500">- ₩{(formData.price * 0.1).toLocaleString()}</span>
+                <div className="flex justify-between text-sm mb-4 text-slate-500">
+                  <span>호스트 수수료 (20%)</span>
+                  <span className="text-rose-500">- ₩{(formData.price * 0.2).toLocaleString()}</span>
                 </div>
                 <div className="border-t border-slate-200 pt-4 flex justify-between text-lg">
-                  <span className="font-black text-slate-900">호스트 정산 금액</span>
-                  <span className="font-black text-blue-600">₩{(formData.price * 0.9).toLocaleString()}</span>
+                  <span className="font-black text-slate-900">호스트 정산 예상금</span>
+                  <span className="font-black text-blue-600">₩{(formData.price * 0.8).toLocaleString()}</span>
                 </div>
               </div>
+            </div>
+
+            <div>
+              <label className="font-bold block mb-2 flex items-center gap-2"><Calendar size={18}/> 투어 가능 일정</label>
+              <textarea 
+                placeholder="예) 10월 1, 2, 7일 / 11월 3, 5일 가능합니다." 
+                value={formData.availability}
+                onChange={(e)=>updateData('availability', e.target.value)}
+                className="w-full p-4 h-24 bg-slate-50 rounded-xl outline-none resize-none text-sm"
+              />
+              <p className="text-[10px] text-slate-400 mt-2">※ 정확한 스케줄 관리는 등록 후 '일정 관리' 탭에서 설정할 수 있습니다.</p>
             </div>
           </div>
         )}
 
       </main>
 
-      {/* 3. 하단 고정 네비게이션 (Fixed Bottom Bar) */}
+      {/* 3. 하단 버튼 */}
       <footer className="h-24 px-6 border-t border-slate-100 flex items-center justify-between sticky bottom-0 bg-white/90 backdrop-blur-lg z-50">
         <button 
           onClick={prevStep}
           disabled={step === 1}
-          className={`px-6 py-3 rounded-xl font-bold text-sm transition-colors ${step === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-900 hover:bg-slate-100 underline decoration-1'}`}
+          className={`px-6 py-3 rounded-xl font-bold text-sm transition-colors ${step === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-900 hover:bg-slate-100'}`}
         >
-          이전 단계
+          이전
         </button>
 
-        <div className="flex gap-4">
+        <div className="flex gap-2">
           {step === totalSteps ? (
-            <button className="bg-black text-white px-8 py-3.5 rounded-xl font-bold text-sm hover:scale-105 transition-transform shadow-lg shadow-slate-200">
-              체험 등록 완료 🎉
+            <button className="bg-black text-white px-8 py-3.5 rounded-xl font-bold text-sm hover:scale-105 transition-transform shadow-lg">
+              신청서 제출하기
             </button>
           ) : (
             <button 
               onClick={nextStep}
-              className="bg-black text-white px-8 py-3.5 rounded-xl font-bold text-sm hover:scale-105 transition-transform flex items-center gap-2 shadow-lg shadow-slate-200"
+              className="bg-black text-white px-8 py-3.5 rounded-xl font-bold text-sm hover:scale-105 transition-transform flex items-center gap-2"
             >
               다음 <ChevronRight size={16}/>
             </button>
