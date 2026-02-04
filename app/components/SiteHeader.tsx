@@ -12,6 +12,7 @@ export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -52,18 +53,28 @@ export default function SiteHeader() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (session?.user) checkHostStatus(session.user.id);
-      else setIsHost(false);
+      else {
+        setIsHost(false);
+        setApplicationStatus(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const checkHostStatus = async (userId: string) => {
-    // 승인된 호스트인지 확인 (체험이 있거나 상태가 approved/active)
-    const { data: app } = await supabase.from('host_applications').select('status').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const { data: app } = await supabase
+      .from('host_applications')
+      .select('status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (app) setApplicationStatus(app.status);
+
     const { count } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('host_id', userId);
     
-    // 'approved'나 'active' 상태일 때만 '진짜 호스트'로 간주하여 대시보드로 직행
     if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
       setIsHost(true);
     }
@@ -75,22 +86,21 @@ export default function SiteHeader() {
   };
 
   const handleModeSwitch = async () => {
-    if (pathname?.startsWith('/host')) { router.push('/'); return; }
-    if (!user) { setIsLoginModalOpen(true); return; }
-    
-    // ✅ 수정됨: 완전히 승인된 호스트만 대시보드로 바로 이동
-    // 심사 중, 보완 요청, 신규 유저는 모두 '설명 페이지'로 이동
-    if (isHost) {
-      router.push('/host/dashboard'); 
-    } else {
-      router.push('/become-a-host');
+    // 1. 이미 호스트 대시보드에 있다면 -> 게스트 홈으로
+    if (pathname?.startsWith('/host')) { 
+      router.push('/'); 
+      return; 
     }
+    
+    // 2. 그 외 모든 경우(게스트, 호스트, 비로그인 포함) -> 설명 페이지로 이동
+    // (설명 페이지에 있는 '시작하기' 버튼이 똑똑하게 대시보드로 보내줄 것입니다)
+    router.push('/become-a-host');
   };
 
-  // ✅ 버튼 라벨 로직
+  // 버튼 라벨
   const getButtonLabel = () => {
     if (pathname?.startsWith('/host')) return '게스트 모드';
-    if (!user || !isHost) return '호스트 등록하기';
+    if (!user || (!isHost && !applicationStatus)) return '호스트 등록하기';
     return '호스트 모드';
   };
 
@@ -107,6 +117,7 @@ export default function SiteHeader() {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
+            {/* 상단 메인 버튼 */}
             <button 
               onClick={handleModeSwitch} 
               className="hidden md:block text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 cursor-pointer"
@@ -144,6 +155,7 @@ export default function SiteHeader() {
                 </div>
               </div>
 
+              {/* 드롭다운 메뉴 */}
               {user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
@@ -163,6 +175,7 @@ export default function SiteHeader() {
                     <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <User size={18}/> 프로필 및 계정
                     </Link>
+                    {/* 드롭다운 메뉴에서도 '호스트 소개' 페이지로 이동 */}
                     <button onClick={handleModeSwitch} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <Settings size={18}/> {pathname?.startsWith('/host') ? '게스트 모드' : '호스트 모드'}
                     </button>

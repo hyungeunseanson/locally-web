@@ -13,11 +13,11 @@ const CATEGORIES = [
   { id: 'tokyo', label: '도쿄', icon: '🗼' },
   { id: 'osaka', label: '오사카', icon: '🏯' },
   { id: 'fukuoka', label: '후쿠오카', icon: '🍜' },
-  { id: 'sapporo', label: '삿포로', icon: '☃️' },
-  { id: 'nagoya', label: '나고야', icon: '🍣' },
-  { id: 'seoul', label: '서울', icon: '🏙️' },
-  { id: 'busan', label: '부산', icon: '🚢' },
-  { id: 'jeju', label: '제주', icon: '🏔️' },
+  { id: 'sapporo', label: '삿포로', icon: '❄️' },
+  { id: 'nagoya', label: '나고야', icon: '🍤' },
+  { id: 'seoul', label: '서울', icon: '🇰🇷' },
+  { id: 'busan', label: '부산', icon: '🌊' },
+  { id: 'jeju', label: '제주', icon: '🍊' },
 ];
 
 const LOCALLY_SERVICES = [
@@ -60,21 +60,15 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ✅ 데이터 로딩 (수정됨: 승인된 체험만 가져오기)
   useEffect(() => {
     const fetchExperiences = async () => {
       try {
         let query = supabase
           .from('experiences')
           .select('*')
-          .eq('status', 'active') // 🟢 이 부분이 추가되었습니다! (승인된 것만 노출)
+          .eq('status', 'active')
           .order('created_at', { ascending: false });
         
-        if (selectedCategory !== 'all') {
-           // 추후 city 컬럼 등으로 필터링 추가 가능
-           // query = query.eq('city', selectedCategory); 
-        }
-
         const { data, error } = await query;
         if (error) throw error;
         if (data) setExperiences(data);
@@ -221,7 +215,8 @@ export default function HomePage() {
             <div>
               <h5 className="font-bold text-black mb-4">호스팅</h5>
               <ul className="space-y-3">
-                <li><Link href="/host/register" className="hover:underline">호스트 되기</Link></li>
+                {/* ✅ 수정됨: 호스트 되기 링크를 설명 페이지로 연결 */}
+                <li><Link href="/become-a-host" className="hover:underline">호스트 되기</Link></li>
                 <li><Link href="#" className="hover:underline">호스트 추천하기</Link></li>
                 <li><Link href="#" className="hover:underline">책임 보험</Link></li>
               </ul>
@@ -249,6 +244,7 @@ export default function HomePage() {
   );
 }
 
+// ... DatePicker, ExperienceCard, ServiceCard (기존과 동일) ...
 function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange: (range: any) => void }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
