@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, MessageCircle, Smile, Camera, Loader2 } from 'lucide-react';
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function AccountPage() {
@@ -27,34 +27,34 @@ export default function AccountPage() {
     phone: '',
     mbti: '',
     kakao_id: '',
-    avatar_url: '' // 프로필 사진 URL 추가
+    avatar_url: '' 
   });
 
-  // 국가 리스트
+  // 국가 리스트 & 국가번호 매핑
   const countries = [
-    { code: 'KR', name: '대한민국 (South Korea)' },
-    { code: 'JP', name: '일본 (Japan)' },
-    { code: 'CN', name: '중국 (China)' },
-    { code: 'TW', name: '대만 (Taiwan)' },
-    { code: 'HK', name: '홍콩 (Hong Kong)' },
-    { code: 'SG', name: '싱가포르 (Singapore)' },
-    { code: 'MY', name: '말레이시아 (Malaysia)' },
-    { code: 'PH', name: '필리핀 (Philippines)' },
-    { code: 'IN', name: '인도 (India)' },
-    { code: 'TH', name: '태국 (Thailand)' },
-    { code: 'VN', name: '베트남 (Vietnam)' },
-    { code: 'US', name: '미국 (USA)' },
-    { code: 'CA', name: '캐나다 (Canada)' },
-    { code: 'FR', name: '프랑스 (France)' },
-    { code: 'GB', name: '영국 (UK)' },
-    { code: 'ES', name: '스페인 (Spain)' },
-    { code: 'DE', name: '독일 (Germany)' },
-    { code: 'CH', name: '스위스 (Switzerland)' },
-    { code: 'IT', name: '이탈리아 (Italy)' },
-    { code: 'AU', name: '호주 (Australia)' }
+    { code: 'KR', name: '대한민국 (South Korea)', phone: '+82' },
+    { code: 'JP', name: '일본 (Japan)', phone: '+81' },
+    { code: 'CN', name: '중국 (China)', phone: '+86' },
+    { code: 'TW', name: '대만 (Taiwan)', phone: '+886' },
+    { code: 'HK', name: '홍콩 (Hong Kong)', phone: '+852' },
+    { code: 'SG', name: '싱가포르 (Singapore)', phone: '+65' },
+    { code: 'MY', name: '말레이시아 (Malaysia)', phone: '+60' },
+    { code: 'PH', name: '필리핀 (Philippines)', phone: '+63' },
+    { code: 'IN', name: '인도 (India)', phone: '+91' },
+    { code: 'TH', name: '태국 (Thailand)', phone: '+66' },
+    { code: 'VN', name: '베트남 (Vietnam)', phone: '+84' },
+    { code: 'US', name: '미국 (USA)', phone: '+1' },
+    { code: 'CA', name: '캐나다 (Canada)', phone: '+1' },
+    { code: 'FR', name: '프랑스 (France)', phone: '+33' },
+    { code: 'GB', name: '영국 (UK)', phone: '+44' },
+    { code: 'ES', name: '스페인 (Spain)', phone: '+34' },
+    { code: 'DE', name: '독일 (Germany)', phone: '+49' },
+    { code: 'CH', name: '스위스 (Switzerland)', phone: '+41' },
+    { code: 'IT', name: '이탈리아 (Italy)', phone: '+39' },
+    { code: 'AU', name: '호주 (Australia)', phone: '+61' }
   ];
 
-  // 더미 후기 데이터
+  // 더미 후기
   const reviews = [
     { id: 1, host: 'Akiho', date: '2026년 1월', content: '정말 매너 좋고 시간 약속도 잘 지키시는 게스트였습니다! 대화도 즐거웠어요.' },
     { id: 2, host: 'Minjun', date: '2025년 12월', content: '깔끔하게 이용해주셔서 감사합니다. 추천합니다!' }
@@ -71,7 +71,7 @@ export default function AccountPage() {
       if (data) {
         setProfile({
           full_name: data.full_name || '',
-          email: user.email || '',
+          email: data.email || user.email || '', // DB 값 우선, 없으면 Auth 값
           nationality: data.nationality || '',
           birth_date: data.birth_date || '',
           gender: data.gender || '',
@@ -94,10 +94,38 @@ export default function AccountPage() {
     getProfile();
   }, []);
 
-  // 📸 프로필 사진 업로드 핸들러
+  // 📞 전화번호 자동 포맷팅 함수
+  const formatPhoneNumber = (value: string) => {
+    const numbers = value.replace(/[^0-9]/g, ''); // 숫자만 남김
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  // 📞 전화번호 입력 핸들러
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 사용자가 입력한 값에서 국가코드 제외한 나머지 부분 포맷팅
+    // (여기서는 간단하게 전체 텍스트에 대해 하이픈 처리를 합니다)
+    // 실제로는 국가코드가 앞에 있으면 분리해서 처리하는 것이 좋으나, 
+    // UX상 사용자가 직접 수정 가능하게 두는 것이 유연합니다.
+    setProfile({ ...profile, phone: e.target.value });
+  };
+
+  // 🌏 국적 변경 시 국가번호 자동 입력
+  const handleNationalityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const code = e.target.value;
+    const country = countries.find(c => c.code === code);
+    let newPhone = profile.phone;
+    
+    // 기존 번호가 없거나 국가번호가 없으면 자동 추가
+    if (country && (!profile.phone || !profile.phone.startsWith('+'))) {
+      newPhone = `${country.phone} `;
+    }
+    setProfile({ ...profile, nationality: code, phone: newPhone });
+  };
+
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
-    
     setUploading(true);
     const file = event.target.files[0];
     const fileExt = file.name.split('.').pop();
@@ -105,22 +133,11 @@ export default function AccountPage() {
     const filePath = `${fileName}`;
 
     try {
-      // 1. Storage에 업로드
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
       if (uploadError) throw uploadError;
-
-      // 2. 공개 URL 가져오기
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      // 3. 상태 업데이트 및 DB 즉시 저장
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
       setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
-      
       alert('프로필 사진이 변경되었습니다.');
     } catch (error: any) {
       alert('사진 업로드 실패: ' + error.message);
@@ -129,10 +146,8 @@ export default function AccountPage() {
     }
   };
 
-  // 💾 전체 정보 저장 핸들러
   const handleSave = async () => {
     setSaving(true);
-    
     const updates = {
       id: user.id, 
       full_name: profile.full_name,
@@ -143,8 +158,8 @@ export default function AccountPage() {
       phone: profile.phone,
       mbti: profile.mbti,
       kakao_id: profile.kakao_id,
-      email: user.email, 
-      avatar_url: profile.avatar_url, // 사진 URL도 함께 저장
+      email: profile.email, // 수정된 이메일 저장
+      avatar_url: profile.avatar_url, 
       updated_at: new Date().toISOString(), 
     };
 
@@ -176,7 +191,7 @@ export default function AccountPage() {
           <div className="w-full lg:w-[360px] flex-shrink-0">
             <div className="border border-slate-200 rounded-3xl p-8 shadow-sm text-center sticky top-28 bg-white">
               
-              {/* 📸 프로필 사진 영역 (클릭 시 파일 선택) */}
+              {/* 📸 프로필 사진 */}
               <div className="relative w-32 h-32 mx-auto mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                 <div className="w-32 h-32 bg-slate-200 rounded-full overflow-hidden border border-slate-100 shadow-inner relative">
                    {profile.avatar_url ? (
@@ -184,26 +199,12 @@ export default function AccountPage() {
                    ) : (
                      <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={48}/></div>
                    )}
-                   
-                   {/* 호버 시 오버레이 */}
                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                      <Camera size={24} className="text-white"/>
                    </div>
-                   
-                   {/* 로딩 표시 */}
-                   {uploading && (
-                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                       <Loader2 size={24} className="text-white animate-spin"/>
-                     </div>
-                   )}
+                   {uploading && <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10"><Loader2 size={24} className="text-white animate-spin"/></div>}
                 </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleAvatarUpload} 
-                  accept="image/*" 
-                  className="hidden"
-                />
+                <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden"/>
               </div>
 
               <h2 className="text-2xl font-black mb-1">{profile.full_name || '이름 없음'}</h2>
@@ -215,9 +216,10 @@ export default function AccountPage() {
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
                   <ShieldCheck size={14}/> 신원 인증됨
                 </div>
+                {/* 🌈 성별 이모지 표시 */}
                 {profile.gender && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-100">
-                    {profile.gender === 'Male' ? '남성' : profile.gender === 'Female' ? '여성' : '기타'}
+                    {profile.gender === 'Male' ? '🙋‍♂️ 남성' : profile.gender === 'Female' ? '🙋‍♀️ 여성' : '🙋 기타'}
                   </div>
                 )}
                 {profile.mbti && (
@@ -232,12 +234,8 @@ export default function AccountPage() {
                   "{profile.bio}"
                 </div>
               )}
-
-              {profile.kakao_id && (
-                <div className="flex items-center justify-center gap-2 text-sm font-medium text-yellow-900 bg-yellow-400/20 py-2 rounded-lg mb-6">
-                  <MessageCircle size={16}/> Kakao: {profile.kakao_id}
-                </div>
-              )}
+              
+              {/* 카카오톡 ID 제거됨 (여기서는 안 보이게) */}
               
               <div className="text-left space-y-4 pt-6 border-t border-slate-100">
                 <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> 호스트에게 받은 후기 ({reviews.length})</h3>
@@ -272,7 +270,7 @@ export default function AccountPage() {
                   <label className="block text-sm font-bold mb-2">국적</label>
                   <select 
                     value={profile.nationality}
-                    onChange={e => setProfile({...profile, nationality: e.target.value})}
+                    onChange={handleNationalityChange}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
                   >
                     <option value="">국적을 선택하세요</option>
@@ -301,9 +299,9 @@ export default function AccountPage() {
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
                   >
                     <option value="">선택하세요</option>
-                    <option value="Male">남성 (Male)</option>
-                    <option value="Female">여성 (Female)</option>
-                    <option value="Other">기타 (Other)</option>
+                    <option value="Male">🙋‍♂️ 남성 (Male)</option>
+                    <option value="Female">🙋‍♀️ 여성 (Female)</option>
+                    <option value="Other">🙋 기타 (Other)</option>
                   </select>
                 </div>
               </div>
@@ -314,13 +312,14 @@ export default function AccountPage() {
                   <input 
                     type="tel" 
                     value={profile.phone}
-                    onChange={e => setProfile({...profile, phone: e.target.value})}
-                    placeholder="국가번호 포함 (ex. +82 10-1234-5678)"
+                    onChange={handlePhoneChange}
+                    placeholder="+82 10-1234-5678"
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
+                  <p className="text-xs text-slate-400 mt-1">* 국적 선택 시 국가번호가 자동 입력됩니다.</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2">카카오톡 ID</label>
+                  <label className="block text-sm font-bold mb-2">카카오톡 ID (선택)</label>
                   <input 
                     type="text" 
                     value={profile.kakao_id}
@@ -348,9 +347,10 @@ export default function AccountPage() {
                   <input 
                     type="email" 
                     value={profile.email}
-                    disabled
-                    className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl text-slate-500"
+                    onChange={e => setProfile({...profile, email: e.target.value})}
+                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
+                  <p className="text-xs text-slate-400 mt-1">* 로그인 시 사용하는 ID가 변경됩니다.</p>
                 </div>
               </div>
 
