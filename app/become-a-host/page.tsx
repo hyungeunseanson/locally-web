@@ -22,8 +22,8 @@ export default function BecomeHostPage() {
               <span className="text-rose-600">수입</span>을 올리세요.
             </h1>
             <p className="text-xl text-slate-500 font-medium leading-relaxed max-w-lg">
-              수많은 게스트의 시선을 사로잡을 독특한<br/>
-              로컬리 체험을 만들어 보세요.
+              수많은 외국인 게스트의 시선을 사로잡을<br/>
+              독특한 로컬리 체험을 만들어 보세요.
             </p>
             <div className="pt-4">
               <Link href="/host/register">
@@ -131,7 +131,7 @@ export default function BecomeHostPage() {
                <div className="flex-1">
                   <h3 className="text-3xl font-black mb-6">투명하고 신속한 정산</h3>
                   <p className="text-xl text-slate-500 leading-relaxed font-medium">
-                     체험이 완료되면 다음 날 바로 입금됩니다.<br/>
+                     체험이 완료되면 다음 달 바로 입금됩니다.<br/>
                      복잡한 절차 없이 수익을 확인하고 관리하세요.
                   </p>
                </div>

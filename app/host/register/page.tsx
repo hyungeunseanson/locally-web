@@ -3,35 +3,40 @@
 import React, { useState } from 'react';
 import { 
   ChevronRight, Camera, Globe, MapPin, X, User, Instagram, 
-  CheckCircle2, ShieldCheck, Flag, CreditCard, Clock, Smile
+  CheckCircle2, ShieldCheck, Flag, CreditCard, Clock, Smile, Building, FileText
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HostRegisterPage() {
   const [step, setStep] = useState(1);
-  const totalSteps = 7; // 호스트 등록은 총 7단계 (완료 화면 포함)
+  const totalSteps = 7; // 호스트 등록 총 7단계
 
   const [formData, setFormData] = useState({
-    // Step 1: 타겟 설정
-    targetCountry: '', 
+    // Step 1: 내 국적 (Host Nationality) - 순서 변경됨
+    hostNationality: '', 
 
-    // Step 2: 언어 능력
-    languageLevel: 3, 
-    languageCert: '',
+    // Step 2: 타겟 언어
+    targetLanguage: '', 
 
     // Step 3: 기본 정보
     name: '', phone: '', dob: '', email: '', instagram: '', source: '',
 
-    // Step 4: 프로필 (사진/소개)
+    // Step 4: 언어 능력
+    languageLevel: 3, 
+    languageCert: '',
+
+    // Step 5: 프로필
     profilePhoto: null as string | null,
     selfIntro: '',
 
-    // Step 5: 신분 인증
-    idCardType: '', 
+    // Step 6: 신분 인증
     idCardFile: null as string | null,
 
-    // Step 6: 신청 사유
-    motivation: ''
+    // Step 7: 정산 계좌 (Motivation 대체)
+    bankName: '',
+    accountNumber: '',
+    accountHolder: '',
+    agreeTerms: false // 약관 동의 추가
   });
 
   const nextStep = () => { if (step < totalSteps) setStep(step + 1); };
@@ -44,7 +49,11 @@ export default function HostRegisterPage() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
     if (e.target.files && e.target.files[0]) {
       const url = URL.createObjectURL(e.target.files[0]);
-      updateData(fieldName, url);
+      if (fieldName === 'profilePhoto') {
+        updateData('profilePhoto', url);
+      } else {
+        updateData(fieldName, url);
+      }
     }
   };
 
@@ -70,29 +79,57 @@ export default function HostRegisterPage() {
         </header>
       )}
 
-      {/* 2. 메인 컨텐츠 (max-w-xl로 축소하여 중앙 집중) */}
+      {/* 2. 메인 컨텐츠 (max-w-xl로 컴팩트하게) */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* STEP 1: 타겟 국적 선택 */}
+        {/* STEP 1: 호스트 국적 선택 (가장 먼저) */}
         {step === 1 && (
           <div className="w-full space-y-8 text-center">
             <div>
-              <span className="bg-indigo-50 text-indigo-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 1. 타겟 설정</span>
-              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">어떤 국적의 게스트를<br/>만나고 싶으신가요?</h1>
-              <p className="text-sm text-slate-500">주로 소통하게 될 언어권의 게스트를 선택해 주세요.</p>
+              <span className="bg-indigo-50 text-indigo-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 1. 국적 선택</span>
+              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">호스트님의 국적은<br/>어디인가요?</h1>
+              <p className="text-sm text-slate-500">신분증 확인 및 정산 통화 기준이 됩니다.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
+              <button 
+                onClick={() => updateData('hostNationality', 'Korea')} 
+                className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.hostNationality === 'Korea' ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}
+              >
+                <div className="text-4xl mb-2">🇰🇷</div>
+                <div className="font-bold text-lg">한국인</div>
+              </button>
+              <button 
+                onClick={() => updateData('hostNationality', 'Japan')} 
+                className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.hostNationality === 'Japan' ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}
+              >
+                <div className="text-4xl mb-2">🇯🇵</div>
+                <div className="font-bold text-lg">일본인</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: 타겟 언어 (만나고 싶은 게스트) */}
+        {step === 2 && (
+          <div className="w-full space-y-8 text-center">
+            <div>
+              <span className="bg-indigo-50 text-indigo-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 2. 언어 선택</span>
+              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">어떤 언어권 게스트와<br/>만나고 싶으신가요?</h1>
+              <p className="text-sm text-slate-500">주로 소통하게 될 언어를 선택해 주세요.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
               {[
-                { code: 'Japanese', label: '일본 🇯🇵', sub: 'Japanese' },
+                { code: 'Japanese', label: '일본어 🇯🇵', sub: 'Japanese' },
                 { code: 'English', label: '미국/영어권 🇺🇸', sub: 'English' },
-                { code: 'Chinese', label: '중국 🇨🇳', sub: 'Chinese' },
-                { code: 'Korean', label: '한국 🇰🇷', sub: 'Korean' },
+                { code: 'Chinese', label: '중국어 🇨🇳', sub: 'Chinese' },
+                { code: 'Korean', label: '한국어 🇰🇷', sub: 'Korean' },
               ].map((lang) => (
                 <button 
                   key={lang.code}
-                  onClick={() => updateData('targetCountry', lang.code)}
-                  className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.targetCountry === lang.code ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}
+                  onClick={() => updateData('targetLanguage', lang.code)}
+                  className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.targetLanguage === lang.code ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}
                 >
                   <div className="text-lg font-black mb-1">{lang.label}</div>
                   <div className="text-xs text-slate-400 font-medium">{lang.sub}</div>
@@ -102,11 +139,55 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 2: 언어 능력 */}
-        {step === 2 && (
+        {/* STEP 3: 기본 정보 */}
+        {step === 3 && (
           <div className="w-full space-y-8">
             <div className="text-center">
-              <span className="bg-blue-50 text-blue-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 2. 언어 능력</span>
+              <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 3. 기본 정보</span>
+              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">호스트님의<br/>연락처를 알려주세요</h1>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">성함 (실명)</label>
+                  <input type="text" placeholder="홍길동" value={formData.name} onChange={(e)=>updateData('name', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">생년월일</label>
+                  <input type="text" placeholder="YYYY.MM.DD" value={formData.dob} onChange={(e)=>updateData('dob', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">휴대전화 번호</label>
+                <input type="tel" placeholder="010-1234-5678" value={formData.phone} onChange={(e)=>updateData('phone', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">이메일 주소</label>
+                <input type="email" placeholder="example@gmail.com" value={formData.email} onChange={(e)=>updateData('email', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 flex items-center gap-1"><Instagram size={12}/> Instagram ID</label>
+                  <input type="text" placeholder="@locally.host" value={formData.instagram} onChange={(e)=>updateData('instagram', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">가입 경로</label>
+                  <input type="text" placeholder="예) 인스타, 지인 추천" value={formData.source} onChange={(e)=>updateData('source', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: 언어 능력 */}
+        {step === 4 && (
+          <div className="w-full space-y-8">
+            <div className="text-center">
+              <span className="bg-blue-50 text-blue-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 4. 언어 능력</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">해당 언어를<br/>얼마나 유창하게 하시나요?</h1>
               <p className="text-sm text-slate-500">게스트와의 원활한 소통을 위해 정확히 선택해 주세요.</p>
             </div>
@@ -152,55 +233,11 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 3: 기본 정보 */}
-        {step === 3 && (
-          <div className="w-full space-y-8">
-            <div className="text-center">
-              <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 3. 기본 정보</span>
-              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">호스트님의<br/>연락처를 알려주세요</h1>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">성함 (실명)</label>
-                  <input type="text" placeholder="홍길동" value={formData.name} onChange={(e)=>updateData('name', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all text-sm"/>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">생년월일</label>
-                  <input type="text" placeholder="YYYY.MM.DD" value={formData.dob} onChange={(e)=>updateData('dob', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all text-sm"/>
-                </div>
-              </div>
-              
-              <div>
-                <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">휴대전화 번호</label>
-                <input type="tel" placeholder="010-1234-5678" value={formData.phone} onChange={(e)=>updateData('phone', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all text-sm"/>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">이메일 주소</label>
-                <input type="email" placeholder="example@gmail.com" value={formData.email} onChange={(e)=>updateData('email', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all text-sm"/>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 flex items-center gap-1"><Instagram size={12}/> Instagram ID</label>
-                  <input type="text" placeholder="@locally.host" value={formData.instagram} onChange={(e)=>updateData('instagram', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all text-sm"/>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">가입 경로</label>
-                  <input type="text" placeholder="예) 인스타, 지인 추천" value={formData.source} onChange={(e)=>updateData('source', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all text-sm"/>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: 프로필 설정 (스타일은 유지하되 호스트 프로필용으로 구성) */}
-        {step === 4 && (
+        {/* STEP 5: 프로필 설정 */}
+        {step === 5 && (
           <div className="w-full space-y-8 text-center">
             <div>
-              <span className="bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 4. 프로필 설정</span>
+              <span className="bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 5. 프로필 설정</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">게스트에게 보여질<br/>모습을 꾸며보세요</h1>
             </div>
             <div className="flex flex-col items-center gap-6">
@@ -221,11 +258,11 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 5: 신분 인증 */}
-        {step === 5 && (
+        {/* STEP 6: 신분 인증 */}
+        {step === 6 && (
           <div className="w-full space-y-8">
             <div className="text-center">
-              <span className="bg-purple-50 text-purple-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 5. 신뢰 인증</span>
+              <span className="bg-purple-50 text-purple-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 6. 신뢰 인증</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">인증된 호스트<br/>배지를 받아보세요</h1>
               <p className="text-sm text-slate-500">신분증을 제출하면 프로필에 <span className="text-blue-600 font-bold"><ShieldCheck size={14} className="inline"/> 인증 배지</span>가 표시됩니다.</p>
             </div>
@@ -254,25 +291,77 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 6: 신청 사유 */}
-        {step === 6 && (
-          <div className="w-full space-y-8 text-center">
-            <div>
-              <span className="bg-green-50 text-green-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 6. 신청 사유</span>
-              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">마지막 질문입니다!</h1>
-              <p className="text-sm text-slate-500">로컬리 호스트가 되고 싶은 이유를 적어주세요.</p>
+        {/* STEP 7: 정산 계좌 등록 (마지막) */}
+        {step === 7 && (
+          <div className="w-full space-y-8">
+            <div className="text-center">
+              <span className="bg-green-50 text-green-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 7. 정산 계좌</span>
+              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">수익을 지급받을<br/>계좌를 알려주세요</h1>
+              <p className="text-sm text-slate-500">본인 명의의 계좌만 등록 가능합니다.</p>
             </div>
-            <textarea 
-              placeholder="예) 외국인 친구들과 교류하는 것을 좋아해서 지원하게 되었습니다." 
-              value={formData.motivation} 
-              onChange={(e)=>updateData('motivation', e.target.value)} 
-              className="w-full p-5 h-48 bg-slate-50 rounded-2xl outline-none text-sm resize-none border border-transparent focus:border-black bg-slate-50"
-            />
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">은행명</label>
+                <div className="relative">
+                  <Building size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
+                  <input 
+                    type="text" 
+                    placeholder="예) 카카오뱅크, 신한은행" 
+                    value={formData.bankName} 
+                    onChange={(e)=>updateData('bankName', e.target.value)} 
+                    className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">계좌번호</label>
+                <div className="relative">
+                  <CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
+                  <input 
+                    type="tel" 
+                    placeholder="- 없이 숫자만 입력" 
+                    value={formData.accountNumber} 
+                    onChange={(e)=>updateData('accountNumber', e.target.value)} 
+                    className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">예금주</label>
+                <div className="relative">
+                  <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
+                  <input 
+                    type="text" 
+                    placeholder="본인 실명" 
+                    value={formData.accountHolder} 
+                    onChange={(e)=>updateData('accountHolder', e.target.value)} 
+                    className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* 약관 동의 */}
+              <div className="pt-4">
+                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${formData.agreeTerms ? 'bg-black border-black' : 'border-slate-300 bg-white'}`}>
+                    {formData.agreeTerms && <CheckCircle2 size={14} className="text-white"/>}
+                  </div>
+                  <input type="checkbox" className="hidden" checked={formData.agreeTerms} onChange={(e) => updateData('agreeTerms', e.target.checked)}/>
+                  <div className="text-xs text-slate-500 leading-relaxed">
+                    <span className="font-bold text-slate-900">개인정보 수집 및 이용에 동의합니다.</span><br/>
+                    수집된 정보는 호스트 심사 및 정산 목적으로만 사용됩니다.
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* STEP 7: 완료 화면 */}
-        {step === 7 && (
+        {/* STEP 8: 완료 화면 */}
+        {step === 8 && (
           <div className="w-full text-center space-y-8 animate-in zoom-in-95 duration-500">
             <div className="w-28 h-28 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-100">
               <CheckCircle2 size={56}/>
@@ -307,8 +396,8 @@ export default function HostRegisterPage() {
 
       </main>
 
-      {/* 3. 하단 고정 네비게이션 (Step 7 완료 화면 제외) */}
-      {step < totalSteps && (
+      {/* 3. 하단 고정 네비게이션 (Step 8 완료 화면 제외) */}
+      {step < totalSteps + 1 && (
         <footer className="h-20 px-6 border-t border-slate-100 flex items-center justify-between sticky bottom-0 bg-white/90 backdrop-blur-lg z-50">
           <button 
             onClick={prevStep}
@@ -319,10 +408,11 @@ export default function HostRegisterPage() {
           </button>
 
           <div className="flex gap-2">
-            {step === totalSteps - 1 ? (
+            {step === totalSteps ? (
               <button 
-                onClick={nextStep} 
-                className="bg-black text-white px-8 py-3 rounded-xl font-bold text-xs hover:scale-105 transition-transform shadow-lg shadow-slate-200"
+                onClick={() => setStep(step + 1)} // 실제로는 여기서 DB 전송 로직 필요
+                disabled={!formData.agreeTerms}
+                className="bg-black text-white px-8 py-3 rounded-xl font-bold text-xs hover:scale-105 transition-transform shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 신청서 제출하기
               </button>
