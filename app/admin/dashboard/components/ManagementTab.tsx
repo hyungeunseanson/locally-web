@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, ChevronRight, User, Mail, Globe, MessageCircle, Phone, Smile, Calendar, MapPin } from 'lucide-react';
+import { Search, ChevronRight, User, Mail, Globe, MessageCircle, Phone, Smile, Calendar, MapPin, Cake } from 'lucide-react';
 import { InfoRow } from './SharedComponents';
 
 export default function ManagementTab({ 
@@ -10,6 +10,19 @@ export default function ManagementTab({
   selectedItem, setSelectedItem, 
   updateStatus, deleteItem 
 }: any) {
+
+  // 나이 계산 헬퍼 함수
+  const calculateAge = (birthDate: string) => {
+    if (!birthDate) return '';
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return `(만 ${age}세)`;
+  };
 
   return (
     <div className="flex-1 flex gap-6 overflow-hidden h-full">
@@ -51,14 +64,14 @@ export default function ManagementTab({
             />
           ))}
 
-          {/* C. ✅ 고객(유저) 리스트 - 기본 정보는 무조건 표시 */}
+          {/* C. ✅ 고객(유저) 리스트 - 생년월일/국적 추가, 자기소개 삭제 */}
           {activeTab === 'USERS' && users.map((user:any) => (
             <div key={user.id} className="p-5 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors hover:border-slate-300 group bg-white">
               
-              {/* 상단: 기본 정보 (가입 시 생성되는 데이터) */}
+              {/* 상단: 기본 정보 */}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-4">
-                  {/* 프로필 사진 (없으면 기본 아이콘) */}
+                  {/* 프로필 사진 */}
                   <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 overflow-hidden shrink-0">
                     {user.avatar_url ? (
                       <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
@@ -68,21 +81,23 @@ export default function ManagementTab({
                   </div>
                   <div>
                     <div className="font-bold text-slate-900 flex items-center gap-2 text-base">
-                      {user.full_name || user.name || '이름 미설정 (Guest)'}
-                      {/* 국적 배지 (데이터 있으면 표시) */}
-                      {user.nationality && (
-                        <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200 flex items-center gap-1 font-medium">
+                      {user.full_name || user.name || 'Unknown User'}
+                      {/* 🇰🇷 국적 배지 (강조) */}
+                      {user.nationality ? (
+                        <span className="text-[10px] bg-slate-800 text-white px-1.5 py-0.5 rounded flex items-center gap-1 font-bold">
                           <Globe size={10}/> {user.nationality}
                         </span>
+                      ) : (
+                        <span className="text-[10px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded border border-slate-200">국적 미상</span>
                       )}
                     </div>
                     <div className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
-                      <Mail size={12}/> {user.email || '이메일 정보 없음'}
+                      <Mail size={12}/> {user.email || '-'}
                     </div>
                   </div>
                 </div>
                 
-                {/* 우측 상단: 가입일 및 삭제 버튼 */}
+                {/* 우측 상단: 가입일 및 삭제 */}
                 <div className="text-right">
                   <div className="text-[10px] text-slate-400 mb-1 flex items-center justify-end gap-1">
                     <Calendar size={10}/> {new Date(user.created_at).toLocaleDateString()} 가입
@@ -93,12 +108,25 @@ export default function ManagementTab({
                 </div>
               </div>
               
-              {/* 하단: 추가 프로필 정보 (유저가 입력하면 자동 노출) */}
+              {/* 하단: 상세 정보 그리드 */}
               <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-50">
-                {/* 1. 연락처 */}
+                
+                {/* 1. 🎂 생년월일 (New) */}
+                {user.birth_date ? (
+                  <div className="text-xs text-slate-700 flex items-center gap-2 bg-slate-50 px-2 py-1.5 rounded font-medium">
+                    <Cake size={12} className="text-rose-400"/> 
+                    {user.birth_date} <span className="text-slate-400 text-[10px]">{calculateAge(user.birth_date)}</span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded">
+                    <Cake size={12}/> 생년월일 미입력
+                  </div>
+                )}
+
+                {/* 2. 📞 연락처 */}
                 {user.phone ? (
-                  <div className="text-xs text-slate-600 flex items-center gap-2 bg-slate-50 px-2 py-1.5 rounded">
-                    <Phone size={12} className="text-blue-500"/> {user.phone}
+                  <div className="text-xs text-slate-600 flex items-center gap-2 bg-blue-50 px-2 py-1.5 rounded text-blue-700">
+                    <Phone size={12}/> {user.phone}
                   </div>
                 ) : (
                   <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded">
@@ -106,10 +134,10 @@ export default function ManagementTab({
                   </div>
                 )}
 
-                {/* 2. 카카오톡 */}
+                {/* 3. 🟡 카카오톡 */}
                 {user.kakao_id ? (
-                  <div className="text-xs text-slate-600 flex items-center gap-2 bg-yellow-50 px-2 py-1.5 rounded">
-                    <MessageCircle size={12} className="text-yellow-600"/> {user.kakao_id}
+                  <div className="text-xs text-yellow-700 flex items-center gap-2 bg-[#FEE500]/30 px-2 py-1.5 rounded font-medium">
+                    <MessageCircle size={12}/> {user.kakao_id}
                   </div>
                 ) : (
                   <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded">
@@ -117,27 +145,14 @@ export default function ManagementTab({
                   </div>
                 )}
 
-                {/* 3. MBTI */}
+                {/* 4. 🧠 MBTI */}
                 {user.mbti ? (
-                  <div className="text-xs text-slate-600 flex items-center gap-2 bg-purple-50 px-2 py-1.5 rounded col-span-2 sm:col-span-1">
-                    <Smile size={12} className="text-purple-500"/> MBTI: <span className="font-bold">{user.mbti}</span>
+                  <div className="text-xs text-purple-700 flex items-center gap-2 bg-purple-50 px-2 py-1.5 rounded font-bold">
+                    <Smile size={12}/> {user.mbti}
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded col-span-2 sm:col-span-1">
+                  <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded">
                     <Smile size={12}/> MBTI 미입력
-                  </div>
-                )}
-              </div>
-
-              {/* 자기소개 (Bio) */}
-              <div className="mt-2">
-                {user.bio ? (
-                  <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg leading-relaxed border border-slate-100 italic">
-                    "{user.bio}"
-                  </p>
-                ) : (
-                  <div className="text-[10px] text-slate-300 text-center py-1">
-                    자기소개가 아직 작성되지 않았습니다.
                   </div>
                 )}
               </div>
