@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { 
   Search, ChevronDown, ChevronUp, MessageCircle, 
-  User, Briefcase, MapPin, CreditCard, ShieldCheck, Smile 
+  User, Briefcase, CreditCard, ShieldCheck, Smile 
 } from 'lucide-react';
+import Link from 'next/link';
 
 // FAQ 데이터 (로컬리 맞춤형 콘텐츠)
 const FAQ_DATA = {
@@ -190,12 +191,22 @@ export default function HelpCenterPage() {
             계정, 결제, 투어 관련 등 궁금한 점이 있다면 편하게 문의해 주세요.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <button className="bg-black text-white px-8 py-3.5 rounded-xl font-bold hover:scale-105 transition-transform flex items-center justify-center gap-2 shadow-lg shadow-slate-200">
+            {/* 1:1 채팅 상담하기 (카카오톡 채널 연결) */}
+            <Link 
+              href="http://pf.kakao.com/_PtvSG/chat" 
+              target="_blank"
+              className="bg-black text-white px-8 py-3.5 rounded-xl font-bold hover:scale-105 transition-transform flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
+            >
               <MessageCircle size={20}/> 1:1 채팅 상담하기
-            </button>
-            <button className="bg-white border border-slate-300 text-slate-900 px-8 py-3.5 rounded-xl font-bold hover:bg-slate-100 transition-colors">
+            </Link>
+            
+            {/* 이메일 문의하기 */}
+            <Link 
+              href="mailto:locally.partners@gmail.com"
+              className="bg-white border border-slate-300 text-slate-900 px-8 py-3.5 rounded-xl font-bold hover:bg-slate-100 transition-colors inline-block"
+            >
               이메일 문의하기
-            </button>
+            </Link>
           </div>
           <p className="text-xs text-slate-400 mt-6">
             운영 시간: 평일 오전 10시 - 오후 7시 (주말/공휴일 휴무)

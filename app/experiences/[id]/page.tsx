@@ -233,6 +233,86 @@ export default function ExperienceDetailPage() {
                  <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:scale-105 transition-transform"><MessageSquare size={18}/></button>
                </div>
             </div>
+            {/* --- [추가 코드 시작] 포함/불포함 및 알아두어야 할 사항 --- */}
+            
+            <div className="border-b border-slate-200 pb-8">
+               <h3 className="text-xl font-bold mb-6">포함 및 불포함 사항</h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* 포함 사항 */}
+                  <div>
+                     <h4 className="font-bold text-sm mb-3 text-slate-900">포함</h4>
+                     <ul className="space-y-2.5">
+                        <li className="flex gap-3 text-sm text-slate-600 items-start">
+                           <Check size={18} className="text-slate-900 flex-shrink-0 mt-0.5"/>
+                           <span>전문 로컬 가이드 비용</span>
+                        </li>
+                        <li className="flex gap-3 text-sm text-slate-600 items-start">
+                           <Check size={18} className="text-slate-900 flex-shrink-0 mt-0.5"/>
+                           <span>웰컴 드링크 1잔 및 로컬 간식</span>
+                        </li>
+                        <li className="flex gap-3 text-sm text-slate-600 items-start">
+                           <Check size={18} className="text-slate-900 flex-shrink-0 mt-0.5"/>
+                           <span>현지인만 아는 맛집 지도 제공</span>
+                        </li>
+                     </ul>
+                  </div>
+                  {/* 불포함 사항 */}
+                  <div>
+                     <h4 className="font-bold text-sm mb-3 text-slate-900">불포함</h4>
+                     <ul className="space-y-2.5">
+                        <li className="flex gap-3 text-sm text-slate-600 items-start">
+                           {/* X 아이콘 대신 회전시킨 Check 아이콘 사용하거나 X 아이콘 import 필요 */}
+                           <Check size={18} className="text-slate-300 flex-shrink-0 mt-0.5 rotate-45"/>
+                           <span>개인 식사 비용 및 쇼핑비</span>
+                        </li>
+                        <li className="flex gap-3 text-sm text-slate-600 items-start">
+                           <Check size={18} className="text-slate-300 flex-shrink-0 mt-0.5 rotate-45"/>
+                           <span>투어 중 이동 교통비 (약 500엔)</span>
+                        </li>
+                        <li className="flex gap-3 text-sm text-slate-600 items-start">
+                           <Check size={18} className="text-slate-300 flex-shrink-0 mt-0.5 rotate-45"/>
+                           <span>여행자 보험</span>
+                        </li>
+                     </ul>
+                  </div>
+               </div>
+               
+               <div className="mt-8 bg-slate-50 p-5 rounded-xl border border-slate-100">
+                 <h4 className="font-bold text-sm mb-2 text-slate-900 flex items-center gap-2">
+                   <span className="text-xl">🎒</span> 준비물
+                 </h4>
+                 <p className="text-sm text-slate-600 leading-relaxed">
+                   많이 걷기 때문에 <strong>편안한 운동화</strong>를 꼭 착용해 주세요. <br/>
+                   개인 경비(약 3,000엔)와 인생샷을 남길 <strong>카메라</strong>가 있으면 좋아요!
+                 </p>
+               </div>
+            </div>
+
+            <div className="pb-12">
+               <h3 className="text-xl font-bold mb-6">알아두어야 할 사항</h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                  <div>
+                     <div className="font-bold text-sm mb-1.5 text-slate-900">게스트 필수조건</div>
+                     <p className="text-sm text-slate-600 leading-relaxed">20세 이상의 게스트만 참가할 수 있습니다. 최대 인원은 10명입니다.</p>
+                  </div>
+                  <div>
+                     <div className="font-bold text-sm mb-1.5 text-slate-900">활동 강도</div>
+                     <p className="text-sm text-slate-600 leading-relaxed">신체 활동 강도: 가벼움 (산책 수준)<br/>사전 숙련도: 초보자 환영</p>
+                  </div>
+                  <div>
+                     <div className="font-bold text-sm mb-1.5 text-slate-900">접근성</div>
+                     <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="text-sm text-slate-600 leading-relaxed underline hover:text-black">
+                       호스트에게 메시지를 보내 자세한 내용을 문의하세요.
+                     </button>
+                  </div>
+                  <div>
+                     <div className="font-bold text-sm mb-1.5 text-slate-900">환불 정책</div>
+                     <p className="text-sm text-slate-600 leading-relaxed">시작 시간을 기준으로 5일 전까지 취소하면 예약금이 전액 환불됩니다. 기상 악화로 인한 취소 시에도 100% 환불됩니다.</p>
+                  </div>
+               </div>
+            </div>
+            
+            {/* --- [추가 코드 끝] --- */}
           </div>
 
           {/* 오른쪽 스티키 예약 카드 */}
