@@ -87,33 +87,24 @@ export default function SiteHeader() {
 
 // ✅ 수정된 handleModeSwitch 함수 (교체용)
 const handleModeSwitch = async () => {
-  // 1. 현재 호스트 페이지에 있다면 -> 게스트 홈으로
+  // 현재 이미 호스트 페이지들에 있다면 -> 게스트 홈으로 돌아가기
   if (pathname?.startsWith('/host')) { 
     router.push('/'); 
     return; 
   }
   
-  // 2. 비로그인 유저 -> 로그인 모달 띄우기 (신청 불가)
-  if (!user) { 
-    setIsLoginModalOpen(true); 
-    return; 
-  }
-  
-  // 3. 신청 이력이 있거나(심사중/보완/거절) 이미 호스트인 경우 -> 바로 대시보드로 이동
-  if (applicationStatus || isHost) {
-    router.push('/host/dashboard'); 
-  } else {
-    // 4. 신청 이력 없음 -> 설명 페이지(Become a Host)로 이동
-    router.push('/become-a-host');
-  }
+  // 그 외(게스트 메인, 비로그인 등) -> 무조건 호스트 설명 페이지로 이동
+  router.push('/become-a-host');
 };
 
-  // 버튼 라벨
-  const getButtonLabel = () => {
-    if (pathname?.startsWith('/host')) return '게스트 모드';
-    if (!user || (!isHost && !applicationStatus)) return '호스트 등록하기';
-    return '호스트 모드';
-  };
+// ✅ 수정된 버튼 라벨 함수 (교체용)
+const getButtonLabel = () => {
+  // 현재 호스트 페이지에 있다면 '게스트 모드' (나가기 개념)
+  if (pathname?.startsWith('/host')) return '게스트 모드';
+  
+  // 그 외엔 무조건 '호스트 등록하기' (설명 페이지 진입 버튼)
+  return '호스트 등록하기';
+};
 
   const getAvatarUrl = () => user?.user_metadata?.avatar_url || null;
 
