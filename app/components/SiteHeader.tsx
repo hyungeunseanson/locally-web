@@ -73,7 +73,8 @@ export default function SiteHeader() {
   const handleModeSwitch = async () => {
     if (pathname?.startsWith('/host')) { router.push('/'); return; }
     if (!user) { setIsLoginModalOpen(true); return; }
-    if (!isHost) { router.push('/host/register'); return; }
+    // ▼ 이렇게 바꾸세요 (/host/register -> /become-a-host)
+    if (!isHost) { router.push('/become-a-host'); return; } 
     router.push('/host/dashboard');
   };
 
