@@ -2,21 +2,24 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, MapPin, Trash2, Search, CheckCircle2, BarChart3, ChevronRight, XCircle, AlertCircle, MessageSquare
+  Users, MapPin, Trash2, Search, CheckCircle2, BarChart3, ChevronRight, 
+  XCircle, AlertCircle, MessageSquare, DollarSign, Ban
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS'>('APPS');
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL'); 
+  // 탭 구성: 지원서 | 체험 | 유저(고객) | 메시지 | 정산/통계
+  const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'CHATS' | 'FINANCE'>('APPS');
+  const [filter, setFilter] = useState('ALL'); 
   
   const [apps, setApps] = useState<any[]>([]);
   const [exps, setExps] = useState<any[]>([]);
-  const [selectedApp, setSelectedApp] = useState<any>(null);
-  const [selectedExp, setSelectedExp] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   
-  const [stats, setStats] = useState({ users: 0, experiences: 0, bookings: 0 });
+  const [selectedItem, setSelectedItem] = useState<any>(null); // 상세 보기용
   const supabase = createClient();
 
   useEffect(() => {
@@ -24,290 +27,291 @@ export default function AdminDashboardPage() {
   }, []);
 
   const fetchData = async () => {
-    const { count: uCount } = await supabase.from('host_applications').select('*', { count: 'exact', head: true });
-    const { count: eCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true });
-    const { count: bCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
-    setStats({ users: uCount || 0, experiences: eCount || 0, bookings: bCount || 0 });
-
+    // 1. 지원서
     const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
     if (appData) setApps(appData);
 
+    // 2. 체험
     const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
     if (expData) setExps(expData);
+
+    // 3. 유저 (profiles 테이블이 있다고 가정, 없으면 auth 데이터는 클라이언트에서 직접 조회 불가하므로 호스트/예약자 기반으로 추론)
+    // *실제 운영 시에는 public.profiles 테이블을 만들어 auth.users와 동기화해야 합니다.
+    // 여기서는 예약자(bookings) 정보와 호스트 정보를 합쳐서 보여주는 방식으로 구현합니다.
+    const { data: userData } = await supabase.from('host_applications').select('id, name, email, phone, created_at, user_id'); 
+    if (userData) setUsers(userData); // 임시로 호스트 지원자들을 유저 목록으로 사용
+
+    // 4. 예약/매출
+    const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
+    if (bookingData) setBookings(bookingData);
+
+    // 5. 메시지 (messages 테이블이 있다고 가정)
+    const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
+    if (msgData) setMessages(msgData);
   };
 
-  // ✅ 호스트 지원서 상태 변경 함수 (중복 제거 및 로직 통합)
-  const handleAppStatus = async (id: string, status: string) => {
-    let comment = '';
-    
-    if (status === 'rejected' || status === 'revision') {
-      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
-      if (input === null) return; 
-      comment = input;
-    } else {
-      if (!confirm('승인하시겠습니까?')) return;
-      status = 'approved'; 
-    }
+  // --- 액션 핸들러 ---
 
-    const { error } = await supabase
-      .from('host_applications')
-      .update({ 
-        status: status, 
-        admin_comment: comment 
-      })
-      .eq('id', id);
-
-    if (error) {
-      alert("오류 발생: " + error.message);
-    } else {
-      alert("처리가 완료되었습니다.");
-      fetchData(); 
-      setSelectedApp(null); 
-    }
-  };
-
-  // ✅ 체험 상태 변경 함수
-  const handleExpStatus = async (id: string, status: string) => {
+  // 호스트/체험 상태 변경
+  const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
     let comment = '';
     if (status === 'rejected' || status === 'revision') {
-      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
+      const input = prompt(`[${status}] 사유를 입력해주세요:`);
       if (input === null) return;
       comment = input;
     } else {
-      if (!confirm('승인하시겠습니까? (즉시 공개됩니다)')) return;
-      status = 'active'; 
+      if (!confirm('승인하시겠습니까?')) return;
+      status = table === 'host_applications' ? 'approved' : 'active';
     }
 
-    const { error } = await supabase
-      .from('experiences')
-      .update({ 
-        status: status, 
-        admin_comment: comment 
-      })
-      .eq('id', id);
-
-    if (error) {
-      alert("오류 발생: " + error.message);
-    } else {
-      alert("처리가 완료되었습니다.");
-      fetchData();
-      setSelectedExp(null);
-    }
-  };
-
-  const handleDeleteExp = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-    await supabase.from('experiences').delete().eq('id', id);
+    await supabase.from(table).update({ status, admin_comment: comment }).eq('id', id);
+    alert('처리되었습니다.');
     fetchData();
-    setSelectedExp(null);
+    setSelectedItem(null);
   };
 
-  const getFilteredList = (list: any[]) => {
-    if (filter === 'ALL') return list;
-    if (filter === 'PENDING') return list.filter(item => item.status === 'pending');
-    if (filter === 'APPROVED') return list.filter(item => item.status === 'approved' || item.status === 'active');
-    if (filter === 'REJECTED') return list.filter(item => item.status === 'rejected' || item.status === 'revision');
-    return list;
+  // 삭제 기능 (호스트/체험/유저)
+  const deleteItem = async (table: string, id: string) => {
+    if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) alert('삭제 실패: ' + error.message);
+    else {
+      alert('삭제되었습니다.');
+      fetchData();
+      setSelectedItem(null);
+    }
   };
 
-  const filteredApps = getFilteredList(apps);
-  const filteredExps = getFilteredList(exps);
+  // --- 통계 계산 ---
+  const totalSales = bookings.reduce((acc, b) => acc + (b.total_price || 0), 0);
+  const platformRevenue = totalSales * 0.2; // 수수료 20%
+  const hostPayout = totalSales * 0.8;      // 정산금 80%
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <SiteHeader />
       
       <div className="flex h-[calc(100vh-80px)]">
-        <aside className="w-64 bg-slate-900 text-white p-6 hidden md:flex flex-col">
-          <nav className="space-y-2 flex-1">
-            <button onClick={() => {setActiveTab('APPS'); setSelectedExp(null); setFilter('ALL');}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors ${activeTab === 'APPS' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>
-              <Users size={18}/> 호스트 지원서
-              {apps.filter(a => a.status === 'pending').length > 0 && <span className="ml-auto bg-rose-500 text-[10px] px-2 py-0.5 rounded-full">{apps.filter(a => a.status === 'pending').length}</span>}
-            </button>
-            <button onClick={() => {setActiveTab('EXPS'); setSelectedApp(null); setFilter('ALL');}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors ${activeTab === 'EXPS' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>
-              <MapPin size={18}/> 체험 관리
-              {exps.filter(e => e.status === 'pending').length > 0 && <span className="ml-auto bg-yellow-500 text-black text-[10px] px-2 py-0.5 rounded-full font-bold">{exps.filter(e => e.status === 'pending').length}</span>}
-            </button>
-          </nav>
+        {/* 사이드바 */}
+        <aside className="w-64 bg-slate-900 text-white flex flex-col p-4 shadow-xl z-10">
+          <div className="mb-6 px-2">
+            <h2 className="text-xs font-bold text-slate-500 uppercase mb-2">Management</h2>
+            <nav className="space-y-1">
+              <NavButton active={activeTab==='APPS'} onClick={()=>setActiveTab('APPS')} icon={<Users size={18}/>} label="호스트 지원서" count={apps.filter(a=>a.status==='pending').length} />
+              <NavButton active={activeTab==='EXPS'} onClick={()=>setActiveTab('EXPS')} icon={<MapPin size={18}/>} label="체험 관리" count={exps.filter(e=>e.status==='pending').length} />
+              <NavButton active={activeTab==='USERS'} onClick={()=>setActiveTab('USERS')} icon={<CheckCircle2 size={18}/>} label="고객(유저) 관리" />
+            </nav>
+          </div>
+          <div className="mb-6 px-2">
+            <h2 className="text-xs font-bold text-slate-500 uppercase mb-2">Monitoring</h2>
+            <nav className="space-y-1">
+              <NavButton active={activeTab==='CHATS'} onClick={()=>setActiveTab('CHATS')} icon={<MessageSquare size={18}/>} label="메시지 모니터링" />
+              <NavButton active={activeTab==='FINANCE'} onClick={()=>setActiveTab('FINANCE')} icon={<DollarSign size={18}/>} label="매출 및 정산" />
+            </nav>
+          </div>
         </aside>
 
-        <main className="flex-1 p-8 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-             <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">총 지원서</p><h2 className="text-3xl font-black">{stats.users}</h2></div>
-             <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">등록된 체험</p><h2 className="text-3xl font-black">{stats.experiences}</h2></div>
-             <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">완료된 예약</p><h2 className="text-3xl font-black">{stats.bookings}</h2></div>
-          </div>
-
-          <div className="flex gap-8 h-[70vh]">
-            <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-3">
-                <span className="font-bold text-lg">{activeTab === 'APPS' ? '지원서 목록' : '체험 목록'}</span>
-                <div className="flex bg-white rounded-lg p-1 border border-slate-200 gap-1">
-                  {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(f => (
-                    <button key={f} onClick={()=>setFilter(f as any)} className={`flex-1 text-[10px] py-1.5 rounded font-bold transition-colors ${filter===f ? 'bg-black text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
-                      {f === 'ALL' ? '전체' : f === 'PENDING' ? '대기' : f === 'APPROVED' ? '승인' : '거절/보완'}
-                    </button>
+        {/* 메인 영역 */}
+        <main className="flex-1 p-6 overflow-hidden flex gap-6">
+          
+          {/* 1. 리스트 영역 (왼쪽) */}
+          <div className={`flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col ${activeTab === 'FINANCE' ? 'hidden' : ''}`}>
+            {/* 필터 헤더 */}
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-lg">
+                {activeTab === 'APPS' && '호스트 지원서'}
+                {activeTab === 'EXPS' && '등록된 체험'}
+                {activeTab === 'USERS' && '가입된 고객'}
+                {activeTab === 'CHATS' && '최근 메시지'}
+              </h3>
+              {activeTab !== 'CHATS' && activeTab !== 'USERS' && (
+                <div className="flex bg-white rounded-lg p-1 border border-slate-200">
+                  {['ALL', 'PENDING', 'APPROVED'].map(f => (
+                    <button key={f} onClick={()=>setFilter(f)} className={`px-3 py-1 text-xs font-bold rounded ${filter===f ? 'bg-black text-white' : 'text-slate-500'}`}>{f}</button>
                   ))}
                 </div>
-              </div>
-              <div className="overflow-y-auto flex-1 p-2 space-y-2">
-                {activeTab === 'APPS' ? filteredApps.map(app => (
-                  <div key={app.id} onClick={() => setSelectedApp(app)} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${selectedApp?.id === app.id ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100'}`}>
-                    <div className="flex justify-between mb-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${app.status==='pending'?'bg-yellow-100 text-yellow-700':app.status==='approved'?'bg-green-100 text-green-700':app.status==='revision'?'bg-orange-100 text-orange-700':'bg-red-100 text-red-700'}`}>{app.status}</span>
-                      <span className="text-xs text-slate-400">{new Date(app.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <div className="font-bold">{app.name}</div>
-                  </div>
-                )) : filteredExps.map(exp => (
-                  <div key={exp.id} onClick={() => setSelectedExp(exp)} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${selectedExp?.id === exp.id ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100'}`}>
-                    <div className="flex gap-3">
-                       {exp.photos && exp.photos[0] ? <img src={exp.photos[0]} className="w-12 h-12 rounded-lg object-cover bg-slate-200"/> : <div className="w-12 h-12 bg-slate-200 rounded-lg"/>}
-                       <div className="flex-1 min-w-0">
-                         <div className="font-bold line-clamp-1 text-sm">{exp.title}</div>
-                         <div className="flex justify-between items-center mt-1">
-                           <span className="text-xs text-slate-500">₩{Number(exp.price).toLocaleString()}</span>
-                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${exp.status==='pending'?'bg-yellow-100 text-yellow-700':exp.status==='active'?'bg-green-100 text-green-700':exp.status==='revision'?'bg-orange-100 text-orange-700':'bg-red-100 text-red-700'}`}>{exp.status}</span>
-                         </div>
-                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              )}
             </div>
 
-            <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col relative shadow-lg p-8 overflow-y-auto">
-              {activeTab === 'APPS' && selectedApp && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h2 className="text-3xl font-black mb-1">{selectedApp.name}</h2>
-                      <div className="text-sm text-slate-500">{selectedApp.email} · {selectedApp.phone}</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="block text-xs text-slate-400 mb-1">지원일: {new Date(selectedApp.created_at).toLocaleDateString()}</span>
-                      <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${selectedApp.status==='pending'?'bg-yellow-100 text-yellow-700':selectedApp.status==='approved'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{selectedApp.status}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                     <InfoBox label="국적 / 언어" value={`${selectedApp.host_nationality === 'Korea' ? '🇰🇷 한국' : '🇯🇵 일본'} / ${selectedApp.target_language}`} />
-                     <InfoBox label="인스타그램" value={selectedApp.instagram} />
-                     <InfoBox label="생년월일" value={selectedApp.dob} />
-                     <InfoBox label="언어 능력" value={`Level ${selectedApp.language_level} (${selectedApp.language_cert || '자격증 없음'})`} />
-                     <InfoBox label="정산 계좌" value={`${selectedApp.bank_name} ${selectedApp.account_number} (${selectedApp.account_holder})`} />
-                  </div>
-                  
-                  <div className="bg-slate-50 p-6 rounded-xl border">
-                    <h3 className="font-bold mb-2 text-sm uppercase text-slate-500">자기소개</h3>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{selectedApp.self_intro}</p>
-                  </div>
-                  
-                  <div className="bg-slate-50 p-6 rounded-xl border">
-                    <h3 className="font-bold mb-2 text-sm uppercase text-slate-500">지원 동기</h3>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{selectedApp.motivation}</p>
-                  </div>
+            {/* 리스트 아이템 */}
+            <div className="overflow-y-auto flex-1 p-2 space-y-2">
+              {/* 호스트 지원서 리스트 */}
+              {activeTab === 'APPS' && apps
+                .filter(item => filter === 'ALL' ? true : filter === 'PENDING' ? item.status === 'pending' : item.status !== 'pending')
+                .map(app => (
+                <ListItem key={app.id} selected={selectedItem?.id === app.id} onClick={()=>setSelectedItem(app)} 
+                  title={app.name} subtitle={`${app.host_nationality} / ${app.target_language}`} status={app.status} date={app.created_at} 
+                />
+              ))}
 
-                  {selectedApp.admin_comment && (
-                    <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                      <h3 className="font-bold mb-1 text-sm text-red-600">🚨 관리자 코멘트</h3>
-                      <p className="text-sm text-red-800">{selectedApp.admin_comment}</p>
-                    </div>
-                  )}
+              {/* 체험 리스트 */}
+              {activeTab === 'EXPS' && exps
+                .filter(item => filter === 'ALL' ? true : filter === 'PENDING' ? item.status === 'pending' : item.status === 'active')
+                .map(exp => (
+                <ListItem key={exp.id} selected={selectedItem?.id === exp.id} onClick={()=>setSelectedItem(exp)} 
+                  img={exp.photos?.[0]} title={exp.title} subtitle={`₩${exp.price.toLocaleString()}`} status={exp.status} date={exp.created_at} 
+                />
+              ))}
 
-                  <div className="flex gap-4 pt-4 border-t border-slate-100">
-                    <button onClick={()=>handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
-                      <XCircle size={18}/> 거절
-                    </button>
-                    <button onClick={()=>handleAppStatus(selectedApp.id, 'revision')} className="flex-1 py-3 border border-orange-200 text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2">
-                      <AlertCircle size={18}/> 보완요청
-                    </button>
-                    <button onClick={()=>handleAppStatus(selectedApp.id, 'approved')} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-                      <CheckCircle2 size={18}/> 승인
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'EXPS' && selectedExp && (
-                <div className="space-y-6">
-                  {selectedExp.photos && selectedExp.photos[0] && (
-                    <div className="w-full h-64 rounded-xl overflow-hidden mb-4">
-                      <img src={selectedExp.photos[0]} className="w-full h-full object-cover"/>
-                    </div>
-                  )}
-                  
+              {/* 유저 리스트 */}
+              {activeTab === 'USERS' && users.map(user => (
+                <div key={user.id} className="p-4 border rounded-xl flex justify-between items-center hover:bg-slate-50">
                   <div>
-                    <h2 className="text-2xl font-black mb-1">{selectedExp.title}</h2>
-                    <div className="flex gap-3 text-sm text-slate-500 font-medium">
-                      <span>{selectedExp.category}</span>
-                      <span>·</span>
-                      <span>{selectedExp.city}</span>
-                      <span>·</span>
-                      <span>{selectedExp.duration}시간</span>
-                    </div>
+                    <div className="font-bold">{user.name}</div>
+                    <div className="text-xs text-slate-500">{user.email}</div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                     <InfoBox label="가격" value={`₩${selectedExp.price.toLocaleString()}`} />
-                     <InfoBox label="최대 인원" value={`${selectedExp.max_guests}명`} />
-                     <InfoBox label="만남 장소" value={selectedExp.meeting_point} />
-                     <InfoBox label="방문 장소" value={selectedExp.spots} />
-                  </div>
-
-                  <div className="bg-slate-50 p-6 rounded-xl border">
-                    <h3 className="font-bold mb-2 text-sm uppercase text-slate-500">상세 설명</h3>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{selectedExp.description}</p>
-                  </div>
-
-                  {selectedExp.admin_comment && (
-                    <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                      <h3 className="font-bold mb-1 text-sm text-red-600">🚨 관리자 코멘트</h3>
-                      <p className="text-sm text-red-800">{selectedExp.admin_comment}</p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 pt-4 border-t border-slate-100">
-                    <button onClick={()=>handleExpStatus(selectedExp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 text-sm">
-                      <XCircle size={16}/> 거절
-                    </button>
-                    <button onClick={()=>handleExpStatus(selectedExp.id, 'revision')} className="flex-1 py-3 border border-orange-200 text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 text-sm">
-                      <AlertCircle size={16}/> 보완요청
-                    </button>
-                    <button onClick={()=>handleExpStatus(selectedExp.id, 'active')} className="flex-[1.5] py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 text-sm">
-                      <CheckCircle2 size={16}/> 승인 (공개)
-                    </button>
-                  </div>
-                  
-                  <div className="pt-2">
-                    <button onClick={()=>handleDeleteExp(selectedExp.id)} className="w-full py-3 text-slate-400 text-xs font-bold hover:text-red-500 transition-colors flex items-center justify-center gap-1">
-                      <Trash2 size={14}/> 체험 영구 삭제
-                    </button>
-                  </div>
+                  <button onClick={()=>deleteItem('host_applications', user.id)} className="text-red-500 text-xs border border-red-200 px-3 py-1.5 rounded hover:bg-red-50">삭제</button>
                 </div>
-              )}
+              ))}
 
-              {!selectedApp && !selectedExp && (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
-                  <Search size={48} className="mb-4 opacity-20"/>
-                  <p>목록에서 항목을 선택하세요.</p>
+              {/* 메시지 리스트 */}
+              {activeTab === 'CHATS' && messages.map(msg => (
+                <div key={msg.id} className="p-4 border-b last:border-0 hover:bg-slate-50 cursor-pointer">
+                  <div className="flex justify-between mb-1">
+                    <span className="font-bold text-xs">{msg.sender_name || 'User'} ➔ {msg.receiver_name || 'Host'}</span>
+                    <span className="text-[10px] text-slate-400">{new Date(msg.created_at).toLocaleString()}</span>
+                  </div>
+                  <p className="text-sm text-slate-700 bg-slate-100 p-2 rounded-lg">{msg.content}</p>
                 </div>
-              )}
+              ))}
             </div>
           </div>
+
+          {/* 2. 상세 보기 영역 (오른쪽) */}
+          {(activeTab === 'APPS' || activeTab === 'EXPS') && (
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col p-6 overflow-y-auto">
+              {selectedItem ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                  {/* 상세 헤더 */}
+                  <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+                    <div>
+                      <h2 className="text-2xl font-black">{selectedItem.title || selectedItem.name}</h2>
+                      <p className="text-sm text-slate-500 mt-1">{selectedItem.id}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{selectedItem.status}</span>
+                  </div>
+
+                  {/* 내용 */}
+                  <div className="space-y-4">
+                    {activeTab === 'APPS' && (
+                      <>
+                        <InfoRow label="연락처" value={`${selectedItem.phone} / ${selectedItem.email}`} />
+                        <InfoRow label="언어" value={selectedItem.target_language} />
+                        <div className="bg-slate-50 p-4 rounded-xl text-sm whitespace-pre-wrap">{selectedItem.self_intro}</div>
+                      </>
+                    )}
+                    {activeTab === 'EXPS' && (
+                      <>
+                        {selectedItem.photos && <img src={selectedItem.photos[0]} className="w-full h-48 object-cover rounded-xl"/>}
+                        <InfoRow label="가격" value={`₩${selectedItem.price}`} />
+                        <div className="bg-slate-50 p-4 rounded-xl text-sm whitespace-pre-wrap">{selectedItem.description}</div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 관리자 액션 버튼 */}
+                  <div className="pt-6 border-t border-slate-100 grid grid-cols-2 gap-3">
+                    <button onClick={()=>updateStatus(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id, 'revision')} className="bg-orange-50 text-orange-600 font-bold py-3 rounded-xl border border-orange-200 hover:bg-orange-100">보완 요청</button>
+                    <button onClick={()=>updateStatus(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id, 'rejected')} className="bg-red-50 text-red-600 font-bold py-3 rounded-xl border border-red-200 hover:bg-red-100">거절</button>
+                    <button onClick={()=>updateStatus(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id, 'approved')} className="col-span-2 bg-black text-white font-bold py-4 rounded-xl hover:bg-slate-800 shadow-lg">승인 하기</button>
+                    <button onClick={()=>deleteItem(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id)} className="col-span-2 text-slate-400 text-xs py-2 hover:text-red-500">영구 삭제</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
+                  <Search size={48} className="mb-4 opacity-20"/>
+                  <p>항목을 선택하세요.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3. 매출/통계 전체 화면 탭 */}
+          {activeTab === 'FINANCE' && (
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-8 overflow-y-auto">
+              <h2 className="text-2xl font-black mb-8">매출 및 정산 현황</h2>
+              
+              <div className="grid grid-cols-3 gap-6 mb-10">
+                <StatCard label="총 거래액 (GMV)" value={`₩${totalSales.toLocaleString()}`} color="bg-slate-900 text-white" />
+                <StatCard label="플랫폼 수익 (20%)" value={`₩${platformRevenue.toLocaleString()}`} color="bg-rose-500 text-white" />
+                <StatCard label="호스트 정산 예정 (80%)" value={`₩${hostPayout.toLocaleString()}`} color="bg-green-500 text-white" />
+              </div>
+
+              <h3 className="font-bold text-lg mb-4">최근 예약 내역</h3>
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-500 uppercase font-bold">
+                  <tr>
+                    <th className="p-4">예약일</th>
+                    <th className="p-4">게스트</th>
+                    <th className="p-4">체험명</th>
+                    <th className="p-4">결제 금액</th>
+                    <th className="p-4">상태</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {bookings.map(b => (
+                    <tr key={b.id} className="hover:bg-slate-50">
+                      <td className="p-4">{new Date(b.created_at).toLocaleDateString()}</td>
+                      <td className="p-4">{b.user_id}</td>
+                      <td className="p-4 font-bold">{b.experiences?.title || 'Unknown'}</td>
+                      <td className="p-4">₩{b.total_price.toLocaleString()}</td>
+                      <td className="p-4"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">결제완료</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
         </main>
       </div>
     </div>
   );
 }
 
-function InfoBox({ label, value }: any) {
+// --- 하위 컴포넌트 ---
+
+function NavButton({ active, onClick, icon, label, count }: any) {
   return (
-    <div>
-      <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">{label}</label>
-      <div className="bg-white border border-slate-100 p-3 rounded-lg text-slate-900 shadow-sm text-sm whitespace-pre-wrap min-h-[46px] flex items-center">
-        {value || '-'}
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors text-sm ${active ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+      {icon} <span>{label}</span>
+      {count > 0 && <span className="ml-auto bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{count}</span>}
+    </button>
+  );
+}
+
+function ListItem({ selected, onClick, img, title, subtitle, status, date }: any) {
+  return (
+    <div onClick={onClick} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all flex gap-3 ${selected ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100'}`}>
+      {img && <img src={img} className="w-12 h-12 rounded-lg object-cover bg-slate-200"/>}
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between mb-1">
+          <div className="font-bold text-sm truncate">{title}</div>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${status==='pending'?'bg-yellow-100 text-yellow-700':status==='approved' || status==='active'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{status}</span>
+        </div>
+        <div className="flex justify-between text-xs text-slate-500">
+          <span>{subtitle}</span>
+          <span>{new Date(date).toLocaleDateString()}</span>
+        </div>
       </div>
     </div>
-  )
+  );
+}
+
+function InfoRow({ label, value }: any) {
+  return (
+    <div className="flex justify-between border-b border-slate-100 pb-2">
+      <span className="text-xs font-bold text-slate-400">{label}</span>
+      <span className="text-sm font-bold">{value}</span>
+    </div>
+  );
+}
+
+function StatCard({ label, value, color }: any) {
+  return (
+    <div className={`p-6 rounded-2xl shadow-lg ${color}`}>
+      <div className="text-xs font-bold opacity-70 mb-1">{label}</div>
+      <div className="text-3xl font-black">{value}</div>
+    </div>
+  );
 }

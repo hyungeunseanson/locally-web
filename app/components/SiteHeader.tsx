@@ -85,16 +85,27 @@ export default function SiteHeader() {
     window.location.reload();
   };
 
+  // ✅ 수정된 handleModeSwitch 함수 (이 부분만 교체하세요)
   const handleModeSwitch = async () => {
-    // 1. 이미 호스트 대시보드에 있다면 -> 게스트 홈으로
+    // 1. 현재 호스트 페이지에 있다면 -> 게스트 홈으로
     if (pathname?.startsWith('/host')) { 
       router.push('/'); 
       return; 
     }
     
-    // 2. 그 외 모든 경우(게스트, 호스트, 비로그인 포함) -> 설명 페이지로 이동
-    // (설명 페이지에 있는 '시작하기' 버튼이 똑똑하게 대시보드로 보내줄 것입니다)
-    router.push('/become-a-host');
+    // 2. 비로그인 유저 -> 로그인 모달 띄우기 (신청 불가)
+    if (!user) { 
+      setIsLoginModalOpen(true); 
+      return; 
+    }
+    
+    // 3. 신청 이력이 있거나(심사중/보완/거절) 이미 호스트인 경우 -> 바로 대시보드로 이동
+    if (applicationStatus || isHost) {
+      router.push('/host/dashboard'); 
+    } else {
+      // 4. 신청 이력 없음 -> 설명 페이지(Become a Host)로 이동
+      router.push('/become-a-host');
+    }
   };
 
   // 버튼 라벨
@@ -197,4 +208,4 @@ export default function SiteHeader() {
       </header>
     </>
   );
-}
+} 
