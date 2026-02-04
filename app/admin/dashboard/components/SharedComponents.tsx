@@ -11,16 +11,20 @@ export function NavButton({ active, onClick, icon, label, count }: any) {
   );
 }
 
-export function StatCard({ label, value, sub, color, icon }: any) {
+// ✅ 수정됨: onClick 지원 및 인터랙티브 스타일 추가 (hover 효과)
+export function StatCard({ label, value, sub, color, icon, onClick }: any) {
   return (
-    <div className={`p-6 rounded-2xl shadow-lg relative overflow-hidden ${color}`}>
+    <div 
+      onClick={onClick}
+      className={`p-6 rounded-2xl shadow-lg relative overflow-hidden ${color} ${onClick ? 'cursor-pointer hover:scale-[1.02] hover:shadow-xl transition-all active:scale-95' : ''}`}
+    >
       <div className="flex justify-between items-start z-10 relative">
         <div>
-          <div className="text-xs font-bold opacity-80 mb-1">{label}</div>
-          <div className="text-3xl font-black">{value}</div>
-          {sub && <div className="text-[10px] mt-2 opacity-70 font-medium">{sub}</div>}
+          <div className="text-xs font-bold opacity-80 mb-1 tracking-wide uppercase">{label}</div>
+          <div className="text-3xl font-black tracking-tight">{value}</div>
+          {sub && <div className="text-[11px] mt-2 opacity-70 font-medium">{sub}</div>}
         </div>
-        <div className="bg-white/20 p-2 rounded-lg">
+        <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-sm">
           {icon}
         </div>
       </div>
