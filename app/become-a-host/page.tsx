@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
-  Globe, DollarSign, Calendar, MessageCircle, ShieldCheck, 
-  Star, ArrowRight, CheckCircle2, ChevronDown, ChevronUp // 👈 여기 추가됨
+  Globe, DollarSign, Calendar, ChevronDown, ChevronUp, 
+  ArrowRight, ShieldCheck, Heart, MessageCircle
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 
@@ -14,155 +14,169 @@ export default function BecomeHostPage() {
       <SiteHeader />
 
       <main>
-        {/* 1. 히어로 섹션 (초대형 타이포) */}
-        <section className="max-w-7xl mx-auto px-6 pt-20 pb-24 grid md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-8">
-            <span className="text-rose-600 font-bold tracking-wide text-sm">LOCALLY HOST</span>
-            <h1 className="text-5xl md:text-7xl font-black leading-tight tracking-tight">
+        {/* 1. 히어로 섹션 (스크린샷 1 참고) */}
+        <section className="max-w-[1440px] mx-auto px-6 py-20 lg:py-32 flex flex-col md:flex-row items-center justify-between gap-16">
+          <div className="flex-1 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h1 className="text-5xl md:text-7xl font-black leading-[1.1] tracking-tight">
               좋아하는 일을 하며<br/>
               <span className="text-rose-600">수입</span>을 올리세요.
             </h1>
-            <p className="text-xl text-slate-500 leading-relaxed max-w-lg">
+            <p className="text-xl text-slate-500 font-medium leading-relaxed max-w-lg">
               수많은 게스트의 시선을 사로잡을 독특한<br/>
               로컬리 체험을 만들어 보세요.
             </p>
-            <Link href="/host/register">
-              <button className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform shadow-xl shadow-rose-200">
-                시작하기
-              </button>
-            </Link>
-          </div>
-          {/* 우측 이미지 그리드 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-4 mt-12">
-              <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80" className="rounded-[2rem] w-full h-64 object-cover shadow-2xl hover:-translate-y-2 transition-transform duration-500"/>
-              <img src="https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=800&q=80" className="rounded-[2rem] w-full h-48 object-cover shadow-2xl hover:-translate-y-2 transition-transform duration-500"/>
-            </div>
-            <div className="space-y-4">
-              <img src="https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=800&q=80" className="rounded-[2rem] w-full h-48 object-cover shadow-2xl hover:-translate-y-2 transition-transform duration-500"/>
-              <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80" className="rounded-[2rem] w-full h-64 object-cover shadow-2xl hover:-translate-y-2 transition-transform duration-500"/>
-            </div>
-          </div>
-        </section>
-
-        {/* 2. 가치 제안 (3단 그리드) */}
-        <section className="bg-slate-50 py-24">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto mb-20">
-              <h2 className="text-4xl font-black mb-6">어디서도 만나볼 수 없는<br/>독특한 체험을 호스팅하세요</h2>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-10">
-              <FeatureCard 
-                icon={<Globe className="w-8 h-8 text-blue-600"/>}
-                title="내가 사는 도시의 매력 소개"
-                desc="랜드마크, 박물관, 숨겨진 골목 맛집까지. 당신만이 아는 특별한 일정을 공유하세요."
-              />
-              <FeatureCard 
-                icon={<DollarSign className="w-8 h-8 text-green-600"/>}
-                title="취미를 수익으로 연결"
-                desc="맛집 탐방, 등산, 쇼핑 등 평소 즐기던 활동을 하며 쏠쏠한 부수입을 창출하세요."
-              />
-              <FeatureCard 
-                icon={<Calendar className="w-8 h-8 text-purple-600"/>}
-                title="유연한 일정 관리"
-                desc="주말, 평일 저녁, 혹은 한 달에 한 번. 내가 원하는 시간에만 자유롭게 활동하세요."
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* 3. 앱 목업 섹션 (지그재그 레이아웃) */}
-        <div className="max-w-7xl mx-auto px-6 py-32 space-y-32">
-          
-          {/* 섹션 A: 게스트와 소통 */}
-          <div className="flex flex-col md:flex-row items-center gap-16">
-            <div className="flex-1 order-2 md:order-1 flex justify-center">
-               {/* 폰 목업 CSS */}
-               <div className="relative w-[300px] h-[600px] bg-black rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden">
-                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-20"></div>
-                 <div className="w-full h-full bg-white pt-12 px-4 flex flex-col">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 rounded-full bg-slate-200"></div>
-                      <div className="h-3 w-32 bg-slate-100 rounded"></div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="bg-slate-100 p-3 rounded-2xl rounded-tl-none text-xs text-slate-500">
-                        안녕하세요! 이번 주말 투어 예약했습니다.
-                      </div>
-                      <div className="bg-rose-500 text-white p-3 rounded-2xl rounded-tr-none text-xs self-end ml-auto w-fit">
-                        환영합니다! 맛집 리스트 준비해둘게요 :)
-                      </div>
-                      <img src="https://images.unsplash.com/photo-1559333086-b0a56225a93c" className="w-full h-40 object-cover rounded-xl mt-2"/>
-                    </div>
-                 </div>
-               </div>
-            </div>
-            <div className="flex-1 order-1 md:order-2">
-              <h3 className="text-3xl font-black mb-6">게스트와 간편한 소통</h3>
-              <p className="text-xl text-slate-500 leading-relaxed">
-                앱 내 채팅 기능을 통해 게스트와 실시간으로 대화하세요.<br/>
-                예약 문의부터 만남 장소 공유까지,<br/>
-                개인 연락처 노출 없이 안전하게 소통할 수 있습니다.
-              </p>
-            </div>
-          </div>
-
-          {/* 섹션 B: 예약 및 일정 관리 */}
-          <div className="flex flex-col md:flex-row items-center gap-16">
-            <div className="flex-1">
-              <h3 className="text-3xl font-black mb-6">내 스케줄에 맞춘 호스팅</h3>
-              <p className="text-xl text-slate-500 leading-relaxed">
-                달력에서 가능한 날짜만 콕콕 찍어 오픈하세요.<br/>
-                갑작스러운 일정 변경도 간편하게 관리할 수 있습니다.<br/>
-                구글 캘린더 연동으로 더 스마트하게!
-              </p>
-            </div>
-            <div className="flex-1 flex justify-center">
-               <div className="relative w-[300px] h-[600px] bg-black rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden">
-                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-20"></div>
-                 <div className="w-full h-full bg-white pt-14 px-6">
-                    <h4 className="font-bold text-xl mb-6">5월 일정</h4>
-                    <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold mb-4">
-                      {['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}
-                    </div>
-                    <div className="grid grid-cols-7 gap-2">
-                      {[...Array(31)].map((_,i) => (
-                        <div key={i} className={`h-8 w-8 rounded-full flex items-center justify-center text-xs ${[3,4,10,11,17,18].includes(i) ? 'bg-black text-white' : 'text-slate-300'}`}>
-                          {i+1}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                      <div className="text-xs font-bold text-slate-500 mb-1">5월 4일 (토)</div>
-                      <div className="font-bold">을지로 노포 투어</div>
-                      <div className="text-sm text-rose-500 mt-2">예약 4명 (마감)</div>
-                    </div>
-                 </div>
-               </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* 4. FAQ 및 하단 CTA */}
-        <section className="bg-slate-50 py-24 border-t border-slate-200">
-          <div className="max-w-4xl mx-auto px-6">
-            <h2 className="text-4xl font-black mb-12 text-center">자주 묻는 질문</h2>
-            <div className="space-y-4">
-              <FAQItem q="외국어를 원어민처럼 잘해야 하나요?" a="아니요! 기본적인 의사소통만 가능하다면 충분합니다. 번역기 앱을 활용해도 괜찮습니다. 중요한 건 친절한 태도입니다."/>
-              <FAQItem q="자격증이 반드시 필요한가요?" a="전문 가이드 자격증은 필수가 아닙니다. 로컬리는 '현지인 친구' 컨셉을 지향합니다. 다만 전문 지식이 필요한 투어는 소개에 명시해 주세요."/>
-              <FAQItem q="수수료는 얼마인가요?" a="호스트 수수료는 20%입니다. 설정하신 금액의 80%가 정산됩니다. 게스트에게는 별도의 플랫폼 수수료가 부과됩니다."/>
-            </div>
-
-            <div className="mt-24 text-center">
-              <h2 className="text-4xl font-black mb-8">지금 바로 시작해보세요</h2>
+            <div className="pt-4">
               <Link href="/host/register">
-                <button className="bg-rose-600 hover:bg-rose-700 text-white px-16 py-6 rounded-2xl font-bold text-xl shadow-xl hover:scale-105 transition-transform">
-                  호스트 등록하기
+                <button className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300">
+                  시작하기
                 </button>
               </Link>
             </div>
+          </div>
+          
+          {/* 아이폰 목업 (CSS로 구현) */}
+          <div className="flex-1 flex justify-center md:justify-end relative">
+             <div className="relative w-[340px] h-[680px] bg-black rounded-[60px] border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
+                {/* 노치 */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
+                {/* 화면 내용 */}
+                <div className="w-full h-full bg-white pt-14 pb-8 px-6 flex flex-col justify-between">
+                   <div>
+                      <div className="w-full h-12 rounded-full bg-slate-100 mb-8 flex items-center px-4 text-slate-400 text-sm">검색을 시작해 보세요</div>
+                      <h3 className="font-black text-2xl mb-4">내일 서울에서<br/>진행되는 체험</h3>
+                      <div className="space-y-4">
+                         <div className="aspect-[4/3] rounded-2xl bg-slate-200 overflow-hidden relative">
+                            <img src="https://images.unsplash.com/photo-1551632811-561732d1e306" className="w-full h-full object-cover"/>
+                            <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold">오전 10시</div>
+                         </div>
+                         <div className="flex justify-between items-start">
+                            <div>
+                               <div className="font-bold text-sm">건축가와 함께하는 북촌 산책</div>
+                               <div className="text-slate-500 text-xs mt-1">₩45,000 / 인</div>
+                            </div>
+                            <div className="flex text-[10px] items-center font-bold">★ 4.98</div>
+                         </div>
+                      </div>
+                   </div>
+                   {/* 하단 네비게이션 흉내 */}
+                   <div className="border-t border-slate-100 pt-4 flex justify-around text-slate-300">
+                      <div className="w-6 h-6 rounded bg-slate-200"></div>
+                      <div className="w-6 h-6 rounded bg-rose-500"></div>
+                      <div className="w-6 h-6 rounded bg-slate-200"></div>
+                   </div>
+                </div>
+             </div>
+             {/* 장식용 배경 원 */}
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-100 rounded-full blur-3xl -z-10 opacity-50"></div>
+          </div>
+        </section>
+
+        {/* 2. 혜택 섹션 (스크린샷 2,3 참고) */}
+        <section className="bg-white py-32">
+          <div className="max-w-[1440px] mx-auto px-6">
+            <h2 className="text-4xl md:text-5xl font-black text-center mb-24 leading-tight">
+              어디서도 만나볼 수 없는<br/>독특한 체험을 호스팅하세요
+            </h2>
+            
+            <div className="grid md:grid-cols-3 gap-x-8 gap-y-16">
+              <FeatureItem 
+                icon={<Globe className="w-10 h-10"/>}
+                title="내가 사는 도시의 매력 소개"
+                desc="랜드마크, 박물관, 문화 명소를 둘러보는 특별한 일정을 준비해 보세요."
+              />
+              <FeatureItem 
+                icon={<Heart className="w-10 h-10"/>}
+                title="좋아하는 것으로 수익 창출"
+                desc="맛집 탐방, 등산, 쇼핑 등 평소 즐기던 활동을 하며 쏠쏠한 부수입을 만드세요."
+              />
+              <FeatureItem 
+                icon={<Calendar className="w-10 h-10"/>}
+                title="내 일정에 맞춘 자유로운 활동"
+                desc="주말, 평일 저녁, 혹은 한 달에 한 번. 내가 원하는 시간에만 투어를 오픈하세요."
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* 3. 모바일 목업 섹션 (스크린샷 4,5 참고) */}
+        <section className="bg-slate-50 py-32">
+          <div className="max-w-[1440px] mx-auto px-6">
+            {/* Case 1 */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-20 mb-32">
+               <div className="flex-1 order-2 md:order-1 flex justify-center">
+                  <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-6 border border-slate-100 transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
+                     <div className="flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden"><img src="https://i.pravatar.cc/150?u=a042581f4e29026024d" className="w-full h-full object-cover"/></div>
+                        <div><div className="font-bold text-sm">Alexi 님</div><div className="text-xs text-slate-500">예약 완료 · 5월 22일</div></div>
+                     </div>
+                     <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-sm text-slate-600 mb-4">
+                        안녕하세요! 이번 주말 투어 정말 기대돼요. 혹시 채식 메뉴 추천도 가능할까요? 🥗
+                     </div>
+                     <div className="bg-rose-500 text-white p-4 rounded-2xl rounded-tr-none text-sm self-end ml-auto w-fit shadow-lg shadow-rose-200">
+                        물론이죠! 비건 옵션이 훌륭한 식당 리스트를 이미 준비해뒀습니다 :)
+                     </div>
+                  </div>
+               </div>
+               <div className="flex-1 order-1 md:order-2">
+                  <h3 className="text-3xl font-black mb-6">게스트와 간편한 소통</h3>
+                  <p className="text-xl text-slate-500 leading-relaxed font-medium">
+                     앱 내 채팅 기능을 통해 전 세계 게스트와 실시간으로 대화하세요.<br/>
+                     개인 연락처 노출 걱정 없이 안전하게 소통할 수 있습니다.
+                  </p>
+               </div>
+            </div>
+
+            {/* Case 2 */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-20">
+               <div className="flex-1">
+                  <h3 className="text-3xl font-black mb-6">투명하고 신속한 정산</h3>
+                  <p className="text-xl text-slate-500 leading-relaxed font-medium">
+                     체험이 완료되면 다음 날 바로 입금됩니다.<br/>
+                     복잡한 절차 없이 수익을 확인하고 관리하세요.
+                  </p>
+               </div>
+               <div className="flex-1 flex justify-center">
+                  <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-8 border border-slate-100 transform rotate-[2deg] hover:rotate-0 transition-transform duration-500 text-center">
+                     <div className="text-slate-500 font-bold mb-2">5월 정산 예정 금액</div>
+                     <div className="text-5xl font-black mb-8 tracking-tight">₩499,784</div>
+                     <div className="space-y-4">
+                        <div className="flex justify-between text-sm border-b border-slate-100 pb-4">
+                           <span className="text-slate-500">지급 계좌</span>
+                           <span className="font-bold">카카오뱅크 **** 1234</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                           <span className="text-slate-500">다음 지급일</span>
+                           <span className="font-bold text-green-600">내일</span>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. FAQ 및 CTA */}
+        <section className="py-32 max-w-4xl mx-auto px-6">
+          <h2 className="text-4xl font-black mb-16 text-center">자주 묻는 질문</h2>
+          <div className="space-y-6">
+            <FAQItem q="외국어를 원어민처럼 잘해야 하나요?" a="아니요! 기본적인 의사소통만 가능하다면 충분합니다. 번역기 앱을 활용해도 괜찮습니다. 중요한 건 언어 실력보다 친절한 마음과 즐거운 분위기입니다."/>
+            <FAQItem q="자격증이 필요한가요?" a="전문 가이드 자격증은 필수가 아닙니다. 로컬리는 '현지인 친구' 컨셉의 여행을 지향합니다. 다만, 특정 전문 지식이 필요한 투어라면 관련 내용을 소개에 적어주세요."/>
+            <FAQItem q="수수료는 얼마인가요?" a="호스트 수수료는 20%입니다. 설정하신 금액의 80%가 정산됩니다. 게스트에게는 별도의 플랫폼 수수료가 부과됩니다."/>
+          </div>
+
+          <div className="mt-32 text-center bg-black rounded-[3rem] p-16 text-white relative overflow-hidden">
+             <div className="relative z-10">
+                <h2 className="text-4xl md:text-5xl font-black mb-8">지금 바로 시작해보세요</h2>
+                <p className="text-slate-400 text-lg mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
+                <Link href="/host/register">
+                  <button className="bg-white text-black px-12 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform flex items-center gap-2 mx-auto">
+                    호스트 등록하기 <ArrowRight size={20}/>
+                  </button>
+                </Link>
+             </div>
+             {/* 배경 데코 */}
+             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-800 to-black z-0"></div>
+             <div className="absolute -top-24 -right-24 w-96 h-96 bg-rose-600 rounded-full blur-[100px] opacity-30"></div>
           </div>
         </section>
       </main>
@@ -170,12 +184,14 @@ export default function BecomeHostPage() {
   );
 }
 
-function FeatureCard({ icon, title, desc }: any) {
+function FeatureItem({ icon, title, desc }: any) {
   return (
-    <div className="flex flex-col items-start text-left">
-      <div className="mb-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100">{icon}</div>
-      <h3 className="text-xl font-bold mb-2">{title}</h3>
-      <p className="text-slate-500 leading-relaxed">{desc}</p>
+    <div className="flex flex-col items-start group">
+      <div className="mb-6 p-4 rounded-2xl bg-slate-50 group-hover:bg-rose-50 transition-colors duration-300">
+        {React.cloneElement(icon, { className: "w-8 h-8 text-slate-900 group-hover:text-rose-600 transition-colors" })}
+      </div>
+      <h3 className="text-2xl font-bold mb-3 leading-tight">{title}</h3>
+      <p className="text-slate-500 leading-relaxed text-lg">{desc}</p>
     </div>
   );
 }
@@ -183,12 +199,12 @@ function FeatureCard({ icon, title, desc }: any) {
 function FAQItem({ q, a }: { q: string, a: string }) {
   const [isOpen, setIsOpen] = React.useState(false);
   return (
-    <div className="border-b border-slate-200 last:border-0">
-      <button onClick={() => setIsOpen(!isOpen)} className="w-full flex justify-between items-center py-6 text-left hover:text-rose-600 transition-colors">
-        <span className="font-bold text-lg">{q}</span>
-        {isOpen ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+    <div className="border-b border-slate-100 last:border-0">
+      <button onClick={() => setIsOpen(!isOpen)} className="w-full flex justify-between items-center py-8 text-left hover:text-rose-600 transition-colors">
+        <span className="font-bold text-xl md:text-2xl">{q}</span>
+        {isOpen ? <ChevronUp size={24}/> : <ChevronDown size={24}/>}
       </button>
-      {isOpen && <div className="pb-6 text-slate-600 leading-relaxed">{a}</div>}
+      {isOpen && <div className="pb-8 text-slate-500 leading-relaxed text-lg">{a}</div>}
     </div>
   );
 }
