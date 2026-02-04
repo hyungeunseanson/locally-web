@@ -1,29 +1,33 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, MessageCircle, Smile } from 'lucide-react';
+import { User, ShieldCheck, Star, Save, MessageCircle, Smile, Camera, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function AccountPage() {
   const supabase = createClient();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<any>(null);
   
-  // 프로필 상태 (성별 gender 추가)
+  // 프로필 상태
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
     nationality: '',
     birth_date: '',
-    gender: '', // ✅ 추가됨
+    gender: '',
     bio: '',
     phone: '',
     mbti: '',
-    kakao_id: ''
+    kakao_id: '',
+    avatar_url: '' // 프로필 사진 URL 추가
   });
 
   // 국가 리스트
@@ -70,20 +74,62 @@ export default function AccountPage() {
           email: user.email || '',
           nationality: data.nationality || '',
           birth_date: data.birth_date || '',
-          gender: data.gender || '', // ✅ 불러오기
+          gender: data.gender || '',
           bio: data.bio || '',
           phone: data.phone || '',
           mbti: data.mbti || '',
-          kakao_id: data.kakao_id || ''
+          kakao_id: data.kakao_id || '',
+          avatar_url: data.avatar_url || user.user_metadata?.avatar_url || ''
         });
       } else {
-        setProfile(prev => ({ ...prev, email: user.email || '', full_name: user.user_metadata?.full_name || '' }));
+        setProfile(prev => ({ 
+          ...prev, 
+          email: user.email || '', 
+          full_name: user.user_metadata?.full_name || '',
+          avatar_url: user.user_metadata?.avatar_url || ''
+        }));
       }
       setLoading(false);
     };
     getProfile();
   }, []);
 
+  // 📸 프로필 사진 업로드 핸들러
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) return;
+    
+    setUploading(true);
+    const file = event.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    try {
+      // 1. Storage에 업로드
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 2. 공개 URL 가져오기
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 3. 상태 업데이트 및 DB 즉시 저장
+      setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
+      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+      
+      alert('프로필 사진이 변경되었습니다.');
+    } catch (error: any) {
+      alert('사진 업로드 실패: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // 💾 전체 정보 저장 핸들러
   const handleSave = async () => {
     setSaving(true);
     
@@ -92,12 +138,13 @@ export default function AccountPage() {
       full_name: profile.full_name,
       nationality: profile.nationality,
       birth_date: profile.birth_date || null,
-      gender: profile.gender, // ✅ 저장
+      gender: profile.gender,
       bio: profile.bio,
       phone: profile.phone,
       mbti: profile.mbti,
       kakao_id: profile.kakao_id,
       email: user.email, 
+      avatar_url: profile.avatar_url, // 사진 URL도 함께 저장
       updated_at: new Date().toISOString(), 
     };
 
@@ -128,13 +175,37 @@ export default function AccountPage() {
           {/* 왼쪽: 프로필 카드 */}
           <div className="w-full lg:w-[360px] flex-shrink-0">
             <div className="border border-slate-200 rounded-3xl p-8 shadow-sm text-center sticky top-28 bg-white">
-              <div className="w-32 h-32 bg-slate-200 rounded-full mx-auto mb-4 overflow-hidden border border-slate-100 relative shadow-inner">
-                 {user?.user_metadata?.avatar_url ? (
-                   <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover"/>
-                 ) : (
-                   <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={48}/></div>
-                 )}
+              
+              {/* 📸 프로필 사진 영역 (클릭 시 파일 선택) */}
+              <div className="relative w-32 h-32 mx-auto mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <div className="w-32 h-32 bg-slate-200 rounded-full overflow-hidden border border-slate-100 shadow-inner relative">
+                   {profile.avatar_url ? (
+                     <img src={profile.avatar_url} className="w-full h-full object-cover"/>
+                   ) : (
+                     <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={48}/></div>
+                   )}
+                   
+                   {/* 호버 시 오버레이 */}
+                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                     <Camera size={24} className="text-white"/>
+                   </div>
+                   
+                   {/* 로딩 표시 */}
+                   {uploading && (
+                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                       <Loader2 size={24} className="text-white animate-spin"/>
+                     </div>
+                   )}
+                </div>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleAvatarUpload} 
+                  accept="image/*" 
+                  className="hidden"
+                />
               </div>
+
               <h2 className="text-2xl font-black mb-1">{profile.full_name || '이름 없음'}</h2>
               <p className="text-slate-500 text-sm mb-4">
                 {countries.find(c => c.code === profile.nationality)?.name || profile.nationality || '국적 미설정'}
@@ -212,7 +283,6 @@ export default function AccountPage() {
                 </div>
               </div>
 
-              {/* ✅ 성별 입력 필드 추가 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold mb-2">생년월일</label>
