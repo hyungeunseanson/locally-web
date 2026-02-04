@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Edit, Eye, Trash2, MapPin, Clock } from 'lucide-react';
+import { Calendar, Edit, Eye, Trash2, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 
 export default function MyExperiences() {
@@ -50,55 +50,78 @@ export default function MyExperiences() {
       )}
       
       {experiences.map((exp) => (
-        <div key={exp.id} className="bg-white border border-slate-100 rounded-2xl p-6 flex justify-between items-center shadow-sm hover:shadow-lg transition-all">
-          <div className="flex gap-5 items-center">
-            {/* 썸네일 표시 */}
-            <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
-              {exp.photos && exp.photos.length > 0 ? (
-                <img src={exp.photos[0]} className="w-full h-full object-cover" alt={exp.title} />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">No Img</div>
-              )}
-              {/* 상태 뱃지 */}
-              <div className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase text-white ${
-                exp.status === 'active' ? 'bg-green-500' : 'bg-slate-500'
-              }`}>
-                {exp.status === 'active' ? '판매중' : '심사중'}
+        <div key={exp.id} className="group flex flex-col gap-2">
+          {/* ✅ 디자인 추가: 보완 요청 또는 거절 시 관리자 코멘트 말풍선 표시 */}
+          {(exp.status === 'revision' || exp.status === 'rejected') && exp.admin_comment && (
+            <div className={`p-4 rounded-2xl border flex items-start gap-3 text-sm animate-in fade-in slide-in-from-top-1 duration-300 ${
+              exp.status === 'revision' ? 'bg-orange-50 border-orange-100 text-orange-800' : 'bg-red-50 border-red-100 text-red-800'
+            }`}>
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold mr-2">
+                  {exp.status === 'revision' ? '⚠️ 관리자 보완 요청:' : '❌ 관리자 거절 사유:'}
+                </span>
+                {exp.admin_comment}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 flex justify-between items-center shadow-sm hover:shadow-lg transition-all">
+            <div className="flex gap-5 items-center">
+              {/* 썸네일 표시 */}
+              <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative border border-slate-50">
+                {exp.photos && exp.photos.length > 0 ? (
+                  <img src={exp.photos[0]} className="w-full h-full object-cover" alt={exp.title} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">No Img</div>
+                )}
+                {/* 상태 뱃지 업데이트 */}
+                <div className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase text-white shadow-sm ${
+                  exp.status === 'active' ? 'bg-green-500' : 
+                  exp.status === 'revision' ? 'bg-orange-500' :
+                  exp.status === 'rejected' ? 'bg-red-500' : 'bg-slate-500'
+                }`}>
+                  {exp.status === 'active' ? '판매중' : 
+                   exp.status === 'revision' ? '보완요청' :
+                   exp.status === 'rejected' ? '거절됨' : '심사중'}
+                </div>
+              </div>
+
+              <div>
+                <h2 className="font-bold text-xl mb-1">{exp.title}</h2>
+                <div className="flex items-center gap-3 text-sm text-slate-500">
+                  <span className="flex items-center gap-1"><MapPin size={14}/> {exp.city}</span>
+                  <span className="flex items-center gap-1"><Clock size={14}/> {exp.duration}시간</span>
+                </div>
+                <p className="text-sm font-bold text-slate-900 mt-2">
+                  ₩{Number(exp.price).toLocaleString()} 
+                  <span className="text-slate-400 font-normal ml-2">· 예약 {exp.bookings?.[0]?.count || 0}건</span>
+                </p>
               </div>
             </div>
 
-            <div>
-              <h2 className="font-bold text-xl mb-1">{exp.title}</h2>
-              <div className="flex items-center gap-3 text-sm text-slate-500">
-                <span className="flex items-center gap-1"><MapPin size={14}/> {exp.city}</span>
-                <span className="flex items-center gap-1"><Clock size={14}/> {exp.duration}시간</span>
-              </div>
-              <p className="text-sm font-bold text-slate-900 mt-2">
-                ₩{Number(exp.price).toLocaleString()} 
-                <span className="text-slate-400 font-normal ml-2">· 예약 {exp.bookings?.[0]?.count || 0}건</span>
-              </p>
+            {/* 액션 버튼 */}
+            <div className="flex gap-2">
+              <Link href={`/host/experiences/${exp.id}/dates`}>
+                <button className="px-4 py-2.5 border rounded-xl text-sm font-bold hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                  <Calendar size={16}/> 일정 관리
+                </button>
+              </Link>
+              <Link href={`/host/experiences/${exp.id}/edit`}>
+                <button className={`px-4 py-2.5 border rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
+                  exp.status === 'revision' ? 'bg-black text-white' : 'hover:bg-slate-50'
+                }`}>
+                  <Edit size={16}/> {exp.status === 'revision' ? '내용 수정하기' : '수정'}
+                </button>
+              </Link>
+              <button 
+                onClick={() => handleDelete(exp.id)}
+                className="p-2.5 border rounded-xl text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
+                title="삭제"
+              >
+                <Trash2 size={18}/>
+              </button>
             </div>
-          </div>
-
-          {/* 액션 버튼 */}
-          <div className="flex gap-2">
-            <Link href={`/host/experiences/${exp.id}/dates`}>
-              <button className="px-4 py-2.5 border rounded-xl text-sm font-bold hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                <Calendar size={16}/> 일정 관리
-              </button>
-            </Link>
-            <Link href={`/host/experiences/${exp.id}/edit`}>
-              <button className="px-4 py-2.5 border rounded-xl text-sm font-bold hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                <Edit size={16}/> 수정
-              </button>
-            </Link>
-            <button 
-              onClick={() => handleDelete(exp.id)}
-              className="p-2.5 border rounded-xl text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
-              title="삭제"
-            >
-              <Trash2 size={18}/>
-            </button>
           </div>
         </div>
       ))}
