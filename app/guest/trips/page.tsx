@@ -25,6 +25,7 @@ export default function GuestTripsPage() {
   };
 
   return (
+    // 배경 클릭 시 메뉴 닫기 기능 포함
     <div className="min-h-screen bg-white text-slate-900 font-sans" onClick={() => setActiveMenuId(null)}>
       <SiteHeader />
 
@@ -34,24 +35,28 @@ export default function GuestTripsPage() {
         {/* 예정된 예약 */}
         <section className="mb-16">
           <h2 className="text-xl font-bold mb-6">예정된 예약</h2>
+          {/* relative 추가: 메뉴 팝업 위치 기준점 */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow flex flex-col md:flex-row relative">
             <div className="p-8 flex-1 flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-start mb-4">
                    <span className="bg-black text-white text-xs font-bold px-3 py-1 rounded-full">D-3</span>
                    
-                   {/* 점 3개 메뉴 */}
+                   {/* 점 3개 메뉴 버튼 영역 */}
                    <div className="relative">
                      <button 
                        onClick={(e) => { e.stopPropagation(); toggleMenu(999); }} 
-                       className="text-slate-400 hover:text-black p-1 rounded-full hover:bg-slate-100 transition-colors"
+                       className="text-slate-400 hover:text-black p-1.5 rounded-full hover:bg-slate-100 transition-colors"
                      >
-                       <MoreHorizontal/>
+                       <MoreHorizontal size={20}/>
                      </button>
+                     {/* 메뉴 팝업 */}
                      {activeMenuId === 999 && (
-                       <div className="absolute right-0 top-8 w-40 bg-white border border-slate-100 rounded-xl shadow-xl z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                         <button className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 font-medium">예약 상세 보기</button>
-                         <button className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 text-red-500 font-medium">예약 취소 요청</button>
+                       <div className="absolute right-0 top-8 w-48 bg-white border border-slate-100 rounded-xl shadow-xl z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                         <button className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 font-medium text-slate-700">예약 상세 보기</button>
+                         <button className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 font-medium text-slate-700">날짜 변경 요청</button>
+                         <div className="h-px bg-slate-100 my-1"></div>
+                         <button className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 text-red-500 font-medium">예약 취소</button>
                        </div>
                      )}
                    </div>
@@ -164,7 +169,7 @@ function TripCard({ id, image, title, date, host, isReviewed, onReviewClick }: a
   );
 }
 
-// ⭐ 후기 모달 (사진 첨부 기능 추가)
+// ⭐ 후기 모달 (사진 첨부 기능 포함)
 function ReviewModal({ trip, onClose }: any) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -238,7 +243,7 @@ function ReviewModal({ trip, onClose }: any) {
             onChange={(e) => setReviewText(e.target.value)}
           />
 
-          {/* 사진 첨부 */}
+          {/* 사진 첨부 영역 */}
           <div className="flex gap-3 mb-6">
             {images.map((img, idx) => (
               <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group">
@@ -249,7 +254,7 @@ function ReviewModal({ trip, onClose }: any) {
               </div>
             ))}
             {images.length < 2 && (
-              <label className="w-16 h-16 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-slate-500 hover:text-slate-600 transition-colors">
+              <label className="w-16 h-16 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-slate-500 hover:text-slate-600 transition-colors bg-slate-50/50">
                 <Camera size={20}/>
                 <span className="text-[10px] mt-1">사진 추가</span>
                 <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload}/>
