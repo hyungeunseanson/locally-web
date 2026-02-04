@@ -197,8 +197,8 @@ export default function CreateExperiencePage() {
           <div className="w-full space-y-8">
             <div className="text-center">
               <span className="bg-purple-50 text-purple-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 4. 신뢰 인증</span>
-              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">인증된 호스트<br/>뱃지를 받아보세요</h1>
-              <p className="text-sm text-slate-500">신분증을 제출하면 프로필에 <span className="text-blue-600 font-bold"><ShieldCheck size={14} className="inline"/> 인증 뱃지</span>가 표시됩니다.</p>
+              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">인증된 호스트<br/>배지를 받아보세요</h1>
+              <p className="text-sm text-slate-500">신분증을 제출하면 프로필에 <span className="text-blue-600 font-bold"><ShieldCheck size={14} className="inline"/> 인증 배지</span>가 표시됩니다.</p>
             </div>
 
             <div className="border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center hover:bg-slate-50 transition-all cursor-pointer group relative">
@@ -221,7 +221,7 @@ export default function CreateExperiencePage() {
                 </label>
               )}
             </div>
-            <p className="text-[10px] text-slate-400 text-center mt-4 bg-slate-50 py-2 rounded-lg">* 제출된 신분증 정보는 본인 확인 용도로만 사용되며, 확인 즉시 안전하게 파기됩니다.</p>
+            <p className="text-[12px] text-slate-400 text-center mt-4 bg-slate-50 py-2 rounded-lg">* 제출된 신분증 정보는 본인 확인 용도로만 사용되며, 확인 즉시 안전하게 파기됩니다.</p>
           </div>
         )}
 
@@ -301,7 +301,7 @@ export default function CreateExperiencePage() {
               <div>
                 <label className="font-bold block mb-2 text-xs text-slate-500 ml-1">상세 소개글</label>
                 <textarea 
-                  placeholder="투어의 매력 포인트, 진행 방식, 호스트의 생각 등을 자유롭게 적어주세요. (최소 50자 이상 권장)"
+                  placeholder="투어의 매력 포인트, 진행 방식, 호스트의 생각 등을 자유롭게 적어주세요. (최소 100자 이상 권장)"
                   value={formData.description} 
                   onChange={(e)=>updateData('description', e.target.value)} 
                   className="w-full p-4 h-48 bg-slate-50 rounded-xl outline-none resize-none text-sm leading-relaxed border-2 border-transparent focus:border-black focus:bg-white transition-all"
