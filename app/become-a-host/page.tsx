@@ -41,7 +41,7 @@ export default function BecomeHostPage() {
               퇴근 후 맛집 탐방, 주말 등산, 단골 카페 수다...<br/>
               좋아하는 것을 외국인 친구와 함께하며 수익을 창출하세요.
             </p>
-            <Link href="/host/create">
+            <Link href="/host/register">
               <button className="bg-rose-500 hover:bg-rose-600 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all shadow-xl hover:scale-105">
                 호스트 시작하기
               </button>
