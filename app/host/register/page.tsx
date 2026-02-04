@@ -146,7 +146,8 @@ export default function HostRegisterPage() {
           <div className="w-full space-y-8 text-center">
             <div>
               <span className="bg-blue-50 text-blue-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 4. 언어 능력</span>
-              <h1 className="text-3xl font-black mt-4 mb-3">해당 언어를<br/>얼마나 잘하시나요?</h1>
+              <h1 className="text-3xl font-black mt-4 mb-3">해당 언어를<br/>얼마나 유창하게 하시나요?</h1>
+              <p className="text-sm text-slate-500">게스트와의 원활한 소통을 위해 정확히 선택해 주세요.</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex justify-between text-2xl mb-6 px-1"><span>🌱</span><span>🌿</span><span>🌳</span><span>🗣️</span><span>👑</span></div>
@@ -184,8 +185,8 @@ export default function HostRegisterPage() {
           <div className="w-full space-y-8 text-center">
             <div>
               <span className="bg-purple-50 text-purple-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 6. 신뢰 인증</span>
-              <h1 className="text-3xl font-black mt-4 mb-3">인증 뱃지 받기</h1>
-              <p className="text-sm text-slate-500">신분증 제출 시 호스트 신뢰도가 상승합니다.</p>
+              <h1 className="text-3xl font-black mt-4 mb-3">인증된 호스트<br/>배지를 받아보세요</h1>
+              <p className="text-sm text-slate-500">신분증을 제출하면 프로필에 <span className="text-blue-600 font-bold"><ShieldCheck size={14} className="inline"/> 인증 배지</span>가 표시됩니다.</p>
             </div>
             <label className="block border-2 border-dashed border-slate-300 rounded-3xl p-10 cursor-pointer hover:bg-slate-50">
               <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(e, 'idCardFile')}/>
