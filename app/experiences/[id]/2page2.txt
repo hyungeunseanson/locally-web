@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Star, Heart, Share, ChevronLeft, ShieldCheck, 
-  MapPin, ChevronRight, MessageSquare, Copy, Check, Clock
+  MapPin, ChevronRight, MessageSquare, Copy, Check
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
@@ -27,7 +27,7 @@ export default function ExperienceDetailPage() {
   const [inquiryText, setInquiryText] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // ✨ UI 상태 추가
+  // ✨ UI 상태 추가 (저장, 공유, 후기펼치기)
   const [isSaved, setIsSaved] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
@@ -55,11 +55,15 @@ export default function ExperienceDetailPage() {
     fetchData();
   }, [params.id, supabase]);
 
+  // ✨ 기능: 스크롤 이동
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
-    if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
+  // ✨ 기능: 공유하기 (클립보드 복사)
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     setShowToast(true);
@@ -79,14 +83,6 @@ export default function ExperienceDetailPage() {
     if (!user) return alert("로그인이 필요합니다.");
     if (!selectedDate) return alert("날짜를 선택해주세요.");
     router.push(`/experiences/${params.id}/payment`);
-  };
-
-  // 날짜 포맷팅 함수 (2026-02-04 -> 2월 4일 (수))
-  const formatDateDisplay = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    return `${date.getMonth() + 1}월 ${date.getDate()}일 (${days[date.getDay()]})`;
   };
 
   // 달력 렌더링
@@ -121,7 +117,7 @@ export default function ExperienceDetailPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-20">
       <SiteHeader />
 
-      {/* 토스트 알림 */}
+      {/* ✨ 토스트 알림 (공유하기 클릭 시) */}
       {showToast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
           <Check size={16} className="text-green-400"/> 링크가 복사되었습니다.
@@ -130,29 +126,40 @@ export default function ExperienceDetailPage() {
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
         
-        {/* 헤더 섹션 */}
+        {/* 타이틀 및 헤더 */}
         <section className="mb-6">
           <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
           <div className="flex justify-between items-end">
+            {/* ✨ 기능: 클릭 시 해당 섹션으로 스크롤 이동 */}
             <div className="flex items-center gap-4 text-sm font-medium text-slate-800">
               <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
-                <Star size={14} fill="black"/> <span className="font-bold">4.98</span> <span className="text-slate-500 underline">후기 15개</span>
+                <Star size={14} fill="black"/> 
+                <span className="font-bold">4.98</span> 
+                <span className="text-slate-500 underline">후기 15개</span>
               </button>
               <span className="text-slate-300">|</span>
               <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700">
                 <MapPin size={14}/> {experience.location}
               </button>
             </div>
+
             <div className="flex gap-2">
-               <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Share size={16} /> 공유하기</button>
-               <button onClick={() => setIsSaved(!isSaved)} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} /> {isSaved ? '저장됨' : '저장'}</button>
+               <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
+                 <Share size={16} /> 공유하기
+               </button>
+               {/* ✨ 기능: 찜하기 토글 (색상 변경) */}
+               <button onClick={() => setIsSaved(!isSaved)} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
+                 <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} /> 
+                 {isSaved ? '저장됨' : '저장'}
+               </button>
             </div>
           </div>
         </section>
 
-        {/* 이미지 섹션 */}
+        {/* ✨ 이미지 그리드 (4:5 비율 느낌 살림, h-[480px]로 시원하게) */}
         <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
            <img src={experience.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+           {/* 그라데이션 오버레이 */}
            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
            <button className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform">
              <ChevronRight size={16}/> 사진 모두 보기
@@ -163,70 +170,121 @@ export default function ExperienceDetailPage() {
           
           {/* 왼쪽 컨텐츠 */}
           <div className="flex-1 space-y-10">
+            
+            {/* ✨ 1. 호스트 요약 (심플하게 변경) */}
             <div className="border-b border-slate-200 pb-8 flex justify-between items-center">
-              <div><h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2><p className="text-slate-500 text-base">최대 {guestCount + 3}명 · 2시간 · 한국어/영어</p></div>
-              <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/></div>
+              <div>
+                <h2 className="text-2xl font-bold mb-1">
+                  호스트: {hostProfile?.name || 'Locally Host'}님
+                </h2>
+                <p className="text-slate-500 text-base">
+                  최대 {guestCount + 3}명 · 2시간 · 한국어/영어
+                </p>
+              </div>
+              <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
+                 <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/>
+              </div>
             </div>
 
-            <div className="border-b border-slate-200 pb-8"><h3 className="text-xl font-bold mb-4">체험 소개</h3><p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p></div>
+            {/* 2. 체험 소개 */}
+            <div className="border-b border-slate-200 pb-8">
+              <h3 className="text-xl font-bold mb-4">체험 소개</h3>
+              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p>
+            </div>
 
+            {/* ✨ 3. 후기 섹션 (펼치기 기능 추가) */}
             <div id="reviews" className="border-b border-slate-200 pb-8 scroll-mt-24">
-               <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Star size={20} fill="black"/> 4.98 · 후기 15개</h3>
+               <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                 <Star size={20} fill="black"/> 4.98 · 후기 15개
+               </h3>
+               
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                  {/* 펼쳐지면 더 많은 아이템(8개), 아니면 4개만 보여줌 */}
                   {(isReviewsExpanded ? [1,2,3,4,5,6,7,8] : [1,2,3,4]).map(i => (
                     <div key={i} className="space-y-3">
-                       <div className="flex items-center gap-3"><div className="w-10 h-10 bg-slate-200 rounded-full bg-cover bg-center" style={{backgroundImage: `url('https://i.pravatar.cc/150?u=${i}')`}}></div><div><div className="font-bold text-sm text-slate-900">Guest {i}</div><div className="text-xs text-slate-500">2026년 1월</div></div></div>
-                       <p className="text-sm text-slate-600 leading-relaxed">호스트님이 정말 친절하셨고, 코스도 완벽했습니다. 현지인만 아는 맛집을 알게 되어 너무 좋았어요!</p>
+                       <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-slate-200 rounded-full bg-cover bg-center" style={{backgroundImage: `url('https://i.pravatar.cc/150?u=${i}')`}}></div>
+                          <div>
+                            <div className="font-bold text-sm text-slate-900">Guest {i}</div>
+                            <div className="text-xs text-slate-500">2026년 1월</div>
+                          </div>
+                       </div>
+                       <p className="text-sm text-slate-600 leading-relaxed">
+                         호스트님이 정말 친절하셨고, 코스도 완벽했습니다. 현지인만 아는 맛집을 알게 되어 너무 좋았어요!
+                       </p>
                     </div>
                   ))}
                </div>
-               <button onClick={() => setIsReviewsExpanded(!isReviewsExpanded)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors">{isReviewsExpanded ? '후기 접기' : '후기 15개 모두 보기'}</button>
+               
+               <button 
+                 onClick={() => setIsReviewsExpanded(!isReviewsExpanded)}
+                 className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors"
+               >
+                 {isReviewsExpanded ? '후기 접기' : '후기 15개 모두 보기'}
+               </button>
             </div>
 
+            {/* ✨ 4. 호스트 상세 (이전의 큰 박스를 여기로 이동) */}
             <div className="border-b border-slate-200 pb-8">
               <h3 className="text-xl font-bold mb-6">호스트 소개</h3>
               <div className="space-y-4">
                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/></div>
-                    <div><h4 className="text-lg font-bold">호스트 {hostProfile?.name || 'Locally'}님</h4><div className="flex gap-2 items-center text-xs text-slate-500 mt-1"><ShieldCheck size={14} className="text-black"/> 신원 인증됨 · 슈퍼호스트</div></div>
+                    <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm">
+                      <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold">호스트 {hostProfile?.name || 'Locally'}님</h4>
+                      <div className="flex gap-2 items-center text-xs text-slate-500 mt-1">
+                         <ShieldCheck size={14} className="text-black"/> 신원 인증됨 · 슈퍼호스트
+                      </div>
+                    </div>
                  </div>
-                 <p className="text-slate-600 leading-relaxed max-w-2xl">{hostProfile?.self_intro || "안녕하세요! 여행을 사랑하는 호스트입니다."}</p>
-                 <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-100 transition-colors inline-block mt-2">호스트에게 연락하기</button>
+                 <p className="text-slate-600 leading-relaxed max-w-2xl">
+                   {hostProfile?.self_intro || "안녕하세요! 여행을 사랑하는 호스트입니다. 현지인만 아는 특별한 장소로 여러분을 초대합니다. 단순한 가이드가 아니라 친구처럼 편안한 여행을 만들어 드릴게요."}
+                 </p>
+                 <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-100 transition-colors inline-block mt-2">
+                   호스트에게 연락하기
+                 </button>
               </div>
             </div>
 
-            {/* ✨ 지도 섹션 수정: 3D/벡터 스타일 지도 이미지로 교체 */}
+            {/* ✨ 5. 만나는 장소 (구글 지도 연결) */}
             <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
                <p className="text-slate-500 mb-4">{experience.location} (정확한 위치는 예약 확정 후 표시됩니다)</p>
+               
+               {/* 구글 지도 검색 링크 연결 */}
                <Link href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.location || 'Seoul')}`} target="_blank">
-                 <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
-                    {/* 단순하고 깔끔한 3D/벡터 스타일 지도 이미지 (Mapbox/Google 스타일) */}
-                    <img 
-                      src="https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=2674&auto=format&fit=crop" // 3D 지도 느낌의 이미지 예시
-                      className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-700"
-                      style={{filter: 'grayscale(20%) contrast(110%)'}} 
-                    />
+                 <div className="w-full h-[320px] bg-slate-100 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
+                    <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b" className="w-full h-full object-cover opacity-80 group-hover:opacity-90 group-hover:scale-105 transition-all duration-500 grayscale group-hover:grayscale-0"/>
                     <div className="absolute inset-0 flex items-center justify-center">
-                       <div className="bg-white/90 backdrop-blur-md px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-110 transition-transform text-slate-900 border border-white/50">
+                       <div className="bg-white px-4 py-3 rounded-full shadow-xl flex items-center gap-2 font-bold text-sm hover:scale-110 transition-transform">
                           <MapPin size={18} className="text-rose-500 fill-rose-500"/>
-                          지도에서 보기
+                          구글 지도에서 보기
                        </div>
                     </div>
                  </div>
                </Link>
             </div>
 
+            {/* 6. 문의하기 */}
             <div id="inquiry" className="pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-4">문의하기</h3>
+               <p className="text-sm text-slate-500 mb-4">체험에 대해 궁금한 점이 있으신가요?</p>
                <div className="flex gap-2">
-                 <input value={inquiryText} onChange={e => setInquiryText(e.target.value)} placeholder="호스트에게 메시지 보내기..." className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black"/>
+                 <input 
+                   value={inquiryText} 
+                   onChange={e => setInquiryText(e.target.value)} 
+                   placeholder="호스트에게 메시지 보내기..." 
+                   className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black"
+                 />
                  <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:scale-105 transition-transform"><MessageSquare size={18}/></button>
                </div>
             </div>
+
           </div>
 
-          {/* 오른쪽 스티키 예약 카드 */}
+          {/* 오른쪽 스티키 예약 카드 (기존 유지) */}
           <div className="w-full md:w-[380px]">
             <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-6 bg-white">
                <div className="flex justify-between items-end mb-6">
@@ -257,22 +315,6 @@ export default function ExperienceDetailPage() {
                    </div>
                  </div>
                </div>
-
-               {/* ✨ 날짜 선택 시 상세 정보 표시 (회색 텍스트 & 남은 자리) */}
-               {selectedDate && (
-                 <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-                   <div className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-1">
-                     <Clock size={14} className="text-slate-500"/> 
-                     {formatDateDisplay(selectedDate)}
-                   </div>
-                   <div className="flex justify-between items-center">
-                     <span className="text-xs font-medium text-slate-500">오후 6:30 ~ 9:30</span>
-                     <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">
-                       3자리 남음
-                     </span>
-                   </div>
-                 </div>
-               )}
 
                <button 
                  onClick={handleReserve} 
