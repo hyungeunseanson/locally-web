@@ -297,7 +297,7 @@ export default function ExperienceDetailPage() {
                         <div className="font-bold text-sm mb-1">1인 출발 확정 옵션</div>
                         <div className="text-xs text-slate-500 leading-tight">
                           최소 인원 미달 시에도 취소 없이 출발합니다. <br/>
-                          <span className="text-rose-500 font-bold">*추가 인원 모객 시 확정비 환불</span>
+                          <span className="text-rose-500 font-bold">*추가 인원 모객 시 자동 환불</span>
                         </div>
                         <div className="font-bold text-sm mt-2 text-slate-900">+ ₩{SOLO_GUARANTEE_PRICE.toLocaleString()}</div>
                       </div>

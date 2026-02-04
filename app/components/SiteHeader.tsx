@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Menu, Globe, User, LogOut, Briefcase, ArrowRightLeft, Check, MessageSquare, Heart } from 'lucide-react';
+import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageCircle, Settings, HelpCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
@@ -13,12 +13,10 @@ export default function SiteHeader() {
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
   
-  // 메뉴 상태
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 언어 설정 (에러 방지를 위해 기본값 처리)
   const languageContext = useLanguage();
   const setLang = languageContext?.setLang || (() => {});
   const lang = languageContext?.lang || 'ko';
@@ -29,12 +27,10 @@ export default function SiteHeader() {
     { label: '中文', value: 'zh' }, { label: '日本語', value: 'ja' }
   ];
 
-  // ✅ Supabase 클라이언트 안정화 (무한루프 방지)
   const [supabase] = useState(() => createClient());
   const router = useRouter();
   const pathname = usePathname();
 
-  // 외부 클릭 닫기
   useEffect(() => {
     function handleClickOutside(event: any) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -46,7 +42,6 @@ export default function SiteHeader() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 유저 상태 체크
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -62,7 +57,7 @@ export default function SiteHeader() {
     });
 
     return () => subscription.unsubscribe();
-  }, []); // 의존성 배열 비움 (안전)
+  }, []);
 
   const checkHostStatus = async (userId: string) => {
     const { data: app } = await supabase.from('host_applications').select('status').eq('user_id', userId).eq('status', 'approved').maybeSingle();
@@ -88,15 +83,7 @@ export default function SiteHeader() {
     return t('host_mode');
   };
 
-  // ✅ 안전한 프로필 이미지 URL 가져오기
-  const getAvatarUrl = () => {
-    return user?.user_metadata?.avatar_url || null;
-  };
-
-  // ✅ 안전한 이름 가져오기
-  const getUserName = () => {
-    return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-  };
+  const getAvatarUrl = () => user?.user_metadata?.avatar_url || null;
 
   return (
     <>
@@ -109,7 +96,6 @@ export default function SiteHeader() {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            {/* 호스트 모드 버튼 */}
             <button 
               onClick={handleModeSwitch} 
               className="hidden md:block text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 cursor-pointer"
@@ -117,7 +103,6 @@ export default function SiteHeader() {
                {getButtonLabel()}
             </button>
 
-            {/* 언어 버튼 */}
             <div className="relative hidden sm:block">
               <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
                 <Globe size={18} />
@@ -133,7 +118,6 @@ export default function SiteHeader() {
               )}
             </div>
 
-            {/* 유저 메뉴 버튼 (클릭하면 열림) */}
             <div className="relative">
               <div 
                 onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
@@ -149,20 +133,16 @@ export default function SiteHeader() {
                 </div>
               </div>
 
-              {/* 드롭다운 메뉴 (에러 원인 해결됨) */}
+              {/* ✨ 개편된 드롭다운 메뉴 */}
               {user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   
-                  {/* 프로필 정보 */}
-                  <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                    <p className="font-bold text-sm truncate">{getUserName()}</p>
-                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                  </div>
-
-                  {/* 메뉴 그룹 1 */}
+                  {/* 주요 활동 */}
                   <div className="py-2 border-b border-slate-100">
-                    <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                       <MessageSquare size={18}/> 메시지
+                    <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
+                       <span className="flex items-center gap-3"><MessageCircle size={18}/> 메시지</span>
+                       {/* 알림 뱃지 예시 (나중에 로직 연결) */}
+                       <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">N</span> 
                     </Link>
                     <Link href="/guest/trips" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
                        <Briefcase size={18}/> 여행
@@ -172,19 +152,23 @@ export default function SiteHeader() {
                     </button>
                   </div>
 
-                  {/* 메뉴 그룹 2 */}
+                  {/* 계정 설정 */}
                   <div className="py-2 border-b border-slate-100">
-                    <button onClick={handleModeSwitch} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm text-slate-700">
-                      {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
+                    <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                       <User size={18}/> 프로필 및 계정
+                    </Link>
+                    <button onClick={handleModeSwitch} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                       <Settings size={18}/> {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
                     </button>
-                    <Link href="/account" className="block px-4 py-3 hover:bg-slate-50 text-sm text-slate-700">계정 관리</Link>
-                    <Link href="/help" className="block px-4 py-3 hover:bg-slate-50 text-sm text-slate-700">도움말 센터</Link>
                   </div>
 
-                  {/* 로그아웃 */}
+                  {/* 도움말 & 로그아웃 */}
                   <div className="py-2">
-                    <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm text-red-500 font-semibold">
-                      {t('logout')}
+                    <Link href="/help" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                       <HelpCircle size={18}/> 도움말 센터
+                    </Link>
+                    <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                      <LogOut size={18}/> {t('logout')}
                     </button>
                   </div>
                 </div>
