@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 export default function HostRegisterPage() {
   const [step, setStep] = useState(1);
-  const totalSteps = 7; // 호스트 등록 총 7단계
+  const totalSteps = 8; // 호스트 등록 총 7단계
 
   const [formData, setFormData] = useState({
     // Step 1: 내 국적 (Host Nationality) - 순서 변경됨
@@ -360,8 +360,25 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 8: 완료 화면 */}
-        {step === 8 && (
+{/* STEP 8: 신청 사유 (추가됨: 정산 계좌 다음) */}
+{step === 8 && (
+          <div className="w-full space-y-8 text-center">
+            <div>
+              <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 8. 신청 사유</span>
+              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">마지막 질문입니다!</h1>
+              <p className="text-sm text-slate-500">로컬리 호스트가 되고 싶은 이유를 적어주세요.</p>
+            </div>
+            <textarea 
+              placeholder="예) 외국인 친구들과 교류하는 것을 좋아해서 지원하게 되었습니다." 
+              value={formData.motivation} 
+              onChange={(e)=>updateData('motivation', e.target.value)} 
+              className="w-full p-5 h-48 bg-slate-50 rounded-2xl outline-none text-sm resize-none border border-transparent focus:border-black transition-all"
+            />
+          </div>
+        )}  
+
+        {/* STEP 9: 완료 화면 */}
+        {step === 9 && (
           <div className="w-full text-center space-y-8 animate-in zoom-in-95 duration-500">
             <div className="w-28 h-28 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-100">
               <CheckCircle2 size={56}/>
@@ -396,7 +413,7 @@ export default function HostRegisterPage() {
 
       </main>
 
-      {/* 3. 하단 고정 네비게이션 (Step 8 완료 화면 제외) */}
+      {/* 3. 하단 고정 네비게이션 (Step 9 완료 화면 제외) */}
       {step < totalSteps + 1 && (
         <footer className="h-20 px-6 border-t border-slate-100 flex items-center justify-between sticky bottom-0 bg-white/90 backdrop-blur-lg z-50">
           <button 
