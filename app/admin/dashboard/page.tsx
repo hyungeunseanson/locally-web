@@ -23,15 +23,36 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // ✅ 수정된 fetchData 함수 (디버깅 로그 포함)
   const fetchData = async () => {
-    const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
+    console.log("🔄 데이터 불러오는 중..."); // 디버깅 시작 알림
+
+    // 1. 호스트 지원서
+    const { data: appData, error: appError } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
+    if (appError) console.error("❌ 지원서 로딩 실패:", appError);
     if (appData) setApps(appData);
-    const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
+
+    // 2. 체험
+    const { data: expData, error: expError } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
+    if (expError) console.error("❌ 체험 로딩 실패:", expError);
     if (expData) setExps(expData);
-    const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
+
+    // 3. 유저 (Profiles) - 여기가 핵심입니다!
+    const { data: userData, error: userError } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
+    
+    if (userError) {
+      console.error("❌ 유저 데이터 로딩 실패 (RLS 정책 확인 필요):", userError);
+    } else {
+      console.log(`✅ 유저 데이터 로딩 성공: ${userData?.length}명 가져옴`);
+    }
+    
     if (userData) setUsers(userData);
+
+    // 4. 예약/매출
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
     if (bookingData) setBookings(bookingData);
+
+    // 5. 메시지
     const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
     if (msgData) setMessages(msgData);
   };
