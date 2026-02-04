@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  // 로그인 후 이동할 페이지 (없으면 메인으로)
   const next = searchParams.get('next') ?? '/';
 
   if (code) {
@@ -15,9 +14,7 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
+          getAll() { return cookieStore.getAll(); },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
@@ -27,14 +24,35 @@ export async function GET(request: Request) {
       }
     );
 
-    // ✅ 여기서 "도장"을 찍습니다 (코드 -> 세션 교환)
+    // 1. 코드 -> 세션 교환 (로그인 처리)
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
+      // 2. [핵심 추가] 로그인 성공 시 프로필 존재 여부 확인 및 자동 생성
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // 프로필이 이미 있는지 확인
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        // 없으면 생성 (Upsert)
+        if (!existingProfile) {
+          await supabase.from('profiles').insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'New User',
+            avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture,
+          });
+        }
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     }
   }
 
-  // 에러 나면 그냥 메인으로 보냄
   return NextResponse.redirect(`${origin}/auth/auth-code-error`);
 }

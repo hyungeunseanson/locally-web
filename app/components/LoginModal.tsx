@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { X, Chrome, MessageCircle } from 'lucide-react';
-// 🚨 중요: 여기서 반드시 utils의 createClient를 가져와야 쿠키가 구워집니다!
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
@@ -18,18 +17,43 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  
-  // ✅ 컴포넌트 안에서 클라이언트 생성
   const supabase = createClient();
 
   if (!isOpen) return null;
 
-  // 🔹 이메일 로그인/회원가입
+  // 🔹 [핵심 추가] 프로필 확인 및 생성 함수
+  const ensureProfileExists = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    if (!existingProfile) {
+      await supabase.from('profiles').insert({
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || 'User',
+        // 이메일 가입자는 아바타가 없으므로 기본값 처리
+      });
+    }
+  };
+
   const handleAuth = async () => {
     setLoading(true);
     try {
       if (mode === 'SIGNUP') {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            // 가입 시 메타데이터에 이름 저장
+            data: { full_name: email.split('@')[0] } 
+          }
+        });
         if (error) throw error;
         alert('회원가입 성공! 이메일 확인 후 로그인해주세요.');
         setMode('LOGIN');
@@ -37,10 +61,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         
-        // 로그인 성공 시
+        // ✅ 로그인 성공 직후 프로필 생성 보장
+        await ensureProfileExists();
+        
         onClose();
         if (onLoginSuccess) onLoginSuccess();
-        router.refresh(); // ✅ 중요: 새로고침해야 헤더가 로그인 상태를 인식함
+        router.refresh();
       }
     } catch (error: any) {
       alert(error.message);
@@ -49,16 +75,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     }
   };
 
-  // 🔹 소셜 로그인 (구글/카카오)
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        // 로그인 후 콜백 라우트를 통해 쿠키를 굽도록 설정
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    
     if (error) alert(error.message);
   };
 
@@ -67,19 +90,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
 
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative z-10 animate-in fade-in zoom-in duration-200">
-        {/* 헤더 */}
         <div className="h-14 border-b border-slate-100 flex items-center justify-between px-6">
           <span className="font-bold text-sm text-slate-500">{mode === 'LOGIN' ? '로그인' : '회원가입'}</span>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20} /></button>
         </div>
 
-        {/* 바디 */}
         <div className="p-8">
           <h2 className="text-2xl font-black mb-2 text-slate-900">Locally에 오신 것을<br/>환영합니다 👋</h2>
           <p className="text-slate-500 text-sm mb-8">현지인처럼 여행하는 가장 쉬운 방법</p>
           
           <div className="space-y-3 mb-8">
-            {/* 카카오 */}
             <button 
               onClick={() => handleSocialLogin('kakao')}
               className="w-full h-12 bg-[#FEE500] hover:bg-[#FDD835] rounded-xl flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] text-[#391B1B] font-bold"
@@ -88,7 +108,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               카카오로 3초 만에 시작하기
             </button>
 
-            {/* 구글 */}
             <button 
               onClick={() => handleSocialLogin('google')}
               className="w-full h-12 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] text-slate-700 font-bold"
