@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, MapPin, Trash2, Search, CheckCircle2, BarChart3, ChevronRight, 
-  XCircle, AlertCircle, MessageSquare, DollarSign, Ban
+  XCircle, AlertCircle, MessageSquare, DollarSign, Ban, Calendar, TrendingUp
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -12,6 +12,7 @@ export default function AdminDashboardPage() {
   // 탭 구성: 지원서 | 체험 | 유저(고객) | 메시지 | 정산/통계
   const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'CHATS' | 'FINANCE'>('APPS');
   const [filter, setFilter] = useState('ALL'); 
+  const [statPeriod, setStatPeriod] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'QUARTER'>('MONTH');
   
   const [apps, setApps] = useState<any[]>([]);
   const [exps, setExps] = useState<any[]>([]);
@@ -35,8 +36,9 @@ export default function AdminDashboardPage() {
     const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
     if (expData) setExps(expData);
 
-    // 3. 유저
-    const { data: userData } = await supabase.from('host_applications').select('id, name, email, phone, created_at, user_id'); 
+    // 3. 유저 (profiles 테이블 연동)
+    // 고객이 입력한 상세 정보(MBTI, KakaoID 등)를 가져옵니다.
+    const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
     if (userData) setUsers(userData);
 
     // 4. 예약/매출
@@ -101,10 +103,28 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // --- 통계 계산 ---
+  // --- 통계 계산 로직 ---
+  const getFilteredDataByPeriod = (data: any[], dateField: string) => {
+    const now = new Date();
+    const periodMap = {
+      'TODAY': 1,
+      'WEEK': 7,
+      'MONTH': 30,
+      'QUARTER': 90
+    };
+    const days = periodMap[statPeriod];
+    const threshold = new Date(now.setDate(now.getDate() - days));
+    
+    return data.filter(item => new Date(item[dateField]) >= threshold);
+  };
+
+  // 전체 통계
   const totalSales = bookings.reduce((acc, b) => acc + (b.total_price || 0), 0);
-  const platformRevenue = totalSales * 0.2; // 수수료 20%
-  const hostPayout = totalSales * 0.8;      // 정산금 80%
+  
+  // 기간별 통계
+  const periodBookings = getFilteredDataByPeriod(bookings, 'created_at');
+  const periodSales = periodBookings.reduce((acc: number, b: any) => acc + (b.total_price || 0), 0);
+  const periodUsers = getFilteredDataByPeriod(users, 'created_at').length; // profiles에 created_at이 있다면 작동
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -125,7 +145,7 @@ export default function AdminDashboardPage() {
             <h2 className="text-xs font-bold text-slate-500 uppercase mb-2">Monitoring</h2>
             <nav className="space-y-1">
               <NavButton active={activeTab==='CHATS'} onClick={()=>setActiveTab('CHATS')} icon={<MessageSquare size={18}/>} label="메시지 모니터링" />
-              <NavButton active={activeTab==='FINANCE'} onClick={()=>setActiveTab('FINANCE')} icon={<DollarSign size={18}/>} label="매출 및 정산" />
+              <NavButton active={activeTab==='FINANCE'} onClick={()=>setActiveTab('FINANCE')} icon={<DollarSign size={18}/>} label="매출 및 통계" />
             </nav>
           </div>
         </aside>
@@ -140,7 +160,7 @@ export default function AdminDashboardPage() {
               <h3 className="font-bold text-lg">
                 {activeTab === 'APPS' && '호스트 지원서'}
                 {activeTab === 'EXPS' && '등록된 체험'}
-                {activeTab === 'USERS' && '가입된 고객'}
+                {activeTab === 'USERS' && '가입된 고객 정보'}
                 {activeTab === 'CHATS' && '최근 메시지'}
               </h3>
               {activeTab !== 'CHATS' && activeTab !== 'USERS' && (
@@ -172,14 +192,26 @@ export default function AdminDashboardPage() {
                 />
               ))}
 
-              {/* 유저 리스트 */}
+              {/* ✅ 유저 리스트 (상세 정보 표시) */}
               {activeTab === 'USERS' && users.map(user => (
-                <div key={user.id} className="p-4 border rounded-xl flex justify-between items-center hover:bg-slate-50">
-                  <div>
-                    <div className="font-bold">{user.name}</div>
-                    <div className="text-xs text-slate-500">{user.email}</div>
+                <div key={user.id} className="p-4 border rounded-xl hover:bg-slate-50 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-bold flex items-center gap-2">
+                        {user.full_name || '이름 미설정'} 
+                        <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{user.nationality || '국적미상'}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">{user.email}</div>
+                    </div>
+                    <button onClick={()=>deleteItem('profiles', user.id)} className="text-red-500 text-xs border border-red-200 px-3 py-1.5 rounded hover:bg-red-50">계정 삭제</button>
                   </div>
-                  <button onClick={()=>deleteItem('host_applications', user.id)} className="text-red-500 text-xs border border-red-200 px-3 py-1.5 rounded hover:bg-red-50">삭제</button>
+                  
+                  {/* 상세 정보 태그 */}
+                  <div className="flex flex-wrap gap-2 text-[10px]">
+                    {user.phone && <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded">📞 {user.phone}</span>}
+                    {user.kakao_id && <span className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded border border-yellow-100">💬 Kakao: {user.kakao_id}</span>}
+                    {user.mbti && <span className="px-2 py-1 bg-purple-50 text-purple-600 rounded border border-purple-100">🧠 {user.mbti}</span>}
+                  </div>
                 </div>
               ))}
 
@@ -245,40 +277,108 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* 3. 매출/통계 전체 화면 탭 */}
+          {/* 3. ✅ 매출/통계 전체 화면 탭 (업그레이드됨) */}
           {activeTab === 'FINANCE' && (
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-8 overflow-y-auto">
-              <h2 className="text-2xl font-black mb-8">매출 및 정산 현황</h2>
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-black">매출 및 통계 대시보드</h2>
+                {/* 기간 필터 버튼 */}
+                <div className="flex bg-slate-100 rounded-lg p-1">
+                  {[
+                    { key: 'TODAY', label: '오늘' },
+                    { key: 'WEEK', label: '7일' },
+                    { key: 'MONTH', label: '30일' },
+                    { key: 'QUARTER', label: '90일' }
+                  ].map(p => (
+                    <button 
+                      key={p.key} 
+                      onClick={() => setStatPeriod(p.key as any)}
+                      className={`px-4 py-2 text-xs font-bold rounded-md transition-all ${statPeriod === p.key ? 'bg-white text-black shadow-sm' : 'text-slate-500'}`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               
+              {/* 기간별 통계 카드 */}
               <div className="grid grid-cols-3 gap-6 mb-10">
-                <StatCard label="총 거래액 (GMV)" value={`₩${totalSales.toLocaleString()}`} color="bg-slate-900 text-white" />
-                <StatCard label="플랫폼 수익 (20%)" value={`₩${platformRevenue.toLocaleString()}`} color="bg-rose-500 text-white" />
-                <StatCard label="호스트 정산 예정 (80%)" value={`₩${hostPayout.toLocaleString()}`} color="bg-green-500 text-white" />
+                <StatCard 
+                  label="기간 내 매출" 
+                  value={`₩${periodSales.toLocaleString()}`} 
+                  sub={`전체 누적: ₩${totalSales.toLocaleString()}`}
+                  color="bg-slate-900 text-white" 
+                  icon={<DollarSign size={20}/>}
+                />
+                <StatCard 
+                  label="신규 예약" 
+                  value={`${periodBookings.length}건`} 
+                  sub="결제 완료 기준"
+                  color="bg-rose-500 text-white" 
+                  icon={<CheckCircle2 size={20}/>}
+                />
+                <StatCard 
+                  label="신규 가입 유저" 
+                  value={`${periodUsers}명`} 
+                  sub="기간 내 가입자"
+                  color="bg-blue-600 text-white" 
+                  icon={<Users size={20}/>}
+                />
               </div>
 
-              <h3 className="font-bold text-lg mb-4">최근 예약 내역</h3>
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 uppercase font-bold">
-                  <tr>
-                    <th className="p-4">예약일</th>
-                    <th className="p-4">게스트</th>
-                    <th className="p-4">체험명</th>
-                    <th className="p-4">결제 금액</th>
-                    <th className="p-4">상태</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {bookings.map(b => (
-                    <tr key={b.id} className="hover:bg-slate-50">
-                      <td className="p-4">{new Date(b.created_at).toLocaleDateString()}</td>
-                      <td className="p-4">{b.user_id}</td>
-                      <td className="p-4 font-bold">{b.experiences?.title || 'Unknown'}</td>
-                      <td className="p-4">₩{b.total_price.toLocaleString()}</td>
-                      <td className="p-4"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">결제완료</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="grid grid-cols-2 gap-8">
+                {/* 최근 예약 내역 */}
+                <div>
+                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><TrendingUp size={20}/> 최근 거래 내역</h3>
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold">
+                        <tr>
+                          <th className="p-4">예약일</th>
+                          <th className="p-4">체험명</th>
+                          <th className="p-4 text-right">금액</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {bookings.slice(0, 5).map(b => (
+                          <tr key={b.id} className="hover:bg-slate-50">
+                            <td className="p-4 text-slate-500">{new Date(b.created_at).toLocaleDateString()}</td>
+                            <td className="p-4 font-bold">{b.experiences?.title || 'Unknown'}</td>
+                            <td className="p-4 text-right">₩{b.total_price.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 플랫폼 지표 (추천) */}
+                <div>
+                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BarChart3 size={20}/> 플랫폼 주요 지표</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="border p-5 rounded-2xl">
+                      <div className="text-slate-500 text-xs font-bold mb-1">객단가 (AOV)</div>
+                      <div className="text-xl font-black">
+                        ₩{periodBookings.length > 0 ? Math.round(periodSales / periodBookings.length).toLocaleString() : 0}
+                      </div>
+                    </div>
+                    <div className="border p-5 rounded-2xl">
+                      <div className="text-slate-500 text-xs font-bold mb-1">총 등록 체험</div>
+                      <div className="text-xl font-black">{exps.length}개</div>
+                    </div>
+                    <div className="border p-5 rounded-2xl">
+                      <div className="text-slate-500 text-xs font-bold mb-1">총 가입 유저</div>
+                      <div className="text-xl font-black">{users.length}명</div>
+                    </div>
+                    <div className="border p-5 rounded-2xl">
+                      <div className="text-slate-500 text-xs font-bold mb-1">호스트 승인율</div>
+                      <div className="text-xl font-black">
+                        {apps.length > 0 ? Math.round((apps.filter(a=>a.status==='approved').length / apps.length)*100) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -326,11 +426,19 @@ function InfoRow({ label, value }: any) {
   );
 }
 
-function StatCard({ label, value, color }: any) {
+function StatCard({ label, value, sub, color, icon }: any) {
   return (
-    <div className={`p-6 rounded-2xl shadow-lg ${color}`}>
-      <div className="text-xs font-bold opacity-70 mb-1">{label}</div>
-      <div className="text-3xl font-black">{value}</div>
+    <div className={`p-6 rounded-2xl shadow-lg relative overflow-hidden ${color}`}>
+      <div className="flex justify-between items-start z-10 relative">
+        <div>
+          <div className="text-xs font-bold opacity-80 mb-1">{label}</div>
+          <div className="text-3xl font-black">{value}</div>
+          {sub && <div className="text-[10px] mt-2 opacity-70 font-medium">{sub}</div>}
+        </div>
+        <div className="bg-white/20 p-2 rounded-lg">
+          {icon}
+        </div>
+      </div>
     </div>
   );
 }
