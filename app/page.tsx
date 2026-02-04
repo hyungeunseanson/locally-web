@@ -13,11 +13,11 @@ const CATEGORIES = [
   { id: 'tokyo', label: '도쿄', icon: '🗼' },
   { id: 'osaka', label: '오사카', icon: '🏯' },
   { id: 'fukuoka', label: '후쿠오카', icon: '🍜' },
-  { id: 'sapporo', label: '삿포로', icon: '❄️' },
-  { id: 'nagoya', label: '나고야', icon: '🍤' },
-  { id: 'seoul', label: '서울', icon: '🇰🇷' },
-  { id: 'busan', label: '부산', icon: '🌊' },
-  { id: 'jeju', label: '제주', icon: '🍊' },
+  { id: 'sapporo', label: '삿포로', icon: '☃️' },
+  { id: 'nagoya', label: '나고야', icon: '🍣' },
+  { id: 'seoul', label: '서울', icon: '🏙️' },
+  { id: 'busan', label: '부산', icon: '🚢' },
+  { id: 'jeju', label: '제주', icon: '🏔️' },
 ];
 
 const LOCALLY_SERVICES = [

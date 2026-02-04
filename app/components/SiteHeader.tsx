@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageCircle, Settings, HelpCircle } from 'lucide-react';
+import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageCircle, Settings, HelpCircle, Check } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
@@ -12,6 +12,7 @@ export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -20,7 +21,6 @@ export default function SiteHeader() {
   const languageContext = useLanguage();
   const setLang = languageContext?.setLang || (() => {});
   const lang = languageContext?.lang || 'ko';
-  const t = languageContext?.t || ((k: string) => k);
 
   const languages = [
     { label: '한국어', value: 'ko' }, { label: 'English', value: 'en' },
@@ -53,16 +53,33 @@ export default function SiteHeader() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (session?.user) checkHostStatus(session.user.id);
-      else setIsHost(false);
+      else {
+        setIsHost(false);
+        setApplicationStatus(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const checkHostStatus = async (userId: string) => {
-    const { data: app } = await supabase.from('host_applications').select('status').eq('user_id', userId).eq('status', 'approved').maybeSingle();
+    // 신청 상태 확인 (최신순 1개)
+    const { data: app } = await supabase
+      .from('host_applications')
+      .select('status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (app) setApplicationStatus(app.status);
+
+    // 승인된 호스트인지 확인 (체험이 있거나 상태가 approved/active)
     const { count } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('host_id', userId);
-    if (app || (count && count > 0)) setIsHost(true);
+    
+    if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
+      setIsHost(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -71,17 +88,31 @@ export default function SiteHeader() {
   };
 
   const handleModeSwitch = async () => {
-    if (pathname?.startsWith('/host')) { router.push('/'); return; }
-    if (!user) { setIsLoginModalOpen(true); return; }
-    // ▼ 이렇게 바꾸세요 (/host/register -> /become-a-host)
-    if (!isHost) { router.push('/become-a-host'); return; } 
-    router.push('/host/dashboard');
+    // 1. 호스트 페이지에서 누르면 -> 게스트 홈으로
+    if (pathname?.startsWith('/host')) { 
+      router.push('/'); 
+      return; 
+    }
+    // 2. 비로그인 -> 로그인 모달
+    if (!user) { 
+      setIsLoginModalOpen(true); 
+      return; 
+    }
+    
+    // 3. 신청 이력이 있거나 이미 호스트인 경우 -> 대시보드 (심사현황 확인 등)
+    if (applicationStatus || isHost) {
+      router.push('/host/dashboard'); 
+    } else {
+      // 4. 신청 이력 없음 -> 등록 페이지
+      router.push('/host/register');
+    }
   };
 
+  // ✅ 버튼 라벨 한글화
   const getButtonLabel = () => {
-    if (pathname?.startsWith('/host')) return t('guest_mode');
-    if (!user || !isHost) return t('become_host');
-    return t('host_mode');
+    if (pathname?.startsWith('/host')) return '게스트 모드';
+    if (!user || (!isHost && !applicationStatus)) return '호스트 등록하기';
+    return '호스트 모드';
   };
 
   const getAvatarUrl = () => user?.user_metadata?.avatar_url || null;
@@ -134,42 +165,37 @@ export default function SiteHeader() {
                 </div>
               </div>
 
-              {/* ✨ 개편된 드롭다운 메뉴 */}
+              {/* 드롭다운 메뉴 (한글화) */}
               {user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                  
-                  {/* 주요 활동 */}
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
                        <span className="flex items-center gap-3"><MessageCircle size={18}/> 메시지</span>
-                       {/* 알림 뱃지 예시 (나중에 로직 연결) */}
                        <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">N</span> 
                     </Link>
                     <Link href="/guest/trips" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
                        <Briefcase size={18}/> 여행
                     </Link>
                     <Link href="/guest/wishlists" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-   <Heart size={18}/> 위시리스트
-</Link>
+                       <Heart size={18}/> 위시리스트
+                    </Link>
                   </div>
 
-                  {/* 계정 설정 */}
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <User size={18}/> 프로필 및 계정
                     </Link>
                     <button onClick={handleModeSwitch} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                       <Settings size={18}/> {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
+                       <Settings size={18}/> {pathname?.startsWith('/host') ? '게스트 모드' : '호스트 모드'}
                     </button>
                   </div>
 
-                  {/* 도움말 & 로그아웃 */}
                   <div className="py-2">
                     <Link href="/help" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <HelpCircle size={18}/> 도움말 센터
                     </Link>
                     <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                      <LogOut size={18}/> {t('logout')}
+                      <LogOut size={18}/> 로그아웃
                     </button>
                   </div>
                 </div>

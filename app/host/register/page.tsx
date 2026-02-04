@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ChevronRight, Camera, Globe, MapPin, X, User, Instagram, 
   CheckCircle2, ShieldCheck, Flag, CreditCard, Clock, Smile, Building, FileText
@@ -14,40 +14,70 @@ export default function HostRegisterPage() {
   const router = useRouter();
   
   const [step, setStep] = useState(1);
-  const totalSteps = 8; // 호스트 등록은 총 8단계 (9단계는 완료 화면)
+  const totalSteps = 8; 
   const [loading, setLoading] = useState(false);
+  
+  // ✅ 수정 모드: 기존 신청서 ID 저장
+  const [applicationId, setApplicationId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    // Step 1: 타겟 설정
     targetCountry: '', 
-
-    // Step 2: 언어 능력
     languageLevel: 3, 
     languageCert: '',
-
-    // Step 3: 기본 정보
     name: '', phone: '', dob: '', email: '', instagram: '', source: '',
-
-    // Step 4: 프로필 (사진/소개)
     profilePhoto: null as string | null,
     selfIntro: '',
-
-    // Step 5: 신분 인증
     idCardType: '', 
     idCardFile: null as string | null,
-
-    // Step 6: 신청 사유 (기존) -> 여기서는 Step 8로 이동됨
-    
-    // Step 7: 호스트 국적 (추가됨)
     hostNationality: '',
-
-    // Step 8: 정산 계좌 및 동의 (추가됨)
     bankName: '', accountNumber: '', accountHolder: '',
     motivation: '', agreeTerms: false
   });
   
-  // 실제 파일 객체 저장을 위한 상태 (업로드용)
   const [files, setFiles] = useState<{ profile?: File, idCard?: File }>({});
+
+  // ✅ 페이지 로드 시 기존 데이터 불러오기
+  useEffect(() => {
+    const fetchExistingData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('host_applications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (data) {
+        setApplicationId(data.id);
+        // DB 데이터를 폼 상태로 매핑
+        setFormData({
+          targetCountry: data.target_language || '',
+          languageLevel: data.language_level || 3,
+          languageCert: data.language_cert || '',
+          name: data.name || '',
+          phone: data.phone || '',
+          dob: data.dob || '',
+          email: data.email || '',
+          instagram: data.instagram || '',
+          source: data.source || '',
+          profilePhoto: data.profile_photo || null,
+          selfIntro: data.self_intro || '',
+          idCardType: '', 
+          idCardFile: data.id_card_file || null,
+          hostNationality: data.host_nationality || '',
+          bankName: data.bank_name || '',
+          accountNumber: data.account_number || '',
+          accountHolder: data.account_holder || '',
+          motivation: data.motivation || '',
+          agreeTerms: true 
+        });
+      }
+    };
+    fetchExistingData();
+  }, []);
 
   const nextStep = () => { if (step < totalSteps) setStep(step + 1); };
   const prevStep = () => { if (step > 1) setStep(step - 1); };
@@ -60,16 +90,12 @@ export default function HostRegisterPage() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const url = URL.createObjectURL(file);
-      
-      // 미리보기용 URL 저장
       updateData(fieldName === 'profile' ? 'profilePhoto' : 'idCardFile', url);
-      
-      // 실제 파일 저장 (DB 업로드용)
       setFiles(prev => ({ ...prev, [fieldName === 'profile' ? 'profile' : 'idCard']: file }));
     }
   };
 
-  // ✅ DB 저장 로직 (핵심!)
+  // ✅ DB 저장 로직 (Insert -> Upsert/Update로 변경)
   const handleSubmit = async () => {
     if (!formData.agreeTerms) return alert('약관에 동의해주세요.');
     setLoading(true);
@@ -78,9 +104,9 @@ export default function HostRegisterPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요합니다.');
 
-      // 1. 이미지 업로드 (Supabase Storage 'images' 버킷 필요)
-      let profileUrl = null;
-      let idCardUrl = null;
+      // 1. 이미지 업로드 (파일이 새로 선택된 경우에만 업로드)
+      let profileUrl = formData.profilePhoto; 
+      let idCardUrl = formData.idCardFile;    
 
       if (files.profile) {
         const fileName = `profile/${user.id}_${Date.now()}`;
@@ -100,33 +126,42 @@ export default function HostRegisterPage() {
         }
       }
 
-      // 2. 데이터 DB 저장
-      const { error } = await supabase.from('host_applications').insert([
-        {
-          user_id: user.id,
-          host_nationality: formData.hostNationality,
-          target_language: formData.targetCountry, // 기존 targetCountry를 target_language로 매핑
-          name: formData.name,
-          phone: formData.phone,
-          dob: formData.dob,
-          email: formData.email,
-          instagram: formData.instagram,
-          source: formData.source,
-          language_level: formData.languageLevel,
-          language_cert: formData.languageCert,
-          profile_photo: profileUrl,
-          self_intro: formData.selfIntro,
-          id_card_file: idCardUrl,
-          bank_name: formData.bankName,
-          account_number: formData.accountNumber,
-          account_holder: formData.accountHolder,
-          motivation: formData.motivation, // 신청 사유 추가
-          status: 'pending' // 승인 대기 상태
-        }
-      ]);
+      // 2. 데이터 저장 준비
+      const payload = {
+        user_id: user.id,
+        host_nationality: formData.hostNationality,
+        target_language: formData.targetCountry,
+        name: formData.name,
+        phone: formData.phone,
+        dob: formData.dob,
+        email: formData.email,
+        instagram: formData.instagram,
+        source: formData.source,
+        language_level: formData.languageLevel,
+        language_cert: formData.languageCert,
+        profile_photo: profileUrl,
+        self_intro: formData.selfIntro,
+        id_card_file: idCardUrl,
+        bank_name: formData.bankName,
+        account_number: formData.accountNumber,
+        account_holder: formData.accountHolder,
+        motivation: formData.motivation,
+        status: 'pending' // ⭐ 수정 후 제출하면 다시 '심사 대기' 상태로 변경
+      };
+
+      let error;
+      if (applicationId) {
+        // ✅ 기존 신청서가 있으면 Update
+        const res = await supabase.from('host_applications').update(payload).eq('id', applicationId);
+        error = res.error;
+      } else {
+        // ✅ 없으면 Insert
+        const res = await supabase.from('host_applications').insert([payload]);
+        error = res.error;
+      }
 
       if (error) throw error;
-      setStep(step + 1); // 완료 화면으로 이동
+      setStep(step + 1);
 
     } catch (error: any) {
       console.error(error);
@@ -161,7 +196,7 @@ export default function HostRegisterPage() {
       {/* 2. 메인 컨텐츠 */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* STEP 1: 국적 선택 (가장 먼저) */}
+        {/* STEP 1: 국적 선택 */}
         {step === 1 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -169,7 +204,6 @@ export default function HostRegisterPage() {
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">호스트님의 국적은<br/>어디인가요?</h1>
               <p className="text-sm text-slate-500">신분증 확인 및 정산 통화 기준이 됩니다.</p>
             </div>
-
             <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
               <button onClick={() => updateData('hostNationality', 'Korea')} className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.hostNationality === 'Korea' ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}>
                 <div className="text-4xl mb-2">🇰🇷</div>
@@ -183,7 +217,7 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 2: 타겟 언어 (기존 Step 1) */}
+        {/* STEP 2: 타겟 언어 */}
         {step === 2 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -191,7 +225,6 @@ export default function HostRegisterPage() {
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">어떤 언어권 게스트와<br/>만나고 싶으신가요?</h1>
               <p className="text-sm text-slate-500">주로 소통하게 될 언어를 선택해 주세요.</p>
             </div>
-
             <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
               {[
                 { code: 'Japanese', label: '일본어 🇯🇵', sub: 'Japanese' },
@@ -212,7 +245,7 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 3: 언어 능력 (기존 Step 2 - UX 동일하게 복구) */}
+        {/* STEP 3: 언어 능력 */}
         {step === 3 && (
           <div className="w-full space-y-8">
             <div className="text-center">
@@ -220,31 +253,13 @@ export default function HostRegisterPage() {
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">해당 언어를<br/>얼마나 유창하게 하시나요?</h1>
               <p className="text-sm text-slate-500">게스트와의 원활한 소통을 위해 정확히 선택해 주세요.</p>
             </div>
-
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex justify-between items-center mb-6 px-1">
-                <span className="text-2xl">🌱</span>
-                <span className="text-2xl">🌿</span>
-                <span className="text-2xl">🌳</span>
-                <span className="text-2xl">🗣️</span>
-                <span className="text-2xl">👑</span>
+                <span className="text-2xl">🌱</span><span className="text-2xl">🌿</span><span className="text-2xl">🌳</span><span className="text-2xl">🗣️</span><span className="text-2xl">👑</span>
               </div>
-              
-              <input 
-                type="range" min="1" max="5" step="1" 
-                value={formData.languageLevel}
-                onChange={(e) => updateData('languageLevel', Number(e.target.value))}
-                className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-black mb-6"
-              />
-              
+              <input type="range" min="1" max="5" step="1" value={formData.languageLevel} onChange={(e) => updateData('languageLevel', Number(e.target.value))} className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-black mb-6"/>
               <div className="text-center bg-slate-50 p-5 rounded-xl">
-                <h3 className="text-lg font-bold mb-1 text-slate-900">
-                  {formData.languageLevel === 1 && "Lv.1 기초 단계"}
-                  {formData.languageLevel === 2 && "Lv.2 초급 회화"}
-                  {formData.languageLevel === 3 && "Lv.3 일상 회화"}
-                  {formData.languageLevel === 4 && "Lv.4 비즈니스 회화"}
-                  {formData.languageLevel === 5 && "Lv.5 원어민 수준"}
-                </h3>
+                <h3 className="text-lg font-bold mb-1 text-slate-900">{formData.languageLevel === 1 && "Lv.1 기초 단계"}{formData.languageLevel === 2 && "Lv.2 초급 회화"}{formData.languageLevel === 3 && "Lv.3 일상 회화"}{formData.languageLevel === 4 && "Lv.4 비즈니스 회화"}{formData.languageLevel === 5 && "Lv.5 원어민 수준"}</h3>
                 <p className="text-slate-500 text-xs leading-relaxed">
                   {formData.languageLevel === 1 && "간단한 인사말 정도만 가능하며, 번역기 사용이 필수입니다."}
                   {formData.languageLevel === 2 && "단어 위주의 소통이 가능하며, 대화 시 번역기의 도움이 일부 필요합니다."}
@@ -253,7 +268,6 @@ export default function HostRegisterPage() {
                   {formData.languageLevel === 5 && "현지인 수준의 자연스러운 억양과 표현을 구사합니다."}
                 </p>
               </div>
-
               <div className="mt-6">
                 <label className="font-bold block mb-1.5 text-xs ml-1 text-slate-500">어학 자격증 (선택사항)</label>
                 <input type="text" placeholder="예) JLPT N1, TOEIC 900" value={formData.languageCert} onChange={(e)=>updateData('languageCert', e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-black transition-all text-sm"/>
@@ -262,14 +276,13 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 4: 기본 정보 (기존 Step 3 - UX 동일하게 복구) */}
+        {/* STEP 4: 기본 정보 */}
         {step === 4 && (
           <div className="w-full space-y-8">
             <div className="text-center">
               <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 4. 기본 정보</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">호스트님의<br/>연락처를 알려주세요</h1>
             </div>
-
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -281,17 +294,14 @@ export default function HostRegisterPage() {
                   <input type="text" placeholder="YYYY.MM.DD" value={formData.dob} onChange={(e)=>updateData('dob', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
                 </div>
               </div>
-              
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">휴대전화 번호</label>
                 <input type="tel" placeholder="010-1234-5678" value={formData.phone} onChange={(e)=>updateData('phone', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">이메일 주소</label>
                 <input type="email" placeholder="example@gmail.com" value={formData.email} onChange={(e)=>updateData('email', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-500 ml-1 mb-1 flex items-center gap-1"><Instagram size={12}/> Instagram ID</label>
@@ -306,7 +316,7 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 5: 프로필 설정 (추가) */}
+        {/* STEP 5: 프로필 설정 */}
         {step === 5 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -326,7 +336,7 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 6: 신분 인증 (기존 Step 4 - UX 동일하게 복구) */}
+        {/* STEP 6: 신분 인증 */}
         {step === 6 && (
           <div className="w-full space-y-8">
             <div className="text-center">
@@ -334,10 +344,8 @@ export default function HostRegisterPage() {
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">인증된 호스트<br/>배지를 받아보세요</h1>
               <p className="text-sm text-slate-500">신분증을 제출하면 프로필에 <span className="text-blue-600 font-bold"><ShieldCheck size={14} className="inline"/> 인증 배지</span>가 표시됩니다.</p>
             </div>
-
             <div className="border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center hover:bg-slate-50 transition-all cursor-pointer group relative">
               <input type="file" accept="image/*" className="hidden" id="id-upload" onChange={(e) => handlePhotoUpload(e, 'idCard')}/>
-              
               {formData.idCardFile ? (
                 <div className="relative h-40 w-full flex flex-col items-center justify-center">
                   <img src={formData.idCardFile} className="h-full object-contain rounded-lg shadow-sm"/>
@@ -359,7 +367,7 @@ export default function HostRegisterPage() {
           </div>
         )}
 
-        {/* STEP 7: 정산 계좌 (추가) */}
+        {/* STEP 7: 정산 계좌 */}
         {step === 7 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -367,34 +375,24 @@ export default function HostRegisterPage() {
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">수익을 지급받을<br/>계좌를 알려주세요</h1>
               <p className="text-sm text-slate-500">본인 명의의 계좌만 등록 가능합니다.</p>
             </div>
-
             <div className="space-y-4 text-left">
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">은행명</label>
-                <div className="relative">
-                  <Building size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
-                  <input type="text" placeholder="예) 카카오뱅크, 신한은행" value={formData.bankName} onChange={(e)=>updateData('bankName', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
-                </div>
+                <div className="relative"><Building size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/><input type="text" placeholder="예) 카카오뱅크, 신한은행" value={formData.bankName} onChange={(e)=>updateData('bankName', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/></div>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">계좌번호</label>
-                <div className="relative">
-                  <CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
-                  <input type="tel" placeholder="- 없이 숫자만 입력" value={formData.accountNumber} onChange={(e)=>updateData('accountNumber', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
-                </div>
+                <div className="relative"><CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/><input type="tel" placeholder="- 없이 숫자만 입력" value={formData.accountNumber} onChange={(e)=>updateData('accountNumber', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/></div>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">예금주</label>
-                <div className="relative">
-                  <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
-                  <input type="text" placeholder="본인 실명" value={formData.accountHolder} onChange={(e)=>updateData('accountHolder', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/>
-                </div>
+                <div className="relative"><User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/><input type="text" placeholder="본인 실명" value={formData.accountHolder} onChange={(e)=>updateData('accountHolder', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm"/></div>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 8: 신청 사유 (마지막) */}
+        {/* STEP 8: 신청 사유 */}
         {step === 8 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -402,14 +400,7 @@ export default function HostRegisterPage() {
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">마지막 질문입니다!</h1>
               <p className="text-sm text-slate-500">로컬리 호스트가 되고 싶은 이유를 적어주세요.</p>
             </div>
-            
-            <textarea 
-              placeholder="예) 외국인 친구들과 교류하는 것을 좋아해서 지원하게 되었습니다." 
-              value={formData.motivation} 
-              onChange={(e)=>updateData('motivation', e.target.value)} 
-              className="w-full p-5 h-48 bg-slate-50 rounded-2xl outline-none text-sm resize-none border border-slate-200 focus:border-black transition-all"
-            />
-
+            <textarea placeholder="예) 외국인 친구들과 교류하는 것을 좋아해서 지원하게 되었습니다." value={formData.motivation} onChange={(e)=>updateData('motivation', e.target.value)} className="w-full p-5 h-48 bg-slate-50 rounded-2xl outline-none text-sm resize-none border border-slate-200 focus:border-black transition-all"/>
             <div className="pt-2 text-left">
               <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">
                 <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${formData.agreeTerms ? 'bg-black border-black' : 'border-slate-300 bg-white'}`}>
@@ -437,7 +428,6 @@ export default function HostRegisterPage() {
                 <strong>영업일 기준 2~3일 내</strong>에 연락드리겠습니다.
               </p>
             </div>
-            
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 max-w-sm mx-auto text-left space-y-3 shadow-sm">
               <h4 className="font-bold text-sm text-slate-900 mb-1">✅ 이후 진행 절차</h4>
               <ul className="text-xs text-slate-600 space-y-2.5">
@@ -446,7 +436,6 @@ export default function HostRegisterPage() {
                 <li className="flex gap-3 items-center"><span className="bg-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold border border-slate-200">3</span> <span>최종 승인 및 투어 오픈</span></li>
               </ul>
             </div>
-
             <div className="pt-6">
               <Link href="/host/dashboard">
                 <button className="bg-black text-white px-10 py-4 rounded-xl font-bold text-base hover:scale-105 transition-transform shadow-xl">
@@ -459,7 +448,7 @@ export default function HostRegisterPage() {
 
       </main>
 
-      {/* 3. 하단 고정 네비게이션 (Step 9 완료 화면 제외) */}
+      {/* 3. 하단 고정 네비게이션 */}
       {step < totalSteps + 1 && (
         <footer className="h-20 px-6 border-t border-slate-100 flex items-center justify-between sticky bottom-0 bg-white/90 backdrop-blur-lg z-50">
           <button 
