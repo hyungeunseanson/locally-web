@@ -45,20 +45,8 @@ export default function ExperienceDetailPage() {
       if (error) { console.error(error); } 
       else {
         setExperience(exp);
-        // 예약 가능한 날짜 가져오기 (예시: 임시 데이터)
-        // 실제로는 experience_availability 테이블에서 가져와야 함
-        // const { data: dates } = await supabase.from('experience_availability').select('date').eq('experience_id', exp.id).eq('is_booked', false);
-        // if (dates) setAvailableDates(dates.map((d: any) => d.date));
-        
-        // 임시 날짜 데이터 (테스트용)
-        const today = new Date();
-        const dates = [];
-        for(let i=1; i<=10; i++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() + i);
-            dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-        }
-        setAvailableDates(dates);
+        const { data: dates } = await supabase.from('experience_availability').select('date').eq('experience_id', exp.id).eq('is_booked', false);
+        if (dates) setAvailableDates(dates.map((d: any) => d.date));
         
         const { data: hostApp } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).maybeSingle();
         setHostProfile(hostApp || { name: 'Locally Host', self_intro: '안녕하세요!' }); 
@@ -158,7 +146,7 @@ export default function ExperienceDetailPage() {
               </button>
               <span className="text-slate-300">|</span>
               <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700">
-                <MapPin size={14}/> {experience.city}
+                <MapPin size={14}/> {experience.location}
               </button>
             </div>
             <div className="flex gap-2">
@@ -170,7 +158,7 @@ export default function ExperienceDetailPage() {
 
         {/* 이미지 섹션 */}
         <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
-           <img src={experience.photos?.[0]} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+           <img src={experience.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
            <button className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform">
              <ChevronRight size={16}/> 사진 모두 보기
@@ -182,10 +170,8 @@ export default function ExperienceDetailPage() {
           {/* 왼쪽 컨텐츠 */}
           <div className="flex-1 space-y-10">
             <div className="border-b border-slate-200 pb-8 flex justify-between items-center">
-              <div><h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2><p className="text-slate-500 text-base">최대 {experience.max_guests}명 · {experience.duration}시간 · 한국어/영어</p></div>
-              <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
-                {hostProfile?.profile_photo ? <img src={hostProfile.profile_photo} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-200"/>}
-              </div>
+              <div><h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2><p className="text-slate-500 text-base">최대 {guestCount + 3}명 · 2시간 · 한국어/영어</p></div>
+              <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/></div>
             </div>
 
             <div className="border-b border-slate-200 pb-8"><h3 className="text-xl font-bold mb-4">체험 소개</h3><p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p></div>
@@ -270,7 +256,7 @@ export default function ExperienceDetailPage() {
                              {i % 2 !== 0 && (
                                <div className="ml-14 bg-slate-50 p-4 rounded-xl border border-slate-100 flex gap-3 items-start">
                                  <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-white shadow-sm">
-                                   {hostProfile?.profile_photo ? <img src={hostProfile.profile_photo} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-300"/>}
+                                   <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/>
                                  </div>
                                  <div>
                                    <div className="font-bold text-xs text-slate-900 mb-1 flex items-center gap-1">
@@ -296,9 +282,7 @@ export default function ExperienceDetailPage() {
               <h3 className="text-xl font-bold mb-6">호스트 소개</h3>
               <div className="space-y-4">
                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm">
-                        {hostProfile?.profile_photo ? <img src={hostProfile.profile_photo} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-200"/>}
-                    </div>
+                    <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/></div>
                     <div><h4 className="text-lg font-bold">호스트 {hostProfile?.name || 'Locally'}님</h4><div className="flex gap-2 items-center text-xs text-slate-500 mt-1"><ShieldCheck size={14} className="text-black"/> 신원 인증됨 · 슈퍼호스트</div></div>
                  </div>
                  <p className="text-slate-600 leading-relaxed max-w-2xl">{hostProfile?.self_intro || "안녕하세요! 여행을 사랑하는 호스트입니다."}</p>
@@ -309,8 +293,8 @@ export default function ExperienceDetailPage() {
             {/* ✨ 지도 섹션 수정 */}
             <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
-               <p className="text-slate-500 mb-4">{experience.city} (정확한 위치는 예약 확정 후 표시됩니다)</p>
-               <Link href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.city || 'Seoul')}`} target="_blank">
+               <p className="text-slate-500 mb-4">{experience.location} (정확한 위치는 예약 확정 후 표시됩니다)</p>
+               <Link href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.location || 'Seoul')}`} target="_blank">
                  <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
                     <img 
                       src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" 
