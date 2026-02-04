@@ -2,34 +2,36 @@
 
 import React, { useState } from 'react';
 import { 
-  ChevronRight, Camera, MapPin, X, CheckCircle2, Clock, Users, Tag, ArrowLeft
+  ChevronRight, Camera, MapPin, X, CheckCircle2, Clock, Users, ArrowLeft
 } from 'lucide-react';
 import Link from 'next/link';
+import { createClient } from '@/app/utils/supabase/client';
+import { useRouter } from 'next/navigation';
 
 export default function CreateExperiencePage() {
+  const supabase = createClient();
+  const router = useRouter();
+  
   const [step, setStep] = useState(1);
-  const totalSteps = 5; // 단계를 5개로 최적화
+  const totalSteps = 5; 
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    // Step 1: 지역
     country: 'Korea', 
     city: '',
-    
-    // Step 2: 기본 정보
     title: '', 
-    category: '', // 맛집, 액티비티, 문화 등
+    category: '', 
     duration: 3,
     maxGuests: 4,
-
-    // Step 3: 상세 정보
     description: '', 
     spots: '', 
     meetingPoint: '',
-    photos: [] as string[],
-
-    // Step 4: 가격
+    photos: [] as string[], // 미리보기용 URL
     price: 50000,
   });
+
+  // 실제 파일 저장용
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
 
   const nextStep = () => { if (step < totalSteps) setStep(step + 1); };
   const prevStep = () => { if (step > 1) setStep(step - 1); };
@@ -40,8 +42,58 @@ export default function CreateExperiencePage() {
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const url = URL.createObjectURL(e.target.files[0]);
+      const file = e.target.files[0];
+      const url = URL.createObjectURL(file);
       updateData('photos', [...formData.photos, url]);
+      setImageFiles(prev => [...prev, file]);
+    }
+  };
+
+  // ✅ DB 저장 로직
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('로그인이 필요합니다.');
+
+      // 1. 사진 업로드 (Supabase Storage)
+      const photoUrls = [];
+      for (const file of imageFiles) {
+        const fileName = `experience/${user.id}_${Date.now()}_${Math.random()}`;
+        const { error } = await supabase.storage.from('images').upload(fileName, file);
+        if (!error) {
+          const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+          photoUrls.push(data.publicUrl);
+        }
+      }
+
+      // 2. 체험 데이터 저장 (Table insert)
+      const { error } = await supabase.from('experiences').insert([
+        {
+          host_id: user.id,
+          country: formData.country,
+          city: formData.city,
+          title: formData.title,
+          category: formData.category,
+          duration: formData.duration,
+          max_guests: formData.maxGuests,
+          description: formData.description,
+          spots: formData.spots,
+          meeting_point: formData.meetingPoint,
+          photos: photoUrls, // 배열로 저장
+          price: formData.price,
+          status: 'pending' // 초기 상태는 심사 대기
+        }
+      ]);
+
+      if (error) throw error;
+      setStep(step + 1); // 완료 화면으로 이동
+
+    } catch (error: any) {
+      console.error(error);
+      alert('등록 중 오류가 발생했습니다: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,7 +119,7 @@ export default function CreateExperiencePage() {
         </header>
       )}
 
-      {/* 2. 메인 컨텐츠 (max-w-xl로 컴팩트하게) */}
+      {/* 2. 메인 컨텐츠 */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* STEP 1: 지역 선택 */}
@@ -102,7 +154,7 @@ export default function CreateExperiencePage() {
           </div>
         )}
 
-        {/* STEP 2: 기본 정보 (제목, 카테고리, 인원) */}
+        {/* STEP 2: 기본 정보 */}
         {step === 2 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -145,7 +197,7 @@ export default function CreateExperiencePage() {
           </div>
         )}
 
-        {/* STEP 3: 상세 정보 (소개, 코스, 사진) */}
+        {/* STEP 3: 상세 정보 */}
         {step === 3 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -273,7 +325,7 @@ export default function CreateExperiencePage() {
 
       </main>
 
-      {/* 3. 하단 고정 네비게이션 (Step 5 완료 화면 제외) */}
+      {/* 3. 하단 고정 네비게이션 */}
       {step < totalSteps && (
         <footer className="h-20 px-6 border-t border-slate-100 flex items-center justify-between sticky bottom-0 bg-white/90 backdrop-blur-lg z-50">
           <button 
@@ -287,10 +339,11 @@ export default function CreateExperiencePage() {
           <div className="flex gap-2">
             {step === totalSteps - 1 ? (
               <button 
-                onClick={nextStep} // 실제로는 여기서 DB 전송 로직 필요
+                onClick={handleSubmit} 
+                disabled={loading}
                 className="bg-black text-white px-8 py-3 rounded-xl font-bold text-xs hover:scale-105 transition-transform shadow-lg shadow-slate-200"
               >
-                체험 등록하기
+                {loading ? '등록 중...' : '체험 등록하기'}
               </button>
             ) : (
               <button 
