@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, MapPin, Trash2, Search, CheckCircle2, BarChart3, ChevronRight, XCircle, AlertCircle
+  Users, MapPin, Trash2, Search, CheckCircle2, BarChart3, ChevronRight, XCircle, AlertCircle, MessageSquare
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -24,58 +24,36 @@ export default function AdminDashboardPage() {
   }, []);
 
   const fetchData = async () => {
-    // 통계
     const { count: uCount } = await supabase.from('host_applications').select('*', { count: 'exact', head: true });
     const { count: eCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true });
     const { count: bCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
     setStats({ users: uCount || 0, experiences: eCount || 0, bookings: bCount || 0 });
 
-    // 지원서
     const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
     if (appData) setApps(appData);
 
-    // 체험
     const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
     if (expData) setExps(expData);
   };
 
-  // ✅ 호스트 지원서 상태 변경 (코멘트 기능 추가)
-  const handleAppStatus = async (id: string, status: string) => {
-    let comment = '';
-    if (status === 'rejected' || status === 'revision') {
-      const input = prompt(`[${status}] 사유를 입력해주세요:`);
-      if (input === null) return; // 취소 누르면 중단
-      comment = input;
-    } else {
-      if (!confirm('승인하시겠습니까?')) return;
-    }
-
-    await supabase.from('host_applications').update({ status, admin_comment: comment }).eq('id', id);
-    fetchData();
-    setSelectedApp(null);
-  };
-
-  // ✅ 체험 상태 변경 (코멘트 기능 추가)
-  // ✅ 수정 위치: 기존 handleAppStatus 함수를 아래 내용으로 교체
+  // ✅ 호스트 지원서 상태 변경 함수 (중복 제거 및 로직 통합)
   const handleAppStatus = async (id: string, status: string) => {
     let comment = '';
     
-    // 'revision' 또는 'rejected'일 때 사유 입력받기
     if (status === 'rejected' || status === 'revision') {
       const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
-      if (input === null) return; // 취소 시 중단
+      if (input === null) return; 
       comment = input;
     } else {
       if (!confirm('승인하시겠습니까?')) return;
-      status = 'approved'; // 승인 시 값을 approved로 고정
+      status = 'approved'; 
     }
 
-    // DB 업데이트 실행
     const { error } = await supabase
       .from('host_applications')
       .update({ 
-        status: status,       // 전달받은 'revision', 'rejected', 'approved'가 들어감
-        admin_comment: comment // 입력한 코멘트가 들어감
+        status: status, 
+        admin_comment: comment 
       })
       .eq('id', id);
 
@@ -83,8 +61,37 @@ export default function AdminDashboardPage() {
       alert("오류 발생: " + error.message);
     } else {
       alert("처리가 완료되었습니다.");
-      fetchData(); // 목록 새로고침
-      setSelectedApp(null); // 상세창 닫기
+      fetchData(); 
+      setSelectedApp(null); 
+    }
+  };
+
+  // ✅ 체험 상태 변경 함수
+  const handleExpStatus = async (id: string, status: string) => {
+    let comment = '';
+    if (status === 'rejected' || status === 'revision') {
+      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
+      if (input === null) return;
+      comment = input;
+    } else {
+      if (!confirm('승인하시겠습니까? (즉시 공개됩니다)')) return;
+      status = 'active'; 
+    }
+
+    const { error } = await supabase
+      .from('experiences')
+      .update({ 
+        status: status, 
+        admin_comment: comment 
+      })
+      .eq('id', id);
+
+    if (error) {
+      alert("오류 발생: " + error.message);
+    } else {
+      alert("처리가 완료되었습니다.");
+      fetchData();
+      setSelectedExp(null);
     }
   };
 
@@ -111,7 +118,6 @@ export default function AdminDashboardPage() {
       <SiteHeader />
       
       <div className="flex h-[calc(100vh-80px)]">
-        {/* 사이드바 */}
         <aside className="w-64 bg-slate-900 text-white p-6 hidden md:flex flex-col">
           <nav className="space-y-2 flex-1">
             <button onClick={() => {setActiveTab('APPS'); setSelectedExp(null); setFilter('ALL');}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors ${activeTab === 'APPS' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>
@@ -125,9 +131,7 @@ export default function AdminDashboardPage() {
           </nav>
         </aside>
 
-        {/* 메인 */}
         <main className="flex-1 p-8 overflow-y-auto">
-          {/* 통계 카드 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
              <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">총 지원서</p><h2 className="text-3xl font-black">{stats.users}</h2></div>
              <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-slate-500 font-bold text-xs">등록된 체험</p><h2 className="text-3xl font-black">{stats.experiences}</h2></div>
@@ -135,7 +139,6 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex gap-8 h-[70vh]">
-            {/* 리스트 목록 */}
             <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
               <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-3">
                 <span className="font-bold text-lg">{activeTab === 'APPS' ? '지원서 목록' : '체험 목록'}</span>
@@ -173,9 +176,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* 상세 보기 패널 */}
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col relative shadow-lg p-8 overflow-y-auto">
-              {/* 호스트 지원서 상세 */}
               {activeTab === 'APPS' && selectedApp && (
                 <div className="space-y-6">
                   <div className="flex justify-between items-start">
@@ -214,25 +215,20 @@ export default function AdminDashboardPage() {
                     </div>
                   )}
 
-// ✅ 수정 위치: 상세 페이지 하단 버튼 영역
-<div className="flex gap-4 pt-4 border-t border-slate-100">
-  <button onClick={()=>handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
-    <XCircle size={18}/> 거절
-  </button>
-  
-  {/* 이 버튼의 두 번째 인자가 'revision' 인지 꼭 확인하세요! */}
-  <button onClick={()=>handleAppStatus(selectedApp.id, 'revision')} className="flex-1 py-3 border border-orange-200 text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2">
-    <AlertCircle size={18}/> 보완요청
-  </button>
-  
-  <button onClick={()=>handleAppStatus(selectedApp.id, 'approved')} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-    <CheckCircle2 size={18}/> 승인
-  </button>
-</div>
+                  <div className="flex gap-4 pt-4 border-t border-slate-100">
+                    <button onClick={()=>handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
+                      <XCircle size={18}/> 거절
+                    </button>
+                    <button onClick={()=>handleAppStatus(selectedApp.id, 'revision')} className="flex-1 py-3 border border-orange-200 text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2">
+                      <AlertCircle size={18}/> 보완요청
+                    </button>
+                    <button onClick={()=>handleAppStatus(selectedApp.id, 'approved')} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+                      <CheckCircle2 size={18}/> 승인
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* 체험 상세 */}
               {activeTab === 'EXPS' && selectedExp && (
                 <div className="space-y-6">
                   {selectedExp.photos && selectedExp.photos[0] && (
@@ -271,7 +267,6 @@ export default function AdminDashboardPage() {
                     </div>
                   )}
 
-                  {/* 3단계 승인 버튼 */}
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
                     <button onClick={()=>handleExpStatus(selectedExp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 text-sm">
                       <XCircle size={16}/> 거절
