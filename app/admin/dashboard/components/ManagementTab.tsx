@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, ChevronRight, User, Mail, Globe, MessageCircle, Phone, Smile, Calendar } from 'lucide-react';
+import { Search, ChevronRight, User, Mail, Globe, MessageCircle, Phone, Smile, Calendar, MapPin } from 'lucide-react';
 import { InfoRow } from './SharedComponents';
 
 export default function ManagementTab({ 
@@ -22,8 +22,8 @@ export default function ManagementTab({
           <h3 className="font-bold text-lg text-slate-800">
             {activeTab === 'APPS' && '📝 호스트 지원서'}
             {activeTab === 'EXPS' && '🎈 등록된 체험'}
-            {activeTab === 'USERS' && '👥 고객 유저 관리'}
-            {activeTab === 'CHATS' && '💬 실시간 메시지'}
+            {activeTab === 'USERS' && '👥 고객(User) 리스트'}
+            {activeTab === 'CHATS' && '💬 메시지 관리'}
           </h3>
           {activeTab !== 'CHATS' && activeTab !== 'USERS' && (
             <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
@@ -51,58 +51,97 @@ export default function ManagementTab({
             />
           ))}
 
-          {/* C. ✅ 고객(유저) 리스트 (상세 정보 자동 연동) */}
+          {/* C. ✅ 고객(유저) 리스트 - 기본 정보는 무조건 표시 */}
           {activeTab === 'USERS' && users.map((user:any) => (
             <div key={user.id} className="p-5 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors hover:border-slate-300 group bg-white">
               
-              {/* 상단: 기본 정보 (가입 시 수집) */}
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
-                    <User size={20}/>
+              {/* 상단: 기본 정보 (가입 시 생성되는 데이터) */}
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-4">
+                  {/* 프로필 사진 (없으면 기본 아이콘) */}
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 overflow-hidden shrink-0">
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={24}/>
+                    )}
                   </div>
                   <div>
-                    <div className="font-bold text-slate-900 flex items-center gap-2">
-                      {user.full_name || '이름 미입력'}
-                      {/* 국적 배지 */}
-                      {user.nationality && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">{user.nationality}</span>}
+                    <div className="font-bold text-slate-900 flex items-center gap-2 text-base">
+                      {user.full_name || user.name || '이름 미설정 (Guest)'}
+                      {/* 국적 배지 (데이터 있으면 표시) */}
+                      {user.nationality && (
+                        <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200 flex items-center gap-1 font-medium">
+                          <Globe size={10}/> {user.nationality}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-xs text-slate-400 flex items-center gap-1">
-                      <Mail size={10}/> {user.email}
+                    <div className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
+                      <Mail size={12}/> {user.email || '이메일 정보 없음'}
                     </div>
                   </div>
                 </div>
+                
+                {/* 우측 상단: 가입일 및 삭제 버튼 */}
                 <div className="text-right">
-                  <button onClick={()=>deleteItem('profiles', user.id)} className="text-slate-300 text-xs hover:text-rose-500 transition-colors underline decoration-slate-200">계정 삭제</button>
-                  <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-end gap-1">
+                  <div className="text-[10px] text-slate-400 mb-1 flex items-center justify-end gap-1">
                     <Calendar size={10}/> {new Date(user.created_at).toLocaleDateString()} 가입
                   </div>
+                  <button onClick={()=>deleteItem('profiles', user.id)} className="text-slate-300 text-xs hover:text-rose-500 transition-colors underline decoration-slate-200 hover:decoration-rose-500">
+                    계정 삭제
+                  </button>
                 </div>
               </div>
               
-              {/* 하단: 추가 프로필 정보 (유저가 입력 시 자동 표시) */}
-              <div className="flex flex-wrap gap-2 text-[11px] mt-2 pt-2 border-t border-slate-50">
+              {/* 하단: 추가 프로필 정보 (유저가 입력하면 자동 노출) */}
+              <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-50">
+                {/* 1. 연락처 */}
                 {user.phone ? (
-                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded border border-blue-100 flex items-center gap-1"><Phone size={10}/> {user.phone}</span>
+                  <div className="text-xs text-slate-600 flex items-center gap-2 bg-slate-50 px-2 py-1.5 rounded">
+                    <Phone size={12} className="text-blue-500"/> {user.phone}
+                  </div>
                 ) : (
-                  <span className="px-2 py-1 bg-slate-50 text-slate-300 rounded border border-slate-100 dashed">연락처 미입력</span>
+                  <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded">
+                    <Phone size={12}/> 연락처 미입력
+                  </div>
                 )}
 
-                {user.kakao_id && (
-                  <span className="px-2 py-1 bg-yellow-50 text-yellow-800 rounded border border-yellow-200 flex items-center gap-1"><MessageCircle size={10}/> Kakao: {user.kakao_id}</span>
+                {/* 2. 카카오톡 */}
+                {user.kakao_id ? (
+                  <div className="text-xs text-slate-600 flex items-center gap-2 bg-yellow-50 px-2 py-1.5 rounded">
+                    <MessageCircle size={12} className="text-yellow-600"/> {user.kakao_id}
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded">
+                    <MessageCircle size={12}/> 카카오 ID 미입력
+                  </div>
                 )}
 
-                {user.mbti && (
-                  <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded border border-purple-100 flex items-center gap-1"><Smile size={10}/> {user.mbti}</span>
+                {/* 3. MBTI */}
+                {user.mbti ? (
+                  <div className="text-xs text-slate-600 flex items-center gap-2 bg-purple-50 px-2 py-1.5 rounded col-span-2 sm:col-span-1">
+                    <Smile size={12} className="text-purple-500"/> MBTI: <span className="font-bold">{user.mbti}</span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-300 flex items-center gap-2 px-2 py-1.5 border border-dashed border-slate-200 rounded col-span-2 sm:col-span-1">
+                    <Smile size={12}/> MBTI 미입력
+                  </div>
                 )}
               </div>
 
-              {/* 자기소개 (있을 경우만 표시) */}
-              {user.bio && (
-                <div className="mt-3 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg leading-relaxed line-clamp-2">
-                  "{user.bio}"
-                </div>
-              )}
+              {/* 자기소개 (Bio) */}
+              <div className="mt-2">
+                {user.bio ? (
+                  <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg leading-relaxed border border-slate-100 italic">
+                    "{user.bio}"
+                  </p>
+                ) : (
+                  <div className="text-[10px] text-slate-300 text-center py-1">
+                    자기소개가 아직 작성되지 않았습니다.
+                  </div>
+                )}
+              </div>
+
             </div>
           ))}
 
