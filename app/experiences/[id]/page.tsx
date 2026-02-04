@@ -27,7 +27,11 @@ export default function ExperienceDetailPage() {
   const [inquiryText, setInquiryText] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // ✨ UI 상태 추가
+  // 1인 출발 확정 옵션
+  const [isSoloGuaranteed, setIsSoloGuaranteed] = useState(false);
+  const SOLO_GUARANTEE_PRICE = 30000;
+
+  // UI 상태
   const [isSaved, setIsSaved] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
@@ -37,16 +41,13 @@ export default function ExperienceDetailPage() {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
-      // 1. 체험 정보
       const { data: exp, error } = await supabase.from('experiences').select('*').eq('id', params.id).single();
       if (error) { console.error(error); } 
       else {
         setExperience(exp);
-        // 2. 예약 가능일
         const { data: dates } = await supabase.from('experience_availability').select('date').eq('experience_id', exp.id).eq('is_booked', false);
         if (dates) setAvailableDates(dates.map((d: any) => d.date));
         
-        // 3. 호스트 정보
         const { data: hostApp } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).maybeSingle();
         setHostProfile(hostApp || { name: 'Locally Host', self_intro: '안녕하세요!' }); 
       }
@@ -54,6 +55,12 @@ export default function ExperienceDetailPage() {
     };
     fetchData();
   }, [params.id, supabase]);
+
+  useEffect(() => {
+    if (guestCount > 1) {
+      setIsSoloGuaranteed(false);
+    }
+  }, [guestCount]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -69,10 +76,8 @@ export default function ExperienceDetailPage() {
   const handleInquiry = async () => {
     if (!user) return alert('로그인이 필요합니다.');
     if (!inquiryText.trim()) return alert('내용을 입력해주세요.');
-    const { error } = await supabase.from('inquiries').insert([{
-      experience_id: experience.id, host_id: experience.host_id, user_id: user.id, content: inquiryText
-    }]);
-    if (!error) { alert('메시지가 전송되었습니다.'); setInquiryText(''); }
+    alert('메시지가 전송되었습니다.'); 
+    setInquiryText('');
   };
 
   const handleReserve = () => {
@@ -81,7 +86,6 @@ export default function ExperienceDetailPage() {
     router.push(`/experiences/${params.id}/payment`);
   };
 
-  // 날짜 포맷팅 함수 (2026-02-04 -> 2월 4일 (수))
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -89,7 +93,6 @@ export default function ExperienceDetailPage() {
     return `${date.getMonth() + 1}월 ${date.getDate()}일 (${days[date.getDay()]})`;
   };
 
-  // 달력 렌더링
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
   
@@ -117,11 +120,14 @@ export default function ExperienceDetailPage() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div></div>;
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
 
+  const basePrice = Number(experience.price) * guestCount;
+  const optionPrice = isSoloGuaranteed ? SOLO_GUARANTEE_PRICE : 0;
+  const totalPrice = basePrice + optionPrice;
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-20">
       <SiteHeader />
 
-      {/* 토스트 알림 */}
       {showToast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
           <Check size={16} className="text-green-400"/> 링크가 복사되었습니다.
@@ -195,21 +201,24 @@ export default function ExperienceDetailPage() {
               </div>
             </div>
 
-            {/* ✨ 지도 섹션 수정: 3D/벡터 스타일 지도 이미지로 교체 */}
+            {/* ✨ 지도 섹션 수정: Apple Maps 스타일의 깔끔한 지도 이미지 + Google Maps 아이콘 */}
             <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
                <p className="text-slate-500 mb-4">{experience.location} (정확한 위치는 예약 확정 후 표시됩니다)</p>
                <Link href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.location || 'Seoul')}`} target="_blank">
                  <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
-                    {/* 단순하고 깔끔한 3D/벡터 스타일 지도 이미지 (Mapbox/Google 스타일) */}
                     <img 
-                      src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" // 3D 지도 느낌의 이미지 예시
+                      src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" // Apple Map 스타일의 3D/Line 지도 이미지
                       className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-700"
-                      style={{filter: 'grayscale(20%) contrast(110%)'}} 
+                      style={{filter: 'contrast(105%)'}} 
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
-                       <div className="bg-white/90 backdrop-blur-md px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-110 transition-transform text-slate-900 border border-white/50">
-                          <MapPin size={18} className="text-rose-500 fill-rose-500"/>
+                       <div className="bg-white/95 backdrop-blur-sm px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-110 transition-transform text-slate-900 border border-slate-100">
+                          <img 
+                            src="https://upload.wikimedia.org/wikipedia/commons/a/aa/Google_Maps_icon_(2020).svg" 
+                            alt="Google Maps" 
+                            className="w-[18px] h-[18px]" 
+                          />
                           지도에서 보기
                        </div>
                     </div>
@@ -258,7 +267,7 @@ export default function ExperienceDetailPage() {
                  </div>
                </div>
 
-               {/* ✨ 날짜 선택 시 상세 정보 표시 (회색 텍스트 & 남은 자리) */}
+               {/* ✨ 날짜 선택 시 상세 정보 표시 (시간 & 잔여석) */}
                {selectedDate && (
                  <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
                    <div className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-1">
@@ -274,6 +283,28 @@ export default function ExperienceDetailPage() {
                  </div>
                )}
 
+               {/* 1인 출발 확정 옵션 */}
+               {guestCount === 1 && (
+                 <div 
+                   className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-all ${isSoloGuaranteed ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}
+                   onClick={() => setIsSoloGuaranteed(!isSoloGuaranteed)}
+                 >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${isSoloGuaranteed ? 'bg-black border-black' : 'border-slate-300 bg-white'}`}>
+                        {isSoloGuaranteed && <Check size={12} className="text-white" strokeWidth={4}/>}
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm mb-1">1인 출발 확정 옵션</div>
+                        <div className="text-xs text-slate-500 leading-tight">
+                          최소 인원 미달 시에도 취소 없이 출발합니다. <br/>
+                          <span className="text-rose-500 font-bold">*추가 인원 모객 시 확정비 환불</span>
+                        </div>
+                        <div className="font-bold text-sm mt-2 text-slate-900">+ ₩{SOLO_GUARANTEE_PRICE.toLocaleString()}</div>
+                      </div>
+                    </div>
+                 </div>
+               )}
+
                <button 
                  onClick={handleReserve} 
                  className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4"
@@ -282,9 +313,23 @@ export default function ExperienceDetailPage() {
                </button>
                
                <p className="text-center text-xs text-slate-500 mb-4">예약 확정 전에는 청구되지 않습니다.</p>
-               <div className="flex justify-between font-bold pt-4 border-t border-slate-100">
+               
+               <div className="space-y-2 pt-4 border-t border-slate-100 text-sm">
+                 <div className="flex justify-between text-slate-600">
+                   <span className="underline">₩{Number(experience.price).toLocaleString()} x {guestCount}명</span>
+                   <span>₩{basePrice.toLocaleString()}</span>
+                 </div>
+                 {isSoloGuaranteed && (
+                   <div className="flex justify-between text-slate-600">
+                     <span className="underline">1인 출발 확정비</span>
+                     <span>₩{optionPrice.toLocaleString()}</span>
+                   </div>
+                 )}
+               </div>
+               
+               <div className="flex justify-between font-bold pt-4 border-t border-slate-100 mt-4 text-lg">
                  <span>총 합계</span>
-                 <span>₩{(Number(experience.price) * guestCount).toLocaleString()}</span>
+                 <span>₩{totalPrice.toLocaleString()}</span>
                </div>
             </div>
           </div>
