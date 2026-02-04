@@ -12,7 +12,6 @@ export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
-  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -53,30 +52,18 @@ export default function SiteHeader() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (session?.user) checkHostStatus(session.user.id);
-      else {
-        setIsHost(false);
-        setApplicationStatus(null);
-      }
+      else setIsHost(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const checkHostStatus = async (userId: string) => {
-    // 신청 상태 확인 (최신순 1개)
-    const { data: app } = await supabase
-      .from('host_applications')
-      .select('status')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (app) setApplicationStatus(app.status);
-
     // 승인된 호스트인지 확인 (체험이 있거나 상태가 approved/active)
+    const { data: app } = await supabase.from('host_applications').select('status').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
     const { count } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('host_id', userId);
     
+    // 'approved'나 'active' 상태일 때만 '진짜 호스트'로 간주하여 대시보드로 직행
     if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
       setIsHost(true);
     }
@@ -88,30 +75,22 @@ export default function SiteHeader() {
   };
 
   const handleModeSwitch = async () => {
-    // 1. 호스트 페이지에서 누르면 -> 게스트 홈으로
-    if (pathname?.startsWith('/host')) { 
-      router.push('/'); 
-      return; 
-    }
-    // 2. 비로그인 -> 로그인 모달
-    if (!user) { 
-      setIsLoginModalOpen(true); 
-      return; 
-    }
+    if (pathname?.startsWith('/host')) { router.push('/'); return; }
+    if (!user) { setIsLoginModalOpen(true); return; }
     
-    // 3. 신청 이력이 있거나 이미 호스트인 경우 -> 대시보드 (심사현황 확인 등)
-    if (applicationStatus || isHost) {
+    // ✅ 수정됨: 완전히 승인된 호스트만 대시보드로 바로 이동
+    // 심사 중, 보완 요청, 신규 유저는 모두 '설명 페이지'로 이동
+    if (isHost) {
       router.push('/host/dashboard'); 
     } else {
-      // 4. 신청 이력 없음 -> 등록 페이지
-      router.push('/host/register');
+      router.push('/become-a-host');
     }
   };
 
-  // ✅ 버튼 라벨 한글화
+  // ✅ 버튼 라벨 로직
   const getButtonLabel = () => {
     if (pathname?.startsWith('/host')) return '게스트 모드';
-    if (!user || (!isHost && !applicationStatus)) return '호스트 등록하기';
+    if (!user || !isHost) return '호스트 등록하기';
     return '호스트 모드';
   };
 
@@ -165,7 +144,6 @@ export default function SiteHeader() {
                 </div>
               </div>
 
-              {/* 드롭다운 메뉴 (한글화) */}
               {user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">

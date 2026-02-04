@@ -1,20 +1,43 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Globe, DollarSign, Calendar, ChevronDown, ChevronUp, 
   ArrowRight, ShieldCheck, Heart, MessageCircle
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
+import { createClient } from '@/app/utils/supabase/client';
 
 export default function BecomeHostPage() {
+  const [hasApplication, setHasApplication] = useState(false);
+  const supabase = createClient();
+
+  // ✅ 유저의 신청 이력 확인 (버튼 링크 결정을 위해)
+  useEffect(() => {
+    const checkStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('host_applications')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+      
+      if (data && data.length > 0) {
+        setHasApplication(true);
+      }
+    };
+    checkStatus();
+  }, []);
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
       <main>
-        {/* 1. 히어로 섹션 (스크린샷 1 참고) */}
+        {/* 1. 히어로 섹션 */}
         <section className="max-w-[1440px] mx-auto px-6 py-20 lg:py-32 flex flex-col md:flex-row items-center justify-between gap-16">
           <div className="flex-1 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <h1 className="text-5xl md:text-7xl font-black leading-[1.1] tracking-tight">
@@ -26,20 +49,19 @@ export default function BecomeHostPage() {
               독특한 로컬리 체험을 만들어 보세요.
             </p>
             <div className="pt-4">
-              <Link href="/host/register">
+              {/* ✅ 스마트 버튼: 신청 이력이 있으면 대시보드, 없으면 등록 페이지 */}
+              <Link href={hasApplication ? "/host/dashboard" : "/host/register"}>
                 <button className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300">
-                  시작하기
+                  {hasApplication ? "내 신청 현황 확인" : "시작하기"}
                 </button>
               </Link>
             </div>
           </div>
           
-          {/* 아이폰 목업 (CSS로 구현) */}
+          {/* 아이폰 목업 */}
           <div className="flex-1 flex justify-center md:justify-end relative">
              <div className="relative w-[340px] h-[680px] bg-black rounded-[60px] border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
-                {/* 노치 */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
-                {/* 화면 내용 */}
                 <div className="w-full h-full bg-white pt-14 pb-8 px-6 flex flex-col justify-between">
                    <div>
                       <div className="w-full h-12 rounded-full bg-slate-100 mb-8 flex items-center px-4 text-slate-400 text-sm">검색을 시작해 보세요</div>
@@ -58,7 +80,6 @@ export default function BecomeHostPage() {
                          </div>
                       </div>
                    </div>
-                   {/* 하단 네비게이션 흉내 */}
                    <div className="border-t border-slate-100 pt-4 flex justify-around text-slate-300">
                       <div className="w-6 h-6 rounded bg-slate-200"></div>
                       <div className="w-6 h-6 rounded bg-rose-500"></div>
@@ -66,12 +87,11 @@ export default function BecomeHostPage() {
                    </div>
                 </div>
              </div>
-             {/* 장식용 배경 원 */}
              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-100 rounded-full blur-3xl -z-10 opacity-50"></div>
           </div>
         </section>
 
-        {/* 2. 혜택 섹션 (스크린샷 2,3 참고) */}
+        {/* 2. 혜택 섹션 */}
         <section className="bg-white py-32">
           <div className="max-w-[1440px] mx-auto px-6">
             <h2 className="text-4xl md:text-5xl font-black text-center mb-24 leading-tight">
@@ -98,10 +118,9 @@ export default function BecomeHostPage() {
           </div>
         </section>
 
-        {/* 3. 모바일 목업 섹션 (스크린샷 4,5 참고) */}
+        {/* 3. 모바일 목업 섹션 */}
         <section className="bg-slate-50 py-32">
           <div className="max-w-[1440px] mx-auto px-6">
-            {/* Case 1 */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-20 mb-32">
                <div className="flex-1 order-2 md:order-1 flex justify-center">
                   <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-6 border border-slate-100 transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
@@ -126,7 +145,6 @@ export default function BecomeHostPage() {
                </div>
             </div>
 
-            {/* Case 2 */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-20">
                <div className="flex-1">
                   <h3 className="text-3xl font-black mb-6">투명하고 신속한 정산</h3>
@@ -168,13 +186,14 @@ export default function BecomeHostPage() {
              <div className="relative z-10">
                 <h2 className="text-4xl md:text-5xl font-black mb-8">지금 바로 시작해보세요</h2>
                 <p className="text-slate-400 text-lg mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
-                <Link href="/host/register">
+                
+                {/* ✅ 하단 CTA 버튼도 스마트하게 변경 */}
+                <Link href={hasApplication ? "/host/dashboard" : "/host/register"}>
                   <button className="bg-white text-black px-12 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform flex items-center gap-2 mx-auto">
-                    호스트 등록하기 <ArrowRight size={20}/>
+                    {hasApplication ? "내 신청 현황 확인" : "호스트 등록하기"} <ArrowRight size={20}/>
                   </button>
                 </Link>
              </div>
-             {/* 배경 데코 */}
              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-800 to-black z-0"></div>
              <div className="absolute -top-24 -right-24 w-96 h-96 bg-rose-600 rounded-full blur-[100px] opacity-30"></div>
           </div>
