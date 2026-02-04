@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { 
   Globe, DollarSign, Calendar, MessageCircle, ShieldCheck, 
-  Star, ArrowRight, CheckCircle2 
+  Star, ArrowRight, CheckCircle2, ChevronDown, ChevronUp // 👈 여기 추가됨
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 
