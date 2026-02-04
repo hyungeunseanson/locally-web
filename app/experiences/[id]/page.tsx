@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Star, Heart, Share, ChevronLeft, ShieldCheck, 
-  MapPin, ChevronRight, MessageSquare, Copy, Check, Clock
+  MapPin, ChevronRight, MessageSquare, Copy, Check, Clock, X 
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
@@ -175,9 +175,8 @@ export default function ExperienceDetailPage() {
             </div>
 
             <div className="border-b border-slate-200 pb-8"><h3 className="text-xl font-bold mb-4">체험 소개</h3><p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p></div>
-          
-            {/* ✨ [수정됨] 후기 섹션 (모달 기능 포함) */}
-            {/* ✨ [수정됨] 후기 섹션 (모달 포함) */}
+
+            {/* ✨ 후기 섹션 (모달 기능 포함) */}
             <div id="reviews" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                  <Star size={20} fill="black"/> 4.98 · 후기 15개
@@ -204,18 +203,16 @@ export default function ExperienceDetailPage() {
                  후기 15개 모두 보기
                </button>
 
-               {/* ✨ [추가됨] 후기 전체보기 모달 팝업 */}
+               {/* ✨ 후기 전체보기 모달 팝업 */}
                {isReviewsExpanded && (
                  <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>
                    <div className="bg-white w-full max-w-4xl h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                      
-                     {/* 모달 헤더 */}
                      <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                        <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> 4.98 (후기 15개)</h3>
                        <button onClick={() => setIsReviewsExpanded(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
                      </div>
 
-                     {/* 모달 내용 (스크롤) */}
                      <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          {[1,2,3,4,5,6,7,8].map(i => (
@@ -228,7 +225,7 @@ export default function ExperienceDetailPage() {
                                정말 잊지 못할 경험이었습니다. 호스트님이 너무 친절하게 대해주셔서 편안하게 여행할 수 있었어요. 다음에도 꼭 다시 이용하고 싶습니다!
                              </p>
                              
-                             {/* 📸 후기 사진 (짝수 번호에만 예시로 표시 - 클릭 시 새창 확대) */}
+                             {/* 📸 후기 사진 (짝수 번호에만 예시로 표시) */}
                              {i % 2 === 0 && (
                                <div className="flex gap-2 mt-3 pt-3 border-t border-slate-50">
                                  <div className="w-20 h-20 rounded-lg bg-slate-200 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-slate-100" onClick={() => window.open(`https://picsum.photos/500/500?random=${i}`, '_blank')}>
@@ -247,8 +244,6 @@ export default function ExperienceDetailPage() {
                  </div>
                )}
             </div>
-            {/* ✨ 수정된 후기 섹션 끝 */}
-            </div>
 
             <div className="border-b border-slate-200 pb-8">
               <h3 className="text-xl font-bold mb-6">호스트 소개</h3>
@@ -262,14 +257,14 @@ export default function ExperienceDetailPage() {
               </div>
             </div>
 
-            {/* ✨ 지도 섹션 수정: Apple Maps 스타일의 깔끔한 지도 이미지 + Google Maps 아이콘 */}
+            {/* ✨ 지도 섹션 수정 */}
             <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
                <p className="text-slate-500 mb-4">{experience.location} (정확한 위치는 예약 확정 후 표시됩니다)</p>
                <Link href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.location || 'Seoul')}`} target="_blank">
                  <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
                     <img 
-                      src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" // Apple Map 스타일의 3D/Line 지도 이미지
+                      src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" 
                       className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-700"
                       style={{filter: 'contrast(105%)'}} 
                     />
@@ -294,12 +289,12 @@ export default function ExperienceDetailPage() {
                  <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:scale-105 transition-transform"><MessageSquare size={18}/></button>
                </div>
             </div>
-            {/* --- [추가 코드 시작] 포함/불포함 및 알아두어야 할 사항 --- */}
-            
-            <div className="border-b border-slate-200 pb-8">
+
+            {/* ✅ 포함/불포함 및 알아두어야 할 사항 */}
+            <div className="border-t border-slate-200 pt-10 pb-8">
                <h3 className="text-xl font-bold mb-6">포함 및 불포함 사항</h3>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* 포함 사항 */}
+                  {/* 포함 */}
                   <div>
                      <h4 className="font-bold text-sm mb-3 text-slate-900">포함</h4>
                      <ul className="space-y-2.5">
@@ -317,21 +312,20 @@ export default function ExperienceDetailPage() {
                         </li>
                      </ul>
                   </div>
-                  {/* 불포함 사항 */}
+                  {/* 불포함 */}
                   <div>
                      <h4 className="font-bold text-sm mb-3 text-slate-900">불포함</h4>
                      <ul className="space-y-2.5">
                         <li className="flex gap-3 text-sm text-slate-600 items-start">
-                           {/* X 아이콘 대신 회전시킨 Check 아이콘 사용하거나 X 아이콘 import 필요 */}
-                           <Check size={18} className="text-slate-300 flex-shrink-0 mt-0.5 rotate-45"/>
+                           <X size={18} className="text-slate-400 flex-shrink-0 mt-0.5"/>
                            <span>개인 식사 비용 및 쇼핑비</span>
                         </li>
                         <li className="flex gap-3 text-sm text-slate-600 items-start">
-                           <Check size={18} className="text-slate-300 flex-shrink-0 mt-0.5 rotate-45"/>
+                           <X size={18} className="text-slate-400 flex-shrink-0 mt-0.5"/>
                            <span>투어 중 이동 교통비 (약 500엔)</span>
                         </li>
                         <li className="flex gap-3 text-sm text-slate-600 items-start">
-                           <Check size={18} className="text-slate-300 flex-shrink-0 mt-0.5 rotate-45"/>
+                           <X size={18} className="text-slate-400 flex-shrink-0 mt-0.5"/>
                            <span>여행자 보험</span>
                         </li>
                      </ul>
@@ -372,8 +366,6 @@ export default function ExperienceDetailPage() {
                   </div>
                </div>
             </div>
-            
-            {/* --- [추가 코드 끝] --- */}
           </div>
 
           {/* 오른쪽 스티키 예약 카드 */}
@@ -408,7 +400,7 @@ export default function ExperienceDetailPage() {
                  </div>
                </div>
 
-               {/* ✨ 날짜 선택 시 상세 정보 표시 (시간 & 잔여석) */}
+               {/* ✨ 날짜 선택 시 상세 정보 표시 */}
                {selectedDate && (
                  <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
                    <div className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-1">
