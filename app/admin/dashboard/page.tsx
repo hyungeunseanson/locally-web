@@ -35,26 +35,28 @@ export default function AdminDashboardPage() {
     const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
     if (expData) setExps(expData);
 
-    // 3. 유저 (임시로 호스트 지원자들을 유저 목록으로 사용 - 실제로는 profiles 테이블 필요)
+    // 3. 유저
     const { data: userData } = await supabase.from('host_applications').select('id, name, email, phone, created_at, user_id'); 
-    if (userData) setUsers(userData); 
+    if (userData) setUsers(userData);
 
     // 4. 예약/매출
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
     if (bookingData) setBookings(bookingData);
 
-    // 5. 메시지 (messages 테이블이 있다고 가정)
+    // 5. 메시지
     const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
     if (msgData) setMessages(msgData);
   };
 
   // --- 액션 핸들러 ---
 
-  // 호스트/체험 상태 변경
+  // ✅ 호스트/체험 상태 변경 (연동 로직 강화)
   const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
     let comment = '';
+    
+    // 1. 사유 입력 받기
     if (status === 'rejected' || status === 'revision') {
-      const input = prompt(`[${status}] 사유를 입력해주세요:`);
+      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
       if (input === null) return;
       comment = input;
     } else {
@@ -62,13 +64,32 @@ export default function AdminDashboardPage() {
       status = table === 'host_applications' ? 'approved' : 'active';
     }
 
+    // 2. 본체 상태 업데이트
     await supabase.from(table).update({ status, admin_comment: comment }).eq('id', id);
+
+    // 3. [핵심 추가] 호스트 상태 변경 시 -> 해당 호스트의 체험들도 같이 상태 변경
+    if (table === 'host_applications' && (status === 'rejected' || status === 'revision')) {
+      // 해당 신청서의 user_id(호스트 ID) 찾기
+      const { data: hostApp } = await supabase.from('host_applications').select('user_id').eq('id', id).single();
+      
+      if (hostApp) {
+        // 호스트의 모든 체험을 'revision' 또는 'rejected' 상태로 변경하여 숨김 처리
+        await supabase
+          .from('experiences')
+          .update({ 
+            status: status, // 호스트 상태와 동일하게 맞춤 (홈 화면에서 사라짐)
+            admin_comment: `호스트 자격이 [${status === 'revision' ? '보완요청' : '거절'}] 상태로 변경되어 자동 비활성화되었습니다.` 
+          })
+          .eq('host_id', hostApp.user_id);
+      }
+    }
+
     alert('처리되었습니다.');
-    fetchData();
+    fetchData(); // 데이터 새로고침
     setSelectedItem(null);
   };
 
-  // 삭제 기능 (호스트/체험/유저)
+  // 삭제 기능
   const deleteItem = async (table: string, id: string) => {
     if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
     const { error } = await supabase.from(table).delete().eq('id', id);
