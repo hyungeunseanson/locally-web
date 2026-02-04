@@ -150,7 +150,7 @@ export default function CreateExperiencePage() {
                   <input type="text" placeholder="@locally.host" value={formData.instagram} onChange={(e)=>updateData('instagram', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all"/>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">알게 된 계기</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">로컬리를 알게 된 계기</label>
                   <input type="text" placeholder="예) 인스타 릴스, 지인 추천" value={formData.source} onChange={(e)=>updateData('source', e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black transition-all"/>
                 </div>
               </div>
