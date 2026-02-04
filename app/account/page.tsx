@@ -13,7 +13,7 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<any>(null);
   
-  // 프로필 상태 (MBTI, KakaoID 추가)
+  // 프로필 상태
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
@@ -24,6 +24,30 @@ export default function AccountPage() {
     mbti: '',
     kakao_id: ''
   });
+
+  // 국가 리스트 (요청하신 국가 포함)
+  const countries = [
+    { code: 'KR', name: '대한민국 (South Korea)' },
+    { code: 'JP', name: '일본 (Japan)' },
+    { code: 'CN', name: '중국 (China)' },
+    { code: 'TW', name: '대만 (Taiwan)' },
+    { code: 'HK', name: '홍콩 (Hong Kong)' },
+    { code: 'SG', name: '싱가포르 (Singapore)' },
+    { code: 'MY', name: '말레이시아 (Malaysia)' },
+    { code: 'PH', name: '필리핀 (Philippines)' },
+    { code: 'IN', name: '인도 (India)' },
+    { code: 'TH', name: '태국 (Thailand)' },
+    { code: 'VN', name: '베트남 (Vietnam)' },
+    { code: 'US', name: '미국 (USA)' },
+    { code: 'CA', name: '캐나다 (Canada)' },
+    { code: 'FR', name: '프랑스 (France)' },
+    { code: 'GB', name: '영국 (UK)' },
+    { code: 'ES', name: '스페인 (Spain)' },
+    { code: 'DE', name: '독일 (Germany)' },
+    { code: 'CH', name: '스위스 (Switzerland)' },
+    { code: 'IT', name: '이탈리아 (Italy)' },
+    { code: 'AU', name: '호주 (Australia)' }
+  ];
 
   // 받은 후기 (더미 데이터)
   const reviews = [
@@ -61,9 +85,9 @@ export default function AccountPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    // profiles 테이블에 mbti, kakao_id 컬럼이 있어야 함
-    const { error } = await supabase.from('profiles').upsert({
-      id: user.id,
+    
+    const updates = {
+      id: user.id, // 필수
       full_name: profile.full_name,
       nationality: profile.nationality,
       birth_date: profile.birth_date || null,
@@ -71,14 +95,19 @@ export default function AccountPage() {
       phone: profile.phone,
       mbti: profile.mbti,
       kakao_id: profile.kakao_id,
-      email: user.email
-    });
+      email: user.email, // 이메일도 동기화
+      updated_at: new Date().toISOString(), // 수정 시간 기록
+    };
+
+    // 1. Update 시도
+    let { error } = await supabase.from('profiles').upsert(updates);
 
     if (error) {
-      console.error(error);
-      alert('저장 중 오류가 발생했습니다.');
+      console.error('Save error:', error);
+      alert(`저장에 실패했습니다. (${error.message})`);
     } else {
-      alert('프로필이 업데이트되었습니다.');
+      alert('✅ 프로필이 성공적으로 업데이트되었습니다.');
+      router.refresh(); // 데이터 갱신을 위해 새로고침
     }
     setSaving(false);
   };
@@ -106,7 +135,9 @@ export default function AccountPage() {
                  )}
               </div>
               <h2 className="text-2xl font-black mb-1">{profile.full_name || '이름 없음'}</h2>
-              <p className="text-slate-500 text-sm mb-4">{profile.nationality === 'KR' ? '대한민국' : profile.nationality || '국적 미설정'}</p>
+              <p className="text-slate-500 text-sm mb-4">
+                {countries.find(c => c.code === profile.nationality)?.name || profile.nationality || '국적 미설정'}
+              </p>
               
               <div className="flex flex-wrap justify-center gap-2 mb-6">
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
@@ -167,11 +198,10 @@ export default function AccountPage() {
                     onChange={e => setProfile({...profile, nationality: e.target.value})}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
                   >
-                    <option value="">선택하세요</option>
-                    <option value="KR">대한민국 (South Korea)</option>
-                    <option value="US">미국 (USA)</option>
-                    <option value="JP">일본 (Japan)</option>
-                    <option value="CN">중국 (China)</option>
+                    <option value="">국적을 선택하세요</option>
+                    {countries.map(country => (
+                      <option key={country.code} value={country.code}>{country.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -192,7 +222,7 @@ export default function AccountPage() {
                     type="tel" 
                     value={profile.phone}
                     onChange={e => setProfile({...profile, phone: e.target.value})}
-                    placeholder="010-0000-0000"
+                    placeholder="국가번호 포함 (ex. +82 10-1234-5678)"
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
                 </div>
