@@ -2,52 +2,66 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // ✅ 라우터 추가
 import { 
   Globe, DollarSign, Calendar, ChevronDown, ChevronUp, 
   ArrowRight, ShieldCheck, Heart, MessageCircle
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import LoginModal from '@/app/components/LoginModal'; // ✅ LoginModal import 추가
+import LoginModal from '@/app/components/LoginModal';
 
 export default function BecomeHostPage() {
   const [hasApplication, setHasApplication] = useState(false);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); // ✅ 모달 상태 추가
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const supabase = createClient();
+  const router = useRouter(); // ✅ Next.js 라우터 사용
 
+  // ✅ [UI용] 페이지 로드 시 버튼 텍스트 결정을 위한 상태 확인
   useEffect(() => {
     const checkStatus = async () => {
-      const { data: { user } } = await supabase.auth.getSession().then(({ data }) => data); // getSession 사용 권장
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
       const { data } = await supabase
         .from('host_applications')
         .select('id')
-        .eq('user_id', user.id)
-        .limit(1);
+        .eq('user_id', session.user.id)
+        .limit(1)
+        .maybeSingle();
       
-      if (data && data.length > 0) {
+      if (data) {
         setHasApplication(true);
       }
     };
     checkStatus();
   }, []);
 
-  // ✅ 버튼 클릭 핸들러 (로그인 체크 로직)
+  // ✅ [기능용] 버튼 클릭 시점의 정확한 로직 (비동기 처리)
   const handleStartClick = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // 1. 비로그인 상태 -> 로그인 모달 띄우기
+    // 1. 비로그인 -> 로그인 모달 
     if (!session) {
       setIsLoginModalOpen(true);
       return;
     }
 
-    // 2. 로그인 상태 -> 신청 이력에 따라 이동
-    if (hasApplication) {
-      window.location.href = "/host/dashboard";
+    // 2. 버튼 누르는 순간, DB에서 최신 신청 상태 다시 확인 (안전장치)
+    const { data } = await supabase
+      .from('host_applications')
+      .select('status')
+      .eq('user_id', session.user.id)
+      .limit(1)
+      .maybeSingle();
+
+    // 3. 결과에 따른 이동
+    if (data) {
+      // 신청 기록이 있음 (보완/거절/대기/승인 모두 포함) -> 대시보드로 이동해서 상태 보여주기
+      router.push('/host/dashboard');
     } else {
-      window.location.href = "/host/register";
+      // 신청 기록 없음 -> 등록 페이지로 이동
+      router.push('/host/register');
     }
   };
 
@@ -55,7 +69,6 @@ export default function BecomeHostPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
       
-      {/* ✅ 로그인 모달 추가 */}
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
       <main>
@@ -71,7 +84,7 @@ export default function BecomeHostPage() {
               독특한 로컬리 체험을 만들어 보세요.
             </p>
             <div className="pt-4">
-              {/* ✅ 수정된 버튼: Link 대신 onClick 사용 */}
+              {/* ✅ 스마트 버튼: 핸들러 연결 */}
               <button 
                 onClick={handleStartClick}
                 className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
@@ -81,7 +94,7 @@ export default function BecomeHostPage() {
             </div>
           </div>
           
-          {/* 아이폰 목업 (디자인 유지) */}
+          {/* 아이폰 목업 */}
           <div className="flex-1 flex justify-center md:justify-end relative">
              <div className="relative w-[340px] h-[680px] bg-black rounded-[60px] border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
@@ -131,7 +144,6 @@ export default function BecomeHostPage() {
         {/* 3. 모바일 목업 섹션 */}
         <section className="bg-slate-50 py-32">
           <div className="max-w-[1440px] mx-auto px-6">
-            {/* ... (기존 모바일 목업 내용 유지) ... */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-20 mb-32">
                <div className="flex-1 order-2 md:order-1 flex justify-center">
                   <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-6 border border-slate-100 transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
@@ -181,7 +193,7 @@ export default function BecomeHostPage() {
                 <h2 className="text-4xl md:text-5xl font-black mb-8">지금 바로 시작해보세요</h2>
                 <p className="text-slate-400 text-lg mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
                 
-                {/* ✅ 하단 버튼도 수정된 핸들러 연결 */}
+                {/* ✅ 하단 CTA 버튼도 동일한 핸들러 연결 */}
                 <button 
                   onClick={handleStartClick}
                   className="bg-white text-black px-12 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform flex items-center gap-2 mx-auto"
@@ -198,7 +210,6 @@ export default function BecomeHostPage() {
   );
 }
 
-// ... FeatureItem, FAQItem 컴포넌트 유지 ...
 function FeatureItem({ icon, title, desc }: any) {
   return (
     <div className="flex flex-col items-start group">
