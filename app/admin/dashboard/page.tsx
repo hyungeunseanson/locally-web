@@ -39,16 +39,34 @@ export default function AdminDashboardPage() {
     if (expData) setExps(expData);
   };
 
+  // ✅ 호스트 지원서 상태 변경 (코멘트 기능 추가)
   const handleAppStatus = async (id: string, status: string) => {
-    if (!confirm(`${status} 상태로 변경하시겠습니까?`)) return;
-    await supabase.from('host_applications').update({ status }).eq('id', id);
+    let comment = '';
+    if (status === 'rejected' || status === 'revision') {
+      const input = prompt(`[${status}] 사유를 입력해주세요:`);
+      if (input === null) return; // 취소 누르면 중단
+      comment = input;
+    } else {
+      if (!confirm('승인하시겠습니까?')) return;
+    }
+
+    await supabase.from('host_applications').update({ status, admin_comment: comment }).eq('id', id);
     fetchData();
     setSelectedApp(null);
   };
 
+  // ✅ 체험 상태 변경 (코멘트 기능 추가)
   const handleExpStatus = async (id: string, status: string) => {
-    if (!confirm(`${status} 상태로 변경하시겠습니까?`)) return;
-    await supabase.from('experiences').update({ status }).eq('id', id);
+    let comment = '';
+    if (status === 'rejected' || status === 'revision') {
+      const input = prompt(`[${status}] 사유를 입력해주세요:`);
+      if (input === null) return; // 취소 누르면 중단
+      comment = input;
+    } else {
+      if (!confirm('승인하시겠습니까? (즉시 공개됩니다)')) return;
+    }
+
+    await supabase.from('experiences').update({ status, admin_comment: comment }).eq('id', id);
     fetchData();
     setSelectedExp(null);
   };
@@ -60,12 +78,11 @@ export default function AdminDashboardPage() {
     setSelectedExp(null);
   };
 
-  // 필터링 로직
   const getFilteredList = (list: any[]) => {
     if (filter === 'ALL') return list;
     if (filter === 'PENDING') return list.filter(item => item.status === 'pending');
     if (filter === 'APPROVED') return list.filter(item => item.status === 'approved' || item.status === 'active');
-    if (filter === 'REJECTED') return list.filter(item => item.status === 'rejected');
+    if (filter === 'REJECTED') return list.filter(item => item.status === 'rejected' || item.status === 'revision');
     return list;
   };
 
@@ -108,7 +125,7 @@ export default function AdminDashboardPage() {
                 <div className="flex bg-white rounded-lg p-1 border border-slate-200 gap-1">
                   {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(f => (
                     <button key={f} onClick={()=>setFilter(f as any)} className={`flex-1 text-[10px] py-1.5 rounded font-bold transition-colors ${filter===f ? 'bg-black text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
-                      {f === 'ALL' ? '전체' : f === 'PENDING' ? '대기' : f === 'APPROVED' ? '승인' : '거절'}
+                      {f === 'ALL' ? '전체' : f === 'PENDING' ? '대기' : f === 'APPROVED' ? '승인' : '거절/보완'}
                     </button>
                   ))}
                 </div>
@@ -117,7 +134,7 @@ export default function AdminDashboardPage() {
                 {activeTab === 'APPS' ? filteredApps.map(app => (
                   <div key={app.id} onClick={() => setSelectedApp(app)} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${selectedApp?.id === app.id ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100'}`}>
                     <div className="flex justify-between mb-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${app.status==='pending'?'bg-yellow-100 text-yellow-700':app.status==='approved'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{app.status}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${app.status==='pending'?'bg-yellow-100 text-yellow-700':app.status==='approved'?'bg-green-100 text-green-700':app.status==='revision'?'bg-orange-100 text-orange-700':'bg-red-100 text-red-700'}`}>{app.status}</span>
                       <span className="text-xs text-slate-400">{new Date(app.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="font-bold">{app.name}</div>
@@ -130,7 +147,7 @@ export default function AdminDashboardPage() {
                          <div className="font-bold line-clamp-1 text-sm">{exp.title}</div>
                          <div className="flex justify-between items-center mt-1">
                            <span className="text-xs text-slate-500">₩{Number(exp.price).toLocaleString()}</span>
-                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${exp.status==='pending'?'bg-yellow-100 text-yellow-700':exp.status==='active'?'bg-green-100 text-green-700':exp.status==='rejected'?'bg-red-100 text-red-700':'bg-orange-100 text-orange-700'}`}>{exp.status}</span>
+                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${exp.status==='pending'?'bg-yellow-100 text-yellow-700':exp.status==='active'?'bg-green-100 text-green-700':exp.status==='revision'?'bg-orange-100 text-orange-700':'bg-red-100 text-red-700'}`}>{exp.status}</span>
                          </div>
                        </div>
                     </div>
@@ -173,8 +190,16 @@ export default function AdminDashboardPage() {
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{selectedApp.motivation}</p>
                   </div>
 
+                  {selectedApp.admin_comment && (
+                    <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                      <h3 className="font-bold mb-1 text-sm text-red-600">🚨 관리자 코멘트</h3>
+                      <p className="text-sm text-red-800">{selectedApp.admin_comment}</p>
+                    </div>
+                  )}
+
                   <div className="flex gap-4 pt-4 border-t border-slate-100">
                     <button onClick={()=>handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2"><XCircle size={18}/> 거절</button>
+                    <button onClick={()=>handleAppStatus(selectedApp.id, 'revision')} className="flex-1 py-3 border border-orange-200 text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2"><AlertCircle size={18}/> 보완요청</button>
                     <button onClick={()=>handleAppStatus(selectedApp.id, 'approved')} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"><CheckCircle2 size={18}/> 승인</button>
                   </div>
                 </div>
@@ -211,6 +236,13 @@ export default function AdminDashboardPage() {
                     <h3 className="font-bold mb-2 text-sm uppercase text-slate-500">상세 설명</h3>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{selectedExp.description}</p>
                   </div>
+
+                  {selectedExp.admin_comment && (
+                    <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                      <h3 className="font-bold mb-1 text-sm text-red-600">🚨 관리자 코멘트</h3>
+                      <p className="text-sm text-red-800">{selectedExp.admin_comment}</p>
+                    </div>
+                  )}
 
                   {/* 3단계 승인 버튼 */}
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
