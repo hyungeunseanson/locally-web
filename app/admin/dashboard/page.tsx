@@ -56,19 +56,36 @@ export default function AdminDashboardPage() {
   };
 
   // ✅ 체험 상태 변경 (코멘트 기능 추가)
-  const handleExpStatus = async (id: string, status: string) => {
+  // ✅ 수정 위치: 기존 handleAppStatus 함수를 아래 내용으로 교체
+  const handleAppStatus = async (id: string, status: string) => {
     let comment = '';
+    
+    // 'revision' 또는 'rejected'일 때 사유 입력받기
     if (status === 'rejected' || status === 'revision') {
-      const input = prompt(`[${status}] 사유를 입력해주세요:`);
-      if (input === null) return; // 취소 누르면 중단
+      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
+      if (input === null) return; // 취소 시 중단
       comment = input;
     } else {
-      if (!confirm('승인하시겠습니까? (즉시 공개됩니다)')) return;
+      if (!confirm('승인하시겠습니까?')) return;
+      status = 'approved'; // 승인 시 값을 approved로 고정
     }
 
-    await supabase.from('experiences').update({ status, admin_comment: comment }).eq('id', id);
-    fetchData();
-    setSelectedExp(null);
+    // DB 업데이트 실행
+    const { error } = await supabase
+      .from('host_applications')
+      .update({ 
+        status: status,       // 전달받은 'revision', 'rejected', 'approved'가 들어감
+        admin_comment: comment // 입력한 코멘트가 들어감
+      })
+      .eq('id', id);
+
+    if (error) {
+      alert("오류 발생: " + error.message);
+    } else {
+      alert("처리가 완료되었습니다.");
+      fetchData(); // 목록 새로고침
+      setSelectedApp(null); // 상세창 닫기
+    }
   };
 
   const handleDeleteExp = async (id: number) => {
@@ -197,11 +214,21 @@ export default function AdminDashboardPage() {
                     </div>
                   )}
 
-                  <div className="flex gap-4 pt-4 border-t border-slate-100">
-                    <button onClick={()=>handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2"><XCircle size={18}/> 거절</button>
-                    <button onClick={()=>handleAppStatus(selectedApp.id, 'revision')} className="flex-1 py-3 border border-orange-200 text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2"><AlertCircle size={18}/> 보완요청</button>
-                    <button onClick={()=>handleAppStatus(selectedApp.id, 'approved')} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"><CheckCircle2 size={18}/> 승인</button>
-                  </div>
+// ✅ 수정 위치: 상세 페이지 하단 버튼 영역
+<div className="flex gap-4 pt-4 border-t border-slate-100">
+  <button onClick={()=>handleAppStatus(selectedApp.id, 'rejected')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
+    <XCircle size={18}/> 거절
+  </button>
+  
+  {/* 이 버튼의 두 번째 인자가 'revision' 인지 꼭 확인하세요! */}
+  <button onClick={()=>handleAppStatus(selectedApp.id, 'revision')} className="flex-1 py-3 border border-orange-200 text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2">
+    <AlertCircle size={18}/> 보완요청
+  </button>
+  
+  <button onClick={()=>handleAppStatus(selectedApp.id, 'approved')} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+    <CheckCircle2 size={18}/> 승인
+  </button>
+</div>
                 </div>
               )}
 
