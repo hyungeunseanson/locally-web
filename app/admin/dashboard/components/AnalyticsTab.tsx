@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   DollarSign, CheckCircle2, Users, TrendingUp, BarChart3, 
   Search, Filter, X, Award, Repeat, Crown, ArrowUpRight, 
-  Calendar, Zap, Map, AlertTriangle
+  Calendar, Zap, Map, AlertTriangle, Clock
 } from 'lucide-react';
 import { StatCard } from './SharedComponents';
 
@@ -185,7 +185,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps }: any) {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-slate-50 p-3 rounded-xl">
               <div className="text-[10px] font-bold text-slate-500 uppercase">Avg. Lead Time</div>
-              <div className="text-xl font-black text-slate-900">24일</div>
+              <div className="text-xl font-black text-slate-900">24.5일</div>
             </div>
             <div className="bg-slate-50 p-3 rounded-xl">
               <div className="text-[10px] font-bold text-slate-500 uppercase">Avg. Conversion</div>
@@ -333,7 +333,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps }: any) {
             <div className="bg-slate-900 text-white p-6 rounded-xl">
               <h4 className="font-bold mb-2 text-rose-400">🚨 긴급 점검 필요</h4>
               <p className="text-sm opacity-90 leading-relaxed mb-4">
-                <strong>'예약 버튼 클릭 -> 결제 완료'</strong> 단계에서 86%가 이탈하고 있습니다.<br/>
+                <strong>'예약 버튼 클릭 &rarr; 결제 완료'</strong> 단계에서 86%가 이탈하고 있습니다.<br/>
                 결제 페이지 로딩 속도가 느리거나, 회원가입 강제 절차가 원인일 수 있습니다.
               </p>
               <div className="flex gap-2">
