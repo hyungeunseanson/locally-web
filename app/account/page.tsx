@@ -13,19 +13,20 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<any>(null);
   
-  // 프로필 상태
+  // 프로필 상태 (성별 gender 추가)
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
     nationality: '',
     birth_date: '',
+    gender: '', // ✅ 추가됨
     bio: '',
     phone: '',
     mbti: '',
     kakao_id: ''
   });
 
-  // 국가 리스트 (요청하신 국가 포함)
+  // 국가 리스트
   const countries = [
     { code: 'KR', name: '대한민국 (South Korea)' },
     { code: 'JP', name: '일본 (Japan)' },
@@ -49,7 +50,7 @@ export default function AccountPage() {
     { code: 'AU', name: '호주 (Australia)' }
   ];
 
-  // 받은 후기 (더미 데이터)
+  // 더미 후기 데이터
   const reviews = [
     { id: 1, host: 'Akiho', date: '2026년 1월', content: '정말 매너 좋고 시간 약속도 잘 지키시는 게스트였습니다! 대화도 즐거웠어요.' },
     { id: 2, host: 'Minjun', date: '2025년 12월', content: '깔끔하게 이용해주셔서 감사합니다. 추천합니다!' }
@@ -61,7 +62,6 @@ export default function AccountPage() {
       if (!user) { router.push('/'); return; }
       setUser(user);
 
-      // 프로필 테이블에서 데이터 가져오기
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       if (data) {
@@ -70,6 +70,7 @@ export default function AccountPage() {
           email: user.email || '',
           nationality: data.nationality || '',
           birth_date: data.birth_date || '',
+          gender: data.gender || '', // ✅ 불러오기
           bio: data.bio || '',
           phone: data.phone || '',
           mbti: data.mbti || '',
@@ -87,19 +88,19 @@ export default function AccountPage() {
     setSaving(true);
     
     const updates = {
-      id: user.id, // 필수
+      id: user.id, 
       full_name: profile.full_name,
       nationality: profile.nationality,
       birth_date: profile.birth_date || null,
+      gender: profile.gender, // ✅ 저장
       bio: profile.bio,
       phone: profile.phone,
       mbti: profile.mbti,
       kakao_id: profile.kakao_id,
-      email: user.email, // 이메일도 동기화
-      updated_at: new Date().toISOString(), // 수정 시간 기록
+      email: user.email, 
+      updated_at: new Date().toISOString(), 
     };
 
-    // 1. Update 시도
     let { error } = await supabase.from('profiles').upsert(updates);
 
     if (error) {
@@ -107,7 +108,7 @@ export default function AccountPage() {
       alert(`저장에 실패했습니다. (${error.message})`);
     } else {
       alert('✅ 프로필이 성공적으로 업데이트되었습니다.');
-      router.refresh(); // 데이터 갱신을 위해 새로고침
+      router.refresh(); 
     }
     setSaving(false);
   };
@@ -124,7 +125,7 @@ export default function AccountPage() {
 
         <div className="flex flex-col lg:flex-row gap-16">
           
-          {/* 왼쪽: 프로필 카드 (호스트에게 보이는 모습) */}
+          {/* 왼쪽: 프로필 카드 */}
           <div className="w-full lg:w-[360px] flex-shrink-0">
             <div className="border border-slate-200 rounded-3xl p-8 shadow-sm text-center sticky top-28 bg-white">
               <div className="w-32 h-32 bg-slate-200 rounded-full mx-auto mb-4 overflow-hidden border border-slate-100 relative shadow-inner">
@@ -143,6 +144,11 @@ export default function AccountPage() {
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
                   <ShieldCheck size={14}/> 신원 인증됨
                 </div>
+                {profile.gender && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-100">
+                    {profile.gender === 'Male' ? '남성' : profile.gender === 'Female' ? '여성' : '기타'}
+                  </div>
+                )}
                 {profile.mbti && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-xs font-bold border border-rose-100">
                     <Smile size={14}/> {profile.mbti}
@@ -206,6 +212,7 @@ export default function AccountPage() {
                 </div>
               </div>
 
+              {/* ✅ 성별 입력 필드 추가 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold mb-2">생년월일</label>
@@ -217,12 +224,38 @@ export default function AccountPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-bold mb-2">성별</label>
+                  <select 
+                    value={profile.gender}
+                    onChange={e => setProfile({...profile, gender: e.target.value})}
+                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
+                  >
+                    <option value="">선택하세요</option>
+                    <option value="Male">남성 (Male)</option>
+                    <option value="Female">여성 (Female)</option>
+                    <option value="Other">기타 (Other)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
                   <label className="block text-sm font-bold mb-2">전화번호</label>
                   <input 
                     type="tel" 
                     value={profile.phone}
                     onChange={e => setProfile({...profile, phone: e.target.value})}
                     placeholder="국가번호 포함 (ex. +82 10-1234-5678)"
+                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2">카카오톡 ID</label>
+                  <input 
+                    type="text" 
+                    value={profile.kakao_id}
+                    onChange={e => setProfile({...profile, kakao_id: e.target.value})}
+                    placeholder="연락용 카카오톡 ID"
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
                 </div>
@@ -241,26 +274,14 @@ export default function AccountPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2">카카오톡 ID</label>
+                  <label className="block text-sm font-bold mb-2">이메일 주소</label>
                   <input 
-                    type="text" 
-                    value={profile.kakao_id}
-                    onChange={e => setProfile({...profile, kakao_id: e.target.value})}
-                    placeholder="연락용 카카오톡 ID"
-                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
+                    type="email" 
+                    value={profile.email}
+                    disabled
+                    className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl text-slate-500"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold mb-2">이메일 주소</label>
-                <input 
-                  type="email" 
-                  value={profile.email}
-                  disabled
-                  className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl text-slate-500"
-                />
-                <p className="text-xs text-slate-400 mt-1">* 이메일 변경은 고객센터에 문의해주세요.</p>
               </div>
 
               <div>
