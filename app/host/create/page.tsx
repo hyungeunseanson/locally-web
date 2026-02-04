@@ -12,32 +12,45 @@ export default function CreateExperiencePage() {
   const supabase = createClient();
   const router = useRouter();
   
+  // ✅ 주요 도시 목록 상수 정의
+  const MAJOR_CITIES = {
+    Korea: ['서울', '부산', '제주', '인천', '경기', '강원', '경주', '전주', '여수', '기타'],
+    Japan: ['도쿄', '오사카', '시즈오카', '교토', '후쿠오카', '삿포로', '오키나와', '나고야', '고베', '기타'],
+  };
+
   const [step, setStep] = useState(1);
   const totalSteps = 5; 
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     country: 'Korea', 
-    city: '',
-    title: '', 
-    category: '', 
-    duration: 3,
-    maxGuests: 4,
-    description: '', 
-    spots: '', 
-    meetingPoint: '',
+    city: '',      // 주요 권역 (서울, 도쿄 등) -> 필터링용
+    subCity: '',   // 상세 지역 (마포구 연남동 등) -> UI 표시용
+    title: '', category: '', duration: 3, maxGuests: 4,
+    description: '', spots: '', meetingPoint: '',
     photos: [] as string[], // 미리보기용 URL
     price: 50000,
   });
 
-  // 실제 파일 저장용
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [isCustomCity, setIsCustomCity] = useState(false); // 직접 입력 모드
+  const [imageFiles, setImageFiles] = useState<File[]>([]); // 실제 파일 저장용
 
   const nextStep = () => { if (step < totalSteps) setStep(step + 1); };
   const prevStep = () => { if (step > 1) setStep(step - 1); };
 
   const updateData = (key: string, value: any) => {
     setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  // ✅ 도시 선택 핸들러
+  const handleCitySelect = (selectedCity: string) => {
+    if (selectedCity === '기타') {
+      setIsCustomCity(true);
+      updateData('city', ''); // 기타 선택 시 초기화 후 직접 입력 유도
+    } else {
+      setIsCustomCity(false);
+      updateData('city', selectedCity);
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,13 +85,17 @@ export default function CreateExperiencePage() {
         {
           host_id: user.id,
           country: formData.country,
-          city: formData.city,
+          city: formData.city, // 표준화된 도시명 저장 (필터링용)
+          
           title: formData.title,
           category: formData.category,
           duration: formData.duration,
           max_guests: formData.maxGuests,
           description: formData.description,
-          spots: formData.spots,
+          
+          // ✅ 상세 지역(subCity)을 spots 정보 앞에 붙여서 저장 (DB 구조 변경 없이 활용)
+          spots: formData.subCity ? `[${formData.subCity}] ${formData.spots}` : formData.spots,
+          
           meeting_point: formData.meetingPoint,
           photos: photoUrls, // 배열로 저장
           price: formData.price,
@@ -122,32 +139,79 @@ export default function CreateExperiencePage() {
       {/* 2. 메인 컨텐츠 */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* STEP 1: 지역 선택 */}
+        {/* STEP 1: 지역 선택 (개선됨) */}
         {step === 1 && (
-          <div className="w-full space-y-8 text-center">
+          <div className="w-full space-y-10 text-center">
             <div>
               <span className="bg-indigo-50 text-indigo-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 1. 지역 설정</span>
-              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">어디에서<br/>투어를 진행하시나요?</h1>
-              <p className="text-sm text-slate-500">게스트가 찾아올 수 있도록 정확한 위치를 알려주세요.</p>
+              <h1 className="text-3xl font-black mt-4 mb-3">어디에서<br/>투어를 진행하시나요?</h1>
+              <p className="text-sm text-slate-500">게스트가 쉽게 찾을 수 있도록 주요 도시를 선택해 주세요.</p>
             </div>
 
-            <div className="space-y-6 text-left">
-              <div>
-                <label className="font-bold block mb-3 text-xs text-slate-500 ml-1">국가 선택</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => updateData('country', 'Korea')} className={`p-3.5 rounded-xl border-2 font-bold text-base transition-all ${formData.country === 'Korea' ? 'bg-black text-white border-black shadow-md' : 'bg-white border-slate-200 text-slate-400'}`}>🇰🇷 한국</button>
-                  <button onClick={() => updateData('country', 'Japan')} className={`p-3.5 rounded-xl border-2 font-bold text-base transition-all ${formData.country === 'Japan' ? 'bg-black text-white border-black shadow-md' : 'bg-white border-slate-200 text-slate-400'}`}>🇯🇵 일본</button>
+            <div className="space-y-8">
+              {/* 1. 국가 선택 */}
+              <div className="flex bg-slate-100 p-1 rounded-2xl">
+                <button 
+                  onClick={() => { updateData('country', 'Korea'); updateData('city', ''); setIsCustomCity(false); }} 
+                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${formData.country === 'Korea' ? 'bg-white shadow-sm text-black' : 'text-slate-400'}`}
+                >
+                  🇰🇷 한국
+                </button>
+                <button 
+                  onClick={() => { updateData('country', 'Japan'); updateData('city', ''); setIsCustomCity(false); }} 
+                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${formData.country === 'Japan' ? 'bg-white shadow-sm text-black' : 'text-slate-400'}`}
+                >
+                  🇯🇵 일본
+                </button>
+              </div>
+
+              {/* 2. 주요 도시 선택 (버튼) */}
+              <div className="text-left">
+                <label className="font-bold block mb-3 text-xs text-slate-500 ml-1">주요 도시 (필수)</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {MAJOR_CITIES[formData.country as 'Korea'|'Japan'].map((city) => (
+                    <button 
+                      key={city}
+                      onClick={() => handleCitySelect(city)}
+                      className={`py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all truncate ${
+                        (!isCustomCity && formData.city === city) || (isCustomCity && city === '기타')
+                          ? 'border-black bg-black text-white' 
+                          : 'border-slate-100 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {city}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div>
-                <label className="font-bold block mb-3 text-xs text-slate-500 ml-1">상세 지역 (도시/동네)</label>
+              {/* 3. 기타 직접 입력 (조건부) */}
+              {isCustomCity && (
+                <div className="text-left animate-in fade-in slide-in-from-top-2">
+                  <label className="font-bold block mb-2 text-xs text-slate-500 ml-1">도시 이름 직접 입력</label>
+                  <div className="flex items-center gap-2 bg-white border-2 border-black p-4 rounded-xl">
+                    <MapPin size={18}/>
+                    <input 
+                      type="text" 
+                      placeholder="예) 수원, 가마쿠라 등" 
+                      value={formData.city}
+                      onChange={(e) => updateData('city', e.target.value)}
+                      className="w-full outline-none font-bold bg-transparent"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 4. 상세 지역 (동네) 입력 */}
+              <div className="text-left">
+                <label className="font-bold block mb-2 text-xs text-slate-500 ml-1">상세 지역 (선택)</label>
                 <input 
                   type="text" 
-                  placeholder={formData.country === 'Korea' ? "예) 서울 마포구 연남동" : "예) 도쿄 신주쿠구"} 
-                  value={formData.city} 
-                  onChange={(e)=>updateData('city', e.target.value)} 
-                  className="w-full p-4 bg-white rounded-xl outline-none font-bold text-lg border-2 border-slate-200 focus:border-black transition-all placeholder:text-slate-300"
+                  placeholder={formData.country === 'Korea' ? "예) 마포구 연남동" : "예) 신주쿠구 가부키초"} 
+                  value={formData.subCity} 
+                  onChange={(e) => updateData('subCity', e.target.value)} 
+                  className="w-full p-4 bg-white rounded-xl outline-none font-bold text-base border-2 border-slate-200 focus:border-black transition-all placeholder:text-slate-300"
                 />
               </div>
             </div>
