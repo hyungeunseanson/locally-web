@@ -175,14 +175,14 @@ export default function ExperienceDetailPage() {
             </div>
 
             <div className="border-b border-slate-200 pb-8"><h3 className="text-xl font-bold mb-4">체험 소개</h3><p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p></div>
-               {/* ✨ 수정된 후기 섹션 시작 */}
+          
             {/* ✨ [수정됨] 후기 섹션 (모달 기능 포함) */}
+            {/* ✨ [수정됨] 후기 섹션 (모달 포함) */}
             <div id="reviews" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                  <Star size={20} fill="black"/> 4.98 · 후기 15개
                </h3>
                
-               {/* 요약 리스트 (최대 4개) */}
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                   {[1,2,3,4].map(i => (
                     <div key={i} className="space-y-3">
@@ -197,7 +197,6 @@ export default function ExperienceDetailPage() {
                   ))}
                </div>
                
-               {/* 모달 열기 버튼 */}
                <button 
                  onClick={() => setIsReviewsExpanded(true)} 
                  className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors"
@@ -205,7 +204,7 @@ export default function ExperienceDetailPage() {
                  후기 15개 모두 보기
                </button>
 
-               {/* ✨ 후기 전체보기 모달 (팝업) */}
+               {/* ✨ [추가됨] 후기 전체보기 모달 팝업 */}
                {isReviewsExpanded && (
                  <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>
                    <div className="bg-white w-full max-w-4xl h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
@@ -213,7 +212,7 @@ export default function ExperienceDetailPage() {
                      {/* 모달 헤더 */}
                      <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                        <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> 4.98 (후기 15개)</h3>
-                       <button onClick={() => setIsReviewsExpanded(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
+                       <button onClick={() => setIsReviewsExpanded(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
                      </div>
 
                      {/* 모달 내용 (스크롤) */}
@@ -229,7 +228,7 @@ export default function ExperienceDetailPage() {
                                정말 잊지 못할 경험이었습니다. 호스트님이 너무 친절하게 대해주셔서 편안하게 여행할 수 있었어요. 다음에도 꼭 다시 이용하고 싶습니다!
                              </p>
                              
-                             {/* 📸 후기 사진 (짝수 번호에만 예시로 표시) */}
+                             {/* 📸 후기 사진 (짝수 번호에만 예시로 표시 - 클릭 시 새창 확대) */}
                              {i % 2 === 0 && (
                                <div className="flex gap-2 mt-3 pt-3 border-t border-slate-50">
                                  <div className="w-20 h-20 rounded-lg bg-slate-200 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-slate-100" onClick={() => window.open(`https://picsum.photos/500/500?random=${i}`, '_blank')}>
