@@ -35,11 +35,9 @@ export default function AdminDashboardPage() {
     const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
     if (expData) setExps(expData);
 
-    // 3. 유저 (profiles 테이블이 있다고 가정, 없으면 auth 데이터는 클라이언트에서 직접 조회 불가하므로 호스트/예약자 기반으로 추론)
-    // *실제 운영 시에는 public.profiles 테이블을 만들어 auth.users와 동기화해야 합니다.
-    // 여기서는 예약자(bookings) 정보와 호스트 정보를 합쳐서 보여주는 방식으로 구현합니다.
+    // 3. 유저 (임시로 호스트 지원자들을 유저 목록으로 사용 - 실제로는 profiles 테이블 필요)
     const { data: userData } = await supabase.from('host_applications').select('id, name, email, phone, created_at, user_id'); 
-    if (userData) setUsers(userData); // 임시로 호스트 지원자들을 유저 목록으로 사용
+    if (userData) setUsers(userData); 
 
     // 4. 예약/매출
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });

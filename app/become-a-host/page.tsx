@@ -187,24 +187,24 @@ export default function BecomeHostPage() {
                 <h2 className="text-4xl md:text-5xl font-black mb-8">지금 바로 시작해보세요</h2>
                 <p className="text-slate-400 text-lg mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
                 
-                {/* ✅ 수정된 CTA 버튼 영역 */}
+{/* ✅ 수정된 CTA 버튼 영역 (교체용) */}
 <div className="pt-4">
-  <button 
-    onClick={async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert("호스트 등록을 위해 먼저 로그인해 주세요.");
-        window.location.href = '/login'; // 또는 로그인 모달 트리거
-        return;
-      }
-      // 신청 이력이 있으면 대시보드, 없으면 등록 페이지
-      window.location.href = hasApplication ? "/host/dashboard" : "/host/register";
-    }}
-    className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
-  >
-    {hasApplication ? "내 신청 현황 확인" : "시작하기"}
-  </button>
-</div>
+              <button 
+                onClick={async () => {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (!user) {
+                    alert("호스트 등록을 위해 먼저 로그인해 주세요.");
+                    window.location.href = '/login'; // 로그인 페이지 또는 모달로 유도
+                    return;
+                  }
+                  // 신청 이력이 있으면 대시보드, 없으면 등록 페이지
+                  window.location.href = hasApplication ? "/host/dashboard" : "/host/register";
+                }}
+                className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+              >
+                {hasApplication ? "내 신청 현황 확인" : "시작하기"}
+              </button>
+            </div>
              </div>
              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-800 to-black z-0"></div>
              <div className="absolute -top-24 -right-24 w-96 h-96 bg-rose-600 rounded-full blur-[100px] opacity-30"></div>
