@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   List, MessageSquare, DollarSign, Star, Plus, 
-  Clock, AlertCircle, XCircle, CheckCircle2, ChevronRight 
+  Clock, AlertCircle, XCircle, CheckCircle2 
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,7 +16,7 @@ import HostReviews from './HostReviews';
 
 export default function HostDashboard() {
   const [activeTab, setActiveTab] = useState('experiences');
-  const [hostStatus, setHostStatus] = useState<any>(null); // 호스트 신청 상태
+  const [hostStatus, setHostStatus] = useState<any>(null); 
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
@@ -29,31 +29,31 @@ export default function HostDashboard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push('/login'); // 로그인 안되어 있으면 이동
+        router.push('/login'); 
         return;
       }
 
-      console.log("Fetching status for user:", user.id); // 디버깅용 로그
+      console.log("🔍 Checking status for user:", user.id);
 
-      // 1. 호스트 신청 내역 조회 (쿼리 수정)
-      // 최신순으로 가져오되, 모든 필드를 가져와서 확인
+      // 최신 신청서 조회 (모든 컬럼 가져오기)
       const { data, error } = await supabase
         .from('host_applications')
-        .select('*') // 모든 필드 조회 (디버깅 용이)
+        .select('*') 
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false }) // 최신 신청서 기준
+        .order('created_at', { ascending: false }) 
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching host status:', error);
+      if (error) {
+        console.error('❌ DB Error:', error);
+      } else {
+        console.log("✅ Fetched Data:", data); // 전체 데이터 확인
+        console.log("👉 Status Value:", data?.status); // 상태값 확인
       }
       
-      console.log("Fetched Host Status:", data); // 데이터 확인 (F12 콘솔)
-
       setHostStatus(data); 
     } catch (error) {
-      console.error(error);
+      console.error('Catch Error:', error);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ export default function HostDashboard() {
     );
   }
 
-  // 1. 호스트 신청을 안 한 경우
+  // 1. 신청 내역 없음
   if (!hostStatus) {
     return (
       <div className="min-h-screen bg-white font-sans">
@@ -77,69 +77,48 @@ export default function HostDashboard() {
           <h1 className="text-3xl font-black mb-4">아직 호스트가 아니시군요!</h1>
           <p className="text-slate-500 mb-8">나만의 특별한 투어를 만들고 수익을 창출해보세요.</p>
           <Link href="/host/register">
-            <button className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">
-              호스트 지원하기
-            </button>
+            <button className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">호스트 지원하기</button>
           </Link>
         </div>
       </div>
     );
   }
 
-  // 2. 심사 대기 중 (Pending)
-  if (hostStatus.status === 'pending') {
+  // 상태값 변수 (소문자로 변환하여 비교)
+  const status = hostStatus.status?.toLowerCase();
+
+  // 2. 심사 대기 (pending)
+  if (status === 'pending') {
     return (
       <div className="min-h-screen bg-white font-sans">
         <SiteHeader />
         <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6">
-          <div className="w-24 h-24 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto">
-            <Clock size={48} />
-          </div>
+          <div className="w-24 h-24 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto"><Clock size={48} /></div>
           <div>
             <h1 className="text-3xl font-black mb-2">심사가 진행 중입니다</h1>
-            <p className="text-slate-500">
-              제출해주신 신청서를 꼼꼼히 확인하고 있습니다.<br/>
-              보통 영업일 기준 2~3일 내에 결과가 안내됩니다.
-            </p>
-          </div>
-          <div className="bg-slate-50 p-4 rounded-xl inline-block text-xs text-slate-400">
-            신청일: {new Date(hostStatus.created_at).toLocaleDateString()}
+            <p className="text-slate-500">결과가 나올 때까지 조금만 기다려 주세요.</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // 3. 보완 요청 (Revision)
-  if (hostStatus.status === 'revision') {
+  // 3. 보완 요청 (revision)
+  if (status === 'revision') {
     return (
       <div className="min-h-screen bg-white font-sans">
         <SiteHeader />
         <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6">
-          <div className="w-24 h-24 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto">
-            <AlertCircle size={48} />
-          </div>
+          <div className="w-24 h-24 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto"><AlertCircle size={48} /></div>
           <div>
             <h1 className="text-3xl font-black mb-2">보완이 필요합니다</h1>
-            <p className="text-slate-500 mb-6">
-              아래 관리자 코멘트를 확인하고,<br/>
-              내용을 보완하여 다시 제출해 주세요.
-            </p>
-            
-            {/* 관리자 코멘트 표시 */}
-            <div className="bg-orange-50 border border-orange-100 p-6 rounded-2xl text-left mb-8 shadow-sm">
-              <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
-                <MessageSquare size={16}/> 관리자 코멘트
-              </h4>
-              <p className="text-orange-700 text-sm whitespace-pre-wrap leading-relaxed">
-                {hostStatus.admin_comment || "관리자가 남긴 상세 코멘트가 없습니다."}
-              </p>
+            <p className="text-slate-500 mb-6">관리자 코멘트를 확인하고 수정해주세요.</p>
+            <div className="bg-orange-50 border border-orange-100 p-6 rounded-2xl text-left mb-8">
+              <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2"><MessageSquare size={16}/> 관리자 코멘트</h4>
+              <p className="text-orange-700 text-sm whitespace-pre-wrap">{hostStatus.admin_comment || "내용 없음"}</p>
             </div>
-
             <Link href="/host/register">
-              <button className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">
-                신청서 수정하기
-              </button>
+              <button className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">신청서 수정하기</button>
             </Link>
           </div>
         </div>
@@ -147,36 +126,21 @@ export default function HostDashboard() {
     );
   }
 
-  // 4. 거절됨 (Rejected)
-  if (hostStatus.status === 'rejected') {
+  // 4. 거절됨 (rejected)
+  if (status === 'rejected') {
     return (
       <div className="min-h-screen bg-white font-sans">
         <SiteHeader />
         <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6">
-          <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
-            <XCircle size={48} />
-          </div>
+          <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto"><XCircle size={48} /></div>
           <div>
             <h1 className="text-3xl font-black mb-2">승인이 거절되었습니다</h1>
-            <p className="text-slate-500 mb-6">
-              아쉽게도 이번에는 모시지 못하게 되었습니다.<br/>
-              사유를 확인해 주시기 바랍니다.
-            </p>
-
-            {/* 관리자 코멘트 표시 */}
-            <div className="bg-red-50 border border-red-100 p-6 rounded-2xl text-left mb-8 shadow-sm">
-              <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">
-                <MessageSquare size={16}/> 거절 사유
-              </h4>
-              <p className="text-red-700 text-sm whitespace-pre-wrap leading-relaxed">
-                {hostStatus.admin_comment || "별도의 사유가 기재되지 않았습니다."}
-              </p>
+            <div className="bg-red-50 border border-red-100 p-6 rounded-2xl text-left mb-8 mt-6">
+              <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2"><MessageSquare size={16}/> 거절 사유</h4>
+              <p className="text-red-700 text-sm whitespace-pre-wrap">{hostStatus.admin_comment || "내용 없음"}</p>
             </div>
-
-            <Link href="/help">
-              <button className="text-slate-400 underline hover:text-slate-600 text-sm">
-                문의하기
-              </button>
+            <Link href="/host/register">
+              <button className="text-slate-400 underline hover:text-slate-600 text-sm">재지원하기</button>
             </Link>
           </div>
         </div>
@@ -184,15 +148,12 @@ export default function HostDashboard() {
     );
   }
 
-  // 5. 승인됨 (Approved/Active) - 정상 대시보드 노출
-  // status === 'approved' 또는 'active'인 경우만 아래 화면 노출
-  if (hostStatus.status === 'approved' || hostStatus.status === 'active') {
+  // 5. 승인됨 (approved / active)
+  if (status === 'approved' || status === 'active') {
     return (
       <div className="min-h-screen bg-white text-slate-900 font-sans">
         <SiteHeader />
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
-          
-          {/* 사이드바 */}
           <aside className="w-64 hidden md:block shrink-0">
              <div className="sticky top-24 space-y-2">
                 <div className="px-4 py-2 mb-4">
@@ -205,7 +166,6 @@ export default function HostDashboard() {
                 <button onClick={() => setActiveTab('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><Star size={20}/> 받은 후기</button>
              </div>
           </aside>
-
           <main className="flex-1">
             <div className="flex justify-between items-end mb-8">
               <h1 className="text-3xl font-black">
@@ -218,7 +178,6 @@ export default function HostDashboard() {
                 <Link href="/host/create"><button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md"><Plus size={18} /> 새 체험 등록</button></Link>
               )}
             </div>
-
             {activeTab === 'experiences' && <MyExperiences />}
             {activeTab === 'inquiries' && <InquiryChat />}
             {activeTab === 'earnings' && <Earnings />}
@@ -229,17 +188,18 @@ export default function HostDashboard() {
     );
   }
 
-  // 예외 케이스 처리 (만약 상태가 없거나 이상할 경우 심사중으로 표시)
+  // 6. 예외 상태 (디버깅용 화면)
   return (
     <div className="min-h-screen bg-white font-sans">
       <SiteHeader />
       <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6">
-        <div className="w-24 h-24 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center mx-auto">
-          <Clock size={48} />
-        </div>
+        <div className="w-24 h-24 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center mx-auto"><Clock size={48} /></div>
         <div>
-          <h1 className="text-3xl font-black mb-2">상태 확인 중...</h1>
-          <p className="text-slate-500">잠시만 기다려주세요.</p>
+          <h1 className="text-3xl font-black mb-2 text-red-500">상태값 오류: {status}</h1>
+          <p className="text-slate-500">알 수 없는 상태입니다. 관리자에게 문의하세요.</p>
+          <div className="mt-4 p-4 bg-slate-100 rounded text-left text-xs">
+            <pre>{JSON.stringify(hostStatus, null, 2)}</pre>
+          </div>
         </div>
       </div>
     </div>
