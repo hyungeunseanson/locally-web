@@ -33,10 +33,13 @@ export default function HostDashboard() {
         return;
       }
 
-      // 호스트 신청 내역 조회
+      console.log("Fetching status for user:", user.id); // 디버깅용 로그
+
+      // 1. 호스트 신청 내역 조회 (쿼리 수정)
+      // 최신순으로 가져오되, 모든 필드를 가져와서 확인
       const { data, error } = await supabase
         .from('host_applications')
-        .select('status, admin_comment, created_at')
+        .select('*') // 모든 필드 조회 (디버깅 용이)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }) // 최신 신청서 기준
         .limit(1)
@@ -46,7 +49,9 @@ export default function HostDashboard() {
         console.error('Error fetching host status:', error);
       }
       
-      setHostStatus(data); // 데이터가 없으면 null (신청 안 함)
+      console.log("Fetched Host Status:", data); // 데이터 확인 (F12 콘솔)
+
+      setHostStatus(data); 
     } catch (error) {
       console.error(error);
     } finally {
@@ -105,7 +110,7 @@ export default function HostDashboard() {
     );
   }
 
-  // 3. 보완 요청 (Revision) - 수정 필요
+  // 3. 보완 요청 (Revision)
   if (hostStatus.status === 'revision') {
     return (
       <div className="min-h-screen bg-white font-sans">
@@ -122,12 +127,12 @@ export default function HostDashboard() {
             </p>
             
             {/* 관리자 코멘트 표시 */}
-            <div className="bg-orange-50 border border-orange-100 p-6 rounded-2xl text-left mb-8">
+            <div className="bg-orange-50 border border-orange-100 p-6 rounded-2xl text-left mb-8 shadow-sm">
               <h4 className="font-bold text-orange-800 mb-2 flex items-center gap-2">
                 <MessageSquare size={16}/> 관리자 코멘트
               </h4>
               <p className="text-orange-700 text-sm whitespace-pre-wrap leading-relaxed">
-                {hostStatus.admin_comment || "별도의 코멘트가 없습니다."}
+                {hostStatus.admin_comment || "관리자가 남긴 상세 코멘트가 없습니다."}
               </p>
             </div>
 
@@ -159,12 +164,12 @@ export default function HostDashboard() {
             </p>
 
             {/* 관리자 코멘트 표시 */}
-            <div className="bg-red-50 border border-red-100 p-6 rounded-2xl text-left mb-8">
+            <div className="bg-red-50 border border-red-100 p-6 rounded-2xl text-left mb-8 shadow-sm">
               <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">
                 <MessageSquare size={16}/> 거절 사유
               </h4>
               <p className="text-red-700 text-sm whitespace-pre-wrap leading-relaxed">
-                {hostStatus.admin_comment || "별도의 코멘트가 없습니다."}
+                {hostStatus.admin_comment || "별도의 사유가 기재되지 않았습니다."}
               </p>
             </div>
 
@@ -179,45 +184,63 @@ export default function HostDashboard() {
     );
   }
 
-  // 5. 승인됨 (Approved) - 정상 대시보드 노출
-  // status === 'approved' 또는 'active'
+  // 5. 승인됨 (Approved/Active) - 정상 대시보드 노출
+  // status === 'approved' 또는 'active'인 경우만 아래 화면 노출
+  if (hostStatus.status === 'approved' || hostStatus.status === 'active') {
+    return (
+      <div className="min-h-screen bg-white text-slate-900 font-sans">
+        <SiteHeader />
+        <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
+          
+          {/* 사이드바 */}
+          <aside className="w-64 hidden md:block shrink-0">
+             <div className="sticky top-24 space-y-2">
+                <div className="px-4 py-2 mb-4">
+                  <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">HOST PARTNER</span>
+                  <p className="text-xs text-slate-400 mt-1">승인된 호스트입니다</p>
+                </div>
+                <button onClick={() => setActiveTab('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><List size={20}/> 내 체험 관리</button>
+                <button onClick={() => setActiveTab('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><MessageSquare size={20}/> 문의함</button>
+                <button onClick={() => setActiveTab('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><DollarSign size={20}/> 수익 및 정산</button>
+                <button onClick={() => setActiveTab('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><Star size={20}/> 받은 후기</button>
+             </div>
+          </aside>
+
+          <main className="flex-1">
+            <div className="flex justify-between items-end mb-8">
+              <h1 className="text-3xl font-black">
+                {activeTab === 'experiences' && '내 체험 관리'}
+                {activeTab === 'inquiries' && '문의 메시지'}
+                {activeTab === 'earnings' && '수익 및 정산'}
+                {activeTab === 'reviews' && '게스트 후기'}
+              </h1>
+              {activeTab === 'experiences' && (
+                <Link href="/host/create"><button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md"><Plus size={18} /> 새 체험 등록</button></Link>
+              )}
+            </div>
+
+            {activeTab === 'experiences' && <MyExperiences />}
+            {activeTab === 'inquiries' && <InquiryChat />}
+            {activeTab === 'earnings' && <Earnings />}
+            {activeTab === 'reviews' && <HostReviews />}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // 예외 케이스 처리 (만약 상태가 없거나 이상할 경우 심사중으로 표시)
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans">
+    <div className="min-h-screen bg-white font-sans">
       <SiteHeader />
-      <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
-        
-        {/* 사이드바 */}
-        <aside className="w-64 hidden md:block shrink-0">
-           <div className="sticky top-24 space-y-2">
-              <div className="px-4 py-2 mb-4">
-                <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">HOST PARTNER</span>
-                <p className="text-xs text-slate-400 mt-1">승인된 호스트입니다</p>
-              </div>
-              <button onClick={() => setActiveTab('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><List size={20}/> 내 체험 관리</button>
-              <button onClick={() => setActiveTab('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><MessageSquare size={20}/> 문의함</button>
-              <button onClick={() => setActiveTab('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><DollarSign size={20}/> 수익 및 정산</button>
-              <button onClick={() => setActiveTab('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}><Star size={20}/> 받은 후기</button>
-           </div>
-        </aside>
-
-        <main className="flex-1">
-          <div className="flex justify-between items-end mb-8">
-            <h1 className="text-3xl font-black">
-              {activeTab === 'experiences' && '내 체험 관리'}
-              {activeTab === 'inquiries' && '문의 메시지'}
-              {activeTab === 'earnings' && '수익 및 정산'}
-              {activeTab === 'reviews' && '게스트 후기'}
-            </h1>
-            {activeTab === 'experiences' && (
-              <Link href="/host/create"><button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md"><Plus size={18} /> 새 체험 등록</button></Link>
-            )}
-          </div>
-
-          {activeTab === 'experiences' && <MyExperiences />}
-          {activeTab === 'inquiries' && <InquiryChat />}
-          {activeTab === 'earnings' && <Earnings />}
-          {activeTab === 'reviews' && <HostReviews />}
-        </main>
+      <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6">
+        <div className="w-24 h-24 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center mx-auto">
+          <Clock size={48} />
+        </div>
+        <div>
+          <h1 className="text-3xl font-black mb-2">상태 확인 중...</h1>
+          <p className="text-slate-500">잠시만 기다려주세요.</p>
+        </div>
       </div>
     </div>
   );
