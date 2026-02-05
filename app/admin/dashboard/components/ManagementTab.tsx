@@ -1,7 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Search, ChevronRight, User, Mail, Globe, MessageCircle, Phone, Smile, Calendar, MapPin, Cake, CheckCircle2 } from 'lucide-react';
+import { 
+  Search, ChevronRight, User, Mail, Globe, MessageCircle, Phone, Smile, 
+  Calendar, MapPin, Cake, CheckCircle2, ShoppingBag, CreditCard, StickyNote 
+} from 'lucide-react';
 import { InfoRow } from './SharedComponents';
 
 export default function ManagementTab({ 
@@ -57,7 +60,7 @@ export default function ManagementTab({
             <ListItem key={exp.id} selected={selectedItem?.id === exp.id} onClick={()=>setSelectedItem(exp)} img={exp.photos?.[0]} title={exp.title} subtitle={`₩${exp.price.toLocaleString()}`} status={exp.status} date={exp.created_at} />
           ))}
 
-          {/* ✅ C. 고객(유저) 리스트 (리스트뷰 복구) */}
+          {/* ✅ C. 고객(유저) 리스트 (리스트뷰로 복구됨) */}
           {activeTab === 'USERS' && users.map((user:any) => (
             <ListItem 
               key={user.id} 
@@ -95,20 +98,86 @@ export default function ManagementTab({
           {selectedItem ? (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               
-              {/* 타이틀 및 상태 헤더 */}
+              {/* 공통 헤더 */}
               <div className="border-b border-slate-100 pb-6">
-                {activeTab !== 'USERS' && (
+                {activeTab !== 'USERS' ? (
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide ${selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{selectedItem.status}</span>
-                )}
-                {activeTab === 'USERS' && (
-                   <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide bg-slate-100 text-slate-600">Customer</span>
+                ) : (
+                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide bg-slate-100 text-slate-600">Customer</span>
                 )}
                 
                 <h2 className="text-3xl font-black text-slate-900 leading-tight">{selectedItem.title || selectedItem.name || selectedItem.full_name || 'Unknown'}</h2>
                 <p className="text-xs text-slate-400 mt-2 font-mono">ID: {selectedItem.id}</p>
               </div>
 
-              {/* A. 체험 상세 정보 */}
+              {/* ✅ [USERS] 고객 상세 정보 (대폭 강화됨) */}
+              {activeTab === 'USERS' && (
+                <div className="space-y-8">
+                  
+                  {/* 1. 프로필 상세 그리드 */}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><User size={12}/> 고객 프로필</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <InfoBox label="이메일" value={selectedItem.email} icon={<Mail size={14}/>} />
+                      <InfoBox label="연락처" value={selectedItem.phone} icon={<Phone size={14}/>} />
+                      <InfoBox label="생년월일" value={selectedItem.birth_date ? `${selectedItem.birth_date} ${calculateAge(selectedItem.birth_date)}` : null} icon={<Cake size={14}/>} />
+                      <InfoBox label="국적" value={selectedItem.nationality} icon={<Globe size={14}/>} />
+                      <InfoBox label="카카오톡 ID" value={selectedItem.kakao_id} icon={<MessageCircle size={14}/>} />
+                      <InfoBox label="MBTI" value={selectedItem.mbti} icon={<Smile size={14}/>} />
+                    </div>
+                  </div>
+
+                  {/* 2. 구매 활동 요약 (통계) */}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><ShoppingBag size={12}/> 구매 활동</h4>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                       <StatSmall label="총 구매액" value="₩1,250,000" color="bg-blue-50 text-blue-700" />
+                       <StatSmall label="구매 횟수" value="5회" color="bg-green-50 text-green-700" />
+                       <StatSmall label="마지막 구매" value="3일 전" color="bg-slate-50 text-slate-700" />
+                    </div>
+                    
+                    {/* 구매 내역 테이블 (예시 데이터) */}
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase border-b border-slate-100">
+                          <tr>
+                            <th className="px-4 py-3">체험명</th>
+                            <th className="px-4 py-3">날짜</th>
+                            <th className="px-4 py-3 text-right">금액</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {[1,2,3].map(i => (
+                            <tr key={i} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-4 py-3 font-medium text-slate-800">을지로 노포 투어 - {i}차</td>
+                              <td className="px-4 py-3 text-slate-500 text-xs">2026.02.0{i}</td>
+                              <td className="px-4 py-3 text-right font-bold text-slate-900">₩50,000</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 3. 관리자 메모 (제안 기능) */}
+                  <div>
+                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1"><StickyNote size={12}/> 관리자 메모</h4>
+                     <textarea 
+                       className="w-full p-4 bg-yellow-50 border border-yellow-100 rounded-xl text-sm placeholder:text-yellow-700/50 focus:outline-none focus:border-yellow-300 transition-all resize-none h-24 text-yellow-900 leading-relaxed" 
+                       placeholder="이 고객에 대한 특이사항을 기록하세요. (예: VIP 고객, 노쇼 이력 있음 등)"
+                     />
+                  </div>
+
+                  {/* 계정 관리 버튼 */}
+                  <div className="pt-6 mt-6 border-t border-slate-100">
+                    <button onClick={()=>deleteItem('profiles', selectedItem.id)} className="w-full py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors flex items-center justify-center gap-2">
+                      <Trash2 size={16}/> 계정 영구 삭제
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* [EXPS] 체험 상세 정보 */}
               {activeTab === 'EXPS' && (
                 <>
                   {selectedItem.photos && (
@@ -131,10 +200,9 @@ export default function ManagementTab({
                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>
                     <div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div>
                   </div>
-                  {/* 동선 (Itinerary) */}
                   {selectedItem.itinerary && (
                     <div>
-                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">진행 코스 (Itinerary)</h4>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">진행 코스</h4>
                       <div className="space-y-3 pl-4 border-l-2 border-slate-100">
                         {selectedItem.itinerary.map((item: any, i: number) => (
                           <div key={i} className="relative pl-6">
@@ -159,52 +227,18 @@ export default function ManagementTab({
                 </>
               )}
 
-              {/* B. 호스트 지원서 상세 */}
+              {/* [APPS] 호스트 지원서 상세 */}
               {activeTab === 'APPS' && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
-                    <InfoBox label="연락처" value={selectedItem.phone} />
-                    <InfoBox label="이메일" value={selectedItem.email} />
-                    <InfoBox label="국적" value={selectedItem.host_nationality} />
-                    <InfoBox label="언어" value={selectedItem.target_language} />
+                    <InfoBox label="연락처" value={selectedItem.phone} icon={<Phone size={14}/>} />
+                    <InfoBox label="이메일" value={selectedItem.email} icon={<Mail size={14}/>} />
+                    <InfoBox label="국적" value={selectedItem.host_nationality} icon={<Globe size={14}/>} />
+                    <InfoBox label="언어" value={selectedItem.target_language} icon={<MessageCircle size={14}/>} />
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">자기소개</h4>
                     <div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.self_intro}</div>
-                  </div>
-                </div>
-              )}
-
-              {/* ✅ C. 고객(User) 상세 정보 (자기소개 제외, 핵심 정보만 깔끔하게) */}
-              {activeTab === 'USERS' && (
-                <div className="space-y-6">
-                  {/* 프로필 헤더 */}
-                  <div className="flex items-center gap-6 mb-6">
-                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
-                      {selectedItem.avatar_url ? <img src={selectedItem.avatar_url} className="w-full h-full object-cover"/> : <User size={40} className="text-slate-400"/>}
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-500 mb-1">가입일</div>
-                      <div className="font-bold text-lg">{new Date(selectedItem.created_at).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-
-                  {/* 정보 그리드 */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <InfoBox label="이메일" value={selectedItem.email} />
-                    <InfoBox label="연락처" value={selectedItem.phone} />
-                    <InfoBox label="국적" value={selectedItem.nationality} />
-                    <InfoBox label="생년월일" value={selectedItem.birth_date ? `${selectedItem.birth_date} ${calculateAge(selectedItem.birth_date)}` : '-'} />
-                    <InfoBox label="카카오톡 ID" value={selectedItem.kakao_id} />
-                    <InfoBox label="MBTI" value={selectedItem.mbti} />
-                  </div>
-
-                  {/* 계정 관리 버튼 */}
-                  <div className="pt-8 mt-8 border-t border-slate-100">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">계정 관리</h4>
-                    <button onClick={()=>deleteItem('profiles', selectedItem.id)} className="w-full py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">
-                      계정 영구 삭제 (Delete User)
-                    </button>
                   </div>
                 </div>
               )}
@@ -230,7 +264,9 @@ export default function ManagementTab({
   );
 }
 
-// 리스트 아이템 컴포넌트
+// 작은 컴포넌트들
+import { Trash2 } from 'lucide-react'; // 아이콘 추가
+
 function ListItem({ selected, onClick, img, title, subtitle, status, date, isUser }: any) {
   return (
     <div onClick={onClick} className={`p-4 rounded-xl border cursor-pointer transition-all flex gap-4 items-center ${selected ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900' : 'border-slate-100 hover:border-slate-300 hover:bg-white bg-white'}`}>
@@ -241,11 +277,9 @@ function ListItem({ selected, onClick, img, title, subtitle, status, date, isUse
           <User size={20}/>
         </div>
       )}
-      
       <div className="flex-1 min-w-0">
         <div className="flex justify-between mb-1">
           <div className="font-bold text-sm truncate text-slate-900">{title}</div>
-          {/* 유저일 경우 국적을 status 위치에 표시, 상태 뱃지 스타일 다르게 */}
           {isUser ? (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{status}</span>
           ) : (
@@ -261,11 +295,22 @@ function ListItem({ selected, onClick, img, title, subtitle, status, date, isUse
   );
 }
 
-function InfoBox({ label, value }: any) {
+function InfoBox({ label, value, icon }: any) {
   return (
     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-      <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">{label}</div>
+      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase mb-1">
+        {icon} {label}
+      </div>
       <div className="font-bold text-slate-900 text-sm">{value || '-'}</div>
+    </div>
+  );
+}
+
+function StatSmall({ label, value, color }: any) {
+  return (
+    <div className={`p-4 rounded-xl border border-transparent ${color || 'bg-slate-50 text-slate-700'}`}>
+      <div className="text-[10px] font-bold opacity-70 mb-1 uppercase">{label}</div>
+      <div className="text-lg font-black">{value}</div>
     </div>
   );
 }
