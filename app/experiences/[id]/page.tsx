@@ -166,13 +166,41 @@ export default function ExperienceDetailPage() {
               </div>
             </div>
 
-            {/* 지도 */}
-            <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
+{/* 지도 섹션 (구글 맵 연동 복구됨) */}
+<div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
-               <p className="text-slate-500 mb-4">{experience.meeting_point || experience.location} (정확한 위치는 예약 확정 후 표시됩니다)</p>
-               <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden border border-slate-200">
-                  <img src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" className="w-full h-full object-cover opacity-90" style={{filter: 'contrast(105%)'}} />
-               </div>
+               <p className="text-slate-500 mb-4">
+                 {experience.meeting_point || experience.location} (정확한 위치는 예약 확정 후 표시됩니다)
+               </p>
+               
+               {/* 클릭 시 구글 맵으로 이동 */}
+               <Link 
+                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.meeting_point || experience.location || 'Seoul')}`} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+               >
+                 <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
+                    {/* 지도 배경 이미지 */}
+                    <img 
+                      src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" 
+                      className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-700"
+                      style={{filter: 'contrast(105%)'}} 
+                      alt="Map Background"
+                    />
+                    
+                    {/* 중앙 구글 맵 버튼 (복구됨!) */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                       <div className="bg-white/95 backdrop-blur-sm px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-110 transition-transform text-slate-900 border border-slate-100">
+                          <img 
+                            src="https://upload.wikimedia.org/wikipedia/commons/a/aa/Google_Maps_icon_(2020).svg" 
+                            alt="Google Maps" 
+                            className="w-[18px] h-[18px]" 
+                          />
+                          지도에서 보기
+                       </div>
+                    </div>
+                 </div>
+               </Link>
             </div>
 
             {/* 문의하기 */}
