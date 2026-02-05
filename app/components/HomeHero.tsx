@@ -18,7 +18,8 @@ interface HomeHeroProps {
   setLocationInput: (val: string) => void;
   dateRange: { start: Date | null, end: Date | null };
   setDateRange: (range: any) => void;
-  searchRef: React.RefObject<HTMLDivElement | null>; // RefObject 타입 수정 (null 허용)
+  searchRef: React.RefObject<HTMLDivElement | null>;
+  onSearch: () => void; // ✅ 검색 함수 Props 추가
 }
 
 export default function HomeHero({
@@ -28,7 +29,8 @@ export default function HomeHero({
   activeSearchField, setActiveSearchField,
   locationInput, setLocationInput,
   dateRange, setDateRange,
-  searchRef
+  searchRef,
+  onSearch // ✅ 받아오기
 }: HomeHeroProps) {
 
   return (
@@ -44,7 +46,7 @@ export default function HomeHero({
         >
           <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">어디든지</div>
           <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">언제든지</div>
-          <div className="px-4 text-sm font-bold text-slate-500">게스트 추가</div>
+          <div className="px-4 text-sm font-bold text-slate-500">검색</div>
           <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
             <Search size={14} strokeWidth={3}/>
           </button>
@@ -55,7 +57,7 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-          {/* 탭 버튼 (스크롤 시 사라짐) */}
+          {/* 탭 버튼 */}
           <div className={`flex gap-8 mb-4 transition-all duration-300 ${isScrolled ? 'opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden' : 'opacity-100 translate-y-0 h-auto'}`}>
             <button onClick={() => setActiveTab('experience')} className={`pb-2 text-base font-bold flex items-center gap-2 transition-all ${activeTab === 'experience' ? 'text-black border-b-[3px] border-black' : 'text-slate-500 hover:text-slate-800 border-b-[3px] border-transparent'}`}>
               <span className="text-xl">🎈</span> 체험
@@ -74,11 +76,12 @@ export default function HomeHero({
             setDateRange={setDateRange}
             onCategorySelect={setSelectedCategory}
             isVisible={!isScrolled} 
+            onSearch={onSearch} // ✅ 넘겨주기
           />
         </div>
       </div>
 
-      {/* 🟢 3. 카테고리 필터 (Sticky 제거됨: 스크롤 시 사라짐) */}
+      {/* 🟢 3. 카테고리 필터 */}
       {activeTab === 'experience' && (
         <div className="bg-white pb-4 pt-2 border-b border-slate-100 relative z-30">
           <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex justify-center">

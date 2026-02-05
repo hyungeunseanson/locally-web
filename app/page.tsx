@@ -4,19 +4,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Globe, Ghost } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
-import HomeHero from '@/app/components/HomeHero'; // 분리된 헤더 컴포넌트 임포트
+import HomeHero from '@/app/components/HomeHero'; 
 import ExperienceCard from '@/app/components/ExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
 import { LOCALLY_SERVICES } from '@/app/constants';
 
 export default function HomePage() {
-  // 상태 관리 (헤더와 콘텐츠 모두에서 사용)
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [experiences, setExperiences] = useState<any[]>([]);
+  
+  const [allExperiences, setAllExperiences] = useState<any[]>([]); // ✅ 전체 데이터 원본
+  const [filteredExperiences, setFilteredExperiences] = useState<any[]>([]); // ✅ 화면에 보여줄 필터링된 데이터
   const [loading, setLoading] = useState(true);
   
-  // 검색 및 스크롤 상태
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | null>(null);
   const [locationInput, setLocationInput] = useState('');
   const [dateRange, setDateRange] = useState<{start: Date | null, end: Date | null}>({ start: null, end: null });
@@ -25,7 +25,6 @@ export default function HomePage() {
   
   const supabase = createClient();
 
-  // 스크롤 감지
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -37,7 +36,6 @@ export default function HomePage() {
 
   const isScrolled = scrollY > 50;
 
-  // 외부 클릭 감지 (검색창 닫기)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -48,7 +46,7 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 데이터 로딩
+  // 📡 데이터 가져오기 (카테고리 변경 시)
   useEffect(() => {
     const fetchExperiences = async () => {
       setLoading(true);
@@ -61,17 +59,50 @@ export default function HomePage() {
         
         const { data, error } = await query;
         if (error) throw error;
-        if (data) setExperiences(data);
+        
+        if (data) {
+          // 카테고리 필터링 (DB에서 가져온 후 적용)
+          let categoryFiltered = data;
+          if (selectedCategory !== 'all') {
+            // DB에 category 필드가 없으면 location이나 title로 임시 필터링
+            // 만약 DB에 category 컬럼이 있다면: item.category === selectedCategory 로 수정
+            categoryFiltered = data.filter((item: any) => 
+              item.location?.includes(selectedCategory) || item.title?.includes(selectedCategory)
+            );
+          }
+
+          setAllExperiences(categoryFiltered);
+          setFilteredExperiences(categoryFiltered); // 초기엔 전체 보여줌
+        }
       } catch (error) { console.error(error); } 
       finally { setLoading(false); }
     };
     fetchExperiences();
   }, [selectedCategory]);
 
+  // 🔍 통합 검색 함수
+  const handleSearch = () => {
+    if (!locationInput.trim()) {
+      setFilteredExperiences(allExperiences); // 검색어 없으면 전체 목록 복구
+      return;
+    }
+
+    const term = locationInput.toLowerCase();
+    
+    // 제목, 지역, 설명, 카테고리(있다면) 중 하나라도 포함되면 노출
+    const result = allExperiences.filter((item) => 
+      (item.title && item.title.toLowerCase().includes(term)) ||
+      (item.location && item.location.toLowerCase().includes(term)) ||
+      (item.description && item.description.toLowerCase().includes(term))
+    );
+
+    setFilteredExperiences(result);
+    setActiveSearchField(null); // 검색 후 창 닫기
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
       
-      {/* 🟢 1. 분리된 상단 영역 (헤더 + 검색 + 카테고리) */}
       <HomeHero 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -85,13 +116,12 @@ export default function HomePage() {
         dateRange={dateRange}
         setDateRange={setDateRange}
         searchRef={searchRef}
+        onSearch={handleSearch} // ✅ 검색 함수 전달
       />
 
-      {/* 🟢 2. 콘텐츠 리스트 */}
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
         {activeTab === 'experience' && (
           loading ? (
-            // 스켈레톤 로딩
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
               {[1,2,3,4,5,6,7,8].map(i => (
                 <div key={i} className="animate-pulse">
@@ -101,17 +131,16 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-          ) : experiences.length === 0 ? (
-            // 빈 화면 (Empty State)
+          ) : filteredExperiences.length === 0 ? ( // ✅ filteredExperiences 사용
             <div className="flex flex-col items-center justify-center py-40 text-center">
               <Ghost size={48} className="text-slate-300 mb-4"/>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">등록된 체험이 없습니다.</h3>
-              <p className="text-slate-500 text-sm">첫 번째 체험을 등록해보세요!</p>
-              <Link href="/become-a-host" className="mt-6 px-6 py-3 bg-black text-white rounded-xl font-bold hover:scale-105 transition-transform">호스트 되기</Link>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">검색 결과가 없습니다.</h3>
+              <p className="text-slate-500 text-sm">다른 키워드로 검색해보세요!</p>
+              <button onClick={() => { setLocationInput(''); setFilteredExperiences(allExperiences); }} className="mt-6 px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors">전체 목록 보기</button>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-              {experiences.map((item) => <ExperienceCard key={item.id} item={item} />)}
+              {filteredExperiences.map((item) => <ExperienceCard key={item.id} item={item} />)}
             </div>
           )
         )}
@@ -123,13 +152,11 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* 🟢 3. 푸터 */}
       <Footer />
     </div>
   );
 }
 
-// 푸터 컴포넌트 (동일 파일 하단에 유지)
 function Footer() {
   return (
     <footer className="border-t border-slate-100 bg-slate-50 mt-20">
