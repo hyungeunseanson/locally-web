@@ -1,0 +1,58 @@
+'use client';
+
+import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+export default function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange: (range: any) => void }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+  const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
+  
+  const handleDateClick = (day: number) => {
+    const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    if (!selectedRange.start || (selectedRange.start && selectedRange.end)) { 
+      onChange({ start: clickedDate, end: null }); 
+    } else { 
+      if (clickedDate < selectedRange.start) { 
+        onChange({ start: clickedDate, end: selectedRange.start }); 
+      } else { 
+        onChange({ ...selectedRange, end: clickedDate }); 
+      } 
+    }
+  };
+
+  const renderDays = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysCount = getDaysInMonth(year, month);
+    const startBlank = getFirstDay(year, month);
+    const days = [];
+    
+    for (let i = 0; i < startBlank; i++) days.push(<div key={`empty-${i}`} />);
+    
+    for (let d = 1; d <= daysCount; d++) {
+      const date = new Date(year, month, d);
+      const isStart = selectedRange.start?.getTime() === date.getTime();
+      const isEnd = selectedRange.end?.getTime() === date.getTime();
+      const isInRange = selectedRange.start && selectedRange.end && date > selectedRange.start && date < selectedRange.end;
+      
+      days.push(
+        <button key={d} onClick={() => handleDateClick(d)} className={`h-10 w-10 rounded-full text-sm font-bold flex items-center justify-center transition-all ${isStart || isEnd ? 'bg-black text-white' : ''} ${isInRange ? 'bg-slate-100' : ''} ${!isStart && !isEnd && !isInRange ? 'hover:border border-black' : ''}`}>{d}</button>
+      );
+    }
+    return days;
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}><ChevronLeft size={20}/></button>
+        <span className="font-bold">{currentDate.getFullYear()}년 {currentDate.getMonth()+1}월</span>
+        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}><ChevronRight size={20}/></button>
+      </div>
+      <div className="grid grid-cols-7 text-center gap-y-1 text-xs font-bold text-slate-500 mb-2">{['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}</div>
+      <div className="grid grid-cols-7 gap-y-1 justify-items-center">{renderDays()}</div>
+    </div>
+  );
+}

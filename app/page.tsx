@@ -1,31 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Heart, Star, MapPin, Search, Globe, ChevronLeft, ChevronRight 
-} from 'lucide-react';
+import { Search, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
-
-const CATEGORIES = [
-  { id: 'all', label: '전체', icon: '🌏' },
-  { id: 'tokyo', label: '도쿄', icon: '🗼' },
-  { id: 'osaka', label: '오사카', icon: '🏯' },
-  { id: 'fukuoka', label: '후쿠오카', icon: '🍜' },
-  { id: 'sapporo', label: '삿포로', icon: '❄️' },
-  { id: 'nagoya', label: '나고야', icon: '🍤' },
-  { id: 'seoul', label: '서울', icon: '🇰🇷' },
-  { id: 'busan', label: '부산', icon: '🌊' },
-  { id: 'jeju', label: '제주', icon: '🍊' },
-];
-
-const LOCALLY_SERVICES = [
-  { id: 1, title: '일본 식당 전화 예약 대행', price: 5000, image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b', desc: '한국어 대응 불가 식당, 대신 예약해드립니다.' },
-  { id: 2, title: '일본 전세 버스 대절 서비스', price: 350000, image: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e', desc: '단체 여행을 위한 쾌적한 버스 대절.' },
-  { id: 3, title: '현지 비즈니스 통역 파견', price: 200000, image: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df', desc: '중요한 미팅, 전문 통역사가 함께합니다.' },
-  { id: 4, title: '팝업 스토어 스태프 인력', price: 15000, image: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d', desc: '일본 현지 행사/팝업 운영 인력 지원.' },
-];
+import MainSearchBar from '@/app/components/MainSearchBar';
+import ExperienceCard from '@/app/components/ExperienceCard';
+import ServiceCard from '@/app/components/ServiceCard';
+import { CATEGORIES, LOCALLY_SERVICES } from '@/app/constants';
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
@@ -33,9 +16,11 @@ export default function HomePage() {
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // 검색 관련 상태
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | null>(null);
   const [locationInput, setLocationInput] = useState('');
   const [dateRange, setDateRange] = useState<{start: Date | null, end: Date | null}>({ start: null, end: null });
+  
   const searchRef = useRef<HTMLDivElement>(null);
   const [scrollY, setScrollY] = useState(0);
   const isScrolled = scrollY > 20;
@@ -78,14 +63,7 @@ export default function HomePage() {
     fetchExperiences();
   }, [selectedCategory]);
 
-  const formatDateRange = () => {
-    if (dateRange.start && dateRange.end) {
-      return `${dateRange.start.getMonth()+1}월 ${dateRange.start.getDate()}일 - ${dateRange.end.getMonth()+1}월 ${dateRange.end.getDate()}일`;
-    }
-    if (dateRange.start) return `${dateRange.start.getMonth()+1}월 ${dateRange.start.getDate()}일`;
-    return '';
-  };
-
+  // 스크롤 애니메이션 스타일 계산
   const progress = Math.min(scrollY / 50, 1);
   const expandedSearchStyle = {
     opacity: 1 - progress * 2,
@@ -101,6 +79,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
+      {/* 1. 상단 고정 헤더 & 축소된 검색바 */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm h-20 transition-shadow">
         <SiteHeader />
         <div 
@@ -115,6 +94,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* 2. 확장된 검색바 & 탭 (스크롤 시 사라짐) */}
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           <div className={`flex gap-8 mb-4 transition-all duration-300 ${isScrolled ? 'opacity-0 -translate-y-10' : 'opacity-100'}`}>
@@ -126,44 +106,20 @@ export default function HomePage() {
             </button>
           </div>
 
-          <div className="relative w-full max-w-3xl h-[66px]" style={expandedSearchStyle as any}>
-            <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100' : 'border-slate-200'} rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] transition-all`}>
-              <div className={`flex-[1.5] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'location' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} onClick={() => setActiveSearchField('location')}>
-                <label className="text-[11px] font-bold text-slate-800">여행지</label>
-                <input type="text" placeholder="도시나 명소로 검색" value={locationInput} readOnly className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"/>
-              </div>
-              <div className={`flex-[1] px-8 h-full flex flex-col justify-center rounded-full cursor-pointer transition-colors relative z-10 ${activeSearchField === 'date' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} onClick={() => setActiveSearchField('date')}>
-                <label className="text-[11px] font-bold text-slate-800">날짜</label>
-                <input type="text" placeholder="날짜 선택" value={formatDateRange()} readOnly className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"/>
-              </div>
-              <div className="pl-4 pr-2 h-full flex items-center justify-end rounded-full z-10">
-                <button className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"><Search size={22} strokeWidth={2.5}/></button>
-              </div>
-            </div>
-
-            {activeSearchField === 'location' && (
-              <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
-                <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
-                <div className="grid grid-cols-1 gap-1">
-                  {CATEGORIES.filter(c => c.id !== 'all').map((city) => (
-                    <button key={city.id} onClick={() => { setLocationInput(city.label); setActiveSearchField('date'); setSelectedCategory(city.id); }} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group">
-                      <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all"><MapPin size={20} /></div>
-                      <span className="font-bold text-slate-700">{city.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeSearchField === 'date' && (
-              <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
-                <DatePicker selectedRange={dateRange} onChange={(range) => { setDateRange(range); if (range.start && range.end) setActiveSearchField(null); }} />
-              </div>
-            )}
-          </div>
+          <MainSearchBar 
+            activeSearchField={activeSearchField}
+            setActiveSearchField={setActiveSearchField}
+            locationInput={locationInput}
+            setLocationInput={setLocationInput}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            onCategorySelect={setSelectedCategory}
+            style={expandedSearchStyle}
+          />
         </div>
       </div>
 
+      {/* 3. 카테고리 탭 (체험 탭일 때만 표시) */}
       {activeTab === 'experience' && (
         <div className="bg-white pb-6 pt-2 border-b border-slate-100">
           <div className="max-w-[1760px] mx-auto px-6 md:px-12 flex justify-center">
@@ -179,6 +135,7 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* 4. 메인 콘텐츠 (리스트) */}
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
         {activeTab === 'experience' && (
           loading ? (
@@ -202,6 +159,7 @@ export default function HomePage() {
         )}
       </main>
 
+      {/* 5. 푸터 */}
       <footer className="border-t border-slate-100 bg-slate-50 mt-20">
         <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
@@ -215,7 +173,6 @@ export default function HomePage() {
             <div>
               <h5 className="font-bold text-black mb-4">호스팅</h5>
               <ul className="space-y-3">
-                {/* ✅ 수정됨: 호스트 되기 링크를 설명 페이지로 연결 */}
                 <li><Link href="/become-a-host" className="hover:underline">호스트 되기</Link></li>
                 <li><Link href="#" className="hover:underline">호스트 추천하기</Link></li>
                 <li><Link href="#" className="hover:underline">책임 보험</Link></li>
@@ -242,79 +199,4 @@ export default function HomePage() {
       </footer>
     </div>
   );
-}
-
-// ... DatePicker, ExperienceCard, ServiceCard (기존과 동일) ...
-function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange: (range: any) => void }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-  const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
-  const handleDateClick = (day: number) => {
-    const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-    if (!selectedRange.start || (selectedRange.start && selectedRange.end)) { onChange({ start: clickedDate, end: null }); } 
-    else { if (clickedDate < selectedRange.start) { onChange({ start: clickedDate, end: selectedRange.start }); } else { onChange({ ...selectedRange, end: clickedDate }); } }
-  };
-  const renderDays = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const daysCount = getDaysInMonth(year, month);
-    const startBlank = getFirstDay(year, month);
-    const days = [];
-    for (let i = 0; i < startBlank; i++) days.push(<div key={`empty-${i}`} />);
-    for (let d = 1; d <= daysCount; d++) {
-      const date = new Date(year, month, d);
-      const isStart = selectedRange.start?.getTime() === date.getTime();
-      const isEnd = selectedRange.end?.getTime() === date.getTime();
-      const isInRange = selectedRange.start && selectedRange.end && date > selectedRange.start && date < selectedRange.end;
-      days.push(
-        <button key={d} onClick={() => handleDateClick(d)} className={`h-10 w-10 rounded-full text-sm font-bold flex items-center justify-center transition-all ${isStart || isEnd ? 'bg-black text-white' : ''} ${isInRange ? 'bg-slate-100' : ''} ${!isStart && !isEnd && !isInRange ? 'hover:border border-black' : ''}`}>{d}</button>
-      );
-    }
-    return days;
-  };
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}><ChevronLeft size={20}/></button>
-        <span className="font-bold">{currentDate.getFullYear()}년 {currentDate.getMonth()+1}월</span>
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}><ChevronRight size={20}/></button>
-      </div>
-      <div className="grid grid-cols-7 text-center gap-y-1 text-xs font-bold text-slate-500 mb-2">{['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}</div>
-      <div className="grid grid-cols-7 gap-y-1 justify-items-center">{renderDays()}</div>
-    </div>
-  );
-}
-
-function ExperienceCard({ item }: any) {
-  return (
-    <Link href={`/experiences/${item.id}`} className="block group">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
-        <img src={item.photos && item.photos[0] ? item.photos[0] : "https://images.unsplash.com/photo-1542051841857-5f90071e7989"} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
-        <button className="absolute top-3 right-3 text-white/70 hover:text-white hover:scale-110 transition-all z-10"><Heart size={24} fill="rgba(0,0,0,0.5)" strokeWidth={2} /></button>
-      </div>
-      <div className="space-y-1 px-1">
-        <div className="flex justify-between items-start">
-          <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">{item.city || '서울'} · {item.category}</h3>
-          <div className="flex items-center gap-1 text-sm shrink-0"><Star size={14} fill="black" /><span>4.95</span><span className="text-slate-400 font-normal">(32)</span></div>
-        </div>
-        <p className="text-[15px] text-slate-500 line-clamp-1">{item.title}</p>
-        <div className="mt-1"><span className="font-bold text-slate-900 text-[15px]">₩{Number(item.price).toLocaleString()}</span><span className="text-[15px] text-slate-900 font-normal"> / 인</span></div>
-      </div>
-    </Link>
-  )
-}
-
-function ServiceCard({ item }: any) {
-  return (
-    <div className="block group cursor-pointer">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3">
-        <img src={item.image} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-6 text-white">
-           <h3 className="font-bold text-lg leading-tight mb-1">{item.title}</h3>
-           <p className="text-sm opacity-90 line-clamp-2">{item.desc}</p>
-        </div>
-      </div>
-      <div className="mt-1 font-bold text-slate-900 px-1">₩{item.price.toLocaleString()}부터</div>
-    </div>
-  )
 }
