@@ -3,26 +3,26 @@
 import React, { useState, useEffect } from 'react';
 import { 
   List, MessageSquare, DollarSign, Star, Plus, 
-  Clock, AlertCircle, XCircle, UserCog 
+  Clock, AlertCircle, XCircle, UserCog, CalendarCheck 
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 
-// ✅ 기존 컴포넌트들 (원래 있던 파일들)
-import MyExperiences from './MyExperiences';
-import InquiryChat from './InquiryChat';
-import Earnings from './Earnings';
-import HostReviews from './HostReviews';
-
-// ✅ 새로 추가한 프로필 에디터 (방금 만든 파일)
-import ProfileEditor from './components/ProfileEditor'; 
+// ✅ 모든 컴포넌트 불러오기 (기존 기능 + 신규 기능)
+import ReservationManager from './components/ReservationManager'; // 1. 예약 관리 (메인)
+import MyExperiences from './MyExperiences';                   // 2. 체험 관리
+import InquiryChat from './InquiryChat';                       // 3. 문의
+import Earnings from './Earnings';                             // 4. 수익
+import HostReviews from './HostReviews';                       // 5. 후기
+import ProfileEditor from './components/ProfileEditor';        // 6. 프로필
 
 export default function HostDashboard() {
-  const [activeTab, setActiveTab] = useState('experiences');
+  // 🔥 기본 탭을 'reservations'(예약 관리)로 설정!
+  const [activeTab, setActiveTab] = useState('reservations');
   const [hostStatus, setHostStatus] = useState<any>(null); 
-  const [profile, setProfile] = useState<any>(null); // 프로필 데이터 추가
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
@@ -36,7 +36,7 @@ export default function HostDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      // 1. 호스트 상태 확인
+      // 1. 호스트 신청 상태 확인
       const { data: hostData, error } = await supabase
         .from('host_applications')
         .select('*') 
@@ -47,7 +47,7 @@ export default function HostDashboard() {
 
       if (!error) setHostStatus(hostData);
 
-      // 2. 프로필 정보 가져오기 (추가됨)
+      // 2. 프로필 정보 가져오기
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -89,7 +89,7 @@ export default function HostDashboard() {
 
   const status = hostStatus.status?.toLowerCase().trim();
 
-  // 2. 심사 중 / 보완 요청 / 거절 등 상태별 화면 (기존 유지)
+  // 2. 심사 중 / 보완 요청 / 거절 등 상태별 화면 (기존 디자인 유지)
   if (['pending', 'revision', 'rejected'].includes(status)) {
     return (
       <div className="min-h-screen bg-white font-sans">
@@ -139,13 +139,13 @@ export default function HostDashboard() {
     );
   }
 
-  // 🚀 3. 승인된 호스트 대시보드 (기존 레이아웃 복구 + 프로필 탭 추가)
+  // 🚀 3. 승인된 호스트 대시보드 (예약 관리 최우선 배치)
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
         
-        {/* 사이드바 (기존 메뉴 유지) */}
+        {/* 사이드바 */}
         <aside className="w-64 hidden md:block shrink-0">
             <div className="sticky top-24 space-y-2">
               <div className="px-4 py-2 mb-4">
@@ -153,22 +153,34 @@ export default function HostDashboard() {
                 <p className="text-xs text-slate-400 mt-1">승인된 호스트입니다</p>
               </div>
               
-              <button onClick={() => setActiveTab('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
+              {/* 1. 예약 관리 (가장 중요!) */}
+              <button onClick={() => setActiveTab('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-black text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+                <CalendarCheck size={20}/> 예약 관리
+              </button>
+
+              {/* 2. 내 체험 관리 */}
+              <button onClick={() => setActiveTab('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
                 <List size={20}/> 내 체험 관리
               </button>
-              <button onClick={() => setActiveTab('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
+
+              {/* 3. 문의함 */}
+              <button onClick={() => setActiveTab('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
                 <MessageSquare size={20}/> 문의함
               </button>
-              <button onClick={() => setActiveTab('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
+
+              {/* 4. 수익 및 정산 */}
+              <button onClick={() => setActiveTab('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
                 <DollarSign size={20}/> 수익 및 정산
               </button>
-              <button onClick={() => setActiveTab('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
+
+              {/* 5. 받은 후기 */}
+              <button onClick={() => setActiveTab('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
                 <Star size={20}/> 받은 후기
               </button>
               
-              {/* ✅ 새로 추가된 프로필 설정 탭 */}
+              {/* 6. 프로필 설정 */}
               <div className="pt-4 mt-4 border-t border-slate-100">
-                <button onClick={() => setActiveTab('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-black text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
+                <button onClick={() => setActiveTab('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
                   <UserCog size={20}/> 프로필 설정
                 </button>
               </div>
@@ -179,6 +191,7 @@ export default function HostDashboard() {
         <main className="flex-1 min-w-0">
           <div className="flex justify-between items-end mb-8">
             <h1 className="text-3xl font-black">
+              {activeTab === 'reservations' && '예약 관리'}
               {activeTab === 'experiences' && '내 체험 관리'}
               {activeTab === 'inquiries' && '문의 메시지'}
               {activeTab === 'earnings' && '수익 및 정산'}
@@ -194,13 +207,16 @@ export default function HostDashboard() {
             )}
           </div>
 
-          {/* 탭별 컴포넌트 렌더링 */}
+          {/* 탭별 컴포넌트 렌더링 (예약 관리가 기본!) */}
+          {activeTab === 'reservations' && (
+            <div className="h-[700px]"> {/* 높이 확보 */}
+               <ReservationManager />
+            </div>
+          )}
           {activeTab === 'experiences' && <MyExperiences />}
           {activeTab === 'inquiries' && <InquiryChat />}
           {activeTab === 'earnings' && <Earnings />}
           {activeTab === 'reviews' && <HostReviews />}
-          
-          {/* ✅ 프로필 에디터 렌더링 */}
           {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}
         </main>
       </div>
