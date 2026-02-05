@@ -46,10 +46,11 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-8">
-      <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-        <User size={20}/> 호스트 프로필 설정
-      </h3>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="mb-8 border-b border-slate-100 pb-6">
+        <h2 className="text-2xl font-bold mb-2">호스트 프로필 설정</h2>
+        <p className="text-slate-500 text-sm">게스트에게 보여질 나의 정보를 매력적으로 꾸며보세요.</p>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <InputGroup label="직업 / 직장" name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16}/>} placeholder="예: 패션 디자이너" />
@@ -64,16 +65,16 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
           name="introduction"
           value={formData.introduction}
           onChange={handleChange}
-          className="w-full h-32 p-4 border border-slate-300 rounded-xl resize-none focus:outline-none focus:border-black transition-all"
-          placeholder="게스트에게 나를 소개해 주세요."
+          className="w-full h-40 p-4 border border-slate-200 rounded-xl resize-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm leading-relaxed"
+          placeholder="게스트에게 나를 소개해 주세요. (여행 스타일, 호스팅 이유 등)"
         />
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end pt-4 border-t border-slate-100">
         <button 
           onClick={handleSave} 
           disabled={loading}
-          className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2"
+          className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95"
         >
           <Save size={18}/> {loading ? '저장 중...' : '저장하기'}
         </button>
@@ -85,7 +86,7 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
 function InputGroup({ label, name, value, onChange, icon, placeholder }: any) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase flex items-center gap-1">
+      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">
         {icon} {label}
       </label>
       <input 
@@ -93,7 +94,7 @@ function InputGroup({ label, name, value, onChange, icon, placeholder }: any) {
         name={name}
         value={value} 
         onChange={onChange}
-        className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium"
+        className="w-full p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm"
         placeholder={placeholder}
       />
     </div>
