@@ -205,59 +205,81 @@ export default function ExperienceDetailPage() {
                )}
             </div>
 
-{/* 🟢 [수정됨] 알아두어야 할 사항 (2x2 모던 그리드 스타일) */}
-<div className="py-12 border-t border-slate-200">
+            import { 
+  // ... 기존 import ...
+  // 👇 아래 아이콘들이 import에 포함되어 있어야 합니다. (없으면 추가해주세요)
+  Users, Zap, ShieldAlert, CalendarX 
+} from 'lucide-react';
+
+// ... (중략) ...
+
+            {/* 🔴 [변경 전] 기존 코드: 알아두어야 할 사항 (텍스트 위주) */}
+            {/* <div className="pb-12">
+               <h3 className="text-xl font-bold mb-6">알아두어야 할 사항</h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                  <div>
+                     <div className="font-bold text-sm mb-1.5 text-slate-900">참가 연령</div>
+                     ...
+                  </div>
+                  ...
+               </div>
+            </div> */}
+
+            {/* 🟢 [변경 후] 새로운 코드: 아이콘이 포함된 2x2 모던 그리드 디자인 */}
+            <div className="py-12 border-t border-slate-200">
                <h3 className="text-2xl font-bold mb-8">알아두어야 할 사항</h3>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-10">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
                   
-                  {/* 1. 이용 규칙 */}
-                  <div>
-                     <h4 className="font-bold text-base mb-3 text-slate-900">이용 규칙</h4>
-                     <ul className="space-y-2 text-sm text-slate-600">
-                        <li>
-                           <span className="font-medium text-slate-900">참가 연령:</span> {experience.rules?.age_limit || '제한 없음'}
-                        </li>
-                        <li>
-                           <span className="font-medium text-slate-900">활동 강도:</span> {experience.rules?.activity_level || '보통'}
-                        </li>
-                        <li>최대 {experience.max_guests}명 참여 가능</li>
-                     </ul>
+                  {/* 1. 게스트 요건 */}
+                  <div className="flex gap-4">
+                     <Users size={24} className="text-slate-900 flex-shrink-0"/>
+                     <div>
+                        <h4 className="font-bold text-base mb-2 text-slate-900">게스트 요건</h4>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                           참가 연령: {experience.rules?.age_limit || '제한 없음'} <br/>
+                           최대 인원: {experience.max_guests}명
+                        </p>
+                     </div>
                   </div>
 
-                  {/* 2. 안전 및 필수 사항 */}
-                  <div>
-                     <h4 className="font-bold text-base mb-3 text-slate-900">안전 및 필수 사항</h4>
-                     <ul className="space-y-2 text-sm text-slate-600">
-                        <li>편안한 신발과 복장을 착용해주세요.</li>
-                        <li>호스트의 안전 지침을 준수해야 합니다.</li>
-                        <li>
-                           <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="font-bold underline decoration-slate-400 hover:text-black">
-                             기타 문의사항 보내기
-                           </button>
-                        </li>
-                     </ul>
+                  {/* 2. 활동 강도 */}
+                  <div className="flex gap-4">
+                     <Zap size={24} className="text-slate-900 flex-shrink-0"/>
+                     <div>
+                        <h4 className="font-bold text-base mb-2 text-slate-900">활동 강도</h4>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                           이 체험의 활동 강도는 <strong>'{experience.rules?.activity_level || '보통'}'</strong> 입니다. <br/>
+                           가벼운 산책 수준의 체력이 필요합니다.
+                        </p>
+                     </div>
                   </div>
 
-                  {/* 3. 환불 정책 */}
-                  <div>
-                     <h4 className="font-bold text-base mb-3 text-slate-900">환불 정책</h4>
-                     <p className="text-sm text-slate-600 leading-relaxed mb-2 line-clamp-3">
-                        {experience.rules?.refund_policy || '체험 시작 5일 전까지 무료 취소 가능합니다. 기상 악화 등으로 인한 취소 시에는 전액 환불됩니다.'}
-                     </p>
-                     <button className="font-bold text-sm underline decoration-slate-900 hover:text-slate-600 flex items-center gap-1">
-                        정책 자세히 보기 <ChevronRight size={14}/>
-                     </button>
+                  {/* 3. 안전 및 접근성 */}
+                  <div className="flex gap-4">
+                     <ShieldAlert size={24} className="text-slate-900 flex-shrink-0"/>
+                     <div>
+                        <h4 className="font-bold text-base mb-2 text-slate-900">안전 및 접근성</h4>
+                        <p className="text-sm text-slate-600 leading-relaxed mb-1">
+                           특이 사항이나 도움이 필요하신 경우 사전에 호스트에게 문의해주세요.
+                        </p>
+                        <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="text-sm font-bold underline decoration-slate-300 hover:text-black">
+                           호스트에게 문의하기
+                        </button>
+                     </div>
                   </div>
 
-                  {/* 4. 접근성 */}
-                  <div>
-                     <h4 className="font-bold text-base mb-3 text-slate-900">접근성</h4>
-                     <p className="text-sm text-slate-600 leading-relaxed mb-2">
-                        도움이 필요하신 경우 사전에 문의해주세요.
-                     </p>
-                     <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="font-bold text-sm underline decoration-slate-900 hover:text-slate-600">
-                        호스트에게 문의하기
-                     </button>
+                  {/* 4. 환불 정책 */}
+                  <div className="flex gap-4">
+                     <CalendarX size={24} className="text-slate-900 flex-shrink-0"/>
+                     <div>
+                        <h4 className="font-bold text-base mb-2 text-slate-900">환불 정책</h4>
+                        <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
+                           {experience.rules?.refund_policy || '체험 시작 5일 전까지 취소 시 전액 환불됩니다.'}
+                        </p>
+                        <button className="text-sm font-bold underline decoration-slate-300 hover:text-black mt-1">
+                           정책 자세히 보기
+                        </button>
+                     </div>
                   </div>
 
                </div>
