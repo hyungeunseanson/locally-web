@@ -4,59 +4,69 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Lightbulb } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ManageDatesPage() {
   const supabase = createClient();
   const params = useParams();
   
-  // 달력 상태
-  const [currentDate, setCurrentDate] = useState(new Date()); // 현재 보고 있는 달
-  const [availableDates, setAvailableDates] = useState<string[]>([]); // 예약 가능 날짜들 (YYYY-MM-DD)
+  // 상태 관리
+  const [currentDate, setCurrentDate] = useState(new Date()); 
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [duration, setDuration] = useState(2); // 기본 2시간 (DB에서 불러옴)
   const [loading, setLoading] = useState(false);
 
-  // 1. 기존 설정된 날짜 불러오기
-  const fetchDates = async () => {
+  // 1. 기존 데이터 및 체험 정보(소요시간) 불러오기
+  const fetchData = async () => {
+    // 체험 정보 가져오기 (소요시간 확인용)
+    const { data: exp } = await supabase.from('experiences').select('duration').eq('id', params.id).single();
+    if (exp) setDuration(exp.duration || 2);
+
+    // 일정 데이터 가져오기
     const { data } = await supabase
       .from('experience_availability')
       .select('date')
       .eq('experience_id', params.id);
     
     if (data) {
-      setAvailableDates(data.map((d: any) => d.date));
+      // 중복 제거하여 날짜 리스트 생성
+      const dates = Array.from(new Set(data.map((d: any) => d.date)));
+      setAvailableDates(dates as string[]);
     }
   };
 
-  useEffect(() => { fetchDates(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  // 2. 날짜 클릭 핸들러 (추가/삭제 토글)
+  // 2. 날짜 클릭 핸들러 (토글)
   const toggleDate = (dateStr: string) => {
     if (availableDates.includes(dateStr)) {
-      setAvailableDates(prev => prev.filter(d => d !== dateStr)); // 있으면 제거
+      setAvailableDates(prev => prev.filter(d => d !== dateStr));
     } else {
-      setAvailableDates(prev => [...prev, dateStr]); // 없으면 추가
+      setAvailableDates(prev => [...prev, dateStr]);
     }
   };
 
-  // 3. 저장하기
+  // 3. 저장하기 (단순화된 버전: 날짜만 저장, 시간은 기본값으로 처리)
+  // *실제로는 여기서 시간대 설정 모달을 띄우는 것이 좋습니다.
   const handleSave = async () => {
     setLoading(true);
     
-    // (1) 기존 날짜 싹 지우고 (간단한 구현을 위해)
+    // (1) 기존 데이터 삭제
     await supabase.from('experience_availability').delete().eq('experience_id', params.id);
     
-    // (2) 선택된 날짜 다시 다 넣기
+    // (2) 선택된 날짜 저장 (기본 시간 14:00으로 통일 - 추후 고도화 가능)
     if (availableDates.length > 0) {
       const insertData = availableDates.map(date => ({
         experience_id: params.id,
         date: date,
+        start_time: '14:00', // 기본 시작 시간 (임시)
         is_booked: false
       }));
       await supabase.from('experience_availability').insert(insertData);
     }
 
-    alert('일정이 저장되었습니다!');
+    alert('일정이 저장되었습니다! 게스트들이 이제 예약할 수 있어요.');
     setLoading(false);
   };
 
@@ -71,12 +81,8 @@ export default function ManageDatesPage() {
     const firstDay = getFirstDayOfMonth(year, month);
     
     const days = [];
-    // 빈 칸 채우기
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-14"></div>);
-    }
+    for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="h-14"></div>);
     
-    // 날짜 채우기
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const isSelected = availableDates.includes(dateStr);
@@ -92,7 +98,7 @@ export default function ManageDatesPage() {
           }`}
         >
           <span className="text-sm font-bold">{day}</span>
-          {isSelected && <span className="text-[10px] mt-1 opacity-80">가능</span>}
+          {isSelected && <span className="text-[10px] mt-1 opacity-80">오픈</span>}
         </div>
       );
     }
@@ -107,7 +113,6 @@ export default function ManageDatesPage() {
       <SiteHeader />
       <main className="max-w-4xl mx-auto px-6 py-12">
         
-        {/* 상단 네비게이션 */}
         <div className="flex justify-between items-center mb-8">
           <Link href="/host/dashboard" className="flex items-center gap-2 text-slate-500 hover:text-black font-bold text-sm">
             <ChevronLeft size={16} /> 대시보드
@@ -120,9 +125,9 @@ export default function ManageDatesPage() {
           </div>
         </div>
 
-        <div className="flex gap-8 items-start">
+        <div className="flex flex-col md:flex-row gap-8 items-start">
           {/* 달력 영역 */}
-          <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-black">
                 {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
@@ -144,18 +149,24 @@ export default function ManageDatesPage() {
             </div>
           </div>
 
-          {/* 우측 설명 (에어비앤비 스타일) */}
-          <div className="w-80 hidden md:block">
+          {/* 우측 설명 및 팁 */}
+          <div className="w-full md:w-80">
             <div className="sticky top-24 space-y-6">
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <h3 className="font-bold mb-2">예약 가능 설정</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">
-                  게스트가 예약할 수 있는 날짜를 선택해주세요.<br/>
-                  날짜를 클릭하면 <span className="font-bold text-black">검은색(가능)</span>으로 바뀝니다.
+              
+              {/* ✨ 호스트 팁 섹션 */}
+              <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-100 relative overflow-hidden">
+                <div className="absolute -right-4 -top-4 w-16 h-16 bg-yellow-200 rounded-full opacity-50"/>
+                <h3 className="font-bold mb-2 text-yellow-900 flex items-center gap-2">
+                  <Lightbulb size={18} className="text-yellow-600"/> 호스트님을 위한 팁!
+                </h3>
+                <p className="text-sm text-yellow-800 leading-relaxed">
+                  주말(금, 토) 저녁 시간대를 오픈하면 예약률이 <strong>2배</strong> 더 높아져요. <br/><br/>
+                  현재 설정된 체험 소요시간은 <strong>{duration}시간</strong>입니다. <br/>
+                  (오후 2시 시작 → 오후 {14 + duration}시 종료 예상)
                 </p>
               </div>
               
-              <div className="border p-4 rounded-xl flex justify-between items-center">
+              <div className="border p-4 rounded-xl flex justify-between items-center bg-white">
                 <span className="text-sm font-bold text-slate-600">선택된 날짜</span>
                 <span className="text-xl font-black">{availableDates.length}일</span>
               </div>
