@@ -227,3 +227,4 @@ function InfoBox({ label, value, icon }: any) {
 function StatSmall({ label, value, color }: any) {
   return <div className={`p-4 rounded-xl border border-transparent ${color || 'bg-slate-50 text-slate-700'}`}><div className="text-[10px] font-bold opacity-70 mb-1 uppercase">{label}</div><div className="text-lg font-black">{value}</div></div>;
 }
+//ㅇㅇ//
