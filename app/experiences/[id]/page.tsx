@@ -11,7 +11,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewSection from './components/ReviewSection';
 import ReservationCard from './components/ReservationCard';
-import HostProfileCard from '@/app/components/HostProfileCard'; // ✅ 이거 꼭 추가!
+import HostProfileSection from './components/HostProfileSection';
 
 export default function ExperienceDetailPage() {
   const router = useRouter();
@@ -154,19 +154,17 @@ export default function ExperienceDetailPage() {
             {/* 후기 */}
             <ReviewSection hostName={hostProfile?.name || 'Locally'} />
 
-            {/* 호스트 상세 프로필 카드 (신규 적용) */}
-            <div className="py-8">
-              <HostProfileCard 
-                hostId={experience.host_id}
-                name={hostProfile?.name || 'Locally Host'}
-                avatarUrl={hostProfile?.avatar_url} // 호스트 아바타 URL 필요
-                job={hostProfile?.job || '여행 가이드'} // DB 필드 확인 필요
-                intro={hostProfile?.self_intro}
-                languages={['한국어', '영어']} // DB에 언어 필드가 있다면 연동
-                dreamDestination="중앙아메리카 커피 여행!"
-                favoriteSong="Growing on me - The Darkness"
-              />
-            </div>
+{/* 호스트 상세 프로필 섹션 (여기 교체!) */}
+<HostProfileSection 
+              hostId={experience.host_id}
+              name={hostProfile?.name || 'Tomoyo'}
+              avatarUrl={hostProfile?.avatar_url}
+              job="패션 디자이너" // DB 필드 연동 필요 (hostProfile.job)
+              dreamDestination="중앙아메리카 커피 여행!"
+              favoriteSong="Growing on me - The Darkness"
+              languages={['영어', '일본어']}
+              intro={hostProfile?.self_intro || "도쿄의 숨겨진 빈티지 샵을 소개하는 것을 좋아합니다. 패션과 커피를 사랑해요!"}
+            />
 
 {/* 지도 섹션 (구글 맵 연동 복구됨) */}
 <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
