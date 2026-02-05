@@ -3,7 +3,7 @@
 import React from 'react';
 import { 
   Search, ChevronRight, User, Mail, Globe, MessageCircle, Phone, Smile, 
-  Calendar, MapPin, Cake, CheckCircle2, ShoppingBag, CreditCard, StickyNote 
+  Calendar, MapPin, Cake, CheckCircle2, ShoppingBag, CreditCard, StickyNote, Star, Clock 
 } from 'lucide-react';
 import { InfoRow } from './SharedComponents';
 
@@ -60,7 +60,7 @@ export default function ManagementTab({
             <ListItem key={exp.id} selected={selectedItem?.id === exp.id} onClick={()=>setSelectedItem(exp)} img={exp.photos?.[0]} title={exp.title} subtitle={`₩${exp.price.toLocaleString()}`} status={exp.status} date={exp.created_at} />
           ))}
 
-          {/* ✅ C. 고객(유저) 리스트 (리스트뷰로 복구됨) */}
+          {/* ✅ C. 고객(유저) 리스트 */}
           {activeTab === 'USERS' && users.map((user:any) => (
             <ListItem 
               key={user.id} 
@@ -99,15 +99,23 @@ export default function ManagementTab({
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               
               {/* 공통 헤더 */}
-              <div className="border-b border-slate-100 pb-6">
-                {activeTab !== 'USERS' ? (
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide ${selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{selectedItem.status}</span>
-                ) : (
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide bg-slate-100 text-slate-600">Customer</span>
+              <div className="border-b border-slate-100 pb-6 flex justify-between items-start">
+                <div>
+                  {activeTab !== 'USERS' ? (
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide ${selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{selectedItem.status}</span>
+                  ) : (
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide bg-slate-100 text-slate-600">Customer</span>
+                  )}
+                  <h2 className="text-3xl font-black text-slate-900 leading-tight">{selectedItem.title || selectedItem.name || selectedItem.full_name || 'Unknown'}</h2>
+                  <p className="text-xs text-slate-400 mt-2 font-mono">ID: {selectedItem.id}</p>
+                </div>
+                {/* 최근 접속 시간 (USERS 탭 전용) */}
+                {activeTab === 'USERS' && (
+                  <div className="text-right">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase mb-1 flex items-center justify-end gap-1"><Clock size={10}/> 최근 접속</div>
+                    <div className="text-sm font-bold text-slate-700">방금 전 (Online)</div>
+                  </div>
                 )}
-                
-                <h2 className="text-3xl font-black text-slate-900 leading-tight">{selectedItem.title || selectedItem.name || selectedItem.full_name || 'Unknown'}</h2>
-                <p className="text-xs text-slate-400 mt-2 font-mono">ID: {selectedItem.id}</p>
               </div>
 
               {/* ✅ [USERS] 고객 상세 정보 (대폭 강화됨) */}
@@ -127,7 +135,7 @@ export default function ManagementTab({
                     </div>
                   </div>
 
-                  {/* 2. 구매 활동 요약 (통계) */}
+                  {/* 2. 구매 활동 요약 */}
                   <div>
                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><ShoppingBag size={12}/> 구매 활동</h4>
                     <div className="grid grid-cols-3 gap-4 mb-4">
@@ -136,15 +144,11 @@ export default function ManagementTab({
                        <StatSmall label="마지막 구매" value="3일 전" color="bg-slate-50 text-slate-700" />
                     </div>
                     
-                    {/* 구매 내역 테이블 (예시 데이터) */}
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                    {/* 구매 내역 테이블 */}
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
                       <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase border-b border-slate-100">
-                          <tr>
-                            <th className="px-4 py-3">체험명</th>
-                            <th className="px-4 py-3">날짜</th>
-                            <th className="px-4 py-3 text-right">금액</th>
-                          </tr>
+                          <tr><th className="px-4 py-3">체험명</th><th className="px-4 py-3">날짜</th><th className="px-4 py-3 text-right">금액</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {[1,2,3].map(i => (
@@ -159,13 +163,28 @@ export default function ManagementTab({
                     </div>
                   </div>
 
-                  {/* 3. 관리자 메모 (제안 기능) */}
+                  {/* ✅ [New] 호스트가 남긴 리뷰 */}
                   <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><Star size={12}/> 호스트 리뷰 (3개)</h4>
+                    <div className="space-y-3">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-bold text-sm text-slate-900 flex items-center gap-1">Host Kim <Star size={10} fill="black" className="text-black"/> 5.0</span>
+                            <span className="text-xs text-slate-400">2026.01.1{i}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            약속 시간도 잘 지켜주시고 매너가 너무 좋으신 게스트님이었습니다. 다음에도 꼭 모시고 싶어요! 추천합니다.
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3. 관리자 메모 */}
+                  <div className="mt-8">
                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1"><StickyNote size={12}/> 관리자 메모</h4>
-                     <textarea 
-                       className="w-full p-4 bg-yellow-50 border border-yellow-100 rounded-xl text-sm placeholder:text-yellow-700/50 focus:outline-none focus:border-yellow-300 transition-all resize-none h-24 text-yellow-900 leading-relaxed" 
-                       placeholder="이 고객에 대한 특이사항을 기록하세요. (예: VIP 고객, 노쇼 이력 있음 등)"
-                     />
+                     <textarea className="w-full p-4 bg-yellow-50 border border-yellow-100 rounded-xl text-sm placeholder:text-yellow-700/50 focus:outline-none focus:border-yellow-300 transition-all resize-none h-24 text-yellow-900 leading-relaxed" placeholder="이 고객에 대한 특이사항을 기록하세요." />
                   </div>
 
                   {/* 계정 관리 버튼 */}
@@ -200,6 +219,7 @@ export default function ManagementTab({
                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>
                     <div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div>
                   </div>
+                  {/* 동선 (Itinerary) */}
                   {selectedItem.itinerary && (
                     <div>
                       <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">진행 코스</h4>
