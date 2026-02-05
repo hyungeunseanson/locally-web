@@ -26,12 +26,13 @@ export default function ManagementTab({
       
       {/* 1. 리스트 영역 (왼쪽) */}
       <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm min-w-[320px]">
-        {/* ... (필터 헤더 - 기존과 동일) ... */}
+        
+        {/* 필터 헤더 */}
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10 backdrop-blur-sm">
           <h3 className="font-bold text-lg text-slate-800">
             {activeTab === 'APPS' && '📝 호스트 지원서'}
             {activeTab === 'EXPS' && '🎈 등록된 체험'}
-            {activeTab === 'USERS' && '👥 고객(User) 리스트'}
+            {activeTab === 'USERS' && '👥 고객 관리'}
             {activeTab === 'CHATS' && '💬 메시지 관리'}
           </h3>
           {activeTab !== 'CHATS' && activeTab !== 'USERS' && (
@@ -43,43 +44,73 @@ export default function ManagementTab({
           )}
         </div>
 
-        {/* 리스트 아이템 */}
+        {/* 리스트 아이템 (스크롤 영역) */}
         <div className="overflow-y-auto flex-1 p-3 space-y-2">
+          
+          {/* A. 호스트 지원서 */}
           {activeTab === 'APPS' && apps.filter((item:any) => filter === 'ALL' ? true : filter === 'PENDING' ? item.status === 'pending' : item.status !== 'pending').map((app:any) => (
             <ListItem key={app.id} selected={selectedItem?.id === app.id} onClick={()=>setSelectedItem(app)} title={app.name} subtitle={`${app.host_nationality} / ${app.target_language}`} status={app.status} date={app.created_at} />
           ))}
+
+          {/* B. 체험 리스트 */}
           {activeTab === 'EXPS' && exps.filter((item:any) => filter === 'ALL' ? true : filter === 'PENDING' ? item.status === 'pending' : item.status === 'active').map((exp:any) => (
             <ListItem key={exp.id} selected={selectedItem?.id === exp.id} onClick={()=>setSelectedItem(exp)} img={exp.photos?.[0]} title={exp.title} subtitle={`₩${exp.price.toLocaleString()}`} status={exp.status} date={exp.created_at} />
           ))}
+
+          {/* ✅ C. 고객(유저) 리스트 (리스트뷰 복구) */}
           {activeTab === 'USERS' && users.map((user:any) => (
-            // ... (기존 유저 리스트 코드 유지) ...
-            <div key={user.id} className="p-5 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors bg-white">
-               <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center"><User size={20}/></div>
-                  <div><div className="font-bold">{user.full_name || 'Unknown'}</div><div className="text-xs text-slate-500">{user.email}</div></div>
-               </div>
+            <ListItem 
+              key={user.id} 
+              selected={selectedItem?.id === user.id} 
+              onClick={()=>setSelectedItem(user)} 
+              img={user.avatar_url} 
+              title={user.full_name || user.name || 'Unknown'} 
+              subtitle={user.email} 
+              status={user.nationality || '미상'} 
+              date={user.created_at} 
+              isUser={true}
+            />
+          ))}
+
+          {/* D. 메시지 */}
+          {activeTab === 'CHATS' && messages.map((msg:any) => (
+            <div key={msg.id} className="p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors">
+              <div className="flex justify-between mb-1.5">
+                <span className="font-bold text-xs text-slate-800 flex items-center gap-1">
+                  <span className="bg-slate-100 px-1.5 rounded text-slate-500">{msg.sender_name || 'User'}</span>
+                  <ChevronRight size={10} className="text-slate-300"/>
+                  <span className="bg-slate-900 text-white px-1.5 rounded">{msg.receiver_name || 'Host'}</span>
+                </span>
+                <span className="text-[10px] text-slate-400">{new Date(msg.created_at).toLocaleString()}</span>
+              </div>
+              <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">{msg.content}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 2. 상세 보기 영역 (오른쪽 - 대폭 강화됨!) */}
-      {(activeTab === 'APPS' || activeTab === 'EXPS') && (
+      {/* 2. 상세 보기 영역 (오른쪽) */}
+      {(activeTab !== 'CHATS') && (
         <div className="flex-[1.5] bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col p-8 overflow-y-auto shadow-sm">
           {selectedItem ? (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               
-              {/* 타이틀 및 상태 */}
+              {/* 타이틀 및 상태 헤더 */}
               <div className="border-b border-slate-100 pb-6">
-                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide ${selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{selectedItem.status}</span>
-                <h2 className="text-3xl font-black text-slate-900 leading-tight">{selectedItem.title || selectedItem.name}</h2>
+                {activeTab !== 'USERS' && (
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide ${selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{selectedItem.status}</span>
+                )}
+                {activeTab === 'USERS' && (
+                   <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 uppercase tracking-wide bg-slate-100 text-slate-600">Customer</span>
+                )}
+                
+                <h2 className="text-3xl font-black text-slate-900 leading-tight">{selectedItem.title || selectedItem.name || selectedItem.full_name || 'Unknown'}</h2>
                 <p className="text-xs text-slate-400 mt-2 font-mono">ID: {selectedItem.id}</p>
               </div>
 
-              {/* ✅ 체험 상세 정보 (모든 데이터 표시) */}
+              {/* A. 체험 상세 정보 */}
               {activeTab === 'EXPS' && (
                 <>
-                  {/* 사진 갤러리 */}
                   {selectedItem.photos && (
                     <div>
                       <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">등록된 사진</h4>
@@ -90,21 +121,16 @@ export default function ManagementTab({
                       </div>
                     </div>
                   )}
-
-                  {/* 기본 정보 */}
                   <div className="grid grid-cols-2 gap-4">
                     <InfoBox label="가격" value={`₩${selectedItem.price?.toLocaleString()}`} />
                     <InfoBox label="소요 시간" value={`${selectedItem.duration}시간`} />
                     <InfoBox label="최대 인원" value={`${selectedItem.max_guests}명`} />
                     <InfoBox label="지역" value={`${selectedItem.country} > ${selectedItem.city}`} />
                   </div>
-
-                  {/* 상세 설명 */}
                   <div>
                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>
                     <div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div>
                   </div>
-
                   {/* 동선 (Itinerary) */}
                   {selectedItem.itinerary && (
                     <div>
@@ -120,8 +146,6 @@ export default function ManagementTab({
                       </div>
                     </div>
                   )}
-
-                  {/* 포함/불포함 */}
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">포함 사항</h4>
@@ -135,7 +159,7 @@ export default function ManagementTab({
                 </>
               )}
 
-              {/* ✅ 호스트 지원서 상세 (기존 유지) */}
+              {/* B. 호스트 지원서 상세 */}
               {activeTab === 'APPS' && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
@@ -151,11 +175,47 @@ export default function ManagementTab({
                 </div>
               )}
 
-              {/* 승인/거절 버튼 */}
-              <div className="pt-8 mt-8 border-t border-slate-100 grid grid-cols-2 gap-4 sticky bottom-0 bg-white pb-4">
-                <button onClick={()=>updateStatus(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절 (Reject)</button>
-                <button onClick={()=>updateStatus(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id, 'approved')} className="py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg hover:shadow-xl transition-all">승인 (Approve)</button>
-              </div>
+              {/* ✅ C. 고객(User) 상세 정보 (자기소개 제외, 핵심 정보만 깔끔하게) */}
+              {activeTab === 'USERS' && (
+                <div className="space-y-6">
+                  {/* 프로필 헤더 */}
+                  <div className="flex items-center gap-6 mb-6">
+                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
+                      {selectedItem.avatar_url ? <img src={selectedItem.avatar_url} className="w-full h-full object-cover"/> : <User size={40} className="text-slate-400"/>}
+                    </div>
+                    <div>
+                      <div className="text-sm text-slate-500 mb-1">가입일</div>
+                      <div className="font-bold text-lg">{new Date(selectedItem.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+
+                  {/* 정보 그리드 */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <InfoBox label="이메일" value={selectedItem.email} />
+                    <InfoBox label="연락처" value={selectedItem.phone} />
+                    <InfoBox label="국적" value={selectedItem.nationality} />
+                    <InfoBox label="생년월일" value={selectedItem.birth_date ? `${selectedItem.birth_date} ${calculateAge(selectedItem.birth_date)}` : '-'} />
+                    <InfoBox label="카카오톡 ID" value={selectedItem.kakao_id} />
+                    <InfoBox label="MBTI" value={selectedItem.mbti} />
+                  </div>
+
+                  {/* 계정 관리 버튼 */}
+                  <div className="pt-8 mt-8 border-t border-slate-100">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">계정 관리</h4>
+                    <button onClick={()=>deleteItem('profiles', selectedItem.id)} className="w-full py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">
+                      계정 영구 삭제 (Delete User)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 승인/거절 버튼 (APPS, EXPS 전용) */}
+              {activeTab !== 'USERS' && (
+                <div className="pt-8 mt-8 border-t border-slate-100 grid grid-cols-2 gap-4 sticky bottom-0 bg-white pb-4">
+                  <button onClick={()=>updateStatus(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절 (Reject)</button>
+                  <button onClick={()=>updateStatus(activeTab==='APPS'?'host_applications':'experiences', selectedItem.id, 'approved')} className="py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg hover:shadow-xl transition-all">승인 (Approve)</button>
+                </div>
+              )}
 
             </div>
           ) : (
@@ -170,14 +230,32 @@ export default function ManagementTab({
   );
 }
 
-// 작은 컴포넌트들
-function ListItem({ selected, onClick, img, title, subtitle, status, date }: any) {
+// 리스트 아이템 컴포넌트
+function ListItem({ selected, onClick, img, title, subtitle, status, date, isUser }: any) {
   return (
     <div onClick={onClick} className={`p-4 rounded-xl border cursor-pointer transition-all flex gap-4 items-center ${selected ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900' : 'border-slate-100 hover:border-slate-300 hover:bg-white bg-white'}`}>
-      {img ? <img src={img} className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0"/> : <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0"><User size={20}/></div>}
+      {img ? (
+        <img src={img} className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0"/>
+      ) : (
+        <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+          <User size={20}/>
+        </div>
+      )}
+      
       <div className="flex-1 min-w-0">
-        <div className="flex justify-between mb-1"><div className="font-bold text-sm truncate text-slate-900">{title}</div><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${status==='pending'?'bg-yellow-100 text-yellow-700':status==='approved' || status==='active'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{status}</span></div>
-        <div className="flex justify-between text-xs text-slate-500"><span>{subtitle}</span><span className="text-slate-400 font-mono">{new Date(date).toLocaleDateString()}</span></div>
+        <div className="flex justify-between mb-1">
+          <div className="font-bold text-sm truncate text-slate-900">{title}</div>
+          {/* 유저일 경우 국적을 status 위치에 표시, 상태 뱃지 스타일 다르게 */}
+          {isUser ? (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{status}</span>
+          ) : (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${status==='pending'?'bg-yellow-100 text-yellow-700':status==='approved' || status==='active'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{status}</span>
+          )}
+        </div>
+        <div className="flex justify-between text-xs text-slate-500">
+          <span>{subtitle}</span>
+          <span className="text-slate-400 font-mono">{new Date(date).toLocaleDateString()}</span>
+        </div>
       </div>
     </div>
   );
