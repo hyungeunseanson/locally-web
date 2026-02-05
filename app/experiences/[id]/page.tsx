@@ -11,6 +11,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewSection from './components/ReviewSection';
 import ReservationCard from './components/ReservationCard';
+import HostProfileCard from '@/app/components/HostProfileCard'; // ✅ 이거 꼭 추가!
 
 export default function ExperienceDetailPage() {
   const router = useRouter();
@@ -153,17 +154,18 @@ export default function ExperienceDetailPage() {
             {/* 후기 */}
             <ReviewSection hostName={hostProfile?.name || 'Locally'} />
 
-            {/* 호스트 상세 */}
-            <div className="border-b border-slate-200 pb-8">
-              <h3 className="text-xl font-bold mb-6">호스트 소개</h3>
-              <div className="space-y-4">
-                 <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/></div>
-                    <div><h4 className="text-lg font-bold">호스트 {hostProfile?.name || 'Locally'}님</h4><div className="flex gap-2 items-center text-xs text-slate-500 mt-1"><ShieldCheck size={14} className="text-black"/> 신원 인증됨 · 슈퍼호스트</div></div>
-                 </div>
-                 <p className="text-slate-600 leading-relaxed max-w-2xl">{hostProfile?.self_intro || "안녕하세요! 여행을 사랑하는 호스트입니다."}</p>
-                 <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-100 transition-colors inline-block mt-2">호스트에게 연락하기</button>
-              </div>
+            {/* 호스트 상세 프로필 카드 (신규 적용) */}
+            <div className="py-8">
+              <HostProfileCard 
+                hostId={experience.host_id}
+                name={hostProfile?.name || 'Locally Host'}
+                avatarUrl={hostProfile?.avatar_url} // 호스트 아바타 URL 필요
+                job={hostProfile?.job || '여행 가이드'} // DB 필드 확인 필요
+                intro={hostProfile?.self_intro}
+                languages={['한국어', '영어']} // DB에 언어 필드가 있다면 연동
+                dreamDestination="중앙아메리카 커피 여행!"
+                favoriteSong="Growing on me - The Darkness"
+              />
             </div>
 
 {/* 지도 섹션 (구글 맵 연동 복구됨) */}
