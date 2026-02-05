@@ -13,14 +13,14 @@ interface MainSearchBarProps {
   dateRange: { start: Date | null, end: Date | null };
   setDateRange: (range: any) => void;
   onCategorySelect: (id: string) => void;
-  style: any;
+  isVisible: boolean; // 스크롤에 따른 표시 여부 제어
 }
 
 export default function MainSearchBar({
   activeSearchField, setActiveSearchField,
   locationInput, setLocationInput,
   dateRange, setDateRange,
-  onCategorySelect, style
+  onCategorySelect, isVisible
 }: MainSearchBarProps) {
 
   const formatDateRange = () => {
@@ -32,7 +32,10 @@ export default function MainSearchBar({
   };
 
   return (
-    <div className="relative w-full max-w-3xl h-[66px]" style={style}>
+    // ✨ 핵심 수정: CSS 클래스로 투명도/위치 제어 (훨씬 부드러움)
+    <div 
+      className={`relative w-full max-w-3xl h-[66px] transition-all duration-300 ease-in-out ${isVisible ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 -translate-y-4 scale-95 pointer-events-none'}`}
+    >
       <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100' : 'border-slate-200'} rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] transition-all`}>
         {/* 여행지 입력 */}
         <div 
