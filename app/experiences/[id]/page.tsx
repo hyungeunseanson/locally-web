@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Share, Heart, ChevronRight, ShieldCheck, MapPin, MessageSquare, Check, X, Clock, User, Globe } from 'lucide-react';
+import { 
+  Share, Heart, ChevronRight, ShieldCheck, MapPin, MessageSquare, Check, X, 
+  Clock, User, Globe, Users, Zap, ShieldAlert, CalendarX 
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -88,6 +91,7 @@ export default function ExperienceDetailPage() {
       {showToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400"/> 링크가 복사되었습니다.</div>}
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
+        {/* 헤더 섹션 */}
         <section className="mb-6">
           <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
           <div className="flex justify-between items-end">
@@ -103,6 +107,7 @@ export default function ExperienceDetailPage() {
           </div>
         </section>
 
+        {/* 이미지 섹션 */}
         <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
            <img src={experience.photos?.[0] || experience.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
@@ -110,7 +115,10 @@ export default function ExperienceDetailPage() {
         </section>
 
         <div className="flex flex-col md:flex-row gap-16 relative">
+          
+          {/* 왼쪽 컨텐츠 영역 */}
           <div className="flex-1 space-y-12">
+            
             {/* 호스트 요약 */}
             <div className="border-b border-slate-200 pb-8 flex justify-between items-center">
               <div>
@@ -126,7 +134,7 @@ export default function ExperienceDetailPage() {
               <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p>
             </div>
 
-            {/* ✨ 동선 (루트) 타임라인 - 신규 추가! */}
+            {/* 동선 (루트) 타임라인 */}
             {experience.itinerary && (
               <div className="border-b border-slate-200 pb-8">
                 <h3 className="text-xl font-bold mb-6">진행 코스</h3>
@@ -205,27 +213,7 @@ export default function ExperienceDetailPage() {
                )}
             </div>
 
-            import { 
-  // ... 기존 import ...
-  // 👇 아래 아이콘들이 import에 포함되어 있어야 합니다. (없으면 추가해주세요)
-  Users, Zap, ShieldAlert, CalendarX 
-} from 'lucide-react';
-
-// ... (중략) ...
-
-            {/* 🔴 [변경 전] 기존 코드: 알아두어야 할 사항 (텍스트 위주) */}
-            {/* <div className="pb-12">
-               <h3 className="text-xl font-bold mb-6">알아두어야 할 사항</h3>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                  <div>
-                     <div className="font-bold text-sm mb-1.5 text-slate-900">참가 연령</div>
-                     ...
-                  </div>
-                  ...
-               </div>
-            </div> */}
-
-            {/* 🟢 [변경 후] 새로운 코드: 아이콘이 포함된 2x2 모던 그리드 디자인 */}
+            {/* 알아두어야 할 사항 (2x2 모던 그리드 with Icons) */}
             <div className="py-12 border-t border-slate-200">
                <h3 className="text-2xl font-bold mb-8">알아두어야 할 사항</h3>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
@@ -286,6 +274,7 @@ export default function ExperienceDetailPage() {
             </div>
           </div>
 
+          {/* 오른쪽 스티키 예약 카드 */}
           <div className="w-full md:w-[380px]">
             <ReservationCard 
               price={Number(experience.price)} 
@@ -298,7 +287,7 @@ export default function ExperienceDetailPage() {
         </div>
       </main>
 
-      {/* ✅ 푸터 (복구됨!) */}
+      {/* 푸터 */}
       <footer className="border-t border-slate-100 bg-slate-50 mt-20">
         <div className="max-w-[1120px] mx-auto px-6 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
