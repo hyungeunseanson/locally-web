@@ -20,7 +20,7 @@ export default function CreateExperiencePage() {
   const [isCustomCity, setIsCustomCity] = useState(false); 
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   
-  // ✅ 리스트 입력을 위한 임시 상태 (포함/불포함)
+  // 리스트 입력을 위한 임시 상태 (포함/불포함)
   const [tempInclusion, setTempInclusion] = useState('');
   const [tempExclusion, setTempExclusion] = useState('');
 
@@ -31,7 +31,7 @@ export default function CreateExperiencePage() {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
-  // ✅ 리스트 추가/삭제 헬퍼 함수
+  // 리스트 추가/삭제 헬퍼 함수
   const addItem = (field: 'inclusions' | 'exclusions', value: string, setter: any) => {
     if (!value.trim()) return;
     updateData(field, [...formData[field], value]);
@@ -62,7 +62,7 @@ export default function CreateExperiencePage() {
     }
   };
 
-  // ✅ DB 저장 로직
+  // DB 저장 로직
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -107,7 +107,7 @@ export default function CreateExperiencePage() {
       ]);
 
       if (error) throw error;
-      setStep(step + 1); // 완료 화면(Step 6)으로 이동
+      setStep(step + 1); // 완료 화면으로 이동
 
     } catch (error: any) {
       console.error(error);
@@ -222,41 +222,15 @@ export default function CreateExperiencePage() {
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">매력을 듬뿍 담아<br/>소개해 주세요</h1>
             </div>
             <div className="space-y-6 text-left">
-              <div>
-                <label className="font-bold block mb-2 text-xs text-slate-500 ml-1">상세 소개글</label>
-                <textarea placeholder="투어의 매력 포인트, 진행 방식, 방문하는 장소의 특징 등을 자유롭게 적어주세요." value={formData.description} onChange={(e)=>updateData('description', e.target.value)} className="w-full p-4 h-40 bg-slate-50 rounded-xl outline-none resize-none text-sm leading-relaxed border-2 border-transparent focus:border-black focus:bg-white transition-all"/>
-              </div>
-              <div>
-                <label className="font-bold block mb-2 text-xs text-slate-500 ml-1">방문 장소 & 코스 요약</label>
-                <input type="text" placeholder="예) 신주쿠역 -> 오모이데 요코초 -> 야키토리집" value={formData.spots} onChange={(e)=>updateData('spots', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none border border-transparent focus:border-black focus:bg-white transition-all text-sm"/>
-              </div>
-              <div>
-                <label className="font-bold block mb-2 text-xs text-slate-500 ml-1">만나는 장소</label>
-                <div className="flex items-center gap-2 bg-slate-50 p-3.5 rounded-xl border border-transparent focus-within:border-black focus-within:bg-white transition-all">
-                  <MapPin size={16} className="text-slate-400"/>
-                  <input type="text" placeholder="예) 신주쿠역 동쪽 출구 스타벅스 앞" value={formData.meetingPoint} onChange={(e)=>updateData('meetingPoint', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium"/>
-                </div>
-              </div>
-              <div>
-                <label className="font-bold block mb-2 text-xs text-slate-500 flex justify-between ml-1">투어 사진 (5장 이상 권장)<span className="text-slate-400 text-[10px] font-normal">현재 {formData.photos.length}장</span></label>
-                <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide">
-                  <label className="w-24 h-24 flex-shrink-0 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all">
-                    <Camera size={20} className="text-slate-400 mb-1"/>
-                    <span className="text-[10px] text-slate-500 font-bold">사진 추가</span>
-                    <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload}/>
-                  </label>
-                  {formData.photos.map((url, idx) => (
-                    <div key={idx} className="w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden relative border border-slate-200 shadow-sm">
-                      <img src={url} className="w-full h-full object-cover"/>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div><label className="font-bold block mb-2 text-xs text-slate-500 ml-1">상세 소개글</label><textarea placeholder="투어의 매력 포인트, 진행 방식, 방문하는 장소의 특징 등을 자유롭게 적어주세요." value={formData.description} onChange={(e)=>updateData('description', e.target.value)} className="w-full p-4 h-40 bg-slate-50 rounded-xl outline-none resize-none text-sm leading-relaxed border-2 border-transparent focus:border-black focus:bg-white transition-all"/></div>
+              <div><label className="font-bold block mb-2 text-xs text-slate-500 ml-1">방문 장소 & 코스 요약</label><input type="text" placeholder="예) 신주쿠역 -> 오모이데 요코초 -> 야키토리집" value={formData.spots} onChange={(e)=>updateData('spots', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none border border-transparent focus:border-black focus:bg-white transition-all text-sm"/></div>
+              <div><label className="font-bold block mb-2 text-xs text-slate-500 ml-1">만나는 장소</label><div className="flex items-center gap-2 bg-slate-50 p-3.5 rounded-xl border border-transparent focus-within:border-black focus-within:bg-white transition-all"><MapPin size={16} className="text-slate-400"/><input type="text" placeholder="예) 신주쿠역 동쪽 출구 스타벅스 앞" value={formData.meetingPoint} onChange={(e)=>updateData('meetingPoint', e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium"/></div></div>
+              <div><label className="font-bold block mb-2 text-xs text-slate-500 flex justify-between ml-1">투어 사진 (5장 이상 권장)<span className="text-slate-400 text-[10px] font-normal">현재 {formData.photos.length}장</span></label><div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide"><label className="w-24 h-24 flex-shrink-0 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all"><Camera size={20} className="text-slate-400 mb-1"/><span className="text-[10px] text-slate-500 font-bold">사진 추가</span><input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload}/></label>{formData.photos.map((url, idx) => (<div key={idx} className="w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden relative border border-slate-200 shadow-sm"><img src={url} className="w-full h-full object-cover"/></div>))}</div></div>
             </div>
           </div>
         )}
 
-        {/* ✅ STEP 4: 제공 및 규칙 (신규 추가!) */}
+        {/* STEP 4: 제공 및 규칙 */}
         {step === 4 && (
           <div className="w-full space-y-8 text-center animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
@@ -340,7 +314,7 @@ export default function CreateExperiencePage() {
           </div>
         )}
 
-        {/* STEP 5: 가격 설정 (기존 Step 4) */}
+        {/* STEP 5: 가격 설정 */}
         {step === 5 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -352,18 +326,12 @@ export default function CreateExperiencePage() {
                 <span className="absolute left-8 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-300">₩</span>
                 <input type="number" value={formData.price} onChange={(e) => updateData('price', Number(e.target.value))} className="w-full pl-16 pr-4 py-4 text-4xl font-black text-center border-b-4 border-slate-200 focus:border-black outline-none bg-transparent transition-all placeholder:text-slate-200"/>
               </div>
-              <div className="bg-white p-6 rounded-[1.5rem] w-full max-w-sm border border-slate-100 shadow-xl shadow-slate-200/50">
-                <h3 className="font-bold text-base mb-4 border-b border-slate-100 pb-3 text-center">💰 정산 예상 금액</h3>
-                <div className="flex justify-between text-sm mb-2"><span className="text-slate-500">설정 가격</span><span className="font-bold">₩{formData.price.toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm mb-4"><span className="text-slate-500">호스트 수수료 (20%)</span><span className="font-bold text-rose-500">- ₩{(formData.price * 0.2).toLocaleString()}</span></div>
-                <div className="border-t-2 border-dashed border-slate-100 pt-4 flex justify-between items-center"><span className="font-bold text-slate-900">내 통장에 입금</span><span className="text-xl font-black text-blue-600">₩{(formData.price * 0.8).toLocaleString()}</span></div>
-                <div className="mt-6 bg-slate-50 p-3 rounded-lg text-[10px] text-slate-400 text-center leading-relaxed">* 게스트 결제 시에는 플랫폼 수수료(10%)가 별도로 부과됩니다.<br/>(호스트 정산금에는 영향을 주지 않습니다)</div>
-              </div>
+              <div className="bg-white p-6 rounded-[1.5rem] w-full max-w-sm border border-slate-100 shadow-xl shadow-slate-200/50"><h3 className="font-bold text-base mb-4 border-b border-slate-100 pb-3 text-center">💰 정산 예상 금액</h3><div className="flex justify-between text-sm mb-2"><span className="text-slate-500">설정 가격</span><span className="font-bold">₩{formData.price.toLocaleString()}</span></div><div className="flex justify-between text-sm mb-4"><span className="text-slate-500">호스트 수수료 (20%)</span><span className="font-bold text-rose-500">- ₩{(formData.price * 0.2).toLocaleString()}</span></div><div className="border-t-2 border-dashed border-slate-100 pt-4 flex justify-between items-center"><span className="font-bold text-slate-900">내 통장에 입금</span><span className="text-xl font-black text-blue-600">₩{(formData.price * 0.8).toLocaleString()}</span></div><div className="mt-6 bg-slate-50 p-3 rounded-lg text-[10px] text-slate-400 text-center leading-relaxed">* 게스트 결제 시에는 플랫폼 수수료(10%)가 별도로 부과됩니다.<br/>(호스트 정산금에는 영향을 주지 않습니다)</div></div>
             </div>
           </div>
         )}
 
-        {/* STEP 6: 완료 화면 (기존 Step 5) */}
+        {/* STEP 6: 완료 화면 */}
         {step === 6 && (
           <div className="w-full text-center space-y-8 animate-in zoom-in-95 duration-500">
             <div className="w-28 h-28 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-100">
@@ -390,7 +358,7 @@ export default function CreateExperiencePage() {
       </main>
 
       {/* 3. 하단 고정 네비게이션 */}
-      {step < totalSteps && (
+      {step < TOTAL_STEPS && (
         <footer className="h-20 px-6 border-t border-slate-100 flex items-center justify-between sticky bottom-0 bg-white/90 backdrop-blur-lg z-50">
           <button 
             onClick={prevStep}
@@ -401,7 +369,7 @@ export default function CreateExperiencePage() {
           </button>
 
           <div className="flex gap-2">
-            {step === totalSteps - 1 ? (
+            {step === TOTAL_STEPS - 1 ? (  // ✅ 여기서 문제가 해결되었습니다!
               <button 
                 onClick={handleSubmit} 
                 disabled={loading}
