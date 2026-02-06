@@ -13,6 +13,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const supabase = createClient();
 
+  // 이미지 URL 보안 처리 (http -> https)
   const secureUrl = (url: string) => {
     if (!url) return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -29,7 +30,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
       setCurrentUser(user);
 
-      // 🚨 [긴급 수정] role 필드 삭제 (에러 원인 제거)
+      // ✅ [수정] role 필드 제거 (DB 에러 방지)
       let query = supabase
         .from('inquiries')
         .select(`
@@ -40,9 +41,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         `)
         .order('updated_at', { ascending: false });
 
-      if (role === 'guest') query = query.eq('user_id', user.id);
-      else if (role === 'host') query = query.eq('host_id', user.id).eq('type', 'general');
-      else if (role === 'admin') query = query.eq('type', 'admin');
+      if (role === 'guest') {
+        query = query.eq('user_id', user.id);
+      } else if (role === 'host') {
+        query = query.eq('host_id', user.id).eq('type', 'general');
+      } else if (role === 'admin') {
+        // ✅ [수정] 관리자는 모든 채팅을 볼 수 있도록 필터 제거 (모니터링 기능 복구)
+        // 필요하다면 query = query.eq('type', 'admin'); 으로 되돌릴 수 있음
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -65,7 +71,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // 🚨 [긴급 수정] 여기도 role 필드 삭제
+      // ✅ [수정] role 필드 제거
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url)`)

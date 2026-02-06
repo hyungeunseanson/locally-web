@@ -9,7 +9,7 @@ import BookingsTab from './components/BookingsTab';
 import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
-import ChatMonitor from './components/ChatMonitor'; // ✅ [추가] ChatMonitor 임포트
+import ChatMonitor from './components/ChatMonitor'; // ✅ [필수] ChatMonitor 임포트
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'BOOKINGS' | 'CHATS' | 'SALES' | 'ANALYTICS'>('APPS');
@@ -19,7 +19,7 @@ export default function AdminDashboardPage() {
   const [exps, setExps] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
-  // const [messages, setMessages] = useState<any[]>([]); // ❌ 기존 messages는 더 이상 사용 안 함
+  // const [messages, setMessages] = useState<any[]>([]); // ❌ 더 이상 사용 안 함
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]); 
 
@@ -62,8 +62,6 @@ export default function AdminDashboardPage() {
     
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
     if (bookingData) setBookings(bookingData);
-    
-    // ❌ 기존 메시지 로딩 로직 제거 (ChatMonitor 내부에서 처리함)
   };
 
   const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
@@ -134,7 +132,7 @@ export default function AdminDashboardPage() {
           ) : activeTab === 'ANALYTICS' ? (
             <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
           ) : activeTab === 'CHATS' ? (
-            // ✅ [수정완료] 여기가 핵심입니다. ManagementTab 대신 ChatMonitor를 렌더링합니다.
+            // ✅ [수정완료] CHATS 탭일 때 ChatMonitor 렌더링
             <ChatMonitor />
           ) : (
             <ManagementTab 

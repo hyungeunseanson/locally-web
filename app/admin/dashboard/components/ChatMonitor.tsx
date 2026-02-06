@@ -32,9 +32,9 @@ export default function ChatMonitor() {
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-              <MessageCircle size={18}/> 1:1 문의함
+              <MessageCircle size={18}/> 1:1 문의 & 모니터링
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
+            <p className="text-xs text-slate-500 mt-1">모든 대화 내역 조회</p>
           </div>
           <button onClick={refresh} className="p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
@@ -68,8 +68,11 @@ export default function ChatMonitor() {
               >
                 <div className="flex justify-between mb-1">
                   <span className="font-bold text-sm text-slate-800 flex items-center gap-1">
+                    {/* 문의 유형 구분 표시 */}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded mr-1 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-200 text-slate-600'}`}>
+                      {inq.type === 'admin' ? '관리자' : '일반'}
+                    </span>
                     {getGuestName(inq.guest)}
-                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono">#{inq.id}</span>
                   </span>
                   <span className="text-[10px] text-slate-400">{new Date(inq.updated_at).toLocaleDateString()}</span>
                 </div>
@@ -95,8 +98,8 @@ export default function ChatMonitor() {
                 </div>
                 <div>
                   <div className="font-bold text-lg text-slate-900">{getGuestName(selectedInquiry.guest)}</div>
-                  <div className="text-xs text-slate-400 flex items-center gap-1">
-                    문의 ID: {selectedInquiry.id}
+                  <div className="text-xs text-slate-400">
+                    {selectedInquiry.type === 'admin' ? '관리자 1:1 문의' : `호스트: ${selectedInquiry.host?.full_name || '알수없음'}`}
                   </div>
                 </div>
               </div>
@@ -104,19 +107,22 @@ export default function ChatMonitor() {
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
-                // ✅ [필승 로직] 
-                // 1. 내가(로그인한 관리자) 쓴 글인가? -> 무조건 오른쪽 (Right)
-                // 2. 내가 안 썼는데, 문의자(Guest)가 쓴 글인가? -> 왼쪽 (Left)
-                // 3. 그 외(다른 관리자/호스트) -> 오른쪽 (Right)
+                // ✅ [필승 정렬 로직]
+                // 1. 내가(로그인한 관리자) 쓴 글이면 무조건 오른쪽.
+                // 2. 남(게스트)이 쓴 글이면 왼쪽.
+                // 3. 그 외(다른 관리자나 호스트)면 오른쪽.
                 const isMe = String(msg.sender_id) === String(currentUser?.id);
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 
-                // 내가 썼거나, 게스트가 안 썼으면(즉 다른 관리자가 썼으면) 오른쪽
-                const showRight = isMe || !isGuest;
+                const alignRight = isMe || !isGuest; 
 
                 return (
-                  <div key={msg.id} className={`flex ${showRight ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${showRight ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
+                  <div key={msg.id} className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}>
+                    {/* 모니터링 시 보낸 사람 이름 표시 */}
+                    <span className="text-[10px] text-slate-400 mb-1 px-1">
+                      {msg.sender?.full_name || '알 수 없음'}
+                    </span>
+                    <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${alignRight ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
                       {msg.content}
                     </div>
                   </div>
@@ -130,7 +136,7 @@ export default function ChatMonitor() {
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                // ✅ 한글 중복 방지 (완벽 해결)
+                // ✅ 한글 중복 전송 방지
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') {
@@ -147,7 +153,7 @@ export default function ChatMonitor() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
             <MessageCircle size={64} className="mb-4 opacity-20"/>
-            <p className="font-medium">좌측 목록에서 문의를 선택해주세요.</p>
+            <p className="font-medium">문의를 선택해주세요.</p>
           </div>
         )}
       </div>
