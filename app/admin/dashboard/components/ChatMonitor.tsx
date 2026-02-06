@@ -26,7 +26,7 @@ export default function ChatMonitor() {
   };
 
   return (
-    <div className="flex h-full gap-6">
+    <div className="flex h-full gap-6 w-full">
       {/* 왼쪽: 문의 목록 */}
       <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm relative">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
@@ -34,19 +34,14 @@ export default function ChatMonitor() {
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <MessageCircle size={18}/> 1:1 문의함
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
+            <p className="text-xs text-slate-500 mt-1">고객 상담 내역 (Admin)</p>
           </div>
-          {/* ✅ 새로고침 버튼 */}
-          <button 
-            onClick={refresh} 
-            className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
-            title="목록 새로고침"
-          >
+          <button onClick={refresh} className="p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           </button>
         </div>
         
-        {/* 🚨 에러 발생 시 화면에 표시 */}
+        {/* 에러 발생 시 표시 */}
         {error && (
           <div className="p-4 bg-red-50 border-b border-red-100 text-red-600 text-xs break-all">
             <div className="flex items-center gap-2 font-bold mb-1"><AlertTriangle size={14}/> 오류 발생</div>
@@ -63,10 +58,8 @@ export default function ChatMonitor() {
             <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
               <MessageCircle size={32} className="mb-2 opacity-20"/>
               <div className="text-sm font-bold mb-1">접수된 문의가 없습니다.</div>
-              {/* 👇 디버깅용 정보 표시: 로그인 상태 확인용 */}
               <div className="text-[10px] bg-slate-100 p-2 rounded text-slate-500 mt-2">
-                User: {currentUser ? currentUser.email : '로그인 안됨'}<br/>
-                ID: {currentUser?.id ? `${currentUser.id.substring(0,8)}...` : 'N/A'}
+                User: {currentUser ? currentUser.email : '로그인 안됨'}
               </div>
               <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">다시 시도</button>
             </div>
@@ -118,7 +111,7 @@ export default function ChatMonitor() {
                 <div className="text-center text-slate-400 text-sm py-10">대화 내용이 없습니다.</div>
               ) : (
                 messages.map((msg) => {
-                  const isMe = msg.sender_id === currentUser?.id; // 내가 보낸 것 (관리자)
+                  const isMe = msg.sender_id === currentUser?.id;
                   return (
                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                       <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>

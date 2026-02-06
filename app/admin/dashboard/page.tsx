@@ -9,6 +9,7 @@ import BookingsTab from './components/BookingsTab';
 import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
+import ChatMonitor from './components/ChatMonitor'; // ✅ [추가] ChatMonitor 임포트
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'BOOKINGS' | 'CHATS' | 'SALES' | 'ANALYTICS'>('APPS');
@@ -18,7 +19,7 @@ export default function AdminDashboardPage() {
   const [exps, setExps] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
+  // const [messages, setMessages] = useState<any[]>([]); // ❌ 기존 messages는 더 이상 사용 안 함
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]); 
 
@@ -62,32 +63,25 @@ export default function AdminDashboardPage() {
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
     if (bookingData) setBookings(bookingData);
     
-    const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
-    if (msgData) setMessages(msgData);
+    // ❌ 기존 메시지 로딩 로직 제거 (ChatMonitor 내부에서 처리함)
   };
 
-  // ✅ [복구됨] 상태 업데이트 로직 (승인/거절/보완)
   const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
     let comment = '';
     
-    // 거절이나 보완 요청 시 사유 입력 받기
     if (status === 'rejected' || status === 'revision') {
       const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
-      if (input === null) return; // 취소 시 중단
+      if (input === null) return;
       comment = input;
     } else {
-      // 승인 시 확인
       if (!confirm(`${status === 'approved' ? '승인' : '활성화'} 처리하시겠습니까?`)) return;
-      // 체험의 경우 approved가 아니라 active로 상태 변경 (테이블마다 상태값이 다를 수 있음)
       if (table === 'experiences' && status === 'approved') status = 'active';
     }
 
     try {
-      // 1. 상태 업데이트
       const { error } = await supabase.from(table).update({ status, admin_comment: comment }).eq('id', id);
       if (error) throw error;
 
-      // 2. 호스트 지원서 승인 시 -> 해당 유저를 'host' 권한으로 등업
       if (table === 'host_applications' && status === 'approved') {
         const app = apps.find(a => a.id === id);
         if (app) {
@@ -96,15 +90,14 @@ export default function AdminDashboardPage() {
       }
 
       alert('처리되었습니다.');
-      fetchData(); // 목록 새로고침
-      setSelectedItem(null); // 선택 해제
+      fetchData();
+      setSelectedItem(null);
     } catch (err: any) {
       console.error(err);
       alert('오류가 발생했습니다: ' + err.message);
     }
   };
 
-  // ✅ [복구됨] 삭제 로직
   const deleteItem = async (table: string, id: string) => {
     if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
     
@@ -140,10 +133,13 @@ export default function AdminDashboardPage() {
             <SalesTab bookings={bookings} />
           ) : activeTab === 'ANALYTICS' ? (
             <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
+          ) : activeTab === 'CHATS' ? (
+            // ✅ [수정완료] 여기가 핵심입니다. ManagementTab 대신 ChatMonitor를 렌더링합니다.
+            <ChatMonitor />
           ) : (
             <ManagementTab 
               activeTab={activeTab} filter={filter} setFilter={setFilter}
-              apps={apps} exps={exps} users={users} messages={messages}
+              apps={apps} exps={exps} users={users} messages={[]}
               selectedItem={selectedItem} setSelectedItem={setSelectedItem}
               updateStatus={updateStatus} deleteItem={deleteItem}
             />
