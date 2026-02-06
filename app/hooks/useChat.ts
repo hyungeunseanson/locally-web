@@ -18,7 +18,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) return;
       setCurrentUser(user);
 
-      // profiles 테이블 조인 시 1단계에서 만든 외래키 명칭 사용
+      // guest:profiles!inquiries_user_id_fkey 형태는 1단계 SQL에서 지정한 관계를 강제합니다.
       let query = supabase
         .from('inquiries')
         .select(`
@@ -98,7 +98,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       setMessages(prev => [...prev, newMessage]);
       fetchInquiries(); 
     } catch (err: any) {
-      alert("메시지 전송 실패: " + err.message);
+      console.error("메시지 전송 실패:", err.message);
     }
   };
 

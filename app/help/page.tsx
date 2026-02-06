@@ -21,7 +21,7 @@ const FAQ_DATA = {
         },
         {
           q: "예약을 취소하면 환불받을 수 있나요?",
-          a: "투어 시작 24시간 전까지 취소하시면 전액 환불해 드립니다. 단, 호스트가 이미 투어 준비를 마친 당일 취소나 노쇼(No-show)의 경우에는 환불이 어렵습니다. 자세한 내용은 각 투어 상세페이지의 환불 규정을 참고해 주세요."
+          a: "투어 시작 24시간 전까지 취소하시면 전액 환불해 드립니다. 단, 호스트가 이미 투어 준비를 마친 당일 취소나 노쇼(No-show)의 경우에는 환불이 어렵습니다."
         }
       ]
     },
@@ -31,7 +31,7 @@ const FAQ_DATA = {
       items: [
         {
           q: "호스트는 믿을 수 있는 사람인가요?",
-          a: "로컬리의 모든 호스트는 엄격한 신원 인증 절차(여권 및 거주지 확인)를 거칩니다."
+          a: "로컬리의 모든 호스트는 엄격한 신원 인증 절차를 거치며, 실제 투어 참여 게스트들의 후기로 평판을 관리합니다."
         }
       ]
     }
@@ -71,8 +71,9 @@ export default function HelpCenterPage() {
   })).filter(category => category.items.length > 0);
 
   const handleAdminSupport = async () => {
+    console.log("관리자 상담 버튼 클릭");
     if (!currentUser) {
-      alert("로그인이 필요합니다.");
+      alert("로그인이 필요한 서비스입니다.");
       return;
     }
 
@@ -85,6 +86,7 @@ export default function HelpCenterPage() {
         router.push('/guest/inbox');
       }
     } catch (e: any) {
+      console.error("상담 생성 실패:", e);
       alert("문의 접수 실패: " + e.message);
     }
   };
@@ -141,7 +143,7 @@ export default function HelpCenterPage() {
 
         <div className="mt-20 border border-slate-200 rounded-3xl p-8 md:p-12 text-center bg-slate-50">
           <h3 className="text-2xl font-black mb-4">아직 해결되지 않으셨나요?</h3>
-          <p className="text-slate-600 mb-8">로컬리 고객센터는 언제나 열려있습니다.</p>
+          <p className="text-slate-600 mb-8 max-w-lg mx-auto">로컬리 고객센터는 언제나 열려있습니다. 궁금한 점이 있다면 편하게 문의해 주세요.</p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <button 
               onClick={handleAdminSupport}
