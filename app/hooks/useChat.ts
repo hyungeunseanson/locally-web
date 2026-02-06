@@ -18,13 +18,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) return;
       setCurrentUser(user);
 
+      // ✅ [수정] 명시적인 외래키 이름을 사용하여 profiles 조인
       let query = supabase
         .from('inquiries')
         .select(`
           *,
           experiences (id, title, image_url),
-          guest:user_id (full_name, avatar_url),
-          host:host_id (full_name, avatar_url)
+          guest:profiles!inquiries_user_id_fkey (full_name, avatar_url),
+          host:profiles!inquiries_host_id_fkey (full_name, avatar_url)
         `)
         .order('updated_at', { ascending: false });
 
@@ -37,23 +38,31 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
 
       const { data, error } = await query;
-      if (!error && data) setInquiries(data);
+      
+      if (error) {
+        console.error("채팅 목록 불러오기 실패:", error.message);
+        return;
+      }
+      
+      if (data) setInquiries(data);
     } finally {
       setIsLoading(false);
     }
   }, [supabase, role]);
 
   const loadMessages = async (inquiryId: number) => {
-    const { data } = await supabase
+    // ✅ [수정] 여기도 sender 조인 시 profiles 테이블 명시
+    const { data, error } = await supabase
       .from('inquiry_messages')
       .select(`
         *,
-        sender:sender_id (full_name)
+        sender:profiles (full_name)
       `)
       .eq('inquiry_id', inquiryId)
       .order('created_at', { ascending: true });
     
-    setMessages(data || []);
+    if (!error) setMessages(data || []);
+    
     const selected = inquiries.find(i => i.id === inquiryId);
     if (selected) setSelectedInquiry(selected);
   };
@@ -108,7 +117,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return data;
   };
 
-  // ✅ [수정완료] 주석 문법 수정 ( -- -> // )
   const createAdminInquiry = async (content: string) => {
     if (!currentUser) throw new Error('로그인이 필요합니다.');
 
@@ -118,8 +126,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         user_id: currentUser.id,
         content: content,
         type: 'admin',
-        host_id: null,      // 관리자는 특정 호스트가 아님
-        experience_id: null // 특정 체험 관련이 아님
+        host_id: null,
+        experience_id: null
       }])
       .select()
       .single();
