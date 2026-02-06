@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
-  Calendar, MapPin, MoreHorizontal, MessageSquare, Receipt, Ghost, Lock // Lock 아이콘 추가
+  Calendar, MapPin, MoreHorizontal, MessageSquare, Receipt, Ghost, Lock, Loader2 
 } from 'lucide-react';
 import Link from 'next/link';
+import { createClient } from '@/app/utils/supabase/client'; // Supabase 클라이언트
 import SiteHeader from '@/app/components/SiteHeader';
 import TripCard from '@/app/components/TripCard';     
 import ReviewModal from '@/app/components/ReviewModal';
@@ -13,25 +14,89 @@ export default function GuestTripsPage() {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+  
+  // 상태 관리
+  const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
+  const [pastTrips, setPastTrips] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 더미 데이터 (프라이빗 투어 예시 추가)
-  const upcomingTrips = [
-    {
-      id: 999,
-      title: "현지인과 함께하는 시부야 이자카야 탐방",
-      host: "Kenji",
-      date: "2026년 10월 24일 (토) 19:00",
-      location: "시부야역 하치코 동상 앞",
-      image: "https://images.unsplash.com/photo-1542051841857-5f90071e7989",
-      dDay: "D-3",
-      isPrivate: true, // ✅ 프라이빗 여부 추가
+  const supabase = createClient();
+
+  useEffect(() => {
+    fetchMyTrips();
+  }, []);
+
+  const fetchMyTrips = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return; // 로그인 안 된 경우 처리 필요 (추후)
+
+      // 1. 내 예약 내역 가져오기 (체험 정보 + 호스트 정보 조인)
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          experiences (
+            id, title, city, category, photos, price,
+            host_id,
+            profiles:host_id (name) 
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('date', { ascending: true }); // 날짜순 정렬
+
+      if (error) {
+        console.error('예약 불러오기 실패:', error);
+        return;
+      }
+
+      if (bookings) {
+        // 2. 날짜 기준으로 예정/지난 여행 분류
+        const now = new Date();
+        const upcoming: any[] = [];
+        const past: any[] = [];
+
+        bookings.forEach((booking: any) => {
+          const tripDate = new Date(booking.date);
+          const isFuture = tripDate >= now;
+          
+          // D-Day 계산
+          const diffTime = Math.abs(tripDate.getTime() - now.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+          const dDay = isFuture ? (diffDays === 0 ? 'D-Day' : `D-${diffDays}`) : null;
+
+          // 데이터 포맷팅
+          const formattedTrip = {
+            id: booking.id,
+            title: booking.experiences?.title,
+            host: booking.experiences?.profiles?.name || '알 수 없음',
+            date: tripDate.toLocaleDateString() + ' ' + (booking.time || ''), // 시간 필드 가정
+            location: booking.experiences?.city || '장소 정보 없음',
+            image: booking.experiences?.photos?.[0] || 'https://via.placeholder.com/400',
+            dDay: dDay,
+            isPrivate: booking.type === 'private', // DB에 type 컬럼이 있다고 가정
+            status: booking.status, // confirmed, pending 등
+            price: booking.total_price,
+            expId: booking.experience_id,
+            isReviewed: false // 추후 리뷰 여부 체크 로직 추가 필요
+          };
+
+          if (isFuture) {
+            upcoming.push(formattedTrip);
+          } else {
+            past.push(formattedTrip);
+          }
+        });
+
+        setUpcomingTrips(upcoming);
+        setPastTrips(past.reverse()); // 지난 여행은 최신순으로
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
-  ];
-
-  const pastTrips = [
-    { id: 1, title: "기모노 입고 다도 체험", host: "Sakura", date: "2025년 12월", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e", isReviewed: false },
-    { id: 2, title: "홋카이도 설국 스키 레슨", host: "Yuki", date: "2025년 1월", image: "https://images.unsplash.com/photo-1551632811-561732d1e306", isReviewed: true }
-  ];
+  };
 
   const handleOpenReview = (trip: any) => {
     setSelectedTrip(trip);
@@ -41,6 +106,26 @@ export default function GuestTripsPage() {
   const toggleMenu = (id: number) => {
     setActiveMenuId(activeMenuId === id ? null : id);
   };
+
+  const handleCancelBooking = async (id: number) => {
+    if (!confirm('정말 예약을 취소하시겠습니까?')) return;
+    
+    const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+    if (!error) {
+      alert('예약이 취소되었습니다.');
+      fetchMyTrips(); // 목록 새로고침
+    } else {
+      alert('취소 실패: ' + error.message);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="animate-spin text-slate-400" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans" onClick={() => setActiveMenuId(null)}>
@@ -61,7 +146,7 @@ export default function GuestTripsPage() {
                     <div className="flex justify-between items-start mb-4">
                        <div className="flex gap-2">
                          <span className="bg-black text-white text-xs font-bold px-3 py-1 rounded-full">{trip.dDay}</span>
-                         {/* ✅ [단독 투어] 뱃지 추가 */}
+                         {trip.status === 'pending' && <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-3 py-1 rounded-full">승인 대기중</span>}
                          {trip.isPrivate && (
                            <span className="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-slate-700">
                              <Lock size={10} /> 단독 투어
@@ -79,8 +164,15 @@ export default function GuestTripsPage() {
                          </button>
                          {activeMenuId === trip.id && (
                            <div className="absolute right-0 top-8 w-40 bg-white border border-slate-100 rounded-xl shadow-xl z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                             <button className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 font-medium text-slate-700">예약 상세 보기</button>
-                             <button className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 text-red-500 font-medium">예약 취소 요청</button>
+                             <Link href={`/experiences/${trip.expId}`}>
+                               <button className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 font-medium text-slate-700">체험 다시 보기</button>
+                             </Link>
+                             <button 
+                               onClick={() => handleCancelBooking(trip.id)}
+                               className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 text-red-500 font-medium"
+                             >
+                               예약 취소 요청
+                             </button>
                            </div>
                          )}
                        </div>
@@ -119,7 +211,6 @@ export default function GuestTripsPage() {
               </div>
             ))
           ) : (
-            // 🟢 예정된 예약 Empty State (빈 화면)
             <div className="border border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center py-16 px-4 bg-slate-50/50 text-center">
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
                 <Ghost size={32} className="text-slate-300"/>
@@ -146,20 +237,17 @@ export default function GuestTripsPage() {
                 />
               ))}
               
-              {/* 다음 여행 유도 카드 */}
               <div className="border border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center p-6 text-slate-400 hover:border-slate-400 hover:bg-slate-50 transition-colors cursor-pointer min-h-[300px] group">
                  <span className="font-bold mb-1 group-hover:text-slate-600 transition-colors">다음 여행을 떠나보세요</span>
                  <Link href="/" className="text-sm underline text-black">체험 둘러보기</Link>
               </div>
             </div>
           ) : (
-            // 🟢 지난 여행 Empty State
             <div className="text-slate-400 text-sm py-10">다녀온 여행이 없습니다.</div>
           )}
         </section>
       </main>
 
-      {/* 후기 작성 모달 */}
       {isReviewModalOpen && selectedTrip && (
         <ReviewModal trip={selectedTrip} onClose={() => setIsReviewModalOpen(false)} />
       )}
