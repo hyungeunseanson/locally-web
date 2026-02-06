@@ -2,16 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, MessageCircle, User, ChevronRight, Calendar, Send, RefreshCw, Loader2 } from 'lucide-react';
-import { useChat } from '@/app/hooks/useChat'; // ✅ 관리자용 훅 사용
+import { useChat } from '@/app/hooks/useChat'; 
 
 export default function ChatMonitor() {
-  // role='admin'으로 호출하여 type='admin'인 문의만 가져옴
-  // ✅ refresh 함수 추가로 가져옴
   const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, refresh, isLoading } = useChat('admin');
   const [replyText, setReplyText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 메시지가 갱신되면 스크롤 하단 이동
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
@@ -23,6 +20,11 @@ export default function ChatMonitor() {
     }
   };
 
+  // 디버깅용: 데이터 들어오는지 확인
+  useEffect(() => {
+    console.log("Admin Inquiries Loaded:", inquiries);
+  }, [inquiries]);
+
   return (
     <div className="flex h-full gap-6">
       {/* 왼쪽: 문의 목록 */}
@@ -32,24 +34,27 @@ export default function ChatMonitor() {
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <MessageCircle size={18}/> 1:1 문의함
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
+            <p className="text-xs text-slate-500 mt-1">고객 1:1 문의 내역</p>
           </div>
-          {/* ✅ 새로고침 버튼 추가 */}
           <button 
             onClick={refresh} 
             className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
-            title="목록 새로고침"
+            title="새로고침"
           >
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           </button>
         </div>
         
         <div className="overflow-y-auto flex-1">
-          {inquiries.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full text-slate-400">
+              <Loader2 className="animate-spin mr-2" size={20} /> 로딩 중...
+            </div>
+          ) : inquiries.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
               <MessageCircle size={32} className="mb-2 opacity-20"/>
               <div className="text-sm">접수된 문의가 없습니다.</div>
-              <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">새로고침</button>
+              <p className="text-xs mt-1">고객이 도움말 센터에서 문의를 남기면 여기에 표시됩니다.</p>
             </div>
           ) : (
             inquiries.map((inq) => (
@@ -60,8 +65,7 @@ export default function ChatMonitor() {
               >
                 <div className="flex justify-between mb-1">
                   <span className="font-bold text-sm text-slate-800 flex items-center gap-1">
-                    {inq.guest?.full_name || '익명 사용자'}
-                    {/* 문의 ID 표시 */}
+                    {inq.guest?.full_name || '익명 고객'}
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono">#{inq.id}</span>
                   </span>
                   <span className="text-[10px] text-slate-400">{new Date(inq.updated_at).toLocaleDateString()}</span>
