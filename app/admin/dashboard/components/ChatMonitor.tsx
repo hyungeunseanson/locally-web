@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MessageCircle, User, ChevronRight, Calendar, Send, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat'; 
 
 export default function ChatMonitor() {
@@ -41,7 +41,6 @@ export default function ChatMonitor() {
           </button>
         </div>
         
-        {/* 에러 발생 시 표시 */}
         {error && (
           <div className="p-4 bg-red-50 border-b border-red-100 text-red-600 text-xs break-all">
             <div className="flex items-center gap-2 font-bold mb-1"><AlertTriangle size={14}/> 오류 발생</div>
@@ -108,7 +107,7 @@ export default function ChatMonitor() {
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
-                // ✅ [핵심 수정] 관리자 화면이므로 "문의자(Guest)"가 보낸 건 왼쪽, 나머지는 오른쪽
+                // ✅ [핵심 수정] 관리자 화면에서는 "문의자(Guest)"가 보낸 건 왼쪽, 나머지는 오른쪽
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 
                 return (
@@ -127,7 +126,7 @@ export default function ChatMonitor() {
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                // ✅ [수정] 한글 중복 전송 방지 (IME 체크)
+                // ✅ 한글 중복 방지
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') handleSend();

@@ -14,16 +14,17 @@ export default function InquiryChat() {
   }, [messages]);
 
   const handleSend = () => {
-    if (selectedInquiry) {
+    if (selectedInquiry && replyText.trim()) {
       sendMessage(selectedInquiry.id, replyText);
       setReplyText('');
     }
   };
 
   return (
-    <div className="flex gap-6 h-full min-h-[600px]">
+    <div className="flex gap-6 h-full min-h-[600px] w-full">
       {/* 목록 */}
-      <div className="w-1/3 border-r border-slate-200 pr-4 overflow-y-auto max-h-[600px]">
+      <div className="w-[300px] shrink-0 border-r border-slate-200 pr-4 overflow-y-auto max-h-[700px]">
+        {inquiries.length === 0 && <div className="text-slate-400 text-sm text-center py-10">문의가 없습니다.</div>}
         {inquiries.map((inq) => (
           <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 rounded-xl cursor-pointer mb-2 ${selectedInquiry?.id === inq.id ? 'bg-slate-100 border-black' : 'hover:bg-slate-50'}`}>
             <div className="text-xs font-bold text-slate-500 mb-1">{inq.experiences?.title}</div>
@@ -34,13 +35,14 @@ export default function InquiryChat() {
       </div>
 
       {/* 채팅창 */}
-      <div className="flex-1 flex flex-col bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden h-[600px]">
+      <div className="flex-1 flex flex-col bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden h-[700px]">
         {selectedInquiry ? (
           <>
             <div className="p-4 border-b border-slate-200 bg-white font-bold">{selectedInquiry.experiences?.title}</div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
-                const isMe = msg.sender_id === currentUser?.id;
+                // ✅ [정상] 호스트 화면: 내가 보낸 건 오른쪽, 남이 보낸 건 왼쪽
+                const isMe = String(msg.sender_id) === String(currentUser?.id);
                 return (
                   <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                     {!isMe && <div className="w-8 h-8 bg-slate-200 rounded-full mr-2 flex items-center justify-center"><User size={16}/></div>}
@@ -57,7 +59,7 @@ export default function InquiryChat() {
                 onChange={(e) => setReplyText(e.target.value)} 
                 placeholder="답장 입력..." 
                 className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black"
-                // ✅ [수정] 한글 중복 방지
+                // ✅ 한글 중복 방지
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') handleSend();

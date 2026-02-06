@@ -15,7 +15,7 @@ export default function GuestInboxPage() {
   }, [messages]);
 
   const handleSend = () => {
-    if (selectedInquiry) {
+    if (selectedInquiry && inputText.trim()) {
       sendMessage(selectedInquiry.id, inputText);
       setInputText('');
     }
@@ -35,20 +35,11 @@ export default function GuestInboxPage() {
               {inquiries.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">대화가 없습니다.</div>}
               {inquiries.map((inq) => (
                 <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
-                  
-                  {/* 아이콘: 관리자 채팅 vs 일반 체험 채팅 구분 */}
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-100'}`}>
-                    {inq.type === 'admin' ? (
-                      <ShieldCheck size={20} />
-                    ) : (
-                      inq.experiences?.image_url ? <img src={inq.experiences.image_url} className="w-full h-full object-cover"/> : <ImageIcon className="text-slate-400"/>
-                    )}
+                    {inq.type === 'admin' ? <ShieldCheck size={20} /> : (inq.experiences?.image_url ? <img src={inq.experiences.image_url} className="w-full h-full object-cover"/> : <ImageIcon className="text-slate-400"/>)}
                   </div>
-
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate">
-                      {inq.type === 'admin' ? '로컬리 고객센터' : inq.experiences?.title}
-                    </div>
+                    <div className="font-bold text-sm truncate">{inq.type === 'admin' ? '로컬리 고객센터' : inq.experiences?.title}</div>
                     <div className="text-xs text-slate-500 truncate">{inq.content}</div>
                   </div>
                 </div>
@@ -61,14 +52,13 @@ export default function GuestInboxPage() {
             {selectedInquiry ? (
               <>
                 <div className="p-4 border-b border-slate-100 font-bold flex items-center gap-2">
-                  <div className="text-base">
-                    {selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : selectedInquiry.experiences?.title}
-                  </div>
+                  <div className="text-base">{selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : selectedInquiry.experiences?.title}</div>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50" ref={scrollRef}>
                   {messages.map((msg) => {
-                    const isMe = msg.sender_id === currentUser?.id;
+                    // ✅ [정상] 유저 화면: 내가 보낸 건 오른쪽, 남이 보낸 건 왼쪽
+                    const isMe = String(msg.sender_id) === String(currentUser?.id);
                     return (
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none'}`}>
@@ -85,7 +75,7 @@ export default function GuestInboxPage() {
                     placeholder="메시지 입력..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    // ✅ [수정] 한글 중복 전송 방지
+                    // ✅ 한글 중복 방지
                     onKeyDown={(e) => {
                       if (e.nativeEvent.isComposing) return;
                       if (e.key === 'Enter') handleSend();
