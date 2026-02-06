@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Calendar, Clock, User, MapPin, Phone, CreditCard, Share2, Map, CheckCircle2 } from 'lucide-react';
+import { X, Printer, Share, MapPin } from 'lucide-react';
 
 interface ReceiptModalProps {
   trip: any;
@@ -11,82 +11,83 @@ interface ReceiptModalProps {
 export default function ReceiptModal({ trip, onClose }: ReceiptModalProps) {
   if (!trip) return null;
 
-  const openGoogleMaps = () => {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.address)}`, '_blank');
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 font-sans">
-      <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden font-sans">
         
-        {/* 상단: 바코드 및 헤더 */}
-        <div className="bg-slate-900 p-6 relative text-center">
-          <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors">
-            <X size={20}/>
+        {/* 헤더 */}
+        <div className="flex justify-between items-start p-6 pb-2">
+          <button onClick={onClose} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
+            <X size={20} className="text-slate-900"/>
           </button>
-          <div className="font-black text-white text-lg tracking-widest mb-2">LOCALLY TICKET</div>
-          
-          {/* 바코드 생성 API 연동 (실제 바코드처럼 보임) */}
-          <div className="bg-white p-2 rounded mb-2">
-            <img 
-              src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${trip.orderId}&scale=2&height=8&includetext`} 
-              alt="Barcode" 
-              className="w-full h-12 object-contain"
-            />
+          <div className="text-right">
+            <h2 className="text-lg font-bold text-slate-900">영수증</h2>
+            <p className="text-xs text-slate-500 font-mono mt-1">ID: {trip.orderId}</p>
           </div>
-          <p className="text-slate-400 text-[10px] font-mono uppercase tracking-wider">Booking Ref: {trip.orderId}</p>
         </div>
 
-        {/* 하단: 상세 내용 */}
-        <div className="p-6 bg-white relative">
-          {/* 펀치홀 (티켓 느낌) */}
-          <div className="absolute -top-3 left-0 w-6 h-6 bg-slate-900 rounded-full"></div>
-          <div className="absolute -top-3 right-0 w-6 h-6 bg-slate-900 rounded-full"></div>
-
-          <div className="mb-6">
-            <h2 className="text-xl font-black text-slate-900 leading-tight mb-2">{trip.title}</h2>
-            <div 
-              onClick={openGoogleMaps}
-              className="flex items-start gap-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors"
-            >
-              <MapPin size={14} className="shrink-0 mt-0.5"/>
-              <span>{trip.address} <span className="font-bold underline ml-1">지도 보기</span></span>
+        {/* 메인 컨텐츠 */}
+        <div className="px-8 py-4">
+          <div className="border-b border-slate-100 pb-8 mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">{trip.title}</h1>
+            <div className="flex items-center gap-1 text-slate-500 text-sm">
+              <span className="font-medium text-slate-900">호스트: {trip.hostName}</span>
+              <span>•</span>
+              <span>{trip.location}</span>
             </div>
           </div>
 
-          <div className="space-y-3 border-b border-dashed border-slate-200 pb-6 mb-6">
-            <InfoRow label="Date" icon={<Calendar size={14}/>} value={trip.date} />
-            <InfoRow label="Time" icon={<Clock size={14}/>} value={trip.time} />
-            <InfoRow label="Guests" icon={<User size={14}/>} value={`${trip.guests}명 (${trip.isPrivate ? 'Private' : 'Group'})`} />
-            <InfoRow label="Booker" icon={<CheckCircle2 size={14}/>} value={trip.userName} />
+          {/* 일정 정보 */}
+          <div className="grid grid-cols-2 gap-8 mb-8">
+            <div>
+              <div className="text-xs font-bold text-slate-500 uppercase mb-1">일정</div>
+              <div className="font-medium text-slate-900">{trip.date}</div>
+              <div className="text-sm text-slate-500">{trip.time}</div>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-500 uppercase mb-1">인원 및 옵션</div>
+              <div className="font-medium text-slate-900">게스트 {trip.guests}명</div>
+              <div className="text-sm text-slate-500">{trip.isPrivate ? '프라이빗 투어' : '그룹 투어'}</div>
+            </div>
+          </div>
+
+          {/* 결제 내역 */}
+          <div className="border-t border-slate-100 pt-8 mb-8">
+            <h3 className="font-bold text-slate-900 mb-4">결제 세부 정보</h3>
             
-            <div className="pt-2 mt-2 border-t border-slate-100">
-              <InfoRow label="Host Contact" icon={<Phone size={14}/>} value={trip.hostPhone} />
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-600">₩{Number(trip.price / trip.guests).toLocaleString()} x {trip.guests}명</span>
+                <span className="text-slate-900">₩{Number(trip.price).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">서비스 수수료</span>
+                <span className="text-slate-900">₩0</span>
+              </div>
+              <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-4">
+                <span className="font-bold text-slate-900 text-base">합계 (KRW)</span>
+                <span className="font-black text-slate-900 text-xl">₩{Number(trip.price).toLocaleString()}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-between items-center mb-6 bg-slate-900 text-white p-4 rounded-xl shadow-lg">
-            <span className="font-bold text-sm flex items-center gap-2"><CreditCard size={16}/> Total Paid</span>
-            <span className="text-2xl font-black">₩{Number(trip.price).toLocaleString()}</span>
+          {/* 하단 버튼 */}
+          <div className="bg-slate-50 -mx-8 px-8 py-6 border-t border-slate-100 flex justify-between items-center">
+             <div className="text-xs text-slate-500">
+               <div>결제 완료됨</div>
+               <div className="mt-1 font-mono">{new Date().toLocaleDateString()}</div>
+             </div>
+             <div className="flex gap-2">
+               <button className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                 <Printer size={14}/> 인쇄
+               </button>
+               <button className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 rounded-lg text-xs font-bold text-white hover:bg-slate-800 transition-colors">
+                 <Share size={14}/> 저장
+               </button>
+             </div>
           </div>
-
-          <button className="w-full py-3 bg-slate-100 text-slate-900 font-bold rounded-xl text-sm hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
-            <Share2 size={16}/> 티켓 이미지 저장
-          </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// 헬퍼 컴포넌트
-function InfoRow({ label, value, icon }: any) {
-  return (
-    <div className="flex justify-between items-center text-sm">
-      <div className="text-slate-400 font-bold text-xs uppercase flex items-center gap-1.5">
-        {icon} {label}
-      </div>
-      <div className="font-bold text-slate-900">{value}</div>
     </div>
   );
 }

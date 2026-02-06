@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, Ghost, History, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Loader2, Ghost, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewModal from '@/app/components/ReviewModal';
+import Link from 'next/link';
+
+// 분리된 컴포넌트 import
 import TripCard from './components/TripCard';     
 import ReceiptModal from './components/ReceiptModal'; 
+import PastTripCard from './components/PastTripCard'; 
 
 export default function GuestTripsPage() {
   const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
@@ -28,12 +31,9 @@ export default function GuestTripsPage() {
   const fetchMyTrips = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setIsLoading(false);
-        return; 
-      }
+      if (!user) { setIsLoading(false); return; }
 
-      // ✅ [수정완료] name -> full_name 으로 변경
+      // ✅ [핵심 쿼리] full_name으로 정확하게 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -66,7 +66,6 @@ export default function GuestTripsPage() {
           const diffDays = Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)); 
           const dDay = isFuture ? (diffDays === 0 ? '오늘' : `D-${diffDays}`) : null;
 
-          // 호스트 정보 가져오기
           const hostData = Array.isArray(booking.experiences.profiles) 
             ? booking.experiences.profiles[0] 
             : booking.experiences.profiles;
@@ -74,7 +73,6 @@ export default function GuestTripsPage() {
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            // ✅ [수정완료] 여기도 full_name으로 변경
             hostName: hostData?.full_name || 'Locally Host',
             hostPhone: hostData?.phone,
             hostId: booking.experiences.host_id,
@@ -136,35 +134,45 @@ export default function GuestTripsPage() {
             </div>
         )}
 
+        {/* 예정된 예약 */}
         <section className="mb-20">
           <h2 className="text-xl font-bold mb-6">다가오는 예약</h2>
           <div className="flex flex-col gap-6">
             {upcomingTrips.length > 0 ? (
               upcomingTrips.map(trip => (
-                <TripCard key={trip.id} trip={trip} onCancel={handleCancelBooking} onOpenReceipt={openReceipt} />
+                <TripCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  onCancel={handleCancelBooking} 
+                  onOpenReceipt={openReceipt} 
+                />
               ))
             ) : (
               <div className="border border-dashed border-slate-200 rounded-2xl py-20 text-center text-slate-400">
                 <Ghost className="mx-auto mb-2" size={24}/>
-                예정된 여행이 없습니다.
+                <p>예정된 여행이 없습니다.</p>
+                <Link href="/" className="text-sm font-bold text-black underline mt-2 inline-block">체험 둘러보기</Link>
               </div>
             )}
           </div>
         </section>
 
+        {/* 지난 여행 */}
         <section>
           <h2 className="text-xl font-bold mb-6 text-slate-400">지난 여행</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {pastTrips.map(trip => (
-              <div key={trip.id} className="border border-slate-200 rounded-2xl overflow-hidden p-5">
-                  <div className="font-bold mb-1 truncate">{trip.title}</div>
-                  <div className="text-xs text-slate-500 mb-4">{trip.date}</div>
-                  {trip.status !== 'cancelled' && <button onClick={() => openReview(trip)} className="text-xs font-bold underline">후기 작성</button>}
-              </div>
-            ))}
+            {pastTrips.length > 0 ? (
+              pastTrips.map(trip => (
+                <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
+              ))
+            ) : (
+              <div className="text-slate-400 text-sm py-4">다녀온 여행이 없습니다.</div>
+            )}
           </div>
         </section>
       </main>
+
+      {/* 모달 */}
       {isReceiptModalOpen && selectedTrip && <ReceiptModal trip={selectedTrip} onClose={() => setIsReceiptModalOpen(false)} />}
       {isReviewModalOpen && selectedTrip && <ReviewModal trip={selectedTrip} onClose={() => setIsReviewModalOpen(false)} />}
     </div>
