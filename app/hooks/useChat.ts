@@ -18,12 +18,12 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) return;
       setCurrentUser(user);
 
-      // ✅ [수정] 명시적인 외래키 이름을 사용하여 profiles 조인
+      // profiles 테이블 조인 시 1단계에서 만든 외래키 명칭 사용
       let query = supabase
         .from('inquiries')
         .select(`
           *,
-          experiences (id, title, image_url),
+          experiences (id, title, photos),
           guest:profiles!inquiries_user_id_fkey (full_name, avatar_url),
           host:profiles!inquiries_host_id_fkey (full_name, avatar_url)
         `)
@@ -38,47 +38,50 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
 
       const { data, error } = await query;
-      
-      if (error) {
-        console.error("채팅 목록 불러오기 실패:", error.message);
-        return;
-      }
-      
+      if (error) throw error;
       if (data) setInquiries(data);
+    } catch (err: any) {
+      console.error("채팅 목록 로딩 에러:", err.message);
     } finally {
       setIsLoading(false);
     }
   }, [supabase, role]);
 
   const loadMessages = async (inquiryId: number) => {
-    // ✅ [수정] 여기도 sender 조인 시 profiles 테이블 명시
-    const { data, error } = await supabase
-      .from('inquiry_messages')
-      .select(`
-        *,
-        sender:profiles (full_name)
-      `)
-      .eq('inquiry_id', inquiryId)
-      .order('created_at', { ascending: true });
-    
-    if (!error) setMessages(data || []);
-    
-    const selected = inquiries.find(i => i.id === inquiryId);
-    if (selected) setSelectedInquiry(selected);
+    try {
+      const { data, error } = await supabase
+        .from('inquiry_messages')
+        .select(`
+          *,
+          sender:profiles (full_name)
+        `)
+        .eq('inquiry_id', inquiryId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setMessages(data || []);
+      
+      const selected = inquiries.find(i => i.id === inquiryId);
+      if (selected) setSelectedInquiry(selected);
+    } catch (err: any) {
+      console.error("메시지 로딩 에러:", err.message);
+    }
   };
 
   const sendMessage = async (inquiryId: number, content: string) => {
     if (!content.trim() || !currentUser) return;
 
-    const { error } = await supabase
-      .from('inquiry_messages')
-      .insert([{
-        inquiry_id: inquiryId,
-        sender_id: currentUser.id,
-        content: content
-      }]);
+    try {
+      const { error } = await supabase
+        .from('inquiry_messages')
+        .insert([{
+          inquiry_id: inquiryId,
+          sender_id: currentUser.id,
+          content: content
+        }]);
 
-    if (!error) {
+      if (error) throw error;
+
       await supabase
         .from('inquiries')
         .update({ content: content, updated_at: new Date().toISOString() })
@@ -94,6 +97,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       };
       setMessages(prev => [...prev, newMessage]);
       fetchInquiries(); 
+    } catch (err: any) {
+      alert("메시지 전송 실패: " + err.message);
     }
   };
 
