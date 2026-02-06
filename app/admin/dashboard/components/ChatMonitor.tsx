@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { Search, MessageCircle, User, ChevronRight, Calendar, Send, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat'; 
 
 export default function ChatMonitor() {
@@ -27,14 +27,14 @@ export default function ChatMonitor() {
 
   return (
     <div className="flex h-full gap-6 w-full">
-      {/* 왼쪽: 문의 목록 */}
-      <div className="w-[350px] shrink-0 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm relative">
+      {/* 왼쪽: 문의 목록 (너비 1/3로 복구) */}
+      <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm relative">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <MessageCircle size={18}/> 1:1 문의함
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
+            <p className="text-xs text-slate-500 mt-1">고객 상담 내역</p>
           </div>
           <button onClick={refresh} className="p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
@@ -57,10 +57,7 @@ export default function ChatMonitor() {
             <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
               <MessageCircle size={32} className="mb-2 opacity-20"/>
               <div className="text-sm font-bold mb-1">접수된 문의가 없습니다.</div>
-              <div className="text-[10px] bg-slate-100 p-2 rounded text-slate-500 mt-2">
-                User: {currentUser ? currentUser.email : '로그인 안됨'}
-              </div>
-              <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">다시 시도</button>
+              <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">새로고침</button>
             </div>
           ) : (
             inquiries.map((inq) => (
@@ -99,7 +96,7 @@ export default function ChatMonitor() {
                 <div>
                   <div className="font-bold text-lg text-slate-900">{getGuestName(selectedInquiry.guest)}</div>
                   <div className="text-xs text-slate-400 flex items-center gap-1">
-                    문의 ID: {selectedInquiry.id} · {new Date(selectedInquiry.created_at).toLocaleString()}
+                    문의 ID: {selectedInquiry.id}
                   </div>
                 </div>
               </div>
@@ -107,12 +104,18 @@ export default function ChatMonitor() {
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
-                // ✅ [핵심 수정] 관리자 화면에서는 "문의자(Guest)"가 보낸 건 왼쪽, 나머지는 오른쪽
+                // ✅ [핵심 수정] 정렬 로직
+                // 1. 내가 보낸 거면 무조건 오른쪽 (자문자답 테스트 시 오른쪽)
+                // 2. 내가 안 보냈는데, 문의자(Guest)가 보낸 거면 왼쪽
+                // 3. 그 외(다른 관리자나 호스트)면 오른쪽 (답변으로 간주)
+                const isMe = String(msg.sender_id) === String(currentUser?.id);
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 
+                const showRight = isMe || !isGuest; 
+
                 return (
-                  <div key={msg.id} className={`flex ${isGuest ? 'justify-start' : 'justify-end'}`}>
-                    <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${isGuest ? 'bg-white border border-slate-200 rounded-tl-none text-slate-800' : 'bg-black text-white rounded-tr-none'}`}>
+                  <div key={msg.id} className={`flex ${showRight ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${showRight ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
                       {msg.content}
                     </div>
                   </div>
@@ -126,10 +129,13 @@ export default function ChatMonitor() {
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                // ✅ 한글 중복 방지
+                // ✅ [수정] preventDefault()로 한글 중복 완벽 차단
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
-                  if (e.key === 'Enter') handleSend();
+                  if (e.key === 'Enter') {
+                    e.preventDefault(); 
+                    handleSend();
+                  }
                 }}
               />
               <button onClick={handleSend} className="bg-black text-white px-5 py-2 rounded-xl hover:bg-slate-800 transition-colors">

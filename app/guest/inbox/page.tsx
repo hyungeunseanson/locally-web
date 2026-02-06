@@ -28,7 +28,6 @@ export default function GuestInboxPage() {
         <h1 className="text-2xl font-bold mb-6">메시지</h1>
         
         <div className="flex-1 flex border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-          {/* 목록 영역 */}
           <div className={`w-full md:w-[320px] lg:w-[400px] border-r border-slate-200 flex flex-col ${selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-slate-100 font-bold bg-white">대화 목록</div>
             <div className="flex-1 overflow-y-auto">
@@ -47,7 +46,6 @@ export default function GuestInboxPage() {
             </div>
           </div>
 
-          {/* 채팅 영역 */}
           <div className={`flex-1 flex flex-col ${!selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
             {selectedInquiry ? (
               <>
@@ -57,7 +55,6 @@ export default function GuestInboxPage() {
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50" ref={scrollRef}>
                   {messages.map((msg) => {
-                    // ✅ [정상] 유저 화면: 내가 보낸 건 오른쪽, 남이 보낸 건 왼쪽
                     const isMe = String(msg.sender_id) === String(currentUser?.id);
                     return (
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -75,10 +72,13 @@ export default function GuestInboxPage() {
                     placeholder="메시지 입력..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    // ✅ 한글 중복 방지
+                    // ✅ [수정] 한글 중복 방지
                     onKeyDown={(e) => {
                       if (e.nativeEvent.isComposing) return;
-                      if (e.key === 'Enter') handleSend();
+                      if (e.key === 'Enter') {
+                        e.preventDefault(); 
+                        handleSend();
+                      }
                     }}
                   />
                   <button onClick={handleSend} className="p-2 bg-black text-white rounded-full"><Send size={16}/></button>
