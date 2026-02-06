@@ -133,7 +133,7 @@ export default function GuestTripsPage() {
           </div>
         </section>
 
-        {/* 2. 지난 여행 */}
+        {/* 2. 지난 여행! */}
         <section>
           <h2 className="text-xl font-bold mb-6 text-slate-400">지난 여행</h2>
           {pastTrips.length > 0 ? (
