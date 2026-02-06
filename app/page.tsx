@@ -169,23 +169,47 @@ export default function HomePage() {
 
 function Footer() {
   return (
-    <footer className="border-t border-slate-100 bg-slate-50 mt-20 relative z-10">
+    // ✅ z-50으로 설정하여 다른 요소에 가려 클릭이 안 되는 문제를 확실히 해결했습니다.
+    <footer className="border-t border-slate-100 bg-slate-50 mt-20 relative z-50">
       <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
-          {/* ... (앞부분 생략) ... */}
+          
+          {/* 1. Locally */}
+          <div>
+            <h5 className="font-bold text-black mb-4">Locally</h5>
+            <ul className="space-y-3">
+              <li><Link href="#" className="hover:underline">회사 소개</Link></li>
+              <li><Link href="/admin/dashboard" className="hover:underline font-bold text-slate-800">관리자 페이지</Link></li>
+            </ul>
+          </div>
+
+          {/* 2. 호스팅 */}
+          <div>
+            <h5 className="font-bold text-black mb-4">호스팅</h5>
+            <ul className="space-y-3">
+              <li><Link href="/become-a-host" className="hover:underline">호스트 되기</Link></li>
+              <li><Link href="#" className="hover:underline">호스트 추천하기</Link></li>
+            </ul>
+          </div>
+
+          {/* 3. 지원 (도움말 센터 연결됨) */}
           <div>
             <h5 className="font-bold text-black mb-4">지원</h5>
             <ul className="space-y-3">
-              {/* 🔴 기존 코드: href="#" (작동 안 함) */}
-              {/* <li><Link href="#" className="hover:underline">도움말 센터</Link></li> */}
-              
-              {/* 🟢 수정 코드: href="/help" (도움말 센터로 이동) */}
+              {/* ✅ href="/help"로 정확히 연결 */}
               <li><Link href="/help" className="hover:underline">도움말 센터</Link></li>
-              
               <li><Link href="#" className="hover:underline">안전 센터</Link></li>
             </ul>
           </div>
-          {/* ... (뒷부분 생략) ... */}
+
+          {/* 4. 하단 정보 (언어, 통화, 저작권) */}
+          <div>
+             <div className="flex gap-4 font-bold text-slate-900 mb-6">
+               <button className="flex items-center gap-1 hover:underline"><Globe size={16}/> 한국어 (KR)</button>
+               <button className="hover:underline">₩ KRW</button>
+             </div>
+             <p className="text-xs">© 2026 Locally, Inc.</p>
+          </div>
         </div>
       </div>
     </footer>
