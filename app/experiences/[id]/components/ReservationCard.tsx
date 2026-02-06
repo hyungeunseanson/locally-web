@@ -1,41 +1,46 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
 interface ReservationCardProps {
   price: number;
+  privatePrice?: number;
+  isPrivateEnabled?: boolean;
   duration: number;
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
-  onReserve: (date: string, time: string, guests: number) => void;
+  onReserve: (date: string, time: string, guests: number, isPrivate: boolean) => void;
 }
 
-export default function ReservationCard({ price, duration, availableDates, dateToTimeMap, onReserve }: ReservationCardProps) {
+export default function ReservationCard({ 
+  price, privatePrice = 0, isPrivateEnabled = false, 
+  duration, availableDates, dateToTimeMap, onReserve 
+}: ReservationCardProps) {
+  
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
-  const [guestCount, setGuestCount] = useState(1);
+  const [guestSelection, setGuestSelection] = useState<string>("1"); 
   const [isSoloGuaranteed, setIsSoloGuaranteed] = useState(false);
   const SOLO_GUARANTEE_PRICE = 30000;
 
+  // 날짜 계산 헬퍼
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
-
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
     return `${date.getMonth() + 1}월 ${date.getDate()}일 (${days[date.getDay()]})`;
   };
-
   const calculateEndTime = (startTime: string) => {
     if (!startTime) return '';
     const [hour, minute] = startTime.split(':').map(Number);
-    const endHour = hour + duration;
-    return `${endHour}:${String(minute).padStart(2, '0')}`;
+    return `${hour + duration}:${String(minute).padStart(2, '0')}`;
   };
 
+  // 달력 렌더링
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -58,17 +63,24 @@ export default function ReservationCard({ price, duration, availableDates, dateT
     return days;
   };
 
-  const basePrice = price * guestCount;
-  const optionPrice = (guestCount === 1 && isSoloGuaranteed) ? SOLO_GUARANTEE_PRICE : 0;
+  // 가격 계산
+  const isPrivate = guestSelection === 'private';
+  const guestCount = isPrivate ? 1 : Number(guestSelection);
+  const basePrice = isPrivate ? privatePrice : (price * guestCount);
+  const optionPrice = (!isPrivate && guestCount === 1 && isSoloGuaranteed) ? SOLO_GUARANTEE_PRICE : 0;
   const totalPrice = basePrice + optionPrice;
 
   return (
     <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-6 bg-white">
       <div className="flex justify-between items-end mb-6">
-        <div><span className="text-2xl font-bold">₩{price.toLocaleString()}</span> <span className="text-slate-500 text-sm">/ 인</span></div>
+        <div>
+          <span className="text-2xl font-bold">₩{isPrivate ? privatePrice.toLocaleString() : price.toLocaleString()}</span> 
+          <span className="text-slate-500 text-sm"> {isPrivate ? '/ 팀 (단독)' : '/ 인'}</span>
+        </div>
       </div>
 
       <div className="border border-slate-300 rounded-xl mb-4 overflow-hidden">
+        {/* 달력 헤더 */}
         <div className="p-4 border-b border-slate-200 bg-white">
           <div className="flex justify-between items-center mb-4">
             <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}><ChevronLeft size={16}/></button>
@@ -82,16 +94,30 @@ export default function ReservationCard({ price, duration, availableDates, dateT
             {renderCalendar()}
           </div>
         </div>
+
+        {/* ✅ 인원 선택 (단독 투어 옵션 포함) */}
         <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
-          <div className="flex flex-col">
+          <div className="flex flex-col w-full">
             <span className="text-[10px] font-bold uppercase text-slate-800">인원</span>
-            <select value={guestCount} onChange={(e)=>setGuestCount(Number(e.target.value))} className="text-sm outline-none bg-transparent font-bold">
-              {[1,2,3,4,5,6].map(n => <option key={n} value={n}>게스트 {n}명</option>)}
+            <select 
+              value={guestSelection} 
+              onChange={(e)=>setGuestSelection(e.target.value)} 
+              className="text-sm outline-none bg-transparent font-bold w-full cursor-pointer py-1"
+            >
+              <optgroup label="일반 예약">
+                {[1,2,3,4,5,6].map(n => <option key={n} value={String(n)}>게스트 {n}명</option>)}
+              </optgroup>
+              {isPrivateEnabled && (
+                <optgroup label="프라이빗 옵션">
+                  <option value="private">🔒 단독 투어 (우리끼리만)</option>
+                </optgroup>
+              )}
             </select>
           </div>
         </div>
       </div>
 
+      {/* 시간 선택 */}
       {selectedDate && (
         <div className="mb-4 animate-in fade-in zoom-in-95 duration-200">
           <p className="text-xs font-bold text-slate-500 mb-2">시간 선택 ({formatDateDisplay(selectedDate)})</p>
@@ -109,7 +135,8 @@ export default function ReservationCard({ price, duration, availableDates, dateT
         </div>
       )}
 
-      {guestCount === 1 && (
+      {/* 1인 옵션 */}
+      {!isPrivate && guestCount === 1 && (
         <div className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-all ${isSoloGuaranteed ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`} onClick={() => setIsSoloGuaranteed(!isSoloGuaranteed)}>
           <div className="flex items-start gap-3">
             <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${isSoloGuaranteed ? 'bg-black border-black' : 'border-slate-300 bg-white'}`}>
@@ -124,12 +151,16 @@ export default function ReservationCard({ price, duration, availableDates, dateT
         </div>
       )}
 
-      <button onClick={() => onReserve(selectedDate, selectedTime, guestCount)} className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4">예약하기</button>
-      <p className="text-center text-xs text-slate-500 mb-4">예약 확정 전에는 청구되지 않습니다.</p>
+      <button onClick={() => onReserve(selectedDate, selectedTime, guestCount, isPrivate)} className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4">
+        {isPrivate ? '단독 투어 예약하기' : '예약하기'}
+      </button>
       
       <div className="space-y-2 pt-4 border-t border-slate-100 text-sm">
-        <div className="flex justify-between text-slate-600"><span className="underline">₩{price.toLocaleString()} x {guestCount}명</span><span>₩{basePrice.toLocaleString()}</span></div>
-        {guestCount === 1 && isSoloGuaranteed && <div className="flex justify-between text-slate-600"><span className="underline">1인 출발 확정비</span><span>₩{optionPrice.toLocaleString()}</span></div>}
+        <div className="flex justify-between text-slate-600">
+          <span className="underline">{isPrivate ? '프라이빗 단독 요금' : `₩${price.toLocaleString()} x ${guestCount}명`}</span>
+          <span>₩{basePrice.toLocaleString()}</span>
+        </div>
+        {!isPrivate && guestCount === 1 && isSoloGuaranteed && <div className="flex justify-between text-slate-600"><span className="underline">1인 출발 확정비</span><span>₩{optionPrice.toLocaleString()}</span></div>}
       </div>
       
       <div className="flex justify-between font-bold pt-4 border-t border-slate-100 mt-4 text-lg"><span>총 합계</span><span>₩{totalPrice.toLocaleString()}</span></div>

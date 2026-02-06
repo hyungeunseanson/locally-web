@@ -1,41 +1,19 @@
 'use client';
 
 import React from 'react';
-import { Share, Heart, MapPin, ChevronRight, Check, X, Users, Zap, ShieldAlert, CalendarX, MessageSquare } from 'lucide-react';
+import { MapPin, MessageSquare, Check, X, Users, Zap, ShieldAlert, CalendarX } from 'lucide-react';
 import Link from 'next/link';
 import ReviewSection from './ReviewSection';
 import HostProfileSection from './HostProfileSection';
 
 export default function ExpMainContent({ 
-  experience, hostProfile, isSaved, setIsSaved, handleShare, scrollToSection, handleInquiry, inquiryText, setInquiryText 
+  experience, hostProfile, handleInquiry, inquiryText, setInquiryText 
 }: any) {
   
   return (
     <div className="flex-1 space-y-12">
-      {/* 1. 헤더 섹션 */}
-      <section className="mb-6">
-        <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
-        <div className="flex justify-between items-end">
-          <div className="flex items-center gap-4 text-sm font-medium text-slate-800">
-            <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4"><span className="font-bold">★ 4.98</span> <span className="text-slate-500 underline">후기 15개</span></button>
-            <span className="text-slate-300">|</span>
-            <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700"><MapPin size={14}/> {experience.location}</button>
-          </div>
-          <div className="flex gap-2">
-             <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Share size={16} /> 공유하기</button>
-             <button onClick={() => setIsSaved(!isSaved)} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} /> {isSaved ? '저장됨' : '저장'}</button>
-          </div>
-        </div>
-      </section>
-
-      {/* 2. 이미지 갤러리 */}
-      <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
-         <img src={experience.photos?.[0] || experience.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
-         <button className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform"><ChevronRight size={16}/> 사진 모두 보기</button>
-      </section>
-
-      {/* 3. 호스트 요약 */}
+      
+      {/* 1. 호스트 요약 */}
       <div className="border-b border-slate-200 pb-8 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2>
@@ -44,13 +22,13 @@ export default function ExpMainContent({
         <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/></div>
       </div>
 
-      {/* 4. 체험 소개 */}
+      {/* 2. 체험 소개 */}
       <div className="border-b border-slate-200 pb-8">
         <h3 className="text-xl font-bold mb-4">체험 소개</h3>
         <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p>
       </div>
 
-      {/* 5. 동선 (루트) */}
+      {/* 3. 동선 (루트) */}
       {experience.itinerary && (
         <div className="border-b border-slate-200 pb-8">
           <h3 className="text-xl font-bold mb-6">진행 코스</h3>
@@ -66,10 +44,10 @@ export default function ExpMainContent({
         </div>
       )}
 
-      {/* 6. 후기 섹션 */}
+      {/* 4. 후기 섹션 */}
       <ReviewSection hostName={hostProfile?.name || 'Locally'} />
 
-      {/* 7. 호스트 상세 프로필 */}
+      {/* 5. 호스트 상세 프로필 */}
       <HostProfileSection 
         hostId={experience.host_id}
         name={hostProfile?.name || 'Tomoyo'}
@@ -81,7 +59,7 @@ export default function ExpMainContent({
         intro={hostProfile?.self_intro || "도쿄의 숨겨진 빈티지 샵을 소개하는 것을 좋아합니다."}
       />
 
-      {/* 8. 지도 (Location) */}
+      {/* 6. 지도 (Location) */}
       <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
          <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
          <p className="text-slate-500 mb-4">{experience.meeting_point || experience.location} (정확한 위치는 예약 확정 후 표시됩니다)</p>
@@ -98,7 +76,7 @@ export default function ExpMainContent({
          </Link>
       </div>
 
-      {/* 9. 문의하기 */}
+      {/* 7. 문의하기 */}
       <div id="inquiry" className="pb-8 scroll-mt-24">
          <h3 className="text-xl font-bold mb-4">문의하기</h3>
          <div className="flex gap-2">
@@ -107,7 +85,7 @@ export default function ExpMainContent({
          </div>
       </div>
 
-      {/* 10. 포함/불포함 */}
+      {/* 8. 포함/불포함 */}
       <div className="border-t border-slate-200 pt-10 pb-8">
          <h3 className="text-xl font-bold mb-6">포함 및 불포함 사항</h3>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -136,7 +114,7 @@ export default function ExpMainContent({
          )}
       </div>
 
-      {/* 11. 알아두어야 할 사항 */}
+      {/* 9. 알아두어야 할 사항 */}
       <div className="py-12 border-t border-slate-200">
          <h3 className="text-2xl font-bold mb-8">알아두어야 할 사항</h3>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
