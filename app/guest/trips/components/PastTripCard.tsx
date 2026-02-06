@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Star } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 interface PastTripCardProps {
   trip: any;
@@ -10,25 +10,33 @@ interface PastTripCardProps {
 
 export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) {
   return (
-    <div className="flex items-start gap-4 p-4 border border-slate-100 rounded-xl bg-white hover:border-slate-200 transition-colors">
-      <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden shrink-0">
-        {trip.image && <img src={trip.image} className="w-full h-full object-cover grayscale opacity-70" />}
+    <div className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors group cursor-default border border-transparent hover:border-slate-100">
+      <div className="w-14 h-14 bg-slate-200 rounded-lg overflow-hidden shrink-0">
+        {trip.image ? (
+          <img src={trip.image} className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all" />
+        ) : (
+          <div className="w-full h-full bg-slate-200"></div>
+        )}
       </div>
+      
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-slate-500 mb-0.5">{trip.date}</div>
-        <h4 className="font-bold text-sm text-slate-900 truncate mb-2">{trip.title}</h4>
+        <h4 className="font-bold text-sm text-slate-900 truncate">{trip.title}</h4>
+        <div className="text-xs text-slate-500 mt-0.5">{trip.date}</div>
         
         {trip.status !== 'cancelled' ? (
           <button 
             onClick={() => onOpenReview(trip)} 
-            className="text-xs font-bold text-black border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 flex items-center gap-1 w-fit"
+            className="text-xs font-semibold text-blue-600 hover:underline mt-1.5"
           >
-            <Star size={10}/> 후기 쓰기
+            후기 작성하기
           </button>
         ) : (
-          <span className="text-[10px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded">취소됨</span>
+          <span className="text-[10px] text-slate-400 mt-1.5 inline-block bg-slate-100 px-1.5 py-0.5 rounded">취소됨</span>
         )}
       </div>
+      
+      {/* 화살표 장식 */}
+      <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-400 transition-colors"/>
     </div>
   );
 }
