@@ -41,9 +41,11 @@ function PaymentContent() {
 
       if (!user) {
         alert("로그인이 필요한 서비스입니다.");
-        // router.push('/login'); // 로그인 페이지 구현 시 주석 해제
         return;
       }
+
+      // ✅ 주문 번호 생성 (예: ORD-171562...)
+      const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
       // 2. 예약 정보 저장 (INSERT)
       const { data, error } = await supabase
@@ -55,10 +57,11 @@ function PaymentContent() {
             date: date,    
             time: time,
             guests: guests,
-            amount: totalPrice,      // ✅ [수정됨] DB가 'amount' 컬럼을 원하므로 이름 변경
-            total_price: totalPrice, // (혹시 몰라 total_price도 같이 보냄, 컬럼 없으면 무시됨)
+            amount: totalPrice,      
+            total_price: totalPrice, 
             status: 'confirmed',     
             type: isPrivate ? 'private' : 'group',
+            order_id: orderId, // ✅ [핵심] 주문 번호 추가 (에러 해결)
             created_at: new Date().toISOString(),
           }
         ])
