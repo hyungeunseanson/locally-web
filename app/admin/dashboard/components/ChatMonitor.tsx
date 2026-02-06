@@ -20,16 +20,11 @@ export default function ChatMonitor() {
     }
   };
 
-  // ✅ 이름 표시 헬퍼 함수 (full_name이 없으면 다른 정보라도 표시)
+  // ✅ 이름 표시 헬퍼 함수 (full_name 없으면 name이나 email 사용)
   const getGuestName = (guest: any) => {
     if (!guest) return '알 수 없는 사용자';
     return guest.full_name || guest.name || guest.email || '익명 고객';
   };
-
-  // 디버깅용: 데이터 들어오는지 확인
-  useEffect(() => {
-    console.log("Admin Inquiries Loaded:", inquiries);
-  }, [inquiries]);
 
   return (
     <div className="flex h-full gap-6">
@@ -40,12 +35,13 @@ export default function ChatMonitor() {
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <MessageCircle size={18}/> 1:1 문의함
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객 1:1 문의 내역</p>
+            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
           </div>
+          {/* ✅ 새로고침 버튼 추가 */}
           <button 
             onClick={refresh} 
             className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
-            title="새로고침"
+            title="목록 새로고침"
           >
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           </button>
@@ -121,7 +117,7 @@ export default function ChatMonitor() {
 
             <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
               <input 
-                className="flex-1 border border-slate-200 bg-slate-50 rounded-xl px-4 py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-sm"
+                className="flex-1 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-sm"
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
