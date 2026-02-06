@@ -85,6 +85,21 @@ export default function GuestInboxPage() {
                     placeholder="메시지 입력..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
+                    // ✅ [수정] 한글 중복 입력 방지 추가
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return;
+                      if (e.key === 'Enter') handleSend();
+                    }}
+                  />
+                  <button onClick={handleSend} className="p-2 bg-black text-white rounded-full"><Send size={16}/></button>
+                </div>
+
+                <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
+                  <input 
+                    className="flex-1 bg-slate-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+                    placeholder="메시지 입력..."
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                   />
                   <button onClick={handleSend} className="p-2 bg-black text-white rounded-full"><Send size={16}/></button>
