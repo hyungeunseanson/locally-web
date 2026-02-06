@@ -18,14 +18,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) return;
       setCurrentUser(user);
 
-      // profiles 테이블 조인 시 1단계에서 만든 외래키 명칭 사용
+      // profiles 테이블 조인 (명시적 외래키 사용)
       let query = supabase
         .from('inquiries')
         .select(`
           *,
           experiences (id, title, photos),
-          guest:profiles!inquiries_user_id_fkey (full_name, avatar_url),
-          host:profiles!inquiries_host_id_fkey (full_name, avatar_url)
+          guest:profiles!inquiries_user_id_fkey (*),
+          host:profiles!inquiries_host_id_fkey (*)
         `)
         .order('updated_at', { ascending: false });
 
@@ -49,11 +49,12 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
+      // ✅ [핵심 수정] sender 조인 시 외래키 명시 (!inquiry_messages_sender_id_fkey)
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`
           *,
-          sender:profiles (full_name)
+          sender:profiles!inquiry_messages_sender_id_fkey (*)
         `)
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
