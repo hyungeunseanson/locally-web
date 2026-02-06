@@ -13,13 +13,15 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [selectedCategory, setSelectedCategory] = useState('all');
   
-  const [allExperiences, setAllExperiences] = useState<any[]>([]); // ✅ 전체 데이터 원본
-  const [filteredExperiences, setFilteredExperiences] = useState<any[]>([]); // ✅ 화면에 보여줄 필터링된 데이터
+  const [allExperiences, setAllExperiences] = useState<any[]>([]); 
+  const [filteredExperiences, setFilteredExperiences] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   
-  const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | null>(null);
+  const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | 'language' | null>(null);
   const [locationInput, setLocationInput] = useState('');
   const [dateRange, setDateRange] = useState<{start: Date | null, end: Date | null}>({ start: null, end: null });
+  const [selectedLanguage, setSelectedLanguage] = useState('all'); // ✅ 언어 상태 추가
+  
   const [scrollY, setScrollY] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   
@@ -46,7 +48,6 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 📡 데이터 가져오기 (카테고리 변경 시)
   useEffect(() => {
     const fetchExperiences = async () => {
       setLoading(true);
@@ -61,18 +62,14 @@ export default function HomePage() {
         if (error) throw error;
         
         if (data) {
-          // 카테고리 필터링 (DB에서 가져온 후 적용)
           let categoryFiltered = data;
           if (selectedCategory !== 'all') {
-            // DB에 category 필드가 없으면 location이나 title로 임시 필터링
-            // 만약 DB에 category 컬럼이 있다면: item.category === selectedCategory 로 수정
             categoryFiltered = data.filter((item: any) => 
               item.location?.includes(selectedCategory) || item.title?.includes(selectedCategory)
             );
           }
-
           setAllExperiences(categoryFiltered);
-          setFilteredExperiences(categoryFiltered); // 초기엔 전체 보여줌
+          setFilteredExperiences(categoryFiltered); 
         }
       } catch (error) { console.error(error); } 
       finally { setLoading(false); }
@@ -80,29 +77,38 @@ export default function HomePage() {
     fetchExperiences();
   }, [selectedCategory]);
 
-  // 🔍 통합 검색 함수
+  // 🔍 통합 검색 함수 (언어 필터 추가)
   const handleSearch = () => {
-    if (!locationInput.trim()) {
-      setFilteredExperiences(allExperiences); // 검색어 없으면 전체 목록 복구
-      return;
+    let result = allExperiences;
+
+    // 1. 텍스트 검색
+    if (locationInput.trim()) {
+      const term = locationInput.toLowerCase();
+      result = result.filter((item) => 
+        (item.title && item.title.toLowerCase().includes(term)) ||
+        (item.location && item.location.toLowerCase().includes(term)) ||
+        (item.description && item.description.toLowerCase().includes(term))
+      );
     }
 
-    const term = locationInput.toLowerCase();
-    
-    // 제목, 지역, 설명, 카테고리(있다면) 중 하나라도 포함되면 노출
-    const result = allExperiences.filter((item) => 
-      (item.title && item.title.toLowerCase().includes(term)) ||
-      (item.location && item.location.toLowerCase().includes(term)) ||
-      (item.description && item.description.toLowerCase().includes(term))
-    );
+    // 2. 언어 필터링
+    if (selectedLanguage !== 'all') {
+      result = result.filter((item) => 
+        item.languages && item.languages.includes(selectedLanguage)
+      );
+    }
 
     setFilteredExperiences(result);
-    setActiveSearchField(null); // 검색 후 창 닫기
+    setActiveSearchField(null); 
   };
+
+  // HomeHero에 Props 전달을 위해 래퍼 컴포넌트 수정 필요 (아래 코드 참고)
+  // (HomeHero.tsx도 Props 타입 수정이 필요하지만, 여기서는 핵심 로직만 보여드립니다.)
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans relative">
       
+      {/* 🟢 HomeHero에 언어 관련 Props 전달 */}
       <HomeHero 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -115,8 +121,12 @@ export default function HomePage() {
         setLocationInput={setLocationInput}
         dateRange={dateRange}
         setDateRange={setDateRange}
+        // 👇 추가된 부분
+        selectedLanguage={selectedLanguage}
+        setSelectedLanguage={setSelectedLanguage}
+        // 👆
         searchRef={searchRef}
-        onSearch={handleSearch} // ✅ 검색 함수 전달
+        onSearch={handleSearch} 
       />
 
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
@@ -131,12 +141,12 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-          ) : filteredExperiences.length === 0 ? ( // ✅ filteredExperiences 사용
+          ) : filteredExperiences.length === 0 ? ( 
             <div className="flex flex-col items-center justify-center py-40 text-center">
               <Ghost size={48} className="text-slate-300 mb-4"/>
               <h3 className="text-lg font-bold text-slate-900 mb-2">검색 결과가 없습니다.</h3>
-              <p className="text-slate-500 text-sm">다른 키워드로 검색해보세요!</p>
-              <button onClick={() => { setLocationInput(''); setFilteredExperiences(allExperiences); }} className="mt-6 px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors">전체 목록 보기</button>
+              <p className="text-slate-500 text-sm">다른 키워드나 언어로 검색해보세요!</p>
+              <button onClick={() => { setLocationInput(''); setSelectedLanguage('all'); setFilteredExperiences(allExperiences); }} className="mt-6 px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors">전체 목록 보기</button>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
