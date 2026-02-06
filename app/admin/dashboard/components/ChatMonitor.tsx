@@ -14,7 +14,7 @@ export default function ChatMonitor() {
   }, [messages]);
 
   const handleSend = () => {
-    if (selectedInquiry) {
+    if (selectedInquiry && replyText.trim()) { // 빈 메시지 방지
       sendMessage(selectedInquiry.id, replyText);
       setReplyText('');
     }
@@ -34,7 +34,7 @@ export default function ChatMonitor() {
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <MessageCircle size={18}/> 1:1 문의함
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객 상담 내역 (Admin)</p>
+            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
           </div>
           <button onClick={refresh} className="p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
@@ -111,7 +111,9 @@ export default function ChatMonitor() {
                 <div className="text-center text-slate-400 text-sm py-10">대화 내용이 없습니다.</div>
               ) : (
                 messages.map((msg) => {
-                  const isMe = msg.sender_id === currentUser?.id;
+                  // ✅ [수정] String()으로 변환하여 안전하게 ID 비교 (정렬 문제 해결)
+                  const isMe = String(msg.sender_id) === String(currentUser?.id); 
+                  
                   return (
                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                       <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
@@ -129,7 +131,11 @@ export default function ChatMonitor() {
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                // ✅ [수정] 한글 입력 중(isComposing)일 때는 전송 막기 (중복 문제 해결)
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === 'Enter') handleSend();
+                }}
               />
               <button onClick={handleSend} className="bg-black text-white px-5 py-2 rounded-xl hover:bg-slate-800 transition-colors">
                 <Send size={18}/>
