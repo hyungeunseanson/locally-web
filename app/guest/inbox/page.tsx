@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import { useChat } from '@/app/hooks/useChat'; // ✅ 커스텀 훅 사용
-import { MessageSquare, Send, User, ChevronLeft, ImageIcon } from 'lucide-react';
+import { useChat } from '@/app/hooks/useChat';
+import { Send, ImageIcon, ShieldCheck } from 'lucide-react';
 
 export default function GuestInboxPage() {
   const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage } = useChat('guest');
@@ -35,11 +35,20 @@ export default function GuestInboxPage() {
               {inquiries.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">대화가 없습니다.</div>}
               {inquiries.map((inq) => (
                 <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
-                  <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden shrink-0">
-                    {inq.experiences?.image_url ? <img src={inq.experiences.image_url} className="w-full h-full object-cover"/> : <ImageIcon className="m-3 text-slate-400"/>}
+                  
+                  {/* ✅ 아이콘: 관리자 채팅 vs 일반 체험 채팅 구분 */}
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-100'}`}>
+                    {inq.type === 'admin' ? (
+                      <ShieldCheck size={20} />
+                    ) : (
+                      inq.experiences?.image_url ? <img src={inq.experiences.image_url} className="w-full h-full object-cover"/> : <ImageIcon className="text-slate-400"/>
+                    )}
                   </div>
+
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate">{inq.experiences?.title}</div>
+                    <div className="font-bold text-sm truncate">
+                      {inq.type === 'admin' ? '로컬리 고객센터' : inq.experiences?.title}
+                    </div>
                     <div className="text-xs text-slate-500 truncate">{inq.content}</div>
                   </div>
                 </div>
@@ -52,8 +61,11 @@ export default function GuestInboxPage() {
             {selectedInquiry ? (
               <>
                 <div className="p-4 border-b border-slate-100 font-bold flex items-center gap-2">
-                  <div className="text-base">{selectedInquiry.experiences?.title}</div>
+                  <div className="text-base">
+                    {selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : selectedInquiry.experiences?.title}
+                  </div>
                 </div>
+                
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50" ref={scrollRef}>
                   {messages.map((msg) => {
                     const isMe = msg.sender_id === currentUser?.id;
@@ -66,6 +78,7 @@ export default function GuestInboxPage() {
                     );
                   })}
                 </div>
+
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
                   <input 
                     className="flex-1 bg-slate-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black"

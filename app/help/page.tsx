@@ -6,9 +6,10 @@ import {
   Search, ChevronDown, ChevronUp, MessageCircle, 
   User, Briefcase, CreditCard, ShieldCheck, Smile 
 } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useChat } from '@/app/hooks/useChat'; // ✅ 채팅 훅 추가
 
-// FAQ 데이터 (로컬리 맞춤형 콘텐츠)
+// FAQ 데이터 (기존 데이터 유지)
 const FAQ_DATA = {
   guest: [
     {
@@ -86,13 +87,16 @@ export default function HelpCenterPage() {
   const [activeTab, setActiveTab] = useState<'guest' | 'host'>('guest');
   const [searchTerm, setSearchTerm] = useState('');
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+  
+  // ✅ 추가: 내부 채팅 연결 로직
+  const { createAdminInquiry } = useChat();
+  const router = useRouter();
 
   const toggleItem = (categoryIndex: number, itemIndex: number) => {
     const key = `${categoryIndex}-${itemIndex}`;
     setOpenItems(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // 검색 필터링 로직
   const filteredData = FAQ_DATA[activeTab].map(category => ({
     ...category,
     items: category.items.filter(item => 
@@ -100,11 +104,27 @@ export default function HelpCenterPage() {
     )
   })).filter(category => category.items.length > 0);
 
+  // ✅ 추가: 문의하기 버튼 핸들러
+  const handleAdminSupport = async () => {
+    const content = prompt("문의하실 내용을 입력해주세요. 관리자가 확인 후 답변드립니다.");
+    if (!content) return; // 취소 시 중단
+
+    try {
+      await createAdminInquiry(content); // 관리자 1:1 채팅 생성
+      
+      if (confirm("문의가 접수되었습니다. 채팅방으로 이동하시겠습니까?")) {
+        router.push('/guest/inbox'); // 메시지함으로 이동
+      }
+    } catch (e: any) {
+      alert("문의 접수 중 오류가 발생했습니다: " + e.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      {/* 1. Hero Search Section */}
+      {/* Hero Search Section */}
       <div className="bg-slate-50 py-16 px-6 text-center border-b border-slate-100">
         <h1 className="text-3xl md:text-4xl font-black mb-6 tracking-tight">
           무엇을 도와드릴까요?
@@ -125,7 +145,7 @@ export default function HelpCenterPage() {
 
       <main className="max-w-4xl mx-auto px-6 py-12">
         
-        {/* 2. Role Switcher Tabs */}
+        {/* Role Switcher Tabs */}
         <div className="flex justify-center mb-12">
           <div className="bg-slate-100 p-1 rounded-xl flex">
             <button 
@@ -143,7 +163,7 @@ export default function HelpCenterPage() {
           </div>
         </div>
 
-        {/* 3. FAQ Accordion List */}
+        {/* FAQ Accordion List */}
         <div className="space-y-10">
           {filteredData.length === 0 ? (
             <div className="text-center py-20 text-slate-500">
@@ -183,7 +203,7 @@ export default function HelpCenterPage() {
           )}
         </div>
 
-        {/* 4. Contact Support Banner */}
+        {/* Contact Support Banner */}
         <div className="mt-20 border border-slate-200 rounded-3xl p-8 md:p-12 text-center bg-slate-50">
           <h3 className="text-2xl font-black mb-4">아직 해결되지 않으셨나요?</h3>
           <p className="text-slate-600 mb-8 max-w-lg mx-auto">
@@ -191,22 +211,22 @@ export default function HelpCenterPage() {
             계정, 결제, 투어 관련 등 궁금한 점이 있다면 편하게 문의해 주세요.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            {/* 1:1 채팅 상담하기 (카카오톡 채널 연결) */}
-            <Link 
-              href="http://pf.kakao.com/_PtvSG/chat" 
-              target="_blank"
+            
+            {/* ✅ 수정됨: 내부 채팅 연결 */}
+            <button 
+              onClick={handleAdminSupport}
               className="bg-black text-white px-8 py-3.5 rounded-xl font-bold hover:scale-105 transition-transform flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
             >
               <MessageCircle size={20}/> 1:1 채팅 상담하기
-            </Link>
+            </button>
             
             {/* 이메일 문의하기 */}
-            <Link 
+            <a 
               href="mailto:locally.partners@gmail.com"
-              className="bg-white border border-slate-300 text-slate-900 px-8 py-3.5 rounded-xl font-bold hover:bg-slate-100 transition-colors inline-block"
+              className="bg-white border border-slate-300 text-slate-900 px-8 py-3.5 rounded-xl font-bold hover:bg-slate-100 transition-colors inline-block flex items-center justify-center"
             >
               이메일 문의하기
-            </Link>
+            </a>
           </div>
           <p className="text-xs text-slate-400 mt-6">
             운영 시간: 평일 오전 10시 - 오후 7시 (주말/공휴일 휴무)
