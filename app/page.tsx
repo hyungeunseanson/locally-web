@@ -172,34 +172,20 @@ function Footer() {
     <footer className="border-t border-slate-100 bg-slate-50 mt-20 relative z-10">
       <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
-          <div>
-            <h5 className="font-bold text-black mb-4">Locally</h5>
-            <ul className="space-y-3">
-              <li><Link href="#" className="hover:underline">회사 소개</Link></li>
-              <li><Link href="/admin/dashboard" className="hover:underline font-bold text-slate-800">관리자 페이지</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h5 className="font-bold text-black mb-4">호스팅</h5>
-            <ul className="space-y-3">
-              <li><Link href="/become-a-host" className="hover:underline">호스트 되기</Link></li>
-              <li><Link href="#" className="hover:underline">호스트 추천하기</Link></li>
-            </ul>
-          </div>
+          {/* ... (앞부분 생략) ... */}
           <div>
             <h5 className="font-bold text-black mb-4">지원</h5>
             <ul className="space-y-3">
-              <li><Link href="#" className="hover:underline">도움말 센터</Link></li>
+              {/* 🔴 기존 코드: href="#" (작동 안 함) */}
+              {/* <li><Link href="#" className="hover:underline">도움말 센터</Link></li> */}
+              
+              {/* 🟢 수정 코드: href="/help" (도움말 센터로 이동) */}
+              <li><Link href="/help" className="hover:underline">도움말 센터</Link></li>
+              
               <li><Link href="#" className="hover:underline">안전 센터</Link></li>
             </ul>
           </div>
-          <div>
-             <div className="flex gap-4 font-bold text-slate-900 mb-6">
-               <button className="flex items-center gap-1 hover:underline"><Globe size={16}/> 한국어 (KR)</button>
-               <button className="hover:underline">₩ KRW</button>
-             </div>
-             <p className="text-xs">© 2026 Locally, Inc.</p>
-          </div>
+          {/* ... (뒷부분 생략) ... */}
         </div>
       </div>
     </footer>
