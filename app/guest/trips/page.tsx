@@ -2,19 +2,19 @@
 
 import React, { useState } from 'react';
 import { 
-  Calendar, MapPin, MoreHorizontal, MessageSquare, Receipt, Ghost 
+  Calendar, MapPin, MoreHorizontal, MessageSquare, Receipt, Ghost, Lock // Lock 아이콘 추가
 } from 'lucide-react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
-import TripCard from '@/app/components/TripCard';     // ✅ 위에서 만든 컴포넌트
-import ReviewModal from '@/app/components/ReviewModal'; // ✅ 위에서 만든 컴포넌트
+import TripCard from '@/app/components/TripCard';     
+import ReviewModal from '@/app/components/ReviewModal';
 
 export default function GuestTripsPage() {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
-  // 더미 데이터 (빈 화면 테스트를 위해 비워둘 수도 있음)
+  // 더미 데이터 (프라이빗 투어 예시 추가)
   const upcomingTrips = [
     {
       id: 999,
@@ -23,7 +23,8 @@ export default function GuestTripsPage() {
       date: "2026년 10월 24일 (토) 19:00",
       location: "시부야역 하치코 동상 앞",
       image: "https://images.unsplash.com/photo-1542051841857-5f90071e7989",
-      dDay: "D-3"
+      dDay: "D-3",
+      isPrivate: true, // ✅ 프라이빗 여부 추가
     }
   ];
 
@@ -58,7 +59,15 @@ export default function GuestTripsPage() {
                 <div className="p-8 flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-4">
-                       <span className="bg-black text-white text-xs font-bold px-3 py-1 rounded-full">{trip.dDay}</span>
+                       <div className="flex gap-2">
+                         <span className="bg-black text-white text-xs font-bold px-3 py-1 rounded-full">{trip.dDay}</span>
+                         {/* ✅ [단독 투어] 뱃지 추가 */}
+                         {trip.isPrivate && (
+                           <span className="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-slate-700">
+                             <Lock size={10} /> 단독 투어
+                           </span>
+                         )}
+                       </div>
                        
                        {/* 메뉴 버튼 */}
                        <div className="relative">

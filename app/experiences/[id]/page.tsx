@@ -76,11 +76,18 @@ export default function ExperienceDetailPage() {
     setInquiryText('');
   };
 
-  const handleReserve = (date: string, time: string, guests: number) => {
+  // ✅ 예약 핸들러 수정: isPrivate 파라미터 추가
+  const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean) => {
     if (!user) return alert("로그인이 필요합니다.");
     if (!date) return alert("날짜를 선택해주세요.");
     if (!time) return alert("시간을 선택해주세요.");
-    router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}`);
+    
+    // 예약 타입 및 가격 정보 전달 (프라이빗 가격은 ReservationCard에서 넘겨받지 않고, 결제 페이지에서 DB 조회하도록 하거나 여기서 함께 전달)
+    // 여기서는 type=private 파라미터를 추가하여 결제 페이지로 이동
+    const typeParam = isPrivate ? '&type=private' : '';
+    // 실제 결제 금액은 서버/결제 페이지에서 다시 계산해야 안전하지만, UX 흐름상 가격도 넘겨줄 수 있습니다.
+    // 여기서는 간단히 type만 넘깁니다.
+    router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div></div>;
@@ -154,20 +161,20 @@ export default function ExperienceDetailPage() {
             {/* 후기 */}
             <ReviewSection hostName={hostProfile?.name || 'Locally'} />
 
-{/* 호스트 상세 프로필 섹션 (여기 교체!) */}
-<HostProfileSection 
+            {/* 호스트 상세 프로필 섹션 */}
+            <HostProfileSection 
               hostId={experience.host_id}
               name={hostProfile?.name || 'Tomoyo'}
               avatarUrl={hostProfile?.avatar_url}
-              job="패션 디자이너" // DB 필드 연동 필요 (hostProfile.job)
+              job="패션 디자이너" 
               dreamDestination="중앙아메리카 커피 여행!"
               favoriteSong="Growing on me - The Darkness"
               languages={['영어', '일본어']}
               intro={hostProfile?.self_intro || "도쿄의 숨겨진 빈티지 샵을 소개하는 것을 좋아합니다. 패션과 커피를 사랑해요!"}
             />
 
-{/* 지도 섹션 (구글 맵 연동 복구됨) */}
-<div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
+            {/* 지도 섹션 (구글 맵 연동 복구됨) */}
+            <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
                <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
                <p className="text-slate-500 mb-4">
                  {experience.meeting_point || experience.location} (정확한 위치는 예약 확정 후 표시됩니다)
@@ -306,6 +313,9 @@ export default function ExperienceDetailPage() {
           <div className="w-full md:w-[380px]">
             <ReservationCard 
               price={Number(experience.price)} 
+              // ✅ 프라이빗 관련 데이터 전달
+              privatePrice={Number(experience.private_price)}
+              isPrivateEnabled={experience.is_private_enabled}
               duration={Number(experience.duration || 2)} 
               availableDates={availableDates}
               dateToTimeMap={dateToTimeMap}
