@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MapPin, MoreHorizontal, Calendar, Map } from 'lucide-react';
+import { MapPin, MoreHorizontal, Receipt, MessageSquare, Map } from 'lucide-react';
 import Link from 'next/link';
 
 interface TripCardProps {
@@ -28,9 +28,9 @@ export default function TripCard({ trip, onCancel, onOpenReceipt }: TripCardProp
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-all duration-300 border border-slate-100">
+    <div className="group bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-all duration-300 border border-slate-100">
       
-      {/* 이미지 영역 (비율 시원하게) */}
+      {/* 🟢 이미지 영역 */}
       <div className="relative aspect-[16/9] sm:aspect-[2/1] overflow-hidden bg-slate-100">
         <Link href={`/experiences/${trip.expId}`} className="block w-full h-full">
           {trip.image ? (
@@ -44,12 +44,12 @@ export default function TripCard({ trip, onCancel, onOpenReceipt }: TripCardProp
           )}
         </Link>
         
-        {/* D-Day 뱃지 (심플하게) */}
+        {/* D-Day 뱃지 */}
         <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-md text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
           {trip.dDay}
         </div>
 
-        {/* 더보기 버튼 (이미지 위로 올림 - 공간 절약) */}
+        {/* 더보기 버튼 */}
         <div className="absolute top-4 right-4">
             <button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2 bg-white/90 hover:bg-white rounded-full shadow-sm transition-colors text-slate-700">
               <MoreHorizontal size={18}/>
@@ -87,20 +87,26 @@ export default function TripCard({ trip, onCancel, onOpenReceipt }: TripCardProp
            <MapPin size={14} className="text-slate-400"/> {trip.location}
         </div>
         
-        {/* 하단 버튼 (깔끔한 텍스트형) */}
-        <div className="flex gap-4 pt-4 border-t border-slate-100">
+        {/* 하단 버튼 그룹 (메시지 버튼 추가됨) */}
+        <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
+          <Link href={`/guest/inbox?hostId=${trip.hostId}`} className="flex-1">
+            <button className="w-full text-center py-2 text-sm font-semibold text-slate-600 hover:text-black hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-center gap-1.5">
+              <MessageSquare size={16} className="text-slate-400"/> 메시지
+            </button>
+          </Link>
+          <div className="w-[1px] h-3 bg-slate-200"></div>
           <button 
             onClick={openGoogleMaps} 
-            className="flex-1 text-center py-2 text-sm font-semibold text-slate-600 hover:text-black hover:bg-slate-50 rounded-lg transition-colors"
+            className="flex-1 text-center py-2 text-sm font-semibold text-slate-600 hover:text-black hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
           >
-            지도 보기
+            <Map size={16} className="text-slate-400"/> 지도
           </button>
-          <div className="w-[1px] bg-slate-200 my-1"></div>
+          <div className="w-[1px] h-3 bg-slate-200"></div>
           <button 
             onClick={() => onOpenReceipt(trip)} 
-            className="flex-1 text-center py-2 text-sm font-semibold text-slate-600 hover:text-black hover:bg-slate-50 rounded-lg transition-colors"
+            className="flex-1 text-center py-2 text-sm font-semibold text-slate-600 hover:text-black hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
           >
-            영수증 보기
+            <Receipt size={16} className="text-slate-400"/> 영수증
           </button>
         </div>
       </div>

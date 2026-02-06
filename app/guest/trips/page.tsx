@@ -7,7 +7,6 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewModal from '@/app/components/ReviewModal';
 
-// 컴포넌트 import
 import TripCard from './components/TripCard';     
 import ReceiptModal from './components/ReceiptModal'; 
 import PastTripCard from './components/PastTripCard'; 
@@ -33,7 +32,6 @@ export default function GuestTripsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // ✅ 쿼리 유지: full_name 및 명시적 FK 사용
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -75,7 +73,7 @@ export default function GuestTripsPage() {
             title: booking.experiences.title,
             hostName: hostData?.full_name || 'Locally Host',
             hostPhone: hostData?.phone,
-            hostId: booking.experiences.host_id,
+            hostId: booking.experiences.host_id, // 메시지 전송용 ID
             date: booking.date, 
             time: booking.time || '14:00',
             location: booking.experiences.city || '서울',
@@ -106,7 +104,7 @@ export default function GuestTripsPage() {
   };
 
   const handleCancelBooking = async (id: number) => {
-    if (!confirm('예약을 취소하시겠습니까?')) return;
+    if (!confirm('정말 예약을 취소하시겠습니까?')) return;
     const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
     if (!error) { 
       alert('예약이 취소되었습니다.'); 
@@ -134,10 +132,8 @@ export default function GuestTripsPage() {
             </div>
         )}
 
-        {/* 🟢 2컬럼 레이아웃 시작 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-          
-          {/* 1. 왼쪽 메인: 예정된 여행 (비중 높게) */}
+          {/* 왼쪽: 예정된 여행 */}
           <section className="lg:col-span-7">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               예정된 일정 <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full">{upcomingTrips.length}</span>
@@ -165,9 +161,9 @@ export default function GuestTripsPage() {
             </div>
           </section>
 
-          {/* 2. 오른쪽 사이드: 지난 여행 (리스트 형태) */}
+          {/* 오른쪽: 지난 여행 */}
           <aside className="lg:col-span-5">
-            <div className="sticky top-24"> {/* 스크롤 시 따라옴 */}
+            <div className="sticky top-24">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-400">
                 <History size={20}/> 지난 여행
               </h2>
@@ -183,11 +179,9 @@ export default function GuestTripsPage() {
               )}
             </div>
           </aside>
-
         </div>
       </main>
 
-      {/* 모달 */}
       {isReceiptModalOpen && selectedTrip && <ReceiptModal trip={selectedTrip} onClose={() => setIsReceiptModalOpen(false)} />}
       {isReviewModalOpen && selectedTrip && <ReviewModal trip={selectedTrip} onClose={() => setIsReviewModalOpen(false)} />}
     </div>
