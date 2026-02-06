@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import Sidebar from './components/Sidebar';
-import UsersTab from './components/UsersTab'; // ✅ 통합 유저 탭
-import BookingsTab from './components/BookingsTab'; // ✅ 통합 예약 탭
-import SalesTab from './components/SalesTab'; // ✅ 별도 생성 필요 (이전 답변 참고)
+import UsersTab from './components/UsersTab';
+import BookingsTab from './components/BookingsTab';
+import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
 
@@ -27,7 +27,6 @@ export default function AdminDashboardPage() {
   useEffect(() => { 
     fetchData(); 
     
-    // 1. 유저 접속 구독
     const presenceChannel = supabase.channel('online_users')
       .on('presence', { event: 'sync' }, () => {
         const newState = presenceChannel.presenceState();
@@ -37,11 +36,10 @@ export default function AdminDashboardPage() {
       })
       .subscribe();
 
-    // 2. 실시간 예약 구독 (예약 발생 시 즉시 반영)
     const bookingChannel = supabase.channel('realtime_bookings')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, (payload) => {
         setBookings(prev => [payload.new, ...prev]);
-        // 필요시 알림 토스트 띄우기 기능 추가 가능
+        alert('🔔 새로운 예약이 접수되었습니다!');
       })
       .subscribe();
 
@@ -52,21 +50,73 @@ export default function AdminDashboardPage() {
   }, []);
 
   const fetchData = async () => {
-    // (기존 fetchData 로직 유지)
     const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
     if (appData) setApps(appData);
+    
     const { data: expData } = await supabase.from('experiences').select('*, bookings(count)').order('created_at', { ascending: false });
     if (expData) setExps(expData);
+    
     const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
     if (userData) setUsers(userData);
+    
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
     if (bookingData) setBookings(bookingData);
+    
     const { data: msgData } = await supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
     if (msgData) setMessages(msgData);
   };
 
-  const updateStatus = async (table: any, id: any, status: any) => { /* 기존 로직 유지 */ };
-  const deleteItem = async (table: any, id: any) => { /* 기존 로직 유지 */ };
+  // ✅ [복구됨] 상태 업데이트 로직 (승인/거절/보완)
+  const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
+    let comment = '';
+    
+    // 거절이나 보완 요청 시 사유 입력 받기
+    if (status === 'rejected' || status === 'revision') {
+      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
+      if (input === null) return; // 취소 시 중단
+      comment = input;
+    } else {
+      // 승인 시 확인
+      if (!confirm(`${status === 'approved' ? '승인' : '활성화'} 처리하시겠습니까?`)) return;
+      // 체험의 경우 approved가 아니라 active로 상태 변경 (테이블마다 상태값이 다를 수 있음)
+      if (table === 'experiences' && status === 'approved') status = 'active';
+    }
+
+    try {
+      // 1. 상태 업데이트
+      const { error } = await supabase.from(table).update({ status, admin_comment: comment }).eq('id', id);
+      if (error) throw error;
+
+      // 2. 호스트 지원서 승인 시 -> 해당 유저를 'host' 권한으로 등업
+      if (table === 'host_applications' && status === 'approved') {
+        const app = apps.find(a => a.id === id);
+        if (app) {
+          await supabase.from('profiles').update({ role: 'host' }).eq('id', app.user_id);
+        }
+      }
+
+      alert('처리되었습니다.');
+      fetchData(); // 목록 새로고침
+      setSelectedItem(null); // 선택 해제
+    } catch (err: any) {
+      console.error(err);
+      alert('오류가 발생했습니다: ' + err.message);
+    }
+  };
+
+  // ✅ [복구됨] 삭제 로직
+  const deleteItem = async (table: string, id: string) => {
+    if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+    
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) {
+      alert('삭제 실패: ' + error.message);
+    } else { 
+      alert('삭제되었습니다.'); 
+      fetchData(); 
+      setSelectedItem(null); 
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -87,7 +137,7 @@ export default function AdminDashboardPage() {
           ) : activeTab === 'BOOKINGS' ? (
             <BookingsTab bookings={bookings} />
           ) : activeTab === 'SALES' ? (
-            <SalesTab bookings={bookings} /> // SalesTab.tsx 필요 (이전 답변 참고)
+            <SalesTab bookings={bookings} />
           ) : activeTab === 'ANALYTICS' ? (
             <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
           ) : (
