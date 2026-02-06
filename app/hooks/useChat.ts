@@ -9,18 +9,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [messages, setMessages] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const supabase = createClient();
 
-  const secureUrl = (url: string) => {
-    if (!url) return null;
-    if (url.startsWith('http://')) return url.replace('http://', 'https://');
-    return url;
-  };
-
   const fetchInquiries = useCallback(async () => {
-    setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -42,17 +34,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       const { data, error } = await query;
       if (error) throw error;
-      
-      if (data) {
-        const safeData = data.map(item => ({
-          ...item,
-          guest: item.guest ? { ...item.guest, avatar_url: secureUrl(item.guest.avatar_url) } : null,
-          host: item.host ? { ...item.host, avatar_url: secureUrl(item.host.avatar_url) } : null
-        }));
-        setInquiries(safeData);
-      }
+      if (data) setInquiries(data);
     } catch (err: any) {
-      setError(err.message);
+      console.error("채팅 목록 로딩 에러:", err.message);
     } finally {
       setIsLoading(false);
     }
@@ -62,24 +46,17 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     try {
       const { data, error } = await supabase
         .from('inquiry_messages')
-        .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url)`)
+        .select(`*, sender:profiles (full_name)`)
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
       
       if (error) throw error;
-
-      if (data) {
-        const safeMessages = data.map(msg => ({
-          ...msg,
-          sender: msg.sender ? { ...msg.sender, avatar_url: secureUrl(msg.sender.avatar_url) } : null
-        }));
-        setMessages(safeMessages);
-      }
+      setMessages(data || []);
       
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) setSelectedInquiry(selected);
     } catch (err: any) {
-      console.error(err);
+      console.error("메시지 로딩 에러:", err.message);
     }
   };
 
@@ -97,32 +74,39 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       if (error) throw error;
 
+      // 채팅방의 마지막 메시지 업데이트
       await supabase
         .from('inquiries')
         .update({ content: content, updated_at: new Date().toISOString() })
         .eq('id', inquiryId);
 
-      // ❌ [삭제됨] setMessages(...) 낙관적 업데이트 코드 제거 (한글 중복 원인)
-      
-      // ✅ [추가] 대신 서버에서 최신 메시지를 다시 가져옴
+      // ❌ [삭제] 낙관적 업데이트 코드 제거 (한글 중복 원인)
+      // const newMessage = { ... }; setMessages(...) 삭제됨
+
+      // ✅ [추가] 서버에서 최신 메시지 다시 로드
       await loadMessages(inquiryId);
-      fetchInquiries(); // 목록 갱신
+      fetchInquiries(); // 목록 새로고침
     } catch (err: any) {
-      alert("전송 실패: " + err.message);
+      console.error("메시지 전송 실패:", err.message);
     }
   };
 
+  // ... createInquiry, createAdminInquiry 등 나머지 함수는 기존 유지 ...
   const createInquiry = async (hostId: string, experienceId: string, content: string) => {
-    if (!currentUser) throw new Error('로그인 필요');
-    const { data, error } = await supabase.from('inquiries').insert([{ user_id: currentUser.id, host_id: hostId, experience_id: experienceId, content, type: 'general' }]).select().single();
+    if (!currentUser) throw new Error('로그인이 필요합니다.');
+    const { data, error } = await supabase.from('inquiries').insert([{
+        user_id: currentUser.id, host_id: hostId, experience_id: experienceId, content: content, type: 'general'
+      }]).select().single();
     if (error) throw error;
     await sendMessage(data.id, content);
     return data;
   };
 
   const createAdminInquiry = async (content: string) => {
-    if (!currentUser) throw new Error('로그인 필요');
-    const { data, error } = await supabase.from('inquiries').insert([{ user_id: currentUser.id, content, type: 'admin', host_id: null, experience_id: null }]).select().single();
+    if (!currentUser) throw new Error('로그인이 필요합니다.');
+    const { data, error } = await supabase.from('inquiries').insert([{
+        user_id: currentUser.id, content: content, type: 'admin', host_id: null, experience_id: null
+      }]).select().single();
     if (error) throw error;
     await sendMessage(data.id, content);
     return data;
@@ -130,5 +114,5 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
-  return { inquiries, selectedInquiry, messages, currentUser, isLoading, error, loadMessages, sendMessage, createInquiry, createAdminInquiry, refresh: fetchInquiries };
+  return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, createAdminInquiry, refresh: fetchInquiries };
 }
