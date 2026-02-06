@@ -14,8 +14,10 @@ export default function GuestTripsPage() {
   const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
   const [pastTrips, setPastTrips] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // 디버깅용 상태
+  const [debugMsg, setDebugMsg] = useState<string>("");
 
-  // 모달 상태
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
@@ -29,9 +31,29 @@ export default function GuestTripsPage() {
   const fetchMyTrips = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      
+      if (!user) {
+        setDebugMsg("로그인된 유저가 없습니다.");
+        setIsLoading(false);
+        return;
+      }
 
-      // 🚨 수정: 에러가 나던 복잡한 profiles 연결을 빼고, 체험 정보만 안전하게 가져옵니다.
+      setDebugMsg(`유저 ID 확인: ${user.id} / 데이터 조회 시작...`);
+
+      // 1. 단순하게 bookings만 먼저 조회 (Join 없이) -> 데이터 존재 여부 확인
+      const { data: rawBookings, error: rawError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('user_id', user.id);
+        
+      if (rawError) {
+        setDebugMsg(`1차 조회 에러: ${rawError.message}`);
+        throw rawError;
+      }
+
+      setDebugMsg(`1차 조회 성공: ${rawBookings?.length}개 발견. 상세 정보 로딩 중...`);
+
+      // 2. 실제 데이터 조회 (Join 포함)
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -43,7 +65,10 @@ export default function GuestTripsPage() {
         .eq('user_id', user.id)
         .order('date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        setDebugMsg(`2차 조회(Join) 에러: ${error.message}`);
+        throw error;
+      }
 
       if (bookings) {
         const upcoming: any[] = [];
@@ -62,8 +87,8 @@ export default function GuestTripsPage() {
 
           const formattedTrip = {
             id: booking.id,
-            title: booking.experiences?.title || '체험 정보 불러오는 중',
-            hostName: 'Locally Host', // 호스트 이름 연결 에러 방지를 위해 고정값 사용
+            title: booking.experiences?.title || '제목 없음',
+            hostName: 'Locally Host', 
             hostId: booking.experiences?.host_id,
             date: booking.date, 
             time: booking.time || '시간 미정',
@@ -89,49 +114,33 @@ export default function GuestTripsPage() {
         setUpcomingTrips(upcoming);
         setPastTrips(past.reverse());
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('데이터 로딩 실패:', err);
+      setDebugMsg(`최종 에러 발생: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 예약 취소
   const handleCancelBooking = async (id: number) => {
     if (!confirm('정말 예약을 취소하시겠습니까?')) return;
-    
     const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
-    if (!error) {
-      alert('예약이 취소되었습니다.');
-      fetchMyTrips(); 
-    } else {
-      alert('취소 실패: ' + error.message);
-    }
+    if (!error) { alert('예약이 취소되었습니다.'); fetchMyTrips(); } 
+    else { alert('취소 실패: ' + error.message); }
   };
 
-  // 모달 핸들러
   const handleOpenReceipt = (trip: any) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
   const handleOpenReview = (trip: any) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
-
-  // 기능: 캘린더 추가
-  const addToCalendar = (trip: any) => {
-    const text = encodeURIComponent(`[Locally] ${trip.title}`);
-    const details = encodeURIComponent(`예약번호: ${trip.orderId}`);
-    const dateStr = trip.date.replace(/-/g, ''); 
-    const dates = `${dateStr}/${dateStr}`; 
-    window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}`, '_blank');
-  };
-
-  // 기능: 주소 복사
-  const copyAddress = (address: string) => {
-    navigator.clipboard.writeText(address);
-    alert('주소가 복사되었습니다.');
-  };
-
+  
   const toggleMenu = (id: number) => setActiveMenuId(activeMenuId === id ? null : id);
 
   if (isLoading) {
-    return <div className="min-h-screen bg-white flex items-center justify-center"><Loader2 className="animate-spin text-slate-400" size={32} /></div>;
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-slate-400 mb-4" size={32} />
+        <p className="text-sm text-slate-500">{debugMsg}</p>
+      </div>
+    );
   }
 
   return (
@@ -139,16 +148,21 @@ export default function GuestTripsPage() {
       <SiteHeader />
 
       <main className="max-w-5xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-black mb-10">나의 여행</h1>
+        <h1 className="text-3xl font-black mb-2">나의 여행</h1>
+        {/* 디버그 메시지 (개발 중에만 보임) */}
+        {upcomingTrips.length === 0 && pastTrips.length === 0 && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-8 text-xs font-mono">
+            [DEBUG SYSTEM MESSAGE]<br/>
+            {debugMsg}<br/>
+            데이터가 0건이라면 SQL Editor에서 RLS 정책을 확인해주세요.
+          </div>
+        )}
 
-        {/* 1. 예정된 예약 */}
         <section className="mb-16">
           <h2 className="text-xl font-bold mb-6">예정된 예약</h2>
           {upcomingTrips.length > 0 ? (
             upcomingTrips.map(trip => (
-              <div key={trip.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow flex flex-col md:flex-row relative mb-6">
-                
-                {/* 정보 영역 */}
+              <div key={trip.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-lg flex flex-col md:flex-row relative mb-6">
                 <div className="p-8 flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start mb-4">
@@ -156,37 +170,25 @@ export default function GuestTripsPage() {
                          <span className="bg-black text-white text-xs font-bold px-3 py-1 rounded-full">{trip.dDay}</span>
                          {trip.isPrivate && <span className="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><Lock size={10} /> Private</span>}
                        </div>
-                       
                        <div className="relative">
                          <button onClick={(e) => { e.stopPropagation(); toggleMenu(trip.id); }} className="p-1.5 hover:bg-slate-100 rounded-full"><MoreHorizontal className="text-slate-400"/></button>
                          {activeMenuId === trip.id && (
                            <div className="absolute right-0 top-8 w-48 bg-white border border-slate-100 rounded-xl shadow-xl z-10 overflow-hidden">
-                             <button onClick={() => addToCalendar(trip)} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 text-slate-700 flex items-center gap-2"><Calendar size={14}/> 캘린더 추가</button>
-                             <button onClick={() => copyAddress(trip.address)} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 text-slate-700 flex items-center gap-2"><Map size={14}/> 주소 복사</button>
-                             <div className="border-t my-1"></div>
                              <button onClick={() => handleCancelBooking(trip.id)} className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 text-red-500">예약 취소</button>
                            </div>
                          )}
                        </div>
                     </div>
-
-                    <h3 className="text-2xl font-bold mb-2 hover:underline"><Link href={`/experiences/${trip.expId}`}>{trip.title}</Link></h3>
-                    
+                    <h3 className="text-2xl font-bold mb-2"><Link href={`/experiences/${trip.expId}`}>{trip.title}</Link></h3>
                     <div className="space-y-3 mt-4">
                       <div className="flex items-center gap-3 text-slate-700"><Calendar className="text-slate-400" size={18}/><span className="font-semibold text-sm">{trip.date} · {trip.time}</span></div>
                       <div className="flex items-center gap-3 text-slate-700"><MapPin className="text-slate-400" size={18}/><span className="font-semibold text-sm">{trip.location}</span></div>
                     </div>
                   </div>
-
                   <div className="flex gap-3 mt-8 pt-8 border-t border-slate-100">
-                    <Link href={`/guest/inbox?hostId=${trip.hostId}`} className="flex-1">
-                      <button className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm"><MessageSquare size={16}/> 문의</button>
-                    </Link>
                     <button onClick={() => handleOpenReceipt(trip)} className="flex-1 border border-slate-200 hover:border-black text-slate-900 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm"><Receipt size={16}/> 영수증</button>
                   </div>
                 </div>
-
-                {/* 이미지 */}
                 <div className="w-full md:w-80 bg-slate-100 relative min-h-[300px]">
                    {trip.image ? <img src={trip.image} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400">No Image</div>}
                 </div>
@@ -196,12 +198,10 @@ export default function GuestTripsPage() {
             <div className="border border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center py-16 px-4 bg-slate-50/50 text-center">
               <Ghost size={32} className="text-slate-300 mb-4"/>
               <h3 className="text-lg font-bold text-slate-900 mb-1">예정된 여행이 없습니다.</h3>
-              <Link href="/" className="mt-4 px-6 py-3 bg-black text-white rounded-xl font-bold text-sm">체험 둘러보기</Link>
             </div>
           )}
         </section>
 
-        {/* 2. 지난 여행 */}
         <section>
           <h2 className="text-xl font-bold mb-6">지난 여행</h2>
           {pastTrips.length > 0 ? (
@@ -226,7 +226,6 @@ export default function GuestTripsPage() {
         </section>
       </main>
 
-      {/* 영수증 모달 */}
       {isReceiptModalOpen && selectedTrip && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in zoom-in-95">
@@ -247,14 +246,12 @@ export default function GuestTripsPage() {
               </div>
               <div className="flex gap-3">
                  <button onClick={() => setIsReceiptModalOpen(false)} className="flex-1 py-3 bg-slate-100 font-bold rounded-xl text-sm">닫기</button>
-                 <button className="flex-1 py-3 bg-black text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"><Share2 size={14}/> 공유</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 후기 모달 */}
       {isReviewModalOpen && selectedTrip && <ReviewModal trip={selectedTrip} onClose={() => setIsReviewModalOpen(false)} />}
     </div>
   );
