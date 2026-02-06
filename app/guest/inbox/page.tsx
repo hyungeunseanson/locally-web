@@ -36,7 +36,7 @@ export default function GuestInboxPage() {
               {inquiries.map((inq) => (
                 <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
                   
-                  {/* ✅ 아이콘: 관리자 채팅 vs 일반 체험 채팅 구분 */}
+                  {/* 아이콘: 관리자 채팅 vs 일반 체험 채팅 구분 */}
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-100'}`}>
                     {inq.type === 'admin' ? (
                       <ShieldCheck size={20} />
@@ -85,22 +85,11 @@ export default function GuestInboxPage() {
                     placeholder="메시지 입력..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    // ✅ [수정] 한글 중복 입력 방지 추가
+                    // ✅ [수정] 한글 중복 전송 방지
                     onKeyDown={(e) => {
                       if (e.nativeEvent.isComposing) return;
                       if (e.key === 'Enter') handleSend();
                     }}
-                  />
-                  <button onClick={handleSend} className="p-2 bg-black text-white rounded-full"><Send size={16}/></button>
-                </div>
-
-                <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
-                  <input 
-                    className="flex-1 bg-slate-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black"
-                    placeholder="메시지 입력..."
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                   />
                   <button onClick={handleSend} className="p-2 bg-black text-white rounded-full"><Send size={16}/></button>
                 </div>

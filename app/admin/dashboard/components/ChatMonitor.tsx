@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MessageCircle, User, ChevronRight, Calendar, Send } from 'lucide-react';
-import { useChat } from '@/app/hooks/useChat';
+import { Search, MessageCircle, User, ChevronRight, Calendar, Send, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { useChat } from '@/app/hooks/useChat'; 
 
 export default function ChatMonitor() {
-  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage } = useChat('admin');
+  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, refresh, isLoading, error } = useChat('admin');
   const [replyText, setReplyText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -20,57 +20,100 @@ export default function ChatMonitor() {
     }
   };
 
+  const getGuestName = (guest: any) => {
+    if (!guest) return '알 수 없는 사용자';
+    return guest.full_name || guest.name || guest.email || '익명 고객';
+  };
+
   return (
-    <div className="flex h-full gap-6">
-      {/* 왼쪽 목록 영역 */}
-      <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2 mb-2">
-            <MessageCircle size={18}/> 1:1 문의함
-          </h3>
-          <p className="text-xs text-slate-500">고객/호스트가 보낸 문의입니다.</p>
+    <div className="flex h-full gap-6 w-full">
+      {/* 왼쪽: 문의 목록 */}
+      <div className="w-[350px] shrink-0 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm relative">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+              <MessageCircle size={18}/> 1:1 문의함
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
+          </div>
+          <button onClick={refresh} className="p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
+            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+          </button>
         </div>
+        
+        {/* 에러 발생 시 표시 */}
+        {error && (
+          <div className="p-4 bg-red-50 border-b border-red-100 text-red-600 text-xs break-all">
+            <div className="flex items-center gap-2 font-bold mb-1"><AlertTriangle size={14}/> 오류 발생</div>
+            {error}
+          </div>
+        )}
+
         <div className="overflow-y-auto flex-1">
-          {inquiries.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm">접수된 문의가 없습니다.</div>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full text-slate-400">
+              <Loader2 className="animate-spin mr-2" size={20} /> 로딩 중...
+            </div>
+          ) : inquiries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
+              <MessageCircle size={32} className="mb-2 opacity-20"/>
+              <div className="text-sm font-bold mb-1">접수된 문의가 없습니다.</div>
+              <div className="text-[10px] bg-slate-100 p-2 rounded text-slate-500 mt-2">
+                User: {currentUser ? currentUser.email : '로그인 안됨'}
+              </div>
+              <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">다시 시도</button>
+            </div>
           ) : (
             inquiries.map((inq) => (
               <div 
                 key={inq.id} 
                 onClick={() => loadMessages(inq.id)}
-                className={`p-4 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 ${selectedInquiry?.id === inq.id ? 'bg-slate-50 border-l-4 border-l-black' : 'border-l-4 border-l-transparent'}`}
+                className={`p-4 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-4 border-l-black' : 'border-l-4 border-l-transparent'}`}
               >
                 <div className="flex justify-between mb-1">
-                  <span className="font-bold text-sm text-slate-800">{inq.guest?.full_name || '익명 사용자'}</span>
+                  <span className="font-bold text-sm text-slate-800 flex items-center gap-1">
+                    {getGuestName(inq.guest)}
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono">#{inq.id}</span>
+                  </span>
                   <span className="text-[10px] text-slate-400">{new Date(inq.updated_at).toLocaleDateString()}</span>
                 </div>
-                <p className="text-sm text-slate-600 line-clamp-1">{inq.content}</p>
+                <p className="text-sm text-slate-600 line-clamp-1">{inq.content || '(내용 없음)'}</p>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {/* 오른쪽 채팅창 */}
+      {/* 오른쪽: 채팅창 */}
       <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
         {selectedInquiry ? (
           <>
             <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
-              <div>
-                <div className="font-bold text-lg">{selectedInquiry.guest?.full_name}</div>
-                <div className="text-xs text-slate-400">문의 ID: {selectedInquiry.id}</div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                  {selectedInquiry.guest?.avatar_url ? (
+                    <img src={selectedInquiry.guest.avatar_url} className="w-full h-full object-cover" alt="Profile" />
+                  ) : (
+                    <User size={20} className="text-slate-400"/>
+                  )}
+                </div>
+                <div>
+                  <div className="font-bold text-lg text-slate-900">{getGuestName(selectedInquiry.guest)}</div>
+                  <div className="text-xs text-slate-400 flex items-center gap-1">
+                    문의 ID: {selectedInquiry.id} · {new Date(selectedInquiry.created_at).toLocaleString()}
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
-                // ✅ [수정] 문의 만든 사람(Guest)이면 왼쪽, 아니면(Admin) 오른쪽
-                // String()으로 감싸서 ID 타입 불일치 방지
+                // ✅ [핵심 수정] 관리자 화면이므로 "문의자(Guest)"가 보낸 건 왼쪽, 나머지는 오른쪽
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 
                 return (
                   <div key={msg.id} className={`flex ${isGuest ? 'justify-start' : 'justify-end'}`}>
-                    <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm ${isGuest ? 'bg-white border border-slate-200 rounded-tl-none text-slate-800' : 'bg-black text-white rounded-tr-none'}`}>
+                    <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${isGuest ? 'bg-white border border-slate-200 rounded-tl-none text-slate-800' : 'bg-black text-white rounded-tr-none'}`}>
                       {msg.content}
                     </div>
                   </div>
@@ -80,17 +123,17 @@ export default function ChatMonitor() {
 
             <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
               <input 
-                className="flex-1 border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:border-blue-500"
+                className="flex-1 border border-slate-200 bg-slate-50 rounded-xl px-4 py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-sm"
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                // ✅ [수정] 한글 조합 중(isComposing)일 때는 전송 막기
+                // ✅ [수정] 한글 중복 전송 방지 (IME 체크)
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') handleSend();
                 }}
               />
-              <button onClick={handleSend} className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors">
+              <button onClick={handleSend} className="bg-black text-white px-5 py-2 rounded-xl hover:bg-slate-800 transition-colors">
                 <Send size={18}/>
               </button>
             </div>
@@ -98,7 +141,7 @@ export default function ChatMonitor() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
             <MessageCircle size={64} className="mb-4 opacity-20"/>
-            <p className="font-medium">문의를 선택해주세요.</p>
+            <p className="font-medium">좌측 목록에서 문의를 선택해주세요.</p>
           </div>
         )}
       </div>
