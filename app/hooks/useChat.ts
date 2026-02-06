@@ -14,7 +14,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const supabase = createClient();
 
   // ✅ 이미지 URL 보안(https) 변환 헬퍼
-  const secureUrl = (url: string) => url ? url.replace('http://', 'https://') : null;
+  const secureUrl = (url: string) => {
+    if (!url) return null;
+    if (url.startsWith('http://')) return url.replace('http://', 'https://');
+    return url;
+  };
 
   const fetchInquiries = useCallback(async () => {
     setIsLoading(true);
@@ -27,8 +31,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
       setCurrentUser(user);
 
-      // 🚨 중요: 여기서 에러가 나면 화면에 띄울 것임
-      // profiles 테이블 조인 시 외래키 명시
+      // profiles 테이블 조인 시 1단계에서 만든 외래키 명칭 사용
       let query = supabase
         .from('inquiries')
         .select(`
@@ -51,7 +54,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       
       if (queryError) {
         console.error("문의 목록 로딩 실패:", queryError);
-        setError(`목록 로딩 실패: ${queryError.message}`); // 에러 저장
+        setError(`목록 로딩 실패: ${queryError.message}`);
         throw queryError;
       }
       
@@ -73,8 +76,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // ✅ [수정] sender 조인 시 외래키 명시 (!inquiry_messages_sender_id_fkey)
-      // 이 부분이 없으면 400 Bad Request가 뜹니다.
+      // ✅ sender 조인 시 외래키 명시 (!inquiry_messages_sender_id_fkey)
       const { data, error: msgError } = await supabase
         .from('inquiry_messages')
         .select(`
@@ -90,7 +92,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         return;
       }
 
-      setMessages(data || []);
+      if (data) {
+        // 메시지 작성자 이미지도 보안 처리
+        const safeMessages = data.map(msg => ({
+          ...msg,
+          sender: msg.sender ? { ...msg.sender, avatar_url: secureUrl(msg.sender.avatar_url) } : null
+        }));
+        setMessages(safeMessages);
+      }
       
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) setSelectedInquiry(selected);
@@ -165,7 +174,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     messages,
     currentUser,
     isLoading,
-    error, // 🚨 에러 내보내기
+    error, // 🚨 에러 상태 내보내기
     loadMessages,
     sendMessage,
     createInquiry,
