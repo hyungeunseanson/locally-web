@@ -4,25 +4,24 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Loader2, Calendar, Users, ShieldCheck, Clock } from 'lucide-react';
 import Script from 'next/script';
-import { createClient } from '@/app/utils/supabase/client'; 
+import { createClient } from '@/app/utils/supabase/client';
 
 function PaymentContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  
   const supabase = createClient();
 
   const [mounted, setMounted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // URL 파라미터 안전하게 가져오기
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
   const time = searchParams?.get('time') || '시간 미정';
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   
-  // 가격 계산
   const basePrice = 50000; 
   const totalPrice = isPrivate ? 300000 : basePrice * guests;
 
@@ -31,53 +30,50 @@ function PaymentContent() {
   }, []);
 
   const handlePayment = async () => {
-    if (!confirm("결제를 진행하시겠습니까?\n(확인 시 즉시 예약이 확정됩니다.)")) return;
+    if (!confirm("결제를 진행하시겠습니까?")) return;
 
     setIsProcessing(true);
 
     try {
-      // 1. 로그인 유저 확인
+      // 1. 로그인 체크
       const { data: { user } } = await supabase.auth.getUser();
-
+      
       if (!user) {
         alert("로그인이 필요한 서비스입니다.");
+        setIsProcessing(false);
         return;
       }
 
-      // ✅ 주문 번호 생성 (예: ORD-171562...)
+      // 2. 주문 번호 생성
       const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-      // 2. 예약 정보 저장 (INSERT)
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert([
-          {
-            experience_id: experienceId,
-            user_id: user.id,
-            date: date,    
-            time: time,
-            guests: guests,
-            amount: totalPrice,      
-            total_price: totalPrice, 
-            status: 'confirmed',     
-            type: isPrivate ? 'private' : 'group',
-            order_id: orderId, // ✅ [핵심] 주문 번호 추가 (에러 해결)
-            created_at: new Date().toISOString(),
-          }
-        ])
-        .select();
+      // 3. [핵심] 결제 전 DB에 'Pending(대기)' 상태로 미리 저장
+      // 이렇게 해야 날짜, 인원수 등 중요 정보가 DB에 확실히 남습니다.
+      const { error } = await supabase.from('bookings').insert([{
+        experience_id: experienceId,
+        user_id: user.id,
+        date: date,
+        time: time,
+        guests: guests,
+        total_price: totalPrice,
+        amount: totalPrice,
+        status: 'pending', // 아직 결제 전이므로 대기 상태
+        type: isPrivate ? 'private' : 'group',
+        order_id: orderId,
+        created_at: new Date().toISOString(),
+      }]);
 
       if (error) {
+        console.error('예약 생성 실패:', error);
         throw error;
       }
 
-      // 3. 완료 페이지 이동
-      router.push(`/experiences/${experienceId}/payment/complete?date=${date}&guests=${guests}&amount=${totalPrice}`);
+      // 4. 저장 성공 시 완료 페이지로 이동 (orderId만 넘기면 됨)
+      // 실제 PG사 연동 시에는 여기서 결제창을 호출합니다.
+      router.push(`/payment/success?orderId=${orderId}&amount=${totalPrice}`);
 
     } catch (error: any) {
-      console.error('결제 실패:', error);
-      alert(`결제 처리 중 오류가 발생했습니다.\n${error.message}`);
-    } finally {
+      alert(`결제 준비 중 오류가 발생했습니다.\n${error.message}`);
       setIsProcessing(false);
     }
   };
@@ -103,7 +99,7 @@ function PaymentContent() {
             <span className="bg-rose-50 text-rose-600 text-[10px] font-bold px-2 py-1 rounded-full">즉시 예약</span>
             {isPrivate && <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-full">프라이빗 단독</span>}
           </div>
-          <h2 className="text-2xl font-bold mb-6 leading-snug">을지로 노포 투어</h2>
+          <h2 className="text-2xl font-bold mb-6 leading-snug">체험 예약</h2>
           
           <div className="space-y-3 text-slate-700 text-sm bg-slate-50 p-5 rounded-2xl border border-slate-100">
             <div className="flex items-center gap-3">
@@ -138,10 +134,6 @@ function PaymentContent() {
           >
             {isProcessing ? <Loader2 className="animate-spin" /> : <><CreditCard size={20}/> 결제하기</>}
           </button>
-          
-          <p className="mt-6 text-[10px] text-slate-300 leading-tight px-4">
-            (주)로컬리는 통신판매중개자로서 통신판매의 당사자가 아니며 상품의 예약, 이용 및 환불 등과 관련한 의무와 책임은 각 판매자에게 있습니다.
-          </p>
         </div>
       </div>
     </div>
