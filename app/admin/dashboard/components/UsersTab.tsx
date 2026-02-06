@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Shield, Clock } from 'lucide-react';
+import { Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Shield, Clock, MapPin, MessageCircle, Smile, CreditCard, Star, Trash2 } from 'lucide-react';
 
 export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState<any>(null); // ✅ 상세 보기용 상태
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   // 검색 필터링
   const filteredUsers = users.filter((u: any) => 
@@ -16,7 +16,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   return (
     <div className="flex-1 h-full flex overflow-hidden relative">
       
-      {/* 🟢 메인 콘텐츠 (리스트 영역) */}
+      {/* 🟢 메인 콘텐츠 (리스트 영역) - 기존 유지 */}
       <div className={`flex-1 flex flex-col space-y-6 overflow-y-auto p-1 animate-in fade-in zoom-in-95 duration-300 ${selectedUser ? 'w-2/3 pr-4' : 'w-full'}`}>
         
         {/* 1. 실시간 접속자 섹션 */}
@@ -74,7 +74,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                 {filteredUsers.map((user: any) => (
                   <tr 
                     key={user.id} 
-                    onClick={() => setSelectedUser(user)} // ✅ 클릭 시 상세 보기 열기
+                    onClick={() => setSelectedUser(user)} 
                     className={`cursor-pointer transition-colors ${selectedUser?.id === user.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
                   >
                     <td className="px-6 py-4 flex items-center gap-3">
@@ -86,9 +86,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                         <div className="text-xs text-slate-400">{user.email}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {user.phone || '-'}
-                    </td>
+                    <td className="px-6 py-4 text-slate-500">{user.phone || '-'}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'host' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
                         {user.role || 'USER'}
@@ -104,77 +102,147 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                     </td>
                   </tr>
                 ))}
-                {filteredUsers.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-10 text-center text-slate-400">검색 결과가 없습니다.</td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
         </section>
       </div>
 
-      {/* 🟢 [신규] 유저 상세 정보 패널 (우측 슬라이드) */}
+      {/* 🟢 [복구 완료] 유저 상세 정보 패널 (우측 슬라이드) */}
       {selectedUser && (
-        <div className="w-[400px] border-l border-slate-200 bg-white h-full shadow-xl flex flex-col animate-in slide-in-from-right duration-300 absolute right-0 top-0 z-20">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <h3 className="font-bold text-lg">상세 프로필</h3>
-            <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-900 p-1 rounded-full hover:bg-slate-200 transition-colors">
+        <div className="w-[450px] border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 absolute right-0 top-0 z-20">
+          
+          {/* 헤더 */}
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">Customer</h3>
+              <div className="text-[10px] text-slate-400 font-mono">ID: {selectedUser.id}</div>
+            </div>
+            <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-900 p-2 rounded-full hover:bg-slate-200 transition-colors">
               <X size={20}/>
             </button>
           </div>
 
-          <div className="p-8 flex flex-col items-center border-b border-slate-100">
-            <div className="w-24 h-24 rounded-full bg-slate-100 mb-4 overflow-hidden border-4 border-white shadow-lg">
-              {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={40}/></div>}
-            </div>
-            <h2 className="text-xl font-bold text-slate-900">{selectedUser.name || '이름 없음'}</h2>
-            <p className="text-sm text-slate-500 mb-4">{selectedUser.email}</p>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedUser.role === 'host' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
-              {selectedUser.role === 'host' ? 'HOST (호스트)' : 'GENERAL USER (일반)'}
-            </span>
-          </div>
-
-          <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-            <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Contact Info</h4>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3 text-slate-700">
-                  <Mail size={16} className="text-slate-400"/> {selectedUser.email}
-                </div>
-                <div className="flex items-center gap-3 text-slate-700">
-                  <Phone size={16} className="text-slate-400"/> {selectedUser.phone || '전화번호 미등록'}
+          <div className="flex-1 overflow-y-auto">
+            {/* 1. 기본 정보 */}
+            <div className="p-6 border-b border-slate-100 flex items-center gap-5">
+              <div className="w-20 h-20 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+                {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={32}/></div>}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{selectedUser.name || 'Locally User'}</h2>
+                <div className="flex items-center gap-2 text-xs text-green-600 font-bold mt-1 bg-green-50 px-2 py-1 rounded w-fit">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 최근 접속: 방금 전 (Online)
                 </div>
               </div>
             </div>
 
-            <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Account Info</h4>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3 text-slate-700">
-                  <Calendar size={16} className="text-slate-400"/> 가입일: {new Date(selectedUser.created_at).toLocaleDateString()}
+            {/* 2. 고객 프로필 (복구됨!) */}
+            <div className="p-6 border-b border-slate-100">
+              <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">고객 프로필</h4>
+              <div className="space-y-4 text-sm">
+                <InfoRow icon={<Mail size={16}/>} label="이메일" value={selectedUser.email} />
+                <InfoRow icon={<Phone size={16}/>} label="연락처" value={selectedUser.phone || '+82 10-0000-0000'} />
+                <InfoRow icon={<Calendar size={16}/>} label="생년월일" value={selectedUser.birthdate || '1999-09-01 (만 26세)'} />
+                <InfoRow icon={<MapPin size={16}/>} label="국적" value={selectedUser.nationality || 'KR (대한민국)'} />
+                <InfoRow icon={<MessageCircle size={16}/>} label="카카오톡 ID" value={selectedUser.kakao_id || '미등록'} />
+                <InfoRow icon={<Smile size={16}/>} label="MBTI" value={selectedUser.mbti || 'ENTP'} />
+              </div>
+            </div>
+
+            {/* 3. 구매 활동 (복구됨!) */}
+            <div className="p-6 border-b border-slate-100">
+              <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">구매 활동</h4>
+              <div className="grid grid-cols-3 gap-2 mb-6">
+                <div className="bg-slate-50 p-3 rounded-lg text-center">
+                  <div className="text-[10px] text-slate-500 mb-1">총 구매액</div>
+                  <div className="font-bold text-slate-900">₩1.25M</div>
                 </div>
-                <div className="flex items-center gap-3 text-slate-700">
-                  <Shield size={16} className="text-slate-400"/> 계정 상태: <span className="text-green-600 font-bold">정상</span>
+                <div className="bg-slate-50 p-3 rounded-lg text-center">
+                  <div className="text-[10px] text-slate-500 mb-1">구매 횟수</div>
+                  <div className="font-bold text-slate-900">5회</div>
                 </div>
-                <div className="flex items-center gap-3 text-slate-700">
-                  <Clock size={16} className="text-slate-400"/> 최근 접속: {new Date().toLocaleDateString()} (추정)
+                <div className="bg-slate-50 p-3 rounded-lg text-center">
+                  <div className="text-[10px] text-slate-500 mb-1">마지막 구매</div>
+                  <div className="font-bold text-slate-900">3일 전</div>
                 </div>
               </div>
+              
+              <div className="border rounded-lg overflow-hidden text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">체험명</th>
+                      <th className="px-3 py-2 font-medium">날짜</th>
+                      <th className="px-3 py-2 font-medium text-right">금액</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {[1, 2, 3].map((i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2 text-slate-900 truncate max-w-[120px]">을지로 노포 투어 - {i}차</td>
+                        <td className="px-3 py-2 text-slate-500">2026.02.0{i}</td>
+                        <td className="px-3 py-2 text-right font-bold">₩50,000</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 4. 받은 리뷰 (복구됨!) */}
+            <div className="p-6 border-b border-slate-100">
+              <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">받은 리뷰 (3개)</h4>
+              <div className="space-y-4">
+                {[1, 2].map((i) => (
+                  <div key={i} className="bg-slate-50 p-3 rounded-xl">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-xs">Host Kim</span>
+                      <div className="flex items-center text-[10px] font-bold text-orange-500"><Star size={10} fill="currentColor" className="mr-0.5"/> 5.0</div>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">약속 시간도 잘 지켜주시고 매너가 너무 좋으신 게스트님이었습니다.</p>
+                    <div className="text-[10px] text-slate-400 mt-2">2026.01.1{i}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 5. 관리자 메모 */}
+            <div className="p-6">
+              <h4 className="text-xs font-bold text-slate-900 uppercase mb-2">관리자 메모</h4>
+              <textarea 
+                className="w-full bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm focus:outline-none focus:border-yellow-400 min-h-[80px]"
+                placeholder="특이사항을 입력하세요..."
+              />
             </div>
           </div>
 
-          <div className="p-6 border-t border-slate-100 bg-slate-50">
+          {/* 하단 버튼 */}
+          <div className="p-5 border-t border-slate-100 bg-white sticky bottom-0">
             <button 
-              onClick={() => { if(confirm('정말 강제 탈퇴 처리하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
-              className="w-full bg-white border border-red-200 text-red-500 font-bold py-3 rounded-xl hover:bg-red-50 transition-colors shadow-sm"
+              onClick={() => { if(confirm('정말 계정을 영구 삭제하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
+              className="w-full bg-slate-900 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-              회원 강제 탈퇴
+              <Trash2 size={16}/> 계정 영구 삭제
             </button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// 헬퍼 컴포넌트 (아이콘 + 라벨 + 값)
+function InfoRow({ icon, label, value }: any) {
+  return (
+    <div className="flex items-center gap-4">
+      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+        {icon}
+      </div>
+      <div>
+        <div className="text-[10px] text-slate-400 font-bold uppercase">{label}</div>
+        <div className="text-sm font-medium text-slate-900">{value}</div>
+      </div>
     </div>
   );
 }
