@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Users, MapPin, CheckCircle2, MessageSquare, DollarSign } from 'lucide-react';
+import { Users, MapPin, CheckCircle2, MessageSquare, DollarSign, Wifi } from 'lucide-react'; // ✅ Wifi 추가
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { NavButton } from './components/SharedComponents';
 import ManagementTab from './components/ManagementTab';
 import AnalyticsTab from './components/AnalyticsTab';
-import { Users, MapPin, CheckCircle2, MessageSquare, DollarSign, Wifi } from 'lucide-react'; // ✅ Wifi 추가
 
 export default function AdminDashboardPage() {
+  // ✅ REALTIME 탭 추가
   const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'CHATS' | 'FINANCE' | 'REALTIME'>('APPS');
   const [filter, setFilter] = useState('ALL'); 
   
@@ -19,30 +19,34 @@ export default function AdminDashboardPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  
   // ✅ 실시간 접속자 목록 상태 추가
-  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]); 
+
   const supabase = createClient();
 
-  useEffect(() => { fetchData(); }, []);
+  // ✅ 통합된 useEffect (데이터 로딩 + 실시간 구독)
+  useEffect(() => { 
+    fetchData(); 
+    
+    // 실시간 접속자 구독 (Supabase Presence)
+    const channel = supabase.channel('online_users')
+      .on('presence', { event: 'sync' }, () => {
+        const newState = channel.presenceState();
+        const users = Object.values(newState).flat(); 
+        
+        // 중복 접속 제거 (user_id 기준)
+        const uniqueUsers = Array.from(new Map(users.map((u: any) => [u.user_id, u])).values());
+        setOnlineUsers(uniqueUsers);
+      })
+      .subscribe();
 
-// ✅ Supabase Presence: 실시간 접속자 구독 로직 추가
-const channel = supabase.channel('online_users')
-.on('presence', { event: 'sync' }, () => {
-  const newState = channel.presenceState();
-  const users = Object.values(newState).flat(); 
-  
-  // 중복 접속 제거 (user_id 기준)
-  const uniqueUsers = Array.from(new Map(users.map((u: any) => [u.user_id, u])).values());
-  setOnlineUsers(uniqueUsers);
-})
-.subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
-return () => { supabase.removeChannel(channel); };
-}, []);
-
-  // ✅ 수정된 fetchData 함수 (디버깅 로그 포함)
+  // ✅ 기존 fetchData 함수 유지 (로그 포함)
   const fetchData = async () => {
-    console.log("🔄 데이터 불러오는 중..."); // 디버깅 시작 알림
+    console.log("🔄 데이터 불러오는 중..."); 
 
     // 1. 호스트 지원서
     const { data: appData, error: appError } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
@@ -54,7 +58,7 @@ return () => { supabase.removeChannel(channel); };
     if (expError) console.error("❌ 체험 로딩 실패:", expError);
     if (expData) setExps(expData);
 
-    // 3. 유저 (Profiles) - 여기가 핵심입니다!
+    // 3. 유저 (Profiles)
     const { data: userData, error: userError } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
     
     if (userError) {
@@ -74,6 +78,7 @@ return () => { supabase.removeChannel(channel); };
     if (msgData) setMessages(msgData);
   };
 
+  // ✅ 기존 updateStatus 함수 유지
   const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
     let comment = '';
     if (status === 'rejected' || status === 'revision') {
@@ -96,6 +101,7 @@ return () => { supabase.removeChannel(channel); };
     setSelectedItem(null);
   };
 
+  // ✅ 기존 deleteItem 함수 유지
   const deleteItem = async (table: string, id: string) => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
     const { error } = await supabase.from(table).delete().eq('id', id);
@@ -107,6 +113,8 @@ return () => { supabase.removeChannel(channel); };
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <SiteHeader />
       <div className="flex h-[calc(100vh-80px)]">
+        
+        {/* 사이드바 */}
         <aside className="w-64 bg-slate-900 text-white flex flex-col p-4 shadow-xl z-10">
           <div className="mb-6 px-2">
             <h2 className="text-xs font-bold text-slate-500 uppercase mb-2">Management</h2>
@@ -119,7 +127,7 @@ return () => { supabase.removeChannel(channel); };
           <div className="mb-6 px-2">
             <h2 className="text-xs font-bold text-slate-500 uppercase mb-2">Monitoring</h2>
             <nav className="space-y-1">
-              {/* ✅ [신규] 실시간 접속자 메뉴 버튼 추가 */}
+              {/* ✅ 실시간 접속자 메뉴 추가 */}
               <NavButton 
                 active={activeTab==='REALTIME'} 
                 onClick={()=>setActiveTab('REALTIME')} 
@@ -133,9 +141,11 @@ return () => { supabase.removeChannel(channel); };
           </div>
         </aside>
 
+        {/* 메인 콘텐츠 영역 */}
         <main className="flex-1 p-6 overflow-hidden flex gap-6">
-{/* ✅ [신규] 실시간 접속자 화면 (REALTIME) */}
-{activeTab === 'REALTIME' ? (
+          
+          {/* ✅ 실시간 접속자 탭 화면 구현 */}
+          {activeTab === 'REALTIME' ? (
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-8 overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
               <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
                 <div>
