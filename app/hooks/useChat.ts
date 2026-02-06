@@ -9,23 +9,33 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [messages, setMessages] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // 🚨 에러 상태 추가
 
   const supabase = createClient();
 
+  // ✅ 이미지 URL 보안(https) 변환 헬퍼
+  const secureUrl = (url: string) => url ? url.replace('http://', 'https://') : null;
+
   const fetchInquiries = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.warn("로그인된 사용자가 없습니다.");
+        return;
+      }
       setCurrentUser(user);
 
-      // profiles 테이블 조인 (명시적 외래키 사용)
+      // 🚨 중요: 여기서 에러가 나면 화면에 띄울 것임
+      // profiles 테이블 조인 시 외래키 명시
       let query = supabase
         .from('inquiries')
         .select(`
           *,
           experiences (id, title, photos),
-          guest:profiles!inquiries_user_id_fkey (*),
-          host:profiles!inquiries_host_id_fkey (*)
+          guest:profiles!inquiries_user_id_fkey (full_name, avatar_url),
+          host:profiles!inquiries_host_id_fkey (full_name, avatar_url)
         `)
         .order('updated_at', { ascending: false });
 
@@ -37,11 +47,25 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         query = query.eq('type', 'admin');
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      if (data) setInquiries(data);
+      const { data, error: queryError } = await query;
+      
+      if (queryError) {
+        console.error("문의 목록 로딩 실패:", queryError);
+        setError(`목록 로딩 실패: ${queryError.message}`); // 에러 저장
+        throw queryError;
+      }
+      
+      if (data) {
+        // 이미지 URL 보안 처리 적용
+        const safeData = data.map(item => ({
+          ...item,
+          guest: item.guest ? { ...item.guest, avatar_url: secureUrl(item.guest.avatar_url) } : null,
+          host: item.host ? { ...item.host, avatar_url: secureUrl(item.host.avatar_url) } : null
+        }));
+        setInquiries(safeData);
+      }
     } catch (err: any) {
-      console.error("채팅 목록 로딩 에러:", err.message);
+      setError(err.message || "알 수 없는 오류 발생");
     } finally {
       setIsLoading(false);
     }
@@ -49,23 +73,29 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // ✅ [핵심 수정] sender 조인 시 외래키 명시 (!inquiry_messages_sender_id_fkey)
-      const { data, error } = await supabase
+      // ✅ [수정] sender 조인 시 외래키 명시 (!inquiry_messages_sender_id_fkey)
+      // 이 부분이 없으면 400 Bad Request가 뜹니다.
+      const { data, error: msgError } = await supabase
         .from('inquiry_messages')
         .select(`
           *,
-          sender:profiles!inquiry_messages_sender_id_fkey (*)
+          sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url)
         `)
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
       
-      if (error) throw error;
+      if (msgError) {
+        console.error("메시지 로딩 실패:", msgError);
+        alert(`메시지 로딩 오류: ${msgError.message}`);
+        return;
+      }
+
       setMessages(data || []);
       
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) setSelectedInquiry(selected);
     } catch (err: any) {
-      console.error("메시지 로딩 에러:", err.message);
+      console.error("메시지 로딩 예외:", err.message);
     }
   };
 
@@ -99,25 +129,16 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       setMessages(prev => [...prev, newMessage]);
       fetchInquiries(); 
     } catch (err: any) {
-      console.error("메시지 전송 실패:", err.message);
+      alert("메시지 전송 실패: " + err.message);
     }
   };
 
   const createInquiry = async (hostId: string, experienceId: string, content: string) => {
     if (!currentUser) throw new Error('로그인이 필요합니다.');
-
     const { data, error } = await supabase
       .from('inquiries')
-      .insert([{
-        user_id: currentUser.id,
-        host_id: hostId,
-        experience_id: experienceId,
-        content: content,
-        type: 'general'
-      }])
-      .select()
-      .single();
-
+      .insert([{ user_id: currentUser.id, host_id: hostId, experience_id: experienceId, content, type: 'general' }])
+      .select().single();
     if (error) throw error;
     await sendMessage(data.id, content);
     return data;
@@ -125,19 +146,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const createAdminInquiry = async (content: string) => {
     if (!currentUser) throw new Error('로그인이 필요합니다.');
-
     const { data, error } = await supabase
       .from('inquiries')
-      .insert([{
-        user_id: currentUser.id,
-        content: content,
-        type: 'admin',
-        host_id: null,
-        experience_id: null
-      }])
-      .select()
-      .single();
-
+      .insert([{ user_id: currentUser.id, content, type: 'admin', host_id: null, experience_id: null }])
+      .select().single();
     if (error) throw error;
     await sendMessage(data.id, content);
     return data;
@@ -153,6 +165,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     messages,
     currentUser,
     isLoading,
+    error, // 🚨 에러 내보내기
     loadMessages,
     sendMessage,
     createInquiry,

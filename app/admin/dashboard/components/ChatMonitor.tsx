@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MessageCircle, User, ChevronRight, Calendar, Send, RefreshCw, Loader2 } from 'lucide-react';
+import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat'; 
 
 export default function ChatMonitor() {
-  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, refresh, isLoading } = useChat('admin');
+  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, refresh, isLoading, error } = useChat('admin');
   const [replyText, setReplyText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -20,7 +20,6 @@ export default function ChatMonitor() {
     }
   };
 
-  // ✅ 이름 표시 헬퍼 함수 (full_name 없으면 name이나 email 사용)
   const getGuestName = (guest: any) => {
     if (!guest) return '알 수 없는 사용자';
     return guest.full_name || guest.name || guest.email || '익명 고객';
@@ -29,24 +28,27 @@ export default function ChatMonitor() {
   return (
     <div className="flex h-full gap-6">
       {/* 왼쪽: 문의 목록 */}
-      <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
+      <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm relative">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <MessageCircle size={18}/> 1:1 문의함
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
+            <p className="text-xs text-slate-500 mt-1">고객 상담 내역</p>
           </div>
-          {/* ✅ 새로고침 버튼 추가 */}
-          <button 
-            onClick={refresh} 
-            className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
-            title="목록 새로고침"
-          >
+          <button onClick={refresh} className="p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           </button>
         </div>
         
+        {/* 🚨 에러 발생 시 표시 */}
+        {error && (
+          <div className="p-4 bg-red-50 border-b border-red-100 text-red-600 text-xs">
+            <div className="flex items-center gap-2 font-bold mb-1"><AlertTriangle size={14}/> 오류 발생</div>
+            {error}
+          </div>
+        )}
+
         <div className="overflow-y-auto flex-1">
           {isLoading ? (
             <div className="flex items-center justify-center h-full text-slate-400">
@@ -55,8 +57,13 @@ export default function ChatMonitor() {
           ) : inquiries.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
               <MessageCircle size={32} className="mb-2 opacity-20"/>
-              <div className="text-sm">접수된 문의가 없습니다.</div>
-              <p className="text-xs mt-1">고객이 도움말 센터에서 문의를 남기면 여기에 표시됩니다.</p>
+              <div className="text-sm font-bold mb-1">접수된 문의가 없습니다.</div>
+              {/* 👇 디버깅용 정보 표시 */}
+              <div className="text-[10px] bg-slate-100 p-2 rounded text-slate-500 mt-2">
+                User: {currentUser ? currentUser.email : '로그인 안됨'}<br/>
+                ID: {currentUser?.id?.substring(0,8)}...
+              </div>
+              <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">다시 시도</button>
             </div>
           ) : (
             inquiries.map((inq) => (
@@ -67,7 +74,6 @@ export default function ChatMonitor() {
               >
                 <div className="flex justify-between mb-1">
                   <span className="font-bold text-sm text-slate-800 flex items-center gap-1">
-                    {/* ✅ 헬퍼 함수 사용 */}
                     {getGuestName(inq.guest)}
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono">#{inq.id}</span>
                   </span>
@@ -103,21 +109,25 @@ export default function ChatMonitor() {
             </div>
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
-              {messages.map((msg) => {
-                const isMe = msg.sender_id === currentUser?.id; // 내가 보낸 것 (관리자)
-                return (
-                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
-                      {msg.content}
+              {messages.length === 0 ? (
+                <div className="text-center text-slate-400 text-sm py-10">대화 내용이 없습니다.</div>
+              ) : (
+                messages.map((msg) => {
+                  const isMe = msg.sender_id === currentUser?.id;
+                  return (
+                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`p-3 rounded-xl max-w-[70%] text-sm shadow-sm leading-relaxed ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
+                        {msg.content}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
               <input 
-                className="flex-1 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-sm"
+                className="flex-1 border border-slate-200 bg-slate-50 rounded-xl px-4 py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-sm"
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
