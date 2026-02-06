@@ -72,11 +72,11 @@ export default function GuestInboxPage() {
                     placeholder="메시지 입력..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    // ✅ [수정] 한글 중복 방지
+                    // ✅ 한글 중복 방지
                     onKeyDown={(e) => {
                       if (e.nativeEvent.isComposing) return;
                       if (e.key === 'Enter') {
-                        e.preventDefault(); 
+                        e.preventDefault();
                         handleSend();
                       }
                     }}

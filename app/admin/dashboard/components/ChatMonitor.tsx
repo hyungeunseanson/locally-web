@@ -27,14 +27,14 @@ export default function ChatMonitor() {
 
   return (
     <div className="flex h-full gap-6 w-full">
-      {/* 왼쪽: 문의 목록 (너비 1/3로 복구) */}
+      {/* 왼쪽: 문의 목록 */}
       <div className="w-1/3 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm relative">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
               <MessageCircle size={18}/> 1:1 문의함
             </h3>
-            <p className="text-xs text-slate-500 mt-1">고객 상담 내역</p>
+            <p className="text-xs text-slate-500 mt-1">고객/호스트 1:1 상담 내역</p>
           </div>
           <button onClick={refresh} className="p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
@@ -104,14 +104,15 @@ export default function ChatMonitor() {
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
-                // ✅ [핵심 수정] 정렬 로직
-                // 1. 내가 보낸 거면 무조건 오른쪽 (자문자답 테스트 시 오른쪽)
-                // 2. 내가 안 보냈는데, 문의자(Guest)가 보낸 거면 왼쪽
-                // 3. 그 외(다른 관리자나 호스트)면 오른쪽 (답변으로 간주)
+                // ✅ [필승 로직] 
+                // 1. 내가(로그인한 관리자) 쓴 글인가? -> 무조건 오른쪽 (Right)
+                // 2. 내가 안 썼는데, 문의자(Guest)가 쓴 글인가? -> 왼쪽 (Left)
+                // 3. 그 외(다른 관리자/호스트) -> 오른쪽 (Right)
                 const isMe = String(msg.sender_id) === String(currentUser?.id);
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 
-                const showRight = isMe || !isGuest; 
+                // 내가 썼거나, 게스트가 안 썼으면(즉 다른 관리자가 썼으면) 오른쪽
+                const showRight = isMe || !isGuest;
 
                 return (
                   <div key={msg.id} className={`flex ${showRight ? 'justify-end' : 'justify-start'}`}>
@@ -129,7 +130,7 @@ export default function ChatMonitor() {
                 placeholder="답변을 입력하세요..."
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                // ✅ [수정] preventDefault()로 한글 중복 완벽 차단
+                // ✅ 한글 중복 방지 (완벽 해결)
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') {

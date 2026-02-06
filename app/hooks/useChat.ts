@@ -13,7 +13,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const supabase = createClient();
 
-  // 이미지 URL 보안 처리
   const secureUrl = (url: string) => {
     if (!url) return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -35,8 +34,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         .select(`
           *,
           experiences (id, title, photos),
-          guest:profiles!inquiries_user_id_fkey (full_name, avatar_url),
-          host:profiles!inquiries_host_id_fkey (full_name, avatar_url)
+          guest:profiles!inquiries_user_id_fkey (full_name, avatar_url, role),
+          host:profiles!inquiries_host_id_fkey (full_name, avatar_url, role)
         `)
         .order('updated_at', { ascending: false });
 
@@ -64,9 +63,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
+      // ✅ sender의 role 정보까지 가져옴
       const { data, error } = await supabase
         .from('inquiry_messages')
-        .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url)`)
+        .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url, role)`)
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
       
@@ -106,7 +106,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         .update({ content: content, updated_at: new Date().toISOString() })
         .eq('id', inquiryId);
 
-      // 전송 후 즉시 서버 데이터 갱신
       await loadMessages(inquiryId);
       fetchInquiries(); 
     } catch (err: any) {
