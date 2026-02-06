@@ -33,15 +33,14 @@ export default function GuestTripsPage() {
         return; 
       }
 
-      // ✅ [수정완료] 문법 오류 해결!
-      // profiles!experiences_host_id_fkey -> 명확한 제약조건 이름을 사용해 연결
+      // ✅ [수정완료] name -> full_name 으로 변경
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
           *,
           experiences (
             id, title, city, photos, address, host_id,
-            profiles!experiences_host_id_fkey (name, phone)
+            profiles!experiences_host_id_fkey (full_name, phone)
           )
         `)
         .eq('user_id', user.id)
@@ -49,7 +48,7 @@ export default function GuestTripsPage() {
 
       if (error) {
         console.error("데이터 로딩 실패:", error);
-        setErrorMsg(error.message); // 화면에 에러 표시
+        setErrorMsg(error.message);
         return;
       }
 
@@ -67,7 +66,7 @@ export default function GuestTripsPage() {
           const diffDays = Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)); 
           const dDay = isFuture ? (diffDays === 0 ? '오늘' : `D-${diffDays}`) : null;
 
-          // 호스트 정보 안전하게 가져오기 (배열이거나 객체일 수 있음)
+          // 호스트 정보 가져오기
           const hostData = Array.isArray(booking.experiences.profiles) 
             ? booking.experiences.profiles[0] 
             : booking.experiences.profiles;
@@ -75,7 +74,8 @@ export default function GuestTripsPage() {
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            hostName: hostData?.name || 'Locally Host',
+            // ✅ [수정완료] 여기도 full_name으로 변경
+            hostName: hostData?.full_name || 'Locally Host',
             hostPhone: hostData?.phone,
             hostId: booking.experiences.host_id,
             date: booking.date, 
@@ -129,7 +129,6 @@ export default function GuestTripsPage() {
       <main className="max-w-5xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-black mb-10 tracking-tight">여행</h1>
         
-        {/* 에러 발생 시 메시지 표시 */}
         {errorMsg && (
             <div className="bg-red-50 text-red-600 p-4 mb-6 rounded-lg flex items-center gap-2">
                 <AlertCircle size={20}/>
@@ -137,7 +136,6 @@ export default function GuestTripsPage() {
             </div>
         )}
 
-        {/* 예정된 예약 */}
         <section className="mb-20">
           <h2 className="text-xl font-bold mb-6">다가오는 예약</h2>
           <div className="flex flex-col gap-6">
@@ -154,7 +152,6 @@ export default function GuestTripsPage() {
           </div>
         </section>
 
-        {/* 지난 여행 */}
         <section>
           <h2 className="text-xl font-bold mb-6 text-slate-400">지난 여행</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
