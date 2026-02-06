@@ -76,18 +76,16 @@ export default function HelpCenterPage() {
       alert("로그인이 필요한 서비스입니다.");
       return;
     }
-
-    const content = prompt("문의하실 내용을 입력해주세요. 관리자가 확인 후 답변드립니다.");
+  
+    const content = prompt("문의하실 내용을 입력해주세요.");
     if (!content) return;
-
+  
     try {
       await createAdminInquiry(content);
-      if (confirm("문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?")) {
-        router.push('/guest/inbox');
-      }
-    } catch (e: any) {
-      console.error("상담 생성 실패:", e);
-      alert("문의 접수 실패: " + e.message);
+      // ... 이하 성공 로직
+    } catch (e) {
+      console.error(e);
+      alert("문의 전송 중 오류가 발생했습니다.");
     }
   };
 

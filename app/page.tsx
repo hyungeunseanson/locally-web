@@ -169,7 +169,7 @@ export default function HomePage() {
 
 function Footer() {
   return (
-    <footer className="border-t border-slate-100 bg-slate-50 mt-20">
+    <footer className="border-t border-slate-100 bg-slate-50 mt-20 relative z-10">
       <div className="max-w-[1760px] mx-auto px-6 md:px-12 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
           <div>
