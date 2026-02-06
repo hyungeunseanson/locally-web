@@ -29,13 +29,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
       setCurrentUser(user);
 
+      // 🚨 [긴급 수정] role 필드 삭제 (에러 원인 제거)
       let query = supabase
         .from('inquiries')
         .select(`
           *,
           experiences (id, title, photos),
-          guest:profiles!inquiries_user_id_fkey (full_name, avatar_url, role),
-          host:profiles!inquiries_host_id_fkey (full_name, avatar_url, role)
+          guest:profiles!inquiries_user_id_fkey (full_name, avatar_url),
+          host:profiles!inquiries_host_id_fkey (full_name, avatar_url)
         `)
         .order('updated_at', { ascending: false });
 
@@ -55,6 +56,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         setInquiries(safeData);
       }
     } catch (err: any) {
+      console.error(err);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -63,10 +65,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // ✅ sender의 role 정보까지 가져옴
+      // 🚨 [긴급 수정] 여기도 role 필드 삭제
       const { data, error } = await supabase
         .from('inquiry_messages')
-        .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url, role)`)
+        .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url)`)
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
       
