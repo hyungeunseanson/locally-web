@@ -12,7 +12,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const supabase = createClient();
 
-  // 1. 채팅방 목록 불러오기
   const fetchInquiries = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -29,15 +28,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         `)
         .order('updated_at', { ascending: false });
 
-      // 역할별 필터링
       if (role === 'guest') {
-        // 게스트: 내가 보낸 문의 (일반 + 관리자)
         query = query.eq('user_id', user.id);
       } else if (role === 'host') {
-        // 호스트: 나에게 온 문의 (일반 체험 문의만)
         query = query.eq('host_id', user.id).eq('type', 'general');
       } else if (role === 'admin') {
-        // 관리자: 관리자 문의만 조회
         query = query.eq('type', 'admin');
       }
 
@@ -48,7 +43,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     }
   }, [supabase, role]);
 
-  // 2. 메시지 불러오기
   const loadMessages = async (inquiryId: number) => {
     const { data } = await supabase
       .from('inquiry_messages')
@@ -64,7 +58,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     if (selected) setSelectedInquiry(selected);
   };
 
-  // 3. 메시지 전송
   const sendMessage = async (inquiryId: number, content: string) => {
     if (!content.trim() || !currentUser) return;
 
@@ -77,13 +70,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }]);
 
     if (!error) {
-      // 채팅방의 마지막 메시지 업데이트
       await supabase
         .from('inquiries')
         .update({ content: content, updated_at: new Date().toISOString() })
         .eq('id', inquiryId);
 
-      // UI 즉시 업데이트 (낙관적 업데이트)
       const newMessage = {
         id: Date.now(),
         inquiry_id: inquiryId,
@@ -93,11 +84,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         sender: { full_name: currentUser.user_metadata?.full_name || '나' }
       };
       setMessages(prev => [...prev, newMessage]);
-      fetchInquiries(); // 목록 새로고침
+      fetchInquiries(); 
     }
   };
 
-  // 4. 일반 문의 생성 (게스트 -> 호스트)
   const createInquiry = async (hostId: string, experienceId: string, content: string) => {
     if (!currentUser) throw new Error('로그인이 필요합니다.');
 
@@ -118,11 +108,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return data;
   };
 
-  // 5. 관리자 1:1 문의 생성 (유저 -> 관리자)
+  // ✅ [수정완료] 주석 문법 수정 ( -- -> // )
   const createAdminInquiry = async (content: string) => {
     if (!currentUser) throw new Error('로그인이 필요합니다.');
 
-    // ✅ [수정완료] 주석 문법 수정 (-- -> //)
     const { data, error } = await supabase
       .from('inquiries')
       .insert([{

@@ -56,7 +56,7 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
               <div className="text-[10px] text-slate-400 font-bold uppercase">확정율</div>
               <div className="text-lg font-black text-blue-600">
-                {Math.round((bookings.filter(b=>b.status==='confirmed').length / bookings.length) * 100)}%
+                {bookings.length > 0 ? Math.round((bookings.filter(b=>b.status==='confirmed').length / bookings.length) * 100) : 0}%
               </div>
             </div>
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
@@ -88,7 +88,8 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                 {filteredBookings.map((bk) => (
                   <tr key={bk.id} onClick={() => setSelectedBooking(bk)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedBooking?.id === bk.id ? 'bg-blue-50' : ''}`}>
                     <td className="px-6 py-4">
-                      <div className="font-mono text-xs text-slate-400 mb-1">#{bk.id.substring(0,8)}</div>
+                      {/* ✅ String() 처리로 BigInt 에러 방지 */}
+                      <div className="font-mono text-xs text-slate-400 mb-1">#{String(bk.id).substring(0,8)}</div>
                       <div className="text-slate-900 font-medium">{new Date(bk.created_at).toLocaleDateString()}</div>
                     </td>
                     <td className="px-6 py-4">
@@ -114,7 +115,7 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
         </div>
       </div>
 
-      {/* 🟢 [신규] 상세 보기 슬라이드 패널 */}
+      {/* 🟢 [신규] 상세 보기 슬라이드 패널 (누락된 부분 복구 완료) */}
       {selectedBooking && (
         <div className="w-[450px] bg-white border-l border-slate-200 h-full shadow-2xl absolute right-0 top-0 z-20 flex flex-col animate-in slide-in-from-right duration-300">
           
