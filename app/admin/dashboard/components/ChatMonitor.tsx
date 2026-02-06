@@ -20,6 +20,12 @@ export default function ChatMonitor() {
     }
   };
 
+  // ✅ 이름 표시 헬퍼 함수 (full_name이 없으면 다른 정보라도 표시)
+  const getGuestName = (guest: any) => {
+    if (!guest) return '알 수 없는 사용자';
+    return guest.full_name || guest.name || guest.email || '익명 고객';
+  };
+
   // 디버깅용: 데이터 들어오는지 확인
   useEffect(() => {
     console.log("Admin Inquiries Loaded:", inquiries);
@@ -65,7 +71,8 @@ export default function ChatMonitor() {
               >
                 <div className="flex justify-between mb-1">
                   <span className="font-bold text-sm text-slate-800 flex items-center gap-1">
-                    {inq.guest?.full_name || '익명 고객'}
+                    {/* ✅ 헬퍼 함수 사용 */}
+                    {getGuestName(inq.guest)}
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-mono">#{inq.id}</span>
                   </span>
                   <span className="text-[10px] text-slate-400">{new Date(inq.updated_at).toLocaleDateString()}</span>
@@ -91,7 +98,7 @@ export default function ChatMonitor() {
                   )}
                 </div>
                 <div>
-                  <div className="font-bold text-lg text-slate-900">{selectedInquiry.guest?.full_name || '익명 고객'}</div>
+                  <div className="font-bold text-lg text-slate-900">{getGuestName(selectedInquiry.guest)}</div>
                   <div className="text-xs text-slate-400 flex items-center gap-1">
                     문의 ID: {selectedInquiry.id} · {new Date(selectedInquiry.created_at).toLocaleString()}
                   </div>
