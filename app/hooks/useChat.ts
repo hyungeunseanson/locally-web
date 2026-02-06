@@ -122,14 +122,15 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const createAdminInquiry = async (content: string) => {
     if (!currentUser) throw new Error('로그인이 필요합니다.');
 
+    // ✅ [수정완료] 주석 문법 수정 (-- -> //)
     const { data, error } = await supabase
       .from('inquiries')
       .insert([{
         user_id: currentUser.id,
         content: content,
         type: 'admin',
-        host_id: null,      -- 관리자는 특정 호스트가 아님
-        experience_id: null -- 특정 체험 관련이 아님
+        host_id: null,      // 관리자는 특정 호스트가 아님
+        experience_id: null // 특정 체험 관련이 아님
       }])
       .select()
       .single();
@@ -152,7 +153,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     loadMessages,
     sendMessage,
     createInquiry,
-    createAdminInquiry, // ✅ 추가됨
+    createAdminInquiry,
     refresh: fetchInquiries
   };
 }
