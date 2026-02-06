@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google"; // ✅ 파일 필요 없는 구글 폰트 사용
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from '@/app/context/LanguageContext';
+import UserPresenceTracker from '@/app/components/UserPresenceTracker'; // ✅ 추가됨
 
-// ✅ Inter 폰트 설정 (GeistVF 대체)
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -18,8 +18,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={inter.className}> {/* ✅ 폰트 적용 */}
+      <body className={inter.className}>
         <LanguageProvider>
+          {/* ✅ 사이트 방문 시 자동으로 접속자 집계 시작 */}
+          <UserPresenceTracker /> 
           {children}
         </LanguageProvider>
       </body>

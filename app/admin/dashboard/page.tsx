@@ -7,9 +7,10 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { NavButton } from './components/SharedComponents';
 import ManagementTab from './components/ManagementTab';
 import AnalyticsTab from './components/AnalyticsTab';
+import { Users, MapPin, CheckCircle2, MessageSquare, DollarSign, Wifi } from 'lucide-react'; // ✅ Wifi 추가
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'CHATS' | 'FINANCE'>('APPS');
+  const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'CHATS' | 'FINANCE' | 'REALTIME'>('APPS');
   const [filter, setFilter] = useState('ALL'); 
   
   const [apps, setApps] = useState<any[]>([]);
@@ -18,10 +19,26 @@ export default function AdminDashboardPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  
+  // ✅ 실시간 접속자 목록 상태 추가
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
   const supabase = createClient();
 
   useEffect(() => { fetchData(); }, []);
+
+// ✅ Supabase Presence: 실시간 접속자 구독 로직 추가
+const channel = supabase.channel('online_users')
+.on('presence', { event: 'sync' }, () => {
+  const newState = channel.presenceState();
+  const users = Object.values(newState).flat(); 
+  
+  // 중복 접속 제거 (user_id 기준)
+  const uniqueUsers = Array.from(new Map(users.map((u: any) => [u.user_id, u])).values());
+  setOnlineUsers(uniqueUsers);
+})
+.subscribe();
+
+return () => { supabase.removeChannel(channel); };
+}, []);
 
   // ✅ 수정된 fetchData 함수 (디버깅 로그 포함)
   const fetchData = async () => {
@@ -102,6 +119,14 @@ export default function AdminDashboardPage() {
           <div className="mb-6 px-2">
             <h2 className="text-xs font-bold text-slate-500 uppercase mb-2">Monitoring</h2>
             <nav className="space-y-1">
+              {/* ✅ [신규] 실시간 접속자 메뉴 버튼 추가 */}
+              <NavButton 
+                active={activeTab==='REALTIME'} 
+                onClick={()=>setActiveTab('REALTIME')} 
+                icon={<Wifi size={18} className={onlineUsers.length > 0 ? "text-green-400 animate-pulse" : ""}/>} 
+                label="실시간 접속자" 
+                count={onlineUsers.length} 
+              />
               <NavButton active={activeTab==='CHATS'} onClick={()=>setActiveTab('CHATS')} icon={<MessageSquare size={18}/>} label="메시지 모니터링" />
               <NavButton active={activeTab==='FINANCE'} onClick={()=>setActiveTab('FINANCE')} icon={<DollarSign size={18}/>} label="매출 및 통계" />
             </nav>
@@ -109,7 +134,54 @@ export default function AdminDashboardPage() {
         </aside>
 
         <main className="flex-1 p-6 overflow-hidden flex gap-6">
-          {activeTab === 'FINANCE' ? (
+{/* ✅ [신규] 실시간 접속자 화면 (REALTIME) */}
+{activeTab === 'REALTIME' ? (
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-8 overflow-y-auto animate-in fade-in zoom-in-95 duration-300">
+              <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+                    <Wifi size={32} className="text-green-500"/> 실시간 접속 현황
+                  </h2>
+                  <p className="text-slate-500 mt-2">현재 사이트를 이용 중인 유저들을 실시간으로 모니터링합니다.</p>
+                </div>
+                <div className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-lg shadow-lg flex items-center gap-3">
+                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                  Total: <span className="text-green-400">{onlineUsers.length}</span>명
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {onlineUsers.map((u: any, idx) => (
+                  <div key={idx} className="p-5 border border-slate-200 rounded-2xl bg-white hover:shadow-lg transition-all hover:border-black group relative overflow-hidden">
+                    <div className="flex items-start gap-4">
+                      <div className="relative">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
+                          {u.email ? u.email[0].toUpperCase() : 'G'}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full animate-pulse"></div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-slate-900 truncate mb-1">{u.email || '비회원 (Guest)'}</div>
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${u.is_anonymous ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-600'}`}>
+                          {u.is_anonymous ? 'Guest' : 'Member'}
+                        </span>
+                        <div className="text-xs text-slate-400 mt-2 font-mono">
+                          {new Date(u.connected_at).toLocaleTimeString()} 입장
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {onlineUsers.length === 0 && (
+                  <div className="col-span-full py-32 text-center text-slate-300 flex flex-col items-center">
+                    <Wifi size={64} className="mb-4 opacity-20"/>
+                    <p className="text-lg">현재 접속 중인 유저가 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : activeTab === 'FINANCE' ? (
             <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
           ) : (
             <ManagementTab 
