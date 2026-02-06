@@ -1,30 +1,31 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense } from 'react'; // ✅ Suspense만 import (useState, useEffect 불필요)
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Check, Home, MapPin, Calendar, User, Download } from 'lucide-react';
-import Confetti from 'react-confetti'; // (선택) 폭죽 효과 라이브러리 설치 필요: npm install react-confetti
+// import Confetti from 'react-confetti'; ❌ 라이브러리 제거
 
-export default function PaymentCompletePage() {
+function PaymentCompleteContent() {
   const searchParams = useSearchParams();
-  const [showConfetti, setShowConfetti] = useState(true);
-  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  // const [showConfetti, setShowConfetti] = useState(true); ❌ 상태 제거
+  // const [windowSize, setWindowSize] = useState({ width: 0, height: 0 }); ❌ 상태 제거
 
   const date = searchParams?.get('date') || '2026-10-24';
   const guests = searchParams?.get('guests') || '2';
   const amount = Number(searchParams?.get('amount')) || 0;
 
+  /* ❌ useEffect 제거
   useEffect(() => {
     setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    // 5초 후 폭죽 멈춤
     const timer = setTimeout(() => setShowConfetti(false), 5000);
     return () => clearTimeout(timer);
   }, []);
+  */
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
-      {showConfetti && <Confetti width={windowSize.width} height={windowSize.height} numberOfPieces={200} recycle={false}/>}
+      {/* {showConfetti && <Confetti ... />} ❌ 컴포넌트 제거 */}
 
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-100 relative z-10 animate-in fade-in zoom-in-95 duration-500">
         
@@ -40,7 +41,6 @@ export default function PaymentCompletePage() {
 
         {/* 영수증 티켓 디자인 */}
         <div className="p-8 bg-white relative">
-          {/* 펀치홀 효과 (티켓 느낌) */}
           <div className="absolute -top-3 left-0 w-6 h-6 bg-slate-50 rounded-full"></div>
           <div className="absolute -top-3 right-0 w-6 h-6 bg-slate-50 rounded-full"></div>
 
@@ -81,5 +81,14 @@ export default function PaymentCompletePage() {
         <Home size={16}/> 홈으로 돌아가기
       </Link>
     </div>
+  );
+}
+
+// ✅ 메인 컴포넌트에서 Suspense 적용 (필수)
+export default function PaymentCompletePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">로딩중...</div>}>
+      <PaymentCompleteContent />
+    </Suspense>
   );
 }
