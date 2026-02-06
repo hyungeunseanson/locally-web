@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Star } from 'lucide-react';
 
 interface PastTripCardProps {
   trip: any;
@@ -9,24 +10,25 @@ interface PastTripCardProps {
 
 export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) {
   return (
-    <div className="border border-slate-100 rounded-2xl overflow-hidden hover:shadow-md transition-all bg-white group flex flex-col p-6 h-full">
-      <div className="mb-auto">
-        <div className="font-bold mb-2 truncate text-slate-900 leading-snug text-lg">{trip.title}</div>
-        <div className="text-sm text-slate-500 font-medium">{trip.date}</div>
+    <div className="flex items-start gap-4 p-4 border border-slate-100 rounded-xl bg-white hover:border-slate-200 transition-colors">
+      <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden shrink-0">
+        {trip.image && <img src={trip.image} className="w-full h-full object-cover grayscale opacity-70" />}
       </div>
-      
-      {trip.status !== 'cancelled' ? (
-        <button 
-          onClick={() => onOpenReview(trip)} 
-          className="text-sm font-semibold underline underline-offset-4 text-slate-900 hover:text-slate-600 transition-colors mt-4 text-left w-fit"
-        >
-          후기 작성하기
-        </button>
-      ) : (
-        <span className="text-xs text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded w-fit mt-4 inline-block">
-          취소됨
-        </span>
-      )}
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-slate-500 mb-0.5">{trip.date}</div>
+        <h4 className="font-bold text-sm text-slate-900 truncate mb-2">{trip.title}</h4>
+        
+        {trip.status !== 'cancelled' ? (
+          <button 
+            onClick={() => onOpenReview(trip)} 
+            className="text-xs font-bold text-black border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 flex items-center gap-1 w-fit"
+          >
+            <Star size={10}/> 후기 쓰기
+          </button>
+        ) : (
+          <span className="text-[10px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded">취소됨</span>
+        )}
+      </div>
     </div>
   );
 }

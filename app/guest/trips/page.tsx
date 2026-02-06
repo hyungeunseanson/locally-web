@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, Ghost, AlertCircle } from 'lucide-react';
+import { Loader2, Ghost, AlertCircle, CalendarClock } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewModal from '@/app/components/ReviewModal';
 import Link from 'next/link';
 
-// 분리된 컴포넌트 import
 import TripCard from './components/TripCard';     
 import ReceiptModal from './components/ReceiptModal'; 
 import PastTripCard from './components/PastTripCard'; 
@@ -33,7 +32,7 @@ export default function GuestTripsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // ✅ 기능 유지: full_name 및 외래키 명시적 사용
+      // ✅ 쿼리 및 기능 보존: full_name 및 FK 명시
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -73,14 +72,14 @@ export default function GuestTripsPage() {
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            hostName: hostData?.full_name || 'Locally Host',
+            hostName: hostData?.full_name || 'Locally Host', // ✅ full_name 유지
             hostPhone: hostData?.phone,
             hostId: booking.experiences.host_id,
             date: booking.date, 
             time: booking.time || '14:00',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
-            image: booking.experiences?.photos?.[0],
+            image: booking.experiences.photos?.[0],
             dDay: dDay,
             isPrivate: booking.type === 'private',
             status: booking.status,
@@ -124,53 +123,68 @@ export default function GuestTripsPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      <main className="max-w-screen-lg mx-auto px-6 py-16 md:py-24">
-        <h1 className="text-4xl font-extrabold mb-12 tracking-tight">여행</h1>
+      <main className="max-w-4xl mx-auto px-6 py-12">
+        <div className="mb-10">
+          <h1 className="text-3xl font-black tracking-tight mb-2">여행</h1>
+          <p className="text-slate-500">예정된 일정을 확인하세요.</p>
+        </div>
         
         {errorMsg && (
             <div className="bg-red-50 text-red-600 p-4 mb-8 rounded-xl flex items-center gap-3 text-sm font-medium">
                 <AlertCircle size={20}/>
-                <span>데이터를 불러오지 못했습니다: {errorMsg}</span>
+                <span>데이터 불러오기 오류: {errorMsg}</span>
             </div>
         )}
 
-        {/* 예정된 예약 */}
-        <section className="mb-24">
-          <h2 className="text-2xl font-bold mb-8">예정된 예약</h2>
-          <div className="flex flex-col gap-8">
-            {upcomingTrips.length > 0 ? (
-              upcomingTrips.map(trip => (
-                <TripCard 
-                  key={trip.id} 
-                  trip={trip} 
-                  onCancel={handleCancelBooking} 
-                  onOpenReceipt={openReceipt} 
-                />
-              ))
-            ) : (
-              <div className="border border-dashed border-slate-200 rounded-3xl py-24 text-center flex flex-col items-center justify-center">
-                <Ghost className="text-slate-300 mb-4" size={32}/>
-                <p className="text-lg font-medium text-slate-900 mb-2">아직 예정된 여행이 없습니다</p>
-                <p className="text-slate-500 text-sm mb-6">새로운 로컬 체험을 찾아 떠나보세요.</p>
-                <Link href="/" className="px-6 py-3 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-100">
-                  체험 둘러보기
-                </Link>
-              </div>
-            )}
-          </div>
+        {/* 🟢 예정된 예약 (타임라인 스타일 적용) */}
+        <section className="mb-16">
+          <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
+            다가오는 일정 <span className="bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded-full">{upcomingTrips.length}</span>
+          </h2>
+          
+          {upcomingTrips.length > 0 ? (
+            <div className="relative border-l-2 border-slate-100 ml-3 md:ml-4 space-y-8 pb-4">
+              {upcomingTrips.map((trip, index) => (
+                <div key={trip.id} className="relative pl-8 md:pl-10">
+                  {/* 타임라인 점 */}
+                  <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-900 border-4 border-white shadow-sm z-10"></div>
+                  
+                  {/* 날짜 헤더 */}
+                  <div className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    {trip.date} <span className="text-slate-300 font-light">|</span> <span className="text-slate-500 font-medium">{trip.dDay}</span>
+                  </div>
+
+                  {/* 카드 컴포넌트 */}
+                  <TripCard 
+                    trip={trip} 
+                    onCancel={handleCancelBooking} 
+                    onOpenReceipt={openReceipt} 
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl py-16 text-center flex flex-col items-center">
+              <CalendarClock className="text-slate-300 mb-3" size={32}/>
+              <p className="text-slate-500 font-medium mb-4">예정된 일정이 없습니다.</p>
+              <Link href="/" className="text-sm font-bold text-slate-900 underline underline-offset-4 hover:text-blue-600">
+                새로운 체험 둘러보기
+              </Link>
+            </div>
+          )}
         </section>
 
         {/* 지난 여행 */}
         <section>
-          <h2 className="text-2xl font-bold mb-8">지난 여행</h2>
+          <h2 className="text-lg font-bold mb-6 text-slate-400">지난 여행</h2>
           {pastTrips.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {pastTrips.map(trip => (
                 <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
               ))}
             </div>
           ) : (
-            <div className="text-slate-500 text-sm py-4 border-t border-slate-100">다녀온 여행이 없습니다.</div>
+            <div className="text-slate-400 text-sm">다녀온 여행 내역이 없습니다.</div>
           )}
         </section>
       </main>
