@@ -1,118 +1,31 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Loader2, Ghost, AlertCircle, History } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewModal from '@/app/components/ReviewModal';
 
+// 분리된 컴포넌트 & 훅 import
+import { useGuestTrips } from './hooks/useGuestTrips'; // ✅ 로직은 여기서 가져옴
 import TripCard from './components/TripCard';     
 import ReceiptModal from './components/ReceiptModal'; 
 import PastTripCard from './components/PastTripCard'; 
 
 export default function GuestTripsPage() {
-  const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
-  const [pastTrips, setPastTrips] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // ✅ 훅 하나로 모든 데이터와 기능을 가져옵니다.
+  const { 
+    upcomingTrips, 
+    pastTrips, 
+    isLoading, 
+    errorMsg, 
+    cancelBooking 
+  } = useGuestTrips();
 
+  // UI 상태 관리 (모달 등)
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
-
-  const supabase = createClient();
-
-  useEffect(() => {
-    fetchMyTrips();
-  }, []);
-
-  const fetchMyTrips = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setIsLoading(false); return; }
-
-      const { data: bookings, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          experiences (
-            id, title, city, photos, address, host_id,
-            profiles!experiences_host_id_fkey (full_name, phone)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('date', { ascending: true });
-
-      if (error) {
-        console.error("데이터 로딩 실패:", error);
-        setErrorMsg(error.message);
-        return;
-      }
-
-      if (bookings) {
-        const upcoming: any[] = [];
-        const past: any[] = [];
-        const today = new Date();
-        today.setHours(0,0,0,0);
-
-        bookings.forEach((booking: any) => {
-          if (!booking.experiences) return;
-
-          const tripDate = new Date(booking.date);
-          const isFuture = tripDate >= today && booking.status !== 'cancelled';
-          const diffDays = Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)); 
-          const dDay = isFuture ? (diffDays === 0 ? '오늘' : `D-${diffDays}`) : null;
-
-          const hostData = Array.isArray(booking.experiences.profiles) 
-            ? booking.experiences.profiles[0] 
-            : booking.experiences.profiles;
-
-          const formattedTrip = {
-            id: booking.id,
-            title: booking.experiences.title,
-            hostName: hostData?.full_name || 'Locally Host',
-            hostPhone: hostData?.phone,
-            hostId: booking.experiences.host_id, // 메시지 전송용 ID
-            date: booking.date, 
-            time: booking.time || '14:00',
-            location: booking.experiences.city || '서울',
-            address: booking.experiences.address || booking.experiences.city,
-            image: booking.experiences.photos?.[0],
-            dDay: dDay,
-            isPrivate: booking.type === 'private',
-            status: booking.status,
-            price: booking.amount || booking.total_price || 0,
-            guests: booking.guests || 1,
-            expId: booking.experience_id,
-            orderId: booking.order_id || booking.id.substring(0,8).toUpperCase(),
-          };
-
-          if (isFuture) upcoming.push(formattedTrip);
-          else past.push(formattedTrip);
-        });
-
-        setUpcomingTrips(upcoming);
-        setPastTrips(past.reverse());
-      }
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCancelBooking = async (id: number) => {
-    if (!confirm('정말 예약을 취소하시겠습니까?')) return;
-    const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
-    if (!error) { 
-      alert('예약이 취소되었습니다.'); 
-      fetchMyTrips(); 
-    } else { 
-      alert('취소 실패: ' + error.message); 
-    }
-  };
 
   const openReceipt = (trip: any) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
   const openReview = (trip: any) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
@@ -122,6 +35,7 @@ export default function GuestTripsPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
+      
       <main className="max-w-7xl mx-auto px-6 py-12 md:py-16">
         <h1 className="text-3xl md:text-4xl font-extrabold mb-12 tracking-tight text-slate-900">여행</h1>
         
@@ -132,8 +46,10 @@ export default function GuestTripsPage() {
             </div>
         )}
 
+        {/* 2컬럼 레이아웃 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-          {/* 왼쪽: 예정된 여행 */}
+          
+          {/* 1. 왼쪽 메인: 예정된 여행 */}
           <section className="lg:col-span-7">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               예정된 일정 <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full">{upcomingTrips.length}</span>
@@ -145,7 +61,7 @@ export default function GuestTripsPage() {
                   <TripCard 
                     key={trip.id} 
                     trip={trip} 
-                    onCancel={handleCancelBooking} 
+                    onCancel={cancelBooking} // 훅에서 가져온 함수 연결
                     onOpenReceipt={openReceipt} 
                   />
                 ))
@@ -161,7 +77,7 @@ export default function GuestTripsPage() {
             </div>
           </section>
 
-          {/* 오른쪽: 지난 여행 */}
+          {/* 2. 오른쪽 사이드: 지난 여행 */}
           <aside className="lg:col-span-5">
             <div className="sticky top-24">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-400">
@@ -179,9 +95,11 @@ export default function GuestTripsPage() {
               )}
             </div>
           </aside>
+
         </div>
       </main>
 
+      {/* 모달 */}
       {isReceiptModalOpen && selectedTrip && <ReceiptModal trip={selectedTrip} onClose={() => setIsReceiptModalOpen(false)} />}
       {isReviewModalOpen && selectedTrip && <ReviewModal trip={selectedTrip} onClose={() => setIsReviewModalOpen(false)} />}
     </div>
