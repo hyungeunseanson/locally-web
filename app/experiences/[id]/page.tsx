@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
+import { useChat } from '@/app/hooks/useChat'; // ✅ 훅 추가
 
 // 분리된 컴포넌트 임포트
 import ExpMainContent from './components/ExpMainContent';
@@ -17,7 +18,7 @@ export default function ExperienceDetailPage() {
   const router = useRouter();
   const params = useParams();
   const supabase = createClient();
-  
+  const { createInquiry } = useChat(); // 훅에서 생성 함수 가져오기
   const [user, setUser] = useState<any>(null);
   const [experience, setExperience] = useState<any>(null);
   const [hostProfile, setHostProfile] = useState<any>(null);
@@ -69,12 +70,25 @@ export default function ExperienceDetailPage() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleInquiry = async () => {
-    if (!user) return alert('로그인이 필요합니다.');
-    if (!inquiryText.trim()) return alert('내용을 입력해주세요.');
-    alert('메시지가 전송되었습니다.'); 
+// ✅ 핸들러 수정: 진짜 채팅방 생성
+const handleInquiry = async () => {
+  if (!user) return alert('로그인이 필요합니다.');
+  if (!inquiryText.trim()) return alert('내용을 입력해주세요.');
+  
+  try {
+    // 체험 정보에서 host_id 가져오기 (experience state 사용)
+    if (!experience?.host_id) return alert('호스트 정보를 불러올 수 없습니다.');
+
+    await createInquiry(experience.host_id, experience.id, inquiryText);
+    
+    if (confirm('문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?')) {
+      router.push('/guest/inbox');
+    }
     setInquiryText('');
-  };
+  } catch (e: any) {
+    alert('문의 전송 실패: ' + e.message);
+  }
+};
 
   const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean) => {
     if (!user) return alert("로그인이 필요합니다.");
