@@ -27,29 +27,31 @@ export default function GuestTripsPage() {
 
   const fetchMyTrips = async () => {
     try {
-      console.log("🚀 여행 목록 불러오기 시작..."); // 디버그 로그
       const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
-        console.log("❌ 로그인된 유저가 없습니다.");
         setIsLoading(false);
         return; 
       }
-      console.log("✅ 유저 확인:", user.id);
 
+      // ✅ [수정완료] 문법 오류 해결!
+      // profiles!experiences_host_id_fkey -> 명확한 제약조건 이름을 사용해 연결
       const { data: bookings, error } = await supabase
         .from('bookings')
-        .select(`*, experiences (id, title, city, photos, address, host_id, profiles:host_id (name, phone))`)
+        .select(`
+          *,
+          experiences (
+            id, title, city, photos, address, host_id,
+            profiles!experiences_host_id_fkey (name, phone)
+          )
+        `)
         .eq('user_id', user.id)
         .order('date', { ascending: true });
 
       if (error) {
-        console.error("❌ Supabase 에러:", error);
-        setErrorMsg(error.message);
-        throw error;
+        console.error("데이터 로딩 실패:", error);
+        setErrorMsg(error.message); // 화면에 에러 표시
+        return;
       }
-
-      console.log("📦 가져온 데이터:", bookings); // 데이터 확인용
 
       if (bookings) {
         const upcoming: any[] = [];
@@ -58,24 +60,30 @@ export default function GuestTripsPage() {
         today.setHours(0,0,0,0);
 
         bookings.forEach((booking: any) => {
-          if (!booking.experiences) return; // 체험 정보 없으면 패스
+          if (!booking.experiences) return;
 
           const tripDate = new Date(booking.date);
           const isFuture = tripDate >= today && booking.status !== 'cancelled';
           const diffDays = Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)); 
-          
+          const dDay = isFuture ? (diffDays === 0 ? '오늘' : `D-${diffDays}`) : null;
+
+          // 호스트 정보 안전하게 가져오기 (배열이거나 객체일 수 있음)
+          const hostData = Array.isArray(booking.experiences.profiles) 
+            ? booking.experiences.profiles[0] 
+            : booking.experiences.profiles;
+
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            hostName: booking.experiences.profiles?.name || '알 수 없음',
-            hostPhone: booking.experiences.profiles?.phone,
+            hostName: hostData?.name || 'Locally Host',
+            hostPhone: hostData?.phone,
             hostId: booking.experiences.host_id,
             date: booking.date, 
             time: booking.time || '14:00',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
             image: booking.experiences.photos?.[0],
-            dDay: isFuture ? (diffDays === 0 ? '오늘' : `D-${diffDays}`) : null,
+            dDay: dDay,
             isPrivate: booking.type === 'private',
             status: booking.status,
             price: booking.amount || booking.total_price || 0,
@@ -92,7 +100,7 @@ export default function GuestTripsPage() {
         setPastTrips(past.reverse());
       }
     } catch (err: any) {
-      console.error("Fetch Logic Error:", err);
+      console.error(err);
       setErrorMsg(err.message);
     } finally {
       setIsLoading(false);
@@ -100,9 +108,14 @@ export default function GuestTripsPage() {
   };
 
   const handleCancelBooking = async (id: number) => {
-    if (!confirm('취소하시겠습니까?')) return;
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
-    fetchMyTrips();
+    if (!confirm('정말 예약을 취소하시겠습니까?')) return;
+    const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+    if (!error) { 
+      alert('예약이 취소되었습니다.'); 
+      fetchMyTrips(); 
+    } else { 
+      alert('취소 실패: ' + error.message); 
+    }
   };
 
   const openReceipt = (trip: any) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
@@ -115,7 +128,14 @@ export default function GuestTripsPage() {
       <SiteHeader />
       <main className="max-w-5xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-black mb-10 tracking-tight">여행</h1>
-        {errorMsg && <div className="bg-red-50 text-red-600 p-4 mb-4 rounded-lg flex items-center gap-2"><AlertCircle size={20}/> 오류 발생: {errorMsg}</div>}
+        
+        {/* 에러 발생 시 메시지 표시 */}
+        {errorMsg && (
+            <div className="bg-red-50 text-red-600 p-4 mb-6 rounded-lg flex items-center gap-2">
+                <AlertCircle size={20}/>
+                <span>데이터를 불러오지 못했습니다: {errorMsg}</span>
+            </div>
+        )}
 
         {/* 예정된 예약 */}
         <section className="mb-20">
@@ -126,7 +146,10 @@ export default function GuestTripsPage() {
                 <TripCard key={trip.id} trip={trip} onCancel={handleCancelBooking} onOpenReceipt={openReceipt} />
               ))
             ) : (
-              <div className="border border-dashed border-slate-200 rounded-2xl py-20 text-center text-slate-400">예정된 여행이 없습니다.</div>
+              <div className="border border-dashed border-slate-200 rounded-2xl py-20 text-center text-slate-400">
+                <Ghost className="mx-auto mb-2" size={24}/>
+                예정된 여행이 없습니다.
+              </div>
             )}
           </div>
         </section>
