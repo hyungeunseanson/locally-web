@@ -1,17 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Share, Heart, ChevronRight, ShieldCheck, MapPin, MessageSquare, Check, X, 
-  Clock, User, Globe, Users, Zap, ShieldAlert, CalendarX 
-} from 'lucide-react';
+import { Globe } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
-import ReviewSection from './components/ReviewSection';
-import ReservationCard from './components/ReservationCard';
-import HostProfileSection from './components/HostProfileSection';
+
+// 📂 분리된 컴포넌트들
+import ExpMainContent from './components/ExpMainContent';
+import ExpSidebar from './components/ExpSidebar';
 
 export default function ExperienceDetailPage() {
   const router = useRouter();
@@ -76,17 +74,12 @@ export default function ExperienceDetailPage() {
     setInquiryText('');
   };
 
-  // ✅ 예약 핸들러 수정: isPrivate 파라미터 추가
+  // ✅ 예약 핸들러 (프라이빗 파라미터 포함)
   const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean) => {
     if (!user) return alert("로그인이 필요합니다.");
     if (!date) return alert("날짜를 선택해주세요.");
     if (!time) return alert("시간을 선택해주세요.");
-    
-    // 예약 타입 및 가격 정보 전달 (프라이빗 가격은 ReservationCard에서 넘겨받지 않고, 결제 페이지에서 DB 조회하도록 하거나 여기서 함께 전달)
-    // 여기서는 type=private 파라미터를 추가하여 결제 페이지로 이동
     const typeParam = isPrivate ? '&type=private' : '';
-    // 실제 결제 금액은 서버/결제 페이지에서 다시 계산해야 안전하지만, UX 흐름상 가격도 넘겨줄 수 있습니다.
-    // 여기서는 간단히 type만 넘깁니다.
     router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
 
@@ -99,233 +92,32 @@ export default function ExperienceDetailPage() {
       {showToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400"/> 링크가 복사되었습니다.</div>}
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
-        {/* 헤더 섹션 */}
-        <section className="mb-6">
-          <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
-          <div className="flex justify-between items-end">
-            <div className="flex items-center gap-4 text-sm font-medium text-slate-800">
-              <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4"><span className="font-bold">★ 4.98</span> <span className="text-slate-500 underline">후기 15개</span></button>
-              <span className="text-slate-300">|</span>
-              <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700"><MapPin size={14}/> {experience.location}</button>
-            </div>
-            <div className="flex gap-2">
-               <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Share size={16} /> 공유하기</button>
-               <button onClick={() => setIsSaved(!isSaved)} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} /> {isSaved ? '저장됨' : '저장'}</button>
-            </div>
-          </div>
-        </section>
-
-        {/* 이미지 섹션 */}
-        <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
-           <img src={experience.photos?.[0] || experience.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
-           <button className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform"><ChevronRight size={16}/> 사진 모두 보기</button>
-        </section>
-
         <div className="flex flex-col md:flex-row gap-16 relative">
           
-          {/* 왼쪽 컨텐츠 영역 */}
-          <div className="flex-1 space-y-12">
-            
-            {/* 호스트 요약 */}
-            <div className="border-b border-slate-200 pb-8 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2>
-                <p className="text-slate-500 text-base">최대 {experience.max_guests}명 · {experience.duration || 2}시간 · 한국어/영어</p>
-              </div>
-              <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/></div>
-            </div>
+          {/* ✅ 왼쪽: 메인 상세 정보 */}
+          <ExpMainContent 
+            experience={experience} 
+            hostProfile={hostProfile}
+            isSaved={isSaved} 
+            setIsSaved={setIsSaved} 
+            handleShare={handleShare} 
+            scrollToSection={scrollToSection} 
+            handleInquiry={handleInquiry} 
+            inquiryText={inquiryText} 
+            setInquiryText={setInquiryText}
+          />
 
-            {/* 체험 소개 */}
-            <div className="border-b border-slate-200 pb-8">
-              <h3 className="text-xl font-bold mb-4">체험 소개</h3>
-              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">{experience.description}</p>
-            </div>
-
-            {/* 동선 (루트) 타임라인 */}
-            {experience.itinerary && (
-              <div className="border-b border-slate-200 pb-8">
-                <h3 className="text-xl font-bold mb-6">진행 코스</h3>
-                <div className="pl-2 border-l-2 border-slate-100 space-y-8 ml-2">
-                  {experience.itinerary.map((item: any, idx: number) => (
-                    <div key={idx} className="relative pl-8 group">
-                      <div className={`absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${idx === 0 ? 'bg-black' : 'bg-slate-400'}`}></div>
-                      <h4 className="font-bold text-slate-900 text-base mb-1">{item.title}</h4>
-                      <p className="text-sm text-slate-600 leading-relaxed">{item.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 후기 */}
-            <ReviewSection hostName={hostProfile?.name || 'Locally'} />
-
-            {/* 호스트 상세 프로필 섹션 */}
-            <HostProfileSection 
-              hostId={experience.host_id}
-              name={hostProfile?.name || 'Tomoyo'}
-              avatarUrl={hostProfile?.avatar_url}
-              job="패션 디자이너" 
-              dreamDestination="중앙아메리카 커피 여행!"
-              favoriteSong="Growing on me - The Darkness"
-              languages={['영어', '일본어']}
-              intro={hostProfile?.self_intro || "도쿄의 숨겨진 빈티지 샵을 소개하는 것을 좋아합니다. 패션과 커피를 사랑해요!"}
-            />
-
-            {/* 지도 섹션 (구글 맵 연동 복구됨) */}
-            <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
-               <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
-               <p className="text-slate-500 mb-4">
-                 {experience.meeting_point || experience.location} (정확한 위치는 예약 확정 후 표시됩니다)
-               </p>
-               
-               {/* 클릭 시 구글 맵으로 이동 */}
-               <Link 
-                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.meeting_point || experience.location || 'Seoul')}`} 
-                 target="_blank" 
-                 rel="noopener noreferrer"
-               >
-                 <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
-                    {/* 지도 배경 이미지 */}
-                    <img 
-                      src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" 
-                      className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-700"
-                      style={{filter: 'contrast(105%)'}} 
-                      alt="Map Background"
-                    />
-                    
-                    {/* 중앙 구글 맵 버튼 (복구됨!) */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                       <div className="bg-white/95 backdrop-blur-sm px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-110 transition-transform text-slate-900 border border-slate-100">
-                          <img 
-                            src="https://upload.wikimedia.org/wikipedia/commons/a/aa/Google_Maps_icon_(2020).svg" 
-                            alt="Google Maps" 
-                            className="w-[18px] h-[18px]" 
-                          />
-                          지도에서 보기
-                       </div>
-                    </div>
-                 </div>
-               </Link>
-            </div>
-
-            {/* 문의하기 */}
-            <div id="inquiry" className="pb-8 scroll-mt-24">
-               <h3 className="text-xl font-bold mb-4">문의하기</h3>
-               <div className="flex gap-2">
-                 <input value={inquiryText} onChange={e => setInquiryText(e.target.value)} placeholder="호스트에게 메시지 보내기..." className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black"/>
-                 <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:scale-105 transition-transform"><MessageSquare size={18}/></button>
-               </div>
-            </div>
-
-            {/* 포함/불포함 */}
-            <div className="border-t border-slate-200 pt-10 pb-8">
-               <h3 className="text-xl font-bold mb-6">포함 및 불포함 사항</h3>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                     <h4 className="font-bold text-sm mb-3 text-slate-900">포함</h4>
-                     <ul className="space-y-2.5">
-                        {experience.inclusions?.length > 0 ? experience.inclusions.map((item: string, i: number) => (
-                          <li key={i} className="flex gap-3 text-sm text-slate-600 items-start"><Check size={18} className="text-slate-900 flex-shrink-0 mt-0.5"/><span>{item}</span></li>
-                        )) : <li className="text-sm text-slate-400">등록된 포함 사항이 없습니다.</li>}
-                     </ul>
-                  </div>
-                  <div>
-                     <h4 className="font-bold text-sm mb-3 text-slate-900">불포함</h4>
-                     <ul className="space-y-2.5">
-                        {experience.exclusions?.length > 0 ? experience.exclusions.map((item: string, i: number) => (
-                          <li key={i} className="flex gap-3 text-sm text-slate-600 items-start"><X size={18} className="text-slate-400 flex-shrink-0 mt-0.5"/><span>{item}</span></li>
-                        )) : <li className="text-sm text-slate-400">등록된 불포함 사항이 없습니다.</li>}
-                     </ul>
-                  </div>
-               </div>
-               {experience.supplies && (
-                 <div className="mt-8 bg-slate-50 p-5 rounded-xl border border-slate-100">
-                   <h4 className="font-bold text-sm mb-2 text-slate-900 flex items-center gap-2"><span className="text-xl">🎒</span> 준비물</h4>
-                   <p className="text-sm text-slate-600 leading-relaxed">{experience.supplies}</p>
-                 </div>
-               )}
-            </div>
-
-            {/* 알아두어야 할 사항 (2x2 모던 그리드 with Icons) */}
-            <div className="py-12 border-t border-slate-200">
-               <h3 className="text-2xl font-bold mb-8">알아두어야 할 사항</h3>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                  
-                  {/* 1. 게스트 요건 */}
-                  <div className="flex gap-4">
-                     <Users size={24} className="text-slate-900 flex-shrink-0"/>
-                     <div>
-                        <h4 className="font-bold text-base mb-2 text-slate-900">게스트 요건</h4>
-                        <p className="text-sm text-slate-600 leading-relaxed">
-                           참가 연령: {experience.rules?.age_limit || '제한 없음'} <br/>
-                           최대 인원: {experience.max_guests}명
-                        </p>
-                     </div>
-                  </div>
-
-                  {/* 2. 활동 강도 */}
-                  <div className="flex gap-4">
-                     <Zap size={24} className="text-slate-900 flex-shrink-0"/>
-                     <div>
-                        <h4 className="font-bold text-base mb-2 text-slate-900">활동 강도</h4>
-                        <p className="text-sm text-slate-600 leading-relaxed">
-                           이 체험의 활동 강도는 <strong>'{experience.rules?.activity_level || '보통'}'</strong> 입니다. <br/>
-                           가벼운 산책 수준의 체력이 필요합니다.
-                        </p>
-                     </div>
-                  </div>
-
-                  {/* 3. 안전 및 접근성 */}
-                  <div className="flex gap-4">
-                     <ShieldAlert size={24} className="text-slate-900 flex-shrink-0"/>
-                     <div>
-                        <h4 className="font-bold text-base mb-2 text-slate-900">안전 및 접근성</h4>
-                        <p className="text-sm text-slate-600 leading-relaxed mb-1">
-                           특이 사항이나 도움이 필요하신 경우 사전에 호스트에게 문의해주세요.
-                        </p>
-                        <button onClick={() => document.getElementById('inquiry')?.scrollIntoView({behavior:'smooth'})} className="text-sm font-bold underline decoration-slate-300 hover:text-black">
-                           호스트에게 문의하기
-                        </button>
-                     </div>
-                  </div>
-
-                  {/* 4. 환불 정책 */}
-                  <div className="flex gap-4">
-                     <CalendarX size={24} className="text-slate-900 flex-shrink-0"/>
-                     <div>
-                        <h4 className="font-bold text-base mb-2 text-slate-900">환불 정책</h4>
-                        <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
-                           {experience.rules?.refund_policy || '체험 시작 5일 전까지 취소 시 전액 환불됩니다.'}
-                        </p>
-                        <button className="text-sm font-bold underline decoration-slate-300 hover:text-black mt-1">
-                           정책 자세히 보기
-                        </button>
-                     </div>
-                  </div>
-
-               </div>
-            </div>
-          </div>
-
-          {/* 오른쪽 스티키 예약 카드 */}
-          <div className="w-full md:w-[380px]">
-            <ReservationCard 
-              price={Number(experience.price)} 
-              // ✅ 프라이빗 관련 데이터 전달
-              privatePrice={Number(experience.private_price)}
-              isPrivateEnabled={experience.is_private_enabled}
-              duration={Number(experience.duration || 2)} 
-              availableDates={availableDates}
-              dateToTimeMap={dateToTimeMap}
-              onReserve={handleReserve}
-            />
-          </div>
+          {/* ✅ 오른쪽: 예약 사이드바 */}
+          <ExpSidebar 
+            experience={experience} 
+            availableDates={availableDates} 
+            dateToTimeMap={dateToTimeMap} 
+            handleReserve={handleReserve} 
+          />
         </div>
       </main>
 
-      {/* 푸터 */}
+      {/* 푸터 (그대로 유지) */}
       <footer className="border-t border-slate-100 bg-slate-50 mt-20">
         <div className="max-w-[1120px] mx-auto px-6 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm text-slate-500">
