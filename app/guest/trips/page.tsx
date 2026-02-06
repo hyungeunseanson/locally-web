@@ -33,7 +33,7 @@ export default function GuestTripsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // ✅ [핵심 쿼리] full_name으로 정확하게 조회
+      // ✅ 기능 유지: full_name 및 외래키 명시적 사용
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -80,7 +80,7 @@ export default function GuestTripsPage() {
             time: booking.time || '14:00',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
-            image: booking.experiences.photos?.[0],
+            image: booking.experiences?.photos?.[0],
             dDay: dDay,
             isPrivate: booking.type === 'private',
             status: booking.status,
@@ -124,20 +124,20 @@ export default function GuestTripsPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-black mb-10 tracking-tight">여행</h1>
+      <main className="max-w-screen-lg mx-auto px-6 py-16 md:py-24">
+        <h1 className="text-4xl font-extrabold mb-12 tracking-tight">여행</h1>
         
         {errorMsg && (
-            <div className="bg-red-50 text-red-600 p-4 mb-6 rounded-lg flex items-center gap-2">
+            <div className="bg-red-50 text-red-600 p-4 mb-8 rounded-xl flex items-center gap-3 text-sm font-medium">
                 <AlertCircle size={20}/>
                 <span>데이터를 불러오지 못했습니다: {errorMsg}</span>
             </div>
         )}
 
         {/* 예정된 예약 */}
-        <section className="mb-20">
-          <h2 className="text-xl font-bold mb-6">다가오는 예약</h2>
-          <div className="flex flex-col gap-6">
+        <section className="mb-24">
+          <h2 className="text-2xl font-bold mb-8">예정된 예약</h2>
+          <div className="flex flex-col gap-8">
             {upcomingTrips.length > 0 ? (
               upcomingTrips.map(trip => (
                 <TripCard 
@@ -148,10 +148,13 @@ export default function GuestTripsPage() {
                 />
               ))
             ) : (
-              <div className="border border-dashed border-slate-200 rounded-2xl py-20 text-center text-slate-400">
-                <Ghost className="mx-auto mb-2" size={24}/>
-                <p>예정된 여행이 없습니다.</p>
-                <Link href="/" className="text-sm font-bold text-black underline mt-2 inline-block">체험 둘러보기</Link>
+              <div className="border border-dashed border-slate-200 rounded-3xl py-24 text-center flex flex-col items-center justify-center">
+                <Ghost className="text-slate-300 mb-4" size={32}/>
+                <p className="text-lg font-medium text-slate-900 mb-2">아직 예정된 여행이 없습니다</p>
+                <p className="text-slate-500 text-sm mb-6">새로운 로컬 체험을 찾아 떠나보세요.</p>
+                <Link href="/" className="px-6 py-3 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-100">
+                  체험 둘러보기
+                </Link>
               </div>
             )}
           </div>
@@ -159,16 +162,16 @@ export default function GuestTripsPage() {
 
         {/* 지난 여행 */}
         <section>
-          <h2 className="text-xl font-bold mb-6 text-slate-400">지난 여행</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {pastTrips.length > 0 ? (
-              pastTrips.map(trip => (
+          <h2 className="text-2xl font-bold mb-8">지난 여행</h2>
+          {pastTrips.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pastTrips.map(trip => (
                 <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
-              ))
-            ) : (
-              <div className="text-slate-400 text-sm py-4">다녀온 여행이 없습니다.</div>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-slate-500 text-sm py-4 border-t border-slate-100">다녀온 여행이 없습니다.</div>
+          )}
         </section>
       </main>
 
