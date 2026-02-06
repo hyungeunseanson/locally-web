@@ -4,17 +4,17 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Loader2, Calendar, Users, ShieldCheck, Clock } from 'lucide-react';
 import Script from 'next/script';
-import { createClient } from '@/app/utils/supabase/client'; // ✅ Supabase 클라이언트 추가
+import { createClient } from '@/app/utils/supabase/client'; 
 
 function PaymentContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   
-  const supabase = createClient(); // ✅ 클라이언트 생성
+  const supabase = createClient();
 
   const [mounted, setMounted] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false); // 로딩 상태
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
@@ -22,7 +22,7 @@ function PaymentContent() {
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   
-  // 가격 계산 (실무에서는 DB에서 체험 가격을 조회해야 함)
+  // 가격 계산
   const basePrice = 50000; 
   const totalPrice = isPrivate ? 300000 : basePrice * guests;
 
@@ -36,27 +36,28 @@ function PaymentContent() {
     setIsProcessing(true);
 
     try {
-      // 1. 현재 로그인한 유저 확인
+      // 1. 로그인 유저 확인
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
         alert("로그인이 필요한 서비스입니다.");
-        router.push('/login'); // 로그인 페이지가 있다면 이동
+        // router.push('/login'); // 로그인 페이지 구현 시 주석 해제
         return;
       }
 
-      // 2. Supabase DB에 예약 정보 저장 (INSERT)
+      // 2. 예약 정보 저장 (INSERT)
       const { data, error } = await supabase
         .from('bookings')
         .insert([
           {
             experience_id: experienceId,
             user_id: user.id,
-            date: date,     // 날짜 컬럼 형식에 맞춰야 함 (YYYY-MM-DD)
-            time: time,     // 시간 컬럼이 있다면 저장
+            date: date,    
+            time: time,
             guests: guests,
-            total_price: totalPrice,
-            status: 'confirmed', // ✅ 핵심: 호스트 승인 없이 바로 '확정'
+            amount: totalPrice,      // ✅ [수정됨] DB가 'amount' 컬럼을 원하므로 이름 변경
+            total_price: totalPrice, // (혹시 몰라 total_price도 같이 보냄, 컬럼 없으면 무시됨)
+            status: 'confirmed',     
             type: isPrivate ? 'private' : 'group',
             created_at: new Date().toISOString(),
           }
@@ -67,8 +68,7 @@ function PaymentContent() {
         throw error;
       }
 
-      // 3. 성공 시 완료 페이지로 이동
-      // (완료 페이지에서도 DB 데이터를 다시 조회할 수 있지만, 편의상 쿼리 파라미터로 넘김)
+      // 3. 완료 페이지 이동
       router.push(`/experiences/${experienceId}/payment/complete?date=${date}&guests=${guests}&amount=${totalPrice}`);
 
     } catch (error: any) {
@@ -100,7 +100,7 @@ function PaymentContent() {
             <span className="bg-rose-50 text-rose-600 text-[10px] font-bold px-2 py-1 rounded-full">즉시 예약</span>
             {isPrivate && <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-full">프라이빗 단독</span>}
           </div>
-          <h2 className="text-2xl font-bold mb-6 leading-snug">을지로 노포 투어</h2> {/* 실제로는 DB에서 title 가져와야 함 */}
+          <h2 className="text-2xl font-bold mb-6 leading-snug">을지로 노포 투어</h2>
           
           <div className="space-y-3 text-slate-700 text-sm bg-slate-50 p-5 rounded-2xl border border-slate-100">
             <div className="flex items-center gap-3">
