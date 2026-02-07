@@ -178,7 +178,7 @@ function Footer() {
           <div>
             <h5 className="font-bold text-black mb-4">Locally</h5>
             <ul className="space-y-3">
-              <li><Link href="#" className="hover:underline">회사 소개</Link></li>
+              <li><Link href="/about" className="hover:underline">회사 소개</Link></li>
               <li><Link href="/admin/dashboard" className="hover:underline font-bold text-slate-800">관리자 페이지</Link></li>
             </ul>
           </div>
