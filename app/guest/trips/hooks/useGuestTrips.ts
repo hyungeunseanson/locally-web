@@ -12,7 +12,6 @@ export function useGuestTrips() {
   
   const supabase = createClient();
 
-  // ✅ [보안] 이미지 URL을 HTTPS로 변환 (Mixed Content 방지)
   const secureUrl = (url: string | null) => {
     if (!url) return null;
     return url.replace('http://', 'https://');
@@ -29,7 +28,6 @@ export function useGuestTrips() {
         return; 
       }
 
-      // ✅ [데이터] 체험 정보 + 호스트 정보 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -74,7 +72,7 @@ export function useGuestTrips() {
             time: booking.time || '14:00',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
-            image: secureUrl(booking.experiences.photos?.[0]), // ✅ HTTPS 적용
+            image: secureUrl(booking.experiences.photos?.[0]), 
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
             status: booking.status,
@@ -99,7 +97,7 @@ export function useGuestTrips() {
     }
   }, [supabase]);
 
-  // ✅ [핵심 수정] 예약 취소 요청 (사유 저장 활성화)
+  // ✅ [수정 완료] 취소 사유 저장 활성화
   const requestCancellation = async (id: number, reason: string) => {
     setIsProcessing(true);
     try {
@@ -107,7 +105,7 @@ export function useGuestTrips() {
         .from('bookings')
         .update({ 
           status: 'cancellation_requested', 
-          cancel_reason: reason // 👈 주석 해제됨! 이제 사유가 저장됩니다.
+          cancel_reason: reason // 👈 이제 사유가 저장됩니다!
         })
         .eq('id', id);
 
