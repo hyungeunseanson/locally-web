@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from '@/app/context/LanguageContext';
 import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext'; // ✅ 절대 경로 확인
+import { ToastProvider } from '@/app/context/ToastContext'; // ✅ 추가
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <LanguageProvider>
           <NotificationProvider>
+          <ToastProvider> {/* ✅ 감싸기 */}
             <UserPresenceTracker /> 
             {children}
           </NotificationProvider>

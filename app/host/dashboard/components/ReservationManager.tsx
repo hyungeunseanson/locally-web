@@ -8,6 +8,9 @@ import {
 import { createClient } from '@/app/utils/supabase/client';
 import Link from 'next/link';
 import { sendNotification } from '@/app/utils/notification';
+import Skeleton from '@/app/components/ui/Skeleton'; // ✅ 스켈레톤 추가
+import EmptyState from '@/app/components/EmptyState'; // ✅ 빈 화면 추가
+import { useToast } from '@/app/context/ToastContext'; // ✅ 토스트 추가
 
 export default function ReservationManager() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
@@ -17,6 +20,7 @@ export default function ReservationManager() {
   const [processingId, setProcessingId] = useState<number | null>(null);
   
   const supabase = createClient();
+  const { showToast } = useToast(); // ✅ 토스트 사용
 
   const secureUrl = (url: string | null) => {
     if (!url) return null;
@@ -45,11 +49,7 @@ export default function ReservationManager() {
 
     } catch (error: any) {
       console.error('예약 로딩 실패:', error);
-      if (error.code === 'PGRST200' || error.message.includes('foreign key')) {
-        setErrorMsg('데이터베이스 연결 설정이 필요합니다. 관리자에게 문의하세요.');
-      } else {
-        setErrorMsg('예약 정보를 불러오지 못했습니다.');
-      }
+      showToast('예약 정보를 불러오지 못했습니다.', 'error'); // ✅ alert 대체
     } finally {
       setLoading(false);
     }
@@ -86,11 +86,11 @@ export default function ReservationManager() {
         link: '/guest/trips'
       });
 
-      alert('환불 처리가 완료되었습니다.');
+      showToast('취소가 승인되고 환불 처리되었습니다.'); // ✅ alert 대체
       fetchReservations(); 
 
     } catch (err: any) {
-      alert(`처리 실패: ${err.message}`);
+      showToast(err.message, 'error'); // ✅ alert 대체
     } finally {
       setProcessingId(null);
     }
@@ -183,16 +183,28 @@ export default function ReservationManager() {
       )}
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-48 text-slate-400">
-            <Loader2 className="animate-spin mb-2" size={24}/>
-            <p className="text-xs">데이터를 불러오는 중...</p>
+{/* ✅ 로딩 스켈레톤 적용 */}
+{loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border rounded-xl p-5 bg-white space-y-3">
+                <div className="flex gap-3">
+                  <Skeleton className="w-12 h-12 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="w-32 h-4" />
+                    <Skeleton className="w-20 h-3" />
+                  </div>
+                </div>
+                <Skeleton className="w-full h-12 rounded-lg" />
+              </div>
+            ))}
           </div>
         ) : filteredList.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
-            <Calendar size={40} className="mb-3 opacity-20"/>
-            <p className="text-sm font-medium">예약 내역이 없습니다.</p>
-          </div>
+          /* ✅ 빈 화면 디자인 적용 */
+          <EmptyState 
+            title="예약 내역이 없습니다." 
+            subtitle={activeTab === 'upcoming' ? "아직 예정된 예약이 없어요." : "해당하는 내역이 없습니다."}
+          />
         ) : (
           filteredList.map(res => (
             <div key={res.id} className={`border rounded-xl p-5 transition-all bg-white shadow-sm ${res.status === 'cancellation_requested' ? 'border-orange-200 bg-orange-50/30' : 'border-slate-100 hover:border-slate-300'}`}>
