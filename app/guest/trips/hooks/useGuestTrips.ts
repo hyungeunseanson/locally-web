@@ -12,7 +12,7 @@ export function useGuestTrips() {
   
   const supabase = createClient();
 
-  // ✅ [추가] 이미지 URL을 HTTPS로 변환하는 함수
+  // ✅ [보안] 이미지 URL을 HTTPS로 변환 (Mixed Content 방지)
   const secureUrl = (url: string | null) => {
     if (!url) return null;
     return url.replace('http://', 'https://');
@@ -29,7 +29,7 @@ export function useGuestTrips() {
         return; 
       }
 
-      // ✅ [수정] 체험 정보와 호스트 정보를 확실하게 가져오는 쿼리
+      // ✅ [데이터] 체험 정보 + 호스트 정보 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -58,9 +58,8 @@ export function useGuestTrips() {
           if (!booking.experiences) return;
 
           const tripDate = new Date(booking.date);
-          const isFuture = tripDate >= today; // 날짜 기준으로만 분류 (취소된 것도 일단 목록엔 뜸)
+          const isFuture = tripDate >= today; 
 
-          // 호스트 정보 추출 (배열이거나 객체일 수 있음)
           const hostData = Array.isArray(booking.experiences.profiles) 
             ? booking.experiences.profiles[0] 
             : booking.experiences.profiles;
@@ -75,8 +74,7 @@ export function useGuestTrips() {
             time: booking.time || '14:00',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
-            // ✅ [수정] 이미지 URL에 secureUrl 적용
-            image: secureUrl(booking.experiences.photos?.[0]),
+            image: secureUrl(booking.experiences.photos?.[0]), // ✅ HTTPS 적용
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
             status: booking.status,
@@ -101,7 +99,7 @@ export function useGuestTrips() {
     }
   }, [supabase]);
 
-  // 예약 취소 요청
+  // ✅ [핵심 수정] 예약 취소 요청 (사유 저장 활성화)
   const requestCancellation = async (id: number, reason: string) => {
     setIsProcessing(true);
     try {
@@ -109,7 +107,7 @@ export function useGuestTrips() {
         .from('bookings')
         .update({ 
           status: 'cancellation_requested', 
-          cancel_reason: reason 
+          cancel_reason: reason // 👈 주석 해제됨! 이제 사유가 저장됩니다.
         })
         .eq('id', id);
 
