@@ -208,12 +208,22 @@ export default function ReservationManager() {
                 <div className="bg-white border border-orange-100 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="flex items-start gap-3 mb-3">
                     <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={16} />
-                    <div>
+                    <div className="flex-1"> {/* flex-1 추가: 텍스트 영역 확장 */}
                       <p className="text-sm font-bold text-orange-800">취소 요청이 접수되었습니다.</p>
                       <p className="text-xs text-orange-600 mt-1">승인 시 결제가 자동으로 취소되고 전액 환불됩니다.</p>
+                      
+                      {/* ✅ [추가됨] 취소 사유가 있으면 보여주는 UI */}
+                      {res.cancel_reason && (
+                        <div className="mt-3 bg-orange-50 p-3 rounded-lg border border-orange-100">
+                           <p className="text-xs font-bold text-orange-800 mb-1">게스트 사유:</p>
+                           <p className="text-xs text-orange-700 whitespace-pre-wrap break-words">
+                             {res.cancel_reason}
+                           </p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-2">
                     <button 
                       onClick={() => handleApproveCancellation(res)}
                       disabled={processingId === res.id}
