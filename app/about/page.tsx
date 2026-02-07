@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Star, Globe, Users, ShieldCheck, Heart, Search, CheckCircle2, MapPin, ArrowRight } from 'lucide-react';
+import { ChevronDown, Star, Globe, Users, User, ShieldCheck, Heart, Search, CheckCircle2, MapPin, ArrowRight, MessageCircle } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 
 // --- [Utility] 에어비앤비 스타일 컴포넌트 ---
