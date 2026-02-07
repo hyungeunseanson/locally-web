@@ -19,7 +19,7 @@ export default function SiteFooter() {
               <li><Link href="/about" className="hover:underline">로컬리 소개</Link></li>
               <li><Link href="/help" className="hover:underline">도움말 센터</Link></li>
               <li><Link href="#" className="hover:underline">안전 센터</Link></li>
-              <li><Link href="/admin" className="hover:underline">관리자페이지</Link></li>
+              <li><Link href="/admin/dashboard" className="hover:underline">관리자페이지</Link></li>
             </ul>
           </div>
 
