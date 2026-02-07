@@ -7,10 +7,16 @@ export function useGuestTrips() {
   const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
   const [pastTrips, setPastTrips] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false); // 로딩 상태 추가
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // 에러 메시지 상태 추가
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   const supabase = createClient();
+
+  // ✅ [추가] 이미지 URL을 HTTPS로 변환하는 함수
+  const secureUrl = (url: string | null) => {
+    if (!url) return null;
+    return url.replace('http://', 'https://');
+  };
 
   const fetchMyTrips = useCallback(async () => {
     try {
@@ -23,6 +29,7 @@ export function useGuestTrips() {
         return; 
       }
 
+      // ✅ [수정] 체험 정보와 호스트 정보를 확실하게 가져오는 쿼리
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -37,7 +44,7 @@ export function useGuestTrips() {
 
       if (error) {
         console.error("데이터 로딩 실패:", error);
-        setErrorMsg(error.message);
+        setErrorMsg('예약 정보를 불러오는데 실패했습니다.');
         throw error;
       }
 
@@ -51,12 +58,9 @@ export function useGuestTrips() {
           if (!booking.experiences) return;
 
           const tripDate = new Date(booking.date);
-          
-          // 취소된 건은 과거 내역이나 별도 처리가 필요할 수 있으나, 여기선 미래 일정 로직에 따라 분류됨
-          // (단, isFuture 체크 시 status가 'cancelled'면 false가 되어 past로 갈 수 있음)
-          // 여기서는 날짜 기준으로만 미래/과거를 나눕니다.
-          const isFuture = tripDate >= today; 
+          const isFuture = tripDate >= today; // 날짜 기준으로만 분류 (취소된 것도 일단 목록엔 뜸)
 
+          // 호스트 정보 추출 (배열이거나 객체일 수 있음)
           const hostData = Array.isArray(booking.experiences.profiles) 
             ? booking.experiences.profiles[0] 
             : booking.experiences.profiles;
@@ -71,7 +75,8 @@ export function useGuestTrips() {
             time: booking.time || '14:00',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
-            image: booking.experiences.photos?.[0],
+            // ✅ [수정] 이미지 URL에 secureUrl 적용
+            image: secureUrl(booking.experiences.photos?.[0]),
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
             status: booking.status,
@@ -96,11 +101,10 @@ export function useGuestTrips() {
     }
   }, [supabase]);
 
-  // ✅ 예약 취소 요청 (DB 업데이트)
+  // 예약 취소 요청
   const requestCancellation = async (id: number, reason: string) => {
     setIsProcessing(true);
     try {
-      // 1. bookings 테이블에 취소 요청 상태와 사유 업데이트
       const { error } = await supabase
         .from('bookings')
         .update({ 
@@ -112,12 +116,12 @@ export function useGuestTrips() {
       if (error) throw error;
 
       alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
-      fetchMyTrips(); // 목록 갱신
-      return true; // 성공
+      fetchMyTrips(); 
+      return true; 
 
     } catch (err: any) {
       alert('요청 실패: ' + err.message);
-      return false; // 실패
+      return false; 
     } finally {
       setIsProcessing(false);
     }
