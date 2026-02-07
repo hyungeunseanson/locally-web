@@ -61,7 +61,8 @@ export default function GuestTripsPage() {
                   <TripCard 
                     key={trip.id} 
                     trip={trip} 
-                    onCancel={cancelBooking} // 훅에서 가져온 함수 연결
+                    onRequestCancel={requestCancellation} // 이름 변경
+                    isProcessing={isProcessing}           // 추가됨
                     onOpenReceipt={openReceipt} 
                   />
                 ))

@@ -3,15 +3,18 @@
 import React, { useState } from 'react';
 import { MapPin, MoreHorizontal, Receipt, MessageSquare, Map } from 'lucide-react';
 import Link from 'next/link';
+import CancellationModal from './CancellationModal'; // ✅ [추가]
 
 interface TripCardProps {
   trip: any;
-  onCancel: (id: number) => void;
+  onRequestCancel: (id: number, reason: string) => Promise<boolean>; // ✅ [변경] 사유 포함 & 비동기 처리
   onOpenReceipt: (trip: any) => void;
+  isProcessing: boolean; // ✅ [추가] 로딩 상태
 }
 
-export default function TripCard({ trip, onCancel, onOpenReceipt }: TripCardProps) {
+export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProcessing }: TripCardProps) { // ✅ Props 이름 변경 확인
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false); // ✅ [추가] 모달 상태
 
   const addToCalendar = () => {
     const text = encodeURIComponent(`[Locally] ${trip.title}`);
@@ -59,7 +62,22 @@ export default function TripCard({ trip, onCancel, onOpenReceipt }: TripCardProp
                 <div className="fixed inset-0 z-10" onClick={() => setIsMenuOpen(false)}></div>
                 <div className="absolute right-0 top-10 w-40 bg-white border border-slate-100 rounded-xl shadow-xl z-20 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100 font-medium">
                   <button onClick={addToCalendar} className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 text-slate-700">캘린더 추가</button>
-                  <button onClick={() => onCancel(trip.id)} className="w-full text-left px-4 py-2.5 text-xs hover:bg-red-50 text-red-600">예약 취소</button>
+{/* ✅ [수정] 예약 취소 버튼 로직 변경 */}
+{trip.status === 'cancellation_requested' ? (
+    <button disabled className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed">
+      취소 대기중
+    </button>
+  ) : (
+    <button 
+      onClick={() => {
+        setIsMenuOpen(false); // 메뉴 닫기
+        setShowCancelModal(true); // 모달 열기
+      }} 
+      className="w-full text-left px-4 py-2.5 text-xs hover:bg-red-50 text-red-600"
+    >
+      예약 취소
+    </button>
+  )}
                 </div>
               </>
             )}
@@ -110,6 +128,16 @@ export default function TripCard({ trip, onCancel, onOpenReceipt }: TripCardProp
           </button>
         </div>
       </div>
+      {/* ✅ [추가] 취소 모달 연결 */}
+      <CancellationModal 
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        isProcessing={isProcessing}
+        onConfirm={async (reason) => {
+          const success = await onRequestCancel(trip.id, reason);
+          if (success) setShowCancelModal(false);
+        }}
+      />
     </div>
   );
 }
