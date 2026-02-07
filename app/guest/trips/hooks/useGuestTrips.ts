@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { sendNotification } from '../../../utils/notification'; // 👈 상대 경로로 변경 (3단계 상위로 이동 후 접근)
+import { sendNotification } from '@/app/utils/notification'; // ✅ 다시 절대 경로로 수정
 
 export function useGuestTrips() {
   const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
