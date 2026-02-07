@@ -38,7 +38,7 @@ export default function ReservationManager() {
           guest:profiles!bookings_user_id_fkey ( id, full_name, avatar_url, email, phone )
         `)
         .eq('experiences.host_id', user.id)
-        .order('date', { ascending: false });
+        .order('created_at', { ascending: false }); // ✅ 최신 예약순 정렬
 
       if (error) throw error;
       setReservations(data || []);
@@ -98,10 +98,14 @@ export default function ReservationManager() {
 
   const getFilteredList = () => {
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0,0,0,0); // 오늘 00:00:00
 
     return reservations.filter(r => {
-      const tripDate = new Date(r.date);
+      // ✅ 날짜 비교 로직 수정 (문자열 -> Date 객체 -> 타임스탬프 비교)
+      // r.date가 'YYYY-MM-DD' 형식이면 로컬 시간 00:00으로 해석되도록 파싱
+      const [year, month, day] = r.date.split('-').map(Number);
+      const tripDate = new Date(year, month - 1, day); 
+      
       const isCancelled = r.status === 'cancelled'; 
       const isRequesting = r.status === 'cancellation_requested';
       
@@ -109,6 +113,7 @@ export default function ReservationManager() {
       if (isCancelled) return false; 
 
       if (activeTab === 'upcoming') {
+         // 미래 예약이거나 오늘 예약인 경우
          return tripDate >= today || isRequesting;
       }
       if (activeTab === 'completed') return tripDate < today && !isRequesting;

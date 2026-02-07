@@ -69,15 +69,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const markAsRead = async (id: number) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    // UI 낙관적 업데이트
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
   };
 
   const markAllAsRead = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id);
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id);
   };
 
   return (

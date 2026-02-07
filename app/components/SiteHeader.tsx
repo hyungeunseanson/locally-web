@@ -7,7 +7,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { useNotification } from '@/app/context/NotificationContext'; // ✅ 다시 절대 경로(@/)로 수정
+import { useNotification } from '@/app/context/NotificationContext'; // ✅ 절대 경로 확인
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -21,7 +21,9 @@ export default function SiteHeader() {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const menuRef = useRef<HTMLHeaderElement>(null);
+  
+  // 🚨 [수정됨] HTMLHeaderElement -> HTMLElement (호환성 해결)
+  const menuRef = useRef<HTMLElement>(null);
 
   const languageContext = useLanguage();
   const setLang = languageContext?.setLang || (() => {});
@@ -41,7 +43,7 @@ export default function SiteHeader() {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
         setIsLangOpen(false);
-        setShowNoti(false); // ✅ 외부 클릭 시 알림창 닫기
+        setShowNoti(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -137,7 +139,6 @@ export default function SiteHeader() {
                {getButtonLabel()}
             </button>
 
-            {/* 언어 설정 */}
             <div className="relative hidden sm:block">
               <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
                 <Globe size={18} />
@@ -153,9 +154,8 @@ export default function SiteHeader() {
               )}
             </div>
 
-            {/* ✅ [위치 확정] 알림 아이콘 (로그인 상태일 때만) */}
             {user && (
-              <div className="relative">
+              <div className="relative mx-1">
                 <button 
                   onClick={() => setShowNoti(!showNoti)} 
                   className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
@@ -166,7 +166,6 @@ export default function SiteHeader() {
                   )}
                 </button>
 
-                {/* 알림 드롭다운 */}
                 {showNoti && (
                   <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                     <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -197,7 +196,6 @@ export default function SiteHeader() {
               </div>
             )}
 
-            {/* 프로필 메뉴 */}
             <div className="relative">
               <div 
                 onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
@@ -213,7 +211,6 @@ export default function SiteHeader() {
                 </div>
               </div>
 
-              {/* 드롭다운 메뉴 */}
               {user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
@@ -253,4 +250,4 @@ export default function SiteHeader() {
       </header>
     </>
   );
-} //깃푸쉬//
+}
