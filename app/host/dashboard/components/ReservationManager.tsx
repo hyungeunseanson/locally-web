@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Link from 'next/link';
+import { sendNotification } from '@/app/utils/notification'; // ✅ import 추가
 
 export default function ReservationManager() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
@@ -78,6 +79,16 @@ export default function ReservationManager() {
     }
   };
 
+  // 🔔 [알림 발송] 게스트에게 알림
+  await sendNotification({
+    supabase,
+    userId: booking.user_id, // 게스트 ID
+    type: 'cancellation_approved',
+    title: '취소 요청 승인됨',
+    message: `'${booking.experiences?.title}' 예약 취소가 승인되었습니다. 환불이 진행됩니다.`,
+    link: '/guest/trips'
+  });
+  
   // 3. 필터링 로직
   const getFilteredList = () => {
     const today = new Date().setHours(0,0,0,0);

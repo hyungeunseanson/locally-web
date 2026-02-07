@@ -7,6 +7,8 @@ import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { Bell } from 'lucide-react';
+import { useNotification } from '@/app/context/NotificationContext'; // ✅ 추가
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -14,9 +16,13 @@ export default function SiteHeader() {
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
+// ✅ [추가] 알림 관련 훅 사용
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
+  const [showNoti, setShowNoti] = useState(false);
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLHeaderElement>(null); // ✅ 타입 수정 (HTMLDivElement -> HTMLHeaderElement)
 
   const languageContext = useLanguage();
   const setLang = languageContext?.setLang || (() => {});
@@ -36,6 +42,7 @@ export default function SiteHeader() {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
         setIsLangOpen(false);
+        setShowNoti(false); // ✅ 외부 클릭 시 알림창도 닫기
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -60,7 +67,7 @@ export default function SiteHeader() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]); // ✅ 의존성 배열 추가
 
   const checkHostStatus = async (userId: string) => {
     const { data: app } = await supabase
@@ -151,6 +158,51 @@ export default function SiteHeader() {
               )}
             </div>
 
+{/* ✅ [추가됨] 알림 벨 아이콘 (로그인 상태일 때만 표시) */}
+{user && (
+              <div className="relative">
+                <button 
+                  onClick={() => setShowNoti(!showNoti)} 
+                  className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+                  )}
+                </button>
+
+                {/* 알림 드롭다운 */}
+                {showNoti && (
+                  <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <span className="font-bold text-sm text-slate-800">알림</span>
+                      <button onClick={markAllAsRead} className="text-xs text-slate-500 hover:text-black font-medium">모두 읽음</button>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-slate-400">새로운 알림이 없습니다.</div>
+                      ) : (
+                        notifications.map(n => (
+                          <div 
+                            key={n.id} 
+                            onClick={() => { markAsRead(n.id); if(n.link) window.location.href = n.link; }}
+                            className={`p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${!n.is_read ? 'bg-blue-50/30' : ''}`}
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-bold text-xs text-slate-800 line-clamp-1">{n.title}</span>
+                              <span className="text-[10px] text-slate-400 shrink-0 ml-2">{new Date(n.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{n.message}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 프로필 메뉴 */}
             <div className="relative">
               <div 
                 onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
@@ -165,6 +217,7 @@ export default function SiteHeader() {
                   )}
                 </div>
               </div>
+
 
               {/* 드롭다운 메뉴 */}
               {user && isMenuOpen && (

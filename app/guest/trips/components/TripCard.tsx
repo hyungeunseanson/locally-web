@@ -130,14 +130,15 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
       </div>
       {/* ✅ [추가] 취소 모달 연결 */}
       <CancellationModal 
-        isOpen={showCancelModal}
-        onClose={() => setShowCancelModal(false)}
-        isProcessing={isProcessing}
-        onConfirm={async (reason) => {
-          const success = await onRequestCancel(trip.id, reason);
-          if (success) setShowCancelModal(false);
-        }}
-      />
+  isOpen={showCancelModal}
+  onClose={() => setShowCancelModal(false)}
+  isProcessing={isProcessing}
+  onConfirm={async (reason) => {
+    // ✅ [변경] trip.hostId를 세 번째 인자로 함께 넘겨줍니다.
+    const success = await onRequestCancel(trip.id, reason, trip.hostId); 
+    if (success) setShowCancelModal(false);
+  }}
+/>
     </div>
   );
 }

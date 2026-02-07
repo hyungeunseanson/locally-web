@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
+import { sendNotification } from '@/app/utils/notification'; // ✅ import 추가
 
 export function useGuestTrips() {
   const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
@@ -97,31 +98,43 @@ export function useGuestTrips() {
     }
   }, [supabase]);
 
-  // ✅ [수정 완료] 취소 사유 저장 활성화
-  const requestCancellation = async (id: number, reason: string) => {
-    setIsProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancellation_requested', 
-          cancel_reason: reason // 👈 이제 사유가 저장됩니다!
-        })
-        .eq('id', id);
+// ✅ [변경] 2. 함수 인자에 hostId: string 추가
+const requestCancellation = async (id: number, reason: string, hostId: string) => { 
+  setIsProcessing(true);
+  try {
+    // 3. 기존의 예약 취소 업데이트 로직 (DB 업데이트)
+    const { error } = await supabase
+      .from('bookings')
+      .update({ 
+        status: 'cancellation_requested', 
+        cancel_reason: reason 
+      })
+      .eq('id', id);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
-      fetchMyTrips(); 
-      return true; 
+    // ✅ [추가] 4. DB 업데이트 성공 후, 호스트에게 알림 발송
+    // 이 부분이 "실제 알림 발송 연결"의 핵심입니다.
+    await sendNotification({
+      supabase,
+      userId: hostId, // 호스트 ID (함수 인자로 받음)
+      type: 'booking_request', // 또는 'cancellation_requested' (타입 정의에 따라)
+      title: '예약 취소 요청',
+      message: '게스트가 예약을 취소하고 싶어합니다. 사유를 확인해주세요.',
+      link: '/host/dashboard?tab=reservations'
+    });
 
-    } catch (err: any) {
-      alert('요청 실패: ' + err.message);
-      return false; 
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
+    fetchMyTrips(); 
+    return true; 
+
+  } catch (err: any) {
+    alert('요청 실패: ' + err.message);
+    return false; 
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   useEffect(() => {
     fetchMyTrips();

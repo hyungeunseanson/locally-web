@@ -3,7 +3,19 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from '@/app/context/LanguageContext';
 import UserPresenceTracker from '@/app/components/UserPresenceTracker'; // ✅ 추가됨
+import { NotificationProvider } from './context/NotificationContext'; 
 
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ko">
+      <body>
+        <NotificationProvider> {/* ✅ 여기 감싸주세요 */}
+           {children}
+        </NotificationProvider>
+      </body>
+    </html>
+  );
+}
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
