@@ -22,10 +22,11 @@ export default function RootLayout({
     <html lang="ko">
       <body className={inter.className}>
         <LanguageProvider>
-          <NotificationProvider>
-          <ToastProvider> {/* ✅ 감싸기 */}
-            <UserPresenceTracker /> 
-            {children}
+        <NotificationProvider>
+            <ToastProvider> {/* ✅ 감싸기 */}
+              <UserPresenceTracker /> 
+              {children}
+            </ToastProvider>
           </NotificationProvider>
         </LanguageProvider>
       </body>
