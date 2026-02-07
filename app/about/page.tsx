@@ -1,229 +1,164 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, Star, ShieldCheck, Globe, Users } from 'lucide-react';
-
-// --- [내부 컴포넌트] 스크롤 시 페이드인 효과 ---
-function FadeInSection({ children, delay = 0 }: { children: React.ReactNode, delay?: number }) {
-  const [isVisible, setIsVisible] = useState(false);
-  const domRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => setIsVisible(entry.isIntersecting));
-    });
-    if (domRef.current) observer.observe(domRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div
-      ref={domRef}
-      className={`transition-all duration-1000 ease-out transform ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-      }`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      {children}
-    </div>
-  );
-}
+import { MapPin, Users, Heart, ShieldCheck, Globe, ArrowRight } from 'lucide-react';
 
 export default function AboutPage() {
-  // 스크롤에 따라 상단 네비게이션 스타일 변경
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   return (
-    <div className="font-sans text-slate-900 bg-white">
+    <div className="min-h-screen bg-white font-sans text-slate-900">
       
-      {/* 1. 고정 헤더 (스크롤 시 배경 생김) */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white py-4 shadow-sm' : 'bg-transparent py-6'}`}>
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <Link href="/" className={`text-2xl font-black tracking-tighter ${scrolled ? 'text-slate-900' : 'text-white'}`}>
-            Locally
+      {/* 1. 히어로 섹션: 차분하고 감성적인 시작 */}
+      <section className="relative py-24 px-6 md:py-32 bg-slate-50">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl md:text-6xl font-serif font-bold text-slate-900 mb-6 leading-tight">
+            여행, 그 이상의 연결. <br/>
+            <span className="text-slate-600">Locally</span>와 함께하세요.
+          </h1>
+          <p className="text-lg md:text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
+            우리는 단순히 여행지를 방문하는 것을 넘어, 그곳의 사람들과 삶에 깊이 스며드는 경험을 지향합니다.
+            Locally는 전 세계의 여행자와 현지인을 이어주는 다리입니다.
+          </p>
+        </div>
+      </section>
+
+      {/* 2. 브랜드 스토리 (텍스트 중심) */}
+      <section className="py-20 px-6 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-16 items-center">
+          <div className="space-y-6">
+            <div className="uppercase tracking-widest text-xs font-bold text-slate-400 border-b border-slate-200 pb-2 inline-block">
+              OUR STORY
+            </div>
+            <h2 className="text-3xl font-bold text-slate-800">
+              관광객이 아닌, <br/>이웃이 되어보세요.
+            </h2>
+            <div className="space-y-4 text-slate-600 leading-relaxed">
+              <p>
+                여행 가이드북에는 나오지 않는 골목길의 작은 카페, 동네 주민들만 아는 산책로, 
+                그리고 그곳에서 만나는 따뜻한 사람들. Locally는 이런 '진짜' 경험을 원했던 
+                여행자들의 마음에서 시작되었습니다.
+              </p>
+              <p>
+                우리는 누구나 자신이 사는 곳의 가이드가 될 수 있다고 믿습니다. 
+                당신의 일상이 누군가에게는 평생 잊지 못할 특별한 여행이 될 수 있습니다.
+              </p>
+            </div>
+          </div>
+          <div className="relative h-96 bg-slate-200 rounded-2xl overflow-hidden">
+            {/* 차분한 톤의 이미지 (흑백 또는 채도 낮은 이미지 추천) */}
+            <div 
+              className="absolute inset-0 bg-cover bg-center grayscale hover:grayscale-0 transition-all duration-700"
+              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1493558103817-58b2924bce98?q=80&w=1000&auto=format&fit=crop')" }}
+            ></div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. 미션 & 가치 (3단 컬럼) */}
+      <section className="py-20 px-6 bg-slate-900 text-slate-300">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">우리가 지키는 가치</h2>
+            <p className="opacity-80">Locally는 단순한 중개를 넘어, 신뢰와 연결을 만듭니다.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-12">
+            <div className="space-y-4">
+              <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center text-white mb-2">
+                <Users size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-white">진정한 연결</h3>
+              <p className="leading-relaxed text-sm">
+                화려한 관광지보다 사람 냄새 나는 만남을 소중히 여깁니다. 
+                현지 호스트와 직접 소통하며 여행의 깊이를 더하세요.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center text-white mb-2">
+                <ShieldCheck size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-white">안전과 신뢰</h3>
+              <p className="leading-relaxed text-sm">
+                모든 호스트와 게스트는 검증 과정을 거칩니다. 
+                안전한 결제 시스템과 리뷰 제도로 믿을 수 있는 커뮤니티를 만듭니다.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center text-white mb-2">
+                <Heart size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-white">취향의 발견</h3>
+              <p className="leading-relaxed text-sm">
+                획일화된 패키지 여행이 아닙니다. 요리, 예술, 아웃도어 등 
+                당신의 취향에 딱 맞는 다채로운 로컬 경험을 발견하세요.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. 여행자 & 호스트 섹션 (교차 배치) */}
+      <section className="py-24 px-6 max-w-6xl mx-auto space-y-24">
+        
+        {/* For Travelers */}
+        <div className="flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1 order-2 md:order-1">
+            <h3 className="text-2xl font-bold mb-4 text-slate-800">여행자라면</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              낯선 도시에서 길을 잃는 것도 좋지만, 현지 친구가 있다면 더 좋겠죠?
+              Locally에서 당신의 취향을 가장 잘 아는 현지 호스트를 찾아보세요.
+              단순한 가이드가 아닌, 여행의 동반자가 되어줄 것입니다.
+            </p>
+            <Link href="/" className="inline-flex items-center gap-2 text-slate-900 font-bold hover:underline">
+              여행지 둘러보기 <ArrowRight size={18}/>
+            </Link>
+          </div>
+          <div className="flex-1 order-1 md:order-2">
+             <div className="aspect-video bg-slate-100 rounded-xl overflow-hidden shadow-sm">
+               <img src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="Traveler" />
+             </div>
+          </div>
+        </div>
+
+        {/* For Hosts */}
+        <div className="flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1">
+             <div className="aspect-video bg-slate-100 rounded-xl overflow-hidden shadow-sm">
+               <img src="https://images.unsplash.com/photo-1556910103-1c02745a30bf?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="Host" />
+             </div>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-2xl font-bold mb-4 text-slate-800">현지인이라면</h3>
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              당신의 일상, 취미, 재능을 전 세계 여행자들과 나누세요.
+              Locally 호스트가 되어 새로운 문화를 만나고, 부수입도 창출할 수 있습니다.
+              특별한 자격증은 필요 없습니다. 열린 마음만 있다면 충분합니다.
+            </p>
+            <Link href="/become-a-host" className="inline-flex items-center gap-2 text-slate-900 font-bold hover:underline">
+              호스트 등록하기 <ArrowRight size={18}/>
+            </Link>
+          </div>
+        </div>
+
+      </section>
+
+      {/* 5. 마지막 CTA (심플하게) */}
+      <section className="py-20 bg-slate-50 text-center px-6">
+        <h2 className="text-3xl font-bold mb-8 text-slate-900">
+          당신의 여정을 시작하세요.
+        </h2>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link href="/">
+            <button className="px-8 py-4 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-colors">
+              여행 떠나기
+            </button>
           </Link>
           <Link href="/become-a-host">
-            <button className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all ${
-              scrolled 
-                ? 'bg-rose-500 text-white hover:bg-rose-600' 
-                : 'bg-white text-slate-900 hover:bg-slate-100'
-            }`}>
+            <button className="px-8 py-4 bg-white text-slate-900 border border-slate-300 rounded-lg font-bold hover:bg-slate-100 transition-colors">
               호스트 되기
             </button>
           </Link>
         </div>
-      </header>
-
-      {/* 2. 초대형 히어로 섹션 (영상/이미지 배경) */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        {/* 배경 이미지 (에어비앤비 느낌의 따뜻하고 활기찬 사진) */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ 
-            backgroundImage: "url('https://images.unsplash.com/photo-1551918120-9739cb430c6d?q=80&w=2572&auto=format&fit=crop')",
-          }}
-        >
-          <div className="absolute inset-0 bg-black/30"></div> {/* 텍스트 가독성을 위한 어두운 필터 */}
-        </div>
-
-        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto text-white">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
-            당신의 일상을 <br />
-            특별한 여행으로.
-          </h1>
-          <p className="text-xl md:text-2xl font-medium mb-10 max-w-2xl mx-auto opacity-90">
-            현지인만이 줄 수 있는 경험, Locally에서 시작하세요.
-          </p>
-          <Link href="/become-a-host">
-            <button className="bg-rose-500 text-white px-10 py-5 rounded-full font-bold text-lg hover:bg-rose-600 transition-all hover:scale-105 flex items-center gap-2 mx-auto shadow-xl">
-              <span className="pb-1">시작하기</span> <ArrowRight size={20} />
-            </button>
-          </Link>
-        </div>
-      </section>
-
-      {/* 3. 섹션: 호스팅의 가치 (이미지 + 텍스트 교차 배치) */}
-      <section className="py-32 px-6 max-w-7xl mx-auto">
-        <FadeInSection>
-          <div className="flex flex-col md:flex-row items-center gap-16 mb-32">
-            <div className="w-full md:w-1/2">
-              <img 
-                src="https://images.unsplash.com/photo-1556910103-1c02745a30bf?q=80&w=2070&auto=format&fit=crop" 
-                alt="Hosting" 
-                className="rounded-3xl shadow-2xl w-full h-[500px] object-cover"
-              />
-            </div>
-            <div className="w-full md:w-1/2 space-y-6">
-              <h2 className="text-4xl md:text-5xl font-bold leading-tight">
-                취미를 공유하고,<br/>수입을 만드세요.
-              </h2>
-              <p className="text-lg text-slate-600 leading-relaxed">
-                요리, 공예, 투어, 무엇이든 좋습니다. 당신이 사랑하는 일을 전 세계 여행자들과 나누세요. 
-                Locally가 당신의 재능이 빛날 수 있도록 돕겠습니다.
-              </p>
-            </div>
-          </div>
-        </FadeInSection>
-
-        <FadeInSection>
-          <div className="flex flex-col md:flex-row-reverse items-center gap-16">
-            <div className="w-full md:w-1/2">
-              <img 
-                src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=2064&auto=format&fit=crop" 
-                alt="Community" 
-                className="rounded-3xl shadow-2xl w-full h-[500px] object-cover"
-              />
-            </div>
-            <div className="w-full md:w-1/2 space-y-6">
-              <h2 className="text-4xl md:text-5xl font-bold leading-tight">
-                전 세계 친구들을<br/>만나세요.
-              </h2>
-              <p className="text-lg text-slate-600 leading-relaxed">
-                단순한 거래가 아닙니다. 문화를 교류하고, 새로운 친구를 사귀는 경험입니다. 
-                Locally 호스트가 되어 글로벌 커뮤니티의 일원이 되어보세요.
-              </p>
-            </div>
-          </div>
-        </FadeInSection>
-      </section>
-
-      {/* 4. 통계 섹션 (에어비앤비 스타일의 굵은 숫자) */}
-      <section className="bg-slate-50 py-32 px-6">
-        <div className="max-w-7xl mx-auto">
-          <FadeInSection>
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-20">Locally와 함께하는 이유</h2>
-          </FadeInSection>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
-            <FadeInSection delay={100}>
-              <div className="space-y-4">
-                <div className="text-5xl md:text-6xl font-black text-rose-500">100%</div>
-                <h3 className="text-xl font-bold">안전한 결제 보호</h3>
-                <p className="text-slate-500">게스트가 체크인할 때까지<br/>결제 대금을 안전하게 보호합니다.</p>
-              </div>
-            </FadeInSection>
-            <FadeInSection delay={200}>
-              <div className="space-y-4">
-                <div className="text-5xl md:text-6xl font-black text-rose-500">$0</div>
-                <h3 className="text-xl font-bold">가입비 없음</h3>
-                <p className="text-slate-500">체험 등록부터 예약 관리까지<br/>초기 비용 없이 시작하세요.</p>
-              </div>
-            </FadeInSection>
-            <FadeInSection delay={300}>
-              <div className="space-y-4">
-                <div className="text-5xl md:text-6xl font-black text-rose-500">24/7</div>
-                <h3 className="text-xl font-bold">글로벌 지원</h3>
-                <p className="text-slate-500">언제 어디서나<br/>Locally 팀이 도와드립니다.</p>
-              </div>
-            </FadeInSection>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. 에어비앤비 스타일 안전 보장 (아이콘 그리드) */}
-      <section className="py-32 px-6 max-w-7xl mx-auto">
-        <FadeInSection>
-          <div className="flex flex-col md:flex-row gap-16">
-            <div className="w-full md:w-1/3">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                호스팅을<br/>안전하게 지원합니다.
-              </h2>
-              <p className="text-lg text-slate-600">
-                게스트 검증부터 보험까지, 호스트님이 안심하고 활동할 수 있도록 모든 준비를 마쳤습니다.
-              </p>
-            </div>
-            <div className="w-full md:w-2/3 grid grid-cols-1 sm:grid-cols-2 gap-8">
-              <div className="flex gap-4">
-                <ShieldCheck className="w-8 h-8 text-rose-500 shrink-0" />
-                <div>
-                  <h3 className="font-bold text-lg mb-2">게스트 신원 인증</h3>
-                  <p className="text-slate-500">모든 게스트는 예약 전 엄격한 신원 확인 절차를 거칩니다.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <Star className="w-8 h-8 text-rose-500 shrink-0" />
-                <div>
-                  <h3 className="font-bold text-lg mb-2">공정한 리뷰 시스템</h3>
-                  <p className="text-slate-500">체험이 완료된 후에만 리뷰를 작성할 수 있어 신뢰할 수 있습니다.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <Globe className="w-8 h-8 text-rose-500 shrink-0" />
-                <div>
-                  <h3 className="font-bold text-lg mb-2">호스트 보호 프로그램</h3>
-                  <p className="text-slate-500">만일의 사고에 대비해 최대 100만 달러까지 보장합니다.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <Users className="w-8 h-8 text-rose-500 shrink-0" />
-                <div>
-                  <h3 className="font-bold text-lg mb-2">커뮤니티 가이드라인</h3>
-                  <p className="text-slate-500">서로 존중하는 커뮤니티를 위해 엄격한 기준을 적용합니다.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </FadeInSection>
-      </section>
-
-      {/* 6. 하단 CTA (검은 배경의 강렬한 마무리) */}
-      <section className="bg-black py-32 px-6 text-center text-white">
-        <FadeInSection>
-          <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight">
-            지금 바로 호스트가<br/>되어보세요.
-          </h2>
-          <Link href="/become-a-host">
-            <button className="bg-rose-500 text-white px-12 py-5 rounded-full font-bold text-xl hover:bg-rose-600 transition-all hover:scale-105 shadow-2xl">
-              시작하기
-            </button>
-          </Link>
-        </FadeInSection>
       </section>
 
     </div>
