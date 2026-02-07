@@ -6,7 +6,7 @@ import {
   Clock, AlertCircle, XCircle, UserCog, CalendarCheck 
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // ✅ [추가] 쿼리 파라미터 사용
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 
@@ -26,10 +26,15 @@ export default function HostDashboard() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams(); // ✅ [추가] URL 쿼리 파라미터 읽기
 
   useEffect(() => {
+    // ✅ [추가] URL에 ?tab=inquiries 등이 있으면 해당 탭으로 이동
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+
     fetchData();
-  }, []);
+  }, [searchParams]);
 
   const fetchData = async () => {
     try {
@@ -154,7 +159,8 @@ export default function HostDashboard() {
               </div>
               
               {/* 1. 예약 관리 (가장 중요!) */}
-              <button onClick={() => setActiveTab('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-black text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+{/* ✅ [수정] 버튼 클릭 시 activeTab 변경 */}
+<button onClick={() => setActiveTab('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-black text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
                 <CalendarCheck size={20}/> 예약 관리
               </button>
 
@@ -207,9 +213,9 @@ export default function HostDashboard() {
             )}
           </div>
 
-          {/* 탭별 컴포넌트 렌더링 (예약 관리가 기본!) */}
-          {activeTab === 'reservations' && (
-            <div className="h-[700px]"> {/* 높이 확보 */}
+{/* ✅ [수정] 탭에 따른 컴포넌트 렌더링 */}
+{activeTab === 'reservations' && (
+            <div className="h-[700px]">
                <ReservationManager />
             </div>
           )}
