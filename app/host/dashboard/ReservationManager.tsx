@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Link from 'next/link';
-import { sendNotification } from '@/app/utils/notification'; // Ensure import
+import { sendNotification } from '@/app/utils/notification'; 
 
 export default function ReservationManager() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
@@ -44,11 +44,11 @@ export default function ReservationManager() {
       setReservations(data || []);
 
     } catch (error: any) {
-      console.error('Reservation load error:', error);
+      console.error('예약 로딩 실패:', error);
       if (error.code === 'PGRST200' || error.message.includes('foreign key')) {
-        setErrorMsg('Database connection error. Please re-run SQL.');
+        setErrorMsg('데이터베이스 연결 설정이 필요합니다.');
       } else {
-        setErrorMsg('Failed to load reservations.');
+        setErrorMsg('예약 정보를 불러오지 못했습니다.');
       }
     } finally {
       setLoading(false);
@@ -60,7 +60,7 @@ export default function ReservationManager() {
   }, [fetchReservations]);
 
   const handleApproveCancellation = async (booking: any) => {
-    if (!confirm(`Approve cancellation for '${booking.guest?.full_name}'?`)) return;
+    if (!confirm(`'${booking.guest?.full_name}' 님의 취소를 승인하고 환불하시겠습니까?`)) return;
 
     setProcessingId(booking.id);
     try {
@@ -69,28 +69,28 @@ export default function ReservationManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           bookingId: booking.id, 
-          reason: 'Host approved cancellation' 
+          reason: '호스트 승인에 의한 환불' 
         }),
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Refund failed');
+      if (!res.ok) throw new Error(result.error || '환불 실패');
 
-      // 🔔 Send notification to guest
+      // 🔔 알림 발송
       await sendNotification({
         supabase,
         userId: booking.user_id,
         type: 'cancellation_approved',
-        title: 'Cancellation Approved',
-        message: `'${booking.experiences?.title}' cancellation has been approved. Refund initiating.`,
+        title: '취소 요청 승인됨',
+        message: `'${booking.experiences?.title}' 예약 취소가 승인되었습니다. 환불이 진행됩니다.`,
         link: '/guest/trips'
       });
 
-      alert('Cancellation approved and refunded.');
+      alert('환불 처리가 완료되었습니다.');
       fetchReservations(); 
 
     } catch (err: any) {
-      alert(`Failed: ${err.message}`);
+      alert(`처리 실패: ${err.message}`);
     } finally {
       setProcessingId(null);
     }
@@ -120,13 +120,13 @@ export default function ReservationManager() {
   const filteredList = getFilteredList();
 
   const renderStatusBadge = (status: string, date: string) => {
-    if (status === 'cancellation_requested') return <span className="bg-orange-100 text-orange-700 text-[10px] px-2 py-1 rounded-full font-bold animate-pulse">Requesting Cancel</span>;
-    if (status === 'cancelled') return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-bold">Cancelled</span>;
+    if (status === 'cancellation_requested') return <span className="bg-orange-100 text-orange-700 text-[10px] px-2 py-1 rounded-full font-bold animate-pulse">취소 요청됨</span>;
+    if (status === 'cancelled') return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-bold">취소 완료</span>;
     if (status === 'PAID') {
       const isUpcoming = new Date(date) >= new Date();
       return isUpcoming 
-        ? <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold">Confirmed</span>
-        : <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">Completed</span>;
+        ? <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold">예약 확정</span>
+        : <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">이용 완료</span>;
     }
     return <span className="bg-slate-100 text-slate-500 text-[10px] px-2 py-1 rounded-full">{status}</span>;
   };
@@ -135,17 +135,17 @@ export default function ReservationManager() {
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
       <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          📅 Reservation Manager
-          <button onClick={fetchReservations} className="p-1.5 hover:bg-slate-200 rounded-full text-slate-400 transition-colors" title="Refresh">
+          📅 예약 관리
+          <button onClick={fetchReservations} className="p-1.5 hover:bg-slate-200 rounded-full text-slate-400 transition-colors" title="새로고침">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
         </h3>
         
         <div className="flex bg-slate-200/50 p-1 rounded-xl">
           {[
-            { id: 'upcoming', label: 'Upcoming' },
-            { id: 'completed', label: 'Completed' },
-            { id: 'cancelled', label: 'Cancelled' }
+            { id: 'upcoming', label: '예정/요청' },
+            { id: 'completed', label: '완료됨' },
+            { id: 'cancelled', label: '취소/환불' }
           ].map(tab => {
             const count = tab.id === 'cancelled' || tab.id === 'upcoming'
               ? reservations.filter(r => r.status === 'cancellation_requested').length 
@@ -181,12 +181,12 @@ export default function ReservationManager() {
         {loading ? (
           <div className="flex flex-col items-center justify-center h-48 text-slate-400">
             <Loader2 className="animate-spin mb-2" size={24}/>
-            <p className="text-xs">Loading data...</p>
+            <p className="text-xs">데이터 불러오는 중...</p>
           </div>
         ) : filteredList.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
             <Calendar size={40} className="mb-3 opacity-20"/>
-            <p className="text-sm font-medium">No reservations found.</p>
+            <p className="text-sm font-medium">예약 내역이 없습니다.</p>
           </div>
         ) : (
           filteredList.map(res => (
@@ -203,11 +203,11 @@ export default function ReservationManager() {
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-bold text-slate-900 text-sm">{res.guest?.full_name || 'Guest'}</span>
+                      <span className="font-bold text-slate-900 text-sm">{res.guest?.full_name || '게스트'}</span>
                       {renderStatusBadge(res.status, res.date)}
                     </div>
                     <div className="text-xs text-slate-500 flex items-center gap-2">
-                      <span>{res.guests} guests</span>
+                      <span>{res.guests}명</span>
                       <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                       <span>₩{res.amount?.toLocaleString()}</span>
                     </div>
@@ -215,7 +215,7 @@ export default function ReservationManager() {
                 </div>
                 
                 <Link href={`/host/dashboard?tab=inquiries&guestId=${res.user_id}`}>
-                    <button className="text-slate-400 hover:text-black p-2 rounded-full hover:bg-slate-100 transition-colors" title="Message">
+                    <button className="text-slate-400 hover:text-black p-2 rounded-full hover:bg-slate-100 transition-colors" title="메시지 보내기">
                         <MessageSquare size={18}/>
                     </button>
                 </Link>
@@ -225,7 +225,7 @@ export default function ReservationManager() {
                 <div className="font-bold text-sm text-slate-800 mb-2 truncate">{res.experiences?.title}</div>
                 <div className="flex items-center gap-4 text-xs text-slate-500">
                   <span className="flex items-center gap-1.5"><Calendar size={14}/> {new Date(res.date).toLocaleDateString()}</span>
-                  <span className="flex items-center gap-1.5"><Clock size={14}/> {res.time || 'TBD'}</span>
+                  <span className="flex items-center gap-1.5"><Clock size={14}/> {res.time || '시간 미정'}</span>
                 </div>
               </div>
 
@@ -234,12 +234,12 @@ export default function ReservationManager() {
                   <div className="flex items-start gap-3 mb-3">
                     <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={16} />
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-orange-800">Cancellation Requested</p>
-                      <p className="text-xs text-orange-600 mt-1">Approval will trigger a full refund.</p>
+                      <p className="text-sm font-bold text-orange-800">취소 요청이 접수되었습니다.</p>
+                      <p className="text-xs text-orange-600 mt-1">승인 시 전액 환불됩니다.</p>
                       
                       {res.cancel_reason && (
                         <div className="mt-2 bg-orange-50 p-2 rounded border border-orange-100">
-                           <p className="text-xs font-bold text-orange-800 mb-1">Reason:</p>
+                           <p className="text-xs font-bold text-orange-800 mb-1">게스트 사유:</p>
                            <p className="text-xs text-orange-700 break-words whitespace-pre-wrap">"{res.cancel_reason}"</p>
                         </div>
                       )}
@@ -252,7 +252,7 @@ export default function ReservationManager() {
                       className="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-orange-200"
                     >
                       {processingId === res.id ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>}
-                      Approve & Refund
+                      승인 및 환불
                     </button>
                   </div>
                 </div>
