@@ -8,15 +8,20 @@ export function useGuestTrips() {
   const [pastTrips, setPastTrips] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false); // 로딩 상태 추가
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // 에러 메시지 상태 추가
   
   const supabase = createClient();
 
   const fetchMyTrips = useCallback(async () => {
-    // ... (기존 fetchMyTrips 로직 100% 동일, 생략 없음) ...
     try {
       setIsLoading(true);
+      setErrorMsg(null);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setIsLoading(false); return; }
+      
+      if (!user) {
+        setIsLoading(false);
+        return; 
+      }
 
       const { data: bookings, error } = await supabase
         .from('bookings')
@@ -30,7 +35,11 @@ export function useGuestTrips() {
         .eq('user_id', user.id)
         .order('date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("데이터 로딩 실패:", error);
+        setErrorMsg(error.message);
+        throw error;
+      }
 
       if (bookings) {
         const upcoming: any[] = [];
@@ -40,12 +49,17 @@ export function useGuestTrips() {
 
         bookings.forEach((booking: any) => {
           if (!booking.experiences) return;
+
           const tripDate = new Date(booking.date);
           
-          // 💡 상태가 'cancelled'거나 'cancellation_requested'여도 목록엔 보여야 함
+          // 취소된 건은 과거 내역이나 별도 처리가 필요할 수 있으나, 여기선 미래 일정 로직에 따라 분류됨
+          // (단, isFuture 체크 시 status가 'cancelled'면 false가 되어 past로 갈 수 있음)
+          // 여기서는 날짜 기준으로만 미래/과거를 나눕니다.
           const isFuture = tripDate >= today; 
 
-          const hostData = Array.isArray(booking.experiences.profiles) ? booking.experiences.profiles[0] : booking.experiences.profiles;
+          const hostData = Array.isArray(booking.experiences.profiles) 
+            ? booking.experiences.profiles[0] 
+            : booking.experiences.profiles;
 
           const formattedTrip = {
             id: booking.id,
@@ -59,56 +73,67 @@ export function useGuestTrips() {
             address: booking.experiences.address || booking.experiences.city,
             image: booking.experiences.photos?.[0],
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
-            status: booking.status, // status 그대로 전달 (PAID, cancellation_requested 등)
-            price: booking.amount,
-            guests: booking.guests,
-            orderId: booking.order_id,
+            isPrivate: booking.type === 'private',
+            status: booking.status,
+            price: booking.amount || booking.total_price || 0,
+            guests: booking.guests || 1,
+            expId: booking.experience_id,
+            orderId: booking.order_id || booking.id.substring(0,8).toUpperCase(),
           };
 
           if (isFuture) upcoming.push(formattedTrip);
           else past.push(formattedTrip);
         });
+
         setUpcomingTrips(upcoming);
         setPastTrips(past.reverse());
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setErrorMsg(err.message);
     } finally {
       setIsLoading(false);
     }
   }, [supabase]);
 
-  // ✅ [수정] 취소 요청 로직 (DB 업데이트만 수행)
+  // ✅ 예약 취소 요청 (DB 업데이트)
   const requestCancellation = async (id: number, reason: string) => {
     setIsProcessing(true);
     try {
       // 1. bookings 테이블에 취소 요청 상태와 사유 업데이트
-      // (cancel_reason 컬럼이 없다면 Supabase에서 추가해야 함, 혹은 admin_comment 등에 임시 저장)
-      try {
-        // ✅ [수정] cancel_reason 필드에 사유 저장 (주석 해제)
-        const { error } = await supabase
-          .from('bookings')
-          .update({ 
-            status: 'cancellation_requested', 
-            cancel_reason: reason // 이 부분이 핵심입니다!
-          })
-          .eq('id', id);
-  
-        if (error) throw error;
-  
-        alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
-        fetchMyTrips(); 
-        return true; 
-  
-      } catch (err: any) {
-        alert('요청 실패: ' + err.message);
-        return false; 
-      } finally {
-        setIsProcessing(false);
-      }
-    };
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'cancellation_requested', 
+          cancel_reason: reason 
+        })
+        .eq('id', id);
 
-  useEffect(() => { fetchMyTrips(); }, [fetchMyTrips]);
+      if (error) throw error;
 
-  return { upcomingTrips, pastTrips, isLoading, isProcessing, requestCancellation, refreshTrips: fetchMyTrips };
+      alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
+      fetchMyTrips(); // 목록 갱신
+      return true; // 성공
+
+    } catch (err: any) {
+      alert('요청 실패: ' + err.message);
+      return false; // 실패
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyTrips();
+  }, [fetchMyTrips]);
+
+  return {
+    upcomingTrips,
+    pastTrips,
+    isLoading,
+    isProcessing,
+    errorMsg,
+    requestCancellation,
+    refreshTrips: fetchMyTrips
+  };
 }
