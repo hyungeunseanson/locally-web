@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Globe, Users, ShieldCheck, Star, MapPin, MessageCircle, Calendar } from 'lucide-react';
+// 🚨 수정된 부분: Heart 아이콘 추가됨
+import { ArrowRight, Globe, Users, ShieldCheck, Star, MapPin, MessageCircle, Calendar, Heart } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 
-// --- [Utility] 카운터 애니메이션 (명세: 숫자 강조) ---
+// --- [Utility] 카운터 애니메이션 ---
 function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
@@ -41,9 +42,7 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white font-sans text-[#222222]">
       <SiteHeader />
 
-      {/* [1. Hero Section] 
-        명세: Title 36px+(실제론 더 크게), Sub 16px, iPhone Mockup 
-      */}
+      {/* [1. Hero Section] */}
       <section className="pt-40 pb-20 px-6 md:px-12 max-w-[1280px] mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
           
@@ -70,7 +69,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Right: iPhone Mockup (CSS Implementation) */}
+          {/* Right: iPhone Mockup */}
           <div className="flex-1 flex justify-center lg:justify-end">
             <div className="relative w-[300px] h-[600px] bg-black rounded-[3rem] border-[8px] border-black shadow-2xl overflow-hidden ring-4 ring-gray-100">
               {/* Dynamic Island */}
@@ -122,9 +121,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [2. Stats & Social Proof] 
-        명세: Counter Grid (800명+, 5개 도시, 3개 국가) 
-      */}
+      {/* [2. Stats & Social Proof] */}
       <section className="py-20 bg-[#F7F7F7] border-y border-gray-200">
         <div className="max-w-[1280px] mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
@@ -156,9 +153,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [3. Feature Grid] 
-        명세: "매력을 생생하게 소개", 3 Column, Aspect Ratio 4:5, Rounded 12px 
-      */}
+      {/* [3. Feature Grid] */}
       <section className="py-32 px-6 max-w-[1280px] mx-auto">
         <div className="mb-16 text-center md:text-left">
           <h2 className="text-3xl md:text-4xl font-extrabold mb-4 leading-tight">
@@ -188,9 +183,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [4. Process & Trust] 
-        명세: "간단한 등록", 3 Step Icons, Protection Checklist 
-      */}
+      {/* [4. Process & Trust] */}
       <section className="py-24 px-6 bg-[#F7F7F7]">
         <div className="max-w-[1280px] mx-auto">
           <div className="flex flex-col md:flex-row gap-16 md:gap-32">
@@ -223,7 +216,7 @@ export default function AboutPage() {
               </div>
             </div>
 
-            {/* Protection (AirCover Style) */}
+            {/* Protection */}
             <div className="flex-1 bg-white p-10 rounded-3xl border border-gray-200 shadow-sm">
               <div className="flex items-center gap-2 mb-6">
                 <ShieldCheck size={32} className="text-rose-600" />
@@ -250,9 +243,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [5. Final CTA] 
-        명세: "좋아하는 일을 하며 수입을 올리세요" 
-      */}
+      {/* [5. Final CTA] */}
       <section className="py-40 px-6 text-center max-w-4xl mx-auto">
         <h2 className="text-4xl md:text-6xl font-extrabold mb-8 tracking-tight">
           좋아하는 일을 하며 <br/>수입을 올리세요.
