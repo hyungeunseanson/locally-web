@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Star, Globe, Users, User, ShieldCheck, Heart, Search, CheckCircle2, MapPin, ArrowRight, MessageCircle } from 'lucide-react';
+import { ChevronDown, Star, Globe, Users, ShieldCheck, Heart, Search, CheckCircle2, MapPin, ArrowRight, MessageCircle, Calendar } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 
 // --- [Utility] 에어비앤비 스타일 컴포넌트 ---
@@ -46,17 +46,15 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
 }
 
 export default function AboutPage() {
-  const [activeTab, setActiveTab] = useState(0);
-
   return (
     <div className="min-h-screen bg-white font-sans text-[#222222] selection:bg-rose-100">
       <SiteHeader />
 
-      {/* 1. HERO SECTION: 따뜻하고 감성적인 시작 */}
-      <section className="relative pt-32 pb-20 px-6 max-w-[1440px] mx-auto overflow-hidden">
+      {/* 1. HERO SECTION: 요청하신 아이폰 목업 적용 */}
+      <section className="relative pt-32 pb-24 px-6 max-w-[1440px] mx-auto overflow-hidden">
         <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-32">
           
-          {/* Left: 텍스트 (여백과 타이포그래피 강조) */}
+          {/* Left: 텍스트 */}
           <div className="flex-1 text-center lg:text-left z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold uppercase tracking-widest mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <Globe size={12} />
@@ -85,78 +83,60 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Right: 목업 (기존의 투박한 테두리 제거 -> 깔끔한 플로팅 카드 스타일) */}
-          <div className="flex-1 w-full max-w-[400px] relative">
-            {/* 배경 장식 (따뜻한 원형 블러) */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-rose-100/50 rounded-full blur-3xl -z-10"></div>
-            
-            {/* 폰 프레임 (세련된 그림자 + 얇은 테두리) */}
-            <div className="relative bg-white rounded-[3rem] shadow-[0_30px_60px_-12px_rgba(0,0,0,0.12)] border border-gray-100 overflow-hidden aspect-[9/19]">
-              {/* 상단 앱바 */}
-              <div className="pt-12 pb-4 px-6 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-20">
-                <span className="font-serif font-black text-xl italic text-rose-600">Locally.</span>
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                  <Users size={16} className="text-gray-600"/>
+          {/* Right: 요청하신 iPhone Mockup Code */}
+          <div className="flex-1 flex justify-center md:justify-end relative">
+             <div className="relative w-[340px] h-[680px] bg-black rounded-[60px] border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5 transform hover:scale-[1.02] transition-transform duration-500">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
+                <div className="w-full h-full bg-white pt-14 pb-8 px-6 flex flex-col justify-between">
+                   <div>
+                      <div className="w-full h-12 rounded-full bg-slate-100 mb-8 flex items-center px-4 gap-2 text-slate-400 text-sm shadow-inner">
+                        <Search size={16} />
+                        검색을 시작해 보세요
+                      </div>
+                      <h3 className="font-black text-2xl mb-6 leading-tight">내일 서울에서<br/>진행되는 체험</h3>
+                      <div className="space-y-6">
+                         <div className="group cursor-pointer">
+                            <div className="aspect-[4/3] rounded-2xl bg-slate-200 overflow-hidden relative shadow-md mb-3">
+                                <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Activity"/>
+                                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold shadow-sm">오전 10시</div>
+                                <div className="absolute top-3 right-3 bg-white/90 backdrop-blur p-1.5 rounded-full shadow-sm">
+                                   <Heart size={14} className="text-rose-500 fill-rose-500"/>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                   <div className="font-bold text-base text-slate-900">건축가와 함께하는 북촌 산책</div>
+                                   <div className="text-slate-500 text-sm mt-1">₩45,000 / 인</div>
+                                </div>
+                                <div className="flex text-xs items-center font-bold gap-1 bg-slate-100 px-2 py-1 rounded-md">
+                                   <Star size={10} className="fill-black"/> 4.98
+                                </div>
+                            </div>
+                         </div>
+                      </div>
+                   </div>
+                   {/* Bottom Nav Simulation */}
+                   <div className="border-t border-slate-100 pt-4 flex justify-around items-center text-slate-300">
+                      <div className="flex flex-col items-center gap-1">
+                         <Globe size={24} className="text-rose-500" />
+                      </div>
+                      <Heart size={24} />
+                      <MessageCircle size={24} />
+                      <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
+                         <img src="https://i.pravatar.cc/150?u=host" className="w-full h-full object-cover opacity-50"/>
+                      </div>
+                   </div>
                 </div>
-              </div>
-
-              {/* 스크롤 콘텐츠 */}
-              <div className="px-4 space-y-5 pb-20">
-                {/* 검색바 */}
-                <div className="bg-gray-50 rounded-full py-3 px-4 flex items-center gap-3 shadow-sm border border-gray-100">
-                  <Search size={18} className="text-rose-500" />
-                  <span className="text-sm font-medium text-gray-400">어디로 떠나세요?</span>
-                </div>
-
-                {/* 카드 1 */}
-                <div className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all">
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover group-hover:scale-105 transition duration-700" alt="Seoul"/>
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1">
-                      <Star size={10} className="fill-rose-500 text-rose-500"/> 4.9
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="font-bold text-sm text-[#222222]">서울 야경 투어</div>
-                    <div className="text-xs text-gray-500 mt-1">Host Jiwon</div>
-                  </div>
-                </div>
-
-                {/* 카드 2 */}
-                <div className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all">
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover group-hover:scale-105 transition duration-700" alt="Cafe"/>
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1">
-                      <Star size={10} className="fill-rose-500 text-rose-500"/> 5.0
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="font-bold text-sm text-[#222222]">성수동 카페거리</div>
-                    <div className="text-xs text-gray-500 mt-1">Host Minji</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 하단 네비게이션 */}
-              <div className="absolute bottom-0 w-full bg-white border-t border-gray-50 py-4 px-6 flex justify-between text-gray-300">
-                <Globe size={24} className="text-rose-600" />
-                <Heart size={24} />
-                <MessageCircle size={24} />
-                <User size={24} />
-              </div>
-            </div>
+             </div>
+             {/* Background Decoration */}
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-100 rounded-full blur-3xl -z-10 opacity-50"></div>
           </div>
         </div>
       </section>
 
-      {/* 2. STATS: 신뢰감 (흑백 + 깔끔함) */}
-      <section className="py-24 bg-[#F7F7F7]">
+      {/* 2. STATS: 깔끔한 숫자 */}
+      <section className="py-20 bg-[#F7F7F7]">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4 tracking-tight">가장 사랑받는 로컬 커뮤니티</h2>
-            <p className="text-[#717171] max-w-2xl mx-auto">전 세계 여행자와 호스트가 만들어가는 따뜻한 연결.<br/>수치로 증명된 신뢰를 확인하세요.</p>
-          </div>
-          
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
               { label: 'Active Hosts', value: 800, suffix: '+' },
@@ -164,7 +144,7 @@ export default function AboutPage() {
               { label: 'Countries', value: 3, suffix: '' },
               { label: 'Avg Rating', value: 4.9, suffix: '' },
             ].map((stat, i) => (
-              <div key={i} className="text-center p-6 bg-white rounded-2xl shadow-sm border border-gray-100/50 hover:shadow-md transition-shadow">
+              <div key={i} className="text-center p-6 bg-white rounded-[32px] shadow-sm border border-gray-100/50 hover:shadow-md transition-shadow">
                 <div className="text-4xl md:text-5xl font-black text-[#222222] mb-2">
                   <AirbnbCounter end={stat.value} suffix={stat.suffix} />
                 </div>
@@ -175,9 +155,9 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 3. CATEGORIES: 촌스러운 아이콘 -> 감성적인 '사진' 카드 (가장 큰 변화) */}
+      {/* 3. 취향 발견 섹션 (요청하신 카드 스타일 적용) */}
       <section className="py-32 px-6 max-w-[1440px] mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
           <div>
             <h2 className="text-3xl md:text-4xl font-[800] text-[#222222] mb-4 tracking-tight">
               당신의 취향을 발견하세요
@@ -191,86 +171,109 @@ export default function AboutPage() {
           </Link>
         </div>
 
-        {/* Masonry Grid Layout (비대칭 그리드로 세련됨 강조) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-auto md:h-[600px]">
-          {/* Card 1: Large */}
-          <div className="md:col-span-2 md:row-span-2 group relative rounded-3xl overflow-hidden cursor-pointer">
-            <img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Gourmet"/>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-            <div className="absolute bottom-8 left-8 text-white">
-              <div className="text-sm font-bold uppercase tracking-wider mb-2 opacity-90">Gastronomy</div>
-              <h3 className="text-3xl font-bold">로컬 미식 탐방</h3>
+        {/* 요청하신 스타일: 3개의 깔끔한 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            { 
+               title: "로컬 미식 탐방", 
+               desc: "숨겨진 맛집과 전통 요리", 
+               img: "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=800&auto=format&fit=crop" 
+            },
+            { 
+               title: "전통 문화 체험", 
+               desc: "장인과 함께하는 공예", 
+               img: "https://images.unsplash.com/photo-1583324113626-70df0f4deaab?q=80&w=800&auto=format&fit=crop" 
+            },
+            { 
+               title: "시크릿 야경 투어", 
+               desc: "현지인만 아는 뷰포인트", 
+               img: "https://images.unsplash.com/photo-1478860409698-8707f313ee8b?q=80&w=800&auto=format&fit=crop" 
+            }
+          ].map((item, idx) => (
+            <div key={idx} className="bg-white rounded-[40px] p-4 shadow-xl shadow-slate-200/50 border border-slate-100 hover:-translate-y-2 transition-transform duration-300 cursor-pointer group">
+               <div className="aspect-[4/5] rounded-[32px] overflow-hidden mb-6 relative">
+                  <img src={item.img} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={item.title}/>
+                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-2 rounded-full shadow-sm">
+                     <ArrowRight size={20} className="text-slate-900 group-hover:text-rose-500 transition-colors"/>
+                  </div>
+               </div>
+               <div className="px-2 pb-2">
+                  <h3 className="text-2xl font-black text-slate-900 mb-2">{item.title}</h3>
+                  <p className="text-slate-500 font-medium">{item.desc}</p>
+               </div>
             </div>
-          </div>
-          
-          {/* Card 2 */}
-          <div className="group relative rounded-3xl overflow-hidden cursor-pointer">
-            <img src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Culture"/>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-            <div className="absolute bottom-6 left-6 text-white">
-              <h3 className="text-xl font-bold">전통 문화 체험</h3>
-            </div>
-          </div>
-
-          {/* Card 3 */}
-          <div className="group relative rounded-3xl overflow-hidden cursor-pointer">
-            <img src="https://images.unsplash.com/photo-1478860409698-8707f313ee8b?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Night"/>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-            <div className="absolute bottom-6 left-6 text-white">
-              <h3 className="text-xl font-bold">시크릿 야경 투어</h3>
-            </div>
-          </div>
-
-          {/* Card 4 (Wide) */}
-          <div className="md:col-span-2 group relative rounded-3xl overflow-hidden cursor-pointer">
-            <img src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Adventure"/>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-            <div className="absolute bottom-8 left-8 text-white">
-              <div className="text-sm font-bold uppercase tracking-wider mb-2 opacity-90">Adventure</div>
-              <h3 className="text-2xl font-bold">아웃도어 액티비티</h3>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* 4. CONTENT & VALUES: 텍스트 위주로 깔끔하게 */}
-      <section className="py-24 px-6 bg-white">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-             <div>
-                <h2 className="text-3xl font-extrabold mb-6 leading-tight">
-                  소통의 가치와<br/>문화 기여가<br/><span className="text-rose-600">시장 가치</span>가 됩니다.
-                </h2>
-                <p className="text-[#717171] text-lg mb-8 leading-relaxed">
-                  자신의 재능과 취향을 공유하는 것만으로도 수입을 만들 수 있습니다.
-                  Locally는 단순한 중개를 넘어, 사람과 사람을 잇는 가치를 만듭니다.
-                </p>
-                <Link href="/become-a-host" className="text-rose-600 font-bold hover:underline flex items-center gap-2">
-                   전문가 호스트 알아보기 <ArrowRight size={18}/>
-                </Link>
-             </div>
-             
-             <div className="space-y-4">
-                {[
-                  { name: "Lee Sang-hoon", role: "한일 창업가 매칭 전문가", img: "https://i.pravatar.cc/150?u=30" },
-                  { name: "Kim Ji-won", role: "로컬 미식 큐레이터", img: "https://i.pravatar.cc/150?u=31" },
-                  { name: "Tanaka Ken", role: "전통 건축 해설사", img: "https://i.pravatar.cc/150?u=32" }
-                ].map((profile, i) => (
-                  <div key={i} className="flex items-center gap-5 p-4 rounded-2xl border border-gray-100 hover:border-rose-100 hover:shadow-lg hover:shadow-rose-50/50 transition-all bg-white group cursor-pointer">
-                     <img src={profile.img} alt={profile.name} className="w-14 h-14 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all"/>
-                     <div>
-                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 group-hover:text-rose-500">{profile.role}</div>
-                        <div className="text-lg font-bold text-[#222222]">{profile.name}</div>
+      {/* 4. 모바일 목업 섹션 (요청하신 채팅 & 정산 UI 코드 적용) */}
+      <section className="bg-slate-50 py-32 rounded-[3rem] my-10 mx-4">
+          <div className="max-w-[1280px] mx-auto px-6">
+            
+            {/* Block 1: 게스트 소통 */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-20 mb-32">
+               <div className="flex-1 order-2 md:order-1 flex justify-center">
+                  <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-6 border border-slate-100 transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
+                     <div className="flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-sm">
+                           <img src="https://i.pravatar.cc/150?u=a042581f4e29026024d" className="w-full h-full object-cover" alt="User"/>
+                        </div>
+                        <div><div className="font-bold text-sm">Alexi 님</div><div className="text-xs text-slate-500">예약 완료 · 5월 22일</div></div>
+                     </div>
+                     <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-sm text-slate-600 mb-4 font-medium leading-relaxed">
+                        안녕하세요! 이번 주말 투어 정말 기대돼요. 혹시 채식 메뉴 추천도 가능할까요? 🥗
+                     </div>
+                     <div className="bg-rose-500 text-white p-4 rounded-2xl rounded-tr-none text-sm self-end ml-auto w-fit shadow-lg shadow-rose-200 font-medium leading-relaxed">
+                        물론이죠! 비건 옵션이 훌륭한 식당 리스트를 이미 준비해뒀습니다 :)
                      </div>
                   </div>
-                ))}
-             </div>
-          </div>
-        </div>
-      </section>
+               </div>
+               <div className="flex-1 order-1 md:order-2">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-6 text-rose-500">
+                     <MessageCircle size={24} />
+                  </div>
+                  <h3 className="text-4xl font-black mb-6 leading-tight">게스트와 <br/>간편한 소통</h3>
+                  <p className="text-xl text-slate-500 leading-relaxed font-medium">
+                     앱 내 채팅 기능을 통해 전 세계 게스트와 실시간으로 대화하세요.<br/>
+                     개인 연락처 노출 걱정 없이 안전하게 소통할 수 있습니다.
+                  </p>
+               </div>
+            </div>
 
-      {/* 5. TRUST: 에어커버 스타일 (배경색 + 깔끔한 리스트) */}
-      <section className="py-24 px-6 bg-slate-50">
+            {/* Block 2: 정산 */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-20">
+               <div className="flex-1">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-6 text-rose-500">
+                     <CheckCircle2 size={24} />
+                  </div>
+                  <h3 className="text-4xl font-black mb-6 leading-tight">투명하고 <br/>신속한 정산</h3>
+                  <p className="text-xl text-slate-500 leading-relaxed font-medium">
+                     체험이 완료되면 다음 달 바로 입금됩니다.<br/>
+                     복잡한 절차 없이 수익을 확인하고 관리하세요.
+                  </p>
+               </div>
+               <div className="flex-1 flex justify-center">
+                  <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-8 border border-slate-100 transform rotate-[2deg] hover:rotate-0 transition-transform duration-500 text-center">
+                     <div className="text-slate-400 font-bold mb-2 text-sm uppercase tracking-wider">5월 정산 예정 금액</div>
+                     <div className="text-5xl font-black mb-8 tracking-tight text-slate-900">₩499,784</div>
+                     <div className="space-y-4 bg-slate-50 p-4 rounded-2xl">
+                        <div className="flex justify-between text-sm border-b border-slate-200 pb-3">
+                           <span className="text-slate-500 font-medium">지급 계좌</span>
+                           <span className="font-bold">카카오뱅크 **** 1234</span>
+                        </div>
+                        <div className="flex justify-between text-sm pt-1">
+                           <span className="text-slate-500 font-medium">다음 지급일</span>
+                           <span className="font-bold text-green-600 flex items-center gap-1"><Calendar size={14}/> 내일</span>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          </div>
+        </section>
+
+      {/* 5. TRUST: 에어커버 스타일 */}
+      <section className="py-24 px-6 bg-white">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-16">
           <div className="flex-1">
              <div className="flex items-center gap-2 mb-6">
@@ -282,11 +285,11 @@ export default function AboutPage() {
                 예약부터 체험 종료까지, Locally가 당신을 든든하게 지켜드립니다.
                 호스트와 게스트 모두를 위한 포괄적인 보호 장치를 경험하세요.
              </p>
-             <button className="border-2 border-black px-6 py-3 rounded-xl font-bold hover:bg-black hover:text-white transition-colors">
+             <button className="border-2 border-slate-900 px-6 py-3 rounded-xl font-bold hover:bg-slate-900 hover:text-white transition-colors">
                 보호 프로그램 자세히 보기
              </button>
           </div>
-          <div className="flex-1 w-full bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+          <div className="flex-1 w-full bg-slate-50 p-10 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
              {[
                "엄격한 호스트 및 게스트 신원 인증",
                "24시간 글로벌 안전 지원 팀 운영",
@@ -294,15 +297,17 @@ export default function AboutPage() {
                "책임 배상 보험 프로그램"
              ].map((item, i) => (
                <div key={i} className="flex items-start gap-4">
-                  <CheckCircle2 className="text-green-500 shrink-0 mt-0.5" size={20} />
-                  <span className="font-medium text-[#222222]">{item}</span>
+                  <div className="bg-white p-1 rounded-full shadow-sm text-green-500 mt-0.5">
+                     <CheckCircle2 size={18} />
+                  </div>
+                  <span className="font-bold text-[#222222] text-lg">{item}</span>
                </div>
              ))}
           </div>
         </div>
       </section>
 
-      {/* 6. FAQ (Minimalist) */}
+      {/* 6. FAQ */}
       <section className="py-24 px-6 max-w-3xl mx-auto">
         <h2 className="text-3xl font-extrabold text-center mb-16">자주 묻는 질문</h2>
         <div className="space-y-2">
@@ -321,7 +326,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 7. FOOTER CTA: 마지막 임팩트 */}
+      {/* 7. FOOTER CTA */}
       <section className="py-32 px-6 bg-[#222222] text-white text-center">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-4xl md:text-6xl font-[800] mb-10 tracking-tight leading-tight">
