@@ -221,8 +221,6 @@ export default function ReservationManager() {
                 </div>
               </div>
 
-              {/* ▼▼▼ [수정된 부분] 취소 요청일 때 사유 표시 UI ▼▼▼ */}
-              {res.status === 'cancellation_requested' && ({/* ▼▼▼ [수정된 부분] 취소 요청일 때 사유 표시 UI (이 블록 전체를 교체하세요) ▼▼▼ */}
               {res.status === 'cancellation_requested' && (
                 <div className="bg-white border border-orange-100 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="flex items-start gap-3 mb-3">
@@ -231,8 +229,8 @@ export default function ReservationManager() {
                       <p className="text-sm font-bold text-orange-800">취소 요청이 접수되었습니다.</p>
                       <p className="text-xs text-orange-600 mt-1">승인 시 전액 환불됩니다.</p>
                       
-                      {/* ✅ [추가됨] 취소 사유 표시 (cancel_reason이 있을 때만 보임) */}
-                      {res.cancel_reason && (
+{/* ✅ [추가] 게스트 사유 표시 영역 */}
+{res.cancel_reason && (
                         <div className="mt-2 bg-orange-50 p-2 rounded border border-orange-100">
                            <p className="text-xs font-bold text-orange-800 mb-1">게스트 사유:</p>
                            <p className="text-xs text-orange-700 break-words whitespace-pre-wrap">
