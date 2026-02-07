@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Globe, Users, ShieldCheck, Star, MapPin, MessageCircle, Calendar, Heart, Search, ChevronDown } from 'lucide-react';
-import SiteHeader from '@/app/components/SiteHeader'; // 헤더는 기존 컴포넌트 사용
+// 🚨 수정된 부분: User 아이콘 추가됨
+import { ArrowRight, Globe, Users, User, ShieldCheck, Star, MapPin, MessageCircle, Calendar, Heart, Search, ChevronDown } from 'lucide-react';
+import SiteHeader from '@/app/components/SiteHeader';
 
 // --- [Utility Components] ---
 // 1. 에어비앤비 스타일의 부드러운 카운터
 function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
-  React.useEffect(() => {
+  useEffect(() => {
     let start = 0;
     const duration = 1500;
     const increment = end / (duration / 16);
@@ -49,11 +50,11 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white font-sans text-[#222222]">
       <SiteHeader />
 
-      {/* [1. HERO SECTION] - AirbnbExperience.tsx 구조 기반 */}
+      {/* [1. HERO SECTION] */}
       <section className="pt-40 pb-20 px-6 max-w-6xl mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
           
-          {/* Left: Typography (Locally 콘텐츠) */}
+          {/* Left: Typography */}
           <div className="flex-1 space-y-8 text-center lg:text-left animate-in fade-in slide-in-from-bottom-6 duration-1000">
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]">
               해외여행에서 <br/>
@@ -76,15 +77,16 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Right: iPhone Mockup (AirbnbExperience.tsx 스타일의 둥근 이미지 프레임) */}
+          {/* Right: iPhone Mockup */}
           <div className="flex-1 flex justify-center lg:justify-end">
             <div className="relative w-[320px] h-[640px] bg-black rounded-[3rem] border-[8px] border-black shadow-2xl overflow-hidden ring-4 ring-gray-100">
               {/* Dynamic Island */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-b-2xl z-20"></div>
-              {/* App Screen Content (Locally 앱 UI) */}
+              {/* App Screen Content */}
               <div className="bg-white w-full h-full pt-10 px-4 pb-4 flex flex-col relative overflow-hidden">
                 <div className="flex justify-between items-center mb-4 px-1">
                   <span className="font-serif font-bold text-xl italic text-[#FF385C]">Locally.</span>
+                  {/* 🚨 User 아이콘 사용된 부분 */}
                   <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"><User size={16}/></div>
                 </div>
                 <div className="flex-1 space-y-4 overflow-hidden">
@@ -124,7 +126,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [2. SOCIAL PROOF & STATS] - AirbnbExperience.tsx의 아바타 + LocallyLanding.tsx의 데이터 */}
+      {/* [2. SOCIAL PROOF & STATS] */}
       <section className="py-24 bg-[#F7F7F7] border-y border-gray-200 text-center">
         <div className="max-w-4xl mx-auto px-6">
           {/* Avatar Stack */}
@@ -168,7 +170,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [3. FEATURE GRID] - AirbnbExperience.tsx의 3단 그리드 구조 */}
+      {/* [3. FEATURE GRID] */}
       <section className="py-32 px-6 max-w-6xl mx-auto">
         <div className="mb-16 text-center md:text-left">
           <h2 className="text-3xl md:text-4xl font-extrabold mb-4 leading-tight">
@@ -198,7 +200,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [4. INTERACTIVE CALCULATOR & MAP] - AirbnbStays.tsx의 계산기+지도 */}
+      {/* [4. INTERACTIVE CALCULATOR & MAP] */}
       <section className="max-w-6xl mx-auto px-6 py-24 flex flex-col md:flex-row items-center gap-16 bg-gray-50 rounded-[3rem] my-20">
         <div className="flex-1">
           <h2 className="text-3xl md:text-4xl font-extrabold mb-4">호스트가 되어보세요</h2>
@@ -222,7 +224,7 @@ export default function AboutPage() {
           </div>
         </div>
         
-        {/* Map View (AirbnbStays.tsx 스타일) */}
+        {/* Map View */}
         <div className="flex-1 w-full bg-blue-50 rounded-3xl h-[450px] relative overflow-hidden shadow-inner border border-gray-100 bg-[url('https://images.unsplash.com/photo-1625132683978-40362198002d?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center opacity-90">
            <div className="absolute top-1/2 left-1/3 bg-white px-4 py-2 rounded-full shadow-lg font-bold text-sm animate-bounce">₩128,400</div>
            <div className="absolute top-1/4 left-2/3 bg-white px-4 py-2 rounded-full shadow-lg font-bold text-sm animate-bounce delay-100">₩156,000</div>
@@ -230,7 +232,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [5. TRUST & SAFETY (AirCover Style)] - AirbnbStays.tsx의 신뢰 섹션 */}
+      {/* [5. TRUST & SAFETY] */}
       <section className="py-24 px-6 text-center">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-center mb-6 items-center gap-2">
@@ -256,7 +258,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [6. FAQ Section] - 에어비앤비 스타일 아코디언 */}
+      {/* [6. FAQ Section] */}
       <section className="py-24 px-6 max-w-4xl mx-auto border-t border-gray-200">
         <h2 className="text-3xl font-bold mb-12 text-center">자주 묻는 질문</h2>
         <div className="space-y-2">
