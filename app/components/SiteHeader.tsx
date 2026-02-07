@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageCircle, Settings, HelpCircle, Check } from 'lucide-react';
+import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageCircle, Settings, HelpCircle, Check, Bell } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { Bell } from 'lucide-react';
-import { useNotification } from '@/app/context/NotificationContext'; // ✅ 추가
+import { useNotification } from '../context/NotificationContext'; // ✅ 상대 경로로 수정됨
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -16,13 +15,13 @@ export default function SiteHeader() {
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
-// ✅ [추가] 알림 관련 훅 사용
+  // ✅ 알림 관련 훅
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [showNoti, setShowNoti] = useState(false);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const menuRef = useRef<HTMLHeaderElement>(null); // ✅ 타입 수정 (HTMLDivElement -> HTMLHeaderElement)
+  const menuRef = useRef<HTMLHeaderElement>(null);
 
   const languageContext = useLanguage();
   const setLang = languageContext?.setLang || (() => {});
@@ -42,7 +41,7 @@ export default function SiteHeader() {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
         setIsLangOpen(false);
-        setShowNoti(false); // ✅ 외부 클릭 시 알림창도 닫기
+        setShowNoti(false); // ✅ 외부 클릭 시 알림창 닫기
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -67,7 +66,7 @@ export default function SiteHeader() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]); // ✅ 의존성 배열 추가
+  }, [supabase]);
 
   const checkHostStatus = async (userId: string) => {
     const { data: app } = await supabase
@@ -92,7 +91,6 @@ export default function SiteHeader() {
     window.location.reload();
   };
 
-  // 1. [메인 헤더 버튼용] 무조건 설명 페이지로 이동
   const handleMainHeaderButtonClick = () => {
     if (pathname?.startsWith('/host')) { 
       router.push('/'); 
@@ -101,24 +99,21 @@ export default function SiteHeader() {
     }
   };
 
-  // 2. [드롭다운 메뉴용] 호스트는 대시보드, 일반 유저는 설명 페이지로
   const handleDropdownMenuClick = () => {
     if (pathname?.startsWith('/host')) { 
-      router.push('/'); // 호스트 페이지에선 '게스트 모드' 역할
+      router.push('/'); 
       return;
     }
 
     if (applicationStatus || isHost) {
-      router.push('/host/dashboard'); // 호스트/신청자는 대시보드로
+      router.push('/host/dashboard'); 
     } else {
-      router.push('/become-a-host'); // 일반 유저는 설명 페이지로
+      router.push('/become-a-host'); 
     }
   };
 
-  // 버튼 라벨
   const getButtonLabel = () => {
     if (pathname?.startsWith('/host')) return '게스트 모드';
-    // 메인 버튼은 로그인/호스트 여부와 상관없이 항상 '호스트 등록하기'
     return '호스트 등록하기';
   };
 
@@ -135,7 +130,6 @@ export default function SiteHeader() {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            {/* 상단 메인 버튼 (설명 페이지로 이동) */}
             <button 
               onClick={handleMainHeaderButtonClick} 
               className="hidden md:block text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 cursor-pointer"
@@ -143,6 +137,7 @@ export default function SiteHeader() {
                {getButtonLabel()}
             </button>
 
+            {/* 언어 설정 */}
             <div className="relative hidden sm:block">
               <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
                 <Globe size={18} />
@@ -158,8 +153,8 @@ export default function SiteHeader() {
               )}
             </div>
 
-{/* ✅ [추가됨] 알림 벨 아이콘 (로그인 상태일 때만 표시) */}
-{user && (
+            {/* ✅ [위치 확정] 알림 아이콘 (로그인 상태일 때만) */}
+            {user && (
               <div className="relative">
                 <button 
                   onClick={() => setShowNoti(!showNoti)} 
@@ -167,7 +162,7 @@ export default function SiteHeader() {
                 >
                   <Bell size={20} />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white animate-pulse"></span>
                   )}
                 </button>
 
@@ -218,14 +213,12 @@ export default function SiteHeader() {
                 </div>
               </div>
 
-
               {/* 드롭다운 메뉴 */}
               {user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
                        <span className="flex items-center gap-3"><MessageCircle size={18}/> 메시지</span>
-                       <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">N</span> 
                     </Link>
                     <Link href="/guest/trips" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
                        <Briefcase size={18}/> 여행
@@ -239,7 +232,6 @@ export default function SiteHeader() {
                     <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <User size={18}/> 프로필 및 계정
                     </Link>
-                    {/* ✅ 드롭다운의 버튼은 '스마트'하게 대시보드로 이동 */}
                     <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                        <Settings size={18}/> {pathname?.startsWith('/host') ? '게스트 모드' : '호스트 모드'}
                     </button>
