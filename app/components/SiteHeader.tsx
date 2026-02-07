@@ -7,7 +7,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import LoginModal from '@/app/components/LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { useNotification } from '@/app/context/NotificationContext'; // ✅ 다시 절대 경로로 수정
+import { useNotification } from '@/app/context/NotificationContext'; // ✅ 절대 경로로 수정
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);

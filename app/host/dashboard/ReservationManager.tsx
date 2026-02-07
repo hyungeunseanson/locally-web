@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Link from 'next/link';
-import { sendNotification } from '../../../utils/notification'; // 👈 상대 경로로 변경
+import { sendNotification } from '@/app/utils/notification'; // ✅ 절대 경로 확인
 
 export default function ReservationManager() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
