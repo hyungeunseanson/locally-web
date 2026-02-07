@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-// 🚨 수정사항: 아래 import에 'User'가 추가되었습니다.
-import { ArrowRight, Globe, Users, User, ShieldCheck, Star, MapPin, MessageCircle, Calendar, Heart, Search, ChevronDown } from 'lucide-react';
+// 필요한 아이콘 모두 import
+import { ArrowRight, Globe, Users, User, ShieldCheck, Star, MapPin, MessageCircle, Calendar, Heart, Search, ChevronDown, CheckCircle2 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader'; 
 
 // --- [Utility Components] ---
 // 1. 에어비앤비 스타일의 부드러운 카운터
 function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
-  React.useEffect(() => {
+  useEffect(() => {
     let start = 0;
     const duration = 1500;
     const increment = end / (duration / 16);
@@ -28,7 +28,7 @@ function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   return <span className="tabular-nums">{count.toLocaleString()}{suffix}</span>;
 }
 
-// 2. 에어비앤비 스타일의 FAQ 아코디언
+// 2. FAQ 아코디언
 function FAQItem({ question, answer }: { question: string, answer: string }) {
   const [isOpen, setIsOpen] = useState(false);
   return (
@@ -49,11 +49,11 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white font-sans text-[#222222]">
       <SiteHeader />
 
-      {/* [1. HERO SECTION] - AirbnbExperience.tsx 구조 기반 */}
+      {/* [1. HERO SECTION] */}
       <section className="pt-40 pb-20 px-6 max-w-6xl mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
           
-          {/* Left: Typography (Locally 콘텐츠) */}
+          {/* Left: Typography */}
           <div className="flex-1 space-y-8 text-center lg:text-left animate-in fade-in slide-in-from-bottom-6 duration-1000">
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]">
               해외여행에서 <br/>
@@ -62,6 +62,16 @@ export default function AboutPage() {
             <p className="text-xl md:text-2xl text-[#717171] font-medium leading-relaxed max-w-xl mx-auto lg:mx-0 font-serif italic">
               "Travel like a local with locals."
             </p>
+            
+            {/* Interaction Tabs (로컬리 내용 반영) */}
+            <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+              {["현지인과 대화", "로컬 경험", "문화 교류", "비즈니스 기회"].map((tab, i) => (
+                <span key={i} className={`px-4 py-2 rounded-full text-sm font-bold border ${i === 0 ? 'bg-black text-white border-black' : 'border-gray-200 text-gray-500'}`}>
+                  {tab}
+                </span>
+              ))}
+            </div>
+
             <div className="pt-6 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link href="/">
                 <button className="bg-[#FF385C] hover:bg-[#E01E5A] text-white px-8 py-4 rounded-xl font-bold text-lg transition-transform hover:scale-105 shadow-xl active:scale-95">
@@ -76,44 +86,39 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Right: iPhone Mockup (CSS 구현) */}
+          {/* Right: iPhone Mockup (Recommended List 반영) */}
           <div className="flex-1 flex justify-center lg:justify-end">
             <div className="relative w-[320px] h-[640px] bg-black rounded-[3rem] border-[8px] border-black shadow-2xl overflow-hidden ring-4 ring-gray-100">
-              {/* Dynamic Island */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-b-2xl z-20"></div>
-              {/* App Screen Content (Locally 앱 UI) */}
               <div className="bg-white w-full h-full pt-10 px-4 pb-4 flex flex-col relative overflow-hidden">
                 <div className="flex justify-between items-center mb-4 px-1">
                   <span className="font-serif font-bold text-xl italic text-[#FF385C]">Locally.</span>
-                  {/* User 아이콘 사용됨 */}
                   <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"><User size={16}/></div>
                 </div>
-                <div className="flex-1 space-y-4 overflow-hidden">
-                  {/* Mockup Card 1 */}
-                  <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
-                    <div className="h-32 bg-gray-200 relative">
-                      <img src="https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="Seoul"/>
-                      <div className="absolute top-2 right-2 bg-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={12} fill="#FF385C" color="#FF385C"/>4.9</div>
+                
+                {/* Recommended List */}
+                <div className="flex-1 space-y-4 overflow-y-auto pb-16 no-scrollbar">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Recommended</h4>
+                  {[
+                    { title: "서울 밤 산책", host: "Hyungeun", img: "https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=400&auto=format&fit=crop" },
+                    { title: "도쿄 카페 투어", host: "Yuki", img: "https://images.unsplash.com/photo-1554797589-7241bb691973?q=80&w=400&auto=format&fit=crop" },
+                    { title: "교토 명소 탐방", host: "Sato", img: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=400&auto=format&fit=crop" },
+                    { title: "부산 맛집 탐방", host: "Sean", img: "https://images.unsplash.com/photo-1635206680720-63953e54b67d?q=80&w=400&auto=format&fit=crop" }
+                  ].map((item, i) => (
+                    <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                      <div className="h-32 bg-gray-200 relative">
+                        <img src={item.img} className="w-full h-full object-cover" alt={item.title}/>
+                        <div className="absolute top-2 right-2 bg-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="#FF385C" color="#FF385C"/>4.9</div>
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-bold text-sm mb-1 truncate">{item.title}</h3>
+                        <p className="text-xs text-gray-500">Host {item.host}</p>
+                      </div>
                     </div>
-                    <div className="p-3">
-                      <h3 className="font-bold text-sm mb-1 truncate">현지인과 함께하는 야경 투어</h3>
-                      <p className="text-xs text-gray-500">서울 • 호스트 Jiwon</p>
-                    </div>
-                  </div>
-                  {/* Mockup Card 2 */}
-                  <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
-                    <div className="h-32 bg-gray-200 relative">
-                      <img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="Cafe"/>
-                      <div className="absolute top-2 right-2 bg-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={12} fill="#FF385C" color="#FF385C"/>5.0</div>
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-bold text-sm mb-1 truncate">성수동 카페거리 도슨트</h3>
-                      <p className="text-xs text-gray-500">서울 • 호스트 Minji</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-                {/* Bottom Nav */}
-                <div className="absolute bottom-4 left-4 right-4 bg-black text-white h-14 rounded-full flex justify-around items-center px-4 shadow-lg">
+
+                <div className="absolute bottom-4 left-4 right-4 bg-black text-white h-14 rounded-full flex justify-around items-center px-4 shadow-lg z-10">
                   <Globe size={20} color="#FF385C" />
                   <Heart size={20} className="opacity-50" />
                   <MessageCircle size={20} className="opacity-50" />
@@ -128,78 +133,136 @@ export default function AboutPage() {
       {/* [2. SOCIAL PROOF & STATS] */}
       <section className="py-24 bg-[#F7F7F7] border-y border-gray-200 text-center">
         <div className="max-w-4xl mx-auto px-6">
-          {/* Avatar Stack */}
           <div className="flex justify-center -space-x-4 mb-8">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="w-16 h-16 rounded-full border-4 border-white overflow-hidden bg-gray-200 shadow-sm">
-                <img src={`https://i.pravatar.cc/150?u=${i + 10}`} alt={`User ${i}`} className="w-full h-full object-cover"/>
+                <img src={`https://i.pravatar.cc/150?u=${i + 20}`} alt={`User ${i}`} className="w-full h-full object-cover"/>
               </div>
             ))}
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">여행 업계에서 가장 사랑받는 로컬 커뮤니티.</h2>
           <p className="text-xl text-[#717171] mb-12">전 세계 수천 명의 호스트와 여행자가 함께합니다.</p>
           
-          {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
             <div className="space-y-2">
-              <div className="text-4xl md:text-5xl font-black text-[#222222]">
-                <AirbnbCounter end={800} suffix="+" />
-              </div>
+              <div className="text-4xl md:text-5xl font-black text-[#222222]"><AirbnbCounter end={800} suffix="+" /></div>
               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest">Active Hosts</div>
             </div>
             <div className="space-y-2">
-              <div className="text-4xl md:text-5xl font-black text-[#222222]">
-                <AirbnbCounter end={5} />
-              </div>
+              <div className="text-4xl md:text-5xl font-black text-[#222222]"><AirbnbCounter end={5} /></div>
               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest">Cities</div>
             </div>
             <div className="space-y-2">
-              <div className="text-4xl md:text-5xl font-black text-[#222222]">
-                <AirbnbCounter end={3} />
-              </div>
+              <div className="text-4xl md:text-5xl font-black text-[#222222]"><AirbnbCounter end={3} /></div>
               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest">Countries</div>
             </div>
             <div className="space-y-2">
-              <div className="text-4xl md:text-5xl font-black text-[#222222]">
-                <AirbnbCounter end={4.9} />
-              </div>
+              <div className="text-4xl md:text-5xl font-black text-[#222222]"><AirbnbCounter end={4.9} /></div>
               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest">Rating</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* [3. FEATURE GRID] */}
+      {/* [3. PROFESSIONAL EXPERTISE - 로컬리 내용 반영] */}
       <section className="py-32 px-6 max-w-6xl mx-auto">
         <div className="mb-16 text-center md:text-left">
           <h2 className="text-3xl md:text-4xl font-extrabold mb-4 leading-tight">
-            로컬리에서<br/>진짜 여행을 경험하세요.
+            소통의 가치와 문화 기여가<br/>시장 가치가 됩니다.
           </h2>
-          <p className="text-lg text-[#717171]">당신의 관심사에 딱 맞는 특별한 만남이 기다립니다.</p>
+          <p className="text-lg text-[#717171]">각 분야의 전문가 호스트를 만나보세요.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { title: "로컬 미식 탐방", img: "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=1000&auto=format&fit=crop" },
-            { title: "숨겨진 야경 투어", img: "https://images.unsplash.com/photo-1478860409698-8707f313ee8b?q=80&w=1000&auto=format&fit=crop" },
-            { title: "전통 문화 체험", img: "https://images.unsplash.com/photo-1583324113626-70df0f4deaab?q=80&w=1000&auto=format&fit=crop" }
-          ].map((item, idx) => (
-            <div key={idx} className="group relative aspect-[4/5] rounded-2xl overflow-hidden cursor-pointer shadow-md">
-              <img 
-                src={item.img} 
-                alt={item.title} 
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-              <div className="absolute bottom-6 left-6">
-                <h3 className="text-white text-2xl font-bold">{item.title}</h3>
+            { role: "한일 창업가 매칭 전문가", name: "Lee Sang-hoon", img: "https://i.pravatar.cc/150?u=30" },
+            { role: "로컬 미식 큐레이터", name: "Kim Ji-won", img: "https://i.pravatar.cc/150?u=31" },
+            { role: "전통 건축 해설사", name: "Tanaka Ken", img: "https://i.pravatar.cc/150?u=32" }
+          ].map((host, i) => (
+            <div key={i} className="flex items-center gap-4 p-6 border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white">
+              <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0">
+                <img src={host.img} alt={host.name} className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-[#FF385C] uppercase tracking-wide mb-1">{host.role}</div>
+                <div className="text-lg font-black text-[#222222]">{host.name}</div>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* [4. INTERACTIVE CALCULATOR & MAP] */}
+      {/* [4. DIVERSITY - A society of diverse people] */}
+      <section className="bg-gray-50 py-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-2xl font-black mb-10 tracking-tight italic uppercase">A society of diverse people</h2>
+          <div className="flex justify-center flex-wrap gap-4 mb-12">
+             {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                <div key={i} className="w-14 h-14 rounded-full bg-white border border-gray-200 flex items-center justify-center p-2 shadow-sm">
+                   <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`} alt="icon" />
+                </div>
+             ))}
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-left max-w-2xl mx-auto">
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+               <div className="text-xs text-gray-500 font-bold mb-1">Art & Design</div>
+               <div className="text-xl font-black">120+</div>
+             </div>
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+               <div className="text-xs text-gray-500 font-bold mb-1">Tech & Startup</div>
+               <div className="text-xl font-black">85+</div>
+             </div>
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+               <div className="text-xs text-gray-500 font-bold mb-1">Food & Beverage</div>
+               <div className="text-xl font-black">210+</div>
+             </div>
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+               <div className="text-xs text-gray-500 font-bold mb-1">Local Heritage</div>
+               <div className="text-xl font-black">140+</div>
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* [5. PROCESS STEPS - 로컬리 내용 + 에어비앤비 레이아웃] */}
+      <section className="py-32 px-6 max-w-6xl mx-auto">
+         <div className="flex flex-col md:flex-row items-center gap-16 md:gap-24">
+            <div className="flex-1 space-y-8">
+               <h2 className="text-3xl md:text-4xl font-extrabold leading-tight">
+                  예약 완료 후<br/>컨펌 메일을 보내드릴게요!
+               </h2>
+               <p className="text-lg text-[#717171]">
+                  원하는 프로그램을 선택하고 예약하면, 호스트가 확인 후 확정 메일을 보내드립니다.
+                  모든 과정은 Locally 앱에서 간편하게 확인할 수 있습니다.
+               </p>
+            </div>
+            <div className="flex-1 flex justify-center">
+               {/* Email Notification Mockup */}
+               <div className="w-72 bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 rotate-3 hover:rotate-0 transition-transform duration-500">
+                  <div className="flex items-center gap-3 mb-6">
+                     <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center text-white font-serif italic text-lg">L.</div>
+                     <div>
+                        <div className="text-sm font-bold">Locally Team</div>
+                        <div className="text-xs text-gray-400">Just now</div>
+                     </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-4">
+                     <div className="font-bold text-lg mb-2">Reservation Confirmed!</div>
+                     <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                        Your local experience with Host Sean is all set. See you soon in Seoul!
+                     </p>
+                     <div className="h-32 bg-gray-200 rounded-lg bg-[url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=400&auto=format&fit=crop')] bg-cover bg-center"></div>
+                  </div>
+                  <div className="flex justify-end">
+                     <CheckCircle2 className="text-green-500 w-8 h-8" />
+                  </div>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      {/* [6. INTERACTIVE CALCULATOR & MAP] */}
       <section className="max-w-6xl mx-auto px-6 py-24 flex flex-col md:flex-row items-center gap-16 bg-gray-50 rounded-[3rem] my-20">
         <div className="flex-1">
           <h2 className="text-3xl md:text-4xl font-extrabold mb-4">호스트가 되어보세요</h2>
@@ -231,7 +294,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [5. TRUST & SAFETY (AirCover Style)] */}
+      {/* [7. TRUST & SAFETY] */}
       <section className="py-24 px-6 text-center">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-center mb-6 items-center gap-2">
@@ -257,7 +320,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [6. FAQ Section] */}
+      {/* [8. FAQ Section] */}
       <section className="py-24 px-6 max-w-4xl mx-auto border-t border-gray-200">
         <h2 className="text-3xl font-bold mb-12 text-center">자주 묻는 질문</h2>
         <div className="space-y-2">
@@ -273,14 +336,10 @@ export default function AboutPage() {
             question="결제는 안전한가요?" 
             answer="네, 모든 결제는 Locally의 보안 시스템을 통해 안전하게 처리되며, 체험이 완료된 후 호스트에게 정산됩니다." 
           />
-          <FAQItem 
-            question="예약을 취소하고 싶어요." 
-            answer="마이페이지 > 여행 탭에서 예약을 관리할 수 있습니다. 호스트가 설정한 환불 정책에 따라 환불이 진행됩니다." 
-          />
         </div>
       </section>
 
-      {/* [7. FOOTER CTA] */}
+      {/* [9. FOOTER CTA] */}
       <section className="py-40 px-6 text-center bg-black text-white">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-4xl md:text-6xl font-extrabold mb-8 tracking-tight leading-tight">
