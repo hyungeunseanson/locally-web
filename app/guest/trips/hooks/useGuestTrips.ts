@@ -50,6 +50,8 @@ export function useGuestTrips() {
           if (!booking.experiences) return;
 
           const tripDate = new Date(booking.date);
+          // 취소된 건은 과거 내역이나 별도 처리가 필요할 수 있으나, 여기선 미래 일정 로직에 따라 분류됨
+          // (단, isFuture 체크 시 status가 'cancelled'면 false가 되어 past로 갈 수 있음)
           const isFuture = tripDate >= today && booking.status !== 'cancelled';
           const diffDays = Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)); 
           const dDay = isFuture ? (diffDays === 0 ? '오늘' : `D-${diffDays}`) : null;
@@ -93,20 +95,34 @@ export function useGuestTrips() {
     }
   }, [supabase]);
 
-  // 예약 취소 기능
+  // ✅ 예약 취소 및 환불 기능 (API 연동)
   const cancelBooking = async (id: number) => {
-    if (!confirm('정말 예약을 취소하시겠습니까?')) return;
+    if (!confirm('정말 예약을 취소하고 환불받으시겠습니까?\n(취소 시 결제가 자동으로 환불됩니다)')) return;
     
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
+    try {
+      // 1. 환불 API 호출 (서버에서 나이스페이 취소 처리)
+      const res = await fetch('/api/payment/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          bookingId: id, 
+          reason: '게스트 요청에 의한 예약 취소' 
+        }),
+      });
 
-    if (!error) { 
-      alert('예약이 취소되었습니다.'); 
-      fetchMyTrips(); // 목록 새로고침
-    } else { 
-      alert('취소 실패: ' + error.message); 
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || '환불 처리에 실패했습니다.');
+      }
+
+      // 2. 성공 시 알림 및 목록 갱신
+      alert('예약이 정상적으로 취소되고 환불되었습니다.');
+      fetchMyTrips(); 
+
+    } catch (err: any) {
+      console.error('취소 에러:', err);
+      alert(`취소 실패: ${err.message}`);
     }
   };
 

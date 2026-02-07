@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     const amount = formData.get('amt');      // 결제 금액
     const orderId = formData.get('moid');    // 주문 번호
     const authDate = formData.get('authDate'); // 승인 일자
+    const tid = formData.get('tid'); // ✅ [추가] 나이스페이 거래번호(TID) 가져오기
 
     // 1. 결제 성공(0000) 확인
     if (resCode === '0000') {
@@ -31,6 +32,7 @@ const supabase = createServerClient(
             user_id: user.id,
             amount: Number(amount),
             order_id: orderId as string,
+            tid: tid as string, // ✅ [추가] DB에 tid 저장 (bookings 테이블에 tid 컬럼이 있어야 합니다!)
             status: 'PAID', // 결제 완료 상태
             created_at: new Date().toISOString()
           }
