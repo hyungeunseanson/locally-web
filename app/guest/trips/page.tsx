@@ -13,13 +13,14 @@ import ReceiptModal from './components/ReceiptModal';
 import PastTripCard from './components/PastTripCard'; 
 
 export default function GuestTripsPage() {
-  // ✅ 훅 하나로 모든 데이터와 기능을 가져옵니다.
+  // ✅ [수정] 훅에서 가져오는 변수 이름 변경 (cancelBooking -> requestCancellation)
   const { 
     upcomingTrips, 
     pastTrips, 
     isLoading, 
     errorMsg, 
-    cancelBooking 
+    requestCancellation, // 이름 변경됨
+    isProcessing         // 새로 추가됨
   } = useGuestTrips();
 
   // UI 상태 관리 (모달 등)
@@ -62,8 +63,8 @@ export default function GuestTripsPage() {
                     key={trip.id} 
                     trip={trip} 
                     onRequestCancel={requestCancellation} // 이름 변경
-                    isProcessing={isProcessing}           // 추가됨
-                    onOpenReceipt={openReceipt} 
+                    isProcessing={isProcessing}        // 추가됨
+                    onOpenReceipt={openReceipt}
                   />
                 ))
               ) : (
