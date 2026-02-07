@@ -84,27 +84,29 @@ export function useGuestTrips() {
     try {
       // 1. bookings 테이블에 취소 요청 상태와 사유 업데이트
       // (cancel_reason 컬럼이 없다면 Supabase에서 추가해야 함, 혹은 admin_comment 등에 임시 저장)
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancellation_requested', 
-          // cancel_reason: reason // 👈 DB에 컬럼 추가 권장
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
-      fetchMyTrips(); // 목록 갱신
-      return true; // 성공
-
-    } catch (err: any) {
-      alert('요청 실패: ' + err.message);
-      return false; // 실패
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+      try {
+        // ✅ [수정] cancel_reason 필드에 사유 저장 (주석 해제)
+        const { error } = await supabase
+          .from('bookings')
+          .update({ 
+            status: 'cancellation_requested', 
+            cancel_reason: reason // 이 부분이 핵심입니다!
+          })
+          .eq('id', id);
+  
+        if (error) throw error;
+  
+        alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
+        fetchMyTrips(); 
+        return true; 
+  
+      } catch (err: any) {
+        alert('요청 실패: ' + err.message);
+        return false; 
+      } finally {
+        setIsProcessing(false);
+      }
+    };
 
   useEffect(() => { fetchMyTrips(); }, [fetchMyTrips]);
 

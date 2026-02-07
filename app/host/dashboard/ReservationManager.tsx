@@ -222,24 +222,33 @@ export default function ReservationManager() {
                 </div>
               </div>
 
-              {/* 취소 요청 승인 버튼 */}
-              {res.status === 'cancellation_requested' && (
+  {/* 🚨 취소 요청 처리 버튼 (취소 요청 상태일 때만 표시) */}
+  {res.status === 'cancellation_requested' && (
                 <div className="bg-white border border-orange-100 rounded-lg p-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="flex items-start gap-3 mb-3">
                     <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={16} />
-                    <div>
-                      <p className="text-sm font-bold text-orange-800">취소 요청됨</p>
-                      <p className="text-xs text-orange-600 mt-1">승인 시 전액 환불됩니다.</p>
+                    <div className="flex-1"> {/* flex-1 추가 */}
+                      <p className="text-sm font-bold text-orange-800">취소 요청이 접수되었습니다.</p>
+                      <p className="text-xs text-orange-600 mt-1">승인 시 결제가 자동으로 취소되고 전액 환불됩니다.</p>
+                      
+                      {/* ✅ [추가] 취소 사유 표시 영역 */}
+                      {res.cancel_reason && (
+                        <div className="mt-3 bg-orange-50 p-3 rounded-lg border border-orange-100">
+                          <p className="text-xs font-bold text-orange-800 mb-1">게스트 사유:</p>
+                          <p className="text-xs text-orange-700 break-words">"{res.cancel_reason}"</p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  
+                  <div className="flex gap-2 mt-2"> {/* mt-2 추가 */}
                     <button 
                       onClick={() => handleApproveCancellation(res)}
                       disabled={processingId === res.id}
                       className="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-orange-200"
                     >
                       {processingId === res.id ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>}
-                      승인 및 환불
+                      취소 승인 및 환불
                     </button>
                   </div>
                 </div>
