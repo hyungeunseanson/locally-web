@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-// 🚨 수정된 부분: User 아이콘 추가됨
+// 🚨 수정사항: 아래 import에 'User'가 추가되었습니다.
 import { ArrowRight, Globe, Users, User, ShieldCheck, Star, MapPin, MessageCircle, Calendar, Heart, Search, ChevronDown } from 'lucide-react';
-import SiteHeader from '@/app/components/SiteHeader';
+import SiteHeader from '@/app/components/SiteHeader'; 
 
 // --- [Utility Components] ---
 // 1. 에어비앤비 스타일의 부드러운 카운터
 function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
-  useEffect(() => {
+  React.useEffect(() => {
     let start = 0;
     const duration = 1500;
     const increment = end / (duration / 16);
@@ -42,7 +42,6 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
   );
 }
 
-
 export default function AboutPage() {
   const [days, setDays] = useState(7); // 수익 계산기용 상태
 
@@ -50,11 +49,11 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white font-sans text-[#222222]">
       <SiteHeader />
 
-      {/* [1. HERO SECTION] */}
+      {/* [1. HERO SECTION] - AirbnbExperience.tsx 구조 기반 */}
       <section className="pt-40 pb-20 px-6 max-w-6xl mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
           
-          {/* Left: Typography */}
+          {/* Left: Typography (Locally 콘텐츠) */}
           <div className="flex-1 space-y-8 text-center lg:text-left animate-in fade-in slide-in-from-bottom-6 duration-1000">
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]">
               해외여행에서 <br/>
@@ -77,16 +76,16 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Right: iPhone Mockup */}
+          {/* Right: iPhone Mockup (CSS 구현) */}
           <div className="flex-1 flex justify-center lg:justify-end">
             <div className="relative w-[320px] h-[640px] bg-black rounded-[3rem] border-[8px] border-black shadow-2xl overflow-hidden ring-4 ring-gray-100">
               {/* Dynamic Island */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-b-2xl z-20"></div>
-              {/* App Screen Content */}
+              {/* App Screen Content (Locally 앱 UI) */}
               <div className="bg-white w-full h-full pt-10 px-4 pb-4 flex flex-col relative overflow-hidden">
                 <div className="flex justify-between items-center mb-4 px-1">
                   <span className="font-serif font-bold text-xl italic text-[#FF385C]">Locally.</span>
-                  {/* 🚨 User 아이콘 사용된 부분 */}
+                  {/* User 아이콘 사용됨 */}
                   <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"><User size={16}/></div>
                 </div>
                 <div className="flex-1 space-y-4 overflow-hidden">
@@ -232,7 +231,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* [5. TRUST & SAFETY] */}
+      {/* [5. TRUST & SAFETY (AirCover Style)] */}
       <section className="py-24 px-6 text-center">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-center mb-6 items-center gap-2">
