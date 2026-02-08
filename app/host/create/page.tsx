@@ -6,19 +6,19 @@ import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { TOTAL_STEPS, INITIAL_FORM_DATA } from './config';
-import ExperienceFormSteps from './components/ExperienceFormSteps'; // ✅ 분리된 파일 임포트
+import ExperienceFormSteps from './components/ExperienceFormSteps'; 
 
 export default function CreateExperiencePage() {
   const supabase = createClient();
   const router = useRouter();
 
-  // --- 상태 관리 (State) ---
+  // --- 상태 관리 ---
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     ...INITIAL_FORM_DATA,
-    is_private_enabled: false, // ✅ 프라이빗 옵션 추가
-    private_price: 0,          // ✅ 프라이빗 가격 추가
+    is_private_enabled: false, 
+    private_price: 0,          
   });
 
   // UI용 임시 상태
@@ -102,6 +102,10 @@ export default function CreateExperiencePage() {
           city: formData.city,
           title: formData.title,
           category: formData.category,
+          
+          // 🟢 [수정 완료] 언어 데이터 저장 추가! (절대 누락 금지)
+          languages: formData.languages,
+
           duration: formData.duration,
           max_guests: formData.maxGuests,
           description: formData.description,
@@ -115,14 +119,13 @@ export default function CreateExperiencePage() {
           supplies: formData.supplies,
           rules: formData.rules, 
           status: 'pending',
-          // ✅ 프라이빗 정보 저장
           is_private_enabled: formData.is_private_enabled,
           private_price: formData.private_price
         }
       ]);
 
       if (error) throw error;
-      setStep(step + 1); // 완료 화면으로 이동
+      setStep(step + 1); 
 
     } catch (error: any) {
       console.error(error);
@@ -134,7 +137,7 @@ export default function CreateExperiencePage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
-      {/* 헤더 (진행바) */}
+      {/* 헤더 */}
       {step < TOTAL_STEPS && (
         <header className="fixed top-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-md z-50 px-6 flex items-center justify-between">
           <Link href="/host/dashboard" className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-900"/></Link>
@@ -145,7 +148,7 @@ export default function CreateExperiencePage() {
         </header>
       )}
 
-      {/* 메인 컨텐츠 (여기에 모든 스텝이 들어감) */}
+      {/* 메인 컨텐츠 */}
       <main className="flex-1 flex flex-col items-center pt-32 pb-40 px-6 w-full max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <ExperienceFormSteps 
           step={step}
@@ -167,7 +170,7 @@ export default function CreateExperiencePage() {
         />
       </main>
 
-      {/* 푸터 (네비게이션 버튼) */}
+      {/* 푸터 */}
       {step < TOTAL_STEPS && (
         <footer className="fixed bottom-0 left-0 right-0 h-24 bg-white/90 backdrop-blur-md border-t border-slate-100 flex items-center justify-between px-6 z-50">
           <button onClick={prevStep} disabled={step === 1} className={`px-6 py-3 rounded-full font-bold text-sm transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100 underline decoration-2'}`}>이전</button>

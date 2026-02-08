@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link'; // Link 추가
 import { 
   Search, User, Mail, Globe, MessageCircle, Phone, Smile, Clock, 
-  MapPin, Cake, CheckCircle2, ShoppingBag, StickyNote, Star, Trash2, Link as LinkIcon 
+  MapPin, Cake, CheckCircle2, ShoppingBag, StickyNote, Star, Trash2, Link as LinkIcon, Edit 
 } from 'lucide-react';
 
 export default function DetailsPanel({ activeTab, selectedItem, updateStatus, deleteItem }: any) {
@@ -123,14 +124,26 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
           </div>
         )}
 
-        {/* 🟠 [APPS] 호스트 지원서 상세 (누락된 정보 복구) */}
+        {/* 🟠 [APPS] 호스트 지원서 상세 (누락된 정보 복구 & 언어 배열 처리) */}
         {activeTab === 'APPS' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <InfoBox label="연락처" value={selectedItem.phone} icon={<Phone size={14}/>} />
               <InfoBox label="이메일" value={selectedItem.email} icon={<Mail size={14}/>} />
               <InfoBox label="국적" value={selectedItem.host_nationality} icon={<Globe size={14}/>} />
-              <InfoBox label="언어" value={selectedItem.target_language} icon={<MessageCircle size={14}/>} />
+            </div>
+            
+            {/* 🟢 언어 표시 (배열 처리) */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase mb-2">
+                 <MessageCircle size={14}/> 언어
+               </div>
+               <div className="flex flex-wrap gap-2">
+                 {Array.isArray(selectedItem.languages) && selectedItem.languages.length > 0 
+                   ? selectedItem.languages.map((l:string) => <span key={l} className="px-2 py-1 bg-white border rounded text-xs font-bold">{l}</span>)
+                   : <span className="text-sm font-bold text-slate-900">{selectedItem.target_language || '-'}</span>
+                 }
+               </div>
             </div>
             
             <div>
@@ -151,7 +164,16 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
 
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><LinkIcon size={12}/> SNS 및 포트폴리오</h4>
-              {selectedItem.sns_links ? (
+              {/* 배열(포트폴리오)와 문자열(SNS링크) 모두 처리 */}
+              {Array.isArray(selectedItem.portfolio_urls) && selectedItem.portfolio_urls.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedItem.portfolio_urls.map((url:string, i:number) => (
+                    <a key={i} href={url} target="_blank" rel="noreferrer" className="text-blue-600 underline text-sm bg-blue-50 p-3 rounded-lg block truncate hover:text-blue-800">
+                      {url}
+                    </a>
+                  ))}
+                </div>
+              ) : selectedItem.sns_links ? (
                 <a href={selectedItem.sns_links} target="_blank" rel="noreferrer" className="text-blue-600 underline text-sm bg-blue-50 p-3 rounded-lg block truncate hover:text-blue-800">
                   {selectedItem.sns_links}
                 </a>
@@ -168,7 +190,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
           </div>
         )}
 
-        {/* 🟣 [EXPS] 체험 상세 정보 */}
+        {/* 🟣 [EXPS] 체험 상세 정보 (수정 버튼 추가) */}
         {activeTab === 'EXPS' && (
           <div className="space-y-8">
             {selectedItem.photos && (
@@ -187,6 +209,14 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
               <InfoBox label="최대 인원" value={`${selectedItem.max_guests}명`} />
               <InfoBox label="지역" value={`${selectedItem.country} > ${selectedItem.city}`} />
             </div>
+            
+            {/* 🟢 관리자 권한으로 수정하기 버튼 추가 */}
+            <Link href={`/host/experiences/${selectedItem.id}/edit`}>
+              <button className="w-full py-3 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors mb-4">
+                <Edit size={16}/> 관리자 권한으로 수정하기
+              </button>
+            </Link>
+
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>
               <div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div>
@@ -227,4 +257,3 @@ function InfoBox({ label, value, icon }: any) {
 function StatSmall({ label, value, color }: any) {
   return <div className={`p-4 rounded-xl border border-transparent ${color || 'bg-slate-50 text-slate-700'}`}><div className="text-[10px] font-bold opacity-70 mb-1 uppercase">{label}</div><div className="text-lg font-black">{value}</div></div>;
 }
-//ㅇㅇ//

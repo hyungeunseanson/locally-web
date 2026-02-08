@@ -8,9 +8,7 @@ import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
-import { useChat } from '@/app/hooks/useChat'; // ✅ 훅 추가
-
-// 분리된 컴포넌트 임포트
+import { useChat } from '@/app/hooks/useChat'; 
 import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
 
@@ -18,7 +16,7 @@ export default function ExperienceDetailPage() {
   const router = useRouter();
   const params = useParams();
   const supabase = createClient();
-  const { createInquiry } = useChat(); // 훅에서 생성 함수 가져오기
+  const { createInquiry } = useChat(); 
   const [user, setUser] = useState<any>(null);
   const [experience, setExperience] = useState<any>(null);
   const [hostProfile, setHostProfile] = useState<any>(null);
@@ -40,6 +38,8 @@ export default function ExperienceDetailPage() {
       if (error) { console.error(error); } 
       else {
         setExperience(exp);
+        
+        // 날짜 정보
         const { data: dates } = await supabase.from('experience_availability').select('date, start_time').eq('experience_id', exp.id).eq('is_booked', false);
         if (dates) {
           const datesList = Array.from(new Set(dates.map((d: any) => d.date)));
@@ -51,8 +51,18 @@ export default function ExperienceDetailPage() {
           });
           setDateToTimeMap(timeMap);
         }
-        const { data: hostApp } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).maybeSingle();
-        setHostProfile(hostApp || { name: 'Locally Host', self_intro: '안녕하세요!' }); 
+
+        // 🟢 호스트 정보 가져오기 (profiles + host_applications 병합)
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', exp.host_id).single();
+        const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        
+        // 프로필 정보 우선순위: profiles(최신) -> host_applications(지원서) -> 기본값
+        setHostProfile({
+          name: profile?.name || app?.name || 'Locally Host',
+          avatar_url: profile?.avatar_url || app?.profile_photo || null,
+          languages: profile?.languages || app?.languages || [], // 언어 배열
+          introduction: profile?.bio || profile?.introduction || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.'
+        });
       }
       setLoading(false);
     };
@@ -70,25 +80,22 @@ export default function ExperienceDetailPage() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-// ✅ 핸들러 수정: 진짜 채팅방 생성
-const handleInquiry = async () => {
-  if (!user) return alert('로그인이 필요합니다.');
-  if (!inquiryText.trim()) return alert('내용을 입력해주세요.');
-  
-  try {
-    // 체험 정보에서 host_id 가져오기 (experience state 사용)
-    if (!experience?.host_id) return alert('호스트 정보를 불러올 수 없습니다.');
-
-    await createInquiry(experience.host_id, experience.id, inquiryText);
+  const handleInquiry = async () => {
+    if (!user) return alert('로그인이 필요합니다.');
+    if (!inquiryText.trim()) return alert('내용을 입력해주세요.');
     
-    if (confirm('문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?')) {
-      router.push('/guest/inbox');
+    try {
+      if (!experience?.host_id) return alert('호스트 정보를 불러올 수 없습니다.');
+      await createInquiry(experience.host_id, experience.id, inquiryText);
+      
+      if (confirm('문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?')) {
+        router.push('/guest/inbox');
+      }
+      setInquiryText('');
+    } catch (e: any) {
+      alert('문의 전송 실패: ' + e.message);
     }
-    setInquiryText('');
-  } catch (e: any) {
-    alert('문의 전송 실패: ' + e.message);
-  }
-};
+  };
 
   const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean) => {
     if (!user) return alert("로그인이 필요합니다.");
@@ -108,7 +115,7 @@ const handleInquiry = async () => {
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
         
-        {/* ✅ [복구 완료] 헤더 & 이미지 섹션 (Flex 밖으로 꺼냄 -> 넓어짐) */}
+        {/* 상단 섹션 */}
         <section className="mb-6">
           <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
           <div className="flex justify-between items-end">
@@ -130,12 +137,12 @@ const handleInquiry = async () => {
            <button className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform"><ChevronRight size={16}/> 사진 모두 보기</button>
         </section>
 
-        {/* 하단 2단 레이아웃 (본문 + 사이드바) */}
+        {/* 하단 2단 레이아웃 */}
         <div className="flex flex-col md:flex-row gap-16 relative">
           
           <ExpMainContent 
             experience={experience} 
-            hostProfile={hostProfile}
+            hostProfile={hostProfile} // 🟢 전달
             handleInquiry={handleInquiry} 
             inquiryText={inquiryText} 
             setInquiryText={setInquiryText}
