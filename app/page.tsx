@@ -77,30 +77,30 @@ export default function HomePage() {
     fetchExperiences();
   }, [selectedCategory]);
 
-  // 🔍 통합 검색 함수 (언어 필터 추가)
-  const handleSearch = () => {
-    let result = allExperiences;
+  // // 🔍 통합 검색 함수 (언어 필터 추가)
+  // const handleSearch = () => {
+  //   let result = allExperiences;
 
-    // 1. 텍스트 검색
-    if (locationInput.trim()) {
-      const term = locationInput.toLowerCase();
-      result = result.filter((item) => 
-        (item.title && item.title.toLowerCase().includes(term)) ||
-        (item.location && item.location.toLowerCase().includes(term)) ||
-        (item.description && item.description.toLowerCase().includes(term))
-      );
-    }
+  //   // 1. 텍스트 검색
+  //   if (locationInput.trim()) {
+  //     const term = locationInput.toLowerCase();
+  //     result = result.filter((item) => 
+  //       (item.title && item.title.toLowerCase().includes(term)) ||
+  //       (item.location && item.location.toLowerCase().includes(term)) ||
+  //       (item.description && item.description.toLowerCase().includes(term))
+  //     );
+  //   }
 
-    // 2. 언어 필터링
-    if (selectedLanguage !== 'all') {
-      result = result.filter((item) => 
-        item.languages && item.languages.includes(selectedLanguage)
-      );
-    }
+  //   // 2. 언어 필터링
+  //   if (selectedLanguage !== 'all') {
+  //     result = result.filter((item) => 
+  //       item.languages && item.languages.includes(selectedLanguage)
+  //     );
+  //   }
 
-    setFilteredExperiences(result);
-    setActiveSearchField(null); 
-  };
+  //   setFilteredExperiences(result);
+  //   setActiveSearchField(null); 
+  // };
 
   // HomeHero에 Props 전달을 위해 래퍼 컴포넌트 수정 필요 (아래 코드 참고)
   // (HomeHero.tsx도 Props 타입 수정이 필요하지만, 여기서는 핵심 로직만 보여드립니다.)
@@ -126,7 +126,7 @@ export default function HomePage() {
         setSelectedLanguage={setSelectedLanguage}
         // 👆
         searchRef={searchRef}
-        onSearch={handleSearch} 
+        // onSearch={handleSearch} 
       />
 
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">

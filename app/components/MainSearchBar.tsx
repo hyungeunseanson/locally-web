@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Search, MapPin, Globe } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation'; // 🟢 추가: 라우터 사용
 import { CATEGORIES } from '@/app/constants';
 import DatePicker from './DatePicker';
 
@@ -16,7 +17,7 @@ interface MainSearchBarProps {
   setSelectedLanguage: (lang: string) => void;
   onCategorySelect: (id: string) => void;
   isVisible: boolean;
-  onSearch: () => void;
+  onSearch?: () => void; // 🟢 선택적 prop으로 변경 (페이지 이동 방식 사용 시 불필요할 수 있음)
 }
 
 export default function MainSearchBar({
@@ -27,6 +28,7 @@ export default function MainSearchBar({
   onCategorySelect, isVisible,
   onSearch
 }: MainSearchBarProps) {
+  const router = useRouter(); // 🟢 라우터 훅 사용
 
   const formatDateRange = () => {
     if (dateRange.start && dateRange.end) {
@@ -36,10 +38,28 @@ export default function MainSearchBar({
     return '';
   };
 
+  // 🟢 검색 실행 함수 (URL 이동 로직 추가)
+  const handleSearchClick = () => {
+    // 1. 기존 onSearch가 있으면 실행 (메인 페이지에서 로컬 필터링을 원할 경우 유지)
+    if (onSearch) {
+      onSearch();
+    } else {
+      // 2. 검색 결과 페이지로 이동 (/search)
+      const params = new URLSearchParams();
+      if (locationInput) params.set('location', locationInput);
+      if (dateRange.start) params.set('startDate', dateRange.start.toISOString());
+      if (dateRange.end) params.set('endDate', dateRange.end.toISOString());
+      if (selectedLanguage && selectedLanguage !== 'all') params.set('language', selectedLanguage);
+      
+      router.push(`/search?${params.toString()}`);
+    }
+    
+    setActiveSearchField(null);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      onSearch();
-      setActiveSearchField(null);
+      handleSearchClick(); // 🟢 엔터키 입력 시에도 동일 로직 실행
     }
   };
 
@@ -51,7 +71,7 @@ export default function MainSearchBar({
     >
       <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100' : 'border-slate-200'} rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] transition-all`}>
         
-        {/* 1. 여행지 입력 (flex-1로 변경하여 동일 너비 적용) */}
+        {/* 1. 여행지 입력 */}
         <div 
           className={`flex-1 relative h-full flex flex-col justify-center px-8 rounded-full cursor-pointer transition-all z-10 group
             ${activeSearchField === 'location' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} 
@@ -66,13 +86,11 @@ export default function MainSearchBar({
             onKeyDown={handleKeyDown} 
             className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer" 
           />
-          
-          {/* 구분선 */}
           <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-[1px] h-8 bg-slate-200 transition-opacity 
             ${activeSearchField === 'location' || activeSearchField === 'date' ? 'opacity-0' : 'group-hover:opacity-0'}`}></div>
         </div>
         
-        {/* 2. 날짜 입력 (flex-1) */}
+        {/* 2. 날짜 입력 */}
         <div 
           className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all z-10 group
             ${activeSearchField === 'date' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} 
@@ -86,13 +104,11 @@ export default function MainSearchBar({
             readOnly 
             className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
           />
-
-          {/* 구분선 */}
           <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-[1px] h-8 bg-slate-200 transition-opacity 
             ${activeSearchField === 'date' || activeSearchField === 'language' ? 'opacity-0' : 'group-hover:opacity-0'}`}></div>
         </div>
 
-        {/* 3. 언어 선택 (flex-1) */}
+        {/* 3. 언어 선택 */}
         <div 
           className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all z-10 group
             ${activeSearchField === 'language' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} 
@@ -113,7 +129,7 @@ export default function MainSearchBar({
         {/* 4. 검색 버튼 */}
         <div className="pl-2 pr-2 h-full flex items-center justify-end rounded-full z-10">
           <button 
-            onClick={onSearch} 
+            onClick={handleSearchClick} // 🟢 변경된 함수 연결
             className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"
           >
             <Search size={20} strokeWidth={2.5}/>
@@ -121,7 +137,7 @@ export default function MainSearchBar({
         </div>
       </div>
 
-      {/* 🟢 팝업: 지역 선택 */}
+      {/* 팝업들은 기존 코드와 동일하게 유지 (생략 없음) */}
       {activeSearchField === 'location' && (
         <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
@@ -136,14 +152,12 @@ export default function MainSearchBar({
         </div>
       )}
 
-      {/* 🟢 팝업: 날짜 선택 */}
       {activeSearchField === 'date' && (
         <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <DatePicker selectedRange={dateRange} onChange={(range) => { setDateRange(range); if (range.start && range.end) setActiveSearchField('language'); }} />
         </div>
       )}
 
-      {/* 🟢 팝업: 언어 선택 */}
       {activeSearchField === 'language' && (
         <div className="absolute top-[80px] right-0 w-[200px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">언어 선택</h4>
