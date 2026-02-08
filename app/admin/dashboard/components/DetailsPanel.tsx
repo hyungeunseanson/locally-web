@@ -209,8 +209,8 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
           </div>
         )}
 
-        {/* 🟢 [BOOKINGS] 실시간/예약 상세 (신규 추가) */}
-        {(activeTab === 'BOOKINGS' || activeTab === 'REALTIME') && (
+{/* 🟢 [BOOKINGS] 실시간/예약 상세 (여기서부터 추가하세요) */}
+{(activeTab === 'BOOKINGS' || activeTab === 'REALTIME') && (
           <div className="space-y-6">
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><Clock size={12}/> 예약 정보</h4>
