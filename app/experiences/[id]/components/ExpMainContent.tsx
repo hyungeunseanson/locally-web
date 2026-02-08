@@ -19,14 +19,14 @@ export default function ExpMainContent({
           <h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2>
           <p className="text-slate-500 text-base">최대 {experience.max_guests}명 · {experience.duration || 2}시간 · 한국어/영어</p>
         </div>
-        <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/>
-{/* ✅ 수정됨: 고정 이미지 제거하고 실제 프로필 사진 연결 */}
-{hostProfile?.avatar_url ? (
-             <img src={hostProfile.avatar_url} className="w-full h-full object-cover"/>
-           ) : (
-             <User className="text-slate-300 w-8 h-8"/>
-           )}
-        </div>
+        <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
+   {/* ✅ Unsplash 이미지 태그를 지우고, 아래 조건문만 남기세요 */}
+   {hostProfile?.avatar_url ? (
+     <img src={hostProfile.avatar_url} className="w-full h-full object-cover"/>
+   ) : (
+     <User className="text-slate-300 w-8 h-8"/>
+   )}
+</div>
       </div>
 
       {/* 2. 체험 소개 */}

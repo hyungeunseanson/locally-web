@@ -60,7 +60,7 @@ export default function ExperienceDetailPage() {
 setHostProfile({
   id: exp.host_id, // 호스트 ID 추가 (필요할 수 있음)
   name: profile?.name || app?.name || 'Locally Host',
-  avatar_url: profile?.avatar_url || app?.profile_photo || null,
+  avatar_url: app?.profile_photo || profile?.avatar_url || null,
   languages: (profile?.languages && profile.languages.length > 0) ? profile.languages : (app?.languages || []),
   // 소개글 로직 강화: introduction이 있으면 사용, 없으면 bio, 없으면 self_intro
   introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
