@@ -49,15 +49,17 @@ export default function ExpMainContent({
 
       {/* 5. 호스트 상세 프로필 */}
       <HostProfileSection 
-        hostId={experience.host_id}
-        name={hostProfile?.name || 'Tomoyo'}
-        avatarUrl={hostProfile?.avatar_url}
-        job="패션 디자이너"
-        dreamDestination="중앙아메리카 커피 여행!"
-        favoriteSong="Growing on me - The Darkness"
-        languages={['영어', '일본어']}
-        intro={hostProfile?.self_intro || "도쿄의 숨겨진 빈티지 샵을 소개하는 것을 좋아합니다."}
-      />
+  hostId={experience.host_id}
+  name={hostProfile?.name || 'Tomoyo'}
+  avatarUrl={hostProfile?.avatar_url}
+  job={hostProfile?.job || "패션 디자이너"}
+  dreamDestination={hostProfile?.dream_destination || "중앙아메리카 커피 여행!"}
+  favoriteSong={hostProfile?.favorite_song || "Growing on me - The Darkness"}
+  // ✅ 1. 언어 데이터 연결
+  languages={hostProfile?.languages || []} 
+  // ✅ 2. 소개글 속성명 일치 (introduction)
+  intro={hostProfile?.introduction || "도쿄의 숨겨진 빈티지 샵을 소개하는 것을 좋아합니다."} 
+/>
 
       {/* 6. 지도 (Location) */}
       <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">

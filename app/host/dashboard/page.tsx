@@ -77,7 +77,7 @@ function DashboardContent() {
         favorite_song: profileData?.favorite_song || '',
         };
       
-      setProfile(profileData);
+      setProfile(mergedProfile);
 
     } catch (error) {
       console.error(error);
