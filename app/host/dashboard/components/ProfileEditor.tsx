@@ -1,33 +1,41 @@
 'use client';
 
-import React, { useState, useEffect } from 'react'; // ✅ useEffect 확인
+import React, { useState, useEffect } from 'react';
+// ✅ 아이콘 추가됨
 import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-
 
 export default function ProfileEditor({ profile, onUpdate }: any) {
   // ✅ 탭 상태 추가
   const [activeTab, setActiveTab] = useState<'public' | 'private'>('public');
-
-  // ✅ formData에 비공개 정보 필드들 추가
+  
+  // ✅ formData 확장 (비공개 정보 포함)
   const [formData, setFormData] = useState({
-    // 기존 정보
-    job: '', dream_destination: '', favorite_song: '', languages: '', introduction: '', name: '',
-    // 신규 추가 (비공개 정보)
-    phone: '', dob: '', host_nationality: '',
-    bank_name: '', account_number: '', account_holder: '',
+    // 공개 정보
+    name: '',
+    job: '',
+    dream_destination: '',
+    favorite_song: '',
+    languages: '',
+    introduction: '',
+    // 비공개 정보
+    phone: '',
+    dob: '',
+    host_nationality: '',
+    bank_name: '',
+    account_number: '',
+    account_holder: '',
     motivation: ''
   });
   
   const [loading, setLoading] = useState(false);
-  const supabase = createClient();
   const [uploading, setUploading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     if (profile) {
       setFormData({
-        // 공개 정보
         name: profile.name || '',
         job: profile.job || '',
         dream_destination: profile.dream_destination || '',
@@ -35,7 +43,7 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
         languages: Array.isArray(profile.languages) ? profile.languages.join(', ') : (profile.languages || ''),
         introduction: profile.introduction || profile.bio || '',
         
-        // ✅ 비공개 정보 연결 (추가됨)
+        // 비공개 데이터 초기화
         phone: profile.phone || '',
         dob: profile.dob || '',
         host_nationality: profile.host_nationality || '',
@@ -48,32 +56,28 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
     }
   }, [profile]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-// 👇 handleChange 함수 아래에 추가
-const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  if (!e.target.files || e.target.files.length === 0) return;
-  setUploading(true);
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const file = e.target.files[0];
-    const fileName = `profile/${user.id}_${Date.now()}`;
-    const { error } = await supabase.storage.from('images').upload(fileName, file);
-    
-    if (error) throw error;
-    
-    const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-    setAvatarUrl(data.publicUrl); // ✅ 미리보기 URL 업데이트
-  } catch (err: any) {
-    alert('사진 업로드 실패: ' + err.message);
-  } finally {
-    setUploading(false);
-  }
-};
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const file = e.target.files[0];
+      const fileName = `profile/${user.id}_${Date.now()}`;
+      const { error } = await supabase.storage.from('images').upload(fileName, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+      setAvatarUrl(data.publicUrl);
+    } catch (err: any) {
+      alert('사진 업로드 실패: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -83,17 +87,17 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         id: user.id,
         updated_at: new Date().toISOString(),
         
-        // 기존 공개 데이터
-        name: formData.name, // 이름 추가
+        // 공개 데이터
+        name: formData.name,
         job: formData.job,
         dream_destination: formData.dream_destination,
         favorite_song: formData.favorite_song,
-        languages: formData.languages.split(',').map((s:string) => s.trim()).filter((s:string) => s),
+        languages: formData.languages.split(',').map((s:string) => s.trim()).filter(Boolean),
         introduction: formData.introduction,
         bio: formData.introduction,
         avatar_url: avatarUrl,
 
-        // ✅ 비공개 데이터 추가 저장
+        // 비공개 데이터 저장
         phone: formData.phone,
         dob: formData.dob,
         host_nationality: formData.host_nationality,
@@ -105,7 +109,7 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
       const { error } = await supabase.from('profiles').upsert(updates);
       if (!error) {
-        alert('프로필이 저장되었습니다!');
+        alert('정보가 성공적으로 저장되었습니다!');
         if(onUpdate) onUpdate();
       } else {
         alert('저장 중 오류가 발생했습니다.');
@@ -118,7 +122,7 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
       
-      {/* ✅ 1. 상단 탭 메뉴 (신규 추가) */}
+      {/* 상단 탭 메뉴 */}
       <div className="flex border-b border-slate-100 bg-slate-50/50">
         <button 
           onClick={() => setActiveTab('public')}
@@ -135,50 +139,37 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       </div>
 
       <div className="p-8">
-        
-        {/* ✅ 2. 공개 프로필 탭 내용 (기존 내용 + 사진 업로드) */}
+        {/* 🟢 공개 프로필 탭 */}
         {activeTab === 'public' && (
           <div className="space-y-8 animate-in fade-in">
-            <div className="flex flex-col items-center mb-8">
-                <label className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg cursor-pointer group hover:border-slate-200 transition-all">
-                   {avatarUrl ? (
-                     <img src={avatarUrl} className="w-full h-full object-cover"/>
-                   ) : (
-                     <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={48}/></div>
-                   )}
-                   <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                     <Camera className="text-white"/>
-                   </div>
-                   <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading}/>
-                </label>
-                <span className="text-xs text-slate-400 mt-2">{uploading ? '업로드 중...' : '사진 변경'}</span>
+            <div className="flex flex-col items-center">
+              <label className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg cursor-pointer group hover:border-slate-200 transition-all">
+                 {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={48}/></div>}
+                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white"/></div>
+                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading}/>
+              </label>
+              <span className="text-xs text-slate-400 mt-2">프로필 사진 변경</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputGroup label="이름 (닉네임)" name="name" value={formData.name} onChange={handleChange} icon={<User size={16}/>} />
-                <InputGroup label="직업 / 직장" name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16}/>} placeholder="예: 패션 디자이너" />
-                <InputGroup label="꿈의 여행지" name="dream_destination" value={formData.dream_destination} onChange={handleChange} icon={<Globe size={16}/>} placeholder="예: 아이슬란드 오로라 여행" />
-                <InputGroup label="최애 노래" name="favorite_song" value={formData.favorite_song} onChange={handleChange} icon={<Music size={16}/>} placeholder="예: Bohemian Rhapsody" />
-                <div className="col-span-2">
-                    <InputGroup label="구사 언어 (쉼표로 구분)" name="languages" value={formData.languages} onChange={handleChange} icon={<MessageCircle size={16}/>} placeholder="예: 한국어, 영어" />
-                </div>
+              <InputGroup label="이름 (닉네임)" name="name" value={formData.name} onChange={handleChange} icon={<User size={16}/>} />
+              <InputGroup label="직업 / 직장" name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16}/>} placeholder="예: 패션 디자이너" />
+              <InputGroup label="꿈의 여행지" name="dream_destination" value={formData.dream_destination} onChange={handleChange} icon={<Globe size={16}/>} placeholder="예: 아이슬란드 오로라 여행" />
+              <InputGroup label="최애 노래" name="favorite_song" value={formData.favorite_song} onChange={handleChange} icon={<Music size={16}/>} placeholder="예: Bohemian Rhapsody" />
+              <div className="col-span-2">
+                <InputGroup label="구사 언어 (쉼표로 구분)" name="languages" value={formData.languages} onChange={handleChange} icon={<MessageCircle size={16}/>} placeholder="예: 한국어, 영어" />
+              </div>
             </div>
 
             <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">자기소개</label>
-                <textarea 
-                  name="introduction"
-                  value={formData.introduction}
-                  onChange={handleChange}
-                  className="w-full h-40 p-4 border border-slate-200 rounded-xl resize-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm leading-relaxed"
-                  placeholder="게스트에게 나를 소개해 주세요."
-                />
+              <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">자기소개</label>
+              <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-sm" placeholder="게스트에게 나를 소개해 주세요." />
             </div>
           </div>
         )}
 
-{/* 🔴 비공개 정보 탭 (수정 불가 / 관리자 문의) */}
-{activeTab === 'private' && (
+        {/* 🔴 비공개 정보 탭 (수정 불가 / 관리자 문의) */}
+        {activeTab === 'private' && (
           <div className="space-y-8 animate-in fade-in">
             
             {/* 🔒 수정 불가 안내 메시지 */}
@@ -225,8 +216,8 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
           </div>
         )}
 
-{/* 저장 버튼 (공개 탭일 때만 노출) */}
-{activeTab === 'public' && (
+        {/* 저장 버튼 (공개 탭일 때만 노출) */}
+        {activeTab === 'public' && (
           <div className="flex justify-end pt-8 mt-4 border-t border-slate-100">
             <button onClick={handleSave} disabled={loading} className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50">
               <Save size={18}/> {loading ? '저장 중...' : '변경사항 저장하기'}
@@ -241,17 +232,15 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 function InputGroup({ label, name, value, onChange, icon, placeholder, disabled }: any) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">
-        {icon} {label}
-      </label>
+      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">{icon} {label}</label>
       <input 
         type="text" 
-        name={name}
+        name={name} 
         value={value} 
-        onChange={onChange}
-        disabled={disabled} // ✅ 비활성화 속성 연결
-        className="w-full p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm"
-        placeholder={placeholder}
+        onChange={onChange} 
+        disabled={disabled}
+        className={`w-full p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'}`} 
+        placeholder={placeholder} 
       />
     </div>
   );
