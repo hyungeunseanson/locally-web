@@ -17,6 +17,15 @@ export default function BecomeHostPage() {
   const supabase = createClient();
   const router = useRouter(); // ✅ Next.js 라우터 사용
 
+// 🟢 formData 상태 수정 (languages를 배열로)
+const [formData, setFormData] = useState({
+  motivation: '',
+  languages: [] as string[], // 배열로 변경
+  experience_type: '',
+  intro: '',
+  portfolio_urls: [] as string[]
+});
+
   // ✅ [UI용] 페이지 로드 시 버튼 텍스트 결정을 위한 상태 확인
   useEffect(() => {
     const checkStatus = async () => {
@@ -37,38 +46,51 @@ export default function BecomeHostPage() {
     checkStatus();
   }, []);
 
-  // ✅ [기능용] 버튼 클릭 시점의 정확한 로직 (비동기 처리)
-  const handleStartClick = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    // 1. 비로그인 -> 로그인 모달 
-    if (!session) {
-      setIsLoginModalOpen(true);
-      return;
-    }
-
-    // 2. 버튼 누르는 순간, DB에서 최신 신청 상태 다시 확인 (안전장치)
-    const { data } = await supabase
-      .from('host_applications')
-      .select('status')
-      .eq('user_id', session.user.id)
-      .limit(1)
-      .maybeSingle();
-
-    // 3. 결과에 따른 이동
-    if (data) {
-      // 신청 기록이 있음 (보완/거절/대기/승인 모두 포함) -> 대시보드로 이동해서 상태 보여주기
-      router.push('/host/dashboard');
+  // 🟢 언어 토글 함수 추가
+  const toggleLanguage = (lang: string) => {
+    const current = formData.languages;
+    if (current.includes(lang)) {
+      setFormData(prev => ({ ...prev, languages: current.filter(l => l !== lang) }));
     } else {
-      // 신청 기록 없음 -> 등록 페이지로 이동
-      router.push('/host/register');
+      setFormData(prev => ({ ...prev, languages: [...current, lang] }));
+    }
+  };
+
+// 🟢 호스트 지원 제출 함수 (DB 저장 로직 수정)
+  const handleSubmitApplication = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('로그인이 필요합니다.');
+
+      const { error } = await supabase
+        .from('host_applications')
+        .insert({
+          user_id: user.id,
+          motivation: formData.motivation,
+          languages: formData.languages, // 배열 그대로 저장
+          experience_type: formData.experience_type,
+          self_intro: formData.intro,
+          portfolio_urls: formData.portfolio_urls,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+      
+      alert('호스트 지원이 완료되었습니다! 관리자 승인을 기다려주세요.');
+      setHasApplication(true); // 상태 업데이트
+      router.push('/host/dashboard'); // 대시보드로 이동
+
+    } catch (error: any) {
+      alert('지원 중 오류가 발생했습니다: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
       <main>
