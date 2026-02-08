@@ -1,7 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Shield, Clock, MapPin, MessageCircle, Smile, CreditCard, Star, Trash2 } from 'lucide-react';
+import { Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Clock, MapPin, MessageCircle, Smile, Trash2, Star } from 'lucide-react';
+
+// 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
+function timeAgo(dateString: string | null) {
+  if (!dateString) return '기록 없음';
+  
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return '방금 전';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}일 전`;
+  return past.toLocaleDateString(); // 오래된 건 날짜로 표시
+}
 
 export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,10 +28,13 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
     u.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
+  const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
+
   return (
     <div className="flex-1 h-full flex overflow-hidden relative">
       
-      {/* 🟢 메인 콘텐츠 (리스트 영역) - 기존 유지 */}
+      {/* 🟢 메인 콘텐츠 (리스트 영역) */}
       <div className={`flex-1 flex flex-col space-y-6 overflow-y-auto p-1 animate-in fade-in zoom-in-95 duration-300 ${selectedUser ? 'w-2/3 pr-4' : 'w-full'}`}>
         
         {/* 1. 실시간 접속자 섹션 */}
@@ -66,49 +84,67 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                 <tr>
                   <th className="px-6 py-3">유저 정보</th>
                   <th className="px-6 py-3">연락처</th>
+                  <th className="px-6 py-3">최근 접속</th> {/* 🟢 추가됨 */}
                   <th className="px-6 py-3">구분</th>
                   <th className="px-6 py-3 text-right">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredUsers.map((user: any) => (
-                  <tr 
-                    key={user.id} 
-                    onClick={() => setSelectedUser(user)} 
-                    className={`cursor-pointer transition-colors ${selectedUser?.id === user.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
-                  >
-                    <td className="px-6 py-4 flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden border border-slate-100">
-                        {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={16}/>}
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900">{user.name || '이름 없음'}</div>
-                        <div className="text-xs text-slate-400">{user.email}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">{user.phone || '-'}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'host' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
-                        {user.role || 'USER'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); deleteItem('profiles', user.id); }} 
-                        className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <MoreHorizontal size={16}/>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredUsers.map((user: any) => {
+                  const isOnline = onlineUserIds.has(user.id);
+                  return (
+                    <tr 
+                      key={user.id} 
+                      onClick={() => setSelectedUser(user)} 
+                      className={`cursor-pointer transition-colors ${selectedUser?.id === user.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                    >
+                      <td className="px-6 py-4 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden border border-slate-100 relative">
+                          {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={16}/>}
+                          {/* 🟢 온라인 상태일 때 초록색 점 표시 */}
+                          {isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-900">{user.name || '이름 없음'}</div>
+                          <div className="text-xs text-slate-400">{user.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500">{user.phone || '-'}</td>
+                      
+                      {/* 🟢 최근 접속 시간 표시 (수정됨) */}
+                      <td className="px-6 py-4">
+                        {isOnline ? (
+                          <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded">Online</span>
+                        ) : (
+                          <span className="text-slate-500 text-xs flex items-center gap-1">
+                            <Clock size={12}/> {timeAgo(user.last_active_at)}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'host' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
+                          {user.role || 'USER'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); deleteItem('profiles', user.id); }} 
+                          className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <MoreHorizontal size={16}/>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </section>
       </div>
 
-      {/* 🟢 [복구 완료] 유저 상세 정보 패널 (우측 슬라이드) */}
+      {/* 🟢 유저 상세 정보 패널 (우측 슬라이드) - 기존 내용 복구됨 */}
       {selectedUser && (
         <div className="w-[450px] border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 absolute right-0 top-0 z-20">
           
@@ -131,13 +167,23 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selectedUser.name || 'Locally User'}</h2>
-                <div className="flex items-center gap-2 text-xs text-green-600 font-bold mt-1 bg-green-50 px-2 py-1 rounded w-fit">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 최근 접속: 방금 전 (Online)
+                
+                {/* 🟢 상세 페이지 최근 접속 표시 (수정됨) */}
+                <div className={`flex items-center gap-2 text-xs font-bold mt-1 px-2 py-1 rounded w-fit ${onlineUserIds.has(selectedUser.id) ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                  {onlineUserIds.has(selectedUser.id) ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 지금 활동 중 (Online)
+                    </>
+                  ) : (
+                    <>
+                      <Clock size={12}/> 마지막 접속: {timeAgo(selectedUser.last_active_at)}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* 2. 고객 프로필 (복구됨!) */}
+            {/* 2. 고객 프로필 (기존 유지) */}
             <div className="p-6 border-b border-slate-100">
               <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">고객 프로필</h4>
               <div className="space-y-4 text-sm">
@@ -150,7 +196,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               </div>
             </div>
 
-            {/* 3. 구매 활동 (복구됨!) */}
+            {/* 3. 구매 활동 (기존 유지) */}
             <div className="p-6 border-b border-slate-100">
               <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">구매 활동</h4>
               <div className="grid grid-cols-3 gap-2 mb-6">
@@ -190,7 +236,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               </div>
             </div>
 
-            {/* 4. 받은 리뷰 (복구됨!) */}
+            {/* 4. 받은 리뷰 (기존 유지) */}
             <div className="p-6 border-b border-slate-100">
               <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">받은 리뷰 (3개)</h4>
               <div className="space-y-4">
@@ -207,7 +253,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               </div>
             </div>
 
-            {/* 5. 관리자 메모 */}
+            {/* 5. 관리자 메모 (기존 유지) */}
             <div className="p-6">
               <h4 className="text-xs font-bold text-slate-900 uppercase mb-2">관리자 메모</h4>
               <textarea 
