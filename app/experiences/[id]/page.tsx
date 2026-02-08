@@ -56,13 +56,19 @@ export default function ExperienceDetailPage() {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', exp.host_id).single();
         const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
         
-        // 프로필 정보 우선순위: profiles(최신) -> host_applications(지원서) -> 기본값
-        setHostProfile({
-          name: profile?.name || app?.name || 'Locally Host',
-          avatar_url: profile?.avatar_url || app?.profile_photo || null,
-          languages: profile?.languages || app?.languages || [], // 언어 배열
-          introduction: profile?.bio || profile?.introduction || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.'
-        });
+// [수정됨] 프로필 정보 우선순위 강화
+setHostProfile({
+  id: exp.host_id, // 호스트 ID 추가 (필요할 수 있음)
+  name: profile?.name || app?.name || 'Locally Host',
+  avatar_url: profile?.avatar_url || app?.profile_photo || null,
+  languages: (profile?.languages && profile.languages.length > 0) ? profile.languages : (app?.languages || []),
+  // 소개글 로직 강화: introduction이 있으면 사용, 없으면 bio, 없으면 self_intro
+  introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
+  // 추가 정보들도 있으면 전달
+  job: profile?.job,
+  dream_destination: profile?.dream_destination,
+  favorite_song: profile?.favorite_song
+});
       }
       setLoading(false);
     };

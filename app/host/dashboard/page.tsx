@@ -56,6 +56,26 @@ function DashboardContent() {
         .select('*')
         .eq('id', user.id)
         .single();
+
+      const mergedProfile = {
+        ...profileData, // 기본적으로 프로필 데이터 사용
+          
+          // 프로필에 값이 없으면 지원서(hostData) 값으로 채워넣기 (Fallback)
+        name: profileData?.name || hostData?.name,
+          // avatar_url이 없으면 profile_photo 사용
+        avatar_url: profileData?.avatar_url || hostData?.profile_photo,
+          // 소개글 병합 (introduction -> bio -> self_intro 순)
+        introduction: profileData?.introduction || profileData?.bio || hostData?.self_intro,
+          // 언어 설정 병합
+        languages: (profileData?.languages && profileData.languages.length > 0) 
+          ? profileData.languages 
+          : (hostData?.languages || []),
+            
+          // 기타 메타데이터 (없는 경우 빈 문자열)
+        job: profileData?.job || '',
+        dream_destination: profileData?.dream_destination || '',
+        favorite_song: profileData?.favorite_song || '',
+        };
       
       setProfile(profileData);
 

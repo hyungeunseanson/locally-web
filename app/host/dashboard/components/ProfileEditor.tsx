@@ -19,14 +19,18 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null);
 
   useEffect(() => {
+    // profile이 존재하고, 데이터가 비어있지 않은지 확인
     if (profile) {
       setFormData({
-        job: profile.job || '',
+        job: profile.job || '', // 없으면 빈 문자열
         dream_destination: profile.dream_destination || '',
         favorite_song: profile.favorite_song || '',
+        // 언어 배열을 문자열로 변환 (UI 표시용)
         languages: Array.isArray(profile.languages) ? profile.languages.join(', ') : (profile.languages || ''),
+        // 소개글 우선순위 적용
         introduction: profile.introduction || profile.bio || '',
       });
+      // 사진 URL 설정
       setAvatarUrl(profile.avatar_url || null);
     }
   }, [profile]);
