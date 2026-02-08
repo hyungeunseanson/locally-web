@@ -29,6 +29,7 @@ export default function HomePage() {
   
   const supabase = createClient();
 
+  // 스크롤 및 외부 클릭 처리
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -74,77 +75,98 @@ export default function HomePage() {
     fetchExperiences();
   }, []);
 
-  // 🟢 2. 통합 필터링 함수 (검색 버튼 클릭 or 카테고리 탭 변경 시 실행)
+  // 🟢 2. 강력해진 통합 필터링 함수
   const applyFilters = () => {
     let result = allExperiences;
 
-    // A. 지역/키워드 필터 (제목, 위치, 설명, ⭐카테고리⭐ 포함)
+    // A. 지역/키워드 필터 (띄어쓰기 단위로 쪼개서 AND 조건 검색)
+    // 예: "도쿄 액티비티" -> "도쿄"도 있고 "액티비티"도 있는 항목 검색
     if (locationInput.trim()) {
-      const term = locationInput.toLowerCase();
+      // 1. 특수문자(· 등)를 공백으로 치환하고, 공백 기준으로 단어 쪼개기
+      const searchTerms = locationInput
+        .replace(/[·,.]/g, ' ') // "도쿄 · 액티비티" -> "도쿄   액티비티"
+        .toLowerCase()
+        .split(/\s+/) // 공백 기준으로 배열 생성 ['도쿄', '액티비티']
+        .filter(term => term.length > 0); // 빈 문자열 제거
+
       result = result.filter((item) => {
-        // 검색 대상 필드들을 하나의 문자열로 합쳐서 검사 (더 강력함)
+        // 검색 대상 필드들을 하나의 문자열로 합침
         const targetString = `
           ${item.title || ''} 
           ${item.location || ''} 
           ${item.description || ''} 
           ${item.category || ''}
+          ${Array.isArray(item.tags) ? item.tags.join(' ') : ''} 
         `.toLowerCase();
         
-        return targetString.includes(term);
+        // 모든 검색어가 targetString에 포함되어야 함 (AND 조건)
+        return searchTerms.every(term => targetString.includes(term));
       });
     }
 
-    // B. 언어 필터 (DB에 ['ko', 'en'] 형태로 저장된다고 가정)
+    // B. 언어 필터 (DB에 한글('한국어')로 저장됐든 코드('ko')로 저장됐든 다 찾음)
     if (selectedLanguage !== '전체') {
       const langMap:Record<string, string> = { '한국어': 'ko', '영어': 'en', '일본어': 'ja', '중국어': 'zh' };
-      const langCode = langMap[selectedLanguage] || selectedLanguage;
+      const langCode = langMap[selectedLanguage]; // 'ko'
       
-      result = result.filter((item) => 
-        item.languages && Array.isArray(item.languages) && item.languages.includes(langCode)
-      );
+      result = result.filter((item) => {
+        if (!item.languages || !Array.isArray(item.languages)) return false;
+        // 배열 안에 '한국어'가 있거나 'ko'가 있으면 통과
+        return item.languages.includes(selectedLanguage) || (langCode && item.languages.includes(langCode));
+      });
     }
 
-    // 🟢 C. 날짜 필터 (DB에 available_dates 배열이 있다고 가정)
+    // C. 날짜 필터 (날짜만 선택해도 검색되도록 로직 수정)
     if (dateRange.start) {
-      const selectedStart = new Date(dateRange.start).setHours(0,0,0,0);
-      const selectedEnd = dateRange.end ? new Date(dateRange.end).setHours(23,59,59,999) : new Date(dateRange.start).setHours(23,59,59,999);
+      const selectedStart = new Date(dateRange.start);
+      selectedStart.setHours(0,0,0,0); // 시간 제거
+
+      const selectedEnd = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start);
+      selectedEnd.setHours(23,59,59,999);
 
       result = result.filter((item) => {
-        // available_dates 필드가 없거나 비어있으면 검색 결과에서 제외 (혹은 모든 날짜 가능으로 칠지 결정 필요)
-        if (!item.available_dates || !Array.isArray(item.available_dates)) return false;
+        // available_dates 필드가 없으면(null) -> 일단 검색되게 할지 제외할지 결정 (여기선 날짜 정보 없으면 검색 제외)
+        if (!item.available_dates || !Array.isArray(item.available_dates) || item.available_dates.length === 0) {
+            // 데이터가 없으면 날짜 필터 시 제외하는 게 맞음
+            return false; 
+        }
 
         // 체험 가능 날짜 중 하나라도 선택한 기간에 포함되는지 확인
         return item.available_dates.some((dateStr: string) => {
-          const itemDate = new Date(dateStr).getTime();
-          return itemDate >= selectedStart && itemDate <= selectedEnd;
+          const itemDate = new Date(dateStr);
+          itemDate.setHours(0,0,0,0);
+          return itemDate.getTime() >= selectedStart.getTime() && itemDate.getTime() <= selectedEnd.getTime();
         });
       });
     }
 
     // D. 카테고리 탭 필터 (selectedCategory)
-    // 탭으로 선택한 카테고리는 검색어와 별도로 항상 적용 (단, 'all'이 아닐 때)
     if (selectedCategory !== 'all') {
-       // 카테고리 ID가 지역명과 일치하면 지역 필터링, 아니면 카테고리 필터링
-       // (현재 CATEGORIES 상수 구조상 지역 위주이므로 location 체크)
-       result = result.filter((item) => 
-          item.location?.includes(selectedCategory) || item.title?.includes(selectedCategory)
-       );
+       // 검색창에 입력된 값이 없을 때만 탭 필터 적용 (검색창이 우선)
+       // 또는 검색창 입력값과 카테고리가 충돌하지 않도록 보조
+       if (!locationInput) {
+          result = result.filter((item) => 
+            item.location?.includes(selectedCategory) || item.title?.includes(selectedCategory)
+          );
+       }
     }
 
     setFilteredExperiences(result);
   };
 
-  // 카테고리 탭 변경 시에는 즉시 필터링
+  // 카테고리 탭 변경 시 즉시 필터링
   useEffect(() => {
-    // 🔴 중요: locationInput이 비어있을 때만 카테고리 탭 필터링을 단독 수행.
-    // 검색어가 있으면 검색 버튼 누를 때까지 기다려야 하므로 여기서는 selectedCategory만 반영.
-    // 하지만 "도쿄" 탭을 누르면 바로 도쿄 리스트가 뜨는 건 자연스러우므로 유지.
-    if (!locationInput) {
+    // 탭을 눌렀을 땐 검색창을 비우고 탭 기준 필터링
+    if (selectedCategory !== 'all') {
+        // setLocationInput(''); // 필요시 주석 해제 (탭 누르면 검색어 초기화)
         applyFilters(); 
+    } else {
+        // 전체 탭 누르면 전체 보기
+        applyFilters();
     }
   }, [selectedCategory]); 
 
-  // 🟢 검색 버튼 핸들러
+  // 🟢 검색 버튼 핸들러 (버튼 클릭 시에만 검색 실행)
   const handleSearch = () => {
     applyFilters();
   };
@@ -158,9 +180,14 @@ export default function HomePage() {
         selectedCategory={selectedCategory}
         setSelectedCategory={(id) => {
             setSelectedCategory(id);
-            // 탭을 눌렀을 때는 검색창 비우기 (혼동 방지)
-            if (id !== 'all') {
-                setLocationInput(''); 
+            // 탭 누를 때 검색창 값 초기화 (혼선 방지)
+            if (id === 'all') {
+                setLocationInput('');
+                setFilteredExperiences(allExperiences);
+            } else {
+                // 탭에 해당하는 지역명을 검색창에 넣지 않고, 그냥 필터만 적용하려면 아래 줄 제거
+                const label = CATEGORIES.find(c => c.id === id)?.label;
+                if(label) setLocationInput(label);
             }
         }}
         isScrolled={isScrolled}
@@ -173,7 +200,7 @@ export default function HomePage() {
         selectedLanguage={selectedLanguage}
         setSelectedLanguage={setSelectedLanguage}
         searchRef={searchRef}
-        onSearch={handleSearch} // 검색 버튼 클릭 시 실행
+        onSearch={handleSearch} // 검색 버튼 클릭 시 applyFilters 실행
       />
 
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
@@ -192,7 +219,7 @@ export default function HomePage() {
             <div className="flex flex-col items-center justify-center py-40 text-center">
               <Ghost size={48} className="text-slate-300 mb-4"/>
               <h3 className="text-lg font-bold text-slate-900 mb-2">검색 결과가 없습니다.</h3>
-              <p className="text-slate-500 text-sm">다른 키워드나 언어로 검색해보세요!</p>
+              <p className="text-slate-500 text-sm">다른 키워드, 날짜, 언어로 검색해보세요!</p>
               <button 
                 onClick={() => { 
                     setLocationInput(''); 
