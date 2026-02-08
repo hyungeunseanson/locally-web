@@ -26,8 +26,11 @@ export default function RootLayout({
         <NotificationProvider>
             <ToastProvider> {/* ✅ 감싸기 */}
               <UserPresenceTracker /> 
-              {children}
-              <SiteFooter />
+{/* 🟢 페이지 본문 (children) */}
+{children}
+
+{/* 🟢 [위치 이동] Provider 안쪽으로 이동시켰습니다! */}
+<SiteFooter />
             </ToastProvider>
           </NotificationProvider>
         </LanguageProvider>
