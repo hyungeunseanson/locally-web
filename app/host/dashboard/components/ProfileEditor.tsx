@@ -177,55 +177,68 @@ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
           </div>
         )}
 
-        {/* ✅ 3. 비공개 정보 탭 내용 (신규 추가) */}
-        {activeTab === 'private' && (
+{/* 🔴 비공개 정보 탭 (수정 불가 / 관리자 문의) */}
+{activeTab === 'private' && (
           <div className="space-y-8 animate-in fade-in">
-            {/* 개인 신상 */}
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+            
+            {/* 🔒 수정 불가 안내 메시지 */}
+            <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-xl flex gap-3 text-yellow-800 text-sm">
+               <Lock className="flex-shrink-0 mt-0.5" size={18}/>
+               <div>
+                 <p className="font-bold mb-1">개인 정보 및 정산 정보는 수정할 수 없습니다.</p>
+                 <p className="opacity-80">정보 변경이 필요한 경우, 관리자에게 문의해 주세요. (보안 및 정산 오류 방지)</p>
+               </div>
+            </div>
+
+            {/* 1. 개인 신상 (잠김) */}
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-80">
               <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><User size={18}/> 개인 신상 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputGroup label="연락처" name="phone" value={formData.phone} onChange={handleChange} placeholder="010-0000-0000" />
-                <InputGroup label="생년월일" name="dob" value={formData.dob} onChange={handleChange} placeholder="YYYY-MM-DD" />
+                <InputGroup label="연락처" name="phone" value={formData.phone} disabled={true} />
+                <InputGroup label="생년월일" name="dob" value={formData.dob} disabled={true} />
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">국적</label>
-                  <select name="host_nationality" value={formData.host_nationality} onChange={handleChange as any} className="w-full p-3.5 border border-slate-200 rounded-xl focus:border-black bg-white text-sm outline-none">
-                    <option value="Korea">대한민국 (Korea)</option>
-                    <option value="Japan">일본 (Japan)</option>
-                    <option value="Other">기타 (Other)</option>
-                  </select>
+                  <input value={formData.host_nationality} disabled className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-100 text-slate-500 text-sm cursor-not-allowed"/>
                 </div>
               </div>
             </div>
 
-            {/* 정산 계좌 */}
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+            {/* 2. 정산 계좌 (잠김) */}
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-80">
               <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><CreditCard size={18}/> 정산 계좌 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <InputGroup label="은행명" name="bank_name" value={formData.bank_name} onChange={handleChange} />
-                <InputGroup label="계좌번호" name="account_number" value={formData.account_number} onChange={handleChange} />
-                <InputGroup label="예금주" name="account_holder" value={formData.account_holder} onChange={handleChange} />
+                <InputGroup label="은행명" name="bank_name" value={formData.bank_name} disabled={true} />
+                <InputGroup label="계좌번호" name="account_number" value={formData.account_number} disabled={true} />
+                <InputGroup label="예금주" name="account_holder" value={formData.account_holder} disabled={true} />
               </div>
             </div>
 
-            {/* 지원 동기 */}
+            {/* 3. 지원 동기 (잠김) */}
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5"><FileText size={14}/> 지원 동기 (가입 시 작성)</label>
-              <textarea name="motivation" value={formData.motivation} onChange={handleChange} className="w-full h-32 p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-sm bg-slate-50 outline-none" />
+              <textarea 
+                value={formData.motivation} 
+                disabled 
+                className="w-full h-32 p-4 border border-slate-200 rounded-xl resize-none text-sm bg-slate-100 text-slate-500 cursor-not-allowed" 
+              />
             </div>
           </div>
         )}
 
-        <div className="flex justify-end pt-8 mt-4 border-t border-slate-100">
-          <button onClick={handleSave} disabled={loading} className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50">
-            <Save size={18}/> {loading ? '저장 중...' : '저장하기'}
-          </button>
-        </div>
+{/* 저장 버튼 (공개 탭일 때만 노출) */}
+{activeTab === 'public' && (
+          <div className="flex justify-end pt-8 mt-4 border-t border-slate-100">
+            <button onClick={handleSave} disabled={loading} className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50">
+              <Save size={18}/> {loading ? '저장 중...' : '변경사항 저장하기'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function InputGroup({ label, name, value, onChange, icon, placeholder }: any) {
+function InputGroup({ label, name, value, onChange, icon, placeholder, disabled }: any) {
   return (
     <div>
       <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">
@@ -236,6 +249,7 @@ function InputGroup({ label, name, value, onChange, icon, placeholder }: any) {
         name={name}
         value={value} 
         onChange={onChange}
+        disabled={disabled} // ✅ 비활성화 속성 연결
         className="w-full p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm"
         placeholder={placeholder}
       />

@@ -60,32 +60,11 @@ function DashboardContent() {
       const mergedProfile = {
         ...profileData, // 기본적으로 프로필 데이터 사용
           
-        // 1. 기본 정보 (Fallback)
-        name: profileData?.name || hostData?.name,
-        avatar_url: profileData?.avatar_url || hostData?.profile_photo,
-        introduction: profileData?.introduction || profileData?.bio || hostData?.self_intro,
-        languages: (profileData?.languages && profileData.languages.length > 0) ? profileData.languages : (hostData?.languages || []),
-        
-        // 2. 비공개/개인 정보 (없으면 지원서 데이터 사용)
-        phone: profileData?.phone || hostData?.phone || '',
-        dob: profileData?.dob || hostData?.dob || '',
-        host_nationality: profileData?.host_nationality || hostData?.host_nationality || '',
-        
-        // 3. 정산 정보 (없으면 지원서 데이터 사용)
-        bank_name: profileData?.bank_name || hostData?.bank_name || '',
-        account_number: profileData?.account_number || hostData?.account_number || '',
-        account_holder: profileData?.account_holder || hostData?.account_holder || '',
-        
-        // 4. 기타
-        motivation: profileData?.motivation || hostData?.motivation || '',
-        job: profileData?.job || '',
-        dream_destination: profileData?.dream_destination || '',
-        favorite_song: profileData?.favorite_song || '',
         
           // 프로필에 값이 없으면 지원서(hostData) 값으로 채워넣기 (Fallback)
         name: profileData?.name || hostData?.name,
-          // avatar_url이 없으면 profile_photo 사용
-        avatar_url: profileData?.avatar_url || hostData?.profile_photo,
+// ✅ 호스트 지원서 사진(hostData)을 1순위로 변경
+avatar_url: hostData?.profile_photo || profileData?.avatar_url,
           // 소개글 병합 (introduction -> bio -> self_intro 순)
         introduction: profileData?.introduction || profileData?.bio || hostData?.self_intro,
           // 언어 설정 병합
