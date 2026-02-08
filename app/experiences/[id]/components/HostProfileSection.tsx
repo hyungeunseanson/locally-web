@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, ShieldCheck, Briefcase, Globe, Music, MessageCircle, ChevronRight } from 'lucide-react';
+import { Star, ShieldCheck, Briefcase, Globe, Music, MessageCircle, ChevronRight, User } from 'lucide-react';
 import HostProfileModal from './HostProfileModal';
 
 interface HostProfileProps {
@@ -29,10 +29,14 @@ export default function HostProfileSection(props: HostProfileProps) {
         >
           <div className="flex flex-col md:flex-row gap-8 items-start">
             
-            {/* 🟢 왼쪽: 프로필 사진 */}
-            <div className="relative shrink-0 mx-auto md:mx-0">
-               <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 border border-slate-100">
-                 <img src={props.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+{/* 🟢 왼쪽: 프로필 사진 (수정됨: 실제 사진 우선 표시) */}
+<div className="relative shrink-0 mx-auto md:mx-0">
+               <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 border border-slate-100 flex items-center justify-center">
+                 {props.avatarUrl ? (
+                   <img src={props.avatarUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                 ) : (
+                   <User className="text-slate-300 w-12 h-12"/>
+                 )}
                </div>
                <div className="absolute bottom-0 right-0 bg-rose-500 text-white p-1 rounded-full shadow-sm border-2 border-white">
                  <ShieldCheck size={14} fill="white" className="text-rose-500"/>
