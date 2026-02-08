@@ -3,8 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from '@/app/context/LanguageContext';
 import UserPresenceTracker from '@/app/components/UserPresenceTracker';
-import { NotificationProvider } from '@/app/context/NotificationContext'; // ✅ 절대 경로 확인
-import { ToastProvider } from '@/app/context/ToastContext'; // ✅ 추가
+import { NotificationProvider } from '@/app/context/NotificationContext';
+import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -23,20 +23,18 @@ export default function RootLayout({
     <html lang="ko">
       <body className={inter.className}>
         <LanguageProvider>
-        <NotificationProvider>
-            <ToastProvider> {/* ✅ 감싸기 */}
-              <UserPresenceTracker /> 
-{/* 🟢 페이지 본문 (children) */}
-{children}
+          <NotificationProvider>
+            <ToastProvider>
+              
+              <UserPresenceTracker />
+              
+              {children}
+              
+              <SiteFooter />
 
-{/* 🟢 [위치 이동] Provider 안쪽으로 이동시켰습니다! */}
-<SiteFooter />
             </ToastProvider>
           </NotificationProvider>
         </LanguageProvider>
-
-        {/* 👇 [2. 필수] 여기에 넣으면 모든 페이지 바닥에 붙습니다! */}
-       
       </body>
     </html>
   );
