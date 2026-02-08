@@ -11,8 +11,12 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat'; 
 import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
+import Image from 'next/image'; // 🟢 Next/Image 도입
+import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 도입
 
 export default function ExperienceDetailPage() {
+  const [isCopySuccess, setIsCopySuccess] = useState(false);
+  const { showToast } = useToast(); // 🟢 훅 사용
   const router = useRouter();
   const params = useParams();
   const supabase = createClient();
@@ -26,7 +30,7 @@ export default function ExperienceDetailPage() {
   const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>({});
   
   const [isSaved, setIsSaved] = useState(false);
-  const [showToast, setShowToast] = useState(false);
+  const [isToastVisible, setIsToastVisible] = useState(false);
   const [inquiryText, setInquiryText] = useState('');
 
   useEffect(() => {
@@ -82,13 +86,13 @@ setHostProfile({
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    setIsCopySuccess(true); // ✅ 바뀐 이름 사용
+    setTimeout(() => setIsCopySuccess(false), 3000);
   };
 
   const handleInquiry = async () => {
-    if (!user) return alert('로그인이 필요합니다.');
-    if (!inquiryText.trim()) return alert('내용을 입력해주세요.');
+    if (!user) return showToast('로그인이 필요합니다.', 'error'); // 🟢 alert 대신 Toast
+    if (!inquiryText.trim()) return showToast('내용을 입력해주세요.', 'error');
     
     try {
       if (!experience?.host_id) return alert('호스트 정보를 불러올 수 없습니다.');
@@ -99,7 +103,7 @@ setHostProfile({
       }
       setInquiryText('');
     } catch (e: any) {
-      alert('문의 전송 실패: ' + e.message);
+      showToast('문의 전송 실패: ' + e.message, 'error');
     }
   };
 
@@ -117,7 +121,7 @@ setHostProfile({
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-0">
       <SiteHeader />
-      {showToast && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400"/> 링크가 복사되었습니다.</div>}
+      {isCopySuccess && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400"/> 링크가 복사되었습니다.</div>}
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
         
@@ -138,7 +142,12 @@ setHostProfile({
         </section>
 
         <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
-           <img src={experience.photos?.[0] || experience.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        <Image 
+           src={experience.photos?.[0] || experience.image_url} 
+           alt={experience.title}
+           fill
+           className="object-cover transition-transform duration-700 group-hover:scale-105"
+         />
            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
            <button className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform"><ChevronRight size={16}/> 사진 모두 보기</button>
         </section>
@@ -162,6 +171,7 @@ setHostProfile({
           />
         </div>
       </main>
+
     </div>
   );
 }
