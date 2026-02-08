@@ -170,7 +170,9 @@ export default function HostRegisterPage() {
       }).eq('id', user.id);
 
       if (error) throw error;
-      setStep(step + 1); // 완료 화면은 Form 컴포넌트 내에서는 처리 안하고, 리디렉션 하거나 별도 완료 컴포넌트 보여주면 됨 (여기서는 기존 step 로직 유지)
+      
+      alert('신청이 완료되었습니다! 관리자 승인을 기다려주세요.');
+      router.push('/host/dashboard');
 
     } catch (error: any) {
       console.error(error);

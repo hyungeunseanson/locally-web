@@ -7,7 +7,6 @@ import {
   Instagram, Lock, User, Building, ShieldCheck 
 } from 'lucide-react';
 
-// Props 타입 정의
 interface HostRegisterFormProps {
   step: number;
   totalSteps: number;
@@ -78,7 +77,7 @@ export default function HostRegisterForm({
           </div>
         )}
 
-        {/* 🟢 STEP 2: 타겟 언어 (다중 선택 UI 적용) */}
+        {/* 🟢 STEP 2: 구사 언어 (다중 선택 UI 적용) */}
         {step === 2 && (
           <div className="w-full space-y-8 text-center">
             <div>
