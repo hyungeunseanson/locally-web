@@ -27,12 +27,13 @@ export default function RootLayout({
             <ToastProvider> {/* ✅ 감싸기 */}
               <UserPresenceTracker /> 
               {children}
+              <SiteFooter />
             </ToastProvider>
           </NotificationProvider>
         </LanguageProvider>
 
         {/* 👇 [2. 필수] 여기에 넣으면 모든 페이지 바닥에 붙습니다! */}
-        <SiteFooter />
+       
       </body>
     </html>
   );
