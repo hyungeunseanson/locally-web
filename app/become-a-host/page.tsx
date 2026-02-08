@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // ✅ 라우터 추가
+import { useRouter } from 'next/navigation';
 import { 
   Globe, DollarSign, Calendar, ChevronDown, ChevronUp, 
   ArrowRight, ShieldCheck, Heart, MessageCircle
@@ -15,18 +15,8 @@ export default function BecomeHostPage() {
   const [hasApplication, setHasApplication] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const supabase = createClient();
-  const router = useRouter(); // ✅ Next.js 라우터 사용
+  const router = useRouter();
 
-// 🟢 formData 상태 수정 (languages를 배열로)
-const [formData, setFormData] = useState({
-  motivation: '',
-  languages: [] as string[], // 배열로 변경
-  experience_type: '',
-  intro: '',
-  portfolio_urls: [] as string[]
-});
-
-  // ✅ [UI용] 페이지 로드 시 버튼 텍스트 결정을 위한 상태 확인
   useEffect(() => {
     const checkStatus = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -46,51 +36,32 @@ const [formData, setFormData] = useState({
     checkStatus();
   }, []);
 
-  // 🟢 언어 토글 함수 추가
-  const toggleLanguage = (lang: string) => {
-    const current = formData.languages;
-    if (current.includes(lang)) {
-      setFormData(prev => ({ ...prev, languages: current.filter(l => l !== lang) }));
-    } else {
-      setFormData(prev => ({ ...prev, languages: [...current, lang] }));
+  const handleStartClick = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      setIsLoginModalOpen(true);
+      return;
     }
-  };
 
-// 🟢 호스트 지원 제출 함수 (DB 저장 로직 수정)
-  const handleSubmitApplication = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요합니다.');
+    const { data } = await supabase
+      .from('host_applications')
+      .select('status')
+      .eq('user_id', session.user.id)
+      .limit(1)
+      .maybeSingle();
 
-      const { error } = await supabase
-        .from('host_applications')
-        .insert({
-          user_id: user.id,
-          motivation: formData.motivation,
-          languages: formData.languages, // 배열 그대로 저장
-          experience_type: formData.experience_type,
-          self_intro: formData.intro,
-          portfolio_urls: formData.portfolio_urls,
-          status: 'pending'
-        });
-
-      if (error) throw error;
-      
-      alert('호스트 지원이 완료되었습니다! 관리자 승인을 기다려주세요.');
-      setHasApplication(true); // 상태 업데이트
-      router.push('/host/dashboard'); // 대시보드로 이동
-
-    } catch (error: any) {
-      alert('지원 중 오류가 발생했습니다: ' + error.message);
-    } finally {
-      setLoading(false);
+    if (data) {
+      router.push('/host/dashboard');
+    } else {
+      router.push('/host/register');
     }
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
+      
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
       <main>
@@ -106,7 +77,6 @@ const [formData, setFormData] = useState({
               독특한 로컬리 체험을 만들어 보세요.
             </p>
             <div className="pt-4">
-              {/* ✅ 스마트 버튼: 핸들러 연결 */}
               <button 
                 onClick={handleStartClick}
                 className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
@@ -116,7 +86,6 @@ const [formData, setFormData] = useState({
             </div>
           </div>
           
-          {/* 아이폰 목업 */}
           <div className="flex-1 flex justify-center md:justify-end relative">
              <div className="relative w-[340px] h-[680px] bg-black rounded-[60px] border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
@@ -214,8 +183,6 @@ const [formData, setFormData] = useState({
              <div className="relative z-10">
                 <h2 className="text-4xl md:text-5xl font-black mb-8">지금 바로 시작해보세요</h2>
                 <p className="text-slate-400 text-lg mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
-                
-                {/* ✅ 하단 CTA 버튼도 동일한 핸들러 연결 */}
                 <button 
                   onClick={handleStartClick}
                   className="bg-white text-black px-12 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform flex items-center gap-2 mx-auto"
