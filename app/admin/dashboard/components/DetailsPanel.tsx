@@ -152,7 +152,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
           </div>
         )}
 
-        {/* 🟣 [EXPS] 체험 상세 정보 (이 부분이 누락되어 있었음 -> 복구 완료) */}
+{/* 🟣 [EXPS] 체험 상세 정보 (신규 추가) */}
         {activeTab === 'EXPS' && (
           <div className="space-y-8">
             {selectedItem.photos && (
@@ -166,22 +166,25 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
               </div>
             )}
             
-            {/* 기본 정보 및 수정 버튼 */}
             <div className="grid grid-cols-2 gap-4">
+              {/* ✅ 안전한 값 표시 */}
               <InfoBox label="가격" value={selectedItem.price !== undefined ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
               <InfoBox label="소요 시간" value={selectedItem.duration ? `${selectedItem.duration}시간` : '-'} />
               <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
               <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}` : '-'} />
             </div>
             
-            {/* ✅ 관리자 수정 버튼 (여기에 위치) */}
+            {/* ✅ 관리자 수정 버튼 */}
             <Link href={`/host/experiences/${selectedItem.id}/edit`}>
               <button className="w-full py-3 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors mb-4">
                 <Edit size={16}/> 관리자 권한으로 수정하기
               </button>
             </Link>
 
-            <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4><div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div></div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>
+              <div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div>
+            </div>
             
             {selectedItem.itinerary && (
               <div>
@@ -192,10 +195,15 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
               </div>
             )}
 
+            <div className="grid grid-cols-2 gap-6">
+              <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">포함</h4><ul className="text-sm space-y-1">{selectedItem.inclusions?.map((t:string,i:number)=><li key={i} className="flex gap-2 items-center"><CheckCircle2 size={12} className="text-green-500"/> {t}</li>)}</ul></div>
+              <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">불포함</h4><ul className="text-sm space-y-1 text-slate-500">{selectedItem.exclusions?.map((t:string,i:number)=><li key={i}>- {t}</li>)}</ul></div>
+            </div>
+
             <div className="pt-8 mt-8 border-t border-slate-100 grid grid-cols-2 gap-4 sticky bottom-0 bg-white pb-4">
-              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'revision')} className="py-4 rounded-xl font-bold text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100">보완 요청</button>
-              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100">거절</button>
-              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'approved')} className="col-span-2 py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg">승인</button>
+              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'revision')} className="py-4 rounded-xl font-bold text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
+              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절 (Reject)</button>
+              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'approved')} className="col-span-2 py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인 (Approve)</button>
               <button onClick={()=>deleteItem('experiences', selectedItem.id)} className="col-span-2 text-xs text-slate-400 hover:text-red-500 py-2 flex items-center justify-center gap-1"><Trash2 size={12}/> 체험 영구 삭제</button>
             </div>
           </div>
@@ -218,6 +226,14 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
                 <div className="flex justify-between text-sm"><span className="text-slate-500">이름</span><span className="font-bold">{selectedItem.user_name || selectedItem.profiles?.name || 'Unknown'}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-500">연락처</span><span>{selectedItem.user_phone || selectedItem.profiles?.phone || '-'}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">이메일</span><span>{selectedItem.user_email || selectedItem.profiles?.email || '-'}</span></div>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">체험 정보</h4>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                 <div className="font-bold text-sm mb-1">{selectedItem.experience_title || selectedItem.experiences?.title}</div>
+                 <div className="text-xs text-slate-500">{selectedItem.date} · {selectedItem.time}</div>
               </div>
             </div>
           </div>
