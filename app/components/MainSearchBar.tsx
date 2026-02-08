@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Search, MapPin, Globe } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation'; // 🟢 추가: 라우터 사용
 import { CATEGORIES } from '@/app/constants';
 import DatePicker from './DatePicker';
 
@@ -15,9 +14,10 @@ interface MainSearchBarProps {
   setDateRange: (range: any) => void;
   selectedLanguage: string;
   setSelectedLanguage: (lang: string) => void;
-  onCategorySelect: (id: string) => void;
+  // onCategorySelect는 선택적으로 유지 (카테고리 탭 연동을 위해)
+  onCategorySelect?: (id: string) => void; 
   isVisible: boolean;
-  onSearch?: () => void; // 🟢 선택적 prop으로 변경 (페이지 이동 방식 사용 시 불필요할 수 있음)
+  onSearch: () => void; // 🟢 필수: 검색 실행 함수
 }
 
 export default function MainSearchBar({
@@ -28,7 +28,6 @@ export default function MainSearchBar({
   onCategorySelect, isVisible,
   onSearch
 }: MainSearchBarProps) {
-  const router = useRouter(); // 🟢 라우터 훅 사용
 
   const formatDateRange = () => {
     if (dateRange.start && dateRange.end) {
@@ -38,32 +37,20 @@ export default function MainSearchBar({
     return '';
   };
 
-  // 🟢 검색 실행 함수 (URL 이동 로직 추가)
-  const handleSearchClick = () => {
-    // 1. 기존 onSearch가 있으면 실행 (메인 페이지에서 로컬 필터링을 원할 경우 유지)
-    if (onSearch) {
-      onSearch();
-    } else {
-      // 2. 검색 결과 페이지로 이동 (/search)
-      const params = new URLSearchParams();
-      if (locationInput) params.set('location', locationInput);
-      if (dateRange.start) params.set('startDate', dateRange.start.toISOString());
-      if (dateRange.end) params.set('endDate', dateRange.end.toISOString());
-      if (selectedLanguage && selectedLanguage !== 'all') params.set('language', selectedLanguage);
-      
-      router.push(`/search?${params.toString()}`);
-    }
-    
-    setActiveSearchField(null);
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSearchClick(); // 🟢 엔터키 입력 시에도 동일 로직 실행
+      onSearch(); // 🟢 엔터키 입력 시 검색 실행
+      setActiveSearchField(null);
     }
   };
 
-  const languages = ['전체', '한국어', '영어', '일본어', '중국어'];
+  const languages = [
+    { label: '전체', icon: '🌐' },
+    { label: '한국어', code: 'kr' },
+    { label: '영어', code: 'us' },
+    { label: '일본어', code: 'jp' },
+    { label: '중국어', code: 'cn' },
+  ];
 
   return (
     <div 
@@ -119,7 +106,7 @@ export default function MainSearchBar({
             <input 
               type="text" 
               placeholder="언어 추가" 
-              value={selectedLanguage === 'all' ? '' : selectedLanguage} 
+              value={selectedLanguage === 'all' ? '전체' : selectedLanguage} 
               readOnly 
               className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
             />
@@ -129,7 +116,11 @@ export default function MainSearchBar({
         {/* 4. 검색 버튼 */}
         <div className="pl-2 pr-2 h-full flex items-center justify-end rounded-full z-10">
           <button 
-            onClick={handleSearchClick} // 🟢 변경된 함수 연결
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              onSearch(); // 🟢 검색 실행
+              setActiveSearchField(null);
+            }} 
             className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"
           >
             <Search size={20} strokeWidth={2.5}/>
@@ -137,13 +128,22 @@ export default function MainSearchBar({
         </div>
       </div>
 
-      {/* 팝업들은 기존 코드와 동일하게 유지 (생략 없음) */}
+      {/* 팝업들 (기존 유지) */}
       {activeSearchField === 'location' && (
         <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
           <div className="grid grid-cols-1 gap-1">
             {CATEGORIES.filter(c => c.id !== 'all').map((city) => (
-              <button key={city.id} onClick={() => { setLocationInput(city.label); setActiveSearchField('date'); onCategorySelect(city.id); }} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group">
+              <button 
+                key={city.id} 
+                onClick={(e) => { 
+                  e.stopPropagation();
+                  setLocationInput(city.label); 
+                  setActiveSearchField('date'); 
+                  if (onCategorySelect) onCategorySelect(city.id); // 🟢 카테고리 선택 연동
+                }} 
+                className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group"
+              >
                 <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all"><MapPin size={20} /></div>
                 <span className="font-bold text-slate-700">{city.label}</span>
               </button>
@@ -159,17 +159,32 @@ export default function MainSearchBar({
       )}
 
       {activeSearchField === 'language' && (
-        <div className="absolute top-[80px] right-0 w-[200px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
+        <div className="absolute top-[80px] right-0 w-[240px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">언어 선택</h4>
           <div className="grid grid-cols-1 gap-1">
             {languages.map((lang) => (
               <button 
-                key={lang} 
-                onClick={() => { setSelectedLanguage(lang === '전체' ? 'all' : lang); setActiveSearchField(null); }} 
-                className={`flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left ${selectedLanguage === lang || (selectedLanguage === 'all' && lang === '전체') ? 'bg-slate-100 font-bold' : ''}`}
+                key={lang.label} 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setSelectedLanguage(lang.label); 
+                  setActiveSearchField(null);
+                }} 
+                className={`flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left w-full
+                  ${selectedLanguage === lang.label ? 'bg-slate-100 ring-1 ring-slate-200' : ''}`}
               >
-                <Globe size={18} className="text-slate-400"/>
-                <span className="text-sm text-slate-700">{lang}</span>
+                <div className="w-8 h-6 flex items-center justify-center overflow-hidden rounded shadow-sm border border-slate-100 bg-white">
+                  {lang.icon ? (
+                    <span className="text-lg">{lang.icon}</span>
+                  ) : (
+                    <img 
+                      src={`https://flagcdn.com/w40/${lang.code}.png`} 
+                      alt={lang.label} 
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </div>
+                <span className="text-sm font-bold text-slate-700">{lang.label}</span>
               </button>
             ))}
           </div>
