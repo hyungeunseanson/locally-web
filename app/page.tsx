@@ -7,29 +7,29 @@ import { createClient } from '@/app/utils/supabase/client';
 import HomeHero from '@/app/components/HomeHero'; 
 import ExperienceCard from '@/app/components/ExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
-import { LOCALLY_SERVICES } from '@/app/constants';
-import SiteFooter from '@/app/components/SiteFooter'; // 푸터 추가
+// 🚨 수정된 부분: CATEGORIES 추가됨 (이게 없어서 에러 남)
+import { LOCALLY_SERVICES, CATEGORIES } from '@/app/constants'; 
+import SiteFooter from '@/app/components/SiteFooter';
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [selectedCategory, setSelectedCategory] = useState('all');
   
-  const [allExperiences, setAllExperiences] = useState<any[]>([]); // 전체 데이터 원본
-  const [filteredExperiences, setFilteredExperiences] = useState<any[]>([]); // 필터링된 결과
+  const [allExperiences, setAllExperiences] = useState<any[]>([]); 
+  const [filteredExperiences, setFilteredExperiences] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   
   // 검색창 상태
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | 'language' | null>(null);
   const [locationInput, setLocationInput] = useState('');
   const [dateRange, setDateRange] = useState<{start: Date | null, end: Date | null}>({ start: null, end: null });
-  const [selectedLanguage, setSelectedLanguage] = useState('전체'); // 'all' 대신 '전체' 사용 (UI 통일)
+  const [selectedLanguage, setSelectedLanguage] = useState('전체');
   
   const [scrollY, setScrollY] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   
   const supabase = createClient();
 
-  // 스크롤 감지 및 외부 클릭 처리 (기존 유지)
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -51,7 +51,7 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 🟢 1. 초기 데이터 로드 (전체 목록 가져오기)
+  // 1. 초기 데이터 로드
   useEffect(() => {
     const fetchExperiences = async () => {
       setLoading(true);
@@ -67,7 +67,7 @@ export default function HomePage() {
         
         if (data) {
           setAllExperiences(data);
-          setFilteredExperiences(data); // 초기엔 전체 표시
+          setFilteredExperiences(data);
         }
       } catch (error) { console.error(error); } 
       finally { setLoading(false); }
@@ -75,11 +75,11 @@ export default function HomePage() {
     fetchExperiences();
   }, []);
 
-  // 🟢 2. 통합 필터링 함수 (검색 버튼 클릭 or 카테고리 변경 시 실행)
+  // 2. 통합 필터링 함수
   const applyFilters = () => {
     let result = allExperiences;
 
-    // A. 지역/키워드 필터 (locationInput)
+    // A. 지역/키워드 필터
     if (locationInput.trim()) {
       const term = locationInput.toLowerCase();
       result = result.filter((item) => 
@@ -91,8 +91,6 @@ export default function HomePage() {
 
     // B. 언어 필터
     if (selectedLanguage !== '전체') {
-      // 언어 코드 매핑 (UI용 한글 -> DB 저장용 코드)
-      // DB에 'ko', 'en' 등으로 저장되어 있다고 가정. 만약 한글 그대로 저장되어 있다면 매핑 불필요.
       const langMap:Record<string, string> = { '한국어': 'ko', '영어': 'en', '일본어': 'ja', '중국어': 'zh' };
       const langCode = langMap[selectedLanguage] || selectedLanguage;
       
@@ -101,11 +99,8 @@ export default function HomePage() {
       );
     }
 
-    // C. 카테고리 탭 필터 (selectedCategory)
-    // 'all'이 아니고, 검색창 입력값과 다를 경우에만 추가 필터링 (지역 카테고리인 경우)
+    // C. 카테고리 탭 필터 (에러 났던 부분: CATEGORIES가 이제 import 되어 정상 작동)
     if (selectedCategory !== 'all') {
-       // locationInput이 비어있거나, 입력값과 선택된 카테고리가 다를 때만 카테고리로 한 번 더 거름
-       // (보통 지역 카테고리 선택 시 locationInput에 자동 입력되므로 중복 필터링 방지)
        if (!locationInput || !locationInput.includes(CATEGORIES.find(c=>c.id===selectedCategory)?.label || '')) {
           result = result.filter((item) => 
             item.location?.includes(selectedCategory) || item.title?.includes(selectedCategory)
@@ -113,19 +108,15 @@ export default function HomePage() {
        }
     }
 
-    // D. 날짜 필터 (추후 구현: availability 테이블 연동 필요)
-    // 현재는 날짜 선택 시 해당 기간에 가능한 체험만 보여주는 로직이 복잡하므로 생략하거나, 
-    // 메타데이터에 날짜 정보가 있다면 여기서 필터링.
-
     setFilteredExperiences(result);
   };
 
-  // 카테고리 변경 시 필터링 적용
+  // 카테고리 변경 시 필터링
   useEffect(() => {
     applyFilters();
   }, [selectedCategory]); 
 
-  // 검색 버튼 핸들러 (버튼 클릭 시 필터링 적용)
+  // 검색 버튼 클릭 시 필터링
   const handleSearch = () => {
     applyFilters();
   };
@@ -139,7 +130,6 @@ export default function HomePage() {
         selectedCategory={selectedCategory}
         setSelectedCategory={(id) => {
             setSelectedCategory(id);
-            // 카테고리 선택 시 검색창 텍스트도 해당 지역명으로 업데이트 (선택 사항)
             const categoryLabel = CATEGORIES.find(c => c.id === id)?.label;
             if (categoryLabel && id !== 'all') {
                 setLocationInput(categoryLabel);
@@ -157,7 +147,7 @@ export default function HomePage() {
         selectedLanguage={selectedLanguage}
         setSelectedLanguage={setSelectedLanguage}
         searchRef={searchRef}
-        onSearch={handleSearch} // 🟢 검색 핸들러 전달
+        onSearch={handleSearch}
       />
 
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
