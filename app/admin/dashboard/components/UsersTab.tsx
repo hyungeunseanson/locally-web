@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Clock, MapPin, MessageCircle, Smile, Trash2, Star } from 'lucide-react';
 
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
@@ -22,6 +22,16 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
+  // 1분마다 화면을 갱신해서 "몇 분 전" 시간을 최신화하는 코드
+  const [tick, setTick] = useState(0); 
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => t + 1); // 1분마다 화면을 다시 그리라는 신호
+    }, 60000); // 60초 = 1분
+
+    return () => clearInterval(timer);
+  }, []);
   // 검색 필터링
   const filteredUsers = users.filter((u: any) => 
     u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
