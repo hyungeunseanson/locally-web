@@ -14,10 +14,9 @@ interface MainSearchBarProps {
   setDateRange: (range: any) => void;
   selectedLanguage: string;
   setSelectedLanguage: (lang: string) => void;
-  // onCategorySelect는 선택적으로 유지 (카테고리 탭 연동을 위해)
   onCategorySelect?: (id: string) => void; 
   isVisible: boolean;
-  onSearch: () => void; // 🟢 필수: 검색 실행 함수
+  onSearch: () => void;
 }
 
 export default function MainSearchBar({
@@ -39,7 +38,7 @@ export default function MainSearchBar({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      onSearch(); // 🟢 엔터키 입력 시 검색 실행
+      onSearch();
       setActiveSearchField(null);
     }
   };
@@ -118,7 +117,7 @@ export default function MainSearchBar({
           <button 
             onClick={(e) => { 
               e.stopPropagation(); 
-              onSearch(); // 🟢 검색 실행
+              onSearch(); 
               setActiveSearchField(null);
             }} 
             className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"
@@ -128,7 +127,7 @@ export default function MainSearchBar({
         </div>
       </div>
 
-      {/* 팝업들 (기존 유지) */}
+      {/* 🟢 팝업: 지역 선택 (onCategorySelect 제거됨 -> 즉시 이동 방지) */}
       {activeSearchField === 'location' && (
         <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
@@ -140,7 +139,7 @@ export default function MainSearchBar({
                   e.stopPropagation();
                   setLocationInput(city.label); 
                   setActiveSearchField('date'); 
-                  if (onCategorySelect) onCategorySelect(city.id); // 🟢 카테고리 선택 연동
+                  // 🔴 onCategorySelect(city.id) 삭제! 검색 버튼 누를 때까지 대기.
                 }} 
                 className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group"
               >
@@ -152,12 +151,14 @@ export default function MainSearchBar({
         </div>
       )}
 
+      {/* 날짜 팝업 */}
       {activeSearchField === 'date' && (
         <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <DatePicker selectedRange={dateRange} onChange={(range) => { setDateRange(range); if (range.start && range.end) setActiveSearchField('language'); }} />
         </div>
       )}
 
+      {/* 언어 팝업 */}
       {activeSearchField === 'language' && (
         <div className="absolute top-[80px] right-0 w-[240px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
           <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">언어 선택</h4>

@@ -7,7 +7,6 @@ import { createClient } from '@/app/utils/supabase/client';
 import HomeHero from '@/app/components/HomeHero'; 
 import ExperienceCard from '@/app/components/ExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
-// 🚨 수정된 부분: CATEGORIES 추가됨 (이게 없어서 에러 남)
 import { LOCALLY_SERVICES, CATEGORIES } from '@/app/constants'; 
 import SiteFooter from '@/app/components/SiteFooter';
 
@@ -75,21 +74,27 @@ export default function HomePage() {
     fetchExperiences();
   }, []);
 
-  // 2. 통합 필터링 함수
+  // 🟢 2. 통합 필터링 함수 (검색 버튼 클릭 or 카테고리 탭 변경 시 실행)
   const applyFilters = () => {
     let result = allExperiences;
 
-    // A. 지역/키워드 필터
+    // A. 지역/키워드 필터 (제목, 위치, 설명, ⭐카테고리⭐ 포함)
     if (locationInput.trim()) {
       const term = locationInput.toLowerCase();
-      result = result.filter((item) => 
-        (item.title && item.title.toLowerCase().includes(term)) ||
-        (item.location && item.location.toLowerCase().includes(term)) ||
-        (item.description && item.description.toLowerCase().includes(term))
-      );
+      result = result.filter((item) => {
+        // 검색 대상 필드들을 하나의 문자열로 합쳐서 검사 (더 강력함)
+        const targetString = `
+          ${item.title || ''} 
+          ${item.location || ''} 
+          ${item.description || ''} 
+          ${item.category || ''}
+        `.toLowerCase();
+        
+        return targetString.includes(term);
+      });
     }
 
-    // B. 언어 필터
+    // B. 언어 필터 (DB에 ['ko', 'en'] 형태로 저장된다고 가정)
     if (selectedLanguage !== '전체') {
       const langMap:Record<string, string> = { '한국어': 'ko', '영어': 'en', '일본어': 'ja', '중국어': 'zh' };
       const langCode = langMap[selectedLanguage] || selectedLanguage;
@@ -99,24 +104,47 @@ export default function HomePage() {
       );
     }
 
-    // C. 카테고리 탭 필터 (에러 났던 부분: CATEGORIES가 이제 import 되어 정상 작동)
+    // 🟢 C. 날짜 필터 (DB에 available_dates 배열이 있다고 가정)
+    if (dateRange.start) {
+      const selectedStart = new Date(dateRange.start).setHours(0,0,0,0);
+      const selectedEnd = dateRange.end ? new Date(dateRange.end).setHours(23,59,59,999) : new Date(dateRange.start).setHours(23,59,59,999);
+
+      result = result.filter((item) => {
+        // available_dates 필드가 없거나 비어있으면 검색 결과에서 제외 (혹은 모든 날짜 가능으로 칠지 결정 필요)
+        if (!item.available_dates || !Array.isArray(item.available_dates)) return false;
+
+        // 체험 가능 날짜 중 하나라도 선택한 기간에 포함되는지 확인
+        return item.available_dates.some((dateStr: string) => {
+          const itemDate = new Date(dateStr).getTime();
+          return itemDate >= selectedStart && itemDate <= selectedEnd;
+        });
+      });
+    }
+
+    // D. 카테고리 탭 필터 (selectedCategory)
+    // 탭으로 선택한 카테고리는 검색어와 별도로 항상 적용 (단, 'all'이 아닐 때)
     if (selectedCategory !== 'all') {
-       if (!locationInput || !locationInput.includes(CATEGORIES.find(c=>c.id===selectedCategory)?.label || '')) {
-          result = result.filter((item) => 
-            item.location?.includes(selectedCategory) || item.title?.includes(selectedCategory)
-          );
-       }
+       // 카테고리 ID가 지역명과 일치하면 지역 필터링, 아니면 카테고리 필터링
+       // (현재 CATEGORIES 상수 구조상 지역 위주이므로 location 체크)
+       result = result.filter((item) => 
+          item.location?.includes(selectedCategory) || item.title?.includes(selectedCategory)
+       );
     }
 
     setFilteredExperiences(result);
   };
 
-  // 카테고리 변경 시 필터링
+  // 카테고리 탭 변경 시에는 즉시 필터링
   useEffect(() => {
-    applyFilters();
+    // 🔴 중요: locationInput이 비어있을 때만 카테고리 탭 필터링을 단독 수행.
+    // 검색어가 있으면 검색 버튼 누를 때까지 기다려야 하므로 여기서는 selectedCategory만 반영.
+    // 하지만 "도쿄" 탭을 누르면 바로 도쿄 리스트가 뜨는 건 자연스러우므로 유지.
+    if (!locationInput) {
+        applyFilters(); 
+    }
   }, [selectedCategory]); 
 
-  // 검색 버튼 클릭 시 필터링
+  // 🟢 검색 버튼 핸들러
   const handleSearch = () => {
     applyFilters();
   };
@@ -130,11 +158,9 @@ export default function HomePage() {
         selectedCategory={selectedCategory}
         setSelectedCategory={(id) => {
             setSelectedCategory(id);
-            const categoryLabel = CATEGORIES.find(c => c.id === id)?.label;
-            if (categoryLabel && id !== 'all') {
-                setLocationInput(categoryLabel);
-            } else if (id === 'all') {
-                setLocationInput('');
+            // 탭을 눌렀을 때는 검색창 비우기 (혼동 방지)
+            if (id !== 'all') {
+                setLocationInput(''); 
             }
         }}
         isScrolled={isScrolled}
@@ -147,7 +173,7 @@ export default function HomePage() {
         selectedLanguage={selectedLanguage}
         setSelectedLanguage={setSelectedLanguage}
         searchRef={searchRef}
-        onSearch={handleSearch}
+        onSearch={handleSearch} // 검색 버튼 클릭 시 실행
       />
 
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
@@ -171,6 +197,7 @@ export default function HomePage() {
                 onClick={() => { 
                     setLocationInput(''); 
                     setSelectedLanguage('전체'); 
+                    setDateRange({ start: null, end: null });
                     setSelectedCategory('all');
                     setFilteredExperiences(allExperiences); 
                 }} 
