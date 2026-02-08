@@ -47,19 +47,20 @@ export default function ExpMainContent({
       {/* 4. 후기 섹션 */}
       <ReviewSection hostName={hostProfile?.name || 'Locally'} />
 
-      {/* 5. 호스트 상세 프로필 */}
-      <HostProfileSection 
-  hostId={experience.host_id}
-  name={hostProfile?.name || 'Tomoyo'}
-  avatarUrl={hostProfile?.avatar_url}
-  job={hostProfile?.job || "패션 디자이너"}
-  dreamDestination={hostProfile?.dream_destination || "중앙아메리카 커피 여행!"}
-  favoriteSong={hostProfile?.favorite_song || "Growing on me - The Darkness"}
-  // ✅ 1. 언어 데이터 연결
-  languages={hostProfile?.languages || []} 
-  // ✅ 2. 소개글 속성명 일치 (introduction)
-  intro={hostProfile?.introduction || "도쿄의 숨겨진 빈티지 샵을 소개하는 것을 좋아합니다."} 
-/>
+{/* 5. 호스트 상세 프로필 */}
+<HostProfileSection 
+        hostId={experience.host_id}
+        // ✅ 수정됨: 고정값 제거하고 실제 데이터 사용
+        name={hostProfile?.name || 'Locally Host'} 
+        avatarUrl={hostProfile?.avatar_url}
+        job={hostProfile?.job || "로컬리 호스트"}
+        dreamDestination={hostProfile?.dream_destination || "여행"}
+        favoriteSong={hostProfile?.favorite_song || "음악"}
+        // ✅ 1. 언어 데이터 연결
+        languages={hostProfile?.languages || []} 
+        // ✅ 2. 소개글 연결
+        intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."} 
+      />
 
       {/* 6. 지도 (Location) */}
       <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
