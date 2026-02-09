@@ -45,7 +45,8 @@ export default function ExperienceCard({ item }: { item: any }) {
             <Star size={14} fill="black" /><span>4.95</span><span className="text-slate-400 font-normal">(32)</span>
           </div>
         </div>
-        
+        {/* 🟢 [복구] 누락되었던 제목 코드를 다시 넣었습니다! */}
+        <p className="text-[15px] text-slate-500 line-clamp-1">{item.title}</p>
 {/* 🟢 [수정] 시간 및 언어 정보 함께 표시 */}
 <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
            {durationText && (
