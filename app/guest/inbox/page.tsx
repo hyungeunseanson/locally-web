@@ -4,11 +4,10 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
-import { Send, ImageIcon, ShieldCheck } from 'lucide-react';
+import { Send, ImageIcon, ShieldCheck, User } from 'lucide-react'; // 🟢 User 아이콘 추가
 
-// 🟢 메인 콘텐츠를 별도 컴포넌트로 분리 (Suspense 적용을 위해)
+// 🟢 메인 콘텐츠를 별도 컴포넌트로 분리
 function InboxContent() {
-  // ✅ [수정] useChat에서 필요한 함수들을 모두 꺼내왔습니다. (빨간 줄 해결 원인)
   const { 
     inquiries, 
     selectedInquiry, 
@@ -29,6 +28,7 @@ function InboxContent() {
   const hostId = searchParams.get('hostId');
   const expId = searchParams.get('expId');
   const hostName = searchParams.get('hostName');
+  const hostAvatar = searchParams.get('hostAvatar'); 
   const expTitle = searchParams.get('expTitle');
 
   // 스크롤 하단 고정
@@ -38,45 +38,43 @@ function InboxContent() {
     }
   }, [messages]);
 
-  // 🟢 URL 파라미터가 있을 때 자동 채팅방 세팅
+  // URL 파라미터가 있을 때 자동 채팅방 세팅
   useEffect(() => {
-    // 로딩이 끝났고, 파라미터가 있을 때만 실행
     if (!isLoading && hostId && expId) {
-      
-      // 1. 이미 존재하는 채팅방인지 확인 (타입 변환하여 비교)
       const existing = inquiries.find(
         i => String(i.host_id) === String(hostId) && String(i.experience_id) === String(expId)
       );
       
       if (existing) {
-        // 이미 있으면 그 방의 메시지를 불러옴
         if (selectedInquiry?.id !== existing.id) {
           loadMessages(existing.id);
         }
       } else {
-        // 없으면 '새 채팅방' 모드 시작
-        // (현재 선택된 방이 'new'가 아닐 때만 실행하여 무한 루프 방지)
         if (selectedInquiry?.id !== 'new') {
            startNewChat(
-             { id: hostId, name: hostName || 'Host' }, 
+             { id: hostId, name: hostName || 'Host', avatarUrl: hostAvatar || undefined }, 
              { id: expId, title: expTitle || 'Experience' }
            );
         }
       }
     }
-  }, [isLoading, inquiries, hostId, expId, hostName, expTitle, selectedInquiry, loadMessages, startNewChat]);
+  }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat]);
 
   const handleSend = async () => {
     if (selectedInquiry && inputText.trim()) {
       if (selectedInquiry.id === 'new') {
-        // 🟢 '새 채팅방'인 경우: DB에 채팅방 생성 후 메시지 전송
         await createInquiry(selectedInquiry.host_id, selectedInquiry.experience_id, inputText);
       } else {
-        // 기존 채팅방인 경우
         sendMessage(selectedInquiry.id, inputText);
       }
       setInputText('');
     }
+  };
+
+  // 🟢 [추가] getHostName 함수 정의 (빨간 줄 해결!)
+  const getHostName = (host: any) => {
+    if (!host) return 'Host';
+    return host.name || host.full_name || 'Host';
   };
 
   return (
@@ -93,12 +91,16 @@ function InboxContent() {
               {inquiries.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">대화가 없습니다.</div>}
               {inquiries.map((inq) => (
                 <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-100'}`}>
-                    {inq.type === 'admin' ? <ShieldCheck size={20} /> : (inq.experiences?.image_url ? <img src={inq.experiences.image_url} className="w-full h-full object-cover" alt="exp"/> : <ImageIcon className="text-slate-400"/>)}
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
+                    {inq.type === 'admin' ? <ShieldCheck size={20} /> : (inq.host?.avatar_url ? <img src={inq.host.avatar_url} className="w-full h-full object-cover" alt="host"/> : <User className="text-slate-300" size={20}/>)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm truncate">{inq.type === 'admin' ? '로컬리 고객센터' : inq.experiences?.title}</div>
-                    <div className="text-xs text-slate-500 truncate">{inq.content}</div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    {/* 🟢 호스트 이름 표시 (이제 에러 안 남) */}
+                    <div className="font-bold text-sm truncate">{inq.type === 'admin' ? '로컬리 고객센터' : getHostName(inq.host)}</div>
+                    <div className="text-xs text-slate-500 truncate flex items-center gap-1">
+                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600 font-medium truncate max-w-[120px]">{inq.experiences?.title}</span>
+                      <span className="truncate">{inq.content}</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -110,9 +112,14 @@ function InboxContent() {
             {selectedInquiry ? (
               <>
                 <div className="p-4 border-b border-slate-100 font-bold flex items-center gap-2">
-                  <div className="text-base">{selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : selectedInquiry.experiences?.title}</div>
-                   {/* 호스트 이름 표시 */}
-                   {selectedInquiry.host?.full_name && <span className="text-xs text-slate-500 font-normal">with {selectedInquiry.host.full_name}</span>}
+                   {/* 상단바: 호스트 사진 및 이름 */}
+                   <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                      {selectedInquiry.host?.avatar_url ? <img src={selectedInquiry.host.avatar_url} className="w-full h-full object-cover" alt="host"/> : <div className="w-full h-full flex items-center justify-center"><User className="text-slate-300" size={18}/></div>}
+                   </div>
+                   <div>
+                      <div className="font-bold text-base leading-tight">{selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : getHostName(selectedInquiry.host)}</div>
+                      <div className="text-xs text-slate-500 font-normal">{selectedInquiry.experiences?.title}</div>
+                   </div>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50" ref={scrollRef}>
@@ -120,7 +127,12 @@ function InboxContent() {
                     const isMe = String(msg.sender_id) === String(currentUser?.id);
                     return (
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none'}`}>
+                         {!isMe && (
+                           <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden mr-2 shrink-0">
+                             {msg.sender?.avatar_url ? <img src={msg.sender.avatar_url} className="w-full h-full object-cover" alt="sender"/> : <User className="w-full h-full p-1.5 text-slate-400"/>}
+                           </div>
+                         )}
+                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none shadow-sm'}`}>
                           {msg.content}
                         </div>
                       </div>
@@ -129,28 +141,28 @@ function InboxContent() {
                   
                   {/* 새 채팅방 안내 문구 */}
                   {messages.length === 0 && selectedInquiry.id === 'new' && (
-                     <div className="text-center text-slate-400 text-sm mt-10">
-                        <p>{selectedInquiry.host?.full_name} 님에게 궁금한 점을 물어보세요!</p>
-                        <p className="text-xs mt-1">메시지를 보내면 대화가 시작됩니다.</p>
+                     <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
+                        <div className="w-20 h-20 rounded-full bg-slate-100 mb-4 flex items-center justify-center overflow-hidden border border-slate-200">
+                           {selectedInquiry.host?.avatar_url ? <img src={selectedInquiry.host.avatar_url} className="w-full h-full object-cover" alt="host"/> : <User size={40} className="text-slate-300"/>}
+                        </div>
+                        <p className="font-bold text-slate-900 mb-1">{getHostName(selectedInquiry.host)}님에게 메시지 보내기</p>
+                        <p className="text-xs">궁금한 점을 자유롭게 물어보세요!</p>
                      </div>
                   )}
                 </div>
 
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
                   <input 
-                    className="flex-1 bg-slate-100 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black"
-                    placeholder="메시지 입력..."
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.nativeEvent.isComposing) return;
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
+                    className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all" 
+                    placeholder="메시지 입력..." 
+                    value={inputText} 
+                    onChange={(e) => setInputText(e.target.value)} 
+                    onKeyDown={(e) => { 
+                      if (e.nativeEvent.isComposing) return; 
+                      if (e.key === 'Enter') { e.preventDefault(); handleSend(); } 
+                    }} 
                   />
-                  <button onClick={handleSend} className="p-2 bg-black text-white rounded-full"><Send size={16}/></button>
+                  <button onClick={handleSend} className="p-3 bg-black text-white rounded-full hover:scale-105 transition-transform"><Send size={18}/></button>
                 </div>
               </>
             ) : (
@@ -163,7 +175,6 @@ function InboxContent() {
   );
 }
 
-// 🟢 Suspense로 감싸서 내보내기 (빌드 에러 방지)
 export default function GuestInboxPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center">로딩 중...</div>}>

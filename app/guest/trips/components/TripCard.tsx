@@ -142,7 +142,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
         
         <div className="grid grid-cols-3 gap-3 pt-6 border-t border-slate-100 mt-6">
 {/* 🟢 [수정] 링크에 정보 포함 */}
-<Link href={`/guest/inbox?hostId=${trip.hostId}&expId=${trip.expId}&hostName=${encodeURIComponent(trip.hostName)}&expTitle=${encodeURIComponent(trip.title)}`}>
+<Link href={`/guest/inbox?hostId=${trip.hostId}&expId=${trip.expId}&hostName=${encodeURIComponent(trip.hostName)}&hostAvatar=${encodeURIComponent(trip.hostAvatar || '')}&expTitle=${encodeURIComponent(trip.title)}`}>
             <button className="w-full py-2.5 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-black rounded-xl transition-all flex items-center justify-center gap-1.5">
               <MessageSquare size={14} className="opacity-70"/> 메시지
             </button>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { sendNotification } from '@/app/utils/notification';
-import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 추가
+import { useToast } from '@/app/context/ToastContext';
 
 export function useGuestTrips() {
   const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
@@ -12,7 +12,7 @@ export function useGuestTrips() {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const supabase = createClient();
-  const { showToast } = useToast(); // 🟢 훅 사용
+  const { showToast } = useToast();
 
   const secureUrl = (url: string | null) => {
     if (!url) return null;
@@ -23,19 +23,16 @@ export function useGuestTrips() {
     try {
       setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setIsLoading(false);
-        return; 
-      }
+      if (!user) { setIsLoading(false); return; }
 
+      // 🟢 [수정] 호스트의 name(닉네임)과 avatar_url(사진) 추가 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
           *,
           experiences (
             id, title, city, photos, address, host_id,
-            profiles!experiences_host_id_fkey (full_name, phone)
+            profiles!experiences_host_id_fkey (name, full_name, phone, avatar_url)
           )
         `)
         .eq('user_id', user.id)
@@ -63,14 +60,17 @@ export function useGuestTrips() {
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            hostName: hostData?.full_name || 'Locally Host',
+            // 🟢 [수정] 호스트 등록 이름(name) 우선 사용
+            hostName: hostData?.name || hostData?.full_name || 'Locally Host',
             hostPhone: hostData?.phone,
             hostId: booking.experiences.host_id,
+            // 🟢 [추가] 호스트 사진 정보
+            hostAvatar: secureUrl(hostData?.avatar_url), 
+            
             date: booking.date, 
             time: booking.time || '시간 미정',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
-            // 🟢 [중요] 갤러리를 위해 photos 배열 추가
             photos: booking.experiences.photos || [],
             image: secureUrl(booking.experiences.photos?.[0]), 
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
@@ -97,34 +97,15 @@ export function useGuestTrips() {
     }
   }, [supabase]);
 
-  // 🟢 인자 3개 받음 (id, reason, hostId)
   const requestCancel = async (id: number, reason: string, hostId: string) => {
     setIsProcessing(true);
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancellation_requested', 
-          cancel_reason: reason 
-        })
-        .eq('id', id);
-
+      const { error } = await supabase.from('bookings').update({ status: 'cancellation_requested', cancel_reason: reason }).eq('id', id);
       if (error) throw error;
-
-      // 호스트 알림
-      if (hostId) {
-        await sendNotification({
-            recipient_id: hostId,
-            type: 'booking_cancel_request', // 타입명 확인 필요 (DB에 맞게)
-            content: '예약 취소 요청이 있습니다.',
-            link_url: '/host/dashboard'
-        });
-      }
-
-      showToast('취소 요청이 접수되었습니다.', 'success'); // alert -> Toast
+      if (hostId) await sendNotification({ recipient_id: hostId, type: 'booking_cancel_request', content: '예약 취소 요청이 있습니다.', link_url: '/host/dashboard' });
+      showToast('취소 요청이 접수되었습니다.', 'success');
       fetchMyTrips(); 
       return true; 
-
     } catch (err: any) {
       showToast('요청 실패: ' + err.message, 'error');
       return false; 
@@ -133,17 +114,7 @@ export function useGuestTrips() {
     }
   };
 
-  useEffect(() => {
-    fetchMyTrips();
-  }, [fetchMyTrips]);
+  useEffect(() => { fetchMyTrips(); }, [fetchMyTrips]);
 
-  return {
-    upcomingTrips,
-    pastTrips,
-    isLoading,
-    isProcessing,
-    // 🟢 이름 통일: requestCancel
-    requestCancel,
-    refreshTrips: fetchMyTrips
-  };
+  return { upcomingTrips, pastTrips, isLoading, isProcessing, requestCancel, refreshTrips: fetchMyTrips };
 }
