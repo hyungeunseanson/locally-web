@@ -1,15 +1,24 @@
 'use client';
 
-import React from 'react';
-import { MapPin, MessageSquare, Check, X, Users, Zap, ShieldAlert, CalendarX, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin, MessageSquare, Check, X, Users, Zap, ShieldAlert, CalendarX, User, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import ReviewSection from './ReviewSection';
 import HostProfileSection from './HostProfileSection';
+import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 사용
 
 export default function ExpMainContent({ 
   experience, hostProfile, handleInquiry, inquiryText, setInquiryText 
 }: any) {
+  const { showToast } = useToast();
+  const location = experience.meeting_point || experience.location || 'Seoul';
   
+  // 주소 복사 기능
+  const handleCopyAddress = () => {
+    navigator.clipboard.writeText(location);
+    showToast('주소가 복사되었습니다.', 'success');
+  };
+
   return (
     <div className="flex-1 space-y-12">
       
@@ -19,14 +28,13 @@ export default function ExpMainContent({
           <h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2>
           <p className="text-slate-500 text-base">최대 {experience.max_guests}명 · {experience.duration || 2}시간 · 한국어/영어</p>
         </div>
-        <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
-   {/* ✅ Unsplash 이미지 태그를 지우고, 아래 조건문만 남기세요 */}
-   {hostProfile?.avatar_url ? (
-     <img src={hostProfile.avatar_url} className="w-full h-full object-cover"/>
-   ) : (
-     <User className="text-slate-300 w-8 h-8"/>
-   )}
-</div>
+        <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center relative">
+           {hostProfile?.avatar_url ? (
+             <img src={hostProfile.avatar_url} className="w-full h-full object-cover" alt="Host"/>
+           ) : (
+             <User className="text-slate-300 w-8 h-8"/>
+           )}
+        </div>
       </div>
 
       {/* 2. 체험 소개 */}
@@ -54,44 +62,66 @@ export default function ExpMainContent({
       {/* 4. 후기 섹션 */}
       <ReviewSection hostName={hostProfile?.name || 'Locally'} />
 
-{/* 5. 호스트 상세 프로필 */}
-<HostProfileSection 
+      {/* 5. 호스트 상세 프로필 */}
+      <HostProfileSection 
         hostId={experience.host_id}
-        // ✅ 수정됨: 고정값 제거하고 실제 데이터 사용
         name={hostProfile?.name || 'Locally Host'} 
         avatarUrl={hostProfile?.avatar_url}
         job={hostProfile?.job || "로컬리 호스트"}
         dreamDestination={hostProfile?.dream_destination || "여행"}
         favoriteSong={hostProfile?.favorite_song || "음악"}
-        // ✅ 1. 언어 데이터 연결
         languages={hostProfile?.languages || []} 
-        // ✅ 2. 소개글 연결
         intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."} 
       />
 
-      {/* 6. 지도 (Location) */}
+      {/* 6. 지도 (Location) - 🟢 인터랙티브 지도로 교체 */}
       <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
-         <h3 className="text-xl font-bold mb-4">호스팅 지역</h3>
-         <p className="text-slate-500 mb-4">{experience.meeting_point || experience.location} (정확한 위치는 예약 확정 후 표시됩니다)</p>
-         <Link href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(experience.meeting_point || experience.location || 'Seoul')}`} target="_blank" rel="noopener noreferrer">
-           <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden group cursor-pointer border border-slate-200">
-              <img src="https://developer.apple.com/maps/sample-code/images/embedded-map_2x.png" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-all duration-700" style={{filter: 'contrast(105%)'}} alt="Map Background" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                 <div className="bg-white/95 backdrop-blur-sm px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-110 transition-transform text-slate-900 border border-slate-100">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/aa/Google_Maps_icon_(2020).svg" alt="Google Maps" className="w-[18px] h-[18px]" />
-                    지도에서 보기
-                 </div>
-              </div>
-           </div>
-         </Link>
+         <div className="flex justify-between items-end mb-4">
+            <div>
+               <h3 className="text-xl font-bold mb-1">호스팅 지역</h3>
+               <p className="text-slate-500 text-sm flex items-center gap-1">
+                 <MapPin size={14}/> {location}
+               </p>
+            </div>
+            <button 
+              onClick={handleCopyAddress}
+              className="text-xs font-bold text-slate-600 underline decoration-slate-300 hover:text-black flex items-center gap-1"
+            >
+              <Copy size={12}/> 주소 복사
+            </button>
+         </div>
+
+         <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden border border-slate-200 shadow-sm">
+            {/* 구글 지도 임베드 (무료 버전) */}
+            <iframe 
+              width="100%" 
+              height="100%" 
+              style={{ border: 0 }} 
+              loading="lazy" 
+              allowFullScreen 
+              src={`https://maps.google.com/maps?q=${encodeURIComponent(location)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+              className="grayscale-[20%] hover:grayscale-0 transition-all duration-700"
+            ></iframe>
+            
+            {/* 구글 맵으로 크게 보기 버튼 */}
+            <Link 
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl shadow-lg text-xs font-bold flex items-center gap-2 hover:scale-105 transition-transform border border-slate-200"
+            >
+               <ExternalLink size={14}/> 큰 지도로 보기
+            </Link>
+         </div>
+         <p className="text-xs text-slate-400 mt-2 text-center">* 정확한 만남 장소는 예약 확정 후 호스트가 안내해 드립니다.</p>
       </div>
 
       {/* 7. 문의하기 */}
       <div id="inquiry" className="pb-8 scroll-mt-24">
          <h3 className="text-xl font-bold mb-4">문의하기</h3>
          <div className="flex gap-2">
-           <input value={inquiryText} onChange={e => setInquiryText(e.target.value)} placeholder="호스트에게 메시지 보내기..." className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black"/>
-           <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:scale-105 transition-transform"><MessageSquare size={18}/></button>
+           <input value={inquiryText} onChange={e => setInquiryText(e.target.value)} placeholder="호스트에게 메시지 보내기..." className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors"/>
+           <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center"><MessageSquare size={18}/></button>
          </div>
       </div>
 
