@@ -23,6 +23,14 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
     return url;
   };
 
+  // 🟢 [수정] 하이드레이션 에러 방지를 위한 날짜 포맷터
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    // YYYY. MM. DD. 형식으로 고정 (서버/클라이언트 동일)
+    const date = new Date(dateString);
+    return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}.`;
+  };
+
   // 평점 계산
   const averageRating = reviews.length > 0 
     ? (reviews.reduce((acc, cur) => acc + cur.rating, 0) / reviews.length).toFixed(2) 
@@ -51,15 +59,14 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         // 2. 작성자 ID 추출
         const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id)));
 
-        // 🟢 3. 프로필 정보 가져오기 (수정됨: 에러를 유발하던 full_name, email 제거)
-        const { data: profilesData, error: profilesError } = await supabase
+        // 🟢 3. 프로필 가져오기 (핵심 수정: '*'로 모든 컬럼 조회 -> 400 에러 원천 차단)
+        const { data: profilesData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, name, avatar_url') // 🟢 안전한 컬럼만 조회
+          .select('*') 
           .in('id', userIds);
 
-        if (profilesError) {
-             console.error("프로필 로딩 에러:", profilesError);
-             // 프로필 로딩 실패해도 후기는 보여주기 위해 진행
+        if (profileError) {
+            console.error("프로필 조회 에러(RLS 또는 DB문제):", profileError);
         }
 
         // 4. 데이터 합치기
@@ -68,8 +75,12 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         const combinedReviews = reviewsData.map((review: any) => {
           const userProfile = profileMap.get(review.user_id);
           
-          // 🟢 이름: 프로필의 name이 있으면 쓰고, 없으면 '게스트'
-          const displayName = userProfile?.name || '게스트';
+          // 🟢 4. 이름 찾기 로직 강화 (있는 거 아무거나 가져와라)
+          let displayName = '익명 게스트';
+          if (userProfile) {
+             // full_name, name, username, email 순서로 체크
+             displayName = userProfile.full_name || userProfile.name || userProfile.username || userProfile.email?.split('@')[0] || '게스트';
+          }
 
           return {
             ...review,
@@ -83,7 +94,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         setReviews(combinedReviews);
 
       } catch (err) {
-        console.error("후기 로딩 실패:", err);
+        console.error("후기 로딩 로직 실패:", err);
       } finally {
         setLoading(false);
       }
@@ -113,12 +124,12 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                     {avatarUrl ? (
                       <Image src={avatarUrl} alt="user" fill className="object-cover"/>
                     ) : (
-                      <div className="w-full h-full bg-slate-300"/>
+                      <div className="w-full h-full bg-slate-300 flex items-center justify-center text-xs text-slate-500">?</div>
                     )}
                   </div>
                   <div>
                     <div className="font-bold text-sm text-slate-900">{review.user.name}</div>
-                    <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
+                    <div className="text-xs text-slate-500">{formatDate(review.created_at)}</div>
                   </div>
                 </div>
                 <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
@@ -158,13 +169,13 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden relative shrink-0">
                            {avatarUrl ? (
                              <Image src={avatarUrl} alt="user" fill className="object-cover"/>
-                           ) : <div className="w-full h-full bg-slate-300"/>}
+                           ) : <div className="w-full h-full bg-slate-300 flex items-center justify-center text-xs text-slate-500">?</div>}
                         </div>
                         <div className="flex-1">
                           <div className="flex justify-between items-start mb-1">
                             <div>
                               <div className="font-bold text-sm text-slate-900">{review.user.name}</div>
-                              <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
+                              <div className="text-xs text-slate-500">{formatDate(review.created_at)}</div>
                             </div>
                             <div className="flex text-amber-400">
                               {[...Array(5)].map((_, idx) => (
@@ -175,6 +186,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                           <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                             {review.content}
                           </p>
+                          {/* 사진 렌더링 */}
                           {review.photos && review.photos.length > 0 && (
                             <div className="flex gap-2 mt-3">
                               {review.photos.map((photo: string, idx: number) => (
