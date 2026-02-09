@@ -4,9 +4,8 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
-import { Send, ImageIcon, ShieldCheck, User } from 'lucide-react'; // 🟢 User 아이콘 추가
+import { Send, ImageIcon, ShieldCheck, User } from 'lucide-react';
 
-// 🟢 메인 콘텐츠를 별도 컴포넌트로 분리
 function InboxContent() {
   const { 
     inquiries, 
@@ -23,7 +22,6 @@ function InboxContent() {
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // URL 파라미터 읽기
   const searchParams = useSearchParams();
   const hostId = searchParams.get('hostId');
   const expId = searchParams.get('expId');
@@ -31,14 +29,12 @@ function InboxContent() {
   const hostAvatar = searchParams.get('hostAvatar'); 
   const expTitle = searchParams.get('expTitle');
 
-  // 스크롤 하단 고정
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // URL 파라미터가 있을 때 자동 채팅방 세팅
   useEffect(() => {
     if (!isLoading && hostId && expId) {
       const existing = inquiries.find(
@@ -71,11 +67,28 @@ function InboxContent() {
     }
   };
 
-  // 🟢 [추가] getHostName 함수 정의 (빨간 줄 해결!)
-  const getHostName = (host: any) => {
-    if (!host) return 'Host';
-    return host.name || host.full_name || 'Host';
+  // 🟢 [핵심] 호스트 이름/사진 표시 로직 강화 (URL 파라미터 백업 사용)
+  const getDisplayHost = (inqOrSelected: any) => {
+    // 1. DB에서 가져온 host 정보가 있으면 사용
+    if (inqOrSelected?.host) {
+        return {
+            name: inqOrSelected.host.name || inqOrSelected.host.full_name || 'Host',
+            avatar: inqOrSelected.host.avatar_url
+        };
+    }
+    // 2. DB 정보가 없는데, 현재 보고 있는 채팅방이 URL 파라미터와 일치하면 URL 정보 사용 (비상용)
+    if (inqOrSelected?.host_id === hostId) {
+        return {
+            name: hostName || 'Host',
+            avatar: hostAvatar
+        };
+    }
+    // 3. 다 없으면 기본값
+    return { name: 'Host', avatar: null };
   };
+
+  // 렌더링용 변수 미리 계산 (선택된 채팅방)
+  const currentHostDisplay = selectedInquiry ? getDisplayHost(selectedInquiry) : { name: '', avatar: null };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -84,26 +97,28 @@ function InboxContent() {
         <h1 className="text-2xl font-bold mb-6">메시지</h1>
         
         <div className="flex-1 flex border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-          {/* 좌측: 대화 목록 */}
+          {/* 좌측: 목록 */}
           <div className={`w-full md:w-[320px] lg:w-[400px] border-r border-slate-200 flex flex-col ${selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-slate-100 font-bold bg-white">대화 목록</div>
             <div className="flex-1 overflow-y-auto">
               {inquiries.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">대화가 없습니다.</div>}
-              {inquiries.map((inq) => (
-                <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
-                    {inq.type === 'admin' ? <ShieldCheck size={20} /> : (inq.host?.avatar_url ? <img src={inq.host.avatar_url} className="w-full h-full object-cover" alt="host"/> : <User className="text-slate-300" size={20}/>)}
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    {/* 🟢 호스트 이름 표시 (이제 에러 안 남) */}
-                    <div className="font-bold text-sm truncate">{inq.type === 'admin' ? '로컬리 고객센터' : getHostName(inq.host)}</div>
-                    <div className="text-xs text-slate-500 truncate flex items-center gap-1">
-                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600 font-medium truncate max-w-[120px]">{inq.experiences?.title}</span>
-                      <span className="truncate">{inq.content}</span>
+              {inquiries.map((inq) => {
+                const display = getDisplayHost(inq); // 목록용 호스트 정보
+                return (
+                  <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
+                      {inq.type === 'admin' ? <ShieldCheck size={20} /> : (display.avatar ? <img src={display.avatar} className="w-full h-full object-cover" alt="host"/> : <User className="text-slate-300" size={20}/>)}
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                      <div className="font-bold text-sm truncate">{inq.type === 'admin' ? '로컬리 고객센터' : display.name}</div>
+                      <div className="text-xs text-slate-500 truncate flex items-center gap-1">
+                        <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600 font-medium truncate max-w-[120px]">{inq.experiences?.title}</span>
+                        <span className="truncate">{inq.content}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -112,12 +127,11 @@ function InboxContent() {
             {selectedInquiry ? (
               <>
                 <div className="p-4 border-b border-slate-100 font-bold flex items-center gap-2">
-                   {/* 상단바: 호스트 사진 및 이름 */}
                    <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                      {selectedInquiry.host?.avatar_url ? <img src={selectedInquiry.host.avatar_url} className="w-full h-full object-cover" alt="host"/> : <div className="w-full h-full flex items-center justify-center"><User className="text-slate-300" size={18}/></div>}
+                      {currentHostDisplay.avatar ? <img src={currentHostDisplay.avatar} className="w-full h-full object-cover" alt="host"/> : <div className="w-full h-full flex items-center justify-center"><User className="text-slate-300" size={18}/></div>}
                    </div>
                    <div>
-                      <div className="font-bold text-base leading-tight">{selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : getHostName(selectedInquiry.host)}</div>
+                      <div className="font-bold text-base leading-tight">{selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : currentHostDisplay.name}</div>
                       <div className="text-xs text-slate-500 font-normal">{selectedInquiry.experiences?.title}</div>
                    </div>
                 </div>
@@ -129,7 +143,10 @@ function InboxContent() {
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                          {!isMe && (
                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden mr-2 shrink-0">
-                             {msg.sender?.avatar_url ? <img src={msg.sender.avatar_url} className="w-full h-full object-cover" alt="sender"/> : <User className="w-full h-full p-1.5 text-slate-400"/>}
+                             {/* 상대방 프로필: 메시지 내 sender 정보가 없으면 채팅방 대표 호스트 정보 사용 */}
+                             {msg.sender?.avatar_url || currentHostDisplay.avatar ? 
+                               <img src={msg.sender?.avatar_url || currentHostDisplay.avatar} className="w-full h-full object-cover" alt="sender"/> 
+                               : <User className="w-full h-full p-1.5 text-slate-400"/>}
                            </div>
                          )}
                         <div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none shadow-sm'}`}>
@@ -139,29 +156,19 @@ function InboxContent() {
                     );
                   })}
                   
-                  {/* 새 채팅방 안내 문구 */}
                   {messages.length === 0 && selectedInquiry.id === 'new' && (
                      <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
                         <div className="w-20 h-20 rounded-full bg-slate-100 mb-4 flex items-center justify-center overflow-hidden border border-slate-200">
-                           {selectedInquiry.host?.avatar_url ? <img src={selectedInquiry.host.avatar_url} className="w-full h-full object-cover" alt="host"/> : <User size={40} className="text-slate-300"/>}
+                           {currentHostDisplay.avatar ? <img src={currentHostDisplay.avatar} className="w-full h-full object-cover" alt="host"/> : <User size={40} className="text-slate-300"/>}
                         </div>
-                        <p className="font-bold text-slate-900 mb-1">{getHostName(selectedInquiry.host)}님에게 메시지 보내기</p>
+                        <p className="font-bold text-slate-900 mb-1">{currentHostDisplay.name}님에게 메시지 보내기</p>
                         <p className="text-xs">궁금한 점을 자유롭게 물어보세요!</p>
                      </div>
                   )}
                 </div>
 
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
-                  <input 
-                    className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all" 
-                    placeholder="메시지 입력..." 
-                    value={inputText} 
-                    onChange={(e) => setInputText(e.target.value)} 
-                    onKeyDown={(e) => { 
-                      if (e.nativeEvent.isComposing) return; 
-                      if (e.key === 'Enter') { e.preventDefault(); handleSend(); } 
-                    }} 
-                  />
+                  <input className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all" placeholder="메시지 입력..." value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }} />
                   <button onClick={handleSend} className="p-3 bg-black text-white rounded-full hover:scale-105 transition-transform"><Send size={18}/></button>
                 </div>
               </>
