@@ -19,9 +19,9 @@ export default function GuestTripsPage() {
     pastTrips, 
     isLoading, 
     errorMsg, 
-    requestCancellation, // 이름 변경됨
-    isProcessing         // 새로 추가됨
-    refreshTrips         // 🟢 [추가] 목록 새로고침 함수 가져오기
+    requestCancel, // 🟢 [수정] 훅에서 반환하는 정확한 이름으로 변경
+    isProcessing,  // 🟢 콤마(,) 확인 완료
+    refreshTrips   // 🟢 콤마(,) 확인 완료
   } = useGuestTrips();
 
   // UI 상태 관리 (모달 등)
@@ -63,7 +63,7 @@ export default function GuestTripsPage() {
                   <TripCard 
                     key={trip.id} 
                     trip={trip} 
-                    onRequestCancel={requestCancellation} // 이름 변경
+                    onRequestCancel={requestCancel} // 🟢 [수정] 올바른 함수 전달
                     isProcessing={isProcessing}        // 추가됨
                     onOpenReceipt={openReceipt}
                   />
