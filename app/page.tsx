@@ -7,6 +7,7 @@ import ExperienceCard from '@/app/components/ExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
 import { LOCALLY_SERVICES } from '@/app/constants'; 
 import { useExperienceFilter } from '@/app/hooks/useExperienceFilter'; // 🟢 훅 임포트
+import { ExperienceCardSkeleton } from '@/app/components/skeletons/ExperienceCardSkeleton';
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
@@ -73,15 +74,13 @@ export default function HomePage() {
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
         {activeTab === 'experience' && (
           loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-              {[1,2,3,4,5,6,7,8].map(i => (
-                <div key={i} className="animate-pulse">
-                  <div className="bg-slate-200 aspect-[4/3] rounded-xl mb-3"></div>
-                  <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
-                </div>
-              ))}
-            </div>
-          ) : filteredExperiences.length === 0 ? ( 
+    // 🟢 [수정] 멋진 스켈레톤으로 교체!
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
+    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+      <ExperienceCardSkeleton key={i} />
+    ))}
+  </div>
+) : filteredExperiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-40 text-center">
               <Ghost size={48} className="text-slate-300 mb-4"/>
               <h3 className="text-lg font-bold text-slate-900 mb-2">검색 결과가 없습니다.</h3>

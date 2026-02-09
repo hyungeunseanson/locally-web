@@ -13,6 +13,7 @@ import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
 import Image from 'next/image'; 
 import { useToast } from '@/app/context/ToastContext'; 
+import { ExperienceDetailSkeleton } from '@/app/components/skeletons/ExperienceDetailSkeleton';
 
 export default function ExperienceDetailPage() {
   const [isCopySuccess, setIsCopySuccess] = useState(false);
@@ -114,7 +115,7 @@ export default function ExperienceDetailPage() {
     router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div></div>;
+  if (loading) return <ExperienceDetailSkeleton />;
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
 
   // ✅ 사진 데이터 준비 (없으면 기본 이미지)
