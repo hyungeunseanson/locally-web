@@ -27,49 +27,67 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) { setIsLoading(false); return; }
       setCurrentUser(user);
 
-      // 🟢 [근본적 해결] 체험(experiences)을 통해 호스트 정보를 가져오는 확실한 경로 사용
-      // direct_host: 혹시 모를 직접 연결 (실패해도 괜찮음)
-      // experiences -> host: 이미 검증된 연결 (이걸 메인으로 사용)
+      // 1. 문의(inquiries)와 체험(experiences) 데이터 가져오기
       let query = supabase
         .from('inquiries')
         .select(`
           *,
-          guest:profiles!inquiries_user_id_fkey (*),
-          direct_host:profiles!inquiries_host_id_fkey (*),
-          experiences (
-            id, title, photos, image_url,
-            host:profiles!experiences_host_id_fkey (*)
-          )
+          experiences (id, title, photos, image_url, host_id), 
+          guest:profiles!inquiries_user_id_fkey (*)
         `)
         .order('updated_at', { ascending: false });
 
       if (role === 'guest') query = query.eq('user_id', user.id);
       else if (role === 'host') query = query.eq('host_id', user.id).eq('type', 'general');
 
-      const { data, error } = await query;
+      const { data: inquiriesData, error } = await query;
       if (error) throw error;
       
-      if (data) {
-        const safeData = data.map(item => {
-          // 🟢 호스트 정보 우선순위: 1. 직접 연결된 호스트 -> 2. 체험을 통해 연결된 호스트
-          const rawHost = item.direct_host || item.experiences?.host;
+      if (inquiriesData) {
+        // 2. 호스트 ID 목록 추출 (중복 제거)
+        const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
+
+        // 3. [핵심] Profiles(프로필)와 Host_Applications(신청서) 두 곳에서 정보 조회
+        const [profilesRes, appsRes] = await Promise.all([
+          supabase.from('profiles').select('*').in('id', hostIds),
+          supabase.from('host_applications').select('*').in('user_id', hostIds)
+        ]);
+
+        const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
+        const appsMap = new Map(appsRes.data?.map(a => [a.user_id, a]));
+
+        // 4. 데이터 병합 (ExperienceClient.tsx와 동일한 우선순위 적용)
+        const safeData = inquiriesData.map(item => {
+          const profile = profilesMap.get(item.host_id);
+          const app = appsMap.get(item.host_id);
           
+          // 호스트 정보 조립: 신청서 정보 우선 -> 프로필 정보 -> 기본값
+          const hostName = app?.name || profile?.name || profile?.full_name || 'Locally Host';
+          const hostAvatar = app?.profile_photo || profile?.avatar_url || null;
+
+          const rawGuest = item.guest;
+
           return {
             ...item,
-            // 이제 item.host에 확실한 데이터가 들어갑니다
-            host: rawHost ? { ...rawHost, avatar_url: secureUrl(rawHost.avatar_url) } : null,
-            guest: item.guest ? { ...item.guest, avatar_url: secureUrl(item.guest.avatar_url) } : null,
+            guest: rawGuest ? { ...rawGuest, avatar_url: secureUrl(rawGuest.avatar_url) } : null,
+            // 호스트 객체 완성
+            host: {
+              id: item.host_id,
+              name: hostName,
+              full_name: hostName, // 호환성을 위해 둘 다 넣어줌
+              avatar_url: secureUrl(hostAvatar)
+            },
             experiences: item.experiences ? {
               ...item.experiences,
               image_url: secureUrl(item.experiences.image_url || item.experiences.photos?.[0])
             } : null
           };
         });
+        
         setInquiries(safeData);
       }
     } catch (err: any) {
       console.error(err);
-      // 조용히 실패 (데이터가 없을 수도 있으므로)
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +95,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // 메시지 로드 시 sender 정보 가져오기
+      // 메시지 로드
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (*)`)
@@ -87,6 +105,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       if (data) {
+        // 메시지 내의 sender 정보는 profiles 테이블에 의존하므로, 
+        // 만약 여기서도 사진이 안 나오면 위와 같은 로직이 필요하지만,
+        // 일단 메시지 리스트는 sender 정보만으로 충분한 경우가 많습니다.
         const safeMessages = data.map(msg => ({
           ...msg,
           sender: msg.sender ? { ...msg.sender, avatar_url: secureUrl(msg.sender.avatar_url) } : null
@@ -94,10 +115,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         setMessages(safeMessages);
       }
       
-      // 목록에서 현재 선택된 방 정보 업데이트
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) setSelectedInquiry(selected);
-      
     } catch (err: any) { console.error(err); }
   };
 

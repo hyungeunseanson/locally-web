@@ -35,7 +35,6 @@ function InboxContent() {
     }
   }, [messages]);
 
-  // URL 파라미터가 있을 때 자동 채팅방 세팅
   useEffect(() => {
     if (!isLoading && hostId && expId) {
       const existing = inquiries.find(
@@ -68,31 +67,22 @@ function InboxContent() {
     }
   };
 
-  // 🟢 [UI 로직 강화] 화면에 표시할 호스트 정보 결정
-  // 1순위: 선택된 채팅방의 DB 데이터 (가장 정확함)
-  // 2순위: URL 파라미터로 넘어온 데이터 (로딩 전이나 DB 데이터 누락 시 백업)
-  const getDisplayHost = (inq: any) => {
-    // 채팅방 데이터가 있고, 그 안에 호스트 정보가 있으면 사용
-    if (inq?.host) {
+  // 🟢 [UI 로직] useChat이 조립해준 host 객체를 그대로 사용
+  const getDisplayHost = (inqOrSelected: any) => {
+    if (inqOrSelected?.host) {
         return {
-            name: inq.host.name || inq.host.full_name || 'Host',
-            avatar: inq.host.avatar_url
+            name: inqOrSelected.host.name, // 이미 useChat에서 우선순위 적용됨
+            avatar: inqOrSelected.host.avatar_url
         };
     }
-    // 채팅방 데이터가 부실한데, 현재 URL의 호스트와 ID가 같다면 URL 정보 사용
-    if (inq?.host_id === hostId) {
-        return {
-            name: hostName || 'Host',
-            avatar: hostAvatar
-        };
+    // 백업: URL 정보
+    if (inqOrSelected?.host_id === hostId) {
+        return { name: hostName || 'Host', avatar: hostAvatar };
     }
     return { name: 'Host', avatar: null };
   };
 
-  // 현재 선택된 방의 표시 정보 계산
-  const currentHostDisplay = selectedInquiry 
-    ? getDisplayHost(selectedInquiry) 
-    : { name: '', avatar: null };
+  const currentHostDisplay = selectedInquiry ? getDisplayHost(selectedInquiry) : { name: '', avatar: null };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -107,7 +97,7 @@ function InboxContent() {
             <div className="flex-1 overflow-y-auto">
               {inquiries.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">대화가 없습니다.</div>}
               {inquiries.map((inq) => {
-                const display = getDisplayHost(inq); // 목록용 호스트 정보 계산
+                const display = getDisplayHost(inq); 
                 return (
                   <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
@@ -147,9 +137,9 @@ function InboxContent() {
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                          {!isMe && (
                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden mr-2 shrink-0">
-                             {/* 상대방 프사: 메시지 자체에 정보가 없으면, 채팅방 대표 호스트 사진 사용 */}
-                             {msg.sender?.avatar_url || currentHostDisplay.avatar ? 
-                               <img src={msg.sender?.avatar_url || currentHostDisplay.avatar} className="w-full h-full object-cover" alt="sender"/> 
+                             {/* 메시지 발신자 사진도 호스트라면 currentHostDisplay 사용 */}
+                             {msg.sender?.avatar_url || (String(msg.sender_id) === String(selectedInquiry.host_id) ? currentHostDisplay.avatar : null) ? 
+                               <img src={msg.sender?.avatar_url || (String(msg.sender_id) === String(selectedInquiry.host_id) ? currentHostDisplay.avatar : '')} className="w-full h-full object-cover" alt="sender"/> 
                                : <User className="w-full h-full p-1.5 text-slate-400"/>}
                            </div>
                          )}
