@@ -33,7 +33,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       if (!experienceId) return;
       
       try {
-        // 🟢 1. 후기 데이터만 먼저 가져오기 (에러 발생 확률 0%)
+        // 1. 후기 데이터 가져오기
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
           .select('*')
@@ -48,16 +48,14 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
           return;
         }
 
-        // 🟢 2. 후기 작성자들의 ID 추출
+        // 2. 작성자 ID 추출 및 프로필 정보 가져오기
         const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id)));
-
-        // 🟢 3. 프로필 정보 따로 가져오기
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, name, avatar_url, full_name')
+          .select('id, name, avatar_url, full_name') // 필요한 정보만 쏙
           .in('id', userIds);
 
-        // 🟢 4. 데이터 합치기 (Javascript로 매핑)
+        // 3. 데이터 합치기
         const profileMap = new Map(profilesData?.map((p: any) => [p.id, p]));
 
         const combinedReviews = reviewsData.map((review: any) => ({
@@ -90,12 +88,13 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
           {reviews.slice(0, 4).map((review) => {
             const avatarUrl = secureUrl(review.user?.avatar_url);
+            // 이름 우선순위: name -> full_name -> '익명'
             const userName = review.user?.name || review.user?.full_name || '익명';
             
             return (
               <div key={review.id} className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden relative">
+                  <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden relative shrink-0">
                     {avatarUrl ? (
                       <Image src={avatarUrl} alt="user" fill className="object-cover"/>
                     ) : (
@@ -118,9 +117,9 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         <div className="text-slate-400 text-sm py-4">아직 작성된 후기가 없습니다. 첫 후기를 남겨보세요!</div>
       )}
       
-      {/* 2. 모달 열기 버튼 */}
-      {reviews.length > 4 && (
-        <button onClick={() => setIsReviewsExpanded(true)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors">
+      {/* 2. 모달 열기 버튼 (🟢 수정됨: 1개라도 있으면 무조건 보임) */}
+      {reviews.length > 0 && (
+        <button onClick={() => setIsReviewsExpanded(true)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors w-full md:w-auto">
           후기 {reviews.length}개 모두 보기
         </button>
       )}
