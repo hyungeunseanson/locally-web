@@ -16,7 +16,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 🟢 [보안] http 이미지를 https로 강제 변환 (카카오 프로필 등)
+  // 🟢 [보안] http 이미지를 https로 강제 변환
   const secureUrl = (url: string | null) => {
     if (!url) return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -33,7 +33,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       if (!experienceId) return;
       
       try {
-        // 1. 후기 데이터 가져오기 (가장 안전한 방식)
+        // 1. 후기 데이터 가져오기
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
           .select('*')
@@ -51,10 +51,10 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         // 2. 작성자 ID 추출
         const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id)));
 
-        // 3. 작성자 프로필 정보 따로 가져오기 (조인 에러 방지)
+        // 3. 프로필 정보 가져오기 (이름, 사진, 이메일 등 최대한 많이)
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, name, avatar_url, full_name')
+          .select('id, name, full_name, avatar_url, email')
           .in('id', userIds);
 
         // 4. 데이터 합치기
@@ -62,13 +62,19 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
 
         const combinedReviews = reviewsData.map((review: any) => {
           const userProfile = profileMap.get(review.user_id);
-          // 이름 우선순위: name -> full_name -> '익명'
-          const userName = userProfile?.name || userProfile?.full_name || '익명';
           
+          // 🟢 이름 우선순위: 1.닉네임 -> 2.실명 -> 3.이메일 앞부분 -> 4.게스트
+          let displayName = '게스트';
+          if (userProfile) {
+            if (userProfile.name) displayName = userProfile.name;
+            else if (userProfile.full_name) displayName = userProfile.full_name;
+            else if (userProfile.email) displayName = userProfile.email.split('@')[0];
+          }
+
           return {
             ...review,
             user: {
-              name: userName,
+              name: displayName,
               avatar_url: userProfile?.avatar_url || null
             }
           };
@@ -126,7 +132,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         <div className="text-slate-400 text-sm py-4">아직 작성된 후기가 없습니다. 첫 후기를 남겨보세요!</div>
       )}
       
-      {/* 2. 모달 열기 버튼 (🟢 수정됨: 1개라도 있으면 무조건 보임) */}
+      {/* 2. 모달 열기 버튼 (1개라도 있으면 보임) */}
       {reviews.length > 0 && (
         <button onClick={() => setIsReviewsExpanded(true)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors w-full md:w-auto">
           후기 {reviews.length}개 모두 보기
