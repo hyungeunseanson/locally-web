@@ -21,6 +21,7 @@ export default function GuestTripsPage() {
     errorMsg, 
     requestCancellation, // 이름 변경됨
     isProcessing         // 새로 추가됨
+    refreshTrips         // 🟢 [추가] 목록 새로고침 함수 가져오기
   } = useGuestTrips();
 
   // UI 상태 관리 (모달 등)
@@ -103,7 +104,15 @@ export default function GuestTripsPage() {
 
       {/* 모달 */}
       {isReceiptModalOpen && selectedTrip && <ReceiptModal trip={selectedTrip} onClose={() => setIsReceiptModalOpen(false)} />}
-      {isReviewModalOpen && selectedTrip && <ReviewModal trip={selectedTrip} onClose={() => setIsReviewModalOpen(false)} />}
+{/* 후기 작성 모달 */}
+{isReviewModalOpen && selectedTrip && (
+        <ReviewModal 
+          trip={selectedTrip} 
+          onClose={() => setIsReviewModalOpen(false)}
+          // 🟢 [핵심] 후기 작성 완료 시 목록 새로고침 연결
+          onReviewSubmitted={refreshTrips} 
+        />
+      )}
     </div>
   );
 }

@@ -25,7 +25,7 @@ export function useGuestTrips() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // 1. 예약 정보와 연결된 체험 정보 조회
+      // 1. 예약 정보와 체험 정보, 그리고 연결된 '후기(reviews)' 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -33,28 +33,21 @@ export function useGuestTrips() {
           experiences (
             id, title, city, photos, address, host_id,
             profiles!experiences_host_id_fkey (*) 
-          )
-        `)
+          ),
+          reviews(id) 
+        `) // 🟢 booking_id로 연결된 후기가 있는지 확인 (id만 가져옴)
         .eq('user_id', user.id)
         .order('date', { ascending: true });
 
       if (error) throw error;
 
       if (bookings) {
-        // 2. 호스트 ID 추출 (중복 제거)
+        // 호스트 신청서 정보 매핑 (이전 단계에서 추가한 로직)
         const hostIds = Array.from(new Set(bookings.map((b: any) => b.experiences?.host_id).filter(Boolean)));
-        
-        // 3. [핵심 수정] 호스트 신청서(host_applications) 정보 추가 조회
         let appsMap = new Map();
         if (hostIds.length > 0) {
-          const { data: apps } = await supabase
-            .from('host_applications')
-            .select('user_id, name, profile_photo')
-            .in('user_id', hostIds);
-            
-          if (apps) {
-            apps.forEach((app: any) => appsMap.set(app.user_id, app));
-          }
+          const { data: apps } = await supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', hostIds);
+          if (apps) apps.forEach((app: any) => appsMap.set(app.user_id, app));
         }
 
         const upcoming: any[] = [];
@@ -73,22 +66,17 @@ export function useGuestTrips() {
             ? booking.experiences.profiles[0] 
             : booking.experiences.profiles;
 
-          // 🟢 [우선순위 적용] 호스트 신청서 정보 > 프로필 정보 > 기본값
           const hostApp = appsMap.get(booking.experiences.host_id);
-          
           const finalHostName = hostApp?.name || profileData?.name || profileData?.full_name || 'Locally Host';
           const finalHostAvatar = hostApp?.profile_photo || profileData?.avatar_url;
 
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            
-            // 수정된 호스트 정보 적용
             hostName: finalHostName,
             hostAvatar: secureUrl(finalHostAvatar),
-            hostPhone: profileData?.phone, // 전화번호는 프로필에서 유지
+            hostPhone: profileData?.phone,
             hostId: booking.experiences.host_id,
-            
             date: booking.date, 
             time: booking.time || '시간 미정',
             location: booking.experiences.city || '서울',
@@ -102,6 +90,9 @@ export function useGuestTrips() {
             guests: booking.guests || 1,
             expId: booking.experience_id,
             orderId: booking.order_id || booking.id.substring(0,8).toUpperCase(),
+            
+            // 🟢 [추가] 후기 작성 여부 (배열이 비어있지 않으면 작성함)
+            hasReview: booking.reviews && booking.reviews.length > 0
           };
 
           if (isFuture) upcoming.push(formattedTrip);
@@ -113,7 +104,7 @@ export function useGuestTrips() {
       }
     } catch (err: any) {
       console.error(err);
-      showToast('예약 정보를 불러오는데 실패했습니다.', 'error');
+      // 에러 메시지
     } finally {
       setIsLoading(false);
     }

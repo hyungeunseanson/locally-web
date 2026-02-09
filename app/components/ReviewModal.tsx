@@ -2,15 +2,16 @@
 
 import React, { useState } from 'react';
 import { Star, X, Camera, Loader2 } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
-import { useToast } from '@/app/context/ToastContext';
+import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
+import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
 
 interface ReviewModalProps {
   trip: any;
   onClose: () => void;
+  onReviewSubmitted?: () => void; // 🟢 후기 작성 완료 후 목록 새로고침용 콜백
 }
 
-export default function ReviewModal({ trip, onClose }: ReviewModalProps) {
+export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
   const supabase = createClient();
   const { showToast } = useToast();
 
@@ -54,6 +55,7 @@ export default function ReviewModal({ trip, onClose }: ReviewModalProps) {
       const uploadedUrls: string[] = [];
       
       for (const file of imageFiles) {
+        // 파일명: reviews/유저ID_시간_랜덤문자
         const fileName = `reviews/${user.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         const { error: uploadError } = await supabase.storage.from('images').upload(fileName, file);
         
@@ -66,8 +68,8 @@ export default function ReviewModal({ trip, onClose }: ReviewModalProps) {
       // 2. 후기 데이터 저장
       const { error } = await supabase.from('reviews').insert({
         user_id: user.id,
-        experience_id: trip.expId, // TripCard에서 expId를 넘겨준다고 가정
-        booking_id: trip.id,       // TripCard에서 id는 booking_id
+        experience_id: trip.expId, // 체험 ID
+        booking_id: trip.id,       // 예약 ID
         rating: rating,
         content: reviewText,
         photos: uploadedUrls
@@ -76,6 +78,9 @@ export default function ReviewModal({ trip, onClose }: ReviewModalProps) {
       if (error) throw error;
 
       showToast("소중한 후기가 등록되었습니다!", 'success');
+      
+      // 🟢 목록 새로고침 요청 후 모달 닫기
+      if (onReviewSubmitted) onReviewSubmitted();
       onClose();
 
     } catch (error: any) {

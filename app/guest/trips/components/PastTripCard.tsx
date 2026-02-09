@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, CheckCircle } from 'lucide-react'; // 체크 아이콘 추가
 
 interface PastTripCardProps {
   trip: any;
@@ -24,18 +24,24 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
         <div className="text-xs text-slate-500 mt-0.5">{trip.date}</div>
         
         {trip.status !== 'cancelled' ? (
-          <button 
-            onClick={() => onOpenReview(trip)} 
-            className="text-xs font-semibold text-blue-600 hover:underline mt-1.5"
-          >
-            후기 작성하기
-          </button>
+          // 🟢 [수정] 후기 작성 여부에 따라 UI 분기
+          trip.hasReview ? (
+            <span className="text-xs font-semibold text-green-600 mt-1.5 flex items-center gap-1">
+              <CheckCircle size={12}/> 후기 작성 완료
+            </span>
+          ) : (
+            <button 
+              onClick={() => onOpenReview(trip)} 
+              className="text-xs font-semibold text-blue-600 hover:underline mt-1.5"
+            >
+              후기 작성하기
+            </button>
+          )
         ) : (
           <span className="text-[10px] text-slate-400 mt-1.5 inline-block bg-slate-100 px-1.5 py-0.5 rounded">취소됨</span>
         )}
       </div>
       
-      {/* 화살표 장식 */}
       <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-400 transition-colors"/>
     </div>
   );
