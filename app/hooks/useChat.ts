@@ -27,7 +27,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) { setIsLoading(false); return; }
       setCurrentUser(user);
 
-      // 1. 문의(inquiries)와 체험(experiences) 데이터 가져오기
       let query = supabase
         .from('inquiries')
         .select(`
@@ -44,10 +43,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       if (inquiriesData) {
-        // 2. 호스트 ID 목록 추출 (중복 제거)
         const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
-
-        // 3. [핵심] Profiles(프로필)와 Host_Applications(신청서) 두 곳에서 정보 조회
         const [profilesRes, appsRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', hostIds),
           supabase.from('host_applications').select('*').in('user_id', hostIds)
@@ -56,25 +52,20 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
         const appsMap = new Map(appsRes.data?.map(a => [a.user_id, a]));
 
-        // 4. 데이터 병합 (ExperienceClient.tsx와 동일한 우선순위 적용)
         const safeData = inquiriesData.map(item => {
           const profile = profilesMap.get(item.host_id);
           const app = appsMap.get(item.host_id);
-          
-          // 호스트 정보 조립: 신청서 정보 우선 -> 프로필 정보 -> 기본값
           const hostName = app?.name || profile?.name || profile?.full_name || 'Locally Host';
-          const hostAvatar = app?.profile_photo || profile?.avatar_url || null;
-
+          const hostAvatar = app?.profile_photo || profile?.avatar_url || null; // 신청서 사진 우선
           const rawGuest = item.guest;
 
           return {
             ...item,
             guest: rawGuest ? { ...rawGuest, avatar_url: secureUrl(rawGuest.avatar_url) } : null,
-            // 호스트 객체 완성
             host: {
               id: item.host_id,
               name: hostName,
-              full_name: hostName, // 호환성을 위해 둘 다 넣어줌
+              full_name: hostName,
               avatar_url: secureUrl(hostAvatar)
             },
             experiences: item.experiences ? {
@@ -83,19 +74,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
             } : null
           };
         });
-        
         setInquiries(safeData);
       }
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err: any) { console.error(err); } 
+    finally { setIsLoading(false); }
   }, [supabase, role]);
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // 메시지 로드
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (*)`)
@@ -103,18 +89,13 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         .order('created_at', { ascending: true });
       
       if (error) throw error;
-      
       if (data) {
-        // 메시지 내의 sender 정보는 profiles 테이블에 의존하므로, 
-        // 만약 여기서도 사진이 안 나오면 위와 같은 로직이 필요하지만,
-        // 일단 메시지 리스트는 sender 정보만으로 충분한 경우가 많습니다.
         const safeMessages = data.map(msg => ({
           ...msg,
           sender: msg.sender ? { ...msg.sender, avatar_url: secureUrl(msg.sender.avatar_url) } : null
         }));
         setMessages(safeMessages);
       }
-      
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) setSelectedInquiry(selected);
     } catch (err: any) { console.error(err); }
@@ -125,13 +106,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     try {
       const { error } = await supabase.from('inquiry_messages').insert([{ inquiry_id: inquiryId, sender_id: currentUser.id, content }]);
       if (error) throw error;
-      
       await supabase.from('inquiries').update({ content, updated_at: new Date().toISOString() }).eq('id', inquiryId);
       await loadMessages(inquiryId);
       fetchInquiries(); 
-    } catch (err: any) { 
-      showToast("메시지 전송 실패: " + err.message, 'error');
-    }
+    } catch (err: any) { showToast("메시지 전송 실패: " + err.message, 'error'); }
   };
 
   const createInquiry = async (hostId: string, experienceId: string, content: string) => {
@@ -142,6 +120,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return data;
   };
 
+  // 🟢 [수정] startNewChat: 전달받은 avatarUrl을 강제로 사용
   const startNewChat = (hostData: { id: string; name: string; avatarUrl?: string }, expData: { id: string; title: string }) => {
     setMessages([]);
     setSelectedInquiry({
@@ -149,7 +128,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       type: 'general',
       host_id: hostData.id,
       experience_id: expData.id,
-      host: { name: hostData.name, full_name: hostData.name, avatar_url: hostData.avatarUrl || null },
+      host: { 
+        name: hostData.name, 
+        full_name: hostData.name, 
+        avatar_url: secureUrl(hostData.avatarUrl || null) // 🟢 여기서 확실히 적용
+      },
       experiences: { id: expData.id, title: expData.title },
       content: ''
     });
@@ -157,5 +140,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
+  // loadMessages를 외부에서 호출할 때 setSelectedInquiry가 작동하도록 반환
+  // UI 컴포넌트에서 클릭 시 이 loadMessages가 호출됨
   return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, refresh: fetchInquiries };
 }

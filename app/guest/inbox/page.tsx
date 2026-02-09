@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation'; // 🟢 useRouter 추가
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
-import { Send, ImageIcon, ShieldCheck, User } from 'lucide-react';
+import { Send, ShieldCheck, User } from 'lucide-react';
 
 function InboxContent() {
   const { 
@@ -21,40 +21,69 @@ function InboxContent() {
 
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
-
+  
+  const router = useRouter(); // 🟢 라우터
   const searchParams = useSearchParams();
+  
+  // URL 파라미터 값들
   const hostId = searchParams.get('hostId');
   const expId = searchParams.get('expId');
   const hostName = searchParams.get('hostName');
   const hostAvatar = searchParams.get('hostAvatar'); 
   const expTitle = searchParams.get('expTitle');
+  
+  // 🟢 [상태 추가] URL 파라미터를 이미 처리했는지 여부 (무한 리다이렉트 방지)
+  const [isUrlProcessed, setIsUrlProcessed] = useState(false);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
+  // 🟢 [수정] URL 처리 로직 (단 한 번만 실행되도록 제어)
   useEffect(() => {
-    if (!isLoading && hostId && expId) {
-      const existing = inquiries.find(
-        i => String(i.host_id) === String(hostId) && String(i.experience_id) === String(expId)
-      );
-      
-      if (existing) {
-        if (selectedInquiry?.id !== existing.id) {
-          loadMessages(existing.id);
-        }
-      } else {
-        if (selectedInquiry?.id !== 'new') {
-           startNewChat(
-             { id: hostId, name: hostName || 'Host', avatarUrl: hostAvatar || undefined }, 
-             { id: expId, title: expTitle || 'Experience' }
-           );
-        }
+    // 로딩 중이거나 이미 처리했으면 스킵
+    if (isLoading || isUrlProcessed) return;
+
+    // URL 파라미터가 없으면 처리 완료로 간주
+    if (!hostId || !expId) {
+      setIsUrlProcessed(true);
+      return;
+    }
+
+    // 1. 이미 존재하는 채팅방인지 확인
+    const existing = inquiries.find(
+      i => String(i.host_id) === String(hostId) && String(i.experience_id) === String(expId)
+    );
+    
+    if (existing) {
+      // 이미 있는 방이면 그 방으로 이동
+      if (selectedInquiry?.id !== existing.id) {
+        loadMessages(existing.id);
+      }
+    } else {
+      // 없는 방이면 '새 채팅방' 시작
+      if (selectedInquiry?.id !== 'new') {
+         startNewChat(
+           { id: hostId, name: hostName || 'Host', avatarUrl: hostAvatar || undefined }, 
+           { id: expId, title: expTitle || 'Experience' }
+         );
       }
     }
-  }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat]);
+    
+    // 🟢 처리 완료 플래그 세우기 (이제 다른 채팅방 눌러도 여기로 안 돌아옴)
+    setIsUrlProcessed(true);
+
+  }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
+
+  // 🟢 [수정] 다른 채팅방 클릭 핸들러
+  const handleSelectInquiry = (inqId: number) => {
+    loadMessages(inqId);
+    
+    // 만약 URL에 파라미터가 남아있다면 제거해서 깔끔하게 만듦
+    if (hostId || expId) {
+       router.replace('/guest/inbox');
+    }
+  };
 
   const handleSend = async () => {
     if (selectedInquiry && inputText.trim()) {
@@ -67,16 +96,15 @@ function InboxContent() {
     }
   };
 
-  // 🟢 [UI 로직] useChat이 조립해준 host 객체를 그대로 사용
   const getDisplayHost = (inqOrSelected: any) => {
     if (inqOrSelected?.host) {
         return {
-            name: inqOrSelected.host.name, // 이미 useChat에서 우선순위 적용됨
+            name: inqOrSelected.host.name,
             avatar: inqOrSelected.host.avatar_url
         };
     }
-    // 백업: URL 정보
-    if (inqOrSelected?.host_id === hostId) {
+    // URL 백업 정보는 'new' 상태일 때만 사용 (기존 채팅방 클릭 시엔 DB 정보 우선)
+    if (inqOrSelected?.id === 'new' && inqOrSelected?.host_id === hostId) {
         return { name: hostName || 'Host', avatar: hostAvatar };
     }
     return { name: 'Host', avatar: null };
@@ -99,7 +127,8 @@ function InboxContent() {
               {inquiries.map((inq) => {
                 const display = getDisplayHost(inq); 
                 return (
-                  <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
+                  // 🟢 [수정] 클릭 시 handleSelectInquiry 호출 (URL 정리 포함)
+                  <div key={inq.id} onClick={() => handleSelectInquiry(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
                       {inq.type === 'admin' ? <ShieldCheck size={20} /> : (display.avatar ? <img src={display.avatar} className="w-full h-full object-cover" alt="host"/> : <User className="text-slate-300" size={20}/>)}
                     </div>
@@ -137,9 +166,9 @@ function InboxContent() {
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                          {!isMe && (
                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden mr-2 shrink-0">
-                             {/* 메시지 발신자 사진도 호스트라면 currentHostDisplay 사용 */}
-                             {msg.sender?.avatar_url || (String(msg.sender_id) === String(selectedInquiry.host_id) ? currentHostDisplay.avatar : null) ? 
-                               <img src={msg.sender?.avatar_url || (String(msg.sender_id) === String(selectedInquiry.host_id) ? currentHostDisplay.avatar : '')} className="w-full h-full object-cover" alt="sender"/> 
+                             {/* 상대방 프사 표시 */}
+                             {msg.sender?.avatar_url || currentHostDisplay.avatar ? 
+                               <img src={msg.sender?.avatar_url || currentHostDisplay.avatar} className="w-full h-full object-cover" alt="sender"/> 
                                : <User className="w-full h-full p-1.5 text-slate-400"/>}
                            </div>
                          )}
@@ -153,6 +182,7 @@ function InboxContent() {
                   {messages.length === 0 && selectedInquiry.id === 'new' && (
                      <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
                         <div className="w-20 h-20 rounded-full bg-slate-100 mb-4 flex items-center justify-center overflow-hidden border border-slate-200">
+                           {/* 🟢 여기서도 currentHostDisplay (URL에서 온 사진) 사용 */}
                            {currentHostDisplay.avatar ? <img src={currentHostDisplay.avatar} className="w-full h-full object-cover" alt="host"/> : <User size={40} className="text-slate-300"/>}
                         </div>
                         <p className="font-bold text-slate-900 mb-1">{currentHostDisplay.name}님에게 메시지 보내기</p>
