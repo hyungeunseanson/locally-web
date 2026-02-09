@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Share, Heart, MapPin, ChevronRight, MessageSquare, Check, Globe 
-} from 'lucide-react';
+  Share, Heart, MapPin, ChevronRight, MessageSquare, Check, Globe, X, Grid 
+} from 'lucide-react'; // 🟢 X, Grid 아이콘 추가
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -11,16 +11,17 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat'; 
 import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
-import Image from 'next/image'; // 🟢 Next/Image 도입
-import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 도입
+import Image from 'next/image'; 
+import { useToast } from '@/app/context/ToastContext'; 
 
 export default function ExperienceDetailPage() {
   const [isCopySuccess, setIsCopySuccess] = useState(false);
-  const { showToast } = useToast(); // 🟢 훅 사용
+  const { showToast } = useToast(); 
   const router = useRouter();
   const params = useParams();
   const supabase = createClient();
   const { createInquiry } = useChat(); 
+  
   const [user, setUser] = useState<any>(null);
   const [experience, setExperience] = useState<any>(null);
   const [hostProfile, setHostProfile] = useState<any>(null);
@@ -30,8 +31,10 @@ export default function ExperienceDetailPage() {
   const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>({});
   
   const [isSaved, setIsSaved] = useState(false);
-  const [isToastVisible, setIsToastVisible] = useState(false);
   const [inquiryText, setInquiryText] = useState('');
+
+  // 🟢 갤러리 모달 상태 추가
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,23 +59,19 @@ export default function ExperienceDetailPage() {
           setDateToTimeMap(timeMap);
         }
 
-        // 🟢 호스트 정보 가져오기 (profiles + host_applications 병합)
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', exp.host_id).single();
         const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
         
-// [수정됨] 프로필 정보 우선순위 강화
-setHostProfile({
-  id: exp.host_id, // 호스트 ID 추가 (필요할 수 있음)
-  name: profile?.name || app?.name || 'Locally Host',
-  avatar_url: app?.profile_photo || profile?.avatar_url || null,
-  languages: (profile?.languages && profile.languages.length > 0) ? profile.languages : (app?.languages || []),
-  // 소개글 로직 강화: introduction이 있으면 사용, 없으면 bio, 없으면 self_intro
-  introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
-  // 추가 정보들도 있으면 전달
-  job: profile?.job,
-  dream_destination: profile?.dream_destination,
-  favorite_song: profile?.favorite_song
-});
+        setHostProfile({
+          id: exp.host_id, 
+          name: profile?.name || app?.name || 'Locally Host',
+          avatar_url: app?.profile_photo || profile?.avatar_url || null,
+          languages: (profile?.languages && profile.languages.length > 0) ? profile.languages : (app?.languages || []),
+          introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
+          job: profile?.job,
+          dream_destination: profile?.dream_destination,
+          favorite_song: profile?.favorite_song
+        });
       }
       setLoading(false);
     };
@@ -86,16 +85,16 @@ setHostProfile({
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
-    setIsCopySuccess(true); // ✅ 바뀐 이름 사용
+    setIsCopySuccess(true); 
     setTimeout(() => setIsCopySuccess(false), 3000);
   };
 
   const handleInquiry = async () => {
-    if (!user) return showToast('로그인이 필요합니다.', 'error'); // 🟢 alert 대신 Toast
+    if (!user) return showToast('로그인이 필요합니다.', 'error');
     if (!inquiryText.trim()) return showToast('내용을 입력해주세요.', 'error');
     
     try {
-      if (!experience?.host_id) return alert('호스트 정보를 불러올 수 없습니다.');
+      if (!experience?.host_id) return showToast('호스트 정보를 불러올 수 없습니다.', 'error');
       await createInquiry(experience.host_id, experience.id, inquiryText);
       
       if (confirm('문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?')) {
@@ -108,15 +107,20 @@ setHostProfile({
   };
 
   const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean) => {
-    if (!user) return alert("로그인이 필요합니다.");
-    if (!date) return alert("날짜를 선택해주세요.");
-    if (!time) return alert("시간을 선택해주세요.");
+    if (!user) return showToast("로그인이 필요합니다.", 'error');
+    if (!date) return showToast("날짜를 선택해주세요.", 'error');
+    if (!time) return showToast("시간을 선택해주세요.", 'error');
     const typeParam = isPrivate ? '&type=private' : '';
     router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div></div>;
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
+
+  // ✅ 사진 데이터 준비 (없으면 기본 이미지)
+  const photos = experience.photos && experience.photos.length > 0 
+    ? experience.photos 
+    : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-0">
@@ -125,7 +129,7 @@ setHostProfile({
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
         
-        {/* 상단 섹션 */}
+        {/* 상단 제목 섹션 */}
         <section className="mb-6">
           <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
           <div className="flex justify-between items-end">
@@ -141,15 +145,47 @@ setHostProfile({
           </div>
         </section>
 
+        {/* 🟢 스마트 사진 그리드 섹션 */}
         <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
-        <Image 
-           src={experience.photos?.[0] || experience.image_url} 
-           alt={experience.title}
-           fill
-           className="object-cover transition-transform duration-700 group-hover:scale-105"
-         />
-           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
-           <button className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform"><ChevronRight size={16}/> 사진 모두 보기</button>
+          {photos.length === 1 ? (
+             // 사진 1장: 전체 채우기
+             <div className="w-full h-full relative cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
+                <Image src={photos[0]} alt="Main" fill className="object-cover" />
+             </div>
+          ) : photos.length === 2 ? (
+             // 사진 2장: 50:50 분할 (세로 사진 최적화)
+             <div className="grid grid-cols-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
+                <div className="relative h-full"><Image src={photos[0]} alt="1" fill className="object-cover hover:opacity-95 transition-opacity" /></div>
+                <div className="relative h-full"><Image src={photos[1]} alt="2" fill className="object-cover hover:opacity-95 transition-opacity" /></div>
+             </div>
+          ) : (
+             // 사진 3장 이상: 왼쪽 큰 사진 + 오른쪽 그리드
+             <div className="grid grid-cols-4 grid-rows-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
+                <div className="col-span-2 row-span-2 relative">
+                   <Image src={photos[0]} alt="Main" fill className="object-cover hover:opacity-95 transition-opacity" />
+                </div>
+                <div className="col-span-1 row-span-1 relative">
+                   <Image src={photos[1]} alt="Sub 1" fill className="object-cover hover:opacity-95 transition-opacity" />
+                </div>
+                <div className="col-span-1 row-span-1 relative">
+                   {photos[2] && <Image src={photos[2]} alt="Sub 2" fill className="object-cover hover:opacity-95 transition-opacity" />}
+                </div>
+                <div className="col-span-1 row-span-1 relative">
+                   {photos[3] && <Image src={photos[3]} alt="Sub 3" fill className="object-cover hover:opacity-95 transition-opacity" />}
+                </div>
+                <div className="col-span-1 row-span-1 relative">
+                   {photos[4] && <Image src={photos[4]} alt="Sub 4" fill className="object-cover hover:opacity-95 transition-opacity" />}
+                </div>
+             </div>
+          )}
+
+           {/* '사진 모두 보기' 버튼 */}
+           <button 
+             onClick={(e) => { e.stopPropagation(); setIsGalleryOpen(true); }} // 🟢 클릭 이벤트 추가
+             className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform z-10"
+           >
+             <Grid size={16}/> 사진 모두 보기
+           </button>
         </section>
 
         {/* 하단 2단 레이아웃 */}
@@ -157,7 +193,7 @@ setHostProfile({
           
           <ExpMainContent 
             experience={experience} 
-            hostProfile={hostProfile} // 🟢 전달
+            hostProfile={hostProfile} 
             handleInquiry={handleInquiry} 
             inquiryText={inquiryText} 
             setInquiryText={setInquiryText}
@@ -171,6 +207,34 @@ setHostProfile({
           />
         </div>
       </main>
+
+      {/* 🟢 사진 갤러리 모달 */}
+      {isGalleryOpen && (
+        <div className="fixed inset-0 z-[100] bg-white animate-in fade-in duration-200 flex flex-col">
+          {/* 헤더 */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+             <button onClick={() => setIsGalleryOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24}/></button>
+             <h3 className="font-bold text-lg">사진 모두 보기</h3>
+             <div className="w-10"></div> {/* 여백용 */}
+          </div>
+          
+          {/* 스크롤 영역 */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-slate-50">
+             <div className="max-w-4xl mx-auto space-y-4">
+               {photos.map((photo: string, index: number) => (
+                 <div key={index} className="relative w-full aspect-[3/2] md:aspect-[16/10] bg-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    <Image 
+                      src={photo} 
+                      alt={`Gallery ${index}`} 
+                      fill 
+                      className="object-contain bg-black/5" // object-contain으로 전체 다 보이게 설정
+                    />
+                 </div>
+               ))}
+             </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
