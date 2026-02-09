@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { MapPin, MessageSquare, Check, X, Users, Zap, ShieldAlert, CalendarX, User, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import ReviewSection from './ReviewSection';
 import HostProfileSection from './HostProfileSection';
-import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 사용
+import { useToast } from '@/app/context/ToastContext'; 
 
 export default function ExpMainContent({ 
   experience, hostProfile, handleInquiry, inquiryText, setInquiryText 
@@ -13,7 +13,6 @@ export default function ExpMainContent({
   const { showToast } = useToast();
   const location = experience.meeting_point || experience.location || 'Seoul';
   
-  // 주소 복사 기능
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(location);
     showToast('주소가 복사되었습니다.', 'success');
@@ -74,7 +73,7 @@ export default function ExpMainContent({
         intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."} 
       />
 
-      {/* 6. 지도 (Location) - 🟢 인터랙티브 지도로 교체 */}
+      {/* 6. 지도 (Location) - 🟢 URL 오류 수정 완료 */}
       <div id="location" className="border-b border-slate-200 pb-8 scroll-mt-24">
          <div className="flex justify-between items-end mb-4">
             <div>
@@ -92,7 +91,7 @@ export default function ExpMainContent({
          </div>
 
          <div className="w-full h-[400px] bg-slate-50 rounded-2xl relative overflow-hidden border border-slate-200 shadow-sm">
-            {/* 구글 지도 임베드 (무료 버전) */}
+            {/* 🟢 정상적인 구글 맵 Embed URL 적용 */}
             <iframe 
               width="100%" 
               height="100%" 
@@ -103,7 +102,6 @@ export default function ExpMainContent({
               className="grayscale-[20%] hover:grayscale-0 transition-all duration-700"
             ></iframe>
             
-            {/* 구글 맵으로 크게 보기 버튼 */}
             <Link 
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`} 
               target="_blank" 

@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 
 interface ReviewSectionProps {
-  experienceId: number; // 🟢 ID를 받도록 변경
+  experienceId: number;
   hostName: string;
 }
 
@@ -25,6 +25,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
     const fetchReviews = async () => {
       if (!experienceId) return;
       
+      // 🟢 [복원] 기존의 정확한 외래키 명시 쿼리 사용 (가장 안전함)
       const { data, error } = await supabase
         .from('reviews')
         .select(`
@@ -81,7 +82,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         <div className="text-slate-400 text-sm py-4">아직 작성된 후기가 없습니다. 첫 후기를 남겨보세요!</div>
       )}
       
-      {/* 2. 모달 열기 버튼 (4개 이상일 때만) */}
+      {/* 2. 모달 열기 버튼 */}
       {reviews.length > 4 && (
         <button onClick={() => setIsReviewsExpanded(true)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors">
           후기 {reviews.length}개 모두 보기
@@ -121,7 +122,6 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                           {review.content}
                         </p>
-                        {/* 사진이 있다면 표시 */}
                         {review.photos && review.photos.length > 0 && (
                           <div className="flex gap-2 mt-3">
                             {review.photos.map((photo: string, idx: number) => (
@@ -133,7 +133,6 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         )}
                       </div>
                     </div>
-                    {/* 호스트 답글 (DB에 reply 컬럼이 있다면 표시) */}
                     {review.reply && (
                       <div className="ml-14 bg-slate-50 p-4 rounded-xl border border-slate-100 flex gap-3 items-start">
                          <div className="font-bold text-xs text-slate-900 mb-1 flex items-center gap-1">
