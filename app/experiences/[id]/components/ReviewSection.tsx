@@ -16,7 +16,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 🟢 [보안] http 이미지를 https로 강제 변환
+  // 🟢 [보안] http 이미지를 https로 강제 변환 (카카오 프로필 등)
   const secureUrl = (url: string | null) => {
     if (!url) return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -33,7 +33,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       if (!experienceId) return;
       
       try {
-        // 1. 후기 데이터 가져오기
+        // 1. 후기 데이터 가져오기 (가장 안전한 방식)
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
           .select('*')
@@ -48,20 +48,31 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
           return;
         }
 
-        // 2. 작성자 ID 추출 및 프로필 정보 가져오기
+        // 2. 작성자 ID 추출
         const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id)));
+
+        // 3. 작성자 프로필 정보 따로 가져오기 (조인 에러 방지)
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, name, avatar_url, full_name') // 필요한 정보만 쏙
+          .select('id, name, avatar_url, full_name')
           .in('id', userIds);
 
-        // 3. 데이터 합치기
+        // 4. 데이터 합치기
         const profileMap = new Map(profilesData?.map((p: any) => [p.id, p]));
 
-        const combinedReviews = reviewsData.map((review: any) => ({
-          ...review,
-          user: profileMap.get(review.user_id) || { name: '알 수 없음', avatar_url: null }
-        }));
+        const combinedReviews = reviewsData.map((review: any) => {
+          const userProfile = profileMap.get(review.user_id);
+          // 이름 우선순위: name -> full_name -> '익명'
+          const userName = userProfile?.name || userProfile?.full_name || '익명';
+          
+          return {
+            ...review,
+            user: {
+              name: userName,
+              avatar_url: userProfile?.avatar_url || null
+            }
+          };
+        });
 
         setReviews(combinedReviews);
 
@@ -88,8 +99,6 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
           {reviews.slice(0, 4).map((review) => {
             const avatarUrl = secureUrl(review.user?.avatar_url);
-            // 이름 우선순위: name -> full_name -> '익명'
-            const userName = review.user?.name || review.user?.full_name || '익명';
             
             return (
               <div key={review.id} className="space-y-3">
@@ -102,7 +111,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                     )}
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">{userName}</div>
+                    <div className="font-bold text-sm text-slate-900">{review.user.name}</div>
                     <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
@@ -136,7 +145,6 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
               <div className="grid grid-cols-1 gap-8">
                 {reviews.map((review) => {
                   const avatarUrl = secureUrl(review.user?.avatar_url);
-                  const userName = review.user?.name || review.user?.full_name || '익명';
 
                   return (
                     <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
@@ -149,7 +157,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         <div className="flex-1">
                           <div className="flex justify-between items-start mb-1">
                             <div>
-                              <div className="font-bold text-sm text-slate-900">{userName}</div>
+                              <div className="font-bold text-sm text-slate-900">{review.user.name}</div>
                               <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
                             </div>
                             <div className="flex text-amber-400">
