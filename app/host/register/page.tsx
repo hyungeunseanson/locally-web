@@ -3,19 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-// ✅ 분리된 UI 컴포넌트 임포트
+import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 훅 임포트
 import HostRegisterForm from './components/HostRegisterForm';
 
 export default function HostRegisterPage() {
   const supabase = createClient();
   const router = useRouter();
+  const { showToast } = useToast(); // 🟢 훅 사용
   
   const [step, setStep] = useState(1);
   const totalSteps = 8; 
   const [loading, setLoading] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
 
-  // 🟢 formData 상태 (targetLanguages 배열 확인)
   const [formData, setFormData] = useState({
     targetLanguages: [] as string[], 
     languageLevel: 3, 
@@ -49,7 +49,6 @@ export default function HostRegisterPage() {
         setApplicationId(data.id);
         setFormData(prev => ({
           ...prev,
-          // 🟢 DB 데이터 -> 배열 변환 로직
           targetLanguages: Array.isArray(data.languages) ? data.languages : (data.target_language ? [data.target_language] : []),
           languageLevel: data.language_level || 3,
           languageCert: data.language_cert || '',
@@ -81,7 +80,6 @@ export default function HostRegisterPage() {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
-  // 🟢 언어 토글 로직
   const toggleLanguage = (lang: string) => {
     const current = formData.targetLanguages;
     if (current.includes(lang)) {
@@ -101,7 +99,8 @@ export default function HostRegisterPage() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.agreeTerms) return alert('약관에 동의해주세요.');
+    // 🟢 alert -> showToast (경고)
+    if (!formData.agreeTerms) return showToast('약관에 동의해주세요.', 'error');
     setLoading(true);
 
     try {
@@ -132,7 +131,7 @@ export default function HostRegisterPage() {
       const payload = {
         user_id: user.id,
         host_nationality: formData.hostNationality,
-        languages: formData.targetLanguages, // 🟢 languages 배열 저장
+        languages: formData.targetLanguages,
         name: formData.name,
         phone: formData.phone,
         dob: formData.dob,
@@ -160,7 +159,6 @@ export default function HostRegisterPage() {
         error = res.error;
       }
 
-      // 🟢 프로필 테이블 동기화 (호스트 프로필 설정과 연동)
       await supabase.from('profiles').update({ 
         languages: formData.targetLanguages,
         bio: formData.selfIntro,
@@ -171,12 +169,14 @@ export default function HostRegisterPage() {
 
       if (error) throw error;
       
-      alert('신청이 완료되었습니다! 관리자 승인을 기다려주세요.');
+      // 🟢 alert -> showToast (성공)
+      showToast('신청이 완료되었습니다! 관리자 승인을 기다려주세요.', 'success');
       router.push('/host/dashboard');
 
     } catch (error: any) {
       console.error(error);
-      alert('신청 중 오류가 발생했습니다: ' + error.message);
+      // 🟢 alert -> showToast (에러)
+      showToast('신청 중 오류가 발생했습니다: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
