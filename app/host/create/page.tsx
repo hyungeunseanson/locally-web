@@ -1,16 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { X, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/app/context/ToastContext'; // 🟢 알림 기능 사용
 import { TOTAL_STEPS, INITIAL_FORM_DATA } from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps'; 
 
 export default function CreateExperiencePage() {
   const supabase = createClient();
   const router = useRouter();
+  const { showToast } = useToast(); // 🟢 토스트 훅 가져오기
 
   // --- 상태 관리 ---
   const [step, setStep] = useState(1);
@@ -102,10 +104,7 @@ export default function CreateExperiencePage() {
           city: formData.city,
           title: formData.title,
           category: formData.category,
-          
-          // 🟢 [수정 완료] 언어 데이터 저장 추가! (절대 누락 금지)
           languages: formData.languages,
-
           duration: formData.duration,
           max_guests: formData.maxGuests,
           description: formData.description,
@@ -125,11 +124,14 @@ export default function CreateExperiencePage() {
       ]);
 
       if (error) throw error;
-      setStep(step + 1); 
+      
+      // 🟢 [수정됨] 등록 성공 시 알림 띄우고 대시보드로 이동
+      showToast('체험이 성공적으로 등록되었습니다! 🎉', 'success');
+      router.push('/host/dashboard?tab=experiences'); // 내 체험 관리 탭으로 이동
 
     } catch (error: any) {
       console.error(error);
-      alert('등록 실패: ' + error.message);
+      showToast('등록 실패: ' + error.message, 'error'); // 🟢 에러도 토스트로 표시
     } finally {
       setLoading(false);
     }
@@ -175,7 +177,9 @@ export default function CreateExperiencePage() {
         <footer className="fixed bottom-0 left-0 right-0 h-24 bg-white/90 backdrop-blur-md border-t border-slate-100 flex items-center justify-between px-6 z-50">
           <button onClick={prevStep} disabled={step === 1} className={`px-6 py-3 rounded-full font-bold text-sm transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100 underline decoration-2'}`}>이전</button>
           {step === TOTAL_STEPS - 1 ? (
-            <button onClick={handleSubmit} disabled={loading} className="bg-black text-white px-10 py-4 rounded-full font-bold text-base hover:scale-105 transition-transform shadow-xl shadow-slate-300 disabled:opacity-50">{loading ? '등록 중...' : '체험 등록하기'}</button>
+            <button onClick={handleSubmit} disabled={loading} className="bg-black text-white px-10 py-4 rounded-full font-bold text-base hover:scale-105 transition-transform shadow-xl shadow-slate-300 disabled:opacity-50 flex items-center gap-2">
+               {loading ? '등록 중...' : '체험 등록하기'}
+            </button>
           ) : (
             <button onClick={nextStep} className="bg-black text-white px-10 py-4 rounded-full font-bold text-base hover:scale-105 transition-transform flex items-center gap-2 shadow-xl shadow-slate-300">다음 <ChevronRight size={18}/></button>
           )}
