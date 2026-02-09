@@ -1,73 +1,145 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, X } from 'lucide-react';
+import { createClient } from '@/app/utils/supabase/client';
+import Image from 'next/image';
 
-export default function ReviewSection({ hostName }: { hostName: string }) {
+interface ReviewSectionProps {
+  experienceId: number; // 🟢 ID를 받도록 변경
+  hostName: string;
+}
+
+export default function ReviewSection({ experienceId, hostName }: ReviewSectionProps) {
+  const supabase = createClient();
+  const [reviews, setReviews] = useState<any[]>([]);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // 평점 계산
+  const averageRating = reviews.length > 0 
+    ? (reviews.reduce((acc, cur) => acc + cur.rating, 0) / reviews.length).toFixed(2) 
+    : "0.0";
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!experienceId) return;
+      
+      const { data, error } = await supabase
+        .from('reviews')
+        .select(`
+          *,
+          user:profiles!reviews_user_id_fkey(name, avatar_url) 
+        `)
+        .eq('experience_id', experienceId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("후기 로딩 실패:", error);
+      } else {
+        setReviews(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchReviews();
+  }, [experienceId, supabase]);
+
+  if (loading) return <div className="py-10 text-center text-slate-400">후기를 불러오는 중...</div>;
 
   return (
     <div id="reviews" className="border-b border-slate-200 pb-8 scroll-mt-24">
       <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-        <Star size={20} fill="black"/> 4.98 · 후기 15개
+        <Star size={20} fill="black"/> {averageRating} · 후기 {reviews.length}개
       </h3>
       
       {/* 1. 요약 리스트 (최대 4개) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-        {[1,2,3,4].map(i => (
-          <div key={i} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-200 rounded-full bg-cover bg-center" style={{backgroundImage: `url('https://i.pravatar.cc/150?u=${i}')`}}></div>
-              <div><div className="font-bold text-sm text-slate-900">Guest {i}</div><div className="text-xs text-slate-500">2026년 1월</div></div>
+      {reviews.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+          {reviews.slice(0, 4).map((review) => (
+            <div key={review.id} className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden relative">
+                   {review.user?.avatar_url ? (
+                     <Image src={review.user.avatar_url} alt="user" fill className="object-cover"/>
+                   ) : (
+                     <div className="w-full h-full bg-slate-300"/>
+                   )}
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-900">{review.user?.name || '익명'}</div>
+                  <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
+                {review.content}
+              </p>
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
-              호스트님이 정말 친절하셨고, 코스도 완벽했습니다. 현지인만 아는 맛집을 알게 되어 너무 좋았어요! 사진도 예쁘게 찍어주셔서 인생샷 건졌습니다.
-            </p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-slate-400 text-sm py-4">아직 작성된 후기가 없습니다. 첫 후기를 남겨보세요!</div>
+      )}
       
-      {/* 2. 모달 열기 버튼 */}
-      <button onClick={() => setIsReviewsExpanded(true)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors">
-        후기 15개 모두 보기
-      </button>
+      {/* 2. 모달 열기 버튼 (4개 이상일 때만) */}
+      {reviews.length > 4 && (
+        <button onClick={() => setIsReviewsExpanded(true)} className="mt-8 px-6 py-3 border border-black rounded-xl font-bold hover:bg-slate-50 transition-colors">
+          후기 {reviews.length}개 모두 보기
+        </button>
+      )}
 
       {/* 3. 후기 전체보기 모달 */}
       {isReviewsExpanded && (
         <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>
           <div className="bg-white w-full max-w-4xl h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-              <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> 4.98 (후기 15개)</h3>
+              <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> {averageRating} (후기 {reviews.length}개)</h3>
               <button onClick={() => setIsReviewsExpanded(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
               <div className="grid grid-cols-1 gap-8">
-                {[1,2,3,4,5,6,7,8].map(i => (
-                  <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                {reviews.map((review) => (
+                  <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
                     <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-slate-200 rounded-full bg-cover bg-center shrink-0" style={{backgroundImage: `url('https://i.pravatar.cc/150?u=${i}')`}}></div>
+                      <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden relative shrink-0">
+                         {review.user?.avatar_url ? (
+                           <Image src={review.user.avatar_url} alt="user" fill className="object-cover"/>
+                         ) : <div className="w-full h-full bg-slate-300"/>}
+                      </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-start mb-1">
-                          <div><div className="font-bold text-sm text-slate-900">Guest {i}</div><div className="text-xs text-slate-500">2026년 1월</div></div>
-                          <div className="flex text-amber-400">{[...Array(5)].map((_, idx) => <Star key={idx} size={12} fill="currentColor"/>)}</div>
+                          <div>
+                            <div className="font-bold text-sm text-slate-900">{review.user?.name || '익명'}</div>
+                            <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
+                          </div>
+                          <div className="flex text-amber-400">
+                            {[...Array(5)].map((_, idx) => (
+                              <Star key={idx} size={12} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-200"}/>
+                            ))}
+                          </div>
                         </div>
-                        <p className="text-sm text-slate-700 leading-relaxed">
-                          정말 잊지 못할 경험이었습니다. 호스트님이 너무 친절하게 대해주셔서 편안하게 여행할 수 있었어요.
+                        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                          {review.content}
                         </p>
+                        {/* 사진이 있다면 표시 */}
+                        {review.photos && review.photos.length > 0 && (
+                          <div className="flex gap-2 mt-3">
+                            {review.photos.map((photo: string, idx: number) => (
+                              <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-100">
+                                <Image src={photo} alt="review img" fill className="object-cover"/>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {/* 호스트 답글 */}
-                    {i % 2 !== 0 && (
+                    {/* 호스트 답글 (DB에 reply 컬럼이 있다면 표시) */}
+                    {review.reply && (
                       <div className="ml-14 bg-slate-50 p-4 rounded-xl border border-slate-100 flex gap-3 items-start">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-white shadow-sm">
-                          <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde" className="w-full h-full object-cover"/>
-                        </div>
-                        <div>
-                          <div className="font-bold text-xs text-slate-900 mb-1 flex items-center gap-1">
+                         <div className="font-bold text-xs text-slate-900 mb-1 flex items-center gap-1">
                             호스트 {hostName}님 <span className="bg-black text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">Host</span>
-                          </div>
-                          <p className="text-xs text-slate-600 leading-relaxed">소중한 후기 감사합니다! 😊</p>
-                        </div>
+                         </div>
+                         <p className="text-xs text-slate-600 leading-relaxed">{review.reply}</p>
                       </div>
                     )}
                   </div>

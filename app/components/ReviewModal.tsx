@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, X, Camera } from 'lucide-react';
+import { Star, X, Camera, Loader2 } from 'lucide-react';
+import { createClient } from '@/app/utils/supabase/client';
+import { useToast } from '@/app/context/ToastContext';
 
 interface ReviewModalProps {
   trip: any;
@@ -9,30 +11,79 @@ interface ReviewModalProps {
 }
 
 export default function ReviewModal({ trip, onClose }: ReviewModalProps) {
+  const supabase = createClient();
+  const { showToast } = useToast();
+
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
-  const [images, setImages] = useState<string[]>([]);
+  
+  // 이미지 관리
+  const [images, setImages] = useState<string[]>([]); // 미리보기용 URL
+  const [imageFiles, setImageFiles] = useState<File[]>([]); // 실제 업로드할 파일
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      if (images.length >= 2) return alert("사진은 최대 2장까지 첨부 가능합니다.");
+      if (images.length >= 2) return showToast("사진은 최대 2장까지 첨부 가능합니다.", 'error');
+      
       const file = e.target.files[0];
       const imageUrl = URL.createObjectURL(file);
+      
       setImages([...images, imageUrl]);
+      setImageFiles([...imageFiles, file]);
     }
   };
 
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
+    setImageFiles(imageFiles.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
-    if (rating === 0) return alert("별점을 선택해주세요!");
-    if (reviewText.length < 10) return alert("후기는 10자 이상 작성해주세요.");
+  const handleSubmit = async () => {
+    if (rating === 0) return showToast("별점을 선택해주세요!", 'error');
+    if (reviewText.length < 10) return showToast("후기는 10자 이상 작성해주세요.", 'error');
     
-    alert("소중한 후기가 등록되었습니다! 포인트가 지급되었습니다.");
-    onClose();
+    setIsSubmitting(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("로그인이 필요합니다.");
+
+      // 1. 이미지 업로드 (있을 경우)
+      const uploadedUrls: string[] = [];
+      
+      for (const file of imageFiles) {
+        const fileName = `reviews/${user.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const { error: uploadError } = await supabase.storage.from('images').upload(fileName, file);
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+        uploadedUrls.push(publicUrl);
+      }
+
+      // 2. 후기 데이터 저장
+      const { error } = await supabase.from('reviews').insert({
+        user_id: user.id,
+        experience_id: trip.expId, // TripCard에서 expId를 넘겨준다고 가정
+        booking_id: trip.id,       // TripCard에서 id는 booking_id
+        rating: rating,
+        content: reviewText,
+        photos: uploadedUrls
+      });
+
+      if (error) throw error;
+
+      showToast("소중한 후기가 등록되었습니다!", 'success');
+      onClose();
+
+    } catch (error: any) {
+      console.error(error);
+      showToast("후기 등록 실패: " + error.message, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -54,11 +105,11 @@ export default function ReviewModal({ trip, onClose }: ReviewModalProps) {
         <div className="p-8">
           <div className="flex items-center gap-4 mb-8">
             <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
-              <img src={trip.image} alt={trip.title} className="w-full h-full object-cover"/>
+              {trip.image ? <img src={trip.image} alt={trip.title} className="w-full h-full object-cover"/> : <div className="bg-slate-200 w-full h-full"/>}
             </div>
             <div>
               <h4 className="font-bold text-sm text-slate-900 line-clamp-1">{trip.title}</h4>
-              <p className="text-xs text-slate-500 mt-1">{trip.host} 호스트님과의 만남은 어떠셨나요?</p>
+              <p className="text-xs text-slate-500 mt-1">{trip.hostName || trip.host} 호스트님과의 만남은 어떠셨나요?</p>
             </div>
           </div>
 
@@ -118,10 +169,10 @@ export default function ReviewModal({ trip, onClose }: ReviewModalProps) {
 
           <button 
             onClick={handleSubmit} 
-            className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100" 
-            disabled={rating === 0 || reviewText.length < 10}
+            disabled={rating === 0 || reviewText.length < 10 || isSubmitting}
+            className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
           >
-            후기 등록하기
+            {isSubmitting ? <><Loader2 className="animate-spin" size={20}/> 저장 중...</> : '후기 등록하기'}
           </button>
         </div>
       </div>

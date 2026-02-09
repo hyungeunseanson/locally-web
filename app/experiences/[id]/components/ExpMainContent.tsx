@@ -60,8 +60,8 @@ export default function ExpMainContent({
       )}
 
       {/* 4. 후기 섹션 */}
-      <ReviewSection hostName={hostProfile?.name || 'Locally'} />
-
+      <ReviewSection experienceId={experience.id} hostName={hostProfile?.name || 'Locally'} />
+      
       {/* 5. 호스트 상세 프로필 */}
       <HostProfileSection 
         hostId={experience.host_id}
