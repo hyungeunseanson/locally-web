@@ -13,7 +13,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const supabase = createClient();
 
-  // 이미지 URL 보안 처리 (http -> https)
+  // 이미지 URL 보안 처리
   const secureUrl = (url: string) => {
     if (!url) return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -30,7 +30,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
       setCurrentUser(user);
 
-      // ✅ [수정] role 필드 제거 (DB 에러 방지)
       let query = supabase
         .from('inquiries')
         .select(`
@@ -45,9 +44,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         query = query.eq('user_id', user.id);
       } else if (role === 'host') {
         query = query.eq('host_id', user.id).eq('type', 'general');
-      } else if (role === 'admin') {
-        // ✅ [수정] 관리자는 모든 채팅을 볼 수 있도록 필터 제거 (모니터링 기능 복구)
-        // 필요하다면 query = query.eq('type', 'admin'); 으로 되돌릴 수 있음
       }
 
       const { data, error } = await query;
@@ -71,7 +67,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // ✅ [수정] role 필드 제거
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (full_name, avatar_url)`)
@@ -137,7 +132,22 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return data;
   };
 
+  // 🟢 [신규 기능] 가상의 새 채팅방 설정
+  const startNewChat = (hostData: { id: string; name: string }, expData: { id: string; title: string }) => {
+    setMessages([]); // 메시지 초기화
+    setSelectedInquiry({
+      id: 'new', // 임시 ID
+      type: 'general',
+      host_id: hostData.id,
+      experience_id: expData.id,
+      host: { full_name: hostData.name, avatar_url: null },
+      experiences: { id: expData.id, title: expData.title },
+      content: ''
+    });
+  };
+
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
-  return { inquiries, selectedInquiry, messages, currentUser, isLoading, error, loadMessages, sendMessage, createInquiry, createAdminInquiry, refresh: fetchInquiries };
+  // startNewChat을 리턴에 포함
+  return { inquiries, selectedInquiry, messages, currentUser, isLoading, error, loadMessages, sendMessage, createInquiry, createAdminInquiry, startNewChat, refresh: fetchInquiries };
 }
