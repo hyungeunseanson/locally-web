@@ -25,14 +25,14 @@ export function useGuestTrips() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // 🟢 [수정] 호스트의 name(닉네임)과 avatar_url(사진) 추가 조회
+      // profiles(*)로 안전하게 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
           *,
           experiences (
             id, title, city, photos, address, host_id,
-            profiles!experiences_host_id_fkey (name, full_name, phone, avatar_url)
+            profiles!experiences_host_id_fkey (*) 
           )
         `)
         .eq('user_id', user.id)
@@ -60,12 +60,10 @@ export function useGuestTrips() {
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            // 🟢 [수정] 호스트 등록 이름(name) 우선 사용
             hostName: hostData?.name || hostData?.full_name || 'Locally Host',
             hostPhone: hostData?.phone,
             hostId: booking.experiences.host_id,
-            // 🟢 [추가] 호스트 사진 정보
-            hostAvatar: secureUrl(hostData?.avatar_url), 
+            hostAvatar: secureUrl(hostData?.avatar_url),
             
             date: booking.date, 
             time: booking.time || '시간 미정',
@@ -91,6 +89,7 @@ export function useGuestTrips() {
       }
     } catch (err: any) {
       console.error(err);
+      // 🟢 [복구] 에러 발생 시 사용자에게 알림
       showToast('예약 정보를 불러오는데 실패했습니다.', 'error');
     } finally {
       setIsLoading(false);
