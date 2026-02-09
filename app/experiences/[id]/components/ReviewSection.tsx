@@ -33,7 +33,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       if (!experienceId) return;
       
       try {
-        // 🟢 1. 후기 데이터 가져오기 (가장 안전한 방식: 조인 없이 조회)
+        // 1. 후기 데이터 가져오기
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
           .select('*')
@@ -48,14 +48,19 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
           return;
         }
 
-        // 🟢 2. 작성자 ID 추출
+        // 2. 작성자 ID 추출
         const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id)));
 
-        // 🟢 3. 프로필 정보 따로 가져오기 (조인 에러 방지)
-        const { data: profilesData } = await supabase
+        // 🟢 3. 프로필 정보 가져오기 (수정됨: 에러를 유발하던 full_name, email 제거)
+        const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, name, full_name, avatar_url, email')
+          .select('id, name, avatar_url') // 🟢 안전한 컬럼만 조회
           .in('id', userIds);
+
+        if (profilesError) {
+             console.error("프로필 로딩 에러:", profilesError);
+             // 프로필 로딩 실패해도 후기는 보여주기 위해 진행
+        }
 
         // 4. 데이터 합치기
         const profileMap = new Map(profilesData?.map((p: any) => [p.id, p]));
@@ -63,13 +68,8 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         const combinedReviews = reviewsData.map((review: any) => {
           const userProfile = profileMap.get(review.user_id);
           
-          // 🟢 이름 우선순위: 1.닉네임 -> 2.실명 -> 3.이메일 앞부분 -> 4.게스트
-          let displayName = '게스트';
-          if (userProfile) {
-            if (userProfile.name) displayName = userProfile.name;
-            else if (userProfile.full_name) displayName = userProfile.full_name;
-            else if (userProfile.email) displayName = userProfile.email.split('@')[0];
-          }
+          // 🟢 이름: 프로필의 name이 있으면 쓰고, 없으면 '게스트'
+          const displayName = userProfile?.name || '게스트';
 
           return {
             ...review,
@@ -175,7 +175,6 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                           <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                             {review.content}
                           </p>
-                          {/* 사진 렌더링 */}
                           {review.photos && review.photos.length > 0 && (
                             <div className="flex gap-2 mt-3">
                               {review.photos.map((photo: string, idx: number) => (
