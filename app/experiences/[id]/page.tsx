@@ -146,20 +146,39 @@ export default function ExperienceDetailPage() {
         </section>
 
         {/* 🟢 스마트 사진 그리드 섹션 */}
-        <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group">
+        <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm">
+          
           {photos.length === 1 ? (
-             // 사진 1장: 전체 채우기
-             <div className="w-full h-full relative cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
-                <Image src={photos[0]} alt="Main" fill className="object-cover" />
+             // 사진 1장: 배경 블러 + 중앙 온전한 배치 (머리/다리 잘림 방지)
+             <div className="w-full h-full relative cursor-pointer group" onClick={() => setIsGalleryOpen(true)}>
+                {/* 1. 뒤에 깔리는 흐릿한 배경 (꽉 채움) */}
+                <Image 
+                  src={photos[0]} 
+                  alt="Background" 
+                  fill 
+                  className="object-cover blur-xl opacity-50 scale-110" 
+                />
+                
+                {/* 2. 앞에 뜨는 선명한 원본 (비율 유지) */}
+                <div className="absolute inset-0 flex items-center justify-center p-4">
+                  <div className="relative w-full h-full max-w-[800px] shadow-2xl rounded-lg overflow-hidden transition-transform duration-500 group-hover:scale-[1.02]">
+                    <Image 
+                      src={photos[0]} 
+                      alt="Main" 
+                      fill 
+                      className="object-contain" // 비율 유지하며 다 보여줌
+                    />
+                  </div>
+                </div>
              </div>
           ) : photos.length === 2 ? (
-             // 사진 2장: 50:50 분할 (세로 사진 최적화)
+             // 사진 2장: 50:50 분할 (기존 유지)
              <div className="grid grid-cols-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
                 <div className="relative h-full"><Image src={photos[0]} alt="1" fill className="object-cover hover:opacity-95 transition-opacity" /></div>
                 <div className="relative h-full"><Image src={photos[1]} alt="2" fill className="object-cover hover:opacity-95 transition-opacity" /></div>
              </div>
           ) : (
-             // 사진 3장 이상: 왼쪽 큰 사진 + 오른쪽 그리드
+             // 사진 3장 이상: 에어비앤비 스타일 그리드 (기존 유지)
              <div className="grid grid-cols-4 grid-rows-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
                 <div className="col-span-2 row-span-2 relative">
                    <Image src={photos[0]} alt="Main" fill className="object-cover hover:opacity-95 transition-opacity" />
@@ -181,7 +200,7 @@ export default function ExperienceDetailPage() {
 
            {/* '사진 모두 보기' 버튼 */}
            <button 
-             onClick={(e) => { e.stopPropagation(); setIsGalleryOpen(true); }} // 🟢 클릭 이벤트 추가
+             onClick={(e) => { e.stopPropagation(); setIsGalleryOpen(true); }}
              className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform z-10"
            >
              <Grid size={16}/> 사진 모두 보기
