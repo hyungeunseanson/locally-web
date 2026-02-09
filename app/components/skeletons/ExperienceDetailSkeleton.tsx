@@ -1,5 +1,4 @@
-import { Skeleton } from "@/app/components/ui/Skeleton";
-
+import Skeleton from "@/app/components/ui/Skeleton"; // 🟢 중괄호 제거
 export function ExperienceDetailSkeleton() {
   return (
     <div className="max-w-[1120px] mx-auto px-6 py-8 animate-pulse">

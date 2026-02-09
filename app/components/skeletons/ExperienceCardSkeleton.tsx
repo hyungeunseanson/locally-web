@@ -1,5 +1,4 @@
-import { Skeleton } from "@/app/components/ui/Skeleton";
-
+import Skeleton from "@/app/components/ui/Skeleton"; // 🟢 중괄호 제거
 export function ExperienceCardSkeleton() {
   return (
     <div className="flex flex-col space-y-3">
