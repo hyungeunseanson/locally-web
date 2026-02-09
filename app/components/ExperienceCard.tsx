@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Heart, Star, Globe } from 'lucide-react';
+import { Heart, Star, Globe, Clock } from 'lucide-react'; // 🟢 Clock 아이콘 추가
 import Image from 'next/image';
 import { useWishlist } from '@/app/hooks/useWishlist'; // 🟢 훅 임포트
 
@@ -12,13 +12,14 @@ export default function ExperienceCard({ item }: { item: any }) {
 
   const languages = item.languages || ['한국어']; 
   const imageUrl = item.photos && item.photos[0] ? item.photos[0] : "https://images.unsplash.com/photo-1542051841857-5f90071e7989";
-
+// 🟢 [누락된 부분 추가] 소요 시간 포맷팅 변수 선언
+  const durationText = item.duration ? `${item.duration}시간` : null;
   return (
     <Link href={`/experiences/${item.id}`} className="block group">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
         <Image 
           src={imageUrl} 
-          alt={item.title}
+          alt={item.title} 
           fill 
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
@@ -44,10 +45,21 @@ export default function ExperienceCard({ item }: { item: any }) {
             <Star size={14} fill="black" /><span>4.95</span><span className="text-slate-400 font-normal">(32)</span>
           </div>
         </div>
-        <p className="text-[15px] text-slate-500 line-clamp-1">{item.title}</p>
-        <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
-          <Globe size={12} className="text-slate-400"/><span>{languages.join(' · ')} 진행</span>
+        
+{/* 🟢 [수정] 시간 및 언어 정보 함께 표시 */}
+<div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+           {durationText && (
+             <div className="flex items-center gap-1">
+               <Clock size={12} className="text-slate-400"/>
+               <span>{durationText}</span>
+             </div>
+           )}
+           <div className="flex items-center gap-1">
+             <Globe size={12} className="text-slate-400"/>
+             <span>{languages.join(' · ')} 진행</span>
+           </div>
         </div>
+
         <div className="mt-1">
           <span className="font-bold text-slate-900 text-[15px]">₩{Number(item.price).toLocaleString()}</span>
           <span className="text-[15px] text-slate-900 font-normal"> / 인</span>
