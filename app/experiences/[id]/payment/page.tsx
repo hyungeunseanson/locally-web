@@ -4,20 +4,20 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Loader2, Calendar, Users, ShieldCheck, Clock } from 'lucide-react';
 import Script from 'next/script';
-import Image from 'next/image'; // 🟢 Image 최적화
+import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
-import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 사용
+import { useToast } from '@/app/context/ToastContext';
 
 function PaymentContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const { showToast } = useToast(); // 🟢 훅 사용
+  const { showToast } = useToast();
 
   const [mounted, setMounted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [experience, setExperience] = useState<any>(null); // 🟢 체험 정보 상태
+  const [experience, setExperience] = useState<any>(null);
 
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
@@ -30,7 +30,6 @@ function PaymentContent() {
 
   useEffect(() => { 
     setMounted(true); 
-    // 🟢 체험 정보(사진, 제목) 가져오기
     const fetchExp = async () => {
       if (!experienceId) return;
       const { data } = await supabase
@@ -84,7 +83,6 @@ function PaymentContent() {
 
   if (!mounted) return <div className="min-h-screen bg-white flex items-center justify-center"><Loader2 className="animate-spin text-black" /></div>;
 
-  // 이미지 선택 로직
   const imageUrl = experience?.photos?.[0] || experience?.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
 
   return (
@@ -98,15 +96,21 @@ function PaymentContent() {
         </div>
 
         <div className="p-6">
-          {/* 🟢 체험 요약 카드 (이미지 + 제목) */}
-          <div className="flex gap-4 mb-8">
-            <div className="w-24 h-24 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200">
-               {/* Next/Image 적용 */}
-               <Image src={imageUrl} alt="Experience" fill className="object-cover" />
+          {/* 🟢 사진 비율 수정: w-24 h-32 (세로형) 또는 aspect-[3/4] 적용 */}
+          <div className="flex gap-5 mb-8">
+            <div className="w-24 h-32 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 shadow-sm border border-slate-100">
+               {/* object-cover를 쓰되, 사진의 중심을 맞추기보다 전체적으로 채우도록 함 */}
+               <Image 
+                 src={imageUrl} 
+                 alt="Experience" 
+                 fill 
+                 className="object-cover" 
+                 sizes="100px"
+               />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-               <span className="text-xs font-bold text-slate-500 mb-1">{experience?.location || 'SEOUL'}</span>
-               <h3 className="font-bold text-slate-900 leading-snug line-clamp-2">{experience?.title || '체험 정보를 불러오는 중...'}</h3>
+            <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
+               <span className="text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">{experience?.location || 'SEOUL'}</span>
+               <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-lg">{experience?.title || '체험 정보를 불러오는 중...'}</h3>
             </div>
           </div>
 
