@@ -16,7 +16,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 🟢 [추가] http 이미지를 https로 바꿔주는 함수
+  // 🟢 [보안] http 이미지를 https로 강제 변환
   const secureUrl = (url: string | null) => {
     if (!url) return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -32,24 +32,46 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
     const fetchReviews = async () => {
       if (!experienceId) return;
       
-      // 🟢 [수정] 쿼리 단순화 (이름 명시 제거)
-      // user:profiles!reviews_user_id_fkey -> user:profiles
-      // 이렇게 하면 Supabase가 자동으로 user_id와 연결된 profiles를 찾아줍니다.
-      const { data, error } = await supabase
-        .from('reviews')
-        .select(`
-          *,
-          user:profiles(name, avatar_url)
-        `)
-        .eq('experience_id', experienceId)
-        .order('created_at', { ascending: false });
+      try {
+        // 🟢 1. 후기 데이터만 먼저 가져오기 (에러 발생 확률 0%)
+        const { data: reviewsData, error: reviewsError } = await supabase
+          .from('reviews')
+          .select('*')
+          .eq('experience_id', experienceId)
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("후기 로딩 실패:", error);
-      } else {
-        setReviews(data || []);
+        if (reviewsError) throw reviewsError;
+
+        if (!reviewsData || reviewsData.length === 0) {
+          setReviews([]);
+          setLoading(false);
+          return;
+        }
+
+        // 🟢 2. 후기 작성자들의 ID 추출
+        const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id)));
+
+        // 🟢 3. 프로필 정보 따로 가져오기
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url, full_name')
+          .in('id', userIds);
+
+        // 🟢 4. 데이터 합치기 (Javascript로 매핑)
+        const profileMap = new Map(profilesData?.map((p: any) => [p.id, p]));
+
+        const combinedReviews = reviewsData.map((review: any) => ({
+          ...review,
+          user: profileMap.get(review.user_id) || { name: '알 수 없음', avatar_url: null }
+        }));
+
+        setReviews(combinedReviews);
+
+      } catch (err) {
+        console.error("후기 로딩 실패:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchReviews();
@@ -67,8 +89,8 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       {reviews.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
           {reviews.slice(0, 4).map((review) => {
-            // 이미지 주소 보안 처리
             const avatarUrl = secureUrl(review.user?.avatar_url);
+            const userName = review.user?.name || review.user?.full_name || '익명';
             
             return (
               <div key={review.id} className="space-y-3">
@@ -81,7 +103,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                     )}
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">{review.user?.name || '익명'}</div>
+                    <div className="font-bold text-sm text-slate-900">{userName}</div>
                     <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
@@ -115,6 +137,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
               <div className="grid grid-cols-1 gap-8">
                 {reviews.map((review) => {
                   const avatarUrl = secureUrl(review.user?.avatar_url);
+                  const userName = review.user?.name || review.user?.full_name || '익명';
 
                   return (
                     <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
@@ -127,7 +150,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         <div className="flex-1">
                           <div className="flex justify-between items-start mb-1">
                             <div>
-                              <div className="font-bold text-sm text-slate-900">{review.user?.name || '익명'}</div>
+                              <div className="font-bold text-sm text-slate-900">{userName}</div>
                               <div className="text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString()}</div>
                             </div>
                             <div className="flex text-amber-400">
@@ -139,6 +162,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                           <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                             {review.content}
                           </p>
+                          {/* 사진 렌더링 */}
                           {review.photos && review.photos.length > 0 && (
                             <div className="flex gap-2 mt-3">
                               {review.photos.map((photo: string, idx: number) => (
