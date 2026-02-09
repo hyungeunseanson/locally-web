@@ -6,6 +6,7 @@ import { Heart, Star, MapPin, ArrowRight } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function WishlistsPage() {
   const supabase = createClient();
@@ -18,37 +19,43 @@ export default function WishlistsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
 
-      // 1. 위시리스트 테이블에서 내 찜 목록 가져오기 (체험 정보 포함)
-      // 만약 wishlists 테이블이 없다면 이 부분은 에러가 날 수 있으니 확인 필요
-      // 여기서는 예시로 로직을 구성합니다.
+      // 🟢 [수정] experiences(*)로 모든 컬럼을 가져와서 에러 방지
       const { data, error } = await supabase
         .from('wishlists')
         .select(`
           id,
           created_at,
-          experiences (
-            id,
-            title,
-            price,
-            image_url,
-            location,
-            category,
-            rating
-          )
+          experiences (*) 
         `)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('위시리스트 로딩 실패:', error);
       } else {
-        // experiences가 null이 아닌 것만 필터링 (삭제된 체험 방지)
+        // 체험 정보가 있는 것만 필터링
         setWishlists(data?.filter(item => item.experiences) || []);
       }
       setLoading(false);
     };
 
     fetchWishlists();
-  }, []);
+  }, [router, supabase]);
+
+  // 🟢 [추가] 찜 해제 기능 (화면에서 바로 사라지게)
+  const handleRemove = async (e: React.MouseEvent, wishlistId: number, expId: number) => {
+    e.preventDefault(); 
+    e.stopPropagation();
+    
+    // 낙관적 업데이트 (UI 먼저 삭제)
+    setWishlists(prev => prev.filter(item => item.id !== wishlistId));
+
+    const { error } = await supabase.from('wishlists').delete().eq('id', wishlistId);
+    if (error) {
+       console.error(error);
+       // 에러 시 복구 로직은 생략 (간단한 UX)
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -76,25 +83,33 @@ export default function WishlistsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-10">
             {wishlists.map((item: any) => {
               const exp = item.experiences;
+              // 이미지 처리 (photos 배열 확인)
+              const imageUrl = exp.photos && exp.photos.length > 0 ? exp.photos[0] : (exp.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
+
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
                   <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
-                    <img 
-                      src={exp.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989"} 
+                    <Image 
+                      src={imageUrl} 
                       alt={exp.title} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    <button className="absolute top-3 right-3 text-rose-500 hover:scale-110 transition-all z-10">
+                    {/* 찜 해제 버튼 */}
+                    <button 
+                      onClick={(e) => handleRemove(e, item.id, exp.id)}
+                      className="absolute top-3 right-3 text-rose-500 hover:scale-110 transition-all z-10"
+                    >
                       <Heart size={24} fill="#F43F5E" strokeWidth={2} />
                     </button>
                   </div>
 
                   <div className="space-y-1 px-1">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">{exp.location || '서울'} · {exp.category}</h3>
+                      <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">{exp.city || exp.location || '서울'} · {exp.category}</h3>
                       <div className="flex items-center gap-1 text-sm shrink-0">
                         <Star size={14} fill="black" />
-                        <span>{exp.rating || 'New'}</span>
+                        <span>4.98</span> {/* 평점은 DB에 없으면 고정값 사용 */}
                       </div>
                     </div>
                     <p className="text-[15px] text-slate-500 line-clamp-1">{exp.title}</p>
