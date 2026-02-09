@@ -3,15 +3,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { sendNotification } from '@/app/utils/notification';
+import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 추가
 
 export function useGuestTrips() {
   const [upcomingTrips, setUpcomingTrips] = useState<any[]>([]);
   const [pastTrips, setPastTrips] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   const supabase = createClient();
+  const { showToast } = useToast(); // 🟢 훅 사용
 
   const secureUrl = (url: string | null) => {
     if (!url) return null;
@@ -21,7 +22,6 @@ export function useGuestTrips() {
   const fetchMyTrips = useCallback(async () => {
     try {
       setIsLoading(true);
-      setErrorMsg(null);
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -41,11 +41,7 @@ export function useGuestTrips() {
         .eq('user_id', user.id)
         .order('date', { ascending: true });
 
-      if (error) {
-        console.error("데이터 로딩 실패:", error);
-        setErrorMsg('예약 정보를 불러오는데 실패했습니다.');
-        throw error;
-      }
+      if (error) throw error;
 
       if (bookings) {
         const upcoming: any[] = [];
@@ -56,7 +52,6 @@ export function useGuestTrips() {
         bookings.forEach((booking: any) => {
           if (!booking.experiences) return;
 
-          // 날짜 비교 로직 수정
           const [year, month, day] = booking.date.split('-').map(Number);
           const tripDate = new Date(year, month - 1, day);
           const isFuture = tripDate >= today; 
@@ -75,6 +70,8 @@ export function useGuestTrips() {
             time: booking.time || '시간 미정',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
+            // 🟢 [중요] 갤러리를 위해 photos 배열 추가
+            photos: booking.experiences.photos || [],
             image: secureUrl(booking.experiences.photos?.[0]), 
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
@@ -90,18 +87,18 @@ export function useGuestTrips() {
         });
 
         setUpcomingTrips(upcoming);
-        // ✅ 지난 여행은 최신순(역순)으로 정렬
         setPastTrips(past.reverse());
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message);
+      showToast('예약 정보를 불러오는데 실패했습니다.', 'error');
     } finally {
       setIsLoading(false);
     }
   }, [supabase]);
 
-  const requestCancellation = async (id: number, reason: string, hostId: string) => {
+  // 🟢 인자 3개 받음 (id, reason, hostId)
+  const requestCancel = async (id: number, reason: string, hostId: string) => {
     setIsProcessing(true);
     try {
       const { error } = await supabase
@@ -114,21 +111,22 @@ export function useGuestTrips() {
 
       if (error) throw error;
 
-      await sendNotification({
-        supabase,
-        userId: hostId, 
-        type: 'booking_request',
-        title: '예약 취소 요청',
-        message: '게스트가 예약을 취소하고 싶어합니다. 사유를 확인해주세요.',
-        link: '/host/dashboard?tab=reservations'
-      });
+      // 호스트 알림
+      if (hostId) {
+        await sendNotification({
+            recipient_id: hostId,
+            type: 'booking_cancel_request', // 타입명 확인 필요 (DB에 맞게)
+            content: '예약 취소 요청이 있습니다.',
+            link_url: '/host/dashboard'
+        });
+      }
 
-      alert('취소 요청이 접수되었습니다.\n호스트 확인 후 환불이 진행됩니다.');
+      showToast('취소 요청이 접수되었습니다.', 'success'); // alert -> Toast
       fetchMyTrips(); 
       return true; 
 
     } catch (err: any) {
-      alert('요청 실패: ' + err.message);
+      showToast('요청 실패: ' + err.message, 'error');
       return false; 
     } finally {
       setIsProcessing(false);
@@ -144,8 +142,8 @@ export function useGuestTrips() {
     pastTrips,
     isLoading,
     isProcessing,
-    errorMsg,
-    requestCancellation,
+    // 🟢 이름 통일: requestCancel
+    requestCancel,
     refreshTrips: fetchMyTrips
   };
 }
