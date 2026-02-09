@@ -25,7 +25,7 @@ export function useGuestTrips() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // profiles(*)로 안전하게 조회
+      // 1. 예약 정보와 연결된 체험 정보 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -41,6 +41,22 @@ export function useGuestTrips() {
       if (error) throw error;
 
       if (bookings) {
+        // 2. 호스트 ID 추출 (중복 제거)
+        const hostIds = Array.from(new Set(bookings.map((b: any) => b.experiences?.host_id).filter(Boolean)));
+        
+        // 3. [핵심 수정] 호스트 신청서(host_applications) 정보 추가 조회
+        let appsMap = new Map();
+        if (hostIds.length > 0) {
+          const { data: apps } = await supabase
+            .from('host_applications')
+            .select('user_id, name, profile_photo')
+            .in('user_id', hostIds);
+            
+          if (apps) {
+            apps.forEach((app: any) => appsMap.set(app.user_id, app));
+          }
+        }
+
         const upcoming: any[] = [];
         const past: any[] = [];
         const today = new Date();
@@ -53,17 +69,25 @@ export function useGuestTrips() {
           const tripDate = new Date(year, month - 1, day);
           const isFuture = tripDate >= today; 
 
-          const hostData = Array.isArray(booking.experiences.profiles) 
+          const profileData = Array.isArray(booking.experiences.profiles) 
             ? booking.experiences.profiles[0] 
             : booking.experiences.profiles;
+
+          // 🟢 [우선순위 적용] 호스트 신청서 정보 > 프로필 정보 > 기본값
+          const hostApp = appsMap.get(booking.experiences.host_id);
+          
+          const finalHostName = hostApp?.name || profileData?.name || profileData?.full_name || 'Locally Host';
+          const finalHostAvatar = hostApp?.profile_photo || profileData?.avatar_url;
 
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
-            hostName: hostData?.name || hostData?.full_name || 'Locally Host',
-            hostPhone: hostData?.phone,
+            
+            // 수정된 호스트 정보 적용
+            hostName: finalHostName,
+            hostAvatar: secureUrl(finalHostAvatar),
+            hostPhone: profileData?.phone, // 전화번호는 프로필에서 유지
             hostId: booking.experiences.host_id,
-            hostAvatar: secureUrl(hostData?.avatar_url),
             
             date: booking.date, 
             time: booking.time || '시간 미정',
@@ -89,7 +113,6 @@ export function useGuestTrips() {
       }
     } catch (err: any) {
       console.error(err);
-      // 🟢 [복구] 에러 발생 시 사용자에게 알림
       showToast('예약 정보를 불러오는데 실패했습니다.', 'error');
     } finally {
       setIsLoading(false);
