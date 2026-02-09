@@ -27,14 +27,19 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) { setIsLoading(false); return; }
       setCurrentUser(user);
 
-      // 1. 1차 시도: JOIN을 통한 조회
+      // 🟢 [근본적 해결] 체험(experiences)을 통해 호스트 정보를 가져오는 확실한 경로 사용
+      // direct_host: 혹시 모를 직접 연결 (실패해도 괜찮음)
+      // experiences -> host: 이미 검증된 연결 (이걸 메인으로 사용)
       let query = supabase
         .from('inquiries')
         .select(`
           *,
-          experiences (id, title, photos, image_url),
           guest:profiles!inquiries_user_id_fkey (*),
-          host:profiles!inquiries_host_id_fkey (*)
+          direct_host:profiles!inquiries_host_id_fkey (*),
+          experiences (
+            id, title, photos, image_url,
+            host:profiles!experiences_host_id_fkey (*)
+          )
         `)
         .order('updated_at', { ascending: false });
 
@@ -45,41 +50,26 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       if (data) {
-        // 2. 2차 시도: 호스트 정보가 누락된 경우 수동 조회 (FK 이름 불일치 대비)
-        const missingHostIds = data
-          .filter(item => !item.host && item.host_id)
-          .map(item => item.host_id);
-
-        let profilesMap: Record<string, any> = {};
-
-        if (missingHostIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('*')
-            .in('id', missingHostIds);
-            
-          if (profiles) {
-            profiles.forEach(p => { profilesMap[p.id] = p; });
-          }
-        }
-
         const safeData = data.map(item => {
-          // host가 있으면 쓰고, 없으면 수동 조회한 맵에서 찾음
-          const rawHost = item.host || profilesMap[item.host_id];
-          const rawGuest = item.guest; // 게스트는 본인이므로 보통 있음
-
+          // 🟢 호스트 정보 우선순위: 1. 직접 연결된 호스트 -> 2. 체험을 통해 연결된 호스트
+          const rawHost = item.direct_host || item.experiences?.host;
+          
           return {
             ...item,
-            guest: rawGuest ? { ...rawGuest, avatar_url: secureUrl(rawGuest.avatar_url) } : null,
-            host: rawHost ? { ...rawHost, avatar_url: secureUrl(rawHost.avatar_url) } : null
+            // 이제 item.host에 확실한 데이터가 들어갑니다
+            host: rawHost ? { ...rawHost, avatar_url: secureUrl(rawHost.avatar_url) } : null,
+            guest: item.guest ? { ...item.guest, avatar_url: secureUrl(item.guest.avatar_url) } : null,
+            experiences: item.experiences ? {
+              ...item.experiences,
+              image_url: secureUrl(item.experiences.image_url || item.experiences.photos?.[0])
+            } : null
           };
         });
-        
         setInquiries(safeData);
       }
     } catch (err: any) {
       console.error(err);
-      // 목록 로딩 실패는 조용히 처리
+      // 조용히 실패 (데이터가 없을 수도 있으므로)
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +77,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // 메시지 불러오기 (sender 정보 포함)
+      // 메시지 로드 시 sender 정보 가져오기
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (*)`)
@@ -97,8 +87,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       if (data) {
-        // 메시지 전송자 정보도 누락될 경우를 대비해 수동 매핑 가능하지만, 
-        // 일단 메시지는 sender_id가 확실하므로 JOIN에 의존하되 에러 로그 확인
         const safeMessages = data.map(msg => ({
           ...msg,
           sender: msg.sender ? { ...msg.sender, avatar_url: secureUrl(msg.sender.avatar_url) } : null
@@ -106,9 +94,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         setMessages(safeMessages);
       }
       
-      // 선택된 대화방 정보 업데이트
+      // 목록에서 현재 선택된 방 정보 업데이트
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) setSelectedInquiry(selected);
+      
     } catch (err: any) { console.error(err); }
   };
 
@@ -119,8 +108,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       await supabase.from('inquiries').update({ content, updated_at: new Date().toISOString() }).eq('id', inquiryId);
-      
-      // 메시지 전송 후 즉시 리로드
       await loadMessages(inquiryId);
       fetchInquiries(); 
     } catch (err: any) { 
