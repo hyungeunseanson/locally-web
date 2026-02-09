@@ -33,7 +33,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       if (!experienceId) return;
       
       try {
-        // 1. 후기 데이터 가져오기
+        // 🟢 1. 후기 데이터 가져오기 (가장 안전한 방식: 조인 없이 조회)
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
           .select('*')
@@ -48,10 +48,10 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
           return;
         }
 
-        // 2. 작성자 ID 추출
+        // 🟢 2. 작성자 ID 추출
         const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id)));
 
-        // 3. 프로필 정보 가져오기 (이름, 사진, 이메일 등 최대한 많이)
+        // 🟢 3. 프로필 정보 따로 가져오기 (조인 에러 방지)
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, name, full_name, avatar_url, email')
