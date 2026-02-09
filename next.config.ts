@@ -18,8 +18,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'k.kakaocdn.net', // 카카오 프로필
       },
-      // 본인 Supabase 주소를 안다면 여기에 추가 (모르면 일단 패스)
-      // { protocol: 'https', hostname: 'YOUR_PROJECT.supabase.co' }
+      {
+        protocol: 'https',
+        // 🔴 사용자님의 실제 Supabase 프로젝트 ID입니다!
+        hostname: 'uhinvcydgzqlpnvieyal.supabase.co', 
+      }
     ],
   },
   
