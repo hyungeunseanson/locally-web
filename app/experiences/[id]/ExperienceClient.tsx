@@ -1,18 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Share, Heart, MapPin, Check, X, Grid 
-} from 'lucide-react';
+import { Share, Heart, MapPin, Check, X, Grid } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat'; 
+import { useWishlist } from '@/app/hooks/useWishlist'; // 🟢 훅 임포트
 import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
 import Image from 'next/image'; 
 import { useToast } from '@/app/context/ToastContext'; 
-// ✅ 스켈레톤 임포트 (경로 확인)
 import { ExperienceDetailSkeleton } from '@/app/components/skeletons/ExperienceDetailSkeleton';
 
 export default function ExperienceClient() {
@@ -23,6 +21,10 @@ export default function ExperienceClient() {
   const supabase = createClient();
   const { createInquiry } = useChat(); 
   
+  // 🟢 훅 사용 (복잡한 로직 제거됨)
+  const experienceId = params?.id as string;
+  const { isSaved, toggleWishlist, isLoading: isSaveLoading } = useWishlist(experienceId);
+  
   const [user, setUser] = useState<any>(null);
   const [experience, setExperience] = useState<any>(null);
   const [hostProfile, setHostProfile] = useState<any>(null);
@@ -30,8 +32,6 @@ export default function ExperienceClient() {
   
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>({});
-  
-  const [isSaved, setIsSaved] = useState(false);
   const [inquiryText, setInquiryText] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
@@ -63,7 +63,7 @@ export default function ExperienceClient() {
         
         setHostProfile({
           id: exp.host_id, 
-          name: profile?.name || app?.name || 'Locally Host',
+          name: app?.name || profile?.name || profile?.full_name || 'Locally Host',
           avatar_url: app?.profile_photo || profile?.avatar_url || null,
           languages: (profile?.languages && profile.languages.length > 0) ? profile.languages : (app?.languages || []),
           introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
@@ -95,7 +95,6 @@ export default function ExperienceClient() {
     try {
       if (!experience?.host_id) return showToast('호스트 정보를 불러올 수 없습니다.', 'error');
       await createInquiry(experience.host_id, experience.id, inquiryText);
-      
       if (confirm('문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?')) {
         router.push('/guest/inbox');
       }
@@ -126,7 +125,6 @@ export default function ExperienceClient() {
       {isCopySuccess && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400"/> 링크가 복사되었습니다.</div>}
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
-        
         <section className="mb-6">
           <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
           <div className="flex justify-between items-end">
@@ -137,12 +135,16 @@ export default function ExperienceClient() {
             </div>
             <div className="flex gap-2">
                <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Share size={16} /> 공유하기</button>
-               <button onClick={() => setIsSaved(!isSaved)} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} /> {isSaved ? '저장됨' : '저장'}</button>
+               {/* 🟢 훅 연결 완료 */}
+               <button onClick={toggleWishlist} disabled={isSaveLoading} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
+                 <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} /> 
+                 {isSaved ? '저장됨' : '저장'}
+               </button>
             </div>
           </div>
         </section>
 
-        {/* 스마트 사진 그리드 */}
+        {/* 사진 그리드 등 나머지 UI 유지 */}
         <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
           {photos.length === 1 && (
              <div className="w-full h-full relative cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
@@ -154,41 +156,14 @@ export default function ExperienceClient() {
                 </div>
              </div>
           )}
-          {photos.length === 2 && (
-             <div className="grid grid-cols-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
-                {[0, 1].map(i => (
-                  <div key={i} className="relative h-full overflow-hidden">
-                    <Image src={photos[i]} alt={`img-${i}`} fill className="object-cover hover:scale-105 transition-transform duration-700" />
-                  </div>
-                ))}
-             </div>
-          )}
-          {photos.length === 3 && (
-             <div className="grid grid-cols-3 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="relative h-full overflow-hidden">
-                    <Image src={photos[i]} alt={`img-${i}`} fill className="object-cover hover:scale-105 transition-transform duration-700" />
-                  </div>
-                ))}
-             </div>
-          )}
-          {photos.length === 4 && (
-             <div className="grid grid-cols-2 grid-rows-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
-                {[0, 1, 2, 3].map(i => (
-                  <div key={i} className="relative h-full overflow-hidden">
-                    <Image src={photos[i]} alt={`img-${i}`} fill className="object-cover hover:scale-105 transition-transform duration-700" />
-                  </div>
-                ))}
-             </div>
-          )}
-          {photos.length >= 5 && (
+          {photos.length >= 2 && (
              <div className="grid grid-cols-4 grid-rows-2 gap-2 h-full cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
                 <div className="col-span-2 row-span-2 relative overflow-hidden">
                    <Image src={photos[0]} alt="Main" fill className="object-cover hover:scale-105 transition-transform duration-700" />
                 </div>
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="col-span-1 row-span-1 relative overflow-hidden">
-                    <Image src={photos[i]} alt={`Sub ${i}`} fill className="object-cover hover:scale-105 transition-transform duration-700" />
+                {photos.slice(1, 5).map((photo: string, i: number) => (
+                  <div key={i} className={`relative overflow-hidden ${photos.length === 2 ? 'col-span-2 row-span-2' : 'col-span-1 row-span-1'}`}>
+                    <Image src={photo} alt={`Sub ${i}`} fill className="object-cover hover:scale-105 transition-transform duration-700" />
                   </div>
                 ))}
              </div>
