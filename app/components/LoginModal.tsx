@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Chrome, MessageCircle } from 'lucide-react';
+import { X, Chrome, MessageCircle } from 'lucide-react'; // 🟢 아이콘 유지
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 훅 추가
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -18,10 +19,11 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const { showToast } = useToast(); // 🟢 훅 사용
 
   if (!isOpen) return null;
 
-  // 🔹 [핵심 추가] 프로필 확인 및 생성 함수
+  // 🔹 [핵심 추가] 프로필 확인 및 생성 함수 (기존 로직 유지)
   const ensureProfileExists = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -37,7 +39,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         id: user.id,
         email: user.email,
         full_name: user.user_metadata?.full_name || 'User',
-        // 이메일 가입자는 아바타가 없으므로 기본값 처리
       });
     }
   };
@@ -50,12 +51,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           email, 
           password,
           options: {
-            // 가입 시 메타데이터에 이름 저장
             data: { full_name: email.split('@')[0] } 
           }
         });
         if (error) throw error;
-        alert('회원가입 성공! 이메일 확인 후 로그인해주세요.');
+        
+        // 🟢 alert -> showToast
+        showToast('회원가입 성공! 이메일 확인 후 로그인해주세요.', 'success');
         setMode('LOGIN');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -64,12 +66,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         // ✅ 로그인 성공 직후 프로필 생성 보장
         await ensureProfileExists();
         
+        // 🟢 로그인 성공 Toast (선택사항)
+        showToast('로그인되었습니다.', 'success');
+
         onClose();
         if (onLoginSuccess) onLoginSuccess();
         router.refresh();
       }
     } catch (error: any) {
-      alert(error.message);
+      // 🟢 alert -> showToast (에러)
+      showToast(error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -82,7 +88,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    if (error) alert(error.message);
+    // 🟢 alert -> showToast
+    if (error) showToast(error.message, 'error');
   };
 
   return (
