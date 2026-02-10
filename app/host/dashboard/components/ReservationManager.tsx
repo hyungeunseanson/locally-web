@@ -64,18 +64,17 @@ const addToGoogleCalendar = (res: any) => {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          experiences!inner ( id, title, host_id ),
-          // ✅ [수정] 아래 줄에 kakao_id, introduction, job, languages, host_nationality 추가
-          guest:profiles!bookings_user_id_fkey ( 
-            id, full_name, avatar_url, email, phone, 
-            kakao_id, introduction, job, languages, host_nationality 
-          )
-        `)
-        .eq('experiences.host_id', user.id)
-        .order('date', { ascending: true });
+      .from('bookings')
+      .select(`
+        *,
+        experiences!inner ( id, title, host_id ),
+        guest:profiles!bookings_user_id_fkey ( 
+          id, full_name, avatar_url, email, phone, 
+          kakao_id, introduction, job, languages, host_nationality 
+        )
+      `) // 👈 설명글 없이 이렇게 깔끔해야 합니다.
+      .eq('experiences.host_id', user.id)
+      .order('date', { ascending: true });
 
       if (error) throw error;
       setReservations(data || []);
