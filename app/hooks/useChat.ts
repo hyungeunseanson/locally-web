@@ -15,19 +15,21 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const { showToast } = useToast();
 
   const secureUrl = (url: string | null) => {
-    if (!url) return null;
+    if (!url || url === '') return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
   };
 
+  // 1. 데이터 가져오기 (채팅방 목록 + 안 읽은 메시지)
   const fetchInquiries = useCallback(async () => {
-    setIsLoading(true);
+    // 로딩 상태는 최초 1회만 true로 (깜빡임 방지)
+    if (inquiries.length === 0) setIsLoading(true);
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
       setCurrentUser(user);
 
-      // 1. 문의 목록 조회
       let query = supabase
         .from('inquiries')
         .select(`*, experiences (id, title, photos, image_url, host_id)`)
@@ -44,47 +46,40 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
         const guestIds = Array.from(new Set(inquiriesData.map(item => item.user_id).filter(Boolean)));
 
-        // 2. 정보 병렬 조회 (프로필, 신청서, 안 읽은 메시지)
         const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', hostIds),
           supabase.from('host_applications').select('*').in('user_id', hostIds),
           supabase.from('profiles').select('*').in('id', guestIds),
-          // 🔴 안 읽은 메시지 카운트 로직 (핵심)
+          // 🔴 안 읽은 메시지 카운트 (상대방이 보낸 것만)
           supabase.from('inquiry_messages')
             .select('inquiry_id')
             .in('inquiry_id', inquiryIds)
             .eq('is_read', false)
-            .neq('sender_id', user.id) // 내가 보낸 건 제외 (상대방이 보낸 것만 카운트)
+            .neq('sender_id', user.id) 
         ]);
 
         const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
         const appsMap = new Map(appsRes.data?.map(a => [a.user_id, a]));
         const guestMap = new Map(guestProfilesRes.data?.map(g => [g.id, g]));
 
-        // 안 읽은 메시지 개수 집계
         const unreadCounts: Record<number, number> = {};
-        if (unreadRes.data) {
-          unreadRes.data.forEach((msg: any) => {
-            unreadCounts[msg.inquiry_id] = (unreadCounts[msg.inquiry_id] || 0) + 1;
-          });
-        }
+        unreadRes.data?.forEach((msg: any) => {
+          unreadCounts[msg.inquiry_id] = (unreadCounts[msg.inquiry_id] || 0) + 1;
+        });
 
-        // 3. 데이터 매핑
         const safeData = inquiriesData.map(item => {
-          // 호스트 정보 매핑
           const hostApp = appsMap.get(item.host_id);
           const hostProfile = profilesMap.get(item.host_id);
           const hostName = hostApp?.name || hostProfile?.full_name || '호스트';
           const hostAvatar = hostApp?.profile_photo || hostProfile?.avatar_url;
 
-          // 게스트 정보 매핑
           const guestProfile = guestMap.get(item.user_id);
-          const guestName = guestProfile?.name || guestProfile?.full_name || '게스트';
+          const guestName = guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
           const guestAvatar = guestProfile?.avatar_url;
 
           return {
             ...item,
-            unread_count: unreadCounts[item.id] || 0, // 🔴 계산된 카운트 적용
+            unread_count: unreadCounts[item.id] || 0,
             guest: {
               id: item.user_id,
               name: guestName,
@@ -108,18 +103,13 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
     } catch (err: any) { console.error(err); } 
     finally { setIsLoading(false); }
-  }, [supabase, role]);
+  }, [supabase, role]); // inquiries 의존성 제거 (무한루프 방지)
 
-  // ✅ 읽음 처리 함수 (클릭 시 실행)
   const markAsRead = async (inquiryId: number) => {
     if (!currentUser) return;
-    
-    // UI 즉시 업데이트 (배지 삭제)
     setInquiries(prev => prev.map(inq => 
       inq.id === inquiryId ? { ...inq, unread_count: 0 } : inq
     ));
-
-    // DB 업데이트
     await supabase
       .from('inquiry_messages')
       .update({ is_read: true })
@@ -168,7 +158,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) {
           setSelectedInquiry(selected);
-          markAsRead(inquiryId); // 🔴 메시지 불러올 때 읽음 처리
+          markAsRead(inquiryId);
       }
     } catch (err: any) { console.error(err); }
   };
@@ -209,6 +199,30 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   };
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
+
+  // 🟢 [추가됨] 실시간 구독: 새 메시지가 오면 목록(N배지 포함)을 새로고침
+  useEffect(() => {
+    const channel = supabase
+      .channel('chat-list-updates')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
+        (payload) => {
+          // 새 메시지가 오면 목록을 다시 불러와서 N배지와 미리보기 업데이트
+          fetchInquiries();
+          
+          // 현재 보고 있는 채팅방의 메시지라면, 메시지 목록도 업데이트
+          if (selectedInquiry && payload.new.inquiry_id === selectedInquiry.id) {
+             loadMessages(selectedInquiry.id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, fetchInquiries, selectedInquiry]);
 
   return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, refresh: fetchInquiries };
 }
