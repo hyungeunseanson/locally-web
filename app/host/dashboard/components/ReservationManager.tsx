@@ -263,7 +263,7 @@ export default function ReservationManager() {
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-1">{res.experiences?.title}</p>
                           <div className="flex items-center gap-2">
-                             <h4 className="text-lg font-bold text-slate-900">예약 #{res.id.slice(0, 8)}</h4>
+                          <h4 className="text-lg font-bold text-slate-900">예약 #{String(res.id).slice(0, 8)}</h4>
                              {/* ✅ [복구] 상태 뱃지 삽입 */}
                              {renderStatusBadge(res.status, res.date)}
                           </div>
