@@ -4,7 +4,9 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation'; 
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
+import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
 import { Send, ShieldCheck, User, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 
 function InboxContent() {
   const { 
@@ -20,49 +22,56 @@ function InboxContent() {
   } = useChat('guest');
 
   const [inputText, setInputText] = useState('');
-  const [isSending, setIsSending] = useState(false); // 전송 중 상태
+  const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
+  // 🟢 프로필 모달 상태
+  const [modalUserId, setModalUserId] = useState<string | null>(null);
+  const [modalRole, setModalRole] = useState<'host' | 'guest'>('host');
+
   const router = useRouter(); 
   const searchParams = useSearchParams();
   
-  // URL 파라미터 값들
   const hostId = searchParams.get('hostId');
   const expId = searchParams.get('expId');
   const hostName = searchParams.get('hostName');
   const hostAvatar = searchParams.get('hostAvatar'); 
   const expTitle = searchParams.get('expTitle');
   
-  // URL 파라미터를 이미 처리했는지 여부 (무한 리다이렉트 방지)
   const [isUrlProcessed, setIsUrlProcessed] = useState(false);
+
+  // 🟢 [헬퍼] 보안 이미지 및 시간 포맷
+  const secureUrl = (url: string | null | undefined) => {
+    if (!url) return "/default-avatar.png";
+    if (url.startsWith('http://')) return url.replace('http://', 'https://');
+    return url;
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  };
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  // URL 처리 로직 (단 한 번만 실행되도록 제어)
   useEffect(() => {
-    // 로딩 중이거나 이미 처리했으면 스킵
     if (isLoading || isUrlProcessed) return;
 
-    // URL 파라미터가 없으면 처리 완료로 간주
     if (!hostId || !expId) {
       setIsUrlProcessed(true);
       return;
     }
 
-    // 1. 이미 존재하는 채팅방인지 확인
     const existing = inquiries.find(
       i => String(i.host_id) === String(hostId) && String(i.experience_id) === String(expId)
     );
     
     if (existing) {
-      // 이미 있는 방이면 그 방으로 이동
       if (selectedInquiry?.id !== existing.id) {
         loadMessages(existing.id);
       }
     } else {
-      // 없는 방이면 '새 채팅방' 시작
       if (selectedInquiry?.id !== 'new') {
          startNewChat(
            { id: hostId, name: hostName || 'Host', avatarUrl: hostAvatar || undefined }, 
@@ -70,27 +79,17 @@ function InboxContent() {
          );
       }
     }
-    
-    // 처리 완료 플래그 세우기
     setIsUrlProcessed(true);
-
   }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
 
-  // 다른 채팅방 클릭 핸들러
   const handleSelectInquiry = (inqId: number) => {
     loadMessages(inqId);
-    
-    // 만약 URL에 파라미터가 남아있다면 제거해서 깔끔하게 만듦
-    if (hostId || expId) {
-       router.replace('/guest/inbox');
-    }
+    if (hostId || expId) router.replace('/guest/inbox');
   };
 
-  // 전송 핸들러 (중복 방지 로직 추가)
   const handleSend = async () => {
     if (selectedInquiry && inputText.trim() && !isSending) {
-      setIsSending(true); // 🔒 버튼 잠금
-      
+      setIsSending(true); 
       try {
         if (selectedInquiry.id === 'new') {
           await createInquiry(selectedInquiry.host_id, selectedInquiry.experience_id, inputText);
@@ -101,7 +100,7 @@ function InboxContent() {
       } catch (error) {
         console.error("Failed to send message", error);
       } finally {
-        setIsSending(false); // 🔓 버튼 해제
+        setIsSending(false);
       }
     }
   };
@@ -110,21 +109,38 @@ function InboxContent() {
     if (inqOrSelected?.host) {
         return {
             name: inqOrSelected.host.name,
-            avatar: inqOrSelected.host.avatar_url
+            avatar: inqOrSelected.host.avatar_url,
+            id: inqOrSelected.host.id
         };
     }
-    // URL 백업 정보는 'new' 상태일 때만 사용
     if (inqOrSelected?.id === 'new' && inqOrSelected?.host_id === hostId) {
-        return { name: hostName || 'Host', avatar: hostAvatar };
+        return { name: hostName || 'Host', avatar: hostAvatar, id: hostId };
     }
-    return { name: 'Host', avatar: null };
+    return { name: 'Host', avatar: null, id: null };
   };
 
-  const currentHostDisplay = selectedInquiry ? getDisplayHost(selectedInquiry) : { name: '', avatar: null };
+  const currentHostDisplay = selectedInquiry ? getDisplayHost(selectedInquiry) : { name: '', avatar: null, id: null };
+
+  // 🟢 프로필 클릭 핸들러
+  const handleProfileClick = (id: string | null) => {
+    if (id) {
+      setModalUserId(id);
+      setModalRole('host');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
+      
+      {/* 🟢 프로필 모달 */}
+      <UserProfileModal 
+        userId={modalUserId || ''} 
+        isOpen={!!modalUserId} 
+        onClose={() => setModalUserId(null)} 
+        role={modalRole}
+      />
+
       <main className="max-w-[1280px] mx-auto px-6 py-8 h-[calc(100vh-80px)] flex flex-col">
         <h1 className="text-2xl font-bold mb-6">메시지</h1>
         
@@ -139,15 +155,19 @@ function InboxContent() {
                 return (
                   <div key={inq.id} onClick={() => handleSelectInquiry(inq.id)} className={`relative p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
                     
-                    {/* 안 읽은 메시지 배지 (N) */}
                     {inq.unread_count > 0 && (
-                      <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce z-10">
-                        N
-                      </div>
+                      <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce z-10">N</div>
                     )}
 
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
-                      {inq.type === 'admin' ? <ShieldCheck size={20} /> : (display.avatar ? <img src={display.avatar} className="w-full h-full object-cover" alt="host"/> : <User className="text-slate-300" size={20}/>)}
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 relative ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
+                      {inq.type === 'admin' ? <ShieldCheck size={20} /> : (
+                        <Image 
+                          src={secureUrl(display.avatar)} 
+                          alt="host" 
+                          fill 
+                          className="object-cover"
+                        />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <div className="font-bold text-sm truncate">{inq.type === 'admin' ? '로컬리 고객센터' : display.name}</div>
@@ -166,9 +186,9 @@ function InboxContent() {
           <div className={`flex-1 flex flex-col ${!selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
             {selectedInquiry ? (
               <>
-                <div className="p-4 border-b border-slate-100 font-bold flex items-center gap-2">
-                   <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                      {currentHostDisplay.avatar ? <img src={currentHostDisplay.avatar} className="w-full h-full object-cover" alt="host"/> : <div className="w-full h-full flex items-center justify-center"><User className="text-slate-300" size={18}/></div>}
+                <div className="p-4 border-b border-slate-100 font-bold flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleProfileClick(currentHostDisplay.id)}>
+                   <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative">
+                      <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill className="object-cover" />
                    </div>
                    <div>
                       <div className="font-bold text-base leading-tight">{selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : currentHostDisplay.name}</div>
@@ -180,30 +200,40 @@ function InboxContent() {
                   {messages.map((msg) => {
                     const isMe = String(msg.sender_id) === String(currentUser?.id);
                     return (
-                      <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
                          {!isMe && (
-                           <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden mr-2 shrink-0">
-                             {msg.sender?.avatar_url || currentHostDisplay.avatar ? 
-                               <img src={msg.sender?.avatar_url || currentHostDisplay.avatar} className="w-full h-full object-cover" alt="sender"/> 
-                               : <User className="w-full h-full p-1.5 text-slate-400"/>}
+                           <div 
+                             className="flex flex-col items-center mr-2 cursor-pointer"
+                             onClick={() => handleProfileClick(msg.sender_id)}
+                           >
+                             <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden relative border border-slate-200">
+                               <Image src={secureUrl(msg.sender?.avatar_url || currentHostDisplay.avatar)} alt="sender" fill className="object-cover"/> 
+                             </div>
                            </div>
                          )}
-                        <div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none shadow-sm'}`}>
-                          {msg.content}
-                        </div>
+
+                         <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
+                            {/* 🟢 호스트 이름 표시 */}
+                            {!isMe && (
+                              <span className="text-[11px] text-slate-500 mb-1 ml-1 cursor-pointer" onClick={() => handleProfileClick(msg.sender_id)}>
+                                {msg.sender?.name || currentHostDisplay.name}
+                              </span>
+                            )}
+                            
+                            <div className="flex items-end gap-2">
+                               {isMe && <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1" suppressHydrationWarning>{formatTime(msg.created_at)}</span>}
+                               
+                               <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm break-words ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none'}`}>
+                                 {msg.content}
+                               </div>
+
+                               {/* 🟢 호스트 메시지 시간 표시 */}
+                               {!isMe && <span className="text-[10px] text-slate-400 min-w-[50px] mb-1" suppressHydrationWarning>{formatTime(msg.created_at)}</span>}
+                            </div>
+                         </div>
                       </div>
                     );
                   })}
-                  
-                  {messages.length === 0 && selectedInquiry.id === 'new' && (
-                     <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
-                        <div className="w-20 h-20 rounded-full bg-slate-100 mb-4 flex items-center justify-center overflow-hidden border border-slate-200">
-                           {currentHostDisplay.avatar ? <img src={currentHostDisplay.avatar} className="w-full h-full object-cover" alt="host"/> : <User size={40} className="text-slate-300"/>}
-                        </div>
-                        <p className="font-bold text-slate-900 mb-1">{currentHostDisplay.name}님에게 메시지 보내기</p>
-                        <p className="text-xs">궁금한 점을 자유롭게 물어보세요!</p>
-                     </div>
-                  )}
                 </div>
 
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">

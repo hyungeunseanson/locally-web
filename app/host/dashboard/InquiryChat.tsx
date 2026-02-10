@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat'; 
+import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 [추가] 모달 불러오기
 import { Send, User, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -11,7 +12,10 @@ export default function InquiryChat() {
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 🟢 [보안] HTTP 이미지를 HTTPS로 변환하는 헬퍼 함수
+  // 🟢 [추가] 프로필 모달 상태 관리
+  const [modalUserId, setModalUserId] = useState<string | null>(null);
+
+  // 🟢 [유지] HTTP 이미지를 HTTPS로 변환하는 헬퍼 함수
   const secureUrl = (url: string | null | undefined) => {
     if (!url) return "/default-avatar.png";
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -41,7 +45,15 @@ export default function InquiryChat() {
 
   return (
     <div className="flex gap-6 h-full min-h-[600px] w-full">
-      {/* 좌측 리스트 영역 */}
+      {/* 🟢 [추가] 프로필 모달 컴포넌트 */}
+      <UserProfileModal 
+        userId={modalUserId || ''} 
+        isOpen={!!modalUserId} 
+        onClose={() => setModalUserId(null)} 
+        role="guest" 
+      />
+
+      {/* 좌측 리스트 영역 (기존 디자인 유지) */}
       <div className="w-[300px] shrink-0 border-r border-slate-200 pr-4 overflow-y-auto max-h-[700px]">
         {inquiries.length === 0 && <div className="text-slate-400 text-sm text-center py-10">문의가 없습니다.</div>}
         
@@ -62,7 +74,7 @@ export default function InquiryChat() {
             <div className="flex items-center gap-3 mb-2">
                <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden relative border border-slate-200 shrink-0">
                  <Image 
-                   src={secureUrl(inq.guest?.avatar_url)} // 🟢 HTTPS 적용
+                   src={secureUrl(inq.guest?.avatar_url)} 
                    alt="profile" 
                    fill
                    className="object-cover"
@@ -79,7 +91,7 @@ export default function InquiryChat() {
             <div className="text-sm text-slate-600 line-clamp-2 bg-white/50 p-2 rounded-lg">
               {inq.content}
             </div>
-            {/* 🟢 시간 표시에 suppressHydrationWarning 추가 (에러 #418 해결) */}
+            {/* 🟢 [유지] 시간 표시 에러 방지 */}
             <div className="text-xs text-slate-400 mt-2 text-right" suppressHydrationWarning>
               {formatDate(inq.updated_at)}
             </div>
@@ -91,10 +103,14 @@ export default function InquiryChat() {
       <div className="flex-1 flex flex-col bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden h-[700px]">
         {selectedInquiry ? (
           <>
-            <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3 shadow-sm z-10">
+            {/* 🟢 [수정] 헤더 클릭 시 프로필 모달 오픈 */}
+            <div 
+              className="p-4 border-b border-slate-200 bg-white flex items-center gap-3 shadow-sm z-10 cursor-pointer hover:bg-slate-50 transition-colors"
+              onClick={() => setModalUserId(selectedInquiry.user_id)}
+            >
               <div className="relative w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-100">
                 <Image 
-                  src={secureUrl(selectedInquiry.guest?.avatar_url)} // 🟢 HTTPS 적용
+                  src={secureUrl(selectedInquiry.guest?.avatar_url)} 
                   alt="guest"
                   fill
                   className="object-cover"
@@ -114,10 +130,13 @@ export default function InquiryChat() {
                   <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
                     
                     {!isMe && (
-                      <div className="flex flex-col items-center mr-2">
-                        <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden relative">
+                      <div 
+                        className="flex flex-col items-center mr-2 cursor-pointer"
+                        onClick={() => setModalUserId(msg.sender_id)} // 🟢 [추가] 아바타 클릭 시 프로필
+                      >
+                        <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden relative border border-slate-200">
                           <Image 
-                            src={secureUrl(msg.sender?.avatar_url)} // 🟢 HTTPS 적용
+                            src={secureUrl(msg.sender?.avatar_url)} 
                             alt="sender"
                             fill
                             className="object-cover"
@@ -128,14 +147,16 @@ export default function InquiryChat() {
 
                     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
                       {!isMe && (
-                        <span className="text-[11px] text-slate-500 mb-1 ml-1">
+                        <span 
+                          className="text-[11px] text-slate-500 mb-1 ml-1 cursor-pointer hover:underline"
+                          onClick={() => setModalUserId(msg.sender_id)} // 🟢 [추가] 이름 클릭 시 프로필
+                        >
                           {msg.sender?.name || '게스트'}
                         </span>
                       )}
 
                       <div className="flex items-end gap-2">
                         {isMe && (
-                          // 🟢 시간 표시에 suppressHydrationWarning 추가 (에러 #418 해결)
                           <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1" suppressHydrationWarning>
                             {formatTime(msg.created_at)}
                           </span>
@@ -150,7 +171,6 @@ export default function InquiryChat() {
                         </div>
 
                         {!isMe && (
-                          // 🟢 시간 표시에 suppressHydrationWarning 추가 (에러 #418 해결)
                           <span className="text-[10px] text-slate-400 min-w-[50px] mb-1" suppressHydrationWarning>
                             {formatTime(msg.created_at)}
                           </span>
@@ -168,7 +188,8 @@ export default function InquiryChat() {
                 onChange={(e) => setReplyText(e.target.value)} 
                 placeholder="답장 입력..." 
                 disabled={isSending} 
-                className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100"
+                // 🟢 [수정] 비활성화 시 스타일 강화 (텍스트 흐리게, 커서 금지)
+                className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') {
@@ -182,6 +203,7 @@ export default function InquiryChat() {
                 disabled={!replyText.trim() || isSending} 
                 className="bg-black text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {/* 🟢 [유지] 로딩 스피너 및 아이콘 */}
                 {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
               </button>
             </div>
