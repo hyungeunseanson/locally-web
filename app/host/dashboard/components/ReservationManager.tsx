@@ -20,6 +20,7 @@ export default function ReservationManager() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null); // ✅ 에러 메시지 복구
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [selectedGuest, setSelectedGuest] = useState<any>(null); // ✅ 추가: 선택된 게스트 정보 저장
   
   const router = useRouter();
   const supabase = createClient();
@@ -67,7 +68,11 @@ const addToGoogleCalendar = (res: any) => {
         .select(`
           *,
           experiences!inner ( id, title, host_id ),
-          guest:profiles!bookings_user_id_fkey ( id, full_name, avatar_url, email, phone )
+          // ✅ [수정] 아래 줄에 kakao_id, introduction, job, languages, host_nationality 추가
+          guest:profiles!bookings_user_id_fkey ( 
+            id, full_name, avatar_url, email, phone, 
+            kakao_id, introduction, job, languages, host_nationality 
+          )
         `)
         .eq('experiences.host_id', user.id)
         .order('date', { ascending: true });
@@ -300,8 +305,15 @@ const addToGoogleCalendar = (res: any) => {
                       </div>
 
                       <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row gap-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                        {/* 1. 게스트 프로필 (클릭 기능 추가됨) */}
+                        <div 
+                          className="flex items-center gap-4 cursor-pointer group/profile"
+                          onClick={(e) => {
+                            e.stopPropagation(); // 부모 클릭 방지
+                            setSelectedGuest(res.guest);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 group-hover/profile:ring-2 ring-slate-900 transition-all">
                             {res.guest?.avatar_url ? (
                               <img src={secureUrl(res.guest.avatar_url)!} className="w-full h-full object-cover" alt="Guest" />
                             ) : (
@@ -309,23 +321,36 @@ const addToGoogleCalendar = (res: any) => {
                             )}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900">{res.guest?.full_name || '게스트'}</p>
+                            <div className="flex items-center gap-1">
+                              <p className="font-bold text-slate-900 group-hover/profile:underline underline-offset-2 decoration-2">{res.guest?.full_name || '게스트'}</p>
+                              <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">프로필 보기</span>
+                            </div>
                             <p className="text-xs text-slate-500">{res.guests}명 참여</p>
                           </div>
                         </div>
 
+                        {/* 2. 연락처 정보 (카카오톡 ID 추가됨) */}
                         {isConfirmed && (
                           <div className="flex flex-col justify-center gap-2 text-sm text-slate-600 border-l border-slate-100 pl-6">
-                             {res.guest?.phone && (
-                               <div className="flex items-center gap-2 hover:text-black cursor-pointer">
-                                 <Phone size={14} className="text-slate-400"/> {res.guest.phone}
-                               </div>
-                             )}
-                             {res.guest?.email && (
-                               <div className="flex items-center gap-2 hover:text-black cursor-pointer">
-                                 <Mail size={14} className="text-slate-400"/> {res.guest.email}
-                               </div>
-                             )}
+                              {res.guest?.phone && (
+                                <div className="flex items-center gap-2 hover:text-black cursor-pointer">
+                                  <Phone size={14} className="text-slate-400"/> {res.guest.phone}
+                                </div>
+                              )}
+                              {res.guest?.email && (
+                                <div className="flex items-center gap-2 hover:text-black cursor-pointer">
+                                  <Mail size={14} className="text-slate-400"/> {res.guest.email}
+                                </div>
+                              )}
+                              {/* ✅ 카카오톡 ID 표시 */}
+                              {res.guest?.kakao_id && (
+                                <div className="flex items-center gap-2 hover:text-yellow-600 cursor-pointer text-slate-600">
+                                  <div className="w-3.5 h-3.5 bg-yellow-400 rounded-sm flex items-center justify-center">
+                                    <MessageSquare size={8} className="text-yellow-900" fill="currentColor"/>
+                                  </div>
+                                  {res.guest.kakao_id}
+                                </div>
+                              )}
                           </div>
                         )}
                       </div>
@@ -376,6 +401,76 @@ const addToGoogleCalendar = (res: any) => {
           </div>
         )}
       </div>
+      {/* 👇 여기서부터 복사해서 붙여넣으세요 (마지막 div 바로 위) 👇 */}
+      {selectedGuest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedGuest(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            
+            {/* 닫기 버튼 */}
+            <button onClick={() => setSelectedGuest(null)} className="absolute top-4 right-4 z-10 p-2 bg-white/20 backdrop-blur-md hover:bg-white/40 rounded-full text-white transition-colors">
+              <XCircle size={24} />
+            </button>
+
+            {/* 상단 커버 & 아바타 */}
+            <div className="h-32 bg-slate-900 relative">
+               <div className="absolute -bottom-12 left-6 p-1 bg-white rounded-full">
+                 <div className="w-24 h-24 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                   {selectedGuest.avatar_url ? (
+                     <img src={secureUrl(selectedGuest.avatar_url)!} className="w-full h-full object-cover" alt="Guest" />
+                   ) : (
+                     <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={40}/></div>
+                   )}
+                 </div>
+               </div>
+            </div>
+
+            {/* 프로필 내용 */}
+            <div className="pt-16 px-6 pb-8">
+              <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                {selectedGuest.full_name}
+                {selectedGuest.host_nationality && <span className="text-xl">{selectedGuest.host_nationality}</span>}
+              </h2>
+              <p className="text-sm text-slate-500 font-medium mb-6">
+                {selectedGuest.job || '여행자'} · {selectedGuest.languages ? JSON.parse(selectedGuest.languages).join(', ') : '언어 정보 없음'}
+              </p>
+
+              {/* 소개글 */}
+              <div className="bg-slate-50 p-4 rounded-2xl mb-6">
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                  {selectedGuest.introduction || "아직 자기소개가 없습니다."}
+                </p>
+              </div>
+
+              {/* 연락처 정보 (중요!) */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Info</h3>
+                <div className="grid gap-3">
+                  <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700">
+                      <MessageSquare size={16} fill="currentColor"/> 
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold">KakaoTalk ID</p>
+                      <p className="text-sm font-bold text-slate-900">{selectedGuest.kakao_id || '등록되지 않음'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
+                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                       <Phone size={16}/>
+                     </div>
+                     <div>
+                       <p className="text-[10px] text-slate-400 font-bold">Phone Number</p>
+                       <p className="text-sm font-bold text-slate-900">{selectedGuest.phone || '비공개'}</p>
+                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 👆 여기까지 복사해서 붙여넣으세요 👆 */}
     </div>
   );
 }
