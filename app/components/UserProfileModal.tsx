@@ -57,7 +57,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           ...finalData,
           display_name: hostData.name || baseProfile.full_name,
           // 🟢 DB에 저장된 컬럼명이 profile_photo 인지 확인하세요!
-          display_avatar: hostData.profile_photo || baseProfile.avatar_url, 
+          display_avatar: hostData.profile_photo || hostData.avatar_url || baseProfile.avatar_url,
           display_bio: hostData.introduction || baseProfile.introduction,
           mbti: hostData.mbti,
           languages: hostData.languages,
