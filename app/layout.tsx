@@ -6,13 +6,40 @@ import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
-import Script from "next/script"; // 🟢 외부 스크립트 에러 방지용
+import Script from "next/script"; // 외부 스크립트 에러 방지용
 
 const inter = Inter({ subsets: ["latin"] });
 
+// 🟢 [SEO 최적화] 메타데이터 강화
 export const metadata: Metadata = {
-  title: "Locally",
-  description: "Travel like a local",
+  title: {
+    template: '%s | Locally',
+    default: 'Locally - 현지인과 함께하는 특별한 여행', // 기본 제목
+  },
+  description: "현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요. 현지인처럼 여행하고 싶다면 현지인과 함께.",
+  openGraph: {
+    title: 'Locally - 현지인과 함께하는 특별한 여행',
+    description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
+    url: 'https://locally.vercel.app', // 실제 배포 주소로 변경 권장
+    siteName: '로컬리 Locally',
+    images: [
+      {
+        url: 'https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png', // 대표 이미지 (오픈 그래프)
+        width: 1200,
+        height: 630,
+        alt: 'Locally Hero Image',
+      },
+    ],
+    locale: 'ko_KR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Locally - 현지인과 함께하는 특별한 여행',
+    description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
+    images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'], // 트위터용 이미지
+  },
+  keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', 'Locally'],
 };
 
 export default function RootLayout({
@@ -21,10 +48,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    /* 🟢 suppressHydrationWarning: 날짜/시간 불일치 에러(#418) 방지 */
     <html lang="ko" suppressHydrationWarning={true}>
       <head>
-        {/* 필요한 경우 카카오맵 스크립트 복구 (없으면 지도 에러남) */}
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <script 
             type="text/javascript" 
@@ -33,15 +58,13 @@ export default function RootLayout({
         )}
       </head>
       <body className={inter.className}>
-        {/* 🟢 [핵심 수정] ToastProvider를 가장 바깥으로 뺐습니다! */}
+        {/* Provider 순서: Toast(최상위) -> Notification -> Language */}
         <ToastProvider>
           <NotificationProvider>
             <LanguageProvider>
               
-              {/* 유저 상태 추적 */}
               <UserPresenceTracker />
               
-              {/* 🟢 레이아웃 구조 개선 (푸터 하단 고정) */}
               <div className="flex flex-col min-h-screen">
                 <main className="flex-1">
                   {children}

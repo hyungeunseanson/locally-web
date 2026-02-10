@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { sendNotification } from '@/app/utils/notification'; // 🟢 알림 함수 임포트
 
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -21,7 +22,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   };
 
   const fetchInquiries = useCallback(async () => {
-    // 최초 1회만 로딩 표시 (깜빡임 방지)
     if (inquiries.length === 0) setIsLoading(true);
     
     try {
@@ -101,7 +101,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
     } catch (err: any) { console.error(err); } 
     finally { setIsLoading(false); }
-  }, [supabase, role]); // inquiries 의존성 제거
+  }, [supabase, role]);
 
   const markAsRead = async (inquiryId: number) => {
     if (!currentUser) return;
@@ -161,26 +161,52 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     } catch (err: any) { console.error(err); }
   };
 
+  // 🟢 [수정 완료] 메시지 전송 함수 (중복 제거 및 괄호 정리)
   const sendMessage = async (inquiryId: number, content: string) => {
     if (!content.trim() || !currentUser) return;
     
-    // 🟢 [UI 즉시 업데이트] DB 응답 기다리지 않고 먼저 리스트 갱신 (Optimistic Update)
+    // UI 즉시 업데이트
     setInquiries(prev => prev.map(inq => 
       inq.id === inquiryId 
         ? { ...inq, content: content, updated_at: new Date().toISOString() } 
         : inq
-    ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())); // 최신순 정렬
+    ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
 
     try {
-      // 메시지 저장
+      // 1. 메시지 저장
       const { error } = await supabase.from('inquiry_messages').insert([{ inquiry_id: inquiryId, sender_id: currentUser.id, content }]);
       if (error) throw error;
       
-      // 채팅방 정보(최신글) 업데이트
+      // 2. 채팅방 정보 업데이트
       await supabase.from('inquiries').update({ content, updated_at: new Date().toISOString() }).eq('id', inquiryId);
       
+      // 3. 메시지 목록 새로고침
       await loadMessages(inquiryId);
-      // fetchInquiries(); // Optimistic Update를 했으므로 굳이 전체 다시 안 불러와도 됨 (하지만 안전을 위해 놔둘 수도 있음)
+      
+      // 4. 알림 발송 (10분 쿨타임 적용)
+      const currentInquiry = inquiries.find(i => i.id === inquiryId);
+      if (currentInquiry) {
+        const recipientId = currentUser.id === currentInquiry.host_id 
+          ? currentInquiry.user_id 
+          : currentInquiry.host_id;
+
+        const targetLink = currentUser.id === currentInquiry.host_id 
+          ? '/guest/inbox'            
+          : '/host/dashboard?tab=chat';
+
+        const senderName = currentUser.user_metadata?.full_name || '상대방';
+
+        await sendNotification({
+          recipient_id: recipientId,
+          senderId: currentUser.id,
+          type: 'new_message',
+          title: `💬 ${senderName}님의 새 메시지`,
+          message: content,
+          link: targetLink,
+          inquiry_id: inquiryId // 🟢 10분 제한 핵심 키
+        });
+      }
+
     } catch (err: any) { showToast("메시지 전송 실패: " + err.message, 'error'); }
   };
 
@@ -210,7 +236,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
-  // 🟢 [실시간 리스트 업데이트]
+  // 실시간 리스트 업데이트
   useEffect(() => {
     const channel = supabase
       .channel('chat-list-updates')
@@ -218,7 +244,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
-          // 남이 보낸 메시지일 경우에만 fetch 수행 (내가 보낸 건 sendMessage에서 처리함)
           if (currentUser && payload.new.sender_id !== currentUser.id) {
              fetchInquiries();
           }

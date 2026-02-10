@@ -1,5 +1,5 @@
 import { createClient } from '@/app/utils/supabase/client';
-import { SupabaseClient } from '@supabase/supabase-js'; // 🟢 타입 임포트 추가
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export type NotificationType = 
   | 'booking_request' 
@@ -12,18 +12,19 @@ export type NotificationType =
   | 'admin_alert';
 
 interface SendNotificationParams {
-  userId?: string;        // 기존 코드 호환용
-  recipient_id?: string;  // 신규 코드 호환용
-  senderId?: string;      // 없으면 시스템 알림
+  userId?: string;        
+  recipient_id?: string;  
+  senderId?: string;      
   type: NotificationType;
-  title: string;          // title은 필수값으로 유지 (기본값 처리 하단에서 함)
-  message?: string;       // 기존 코드 호환용
-  content?: string;       // 신규 코드 호환용
-  link?: string;          // 기존 코드 호환용
-  link_url?: string;      // 신규 코드 호환용
+  title: string;          
+  message?: string;       
+  content?: string;       
+  link?: string;          
+  link_url?: string;      
+  supabaseClient?: SupabaseClient;
   
-  // 🟢 [핵심 추가] 서버에서 관리자 권한으로 보낼 때 필요함
-  supabaseClient?: SupabaseClient; 
+  // 🟢 [추가됨] 채팅방 ID (쿨타임 체크용)
+  inquiry_id?: number; 
 }
 
 export const sendNotification = async ({
@@ -33,22 +34,22 @@ export const sendNotification = async ({
   title = '새로운 알림',
   message, content,
   link, link_url,
-  supabaseClient // 🟢 인자로 받음
+  supabaseClient,
+  inquiry_id // 🟢 인자 추가
 }: SendNotificationParams) => {
   
-  // 🟢 [핵심 로직] 외부에서 클라이언트를 주면 그걸 쓰고(서버용), 안 주면 브라우저용 생성
   const supabase = supabaseClient || createClient();
-
   const finalUserId = userId || recipient_id;
-  const finalMessage = message || content || ''; // 빈 문자열 처리로 안전성 확보
+  const finalMessage = message || content || '';
   const finalLink = link || link_url;
 
   if (!finalUserId) {
-    console.error('❌ Notification failed: Missing userId/recipient_id');
+    console.error('❌ Notification failed: Missing recipient ID');
     return;
   }
 
   try {
+    // (1) DB 알림 저장 (앱 내 알림 - 이건 무조건 저장)
     const { error } = await supabase.from('notifications').insert({
       user_id: finalUserId,
       sender_id: senderId || null,
@@ -60,7 +61,30 @@ export const sendNotification = async ({
     });
 
     if (error) throw error;
-    console.log(`🔔 Notification sent to ${finalUserId}: ${title}`);
+
+    // (2) 이메일 발송 API 호출 (여기에 쿨타임 로직 적용됨)
+    const emailTypes: NotificationType[] = [
+      'booking_request', 
+      'booking_confirmed', 
+      'booking_cancelled', 
+      'new_message' 
+    ];
+
+    if (emailTypes.includes(type)) {
+      fetch('/api/notifications/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient_id: finalUserId,
+          title,
+          message: finalMessage,
+          link: finalLink,
+          type,        // 🟢 타입 전달
+          inquiry_id   // 🟢 ID 전달
+        })
+      }).catch(err => console.error('⚠️ Failed to trigger email API:', err));
+    }
+
   } catch (error) {
     console.error('❌ Failed to send notification:', error);
   }
