@@ -5,15 +5,18 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { X, Bell, MessageSquare } from 'lucide-react';
 
-interface Notification {
+interface NotificationDB {
   id: number;
+  user_id: string;
   type: string;
   title: string;
   message: string;
-  link?: string;
+  link: string;
   is_read: boolean;
   created_at: string;
 }
+
+interface NotificationUI extends NotificationDB {}
 
 interface ToastData {
   title: string;
@@ -23,7 +26,7 @@ interface ToastData {
 }
 
 interface NotificationContextType {
-  notifications: Notification[];
+  notifications: NotificationUI[];
   unreadCount: number;
   markAsRead: (id: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
@@ -32,7 +35,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationUI[]>([]);
   const [toast, setToast] = useState<ToastData | null>(null);
   const supabase = createClient();
   const router = useRouter();
@@ -45,7 +48,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. 기존 알림 로딩
+      // 1. 초기 알림 로딩
       const { data } = await supabase
         .from('notifications')
         .select('*')
@@ -57,14 +60,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       // 2. 통합 리얼타임 구독
       channel = supabase
-        .channel('global-notifications')
+        .channel('global-alerts')
         // (A) 시스템 알림
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          { event: 'INSERT', schema: 'public', table: 'notifications' }, 
           (payload) => {
-            const newNoti = payload.new as Notification;
+            const newNoti = payload.new as NotificationDB;
+            if (newNoti.user_id !== user.id) return; 
+
             setNotifications((prev) => [newNoti, ...prev]);
+            
+            // 🟢 토스트 띄우기 (5초)
             setToast({
               title: newNoti.title,
               message: newNoti.message,
@@ -74,13 +81,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setTimeout(() => setToast(null), 5000);
           }
         )
-        // (B) 채팅 메시지 (inquiry_messages)
+        // (B) 채팅 메시지
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
           async (payload) => {
             const newMsg = payload.new;
-            if (newMsg.sender_id === user.id) return; // 내가 보낸 건 무시
+            if (newMsg.sender_id === user.id) return; 
 
             // 채팅방 정보 확인
             const { data: inquiry } = await supabase
@@ -92,7 +99,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             if (inquiry && (inquiry.user_id === user.id || inquiry.host_id === user.id)) {
                 const link = inquiry.host_id === user.id ? '/host/dashboard?tab=chat' : '/guest/inbox';
                 
-                // 1. 토스트 띄우기
+                // 🟢 토스트 띄우기 (5초)
                 setToast({
                   title: '새로운 메시지 💬',
                   message: newMsg.content || '사진을 보냈습니다.',
@@ -101,9 +108,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 });
                 setTimeout(() => setToast(null), 5000);
 
-                // 2. 알림 목록(스택)에 가짜 알림 추가 (새로고침 전까지 유지됨)
-                const virtualNotification: Notification = {
-                  id: Date.now(), // 임시 ID
+                // 알림 스택 추가
+                const virtualNoti: NotificationUI = {
+                  id: Date.now(),
+                  user_id: user.id,
                   type: 'message',
                   title: '새로운 메시지',
                   message: newMsg.content || '사진을 보냈습니다.',
@@ -111,7 +119,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                   is_read: false,
                   created_at: new Date().toISOString()
                 };
-                setNotifications((prev) => [virtualNotification, ...prev]);
+                setNotifications((prev) => [virtualNoti, ...prev]);
             }
           }
         )
@@ -129,8 +137,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const markAsRead = async (id: number) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    // 가짜 알림(ID가 아주 큰 숫자)은 DB 업데이트 패스
-    if (id < 1000000000000) {
+    if (id < 1000000000000) { 
         await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     }
   };
@@ -145,25 +152,32 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead }}>
       {children}
+      
+      {/* 🟢 [디자인 수정] 다크 모드 토스트 알림창 */}
       {toast && (
         <div 
-          className="fixed bottom-6 right-6 z-[9999] bg-white/90 backdrop-blur-sm border border-slate-200 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"
+          className="fixed bottom-6 right-6 z-[9999] bg-slate-900/95 backdrop-blur-sm border border-slate-700 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"
           onClick={() => {
             if (toast.link) router.push(toast.link);
             setToast(null);
           }}
         >
           <div className="flex justify-between items-start gap-3">
-            <div className={`p-2.5 rounded-full shrink-0 ${toast.type === 'message' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
+            {/* 아이콘: 어두운 배경에 맞게 색상 조정 */}
+            <div className={`p-2.5 rounded-full shrink-0 ${toast.type === 'message' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-amber-500/20 text-amber-300'}`}>
               {toast.type === 'message' ? <MessageSquare size={20} /> : <Bell size={20} />}
             </div>
+            
+            {/* 텍스트: 흰색 및 밝은 회색으로 변경 */}
             <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-sm text-slate-900 truncate">{toast.title}</h4>
-              <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">{toast.message}</p>
+              <h4 className="font-bold text-sm text-white truncate">{toast.title}</h4>
+              <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">{toast.message}</p>
             </div>
+            
+            {/* 닫기 버튼: 흰색 호버 효과 */}
             <button 
               onClick={(e) => { e.stopPropagation(); setToast(null); }} 
-              className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors"
+              className="text-slate-500 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
             >
               <X size={16} />
             </button>
