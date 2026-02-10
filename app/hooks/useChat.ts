@@ -20,9 +20,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return url;
   };
 
-  // 1. 데이터 가져오기 (채팅방 목록 + 안 읽은 메시지)
   const fetchInquiries = useCallback(async () => {
-    // 로딩 상태는 최초 1회만 true로 (깜빡임 방지)
+    // 최초 1회만 로딩 표시 (깜빡임 방지)
     if (inquiries.length === 0) setIsLoading(true);
     
     try {
@@ -50,7 +49,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           supabase.from('profiles').select('*').in('id', hostIds),
           supabase.from('host_applications').select('*').in('user_id', hostIds),
           supabase.from('profiles').select('*').in('id', guestIds),
-          // 🔴 안 읽은 메시지 카운트 (상대방이 보낸 것만)
           supabase.from('inquiry_messages')
             .select('inquiry_id')
             .in('inquiry_id', inquiryIds)
@@ -103,7 +101,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
     } catch (err: any) { console.error(err); } 
     finally { setIsLoading(false); }
-  }, [supabase, role]); // inquiries 의존성 제거 (무한루프 방지)
+  }, [supabase, role]); // inquiries 의존성 제거
 
   const markAsRead = async (inquiryId: number) => {
     if (!currentUser) return;
@@ -165,12 +163,24 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const sendMessage = async (inquiryId: number, content: string) => {
     if (!content.trim() || !currentUser) return;
+    
+    // 🟢 [UI 즉시 업데이트] DB 응답 기다리지 않고 먼저 리스트 갱신 (Optimistic Update)
+    setInquiries(prev => prev.map(inq => 
+      inq.id === inquiryId 
+        ? { ...inq, content: content, updated_at: new Date().toISOString() } 
+        : inq
+    ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())); // 최신순 정렬
+
     try {
+      // 메시지 저장
       const { error } = await supabase.from('inquiry_messages').insert([{ inquiry_id: inquiryId, sender_id: currentUser.id, content }]);
       if (error) throw error;
+      
+      // 채팅방 정보(최신글) 업데이트
       await supabase.from('inquiries').update({ content, updated_at: new Date().toISOString() }).eq('id', inquiryId);
+      
       await loadMessages(inquiryId);
-      fetchInquiries(); 
+      // fetchInquiries(); // Optimistic Update를 했으므로 굳이 전체 다시 안 불러와도 됨 (하지만 안전을 위해 놔둘 수도 있음)
     } catch (err: any) { showToast("메시지 전송 실패: " + err.message, 'error'); }
   };
 
@@ -200,7 +210,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
-  // 🟢 [추가됨] 실시간 구독: 새 메시지가 오면 목록(N배지 포함)을 새로고침
+  // 🟢 [실시간 리스트 업데이트]
   useEffect(() => {
     const channel = supabase
       .channel('chat-list-updates')
@@ -208,10 +218,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
-          // 새 메시지가 오면 목록을 다시 불러와서 N배지와 미리보기 업데이트
-          fetchInquiries();
+          // 남이 보낸 메시지일 경우에만 fetch 수행 (내가 보낸 건 sendMessage에서 처리함)
+          if (currentUser && payload.new.sender_id !== currentUser.id) {
+             fetchInquiries();
+          }
           
-          // 현재 보고 있는 채팅방의 메시지라면, 메시지 목록도 업데이트
           if (selectedInquiry && payload.new.inquiry_id === selectedInquiry.id) {
              loadMessages(selectedInquiry.id);
           }
@@ -222,7 +233,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, fetchInquiries, selectedInquiry]);
+  }, [supabase, fetchInquiries, selectedInquiry, currentUser]);
 
   return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, refresh: fetchInquiries };
 }
