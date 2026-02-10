@@ -2,19 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import SiteHeader from '@/app/components/SiteHeader';
-import Sidebar from './components/Sidebar';
 import UsersTab from './components/UsersTab';
 import BookingsTab from './components/BookingsTab';
 import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
 import ChatMonitor from './components/ChatMonitor'; // ✅ [필수] ChatMonitor 임포트
+import { useSearchParams } from 'next/navigation'; // ✅ [추가] URL 탭 상태 읽기용
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'APPS' | 'EXPS' | 'USERS' | 'BOOKINGS' | 'CHATS' | 'SALES' | 'ANALYTICS'>('APPS');
   const [filter, setFilter] = useState('ALL'); 
   
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPS';
+
   const [apps, setApps] = useState<any[]>([]);
   const [exps, setExps] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -57,7 +58,7 @@ export default function AdminDashboardPage() {
     const { data: expData } = await supabase.from('experiences').select('*, bookings(count)').order('created_at', { ascending: false });
     if (expData) setExps(expData);
     
-    const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); 
+    const { data: userData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
     if (userData) setUsers(userData);
     
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
@@ -83,7 +84,7 @@ export default function AdminDashboardPage() {
       if (table === 'host_applications' && status === 'approved') {
         const app = apps.find(a => a.id === id);
         if (app) {
-          await supabase.from('profiles').update({ role: 'host' }).eq('id', app.user_id);
+          await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
         }
       }
 
@@ -110,40 +111,28 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <SiteHeader />
-      <div className="flex h-[calc(100vh-80px)]">
-        
-        <Sidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          appsCount={apps.filter(a=>a.status==='pending').length}
-          expsCount={exps.filter(e=>e.status==='pending').length}
-          onlineUsersCount={onlineUsers.length}
+<div className="bg-white p-6 rounded-lg shadow-sm">
+      
+      {/* 탭 내용 표시 부분 (기존 로직 그대로 활용) */}
+      {activeTab === 'USERS' ? (
+        <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />
+      ) : activeTab === 'BOOKINGS' ? (
+        <BookingsTab bookings={bookings} />
+      ) : activeTab === 'SALES' ? (
+        <SalesTab bookings={bookings} />
+      ) : activeTab === 'ANALYTICS' ? (
+        <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
+      ) : activeTab === 'CHATS' ? (
+        <ChatMonitor />
+      ) : (
+        <ManagementTab 
+          activeTab={activeTab as any} // 타입 에러 방지용 as any 추가
+          filter={filter} setFilter={setFilter}
+          apps={apps} exps={exps} users={users} messages={[]}
+          selectedItem={selectedItem} setSelectedItem={setSelectedItem}
+          updateStatus={updateStatus} deleteItem={deleteItem}
         />
-
-        <main className="flex-1 p-6 overflow-hidden flex gap-6">
-          {activeTab === 'USERS' ? (
-            <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />
-          ) : activeTab === 'BOOKINGS' ? (
-            <BookingsTab bookings={bookings} />
-          ) : activeTab === 'SALES' ? (
-            <SalesTab bookings={bookings} />
-          ) : activeTab === 'ANALYTICS' ? (
-            <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
-          ) : activeTab === 'CHATS' ? (
-            // ✅ [수정완료] CHATS 탭일 때 ChatMonitor 렌더링
-            <ChatMonitor />
-          ) : (
-            <ManagementTab 
-              activeTab={activeTab} filter={filter} setFilter={setFilter}
-              apps={apps} exps={exps} users={users} messages={[]}
-              selectedItem={selectedItem} setSelectedItem={setSelectedItem}
-              updateStatus={updateStatus} deleteItem={deleteItem}
-            />
-          )}
-        </main>
-      </div>
+      )}
     </div>
   );
 }
