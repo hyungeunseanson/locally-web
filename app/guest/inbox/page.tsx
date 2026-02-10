@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation'; // 🟢 useRouter 추가
+import { useSearchParams, useRouter } from 'next/navigation'; 
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import { Send, ShieldCheck, User } from 'lucide-react';
@@ -22,7 +22,7 @@ function InboxContent() {
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  const router = useRouter(); // 🟢 라우터
+  const router = useRouter(); 
   const searchParams = useSearchParams();
   
   // URL 파라미터 값들
@@ -32,14 +32,14 @@ function InboxContent() {
   const hostAvatar = searchParams.get('hostAvatar'); 
   const expTitle = searchParams.get('expTitle');
   
-  // 🟢 [상태 추가] URL 파라미터를 이미 처리했는지 여부 (무한 리다이렉트 방지)
+  // URL 파라미터를 이미 처리했는지 여부 (무한 리다이렉트 방지)
   const [isUrlProcessed, setIsUrlProcessed] = useState(false);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  // 🟢 [수정] URL 처리 로직 (단 한 번만 실행되도록 제어)
+  // URL 처리 로직 (단 한 번만 실행되도록 제어)
   useEffect(() => {
     // 로딩 중이거나 이미 처리했으면 스킵
     if (isLoading || isUrlProcessed) return;
@@ -70,12 +70,12 @@ function InboxContent() {
       }
     }
     
-    // 🟢 처리 완료 플래그 세우기 (이제 다른 채팅방 눌러도 여기로 안 돌아옴)
+    // 처리 완료 플래그 세우기 (이제 다른 채팅방 눌러도 여기로 안 돌아옴)
     setIsUrlProcessed(true);
 
   }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
 
-  // 🟢 [수정] 다른 채팅방 클릭 핸들러
+  // 다른 채팅방 클릭 핸들러
   const handleSelectInquiry = (inqId: number) => {
     loadMessages(inqId);
     
@@ -127,8 +127,16 @@ function InboxContent() {
               {inquiries.map((inq) => {
                 const display = getDisplayHost(inq); 
                 return (
-                  // 🟢 [수정] 클릭 시 handleSelectInquiry 호출 (URL 정리 포함)
-                  <div key={inq.id} onClick={() => handleSelectInquiry(inq.id)} className={`p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
+                  // 클릭 시 handleSelectInquiry 호출 (URL 정리 포함)
+                  <div key={inq.id} onClick={() => handleSelectInquiry(inq.id)} className={`relative p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
+                    
+                    {/* 🟢 [추가됨] 안 읽은 메시지 배지 (N) */}
+                    {inq.unread_count > 0 && (
+                      <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce z-10">
+                        N
+                      </div>
+                    )}
+
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
                       {inq.type === 'admin' ? <ShieldCheck size={20} /> : (display.avatar ? <img src={display.avatar} className="w-full h-full object-cover" alt="host"/> : <User className="text-slate-300" size={20}/>)}
                     </div>
@@ -182,7 +190,7 @@ function InboxContent() {
                   {messages.length === 0 && selectedInquiry.id === 'new' && (
                      <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
                         <div className="w-20 h-20 rounded-full bg-slate-100 mb-4 flex items-center justify-center overflow-hidden border border-slate-200">
-                           {/* 🟢 여기서도 currentHostDisplay (URL에서 온 사진) 사용 */}
+                           {/* 여기서도 currentHostDisplay (URL에서 온 사진) 사용 */}
                            {currentHostDisplay.avatar ? <img src={currentHostDisplay.avatar} className="w-full h-full object-cover" alt="host"/> : <User size={40} className="text-slate-300"/>}
                         </div>
                         <p className="font-bold text-slate-900 mb-1">{currentHostDisplay.name}님에게 메시지 보내기</p>
