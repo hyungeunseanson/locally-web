@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation'; 
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
-import { Send, ShieldCheck, User } from 'lucide-react';
+import { Send, ShieldCheck, User, Loader2 } from 'lucide-react'; // 🟢 Loader2 추가
 
 function InboxContent() {
   const { 
@@ -20,6 +20,7 @@ function InboxContent() {
   } = useChat('guest');
 
   const [inputText, setInputText] = useState('');
+  const [isSending, setIsSending] = useState(false); // 🟢 [추가] 전송 중 상태
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const router = useRouter(); 
@@ -85,14 +86,22 @@ function InboxContent() {
     }
   };
 
-  const handleSend = async () => {
-    if (selectedInquiry && inputText.trim()) {
+// 🟢 [수정] 전송 핸들러 (중복 방지 로직 추가)
+const handleSend = async () => {
+  if (selectedInquiry && inputText.trim() && !isSending) {
+    setIsSending(true); // 🔒 버튼 잠금
+    
+    try {
       if (selectedInquiry.id === 'new') {
         await createInquiry(selectedInquiry.host_id, selectedInquiry.experience_id, inputText);
       } else {
-        sendMessage(selectedInquiry.id, inputText);
+        await sendMessage(selectedInquiry.id, inputText);
       }
       setInputText('');
+    } catch (error) {
+      console.error("Failed to send message", error);
+    } finally {
+      setIsSending(false); // 🔓 버튼 해제
     }
   };
 
@@ -200,8 +209,8 @@ function InboxContent() {
                 </div>
 
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
-                  <input className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all" placeholder="메시지 입력..." value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }} />
-                  <button onClick={handleSend} className="p-3 bg-black text-white rounded-full hover:scale-105 transition-transform"><Send size={18}/></button>
+                  <input className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all" placeholder="메시지 입력..." value={inputText} onChange={(e) => setInputText(e.target.value)} disabled={isSending} onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }} />
+                  <button onClick={handleSend} disabled={!inputText.trim() || isSending} className="p-3 bg-black text-white rounded-full hover:scale-105 transition-transform"> <Send size={18}/>{isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}</button>
                 </div>
               </>
             ) : (

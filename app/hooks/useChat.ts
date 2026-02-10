@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { sendNotification } from '@/app/utils/notification'; // 🟢 알림 함수 임포트
+import { sanitizeText } from '@/app/utils/sanitize'; // 🟢 추가
 
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -161,29 +162,39 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     } catch (err: any) { console.error(err); }
   };
 
-  // 🟢 [수정 완료] 메시지 전송 함수 (중복 제거 및 괄호 정리)
   const sendMessage = async (inquiryId: number, content: string) => {
-    if (!content.trim() || !currentUser) return;
+    // 🟢 [보안] 입력값 소독 (XSS 방지)
+    const cleanContent = sanitizeText(content);
+
+    if (!cleanContent.trim() || !currentUser) return;
     
-    // UI 즉시 업데이트
+    // UI 즉시 업데이트 (소독된 내용으로 보여줌)
     setInquiries(prev => prev.map(inq => 
       inq.id === inquiryId 
-        ? { ...inq, content: content, updated_at: new Date().toISOString() } 
+        ? { ...inq, content: cleanContent, updated_at: new Date().toISOString() } 
         : inq
     ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
 
     try {
-      // 1. 메시지 저장
-      const { error } = await supabase.from('inquiry_messages').insert([{ inquiry_id: inquiryId, sender_id: currentUser.id, content }]);
+      // 1. 메시지 저장 (소독된 내용만 저장)
+      const { error } = await supabase.from('inquiry_messages').insert([{ 
+        inquiry_id: inquiryId, 
+        sender_id: currentUser.id, 
+        content: cleanContent // 🟢 안전한 데이터
+      }]);
+      
       if (error) throw error;
       
       // 2. 채팅방 정보 업데이트
-      await supabase.from('inquiries').update({ content, updated_at: new Date().toISOString() }).eq('id', inquiryId);
+      await supabase.from('inquiries').update({ 
+        content: cleanContent, // 🟢 안전한 데이터
+        updated_at: new Date().toISOString() 
+      }).eq('id', inquiryId);
       
       // 3. 메시지 목록 새로고침
       await loadMessages(inquiryId);
       
-      // 4. 알림 발송 (10분 쿨타임 적용)
+      // 4. 알림 발송 (기존 로직 유지)
       const currentInquiry = inquiries.find(i => i.id === inquiryId);
       if (currentInquiry) {
         const recipientId = currentUser.id === currentInquiry.host_id 
@@ -201,9 +212,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           senderId: currentUser.id,
           type: 'new_message',
           title: `💬 ${senderName}님의 새 메시지`,
-          message: content,
+          message: cleanContent, // 🟢 알림 내용도 안전하게
           link: targetLink,
-          inquiry_id: inquiryId // 🟢 10분 제한 핵심 키
+          inquiry_id: inquiryId
         });
       }
 

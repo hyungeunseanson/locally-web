@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat'; 
-import { Send, User } from 'lucide-react';
+import { Send, User, Loader2 } from 'lucide-react'; // 🟢 Loader2 아이콘 추가
 import Image from 'next/image';
 
 export default function InquiryChat() {
   // 'host' 모드로 실행하여 게스트 정보를 가져옵니다.
   const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage } = useChat('host');
   const [replyText, setReplyText] = useState('');
+  const [isSending, setIsSending] = useState(false); // 🟢 [추가] 전송 중인지 확인하는 상태
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 메시지 로드 시 스크롤 하단 이동
@@ -16,10 +17,13 @@ export default function InquiryChat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const handleSend = () => {
-    if (selectedInquiry && replyText.trim()) {
-      sendMessage(selectedInquiry.id, replyText);
+  const handleSend = async () => {
+    // 🟢 [수정] 전송 중(isSending)이면 함수 실행 막음
+    if (selectedInquiry && replyText.trim() && !isSending) {
+      setIsSending(true); // 🔒 버튼 잠금
+      await sendMessage(selectedInquiry.id, replyText);
       setReplyText('');
+      setIsSending(false); // 🔓 버튼 해제
     }
   };
 
@@ -168,6 +172,7 @@ export default function InquiryChat() {
                 value={replyText} 
                 onChange={(e) => setReplyText(e.target.value)} 
                 placeholder="답장 입력..." 
+                disabled={isSending} // 🟢 전송 중엔 입력 불가
                 className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors"
                 // ✅ 한글 중복 방지 로직 유지
                 onKeyDown={(e) => {
@@ -178,7 +183,7 @@ export default function InquiryChat() {
                   }
                 }}
               />
-              <button onClick={handleSend} className="bg-black text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors">
+              <button onClick={handleSend} disabled={!replyText.trim() || isSending} className="bg-black text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors">
                 <Send size={18}/>
               </button>
             </div>
