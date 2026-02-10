@@ -11,6 +11,7 @@ import { sendNotification } from '@/app/utils/notification';
 import Skeleton from '@/app/components/ui/Skeleton'; // ✅ 스켈레톤 추가
 import EmptyState from '@/app/components/EmptyState'; // ✅ 빈 화면 추가
 import { useToast } from '@/app/context/ToastContext'; // ✅ 토스트 추가
+import { useRouter } from 'next/navigation'; // ✅ 이 줄을 추가하세요!
 
 export default function ReservationManager() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
@@ -92,7 +93,6 @@ export default function ReservationManager() {
 
       // 🔔 알림 발송 로직
       await sendNotification({
-        supabase,
         userId: booking.user_id,
         type: 'cancellation_approved',
         title: '취소 요청 승인됨',
@@ -244,22 +244,24 @@ export default function ReservationManager() {
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                {/* ✅ [추가] 취소 문의 버튼: 이미 취소된 건이 아닐 때만 노출 */}
-                {res.status === 'PAID' && (
-                  <button 
-                    onClick={() => handleRequestUserCancel(res)}
-                    className="text-[11px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 px-2 py-1 rounded transition-colors underline"
-                  >
-                    예약 취소 문의
-                  </button>
-                )}
                 
-                <Link href={`/host/dashboard?tab=inquiries&guestId=${res.user_id}`}>
-                    <button className="text-slate-400 hover:text-black p-2 rounded-full hover:bg-slate-100 transition-colors" title="메시지 보내기">
-                        <MessageSquare size={18}/>
+                <div className="flex gap-2">
+                  {/* ✅ 취소 문의 버튼 */}
+                  {res.status === 'PAID' && (
+                    <button 
+                      onClick={() => handleRequestUserCancel(res)}
+                      className="text-[11px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 px-2 py-1 rounded transition-colors underline"
+                    >
+                      예약 취소 문의
                     </button>
-                </Link>
+                  )}
+                  
+                  <Link href={`/host/dashboard?tab=inquiries&guestId=${res.user_id}`}>
+                    <button className="text-slate-400 hover:text-black p-2 rounded-full hover:bg-slate-100 transition-colors" title="메시지 보내기">
+                      <MessageSquare size={18}/>
+                    </button>
+                  </Link>
+                </div>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg mb-4 border border-slate-100">
@@ -281,9 +283,7 @@ export default function ReservationManager() {
                       {res.cancel_reason && (
                         <div className="mt-2 bg-orange-50 p-2 rounded border border-orange-100">
                            <p className="text-xs font-bold text-orange-800 mb-1">게스트 사유:</p>
-                           <p className="text-xs text-orange-700 break-words whitespace-pre-wrap">
-                             {res.cancel_reason}
-                           </p>
+                           <p className="text-xs text-orange-700 break-words whitespace-pre-wrap">{res.cancel_reason}</p>
                         </div>
                       )}
                     </div>
@@ -292,7 +292,7 @@ export default function ReservationManager() {
                     <button 
                       onClick={() => handleApproveCancellation(res)}
                       disabled={processingId === res.id}
-                      className="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-orange-200"
+                      className="flex-1 bg-orange-600 text-white py-2.5 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
                     >
                       {processingId === res.id ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>}
                       승인 및 환불
@@ -301,7 +301,7 @@ export default function ReservationManager() {
                 </div>
               )}
             </div>
-          ))
+          )) // ✅ 여기서 map이 닫힙니다.
         )}
       </div>
     </div>
