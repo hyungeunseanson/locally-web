@@ -15,10 +15,24 @@ import { useToast } from '@/app/context/ToastContext'; // ✅ 토스트 추가
 export default function ReservationManager() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<any[]>([]);
+  const router = useRouter(); // ✅ useRouter 추가 필요
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<number | null>(null);
   
+  // ✅ [추가] 호스트가 취소하고 싶을 때 실행되는 함수
+  const handleRequestUserCancel = (res: any) => {
+    const confirmMessage = 
+      `🚨 보스님, 예약을 직접 취소하실 수 없습니다.\n\n` +
+      `호스트의 일방적인 취소는 서비스 신뢰도에 큰 영향을 줍니다.\n` +
+      `정말 진행이 어려우신 경우, 고객님께 사정을 설명하고 직접 '취소 요청'을 해달라고 부탁하셔야 합니다.\n\n` +
+      `해당 고객님과 대화하시겠습니까?`;
+
+    if (confirm(confirmMessage)) {
+      // ✅ 해당 게스트와의 채팅 탭으로 이동
+      router.push(`/host/dashboard?tab=chats&guestId=${res.user_id}`);
+    }
+  };
   const supabase = createClient();
   const { showToast } = useToast(); // ✅ 토스트 사용
 
@@ -230,6 +244,16 @@ export default function ReservationManager() {
                     </div>
                   </div>
                 </div>
+                <div className="flex gap-2">
+                {/* ✅ [추가] 취소 문의 버튼: 이미 취소된 건이 아닐 때만 노출 */}
+                {res.status === 'PAID' && (
+                  <button 
+                    onClick={() => handleRequestUserCancel(res)}
+                    className="text-[11px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 px-2 py-1 rounded transition-colors underline"
+                  >
+                    예약 취소 문의
+                  </button>
+                )}
                 
                 <Link href={`/host/dashboard?tab=inquiries&guestId=${res.user_id}`}>
                     <button className="text-slate-400 hover:text-black p-2 rounded-full hover:bg-slate-100 transition-colors" title="메시지 보내기">

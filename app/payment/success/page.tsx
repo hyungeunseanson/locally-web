@@ -1,5 +1,5 @@
 'use client';
-
+import { sendNotification } from '@/app/utils/notification';
 import React, { useEffect, useState, Suspense } from 'react';
 import { CheckCircle, Home, FileText, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -14,20 +14,45 @@ function SuccessContent() {
   const supabase = createClient();
 
   useEffect(() => {
-    const confirmBooking = async () => {
-      if (!orderId) return;
-      
-      // ✅ Insert가 아니라 Update를 사용 (데이터 유실 방지)
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'confirmed' }) 
-        .eq('order_id', orderId);
+// ... SuccessContent 내부 confirmBooking 함수 수정
+// ⬇️ 여기서부터 confirmBooking 함수를 통째로 교체하세요
+const confirmBooking = async () => {
+  if (!orderId) return;
+  
+  try {
+    // 1. DB 상태 업데이트 및 알림을 보낼 호스트 정보(host_id) 가져오기
+    const { data, error } = await supabase
+      .from('bookings')
+      .update({ status: 'confirmed' }) 
+      .eq('order_id', orderId)
+      .select(`
+        *,
+        experiences (
+          title,
+          host_id
+        )
+      `)
+      .single();
 
-      if (error) console.error('확정 실패:', error);
-      setIsSaving(false);
-    };
+    if (error) throw error;
+// 2. 업데이트 성공 시 호스트에게 실시간 알림 전송
+if (data && data.experiences) {
+  await sendNotification({
+    userId: data.experiences.host_id, // 알림 대상: 호스트
+    type: 'new_booking',
+    title: '새로운 예약 확정! 🎉',
+    message: `'${data.experiences.title}' 체험에 새로운 예약이 도착했습니다.`,
+    link: '/host/dashboard?tab=reservations'
+  });
+}
+} catch (error) {
+console.error('확정 처리 중 오류:', error);
+} finally {
+setIsSaving(false);
+}
+};
     confirmBooking();
-  }, [orderId]);
+  }, [orderId, supabase]); // 의존성 배열에 supabase 추가 권장
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">

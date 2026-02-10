@@ -8,6 +8,7 @@ export type NotificationType =
   | 'booking_cancel_request'
   | 'cancellation_requested'
   | 'cancellation_approved'
+  | 'new_booking' // ✅ 이 부분을 추가하면 빨간 줄이 사라집니다.
   | 'new_message' 
   | 'admin_alert';
 
