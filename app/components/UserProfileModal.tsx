@@ -26,7 +26,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
   const fetchProfile = async () => {
     setLoading(true);
     
-    // 1. 기본 계정 정보 조회 (profiles 테이블)
+    // 1. 기본 계정 정보
     const { data: baseProfile } = await supabase
       .from('profiles')
       .select('*')
@@ -40,20 +40,23 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
 
     let finalData = { ...baseProfile };
 
-    // 2. 호스트 역할일 때 (호스트 신청서 정보 우선)
+    // 2. 호스트 역할일 때 (호스트 신청서 조회)
     if (role === 'host') {
-      const { data: hostData } = await supabase
+      // 🟢 [디버깅] 호스트 데이터를 가져옵니다.
+      const { data: hostData, error } = await supabase
         .from('host_applications')
-        .select('name, profile_photo, introduction, mbti, languages, gender')
+        .select('*') // 모든 컬럼을 가져와서 확인 (컬럼명 실수 방지)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle(); // .single() 대신 사용 (에러 방지)
       
+      // 🟢 콘솔에서 이 로그를 꼭 확인해보세요!
+      console.log('🔍 호스트 데이터 조회 결과:', { hostData, error });
+
       if (hostData) {
-        // 호스트 데이터가 있으면 이걸 덮어씌움
         finalData = {
           ...finalData,
           display_name: hostData.name || baseProfile.full_name,
-          // 🟢 [핵심] 호스트 사진이 있으면 무조건 사용, 없으면 기본 프사
+          // 🟢 DB에 저장된 컬럼명이 profile_photo 인지 확인하세요!
           display_avatar: hostData.profile_photo || baseProfile.avatar_url, 
           display_bio: hostData.introduction || baseProfile.introduction,
           mbti: hostData.mbti,
@@ -61,7 +64,8 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           gender: hostData.gender || baseProfile.gender
         };
       } else {
-        // 호스트 데이터 읽기 실패 시 (권한 문제 등) 기본 정보 사용
+        // 호스트 데이터가 없거나 권한이 막힌 경우
+        console.warn('⚠️ 호스트 데이터를 찾을 수 없거나 권한이 없습니다.');
         finalData.display_name = baseProfile.full_name;
         finalData.display_avatar = baseProfile.avatar_url;
         finalData.display_bio = baseProfile.introduction;
@@ -83,7 +87,6 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
     setLoading(false);
   };
 
-  // 🟢 보안 URL 변환 함수 (중복 제거됨)
   const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return "/default-avatar.png";
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -139,7 +142,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
 
             <div className="p-6">
                <div className="grid grid-cols-2 gap-3 mb-6">
-                 {/* 정보 아이콘들 */}
+                 {/* 국적/지역 */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Globe size={16} /></div>
                    <div className="min-w-0">
@@ -148,6 +151,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                    </div>
                  </div>
 
+                 {/* MBTI */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Smile size={16} /></div>
                    <div className="min-w-0">
@@ -156,6 +160,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                    </div>
                  </div>
 
+                 {/* 언어 */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
                    <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0"><Languages size={16} /></div>
                    <div className="min-w-0">
@@ -164,6 +169,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                    </div>
                  </div>
 
+                 {/* 성별 */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
                    <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0"><User size={16} /></div>
                    <div className="min-w-0">
