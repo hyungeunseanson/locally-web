@@ -2,18 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { X, MapPin, Calendar, Languages, Smile, User, Globe } from 'lucide-react';
+import { X, MapPin, Calendar, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
 interface UserProfileModalProps {
   userId: string;
   isOpen: boolean;
   onClose: () => void;
-  role: 'host' | 'guest'; // 'host'면 호스트 프로필, 'guest'면 일반 프로필
+  role: 'host' | 'guest'; 
 }
 
 export default function UserProfileModal({ userId, isOpen, onClose, role }: UserProfileModalProps) {
-  const [displayProfile, setDisplayProfile] = useState<any>(null); // 화면에 보여줄 통합 데이터
+  const [displayProfile, setDisplayProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -26,64 +26,66 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
   const fetchProfile = async () => {
     setLoading(true);
     
-    const secureUrl = (url: string | null | undefined) => {
-        if (!url || url === '') return "/default-avatar.png";
-        if (url.startsWith('http://')) return url.replace('http://', 'https://');
-        return url;
-      };
-
-    // 1. 기본 계정 정보 (공통) - 가입일, 국적 등은 여기서 가져옴
+    // 1. 기본 계정 정보 조회 (profiles 테이블)
     const { data: baseProfile } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
 
-    let finalData = { ...baseProfile }; // 기본으로 회원 정보 사용
+    if (!baseProfile) {
+        setLoading(false);
+        return;
+    }
 
-// 2. 호스트 역할일 때
-if (role === 'host') {
-    const { data: hostData } = await supabase
-      .from('host_applications')
-      .select('name, profile_photo, introduction, mbti, languages, gender')
-      .eq('user_id', userId)
-      .single();
-    
-    if (hostData) {
+    let finalData = { ...baseProfile };
+
+    // 2. 호스트 역할일 때 (호스트 신청서 정보 우선)
+    if (role === 'host') {
+      const { data: hostData } = await supabase
+        .from('host_applications')
+        .select('name, profile_photo, introduction, mbti, languages, gender')
+        .eq('user_id', userId)
+        .single();
+      
+      if (hostData) {
+        // 호스트 데이터가 있으면 이걸 덮어씌움
+        finalData = {
+          ...finalData,
+          display_name: hostData.name || baseProfile.full_name,
+          // 🟢 [핵심] 호스트 사진이 있으면 무조건 사용, 없으면 기본 프사
+          display_avatar: hostData.profile_photo || baseProfile.avatar_url, 
+          display_bio: hostData.introduction || baseProfile.introduction,
+          mbti: hostData.mbti,
+          languages: hostData.languages,
+          gender: hostData.gender || baseProfile.gender
+        };
+      } else {
+        // 호스트 데이터 읽기 실패 시 (권한 문제 등) 기본 정보 사용
+        finalData.display_name = baseProfile.full_name;
+        finalData.display_avatar = baseProfile.avatar_url;
+        finalData.display_bio = baseProfile.introduction;
+      }
+    } else {
+      // 3. 게스트일 때
       finalData = {
         ...finalData,
-        display_name: hostData.name || baseProfile.full_name,
-        // 🟢 [수정] 호스트 사진이 없으면 기본 구글/카카오 프사 사용 (깨짐 방지)
-        display_avatar: hostData.profile_photo || baseProfile.avatar_url, 
-        display_bio: hostData.introduction || baseProfile.introduction,
-        mbti: hostData.mbti,
-        languages: hostData.languages,
-        gender: hostData.gender || baseProfile.gender
+        display_name: baseProfile.full_name,
+        display_avatar: baseProfile.avatar_url,
+        display_bio: baseProfile.introduction || baseProfile.bio,
+        mbti: baseProfile.mbti,
+        languages: baseProfile.languages,
+        gender: baseProfile.gender
       };
-    } else {
-      finalData.display_name = baseProfile.full_name;
-      finalData.display_avatar = baseProfile.avatar_url;
-      finalData.display_bio = baseProfile.introduction;
     }
-  } else {
-    // 3. 게스트일 때
-    finalData = {
-      ...finalData,
-      display_name: baseProfile.full_name,
-      display_avatar: baseProfile.avatar_url,
-      display_bio: baseProfile.introduction || baseProfile.bio,
-      mbti: baseProfile.mbti,
-      languages: baseProfile.languages,
-      gender: baseProfile.gender
-    };
-  }
 
-  setDisplayProfile(finalData);
-  setLoading(false);
-};
+    setDisplayProfile(finalData);
+    setLoading(false);
+  };
 
-  const secureUrl = (url: string | null) => {
-    if (!url) return "/default-avatar.png";
+  // 🟢 보안 URL 변환 함수 (중복 제거됨)
+  const secureUrl = (url: string | null | undefined) => {
+    if (!url || url === '') return "/default-avatar.png";
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
   };
@@ -112,11 +114,10 @@ if (role === 'host') {
           </div>
         ) : (
           <>
-            {/* 상단 프로필 이미지 영역 */}
             <div className="pt-10 pb-6 px-6 flex flex-col items-center bg-slate-50 border-b border-slate-100">
                <div className="w-28 h-28 rounded-full border-4 border-white bg-slate-200 overflow-hidden shadow-lg relative mb-4">
                  <Image 
-src={secureUrl(displayProfile?.display_avatar)} 
+                   src={secureUrl(displayProfile?.display_avatar)} 
                    alt="profile" 
                    fill 
                    className="object-cover"
@@ -136,67 +137,44 @@ src={secureUrl(displayProfile?.display_avatar)}
                </div>
             </div>
 
-            {/* 정보 카드 영역 */}
             <div className="p-6">
                <div className="grid grid-cols-2 gap-3 mb-6">
-                 {/* 1. 국적/지역 */}
+                 {/* 정보 아이콘들 */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                     <Globe size={16} />
-                   </div>
+                   <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Globe size={16} /></div>
                    <div className="min-w-0">
                      <div className="text-[10px] text-slate-400 font-bold uppercase">Location</div>
-                     <div className="text-sm font-semibold text-slate-700 truncate">
-                       {displayProfile?.location || displayProfile?.nationality || "비공개"}
-                     </div>
+                     <div className="text-sm font-semibold text-slate-700 truncate">{displayProfile?.location || displayProfile?.nationality || "비공개"}</div>
                    </div>
                  </div>
 
-                 {/* 2. MBTI */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
-                     <Smile size={16} />
-                   </div>
+                   <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Smile size={16} /></div>
                    <div className="min-w-0">
                      <div className="text-[10px] text-slate-400 font-bold uppercase">MBTI</div>
-                     <div className="text-sm font-semibold text-slate-700 truncate">
-                       {displayProfile?.mbti || "비공개"}
-                     </div>
+                     <div className="text-sm font-semibold text-slate-700 truncate">{displayProfile?.mbti || "비공개"}</div>
                    </div>
                  </div>
 
-                 {/* 3. 언어 */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                     <Languages size={16} />
-                   </div>
+                   <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0"><Languages size={16} /></div>
                    <div className="min-w-0">
                      <div className="text-[10px] text-slate-400 font-bold uppercase">Language</div>
-                     <div className="text-sm font-semibold text-slate-700 truncate">
-                       {displayProfile?.languages || "한국어"}
-                     </div>
+                     <div className="text-sm font-semibold text-slate-700 truncate">{displayProfile?.languages || "한국어"}</div>
                    </div>
                  </div>
 
-                 {/* 4. 성별 */}
                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
-                     <User size={16} />
-                   </div>
+                   <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0"><User size={16} /></div>
                    <div className="min-w-0">
                      <div className="text-[10px] text-slate-400 font-bold uppercase">Gender</div>
-                     <div className="text-sm font-semibold text-slate-700 truncate">
-                       {displayProfile?.gender || "비공개"}
-                     </div>
+                     <div className="text-sm font-semibold text-slate-700 truncate">{displayProfile?.gender || "비공개"}</div>
                    </div>
                  </div>
                </div>
 
-               {/* 자기소개 */}
                <div>
-                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                   About Me
-                 </h3>
+                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">About Me</h3>
                  <div className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-2xl min-h-[80px] whitespace-pre-wrap">
                    {displayProfile?.display_bio || "아직 작성된 자기소개가 없습니다."}
                  </div>
@@ -206,25 +184,5 @@ src={secureUrl(displayProfile?.display_avatar)}
         )}
       </div>
     </div>
-  );
-}
-
-// 로딩용 컴포넌트
-function Loader2({ size, className }: { size: number, className?: string }) {
-  return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }
