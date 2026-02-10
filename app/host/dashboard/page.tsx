@@ -29,6 +29,13 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams(); // 여기서 사용
 
+  // ✅ [이 부분을 복사해서 넣으세요]
+const handleTabChange = (tab: string) => {
+  setActiveTab(tab);
+  // 주소창(URL)을 강제로 업데이트해서 자식 컴포넌트와 신호를 맞춥니다.
+  router.push(`/host/dashboard?tab=${tab}`, { scroll: false });
+};
+
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab) setActiveTab(tab);
@@ -176,28 +183,28 @@ setProfile(mergedProfile);
               <p className="text-xs text-slate-400 mt-1">승인된 호스트입니다</p>
             </div>
             
-            <button onClick={() => setActiveTab('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-black text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-black text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
               <CalendarCheck size={20}/> 예약 관리
             </button>
             
-            <button onClick={() => setActiveTab('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
               <List size={20}/> 내 체험 관리
             </button>
 
-            <button onClick={() => setActiveTab('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
               <MessageSquare size={20}/> 문의함
             </button>
 
-            <button onClick={() => setActiveTab('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
               <DollarSign size={20}/> 수익 및 정산
             </button>
 
-            <button onClick={() => setActiveTab('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
               <Star size={20}/> 받은 후기
             </button>
             
             <div className="pt-4 mt-4 border-t border-slate-100">
-              <button onClick={() => setActiveTab('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
                 <UserCog size={20}/> 프로필 설정
               </button>
             </div>
