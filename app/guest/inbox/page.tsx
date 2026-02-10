@@ -133,12 +133,12 @@ function InboxContent() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
       
-      {/* 🟢 프로필 모달 */}
-      <UserProfileModal 
+{/* 게스트는 무조건 호스트의 프로필을 봐야 하므로 role="host" 고정 */}
+<UserProfileModal 
         userId={modalUserId || ''} 
         isOpen={!!modalUserId} 
         onClose={() => setModalUserId(null)} 
-        role={modalRole}
+        role="host" 
       />
 
       <main className="max-w-[1280px] mx-auto px-6 py-8 h-[calc(100vh-80px)] flex flex-col">
@@ -207,7 +207,12 @@ function InboxContent() {
                              onClick={() => handleProfileClick(msg.sender_id)}
                            >
                              <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden relative border border-slate-200">
-                               <Image src={secureUrl(msg.sender?.avatar_url || currentHostDisplay.avatar)} alt="sender" fill className="object-cover"/> 
+                             <Image 
+                                 src={secureUrl(selectedInquiry.type === 'admin' ? null : currentHostDisplay.avatar)} 
+                                 alt="sender" 
+                                 fill 
+                                 className="object-cover"
+                               />
                              </div>
                            </div>
                          )}
@@ -221,7 +226,7 @@ function InboxContent() {
                             )}
                             
                             <div className="flex items-end gap-2">
-                               {isMe && <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1" suppressHydrationWarning>{formatTime(msg.created_at)}</span>}
+                            {isMe && <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1" suppressHydrationWarning>{formatTime(msg.created_at)}</span>}
                                
                                <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm break-words ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none'}`}>
                                  {msg.content}
@@ -229,7 +234,7 @@ function InboxContent() {
 
                                {/* 🟢 호스트 메시지 시간 표시 */}
                                {!isMe && <span className="text-[10px] text-slate-400 min-w-[50px] mb-1" suppressHydrationWarning>{formatTime(msg.created_at)}</span>}
-                            </div>
+                               </div>
                          </div>
                       </div>
                     );
@@ -238,17 +243,17 @@ function InboxContent() {
 
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
                   <input 
-                    className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all disabled:bg-slate-50 disabled:text-slate-400" 
-                    placeholder="메시지 입력..." 
-                    value={inputText} 
-                    onChange={(e) => setInputText(e.target.value)} 
-                    disabled={isSending} 
-                    onKeyDown={(e) => { 
-                      if (e.nativeEvent.isComposing) return; 
-                      if (e.key === 'Enter') { 
-                        e.preventDefault(); 
-                        handleSend(); 
-                      } 
+className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+placeholder="메시지 입력..." 
+value={inputText} 
+onChange={(e) => setInputText(e.target.value)} 
+disabled={isSending} 
+onKeyDown={(e) => { 
+  if (e.nativeEvent.isComposing) return; 
+  if (e.key === 'Enter') { 
+    e.preventDefault(); 
+    handleSend(); 
+  }
                     }} 
                   />
                   <button 
