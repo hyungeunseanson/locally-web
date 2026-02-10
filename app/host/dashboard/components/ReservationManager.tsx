@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Calendar, Clock, User, CheckCircle2, MessageSquare, 
-  RefreshCw, AlertCircle, Phone, Mail, XCircle, AlertTriangle, Loader2, MapPin
+  RefreshCw, AlertCircle, Phone, Mail, XCircle, AlertTriangle, Loader2, 
+  CalendarPlus // 👈 [추가] 콤마(,) 잊지 마세요!
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Link from 'next/link';
@@ -39,7 +40,21 @@ export default function ReservationManager() {
     if (diff === 0) return 'Today';
     return `D-${diff}`;
   };
-
+// ✅ [추가] 구글 캘린더 일정 등록 함수
+const addToGoogleCalendar = (res: any) => {
+  const title = encodeURIComponent(`[Locally] ${res.experiences?.title} - ${res.guest?.full_name}님`);
+  const details = encodeURIComponent(`예약 번호: #${String(res.id)}\n게스트: ${res.guest?.full_name} (${res.guests}명)\n연락처: ${res.guest?.phone || '없음'}`);
+  
+  // 날짜/시간 파싱 (ISO 포맷 변환)
+  const startDate = new Date(`${res.date}T${res.time || '00:00:00'}`);
+  const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000)); // 기본 2시간으로 설정
+  
+  const formatTime = (date: Date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+  const dates = `${formatTime(startDate)}/${formatTime(endDate)}`;
+  
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`;
+  window.open(url, '_blank');
+};
   const fetchReservations = useCallback(async () => {
     try {
       setLoading(true);
@@ -256,6 +271,16 @@ export default function ReservationManager() {
                       <div className="mt-2 text-xs font-medium text-slate-400 flex items-center gap-1">
                         <Clock size={12}/> {res.time}
                       </div>
+                      {/* ✅ [추가] 캘린더 추가 버튼 (확정된 예약일 때만 노출) */}
+{isConfirmed && (
+  <button 
+    onClick={() => addToGoogleCalendar(res)}
+    className="mt-3 w-full text-[10px] bg-white border border-slate-200 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+    title="구글 캘린더에 추가"
+  >
+    <CalendarPlus size={12}/> 일정 추가
+  </button>
+)}
                     </div>
 
                     <div className="flex-1">
@@ -307,11 +332,12 @@ export default function ReservationManager() {
                     </div>
 
                     <div className="flex flex-row md:flex-col gap-2 justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[140px]">
-                      <Link href={`/host/dashboard?tab=inquiries&guestId=${res.user_id}`} className="w-full">
-                        <button className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm">
-                          <MessageSquare size={16}/> 메시지
-                        </button>
-                      </Link>
+                    <button 
+  onClick={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
+  className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
+>
+  <MessageSquare size={16}/> 메시지
+</button>
                       
                       {isConfirmed && (
                         <button 
