@@ -130,15 +130,12 @@ export default function InquiryChat() {
                   <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
                     
                     {!isMe && (
-                      <div 
-                        className="flex flex-col items-center mr-2 cursor-pointer"
-                        onClick={() => setModalUserId(msg.sender_id)} // 🟢 [추가] 아바타 클릭 시 프로필
-                      >
+                      <div className="flex flex-col items-center mr-2 cursor-pointer" onClick={() => setModalUserId(msg.sender_id)}>
                         <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden relative border border-slate-200">
                           <Image 
-                            src={secureUrl(msg.sender?.avatar_url)} 
-                            alt="sender"
-                            fill
+                            src={secureUrl(selectedInquiry.guest?.avatar_url)} 
+                            alt="guest" 
+                            fill 
                             className="object-cover"
                           />
                         </div>
@@ -151,7 +148,7 @@ export default function InquiryChat() {
                           className="text-[11px] text-slate-500 mb-1 ml-1 cursor-pointer hover:underline"
                           onClick={() => setModalUserId(msg.sender_id)} // 🟢 [추가] 이름 클릭 시 프로필
                         >
-                          {msg.sender?.name || '게스트'}
+{selectedInquiry.guest?.name || '게스트'}
                         </span>
                       )}
 

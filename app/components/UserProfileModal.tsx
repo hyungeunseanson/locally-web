@@ -26,6 +26,12 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
   const fetchProfile = async () => {
     setLoading(true);
     
+    const secureUrl = (url: string | null | undefined) => {
+        if (!url || url === '') return "/default-avatar.png";
+        if (url.startsWith('http://')) return url.replace('http://', 'https://');
+        return url;
+      };
+
     // 1. 기본 계정 정보 (공통) - 가입일, 국적 등은 여기서 가져옴
     const { data: baseProfile } = await supabase
       .from('profiles')
@@ -35,45 +41,46 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
 
     let finalData = { ...baseProfile }; // 기본으로 회원 정보 사용
 
-    // 2. 호스트 프로필을 봐야 하는 경우 -> 호스트 신청서 정보로 덮어쓰기
-    if (role === 'host') {
-      const { data: hostData } = await supabase
-        .from('host_applications')
-        .select('name, profile_photo, introduction, mbti, languages, gender') // 호스트 전용 데이터
-        .eq('user_id', userId)
-        .single();
-      
-      if (hostData) {
-        // 호스트 데이터가 있으면 이걸 우선시해서 덮어씌움
-        finalData = {
-          ...finalData,
-          // 화면 표시용 이름/사진/소개 교체
-          display_name: hostData.name || baseProfile.full_name,
-          display_avatar: hostData.profile_photo || baseProfile.avatar_url,
-          display_bio: hostData.introduction || baseProfile.introduction,
-          // 호스트 전용 스펙
-          mbti: hostData.mbti,
-          languages: hostData.languages,
-          gender: hostData.gender || baseProfile.gender
-        };
-      }
-    } else {
-      // 3. 일반 게스트 프로필인 경우 -> 기본 정보 매핑
+// 2. 호스트 역할일 때
+if (role === 'host') {
+    const { data: hostData } = await supabase
+      .from('host_applications')
+      .select('name, profile_photo, introduction, mbti, languages, gender')
+      .eq('user_id', userId)
+      .single();
+    
+    if (hostData) {
       finalData = {
         ...finalData,
-        display_name: baseProfile.full_name,
-        display_avatar: baseProfile.avatar_url,
-        display_bio: baseProfile.introduction || baseProfile.bio,
-        // 게스트는 보통 MBTI 같은게 profiles에 없으면 비공개 처리
-        mbti: baseProfile.mbti,
-        languages: baseProfile.languages,
-        gender: baseProfile.gender
+        display_name: hostData.name || baseProfile.full_name,
+        // 🟢 [수정] 호스트 사진이 없으면 기본 구글/카카오 프사 사용 (깨짐 방지)
+        display_avatar: hostData.profile_photo || baseProfile.avatar_url, 
+        display_bio: hostData.introduction || baseProfile.introduction,
+        mbti: hostData.mbti,
+        languages: hostData.languages,
+        gender: hostData.gender || baseProfile.gender
       };
+    } else {
+      finalData.display_name = baseProfile.full_name;
+      finalData.display_avatar = baseProfile.avatar_url;
+      finalData.display_bio = baseProfile.introduction;
     }
+  } else {
+    // 3. 게스트일 때
+    finalData = {
+      ...finalData,
+      display_name: baseProfile.full_name,
+      display_avatar: baseProfile.avatar_url,
+      display_bio: baseProfile.introduction || baseProfile.bio,
+      mbti: baseProfile.mbti,
+      languages: baseProfile.languages,
+      gender: baseProfile.gender
+    };
+  }
 
-    setDisplayProfile(finalData);
-    setLoading(false);
-  };
+  setDisplayProfile(finalData);
+  setLoading(false);
+};
 
   const secureUrl = (url: string | null) => {
     if (!url) return "/default-avatar.png";
@@ -109,7 +116,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
             <div className="pt-10 pb-6 px-6 flex flex-col items-center bg-slate-50 border-b border-slate-100">
                <div className="w-28 h-28 rounded-full border-4 border-white bg-slate-200 overflow-hidden shadow-lg relative mb-4">
                  <Image 
-                   src={secureUrl(displayProfile?.display_avatar)} 
+src={secureUrl(displayProfile?.display_avatar)} 
                    alt="profile" 
                    fill 
                    className="object-cover"
