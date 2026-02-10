@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation'; 
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
-import { Send, ShieldCheck, User, Loader2 } from 'lucide-react'; // 🟢 Loader2 추가
+import { Send, ShieldCheck, User, Loader2 } from 'lucide-react';
 
 function InboxContent() {
   const { 
@@ -20,7 +20,7 @@ function InboxContent() {
   } = useChat('guest');
 
   const [inputText, setInputText] = useState('');
-  const [isSending, setIsSending] = useState(false); // 🟢 [추가] 전송 중 상태
+  const [isSending, setIsSending] = useState(false); // 전송 중 상태
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const router = useRouter(); 
@@ -71,7 +71,7 @@ function InboxContent() {
       }
     }
     
-    // 처리 완료 플래그 세우기 (이제 다른 채팅방 눌러도 여기로 안 돌아옴)
+    // 처리 완료 플래그 세우기
     setIsUrlProcessed(true);
 
   }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
@@ -86,22 +86,23 @@ function InboxContent() {
     }
   };
 
-// 🟢 [수정] 전송 핸들러 (중복 방지 로직 추가)
-const handleSend = async () => {
-  if (selectedInquiry && inputText.trim() && !isSending) {
-    setIsSending(true); // 🔒 버튼 잠금
-    
-    try {
-      if (selectedInquiry.id === 'new') {
-        await createInquiry(selectedInquiry.host_id, selectedInquiry.experience_id, inputText);
-      } else {
-        await sendMessage(selectedInquiry.id, inputText);
+  // 전송 핸들러 (중복 방지 로직 추가)
+  const handleSend = async () => {
+    if (selectedInquiry && inputText.trim() && !isSending) {
+      setIsSending(true); // 🔒 버튼 잠금
+      
+      try {
+        if (selectedInquiry.id === 'new') {
+          await createInquiry(selectedInquiry.host_id, selectedInquiry.experience_id, inputText);
+        } else {
+          await sendMessage(selectedInquiry.id, inputText);
+        }
+        setInputText('');
+      } catch (error) {
+        console.error("Failed to send message", error);
+      } finally {
+        setIsSending(false); // 🔓 버튼 해제
       }
-      setInputText('');
-    } catch (error) {
-      console.error("Failed to send message", error);
-    } finally {
-      setIsSending(false); // 🔓 버튼 해제
     }
   };
 
@@ -112,7 +113,7 @@ const handleSend = async () => {
             avatar: inqOrSelected.host.avatar_url
         };
     }
-    // URL 백업 정보는 'new' 상태일 때만 사용 (기존 채팅방 클릭 시엔 DB 정보 우선)
+    // URL 백업 정보는 'new' 상태일 때만 사용
     if (inqOrSelected?.id === 'new' && inqOrSelected?.host_id === hostId) {
         return { name: hostName || 'Host', avatar: hostAvatar };
     }
@@ -136,10 +137,9 @@ const handleSend = async () => {
               {inquiries.map((inq) => {
                 const display = getDisplayHost(inq); 
                 return (
-                  // 클릭 시 handleSelectInquiry 호출 (URL 정리 포함)
                   <div key={inq.id} onClick={() => handleSelectInquiry(inq.id)} className={`relative p-4 cursor-pointer hover:bg-slate-50 flex gap-4 ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
                     
-                    {/* 🟢 [추가됨] 안 읽은 메시지 배지 (N) */}
+                    {/* 안 읽은 메시지 배지 (N) */}
                     {inq.unread_count > 0 && (
                       <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce z-10">
                         N
@@ -183,7 +183,6 @@ const handleSend = async () => {
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                          {!isMe && (
                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden mr-2 shrink-0">
-                             {/* 상대방 프사 표시 */}
                              {msg.sender?.avatar_url || currentHostDisplay.avatar ? 
                                <img src={msg.sender?.avatar_url || currentHostDisplay.avatar} className="w-full h-full object-cover" alt="sender"/> 
                                : <User className="w-full h-full p-1.5 text-slate-400"/>}
@@ -199,7 +198,6 @@ const handleSend = async () => {
                   {messages.length === 0 && selectedInquiry.id === 'new' && (
                      <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
                         <div className="w-20 h-20 rounded-full bg-slate-100 mb-4 flex items-center justify-center overflow-hidden border border-slate-200">
-                           {/* 여기서도 currentHostDisplay (URL에서 온 사진) 사용 */}
                            {currentHostDisplay.avatar ? <img src={currentHostDisplay.avatar} className="w-full h-full object-cover" alt="host"/> : <User size={40} className="text-slate-300"/>}
                         </div>
                         <p className="font-bold text-slate-900 mb-1">{currentHostDisplay.name}님에게 메시지 보내기</p>
@@ -209,8 +207,27 @@ const handleSend = async () => {
                 </div>
 
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
-                  <input className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all" placeholder="메시지 입력..." value={inputText} onChange={(e) => setInputText(e.target.value)} disabled={isSending} onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }} />
-                  <button onClick={handleSend} disabled={!inputText.trim() || isSending} className="p-3 bg-black text-white rounded-full hover:scale-105 transition-transform"> <Send size={18}/>{isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}</button>
+                  <input 
+                    className="flex-1 bg-slate-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all disabled:bg-slate-50 disabled:text-slate-400" 
+                    placeholder="메시지 입력..." 
+                    value={inputText} 
+                    onChange={(e) => setInputText(e.target.value)} 
+                    disabled={isSending} 
+                    onKeyDown={(e) => { 
+                      if (e.nativeEvent.isComposing) return; 
+                      if (e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        handleSend(); 
+                      } 
+                    }} 
+                  />
+                  <button 
+                    onClick={handleSend} 
+                    disabled={!inputText.trim() || isSending} 
+                    className="p-3 bg-black text-white rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+                  >
+                    {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
+                  </button>
                 </div>
               </>
             ) : (
