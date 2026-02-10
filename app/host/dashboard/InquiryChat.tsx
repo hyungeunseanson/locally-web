@@ -22,13 +22,48 @@ export default function InquiryChat() {
 
   return (
     <div className="flex gap-6 h-full min-h-[600px] w-full">
+      {/* 좌측 리스트 영역 */}
       <div className="w-[300px] shrink-0 border-r border-slate-200 pr-4 overflow-y-auto max-h-[700px]">
         {inquiries.length === 0 && <div className="text-slate-400 text-sm text-center py-10">문의가 없습니다.</div>}
+        
         {inquiries.map((inq) => (
-          <div key={inq.id} onClick={() => loadMessages(inq.id)} className={`p-4 rounded-xl cursor-pointer mb-2 ${selectedInquiry?.id === inq.id ? 'bg-slate-100 border-black' : 'hover:bg-slate-50'}`}>
-            <div className="text-xs font-bold text-slate-500 mb-1">{inq.experiences?.title}</div>
-            <div className="font-bold text-sm truncate">{inq.content}</div>
-            <div className="text-xs text-slate-400 mt-2">{new Date(inq.created_at).toLocaleDateString()}</div>
+          <div 
+            key={inq.id} 
+            onClick={() => loadMessages(inq.id)} 
+            className={`relative p-4 rounded-xl cursor-pointer mb-2 transition-all ${
+              selectedInquiry?.id === inq.id ? 'bg-slate-100 border border-slate-300' : 'hover:bg-slate-50 border border-transparent'
+            }`}
+          >
+            {/* 🔴 안 읽은 메시지 배지 (N) */}
+            {inq.unread_count > 0 && (
+              <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce">
+                N
+              </div>
+            )}
+
+            {/* 상대방 이름과 사진 표시 (이제 제대로 나옵니다) */}
+            <div className="flex items-center gap-3 mb-2">
+               <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden relative">
+                 {/* role이 host면 guest 정보, guest면 host 정보 표시 */}
+                 <img 
+                   src={inq.guest?.avatar_url || "/default-avatar.png"} // 호스트 입장일 때
+                   alt="profile" 
+                   className="object-cover w-full h-full"
+                 />
+               </div>
+               <div className="flex-1 min-w-0">
+                 <div className="text-sm font-bold truncate">
+                   {inq.guest?.name || '게스트'} {/* 호스트 입장일 때 */}
+                 </div>
+                 <div className="text-xs text-slate-500 truncate">{inq.experiences?.title}</div>
+               </div>
+            </div>
+
+            <div className="text-sm text-slate-600 line-clamp-2 bg-white/50 p-2 rounded-lg">
+              {inq.content}
+            </div>
+            <div className="text-xs text-slate-400 mt-2 text-right">
+              {new Date(inq.updated_at).toLocaleDateString()}</div>
           </div>
         ))}
       </div>
