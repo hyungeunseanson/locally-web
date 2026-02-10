@@ -20,7 +20,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return url;
   };
 
-  // ✅ 채팅방 목록 및 안 읽은 메시지, 프로필 정보 가져오기
   const fetchInquiries = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -28,7 +27,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) { setIsLoading(false); return; }
       setCurrentUser(user);
 
-      // 1. 문의(채팅방) 목록 조회
+      // 1. 문의 목록 조회
       let query = supabase
         .from('inquiries')
         .select(`*, experiences (id, title, photos, image_url, host_id)`)
@@ -45,46 +44,47 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
         const guestIds = Array.from(new Set(inquiriesData.map(item => item.user_id).filter(Boolean)));
 
-        // 2. 병렬 데이터 조회 (프로필, 호스트신청서, 안 읽은 메시지)
+        // 2. 정보 병렬 조회 (프로필, 신청서, 안 읽은 메시지)
         const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', hostIds),
           supabase.from('host_applications').select('*').in('user_id', hostIds),
           supabase.from('profiles').select('*').in('id', guestIds),
-          // 안 읽은 메시지 카운트 (내가 보낸 게 아닌 것 중 is_read가 false인 것)
+          // 🔴 안 읽은 메시지 카운트 로직 (핵심)
           supabase.from('inquiry_messages')
             .select('inquiry_id')
             .in('inquiry_id', inquiryIds)
             .eq('is_read', false)
-            .neq('sender_id', user.id) 
+            .neq('sender_id', user.id) // 내가 보낸 건 제외 (상대방이 보낸 것만 카운트)
         ]);
 
         const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
         const appsMap = new Map(appsRes.data?.map(a => [a.user_id, a]));
         const guestMap = new Map(guestProfilesRes.data?.map(g => [g.id, g]));
 
-        // 안 읽은 메시지 개수 계산
-        const unreadCounts:Record<number, number> = {};
-        unreadRes.data?.forEach((msg: any) => {
-          unreadCounts[msg.inquiry_id] = (unreadCounts[msg.inquiry_id] || 0) + 1;
-        });
+        // 안 읽은 메시지 개수 집계
+        const unreadCounts: Record<number, number> = {};
+        if (unreadRes.data) {
+          unreadRes.data.forEach((msg: any) => {
+            unreadCounts[msg.inquiry_id] = (unreadCounts[msg.inquiry_id] || 0) + 1;
+          });
+        }
 
-        // 3. 데이터 매핑 (이름/사진 우선순위 적용)
+        // 3. 데이터 매핑
         const safeData = inquiriesData.map(item => {
-          // 호스트 정보: 신청서(host_applications) 우선 -> 없으면 프로필
+          // 호스트 정보 매핑
           const hostApp = appsMap.get(item.host_id);
           const hostProfile = profilesMap.get(item.host_id);
-          
-          const hostName = hostApp?.name || hostProfile?.full_name || hostProfile?.email?.split('@')[0] || '호스트';
+          const hostName = hostApp?.name || hostProfile?.full_name || '호스트';
           const hostAvatar = hostApp?.profile_photo || hostProfile?.avatar_url;
 
-          // 게스트 정보: 프로필 우선
+          // 게스트 정보 매핑
           const guestProfile = guestMap.get(item.user_id);
-          const guestName = guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
+          const guestName = guestProfile?.name || guestProfile?.full_name || '게스트';
           const guestAvatar = guestProfile?.avatar_url;
 
           return {
             ...item,
-            unread_count: unreadCounts[item.id] || 0, // 🔴 안 읽은 메시지 수
+            unread_count: unreadCounts[item.id] || 0, // 🔴 계산된 카운트 적용
             guest: {
               id: item.user_id,
               name: guestName,
@@ -110,26 +110,25 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     finally { setIsLoading(false); }
   }, [supabase, role]);
 
-  // ✅ 메시지 읽음 처리 함수
+  // ✅ 읽음 처리 함수 (클릭 시 실행)
   const markAsRead = async (inquiryId: number) => {
     if (!currentUser) return;
     
-    // UI 즉시 업데이트 (N 배지 제거)
+    // UI 즉시 업데이트 (배지 삭제)
     setInquiries(prev => prev.map(inq => 
       inq.id === inquiryId ? { ...inq, unread_count: 0 } : inq
     ));
 
-    // DB 업데이트: 상대방이 보낸 메시지를 읽음으로 변경
+    // DB 업데이트
     await supabase
       .from('inquiry_messages')
       .update({ is_read: true })
       .eq('inquiry_id', inquiryId)
-      .neq('sender_id', currentUser.id); // 내가 보낸 건 건드리지 않음
+      .neq('sender_id', currentUser.id);
   };
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // 1. 메시지 로드
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*`)
@@ -140,8 +139,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       
       if (data) {
         const senderIds = Array.from(new Set(data.map(m => m.sender_id)));
-        
-        // 2. 메시지 보낸 사람 정보 병렬 조회 (호스트앱 + 프로필 둘 다 체크)
         const [proRes, appRes] = await Promise.all([
             supabase.from('profiles').select('*').in('id', senderIds),
             supabase.from('host_applications').select('*').in('user_id', senderIds)
@@ -151,12 +148,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const appMap = new Map(appRes.data?.map(a => [a.user_id, a]));
 
         const safeMessages = data.map(msg => {
-          // 메시지 보낸 사람 정보 결정 로직
           const p = profileMap.get(msg.sender_id);
           const a = appMap.get(msg.sender_id);
-          
-          // 호스트인 경우 신청서 정보 우선, 아니면 프로필
-          const name = a?.name || p?.full_name || p?.email?.split('@')[0] || '알 수 없음';
+          const name = a?.name || p?.full_name || '알 수 없음';
           const avatar = a?.profile_photo || p?.avatar_url;
 
           return {
@@ -171,11 +165,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         setMessages(safeMessages);
       }
 
-      // 3. 선택된 채팅방 설정 및 읽음 처리 호출
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) {
           setSelectedInquiry(selected);
-          markAsRead(inquiryId); // 🔴 메시지 읽음 처리 실행
+          markAsRead(inquiryId); // 🔴 메시지 불러올 때 읽음 처리
       }
     } catch (err: any) { console.error(err); }
   };
