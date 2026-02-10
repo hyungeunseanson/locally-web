@@ -430,7 +430,19 @@ const addToGoogleCalendar = (res: any) => {
                 {selectedGuest.host_nationality && <span className="text-xl">{selectedGuest.host_nationality}</span>}
               </h2>
               <p className="text-sm text-slate-500 font-medium mb-6">
-                {selectedGuest.job || '여행자'} · {selectedGuest.languages ? JSON.parse(selectedGuest.languages).join(', ') : '언어 정보 없음'}
+              {(() => {
+  if (!selectedGuest.languages) return '언어 정보 없음';
+  try {
+    // 1. 이미 배열인 경우
+    if (Array.isArray(selectedGuest.languages)) return selectedGuest.languages.join(', ');
+    // 2. JSON 문자열인 경우 (예: "['English', 'Korean']")
+    if (selectedGuest.languages.startsWith('[')) return JSON.parse(selectedGuest.languages).join(', ');
+    // 3. 그냥 문자열인 경우 (예: "English")
+    return selectedGuest.languages;
+  } catch (e) {
+    return selectedGuest.languages; // 에러나면 그냥 원본 출력
+  }
+})()}
               </p>
 
               {/* 소개글 */}

@@ -5,12 +5,37 @@ import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 [추가] 모달 불러오기
 import { Send, User, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 
 export default function InquiryChat() {
   const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage } = useChat('host');
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const searchParams = useSearchParams();
+  const guestIdFromUrl = searchParams.get('guestId');
+
+// ✅ [수정됨] URL에 guestId가 있으면 자동으로 해당 채팅방 열기
+useEffect(() => {
+  // inquiries(채팅방 목록)가 로드되었고, URL에 guestId가 있을 때 실행
+  if (guestIdFromUrl && inquiries.length > 0) {
+    
+    // 1. 문의 목록(inquiries) 중에서 해당 게스트(guestId)와 연결된 방 찾기
+    const targetInquiry = inquiries.find(inq => 
+      String(inq.user_id) === String(guestIdFromUrl) || 
+      String(inq.guest?.id) === String(guestIdFromUrl)
+    );
+
+    // 2. 찾았으면 해당 채팅방 메시지 불러오기 (loadMessages 사용)
+    if (targetInquiry) {
+      // 이미 선택된 방이 아닐 때만 로드 (중복 실행 방지)
+      if (selectedInquiry?.id !== targetInquiry.id) {
+        loadMessages(targetInquiry.id);
+      }
+    }
+  }
+}, [guestIdFromUrl, inquiries, loadMessages, selectedInquiry]);
 
   // 🟢 [추가] 프로필 모달 상태 관리
   const [modalUserId, setModalUserId] = useState<string | null>(null);
