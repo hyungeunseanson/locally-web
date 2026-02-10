@@ -247,14 +247,14 @@ export default function ReservationManager() {
                 
                 <div className="flex gap-2">
                   {/* ✅ 취소 문의 버튼 */}
-                  {res.status === 'PAID' && (
-                    <button 
-                      onClick={() => handleRequestUserCancel(res)}
-                      className="text-[11px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 px-2 py-1 rounded transition-colors underline"
-                    >
-                      예약 취소 문의
-                    </button>
-                  )}
+                  {(res.status === 'PAID' || res.status === 'confirmed') && (
+  <button 
+    onClick={() => handleRequestUserCancel(res)}
+    className="text-[11px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 px-2 py-1 rounded transition-colors underline"
+  >
+    예약 취소 문의
+  </button>
+)}
                   
                   <Link href={`/host/dashboard?tab=inquiries&guestId=${res.user_id}`}>
                     <button className="text-slate-400 hover:text-black p-2 rounded-full hover:bg-slate-100 transition-colors" title="메시지 보내기">
