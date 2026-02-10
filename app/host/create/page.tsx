@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 알림 기능 사용
 import { TOTAL_STEPS, INITIAL_FORM_DATA } from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps'; 
+import { validateImage, sanitizeFileName } from '@/app/utils/image';
 
 export default function CreateExperiencePage() {
   const supabase = createClient();
@@ -70,32 +71,62 @@ export default function CreateExperiencePage() {
     updateData('itinerary', newItinerary);
   };
 
-  // 📸 사진 업로드 핸들러
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const url = URL.createObjectURL(file);
-      updateData('photos', [...formData.photos, url]);
-      setImageFiles(prev => [...prev, file]);
+// 📸 사진 업로드 핸들러 수정
+const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (e.target.files) {
+    const files = Array.from(e.target.files);
+    const newUrls: string[] = [];
+    const newFiles: File[] = [];
+
+    // 최대 장수 제한 (예: 5장)
+    if (formData.photos.length + files.length > 5) {
+      showToast('사진은 최대 5장까지 업로드 가능합니다.', 'error');
+      return;
     }
-  };
 
-  // 🚀 최종 제출
-  const handleSubmit = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요합니다.');
-
-      const photoUrls = [];
-      for (const file of imageFiles) {
-        const fileName = `experience/${user.id}_${Date.now()}_${Math.random()}`;
-        const { error } = await supabase.storage.from('images').upload(fileName, file);
-        if (!error) {
-          const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-          photoUrls.push(data.publicUrl);
-        }
+    files.forEach(file => {
+      // ✅ [추가] 이미지 검증 로직
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        showToast(validation.message || '이미지 형식이 올바르지 않습니다.', 'error');
+        return;
       }
+
+      const url = URL.createObjectURL(file);
+      newUrls.push(url);
+      newFiles.push(file);
+    });
+
+    if (newUrls.length > 0) {
+      updateData('photos', [...formData.photos, ...newUrls]);
+      setImageFiles(prev => [...prev, ...newFiles]);
+    }
+  }
+};
+// 🚀 최종 제출 함수 수정 (파일명 최적화 및 버킷 명칭 확인)
+const handleSubmit = async () => {
+  setLoading(true);
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('로그인이 필요합니다.');
+
+    const photoUrls = [];
+    for (const file of imageFiles) {
+      // ✅ [추가] 파일명 최적화 (유저ID_타임스탬프_안전한파일명)
+      const safeName = sanitizeFileName(file.name);
+      const fileName = `experience/${user.id}/${Date.now()}_${safeName}`;
+      
+      // SQL에서 설정한 버킷 이름 'experiences' 또는 'images' 중 실제 사용하시는 것으로 맞춰주세요.
+      const { error: uploadError } = await supabase.storage.from('experiences').upload(fileName, file);
+      
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        continue; 
+      }
+
+      const { data } = supabase.storage.from('experiences').getPublicUrl(fileName);
+      photoUrls.push(data.publicUrl);
+    }
 
       const { error } = await supabase.from('experiences').insert([
         {

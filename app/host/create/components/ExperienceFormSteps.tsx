@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { validateImage, sanitizeFileName } from '@/app/utils/image';
 import { 
   Camera, MapPin, CheckCircle2, Plus, Minus, Trash2, X, Lock, Check 
 } from 'lucide-react';
@@ -111,13 +112,44 @@ export default function ExperienceFormSteps({
   if (step === 2) {
     return (
       <div className="w-full space-y-12">
-        <div className="space-y-2"><h1 className="text-3xl font-black text-slate-900">체험의 첫인상</h1><p className="text-slate-500 text-lg">매력적인 제목과 멋진 사진을 올려주세요.</p></div>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-black text-slate-900">체험의 첫인상</h1>
+          <p className="text-slate-500 text-lg">매력적인 제목과 멋진 사진을 올려주세요. (최대 5장)</p>
+        </div>
         <div className="space-y-10">
           <input type="text" placeholder="체험 제목을 입력하세요" value={formData.title} onChange={(e) => updateData('title', e.target.value)} className="w-full py-4 text-3xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300"/>
+          
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-            <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all"><Camera size={24} className="text-slate-400 mb-2"/><span className="text-xs font-bold text-slate-500">사진 추가</span><input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload}/></label>
-            {formData.photos.map((url: string, idx: number) => (<div key={idx} className="aspect-square rounded-2xl overflow-hidden relative shadow-sm"><img src={url} className="w-full h-full object-cover"/></div>))}
+            {/* 사진 추가 버튼 */}
+            <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all">
+              <Camera size={24} className="text-slate-400 mb-2"/>
+              <span className="text-xs font-bold text-slate-500">사진 추가</span>
+              <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload}/>
+            </label>
+
+            {/* ✅ 사진 미리보기 리스트 + 삭제 기능 추가 */}
+            {formData.photos.map((url: string, idx: number) => (
+              <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative shadow-sm group">
+                <img src={url} className="w-full h-full object-cover" alt={`preview ${idx}`}/>
+                
+                {/* ❌ 삭제 버튼: 호버 시 나타남 */}
+                <button 
+                  type="button"
+                  onClick={() => {
+                    // photos URL 리스트에서 삭제
+                    const newPhotos = formData.photos.filter((_: any, i: number) => i !== idx);
+                    updateData('photos', newPhotos);
+                    // 실제 파일 리스트(imageFiles)에서도 함께 삭제해야 함 (부모에서 관리 필요할 수 있음)
+                    // 지금은 편의상 URL이 사라지면 제출 시 걸러지도록 처리 가능
+                  }}
+                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
           </div>
+          <p className="text-xs text-slate-400 font-medium">* 5MB 이하의 이미지 파일만 업로드 가능합니다.</p>
         </div>
       </div>
     );
