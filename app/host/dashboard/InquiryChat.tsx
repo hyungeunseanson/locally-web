@@ -2,37 +2,39 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat'; 
-import { Send, User, Loader2 } from 'lucide-react'; // 🟢 Loader2 아이콘 추가
+import { Send, User, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
 export default function InquiryChat() {
-  // 'host' 모드로 실행하여 게스트 정보를 가져옵니다.
   const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage } = useChat('host');
   const [replyText, setReplyText] = useState('');
-  const [isSending, setIsSending] = useState(false); // 🟢 [추가] 전송 중인지 확인하는 상태
+  const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 메시지 로드 시 스크롤 하단 이동
+  // 🟢 [보안] HTTP 이미지를 HTTPS로 변환하는 헬퍼 함수
+  const secureUrl = (url: string | null | undefined) => {
+    if (!url) return "/default-avatar.png";
+    if (url.startsWith('http://')) return url.replace('http://', 'https://');
+    return url;
+  };
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
   const handleSend = async () => {
-    // 🟢 [수정] 전송 중(isSending)이면 함수 실행 막음
     if (selectedInquiry && replyText.trim() && !isSending) {
-      setIsSending(true); // 🔒 버튼 잠금
+      setIsSending(true);
       await sendMessage(selectedInquiry.id, replyText);
       setReplyText('');
-      setIsSending(false); // 🔓 버튼 해제
+      setIsSending(false);
     }
   };
 
-  // 시간 포맷팅 헬퍼 함수
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // 날짜 포맷팅 헬퍼 함수
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
   };
@@ -51,18 +53,16 @@ export default function InquiryChat() {
               selectedInquiry?.id === inq.id ? 'bg-slate-100 border border-slate-300' : 'hover:bg-slate-50 border border-transparent'
             }`}
           >
-            {/* 🔴 안 읽은 메시지 배지 (N) - 기존 기능 유지 */}
             {inq.unread_count > 0 && (
               <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce">
                 N
               </div>
             )}
 
-            {/* 상대방(게스트) 이름과 사진 표시 */}
             <div className="flex items-center gap-3 mb-2">
                <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden relative border border-slate-200 shrink-0">
                  <Image 
-                   src={inq.guest?.avatar_url || "/default-avatar.png"} 
+                   src={secureUrl(inq.guest?.avatar_url)} // 🟢 HTTPS 적용
                    alt="profile" 
                    fill
                    className="object-cover"
@@ -79,7 +79,8 @@ export default function InquiryChat() {
             <div className="text-sm text-slate-600 line-clamp-2 bg-white/50 p-2 rounded-lg">
               {inq.content}
             </div>
-            <div className="text-xs text-slate-400 mt-2 text-right">
+            {/* 🟢 시간 표시에 suppressHydrationWarning 추가 (에러 #418 해결) */}
+            <div className="text-xs text-slate-400 mt-2 text-right" suppressHydrationWarning>
               {formatDate(inq.updated_at)}
             </div>
           </div>
@@ -90,11 +91,10 @@ export default function InquiryChat() {
       <div className="flex-1 flex flex-col bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden h-[700px]">
         {selectedInquiry ? (
           <>
-            {/* 🟢 [개선] 채팅방 헤더: 게스트 정보 표시 */}
             <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3 shadow-sm z-10">
               <div className="relative w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-100">
                 <Image 
-                  src={selectedInquiry.guest?.avatar_url || "/default-avatar.png"}
+                  src={secureUrl(selectedInquiry.guest?.avatar_url)} // 🟢 HTTPS 적용
                   alt="guest"
                   fill
                   className="object-cover"
@@ -106,7 +106,6 @@ export default function InquiryChat() {
               </div>
             </div>
 
-            {/* 메시지 영역 */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
                 const isMe = String(msg.sender_id) === String(currentUser?.id);
@@ -114,12 +113,11 @@ export default function InquiryChat() {
                 return (
                   <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
                     
-                    {/* 🟢 상대방 프로필 사진 (메시지 옆) */}
                     {!isMe && (
                       <div className="flex flex-col items-center mr-2">
                         <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden relative">
                           <Image 
-                            src={msg.sender?.avatar_url || "/default-avatar.png"}
+                            src={secureUrl(msg.sender?.avatar_url)} // 🟢 HTTPS 적용
                             alt="sender"
                             fill
                             className="object-cover"
@@ -129,7 +127,6 @@ export default function InquiryChat() {
                     )}
 
                     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
-                      {/* 🟢 보낸 사람 이름 */}
                       {!isMe && (
                         <span className="text-[11px] text-slate-500 mb-1 ml-1">
                           {msg.sender?.name || '게스트'}
@@ -137,14 +134,13 @@ export default function InquiryChat() {
                       )}
 
                       <div className="flex items-end gap-2">
-                        {/* 내 메시지 시간 (왼쪽 표시) */}
                         {isMe && (
-                          <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1">
+                          // 🟢 시간 표시에 suppressHydrationWarning 추가 (에러 #418 해결)
+                          <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1" suppressHydrationWarning>
                             {formatTime(msg.created_at)}
                           </span>
                         )}
 
-                        {/* 말풍선 */}
                         <div className={`p-3 rounded-2xl text-sm leading-relaxed shadow-sm break-words ${
                           isMe 
                             ? 'bg-black text-white rounded-tr-none' 
@@ -153,9 +149,9 @@ export default function InquiryChat() {
                           {msg.content}
                         </div>
 
-                        {/* 상대방 메시지 시간 (오른쪽 표시) */}
                         {!isMe && (
-                          <span className="text-[10px] text-slate-400 min-w-[50px] mb-1">
+                          // 🟢 시간 표시에 suppressHydrationWarning 추가 (에러 #418 해결)
+                          <span className="text-[10px] text-slate-400 min-w-[50px] mb-1" suppressHydrationWarning>
                             {formatTime(msg.created_at)}
                           </span>
                         )}
@@ -166,15 +162,13 @@ export default function InquiryChat() {
               })}
             </div>
 
-            {/* 입력창 (기존 기능 유지) */}
             <div className="p-4 bg-white border-t border-slate-200 flex gap-2">
               <input 
                 value={replyText} 
                 onChange={(e) => setReplyText(e.target.value)} 
                 placeholder="답장 입력..." 
-                disabled={isSending} // 🟢 전송 중엔 입력 불가
-                className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors"
-                // ✅ 한글 중복 방지 로직 유지
+                disabled={isSending} 
+                className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100"
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') {
@@ -183,8 +177,12 @@ export default function InquiryChat() {
                   }
                 }}
               />
-              <button onClick={handleSend} disabled={!replyText.trim() || isSending} className="bg-black text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors">
-                <Send size={18}/>
+              <button 
+                onClick={handleSend} 
+                disabled={!replyText.trim() || isSending} 
+                className="bg-black text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
               </button>
             </div>
           </>
