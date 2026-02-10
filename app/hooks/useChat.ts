@@ -27,7 +27,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) { setIsLoading(false); return; }
       setCurrentUser(user);
 
-      // 1. 문의 목록 기본 조회
+      // 1. 문의 목록 조회
       let query = supabase
         .from('inquiries')
         .select(`*, experiences (id, title, photos, image_url, host_id)`)
@@ -40,15 +40,15 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       if (inquiriesData && inquiriesData.length > 0) {
-        // 2. 관련 사용자 ID 추출 (호스트와 게스트 모두)
+        // 2. ID 추출
         const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
         const guestIds = Array.from(new Set(inquiriesData.map(item => item.user_id).filter(Boolean)));
 
-        // 3. 프로필 및 신청서 정보 병렬 조회 (안전한 분리 조회)
+        // 3. 정보 병렬 조회 (안전하게 따로 조회)
         const [profilesRes, appsRes, guestProfilesRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', hostIds),
           supabase.from('host_applications').select('*').in('user_id', hostIds),
-          supabase.from('profiles').select('*').in('id', guestIds) // 게스트 정보 따로 조회
+          supabase.from('profiles').select('*').in('id', guestIds)
         ]);
 
         const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
@@ -96,7 +96,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // 메시지 가져올 때도 sender 정보 안전하게 처리
+      // 메시지 가져오기
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*`)
@@ -106,7 +106,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       if (data) {
-        // 보낸 사람 ID 수집
+        // 보낸 사람 정보 매핑
         const senderIds = Array.from(new Set(data.map(m => m.sender_id)));
         const { data: senders } = await supabase.from('profiles').select('id, avatar_url').in('id', senderIds);
         const senderMap = new Map(senders?.map(s => [s.id, s]));

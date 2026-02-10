@@ -15,7 +15,7 @@ interface Notification {
   created_at: string;
 }
 
-// 🟢 토스트 데이터 타입 정의
+// 🟢 토스트 데이터 타입
 interface ToastData {
   title: string;
   message: string;
@@ -34,7 +34,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [toast, setToast] = useState<ToastData | null>(null); // 🟢 토스트 상태 관리
+  const [toast, setToast] = useState<ToastData | null>(null);
   const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -46,7 +46,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. 기존 시스템 알림 가져오기
+      // 1. 기존 알림 로딩
       const { data } = await supabase
         .from('notifications')
         .select('*')
@@ -56,59 +56,66 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       if (data) setNotifications(data);
 
-      // 2. 통합 리얼타임 구독 (알림 + 채팅)
+      // 2. 리얼타임 구독 (시스템 알림 + 채팅 메시지)
       channel = supabase
         .channel('global-notifications')
-        // (A) 시스템 알림 구독
+        // (A) 시스템 알림
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
           (payload) => {
             const newNoti = payload.new as Notification;
             setNotifications((prev) => [newNoti, ...prev]);
-            
-            // 시스템 알림 토스트
             setToast({
               title: newNoti.title,
               message: newNoti.message,
               link: newNoti.link,
               type: 'notification'
             });
-            
-            // 5초 뒤 자동 삭제
             setTimeout(() => setToast(null), 5000);
           }
         )
-        // (B) 채팅 메시지 구독 (테이블명: inquiry_messages)
+        // (B) 채팅 메시지 (inquiry_messages 테이블 구독)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
           async (payload) => {
             const newMsg = payload.new;
+            if (newMsg.sender_id === user.id) return; // 내가 보낸 건 무시
 
-            // 1. 내가 보낸 메시지는 무시
-            if (newMsg.sender_id === user.id) return;
-
-            // 2. 현재 채팅방에 있다면 알림 무시 (선택 사항)
-            // if (pathname.includes('/inbox') || pathname.includes('/dashboard')) return;
-
-            // 3. 이 메시지가 나에게 온 것인지 확인 (inquiries 테이블 조회)
+            // 채팅방 정보 조회 (내가 관련된 채팅인지 확인)
             const { data: inquiry } = await supabase
               .from('inquiries')
               .select('user_id, host_id')
               .eq('id', newMsg.inquiry_id)
               .single();
 
-            // 내가 게스트거나 호스트인 채팅방일 때만 알림
             if (inquiry && (inquiry.user_id === user.id || inquiry.host_id === user.id)) {
+                // 현재 채팅방에 있으면 알림 생략 (선택)
+                // if (pathname.includes('/inbox') || pathname.includes('/dashboard')) return;
+
+                const link = inquiry.host_id === user.id ? '/host/dashboard?tab=chat' : '/guest/inbox';
+                
+                // 1. 토스트 띄우기
                 setToast({
                   title: '새로운 메시지 💬',
                   message: newMsg.content || '사진을 보냈습니다.',
-                  link: inquiry.host_id === user.id ? '/host/dashboard?tab=chat' : '/guest/inbox', // 역할에 따라 이동 경로 다르게
+                  link: link,
                   type: 'message'
                 });
-                
                 setTimeout(() => setToast(null), 5000);
+
+                // 2. 알림 스택(목록)에 가짜 알림 추가 (새로고침 전까지 유지)
+                const virtualNotification: Notification = {
+                  id: Date.now(), // 임시 ID
+                  type: 'message',
+                  title: '새로운 메시지',
+                  message: newMsg.content || '사진을 보냈습니다.',
+                  link: link,
+                  is_read: false,
+                  created_at: new Date().toISOString()
+                };
+                setNotifications((prev) => [virtualNotification, ...prev]);
             }
           }
         )
@@ -126,7 +133,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const markAsRead = async (id: number) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    if (id < 1000000000000) { // 가짜 ID가 아닐 때만 DB 업데이트
+        await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    }
   };
 
   const markAllAsRead = async () => {
@@ -139,8 +148,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead }}>
       {children}
-      
-      {/* 🟢 토스트 UI 렌더링 (이 부분이 중요!) */}
+      {/* 🟢 토스트 UI 렌더링 (삭제되지 않았습니다!) */}
       {toast && (
         <div 
           className="fixed bottom-6 right-6 z-[9999] bg-white/90 backdrop-blur-sm border border-slate-200 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"
