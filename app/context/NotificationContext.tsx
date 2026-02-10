@@ -15,7 +15,6 @@ interface Notification {
   created_at: string;
 }
 
-// 🟢 토스트 데이터 타입
 interface ToastData {
   title: string;
   message: string;
@@ -56,7 +55,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       if (data) setNotifications(data);
 
-      // 2. 리얼타임 구독 (시스템 알림 + 채팅 메시지)
+      // 2. 통합 리얼타임 구독
       channel = supabase
         .channel('global-notifications')
         // (A) 시스템 알림
@@ -75,7 +74,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setTimeout(() => setToast(null), 5000);
           }
         )
-        // (B) 채팅 메시지 (inquiry_messages 테이블 구독)
+        // (B) 채팅 메시지 (inquiry_messages)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
@@ -83,7 +82,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             const newMsg = payload.new;
             if (newMsg.sender_id === user.id) return; // 내가 보낸 건 무시
 
-            // 채팅방 정보 조회 (내가 관련된 채팅인지 확인)
+            // 채팅방 정보 확인
             const { data: inquiry } = await supabase
               .from('inquiries')
               .select('user_id, host_id')
@@ -91,9 +90,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               .single();
 
             if (inquiry && (inquiry.user_id === user.id || inquiry.host_id === user.id)) {
-                // 현재 채팅방에 있으면 알림 생략 (선택)
-                // if (pathname.includes('/inbox') || pathname.includes('/dashboard')) return;
-
                 const link = inquiry.host_id === user.id ? '/host/dashboard?tab=chat' : '/guest/inbox';
                 
                 // 1. 토스트 띄우기
@@ -105,7 +101,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 });
                 setTimeout(() => setToast(null), 5000);
 
-                // 2. 알림 스택(목록)에 가짜 알림 추가 (새로고침 전까지 유지)
+                // 2. 알림 목록(스택)에 가짜 알림 추가 (새로고침 전까지 유지됨)
                 const virtualNotification: Notification = {
                   id: Date.now(), // 임시 ID
                   type: 'message',
@@ -133,7 +129,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const markAsRead = async (id: number) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    if (id < 1000000000000) { // 가짜 ID가 아닐 때만 DB 업데이트
+    // 가짜 알림(ID가 아주 큰 숫자)은 DB 업데이트 패스
+    if (id < 1000000000000) {
         await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     }
   };
@@ -148,7 +145,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead }}>
       {children}
-      {/* 🟢 토스트 UI 렌더링 (삭제되지 않았습니다!) */}
       {toast && (
         <div 
           className="fixed bottom-6 right-6 z-[9999] bg-white/90 backdrop-blur-sm border border-slate-200 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"

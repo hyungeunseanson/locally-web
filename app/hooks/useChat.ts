@@ -44,7 +44,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
         const guestIds = Array.from(new Set(inquiriesData.map(item => item.user_id).filter(Boolean)));
 
-        // 3. 정보 병렬 조회 (안전하게 따로 조회)
+        // 3. 정보 병렬 조회
         const [profilesRes, appsRes, guestProfilesRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', hostIds),
           supabase.from('host_applications').select('*').in('user_id', hostIds),
@@ -96,7 +96,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
-      // 메시지 가져오기
       const { data, error } = await supabase
         .from('inquiry_messages')
         .select(`*`)
@@ -106,7 +105,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (error) throw error;
       
       if (data) {
-        // 보낸 사람 정보 매핑
         const senderIds = Array.from(new Set(data.map(m => m.sender_id)));
         const { data: senders } = await supabase.from('profiles').select('id, avatar_url').in('id', senderIds);
         const senderMap = new Map(senders?.map(s => [s.id, s]));
