@@ -27,13 +27,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (!user) { setIsLoading(false); return; }
       setCurrentUser(user);
 
+      // 1. 문의 목록 기본 조회
       let query = supabase
         .from('inquiries')
-        .select(`
-          *,
-          experiences (id, title, photos, image_url, host_id), 
-          guest:profiles!inquiries_user_id_fkey (*)
-        `)
+        .select(`*, experiences (id, title, photos, image_url, host_id)`)
         .order('updated_at', { ascending: false });
 
       if (role === 'guest') query = query.eq('user_id', user.id);
@@ -42,30 +39,45 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       const { data: inquiriesData, error } = await query;
       if (error) throw error;
       
-      if (inquiriesData) {
+      if (inquiriesData && inquiriesData.length > 0) {
+        // 2. 관련 사용자 ID 추출 (호스트와 게스트 모두)
         const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
-        const [profilesRes, appsRes] = await Promise.all([
+        const guestIds = Array.from(new Set(inquiriesData.map(item => item.user_id).filter(Boolean)));
+
+        // 3. 프로필 및 신청서 정보 병렬 조회 (안전한 분리 조회)
+        const [profilesRes, appsRes, guestProfilesRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', hostIds),
-          supabase.from('host_applications').select('*').in('user_id', hostIds)
+          supabase.from('host_applications').select('*').in('user_id', hostIds),
+          supabase.from('profiles').select('*').in('id', guestIds) // 게스트 정보 따로 조회
         ]);
 
         const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
         const appsMap = new Map(appsRes.data?.map(a => [a.user_id, a]));
+        const guestMap = new Map(guestProfilesRes.data?.map(g => [g.id, g]));
 
         const safeData = inquiriesData.map(item => {
+          // 호스트 정보 매핑
           const profile = profilesMap.get(item.host_id);
           const app = appsMap.get(item.host_id);
           const hostName = app?.name || profile?.name || profile?.full_name || 'Locally Host';
           const hostAvatar = app?.profile_photo || profile?.avatar_url || null; // 신청서 사진 우선
-          const rawGuest = item.guest;
+          
+          // 게스트 정보 매핑 (호스트 입장에서 중요)
+          const guestProfile = guestMap.get(item.user_id);
+          const guestName = guestProfile?.name || guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
+          const guestAvatar = guestProfile?.avatar_url || null;
 
           return {
             ...item,
-            guest: rawGuest ? { ...rawGuest, avatar_url: secureUrl(rawGuest.avatar_url) } : null,
+            guest: {
+              id: item.user_id,
+              name: guestName,
+              avatar_url: secureUrl(guestAvatar),
+              email: guestProfile?.email
+            },
             host: {
               id: item.host_id,
               name: hostName,
-              full_name: hostName,
               avatar_url: secureUrl(hostAvatar)
             },
             experiences: item.experiences ? {
@@ -75,6 +87,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           };
         });
         setInquiries(safeData);
+      } else {
+        setInquiries([]);
       }
     } catch (err: any) { console.error(err); } 
     finally { setIsLoading(false); }
@@ -82,17 +96,27 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const loadMessages = async (inquiryId: number) => {
     try {
+      // 메시지 가져올 때도 sender 정보 안전하게 처리
       const { data, error } = await supabase
         .from('inquiry_messages')
-        .select(`*, sender:profiles!inquiry_messages_sender_id_fkey (*)`)
+        .select(`*`)
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
       
       if (error) throw error;
+      
       if (data) {
+        // 보낸 사람 ID 수집
+        const senderIds = Array.from(new Set(data.map(m => m.sender_id)));
+        const { data: senders } = await supabase.from('profiles').select('id, avatar_url').in('id', senderIds);
+        const senderMap = new Map(senders?.map(s => [s.id, s]));
+
         const safeMessages = data.map(msg => ({
           ...msg,
-          sender: msg.sender ? { ...msg.sender, avatar_url: secureUrl(msg.sender.avatar_url) } : null
+          sender: {
+            ...senderMap.get(msg.sender_id),
+            avatar_url: secureUrl(senderMap.get(msg.sender_id)?.avatar_url)
+          }
         }));
         setMessages(safeMessages);
       }
@@ -120,7 +144,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return data;
   };
 
-  // 🟢 [수정] startNewChat: 전달받은 avatarUrl을 강제로 사용
   const startNewChat = (hostData: { id: string; name: string; avatarUrl?: string }, expData: { id: string; title: string }) => {
     setMessages([]);
     setSelectedInquiry({
@@ -130,8 +153,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       experience_id: expData.id,
       host: { 
         name: hostData.name, 
-        full_name: hostData.name, 
-        avatar_url: secureUrl(hostData.avatarUrl || null) // 🟢 여기서 확실히 적용
+        avatar_url: secureUrl(hostData.avatarUrl || null)
       },
       experiences: { id: expData.id, title: expData.title },
       content: ''
@@ -140,7 +162,5 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
-  // loadMessages를 외부에서 호출할 때 setSelectedInquiry가 작동하도록 반환
-  // UI 컴포넌트에서 클릭 시 이 loadMessages가 호출됨
   return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, refresh: fetchInquiries };
 }
