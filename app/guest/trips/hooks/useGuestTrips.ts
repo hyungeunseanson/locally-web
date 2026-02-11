@@ -120,7 +120,7 @@ export function useGuestTrips() {
       if (hostId) await sendNotification({ 
         recipient_id: hostId, 
         type: 'booking_cancel_request', 
-        title: '예약 취소 요청', // 👈 필수 입력값 추가
+        title: '예약 취소 요청', // 👈 필수값 추가!
         content: '예약 취소 요청이 있습니다.', 
         link_url: '/host/dashboard' 
       });
