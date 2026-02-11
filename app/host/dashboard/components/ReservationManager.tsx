@@ -41,6 +41,13 @@ export default function ReservationManager() {
     if (diff === 0) return 'Today';
     return `D-${diff}`;
   };
+
+  // ✅ [수정] 신규 예약 판별 함수 (이거 하나만 있으면 됩니다)
+  const isNewReservation = (createdAt: string) => {
+    const created = new Date(createdAt).getTime();
+    const now = new Date().getTime();
+    return (now - created) / (1000 * 60 * 60) < 24; 
+  };
 // ✅ [추가] 구글 캘린더 일정 등록 함수
 const addToGoogleCalendar = (res: any) => {
   const title = encodeURIComponent(`[Locally] ${res.experiences?.title} - ${res.guest?.full_name}님`);
@@ -88,9 +95,31 @@ const addToGoogleCalendar = (res: any) => {
     }
   }, [supabase]);
 
-  useEffect(() => {
-    fetchReservations();
-  }, [fetchReservations]);
+
+// 2. 실시간 예약 감지 (새 예약 들어오면 알림 + 새로고침)
+useEffect(() => {
+  fetchReservations();
+
+  const channel = supabase
+    .channel('host-bookings')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'bookings' },
+      (payload) => {
+        console.log('예약 변경 감지됨!', payload);
+        fetchReservations();
+        
+        if (payload.eventType === 'INSERT') {
+           showToast('🎉 새로운 예약이 도착했습니다!', 'success');
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [fetchReservations, supabase]);
 
   const handleRequestUserCancel = (res: any) => {
     const confirmMessage = 
@@ -141,7 +170,9 @@ const addToGoogleCalendar = (res: any) => {
   const getFilteredList = () => {
     const today = new Date();
     today.setHours(0,0,0,0);
-    return reservations.filter(r => {
+
+    // 1. 탭에 맞춰서 일단 거르기
+    let filtered = reservations.filter(r => {
       const [year, month, day] = r.date.split('-').map(Number);
       const tripDate = new Date(year, month - 1, day); 
       const isCancelled = r.status === 'cancelled'; 
@@ -152,6 +183,19 @@ const addToGoogleCalendar = (res: any) => {
       if (activeTab === 'upcoming') return tripDate >= today || isRequesting;
       if (activeTab === 'completed') return tripDate < today && !isRequesting;
       return true;
+    });
+
+    // 2. 정렬하기 (신규 예약 우선 -> 그 다음 날짜순)
+    return filtered.sort((a, b) => {
+      const aNew = isNewReservation(a.created_at);
+      const bNew = isNewReservation(b.created_at);
+
+      // 신규 예약(24시간 내)이 무조건 위로
+      if (aNew && !bNew) return -1;
+      if (!aNew && bNew) return 1;
+
+      // 그 다음은 여행 날짜(date) 빠른 순서
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
   };
 
@@ -222,9 +266,8 @@ const addToGoogleCalendar = (res: any) => {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+<div className="flex-1 overflow-y-auto p-6 bg-slate-50">
         {loading ? (
-          // ✅ [복구] 디테일한 스켈레톤 UI
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="border rounded-2xl p-6 bg-white space-y-4">
@@ -249,9 +292,12 @@ const addToGoogleCalendar = (res: any) => {
             {filteredList.map(res => {
               const dDay = getDDay(res.date);
               const isConfirmed = res.status === 'confirmed' || res.status === 'PAID';
+              const isNew = isNewReservation(res.created_at);
 
               return (
-                <div key={res.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div key={res.id} className={`bg-white rounded-2xl p-6 border transition-all relative overflow-hidden group ${
+                  isNew ? 'border-rose-200 shadow-md ring-1 ring-rose-100' : 'border-slate-200 shadow-sm hover:shadow-md'
+                }`}>
                   <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
                     res.status === 'cancellation_requested' ? 'bg-orange-400 animate-pulse' :
                     isConfirmed ? 'bg-green-500' : 
@@ -259,8 +305,6 @@ const addToGoogleCalendar = (res: any) => {
                   }`}/>
 
                   <div className="flex flex-col md:flex-row gap-6">
-                    
-                    {/* 날짜 박스 */}
                     <div className="md:w-32 flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-xl p-4 border border-slate-100">
                       <span className={`text-xs font-bold px-2 py-1 rounded-full mb-2 ${
                         dDay === 'Today' ? 'bg-rose-100 text-rose-600' : 
@@ -275,16 +319,15 @@ const addToGoogleCalendar = (res: any) => {
                       <div className="mt-2 text-xs font-medium text-slate-400 flex items-center gap-1">
                         <Clock size={12}/> {res.time}
                       </div>
-                      {/* ✅ [추가] 캘린더 추가 버튼 (확정된 예약일 때만 노출) */}
-{isConfirmed && (
-  <button 
-    onClick={() => addToGoogleCalendar(res)}
-    className="mt-3 w-full text-[10px] bg-white border border-slate-200 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
-    title="구글 캘린더에 추가"
-  >
-    <CalendarPlus size={12}/> 일정 추가
-  </button>
-)}
+                      {isConfirmed && (
+                        <button 
+                          onClick={() => addToGoogleCalendar(res)}
+                          className="mt-3 w-full text-[10px] bg-white border border-slate-200 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+                          title="구글 캘린더에 추가"
+                        >
+                          <CalendarPlus size={12}/> 일정 추가
+                        </button>
+                      )}
                     </div>
 
                     <div className="flex-1">
@@ -292,8 +335,10 @@ const addToGoogleCalendar = (res: any) => {
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-1">{res.experiences?.title}</p>
                           <div className="flex items-center gap-2">
-                          <h4 className="text-lg font-bold text-slate-900">예약 #{String(res.id).slice(0, 8)}</h4>
-                             {/* ✅ [복구] 상태 뱃지 삽입 */}
+                             <h4 className="text-lg font-bold text-slate-900">예약 #{String(res.id).slice(0, 8)}</h4>
+                             {isNew && (
+                               <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-md font-black animate-pulse">N</span>
+                             )}
                              {renderStatusBadge(res.status, res.date)}
                           </div>
                         </div>
@@ -304,11 +349,10 @@ const addToGoogleCalendar = (res: any) => {
                       </div>
 
                       <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row gap-6">
-                        {/* 1. 게스트 프로필 (클릭 기능 추가됨) */}
                         <div 
                           className="flex items-center gap-4 cursor-pointer group/profile"
                           onClick={(e) => {
-                            e.stopPropagation(); // 부모 클릭 방지
+                            e.stopPropagation();
                             setSelectedGuest(res.guest);
                           }}
                         >
@@ -328,7 +372,6 @@ const addToGoogleCalendar = (res: any) => {
                           </div>
                         </div>
 
-                        {/* 2. 연락처 정보 (카카오톡 ID 추가됨) */}
                         {isConfirmed && (
                           <div className="flex flex-col justify-center gap-2 text-sm text-slate-600 border-l border-slate-100 pl-6">
                               {res.guest?.phone && (
@@ -341,7 +384,6 @@ const addToGoogleCalendar = (res: any) => {
                                   <Mail size={14} className="text-slate-400"/> {res.guest.email}
                                 </div>
                               )}
-                              {/* ✅ 카카오톡 ID 표시 */}
                               {res.guest?.kakao_id && (
                                 <div className="flex items-center gap-2 hover:text-yellow-600 cursor-pointer text-slate-600">
                                   <div className="w-3.5 h-3.5 bg-yellow-400 rounded-sm flex items-center justify-center">
@@ -356,12 +398,12 @@ const addToGoogleCalendar = (res: any) => {
                     </div>
 
                     <div className="flex flex-row md:flex-col gap-2 justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[140px]">
-                    <button 
-  onClick={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
-  className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
->
-  <MessageSquare size={16}/> 메시지
-</button>
+                      <button 
+                        onClick={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
+                        className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
+                      >
+                        <MessageSquare size={16}/> 메시지
+                      </button>
                       
                       {isConfirmed && (
                         <button 
@@ -393,14 +435,13 @@ const addToGoogleCalendar = (res: any) => {
                        </div>
                     </div>
                   )}
-
                 </div>
               );
             })}
           </div>
         )}
       </div>
-      {/* 👇 여기서부터 복사해서 붙여넣으세요 (마지막 div 바로 위) 👇 */}
+
       {selectedGuest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedGuest(null)}>
           <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
@@ -431,18 +472,15 @@ const addToGoogleCalendar = (res: any) => {
               </h2>
               <p className="text-sm text-slate-500 font-medium mb-6">
               {(() => {
-  if (!selectedGuest.languages) return '언어 정보 없음';
-  try {
-    // 1. 이미 배열인 경우
-    if (Array.isArray(selectedGuest.languages)) return selectedGuest.languages.join(', ');
-    // 2. JSON 문자열인 경우 (예: "['English', 'Korean']")
-    if (selectedGuest.languages.startsWith('[')) return JSON.parse(selectedGuest.languages).join(', ');
-    // 3. 그냥 문자열인 경우 (예: "English")
-    return selectedGuest.languages;
-  } catch (e) {
-    return selectedGuest.languages; // 에러나면 그냥 원본 출력
-  }
-})()}
+                if (!selectedGuest.languages) return '언어 정보 없음';
+                try {
+                  if (Array.isArray(selectedGuest.languages)) return selectedGuest.languages.join(', ');
+                  if (selectedGuest.languages.startsWith('[')) return JSON.parse(selectedGuest.languages).join(', ');
+                  return selectedGuest.languages;
+                } catch (e) {
+                  return selectedGuest.languages;
+                }
+              })()}
               </p>
 
               {/* 소개글 */}
@@ -481,7 +519,6 @@ const addToGoogleCalendar = (res: any) => {
           </div>
         </div>
       )}
-      {/* 👆 여기까지 복사해서 붙여넣으세요 👆 */}
     </div>
   );
 }
