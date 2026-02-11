@@ -37,7 +37,11 @@ export default function HomeHero({
   locationInput, setLocationInput,
   dateRange, setDateRange,
   searchRef,
-  onSearch // ✅ 받아오기
+  onSearch,
+  
+  // 👇 여기 두 줄을 꼭 추가해주세요!
+  selectedLanguage, 
+  setSelectedLanguage 
 }: HomeHeroProps) {
 
   return (
@@ -81,9 +85,14 @@ export default function HomeHero({
             setLocationInput={setLocationInput}
             dateRange={dateRange}
             setDateRange={setDateRange}
+            
+            // ✅ [추가] 이 두 줄을 꼭 넣으세요!
+            selectedLanguage={selectedLanguage || '전체'} // 값이 없을 때 기본값 처리
+            setSelectedLanguage={setSelectedLanguage || (() => {})} // 함수 없을 때 빈 함수 처리
+            
             onCategorySelect={setSelectedCategory}
             isVisible={!isScrolled} 
-            onSearch={onSearch} // ✅ 넘겨주기
+            onSearch={onSearch} 
           />
         </div>
       </div>
