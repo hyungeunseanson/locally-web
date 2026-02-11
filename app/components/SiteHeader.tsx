@@ -14,9 +14,10 @@ export default function SiteHeader() {
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
-  
+  const { unreadCount } = useNotification();
+
   // ✅ 알림 관련 훅
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
+  const { notifications, markAsRead, markAllAsRead } = useNotification();
   const [showNoti, setShowNoti] = useState(false);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -154,51 +155,20 @@ export default function SiteHeader() {
               )}
             </div>
 
-            {user && (
-              <div className="relative mx-1">
-                <button 
-                  onClick={() => setShowNoti(!showNoti)} 
-                  className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-                >
-                  <Bell size={20} />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white animate-pulse"></span>
-                  )}
-                </button>
-
-                {showNoti && (
-                  <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                      <span className="font-bold text-sm text-slate-800">알림</span>
-                      <button onClick={markAllAsRead} className="text-xs text-slate-500 hover:text-black font-medium">모두 읽음</button>
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-xs text-slate-400">새로운 알림이 없습니다.</div>
-                      ) : (
-                        notifications.map(n => (
-                          <div 
-                            key={n.id} 
-                            onClick={() => { markAsRead(n.id); if(n.link) window.location.href = n.link; }}
-                            className={`p-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${!n.is_read ? 'bg-blue-50/30' : ''}`}
-                          >
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="font-bold text-xs text-slate-800 line-clamp-1">{n.title}</span>
-                              <span className="text-[10px] text-slate-400 shrink-0 ml-2" suppressHydrationWarning>
-                                {new Date(n.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{n.message}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+{/* ▼▼▼ 새로 넣을 코드 ▼▼▼ */}
+{user && (
+  <Link 
+                href="/notifications" 
+                className="relative mx-1 p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors inline-block"
+              >
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full animate-bounce"></span>
                 )}
-              </div>
+              </Link>
             )}
 
-            <div className="relative">
+<div className="relative ml-1">
               <div 
                 onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
                 className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white select-none"
