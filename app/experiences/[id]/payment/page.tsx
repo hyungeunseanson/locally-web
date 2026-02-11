@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
-import { ChevronLeft, CreditCard, Loader2, Calendar, Users, ShieldCheck, Clock } from 'lucide-react';
+import { ChevronLeft, CreditCard, Loader2, Calendar, Users, ShieldCheck, Clock, Info } from 'lucide-react';
 import Script from 'next/script';
 import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
@@ -25,8 +25,11 @@ function PaymentContent() {
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   
+  // 🟢 [가격 로직 수정]
   const basePrice = 50000; 
-  const totalPrice = isPrivate ? 300000 : basePrice * guests;
+  const hostPrice = isPrivate ? 300000 : basePrice * guests; // 호스트가 설정한 원가
+  const guestFee = hostPrice * 0.1; // 게스트에게 부과하는 수수료 10%
+  const finalAmount = hostPrice + guestFee; // 게스트가 실제로 결제할 총액
 
   useEffect(() => { 
     setMounted(true); 
@@ -43,7 +46,7 @@ function PaymentContent() {
   }, [experienceId]);
 
   const handlePayment = async () => {
-    if (!confirm("결제를 진행하시겠습니까?")) return;
+    if (!confirm(`총 ₩${finalAmount.toLocaleString()}원을 결제하시겠습니까?`)) return;
     setIsProcessing(true);
 
     try {
@@ -56,14 +59,15 @@ function PaymentContent() {
 
       const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+      // 🟢 [DB 저장 로직 수정]
       const { error } = await supabase.from('bookings').insert([{
         experience_id: experienceId,
         user_id: user.id,
         date: date,
         time: time,
         guests: guests,
-        total_price: totalPrice,
-        amount: totalPrice,
+        total_price: hostPrice,      // 20% 떼기 전 호스트의 매출 기준액
+        amount: finalAmount,         // 게스트가 실제로 낸 총 금액
         status: 'pending',
         type: isPrivate ? 'private' : 'group',
         order_id: orderId,
@@ -73,7 +77,7 @@ function PaymentContent() {
       if (error) throw error;
 
       showToast("결제가 완료되었습니다!", 'success');
-      router.push(`/payment/success?orderId=${orderId}&amount=${totalPrice}`);
+      router.push(`/payment/success?orderId=${orderId}&amount=${finalAmount}`);
 
     } catch (error: any) {
       showToast(`결제 실패: ${error.message}`, 'error');
@@ -96,10 +100,8 @@ function PaymentContent() {
         </div>
 
         <div className="p-6">
-          {/* 🟢 사진 비율 수정: w-24 h-32 (세로형) 또는 aspect-[3/4] 적용 */}
           <div className="flex gap-5 mb-8">
             <div className="w-24 h-32 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 shadow-sm border border-slate-100">
-               {/* object-cover를 쓰되, 사진의 중심을 맞추기보다 전체적으로 채우도록 함 */}
                <Image 
                  src={imageUrl} 
                  alt="Experience" 
@@ -115,17 +117,26 @@ function PaymentContent() {
           </div>
 
           <h2 className="text-xl font-bold mb-4">예약 정보 확인</h2>
-          <div className="bg-slate-50 p-6 rounded-2xl space-y-4 mb-8 text-sm text-slate-700 border border-slate-100">
+          <div className="bg-slate-50 p-6 rounded-2xl space-y-4 mb-6 text-sm text-slate-700 border border-slate-100">
              <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><Calendar size={16}/> 날짜</span><span className="font-bold">{date}</span></div>
              <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><Clock size={16}/> 시간</span><span className="font-bold">{time}</span></div>
              <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><Users size={16}/> 인원</span><span className="font-bold">{guests}명</span></div>
              {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><ShieldCheck size={16}/> 타입</span><span className="font-bold text-rose-500">프라이빗 투어</span></div>}
           </div>
 
-          <div className="border-t border-slate-100 pt-6 mb-8">
-            <div className="flex justify-between items-center">
-              <span className="font-bold text-slate-500">총 결제금액</span>
-              <span className="text-3xl font-black text-slate-900">₩{totalPrice.toLocaleString()}</span>
+          {/* 🟢 [수정] 금액 상세 표기 추가 */}
+          <div className="px-2 space-y-2 mb-8 text-sm">
+            <div className="flex justify-between items-center text-slate-600">
+              <span>체험 금액</span>
+              <span>₩{hostPrice.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center text-blue-600">
+              <span className="flex items-center gap-1">서비스 수수료 (10%) <Info size={12}/></span>
+              <span>+ ₩{guestFee.toLocaleString()}</span>
+            </div>
+            <div className="border-t border-slate-100 pt-4 mt-2 flex justify-between items-center">
+              <span className="font-bold text-slate-900">총 결제금액</span>
+              <span className="text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span>
             </div>
           </div>
 
