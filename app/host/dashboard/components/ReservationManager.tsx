@@ -48,10 +48,8 @@ export default function ReservationManager() {
   };
 
   const isNewReservation = (createdAt: string, id: number) => {
-    // ✅ [수정 3] 서버 렌더링 중이거나 확인된 예약이면 false 반환 (에러 방지 핵심)
-    if (!isMounted) return false; 
+    if (!isMounted) return false; // 👈 서버 렌더링 중엔 false 반환 (에러 방지)
     if (checkedIds.includes(id)) return false; 
-    
     const created = new Date(createdAt).getTime();
     const now = new Date().getTime();
     return (now - created) / (1000 * 60 * 60) < 24; 
@@ -100,63 +98,59 @@ export default function ReservationManager() {
     }
   }, [supabase]);
 
-  // ✅ [핵심] 실시간 감지 및 알림/새로고침 로직 강화
-  useEffect(() => {
-    fetchReservations(); // 초기 로드
+// ✅ 실시간 감지 및 알림/갱신 로직
+useEffect(() => {
+  fetchReservations();
 
-    const channel = supabase
-      .channel('host-dashboard-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'bookings' },
-        async (payload) => {
-          console.log('🔔 예약 테이블 변경 감지:', payload);
+  const channel = supabase
+    .channel('host-dashboard-realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'bookings' },
+      async (payload) => {
+        console.log('예약 테이블 변경 감지:', payload);
+        
+        // 1. 데이터 새로고침 (0.5초 딜레이로 DB 반영 대기 -> 취소상태 즉시반영 위함)
+        setTimeout(() => fetchReservations(false), 500);
 
-          // 1. 데이터 새로고침 (DB 반영 시간을 고려해 약간의 딜레이 후 실행)
-          setTimeout(() => fetchReservations(false), 500);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
+        // 2. 알림 전송 로직 (종 아이콘에 빨간불 켜기)
+        if (payload.eventType === 'INSERT') {
+           showToast('🎉 새로운 예약이 도착했습니다!', 'success');
+           await sendNotification({
+             userId: user.id,
+             type: 'new_booking',
+             title: '새로운 예약 도착',
+             message: '새로운 예약이 접수되었습니다. 확인해보세요!',
+             link: '/host/dashboard'
+           });
+        } 
+        else if (payload.eventType === 'UPDATE') {
+          const newStatus = payload.new.status;
+          const oldStatus = payload.old.status;
 
-          // 2. 상황별 알림 처리
-          if (payload.eventType === 'INSERT') {
-             // 신규 예약 발생 시
-             showToast('🎉 새로운 예약이 도착했습니다!', 'success');
-             
-             // 알림 스택에 추가
-             await sendNotification({
-               userId: user.id,
-               type: 'new_booking',
-               title: '새로운 예약 도착',
-               message: '게스트의 새로운 예약이 접수되었습니다.',
-               link: '/host/dashboard'
-             });
-          } 
-          else if (payload.eventType === 'UPDATE') {
-            const newStatus = payload.new.status;
-            const oldStatus = payload.old.status;
-
-            // 취소 요청이 들어왔을 때
-            if (newStatus === 'cancellation_requested' && oldStatus !== 'cancellation_requested') {
-              showToast('🚨 예약 취소 요청이 접수되었습니다.', 'error');
-              
-              await sendNotification({
-                userId: user.id,
-                type: 'booking_cancel_request',
-                title: '예약 취소 요청',
-                message: '게스트가 예약을 취소하고 싶어합니다. 확인해주세요.',
-                link: '/host/dashboard?tab=cancelled' // 취소 탭으로 유도
-              });
-            }
+          // 취소 요청 상태로 바뀌면 알림 전송
+          if (newStatus === 'cancellation_requested' && oldStatus !== 'cancellation_requested') {
+            showToast('🚨 예약 취소 요청이 접수되었습니다.', 'error');
+            await sendNotification({
+              userId: user.id,
+              type: 'booking_cancel_request',
+              title: '예약 취소 요청',
+              message: '게스트가 예약을 취소하고 싶어합니다. 확인해주세요.',
+              link: '/host/dashboard?tab=cancelled'
+            });
           }
         }
-      )
-      .subscribe();
+      }
+    )
+    .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchReservations, supabase]);
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [fetchReservations, supabase]);
 
   const handleRequestUserCancel = (res: any) => {
     const confirmMessage = 
@@ -245,6 +239,7 @@ export default function ReservationManager() {
 
   if (!isMounted) return <Skeleton className="w-full h-64 rounded-2xl" />;
 
+  
   const filteredList = getFilteredList();
 
   return (

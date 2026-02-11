@@ -184,7 +184,9 @@ export default function SiteHeader() {
                           >
                             <div className="flex justify-between items-start mb-1">
                               <span className="font-bold text-xs text-slate-800 line-clamp-1">{n.title}</span>
-                              <span className="text-[10px] text-slate-400 shrink-0 ml-2">{new Date(n.created_at).toLocaleDateString()}</span>
+                              <span className="text-[10px] text-slate-400 shrink-0 ml-2" suppressHydrationWarning>
+                                {new Date(n.created_at).toLocaleDateString()}
+                              </span>
                             </div>
                             <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{n.message}</p>
                           </div>
