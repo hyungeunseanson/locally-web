@@ -4,12 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { sendNotification } from '@/app/utils/notification';
+import { sendNotification } from '@/app/utils/notification'; // ✅ 알림 기능 활용
 import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState';
 import { useToast } from '@/app/context/ToastContext';
 
-// 🟢 [추가] 분리한 컴포넌트 불러오기
+// 컴포넌트 불러오기
 import ReservationCard from './ReservationCard';
 import GuestProfileModal from './GuestProfileModal';
 
@@ -21,11 +21,32 @@ export default function ReservationManager() {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<any>(null);
   
+  // ✅ 확인된 예약 ID 저장 (새로고침해도 유지되도록 localStorage 사용 권장)
+  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+
   const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
 
-  const isNewReservation = (createdAt: string) => {
+  // 초기 로드시 로컬스토리지에서 확인된 예약 목록 가져오기
+  useEffect(() => {
+    const saved = localStorage.getItem('checked_reservations');
+    if (saved) {
+      setCheckedIds(JSON.parse(saved));
+    }
+  }, []);
+
+  // ✅ 예약 확인 처리 함수
+  const handleConfirmCheck = (id: number) => {
+    const newChecked = [...checkedIds, id];
+    setCheckedIds(newChecked);
+    localStorage.setItem('checked_reservations', JSON.stringify(newChecked));
+    showToast('예약을 확인했습니다.');
+  };
+
+  // 신규 예약 판별 (24시간 이내 AND 확인 안 한 것)
+  const isNewReservation = (createdAt: string, id: number) => {
+    if (checkedIds.includes(id)) return false; // 이미 확인했으면 New 아님
     const created = new Date(createdAt).getTime();
     const now = new Date().getTime();
     return (now - created) / (1000 * 60 * 60) < 24; 
@@ -76,6 +97,7 @@ export default function ReservationManager() {
     }
   }, [supabase]);
 
+  // ✅ 실시간 예약 감지 및 알림 생성 (중요!)
   useEffect(() => {
     fetchReservations();
 
@@ -84,12 +106,25 @@ export default function ReservationManager() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookings' },
-        (payload) => {
+        async (payload) => {
           console.log('예약 변경 감지됨!', payload);
           fetchReservations();
           
           if (payload.eventType === 'INSERT') {
              showToast('🎉 새로운 예약이 도착했습니다!', 'success');
+
+             // 🚨 [추가] 알림 종(Notification Stack)에 강제로 알림 넣기
+             // 호스트 본인에게 알림을 보냅니다.
+             const { data: { user } } = await supabase.auth.getUser();
+             if (user) {
+               await sendNotification({
+                 userId: user.id, // 나 자신에게 보냄
+                 type: 'new_booking',
+                 title: '새로운 예약 도착',
+                 message: '새로운 예약이 접수되었습니다. 확인해보세요!',
+                 link: '/host/dashboard'
+               });
+             }
           }
         }
       )
@@ -164,8 +199,9 @@ export default function ReservationManager() {
     });
 
     return filtered.sort((a, b) => {
-      const aNew = isNewReservation(a.created_at);
-      const bNew = isNewReservation(b.created_at);
+      // ✅ 여기서 ID도 넘겨서 확인 여부 체크
+      const aNew = isNewReservation(a.created_at, a.id);
+      const bNew = isNewReservation(b.created_at, b.id);
       if (aNew && !bNew) return -1;
       if (!aNew && bNew) return 1;
       return new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -245,25 +281,24 @@ export default function ReservationManager() {
           />
         ) : (
           <div className="space-y-6">
-            {/* 🟢 이제 카드 컴포넌트를 반복해서 보여줍니다 */}
             {filteredList.map(res => (
               <ReservationCard 
                 key={res.id}
                 res={res}
-                isNew={isNewReservation(res.created_at)}
+                isNew={isNewReservation(res.created_at, res.id)} // ✅ ID도 같이 넘김
                 processingId={processingId}
                 onCalendar={addToGoogleCalendar}
                 onMessage={(userId) => router.push(`/host/dashboard?tab=inquiries&guestId=${userId}`)}
                 onCancelQuery={handleRequestUserCancel}
                 onApproveCancel={handleApproveCancellation}
                 onShowProfile={setSelectedGuest}
+                onConfirmCheck={handleConfirmCheck} // ✅ 확인 버튼 함수 전달
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* 🟢 모달 컴포넌트 */}
       <GuestProfileModal 
         guest={selectedGuest} 
         onClose={() => setSelectedGuest(null)} 
