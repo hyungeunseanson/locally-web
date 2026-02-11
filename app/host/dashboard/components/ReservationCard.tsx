@@ -6,22 +6,24 @@ import {
   Phone, Mail, XCircle, AlertTriangle, Loader2, CalendarPlus 
 } from 'lucide-react';
 
+// ✅ [수정 후] (이렇게 바꾸세요)
 interface Props {
-  res: any;
-  isNew: boolean;
-  processingId: number | null;
-  onCalendar: (res: any) => void;
-  onMessage: (userId: string) => void;
-  onCancelQuery: (res: any) => void;
-  onApproveCancel: (res: any) => void;
-  onShowProfile: (guest: any) => void;
-  onCheck: (id: number) => void; // 👈 이거 한 줄 추가
-}
+    res: any;
+    isNew: boolean;
+    isProcessing: boolean; // ⭕ boolean으로 변경
+    onCalendar: () => void;       // 인자 제거 (부모가 처리함)
+    onMessage: () => void;
+    onCancelQuery: () => void;
+    onApproveCancel: () => void;
+    onShowProfile: () => void;
+    onCheck: () => void;
+  }
 
+// ✅ [수정 후]
 export default function ReservationCard({ 
-  res, isNew, processingId, 
-  onCalendar, onMessage, onCancelQuery, onApproveCancel, onShowProfile, onCheck // 👈 여기에 추가
-}: Props) {
+    res, isNew, isProcessing, // ⭕ 이름 변경
+    onCalendar, onMessage, onCancelQuery, onApproveCancel, onShowProfile, onCheck 
+  }: Props) {
 
   const secureUrl = (url: string | null) => {
     if (!url) return null;
@@ -87,9 +89,9 @@ export default function ReservationCard({
           </div>
           {isConfirmed && (
             <button 
-              onClick={() => onCalendar(res)}
+              onClick={(e) => { e.stopPropagation(); onCalendar(); }}
               className="mt-3 w-full text-[10px] bg-white border border-slate-200 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
-              title="구글 캘린더에 추가"
+              title="캘린더에 추가"
             >
               <CalendarPlus size={12}/> 일정 추가
             </button>
@@ -108,7 +110,7 @@ export default function ReservationCard({
                    <button 
                      onClick={(e) => {
                        e.stopPropagation();
-                       onCheck(res.id); // ✅ 누르면 사라짐
+                       onCheck(); // ✅ 누르면 사라짐
                      }}
                      className="bg-rose-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold animate-pulse hover:bg-rose-600 cursor-pointer"
                      title="클릭하여 확인 표시 제거"
@@ -132,9 +134,9 @@ export default function ReservationCard({
             <div 
               className="flex items-center gap-4 cursor-pointer group/profile"
               onClick={(e) => {
-                e.stopPropagation();
-                onCheck(res.id); // ✅ 프로필 열면 확인 처리
-                onShowProfile(res.guest);
+                e.stopPropagation(); 
+                onCheck(); 
+                onShowProfile();
               }}
             >
               <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 group-hover/profile:ring-2 ring-slate-900 transition-all">
@@ -180,8 +182,8 @@ export default function ReservationCard({
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              onCheck(res.id); // ✅ 메시지 버튼 누르면 'N' 뱃지 사라짐 (확인 처리)
-              onMessage(res.user_id); // 채팅방 이동
+              onCheck(); 
+onMessage();
             }}
             className="w-full h-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
@@ -199,13 +201,13 @@ export default function ReservationCard({
                <p className="font-bold text-orange-900">취소 요청이 접수되었습니다.</p>
                <p className="text-sm text-orange-700 mt-1">게스트 사유: {res.cancel_reason || '사유 없음'}</p>
                <button 
-                 onClick={() => onApproveCancel(res)}
-                 disabled={processingId === res.id}
+  onClick={(e) => { e.stopPropagation(); onApproveCancel(); }} // 인자 제거
+  disabled={isProcessing}
                  className="mt-3 bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors flex items-center gap-2 shadow-md"
                >
-                 {processingId === res.id ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>}
-                 요청 승인 및 환불해주기
-               </button>
+{isProcessing ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>} {/* ⭕ 변수 교체 */}
+  요청 승인 및 환불해주기
+</button>
              </div>
            </div>
         </div>
