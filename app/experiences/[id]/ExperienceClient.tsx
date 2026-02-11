@@ -59,7 +59,7 @@ const { data: bookings } = await supabase
 .from('bookings')
 .select('date, time, guests')
 .eq('experience_id', exp.id)
-.eq('status', 'PAID');
+.in('status', ['PAID', 'confirmed']); // 🟢 PAID 또는 confirmed 상태 모두 체크
 
 if (dates) {
 const timeMap: Record<string, string[]> = {};
@@ -67,21 +67,28 @@ const seatsMap: Record<string, number> = {}; // 잔여석 저장용
 const maxGuests = exp.max_guests || 10; // 기본값 10명
 
 dates.forEach((d: any) => {
-  const key = `${d.date}_${d.start_time}`;
+  const availTime = d.start_time.substring(0, 5);
   
-  // 해당 시간대의 예약 인원 합산
   const currentBooked = bookings
-    ?.filter((b: any) => b.date === d.date && b.time === d.start_time)
-    .reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
+  ?.filter((b: any) => {
+    const bookingTime = b.time.substring(0, 5); // 예약 시간도 앞 5자리만
+    return b.date === d.date && bookingTime === availTime;
+  })
+  .reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
 
-  const remaining = maxGuests - currentBooked;
+const remaining = maxGuests - currentBooked;
 
-  // 🟢 자리가 남아있을 때만 리스트에 추가
-  if (remaining > 0) {
-    if (!timeMap[d.date]) timeMap[d.date] = [];
-    timeMap[d.date].push(d.start_time);
-    seatsMap[key] = remaining; // 잔여석 저장
+// 키 생성 시에도 앞 5자리 사용
+const key = `${d.date}_${availTime}`; 
+
+if (remaining > 0) {
+  if (!timeMap[d.date]) timeMap[d.date] = [];
+  // 중복 방지 체크 후 추가
+  if (!timeMap[d.date].includes(availTime)) {
+     timeMap[d.date].push(availTime);
   }
+  seatsMap[key] = remaining;
+}
 });
 
 // 날짜순 정렬 후 상태 업데이트

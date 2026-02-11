@@ -148,13 +148,15 @@ export default function ReservationCard({
 {/* ▼▼▼ 새로 넣을 코드 (잔여석 표시 기능 추가됨) ▼▼▼ */}
 {dateToTimeMap[selectedDate]?.map(time => {
               // 🟢 1. 이 날짜, 이 시간의 남은 자리를 확인합니다.
-              const key = `${selectedDate}_${time}`;
-              const seats = remainingSeatsMap[key] ?? maxGuests; // 정보가 없으면 최대 정원으로 간주
+// 🟢 [수정] 시간 형식이 HH:MM:SS로 들어올 수도 있으므로 앞 5자리만 사용
+const cleanTime = time.substring(0, 5);
+const key = `${selectedDate}_${cleanTime}`;
+const seats = remainingSeatsMap[key] ?? maxGuests;
               
               return (
                 <button 
                   key={time} 
-                  onClick={() => setSelectedTime(time)} 
+                  onClick={() => setSelectedTime(cleanTime)} // 클릭 시에도 cleanTime 저장
                   // 디자인 클래스는 기존과 동일합니다.
                   className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all flex flex-col items-center 
                     ${selectedTime === time ? 'bg-black text-white border-black' : 'bg-white text-slate-700 border-slate-200 hover:border-black'}`}
