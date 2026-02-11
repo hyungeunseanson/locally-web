@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { sendNotification } from '@/app/utils/notification';
+import { sendNotification } from '@/app/utils/notification'; // 알림 함수
 import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState';
 import { useToast } from '@/app/context/ToastContext';
@@ -98,7 +98,7 @@ export default function ReservationManager() {
     }
   }, [supabase]);
 
-  // 실시간 예약 감지 및 알림
+  // ✅ 실시간 예약 감지 및 알림 (여기가 수정되었습니다)
   useEffect(() => {
     fetchReservations();
 
@@ -114,7 +114,7 @@ export default function ReservationManager() {
           if (payload.eventType === 'INSERT') {
              showToast('🎉 새로운 예약이 도착했습니다!', 'success');
              
-             // 알림 종(Bell)에 빨간 불 들어오게 하기
+             // 알림 종(Bell)에 알림 추가
              const { data: { user } } = await supabase.auth.getUser();
              if (user) {
                await sendNotification({
