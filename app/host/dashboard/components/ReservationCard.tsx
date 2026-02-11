@@ -175,23 +175,18 @@ export default function ReservationCard({
           </div>
         </div>
 
-        {/* 액션 버튼들 */}
-        <div className="flex flex-row md:flex-col gap-2 justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[140px]">
+{/* 액션 버튼들 - 메시지 버튼만 남김 */}
+<div className="flex flex-row md:flex-col gap-2 justify-center border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[140px]">
           <button 
-            onClick={() => onMessage(res.user_id)}
-            className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCheck(res.id); // ✅ 메시지 버튼 누르면 'N' 뱃지 사라짐 (확인 처리)
+              onMessage(res.user_id); // 채팅방 이동
+            }}
+            className="w-full h-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
             <MessageSquare size={16}/> 메시지
           </button>
-          
-          {isConfirmed && (
-            <button 
-              onClick={() => onCancelQuery(res)}
-              className="w-full bg-white text-slate-500 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors flex items-center justify-center gap-2"
-            >
-              <XCircle size={16}/> 취소 문의
-            </button>
-          )}
         </div>
       </div>
 
