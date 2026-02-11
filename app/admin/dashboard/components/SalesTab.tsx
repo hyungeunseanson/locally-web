@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { DollarSign, TrendingUp, CreditCard, Wallet, Calendar, Download, AlertTriangle, CheckCircle } from 'lucide-react';
 
-export default function SalesTab({ bookings }: { bookings: any[] }) {
+export default function SalesTab({ bookings, apps }: { bookings: any[], apps: any[] }) {
   const [dateFilter, setDateFilter] = useState('30D');
   const [settlementTab, setSettlementTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
 
@@ -24,16 +24,50 @@ export default function SalesTab({ bookings }: { bookings: any[] }) {
   
   // 핵심 지표 계산
   const totalRevenue = filteredBookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
-  const platformFee = totalRevenue * 0.15; // 수수료 15% 가정
-  const hostPayout = totalRevenue - platformFee;
+// 🟢 [수수료 정책 반영] 
+  // 전체 매출의 20%를 플랫폼 수익으로 잡음 (고객 수수료 포함된 전체 파이에서 20%)
+  const platformFee = totalRevenue * 0.20; 
+  const hostPayout = totalRevenue - platformFee; // 나머지 80%는 호스트 몫
   const averageOrderValue = filteredBookings.length > 0 ? totalRevenue / filteredBookings.length : 0;
 
-  // 가상의 정산 데이터 (호스트 정산용)
-  const settlementList = [
-    { id: 101, host: 'Host Kim', amount: 450000, bank: 'KakaoBank 3333-01...', status: 'pending', due: '2026-03-01' },
-    { id: 102, host: 'Guide Lee', amount: 1200000, bank: 'Shinhan 110-22...', status: 'pending', due: '2026-03-01' },
-    { id: 103, host: 'Studio Park', amount: 320000, bank: 'Woori 1002-99...', status: 'completed', date: '2026-02-01' },
-  ].filter(s => settlementTab === 'PENDING' ? s.status === 'pending' : s.status === 'completed');
+// 3. 🟢 [핵심] 정산 예정 내역 자동 계산 (Host Grouping Logic)
+const calculateSettlements = () => {
+  const settlementMap = new Map();
+
+  // '이용 완료(completed)'된 예약만 정산 대상으로 잡음
+  const completedBookings = bookings.filter(b => b.status === 'completed');
+
+  completedBookings.forEach(booking => {
+    const hostId = booking.experiences?.host_id;
+    if (!hostId) return;
+
+    if (!settlementMap.has(hostId)) {
+      // 호스트 정보(계좌 등) 매칭
+      const hostInfo = apps.find(a => a.user_id === hostId);
+      
+      settlementMap.set(hostId, {
+        id: hostId,
+        hostName: hostInfo?.name || '알 수 없음',
+        // 계좌 정보가 없으면 '미등록' 표시
+        bank: hostInfo?.bank_name ? `${hostInfo.bank_name} ${hostInfo.account_number}` : '계좌 미등록',
+        accountHolder: hostInfo?.account_holder || '-',
+        totalAmount: 0,
+        count: 0,
+        status: 'pending', // 아직 정산 테이블이 없으므로 기본 '대기' 상태
+        lastDate: booking.date
+      });
+    }
+
+    const current = settlementMap.get(hostId);
+    // 호스트에게 줄 돈 = 결제금액의 80% (플랫폼 수수료 20% 제외)
+    current.totalAmount += (booking.total_price || 0) * 0.8; 
+    current.count += 1;
+  });
+
+  return Array.from(settlementMap.values());
+};
+
+const settlementList = calculateSettlements();
 
   return (
     <div className="flex-1 space-y-8 overflow-y-auto p-2 animate-in fade-in zoom-in-95 duration-300">
@@ -116,20 +150,30 @@ export default function SalesTab({ bookings }: { bookings: any[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {settlementList.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 font-bold text-slate-900">{item.host}</td>
-                <td className="px-6 py-4 font-mono font-bold">₩{item.amount.toLocaleString()}</td>
-                <td className="px-6 py-4 text-slate-500 flex items-center gap-1"><CreditCard size={14}/> {item.bank}</td>
-                <td className="px-6 py-4 text-slate-500">{item.due || item.date}</td>
+            {settlementList.length > 0 ? settlementList.map((item: any, idx: number) => (
+              <tr key={idx} className="hover:bg-slate-50">
+                <td className="px-6 py-4">
+                  {/* hostName과 accountHolder 사용 */}
+                  <div className="font-bold text-slate-900">{item.hostName}</div>
+                  <div className="text-xs text-slate-400">{item.accountHolder}</div>
+                </td>
+                {/* totalAmount 사용 */}
+                <td className="px-6 py-4 font-mono font-bold text-purple-600">₩{item.totalAmount.toLocaleString()}</td>
+                <td className="px-6 py-4 text-slate-500 flex items-center gap-1">
+                  {/* 계좌 미등록 시 빨간 아이콘 */}
+                  {item.bank === '계좌 미등록' ? <AlertTriangle size={14} className="text-red-500"/> : <CreditCard size={14}/>} 
+                  {item.bank}
+                </td>
+                <td className="px-6 py-4 text-slate-500">{item.count}건</td>
                 <td className="px-6 py-4 text-right">
-                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                    {item.status}
+                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.bank === '계좌 미등록' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                    {item.bank === '계좌 미등록' ? '계좌 필요' : '대기중'}
                   </span>
                 </td>
               </tr>
-            ))}
-            {settlementList.length === 0 && <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400">내역이 없습니다.</td></tr>}
+            )) : (
+              <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400">정산할 내역이 없습니다. (완료된 예약이 없음)</td></tr>
+            )}
           </tbody>
         </table>
       </div>

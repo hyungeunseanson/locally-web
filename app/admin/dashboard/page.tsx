@@ -119,7 +119,7 @@ export default function AdminDashboardPage() {
       ) : activeTab === 'BOOKINGS' ? (
         <BookingsTab bookings={bookings} />
       ) : activeTab === 'SALES' ? (
-        <SalesTab bookings={bookings} />
+<SalesTab bookings={bookings} apps={apps} />
       ) : activeTab === 'ANALYTICS' ? (
         <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
       ) : activeTab === 'CHATS' ? (
