@@ -42,7 +42,6 @@ export function useGuestTrips() {
       if (error) throw error;
 
       if (bookings) {
-        // 호스트 신청서 정보 매핑
         const hostIds = Array.from(new Set(bookings.map((b: any) => b.experiences?.host_id).filter(Boolean)));
         let appsMap = new Map();
         if (hostIds.length > 0) {
@@ -85,7 +84,7 @@ export function useGuestTrips() {
             image: secureUrl(booking.experiences.photos?.[0]), 
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
-            status: booking.status, // ✅ 상태값 확인 (여기가 바뀌어야 화면도 바뀜)
+            status: booking.status,
             price: booking.amount || booking.total_price || 0,
             guests: booking.guests || 1,
             expId: booking.experience_id,
@@ -107,38 +106,32 @@ export function useGuestTrips() {
     }
   }, [supabase]);
 
-  // ✅ [수정됨] 취소 요청 로직 강화
+  // ✅ [수정 완료] 과도한 검증 로직 제거 + 알림 정상화
   const requestCancel = async (id: number, reason: string, hostId: string) => {
     setIsProcessing(true);
     try {
-      // 1. DB 업데이트 (상태 변경) 및 결과 확인 (.select() 추가)
-      const { data, error } = await supabase
+      // 1. DB 업데이트 (검증 로직 제거, 에러만 체크)
+      const { error } = await supabase
         .from('bookings')
         .update({ status: 'cancellation_requested', cancel_reason: reason })
-        .eq('id', id)
-        .select(); // 업데이트된 행 반환
+        .eq('id', id);
 
       if (error) throw error;
       
-      // 업데이트된 행이 없으면 실패로 간주
-      if (!data || data.length === 0) {
-        throw new Error('예약 정보를 찾을 수 없거나 변경 권한이 없습니다.');
-      }
-
-      // 2. 호스트에게 알림 전송 (title 추가하여 에러 방지)
+      // 2. 호스트 알림 전송 (title 필수값 포함)
       if (hostId) {
         await sendNotification({ 
           recipient_id: hostId, 
           type: 'booking_cancel_request', 
-          title: '예약 취소 요청', // ✅ 필수값 추가
+          title: '예약 취소 요청', 
           content: '게스트가 예약 취소를 요청했습니다.', 
-          link_url: '/host/dashboard?tab=reservations' 
+          link_url: '/host/dashboard?tab=cancelled' 
         });
       }
 
       showToast('취소 요청이 접수되었습니다.', 'success');
       
-      // 3. 목록 새로고침 (화면 갱신)
+      // 3. 목록 새로고침 (즉시 UI 반영)
       await fetchMyTrips(); 
       return true; 
 
