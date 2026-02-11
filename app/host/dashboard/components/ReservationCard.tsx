@@ -3,7 +3,7 @@
 import React from 'react';
 import { 
   Clock, User, CheckCircle2, MessageSquare, 
-  Phone, Mail, XCircle, AlertTriangle, Loader2, CalendarPlus, Check 
+  Phone, Mail, XCircle, AlertTriangle, Loader2, CalendarPlus 
 } from 'lucide-react';
 
 interface Props {
@@ -15,12 +15,11 @@ interface Props {
   onCancelQuery: (res: any) => void;
   onApproveCancel: (res: any) => void;
   onShowProfile: (guest: any) => void;
-  onConfirmCheck: (id: number) => void; // ✅ 확인 완료 버튼 함수
 }
 
 export default function ReservationCard({ 
   res, isNew, processingId, 
-  onCalendar, onMessage, onCancelQuery, onApproveCancel, onShowProfile, onConfirmCheck 
+  onCalendar, onMessage, onCancelQuery, onApproveCancel, onShowProfile 
 }: Props) {
 
   const secureUrl = (url: string | null) => {
@@ -58,11 +57,10 @@ export default function ReservationCard({
   const isConfirmed = res.status === 'confirmed' || res.status === 'PAID';
 
   return (
-    <div className={`bg-white rounded-2xl p-6 border transition-all relative overflow-hidden group ${
-      isNew ? 'border-blue-500 shadow-md ring-1 ring-blue-100' : 'border-slate-200 shadow-sm hover:shadow-md'
-    }`}>
+    // 🎨 테두리 색상 빨간색 제거 -> 깔끔한 스타일 유지
+    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
       
-      {/* 왼쪽 컬러바 (상태에 따라 색상 변경) */}
+      {/* 왼쪽 컬러바 */}
       <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
         res.status === 'cancellation_requested' ? 'bg-orange-400 animate-pulse' :
         isConfirmed ? 'bg-green-500' : 
@@ -71,7 +69,7 @@ export default function ReservationCard({
 
       <div className="flex flex-col md:flex-row gap-6">
         
-        {/* 1. 날짜 및 캘린더 박스 */}
+        {/* 날짜 박스 */}
         <div className="md:w-32 flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-xl p-4 border border-slate-100">
           <span className={`text-xs font-bold px-2 py-1 rounded-full mb-2 ${
             dDay === 'Today' ? 'bg-rose-100 text-rose-600' : 
@@ -97,7 +95,7 @@ export default function ReservationCard({
           )}
         </div>
 
-        {/* 2. 메인 정보 영역 */}
+        {/* 상세 정보 */}
         <div className="flex-1">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -105,19 +103,13 @@ export default function ReservationCard({
               <div className="flex items-center gap-2">
                  <h4 className="text-lg font-bold text-slate-900">예약 #{String(res.id).slice(0, 8)}</h4>
                  
-                 {/* ✅ 촌스러운 빨간 테두리 대신 깔끔한 NEW 뱃지와 확인 버튼 */}
+                 {/* ✅ [복구] 심플한 'N' 배지 (다른 페이지 UX 통일) */}
                  {isNew && (
-                   <div className="flex items-center gap-2">
-                     <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold animate-pulse">NEW</span>
-                     <button 
-                       onClick={(e) => { e.stopPropagation(); onConfirmCheck(res.id); }}
-                       className="text-[10px] flex items-center gap-1 bg-slate-900 text-white px-2 py-1 rounded hover:bg-black transition-colors"
-                     >
-                       <Check size={10}/> 확인 완료
-                     </button>
-                   </div>
+                   <span className="bg-rose-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold animate-pulse">
+                     N
+                   </span>
                  )}
-
+                 
                  {renderStatusBadge(res.status, res.date)}
               </div>
             </div>
@@ -153,7 +145,7 @@ export default function ReservationCard({
               </div>
             </div>
 
-            {/* ✅ 연락처 정보: 확정되면 무조건 보이게 수정 */}
+            {/* ✅ 연락처 정보: 확정되면 무조건 노출 */}
             {isConfirmed && (
               <div className="flex flex-col justify-center gap-2 text-sm text-slate-600 border-l border-slate-100 pl-6">
                   <div className="flex items-center gap-2 hover:text-black cursor-pointer">
@@ -195,7 +187,7 @@ export default function ReservationCard({
         </div>
       </div>
 
-      {/* 취소 요청 박스 */}
+      {/* 취소 요청 승인 박스 */}
       {res.status === 'cancellation_requested' && (
         <div className="mt-4 bg-orange-50 border border-orange-100 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
            <div className="flex items-start gap-3">
