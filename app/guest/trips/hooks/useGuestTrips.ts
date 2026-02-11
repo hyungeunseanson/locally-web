@@ -80,7 +80,7 @@ export function useGuestTrips() {
             time: booking.time || '시간 미정',
             location: booking.experiences.city || '서울',
             address: booking.experiences.address || booking.experiences.city,
-            photos: booking.experiences.photos || [],
+            photos: booking.experiences.photos?.map((p: string) => secureUrl(p)) || [],
             image: secureUrl(booking.experiences.photos?.[0]), 
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
