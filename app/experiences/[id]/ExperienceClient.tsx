@@ -32,6 +32,7 @@ export default function ExperienceClient() {
   
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>({});
+  const [remainingSeatsMap, setRemainingSeatsMap] = useState<Record<string, number>>({}); // 🟢 잔여석 정보 추가
   const [inquiryText, setInquiryText] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
@@ -46,17 +47,49 @@ export default function ExperienceClient() {
         setExperience(exp);
         
         // 날짜 정보
-        const { data: dates } = await supabase.from('experience_availability').select('date, start_time').eq('experience_id', exp.id).eq('is_booked', false);
-        if (dates) {
-          const datesList = Array.from(new Set(dates.map((d: any) => d.date)));
-          setAvailableDates(datesList as string[]);
-          const timeMap: Record<string, string[]> = {};
-          dates.forEach((d:any) => {
-            if (!timeMap[d.date]) timeMap[d.date] = [];
-            timeMap[d.date].push(d.start_time);
-          });
-          setDateToTimeMap(timeMap);
-        }
+// 2. 예약 가능한 날짜 가져오기 (호스트가 오픈한 날짜)
+const { data: dates } = await supabase
+.from('experience_availability')
+.select('date, start_time')
+.eq('experience_id', exp.id)
+.eq('is_booked', false);
+
+// 3. 🟢 [핵심] 이미 완료된 예약 가져오기 (정원 계산용)
+const { data: bookings } = await supabase
+.from('bookings')
+.select('date, time, guests')
+.eq('experience_id', exp.id)
+.eq('status', 'PAID');
+
+if (dates) {
+const timeMap: Record<string, string[]> = {};
+const seatsMap: Record<string, number> = {}; // 잔여석 저장용
+const maxGuests = exp.max_guests || 10; // 기본값 10명
+
+dates.forEach((d: any) => {
+  const key = `${d.date}_${d.start_time}`;
+  
+  // 해당 시간대의 예약 인원 합산
+  const currentBooked = bookings
+    ?.filter((b: any) => b.date === d.date && b.time === d.start_time)
+    .reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
+
+  const remaining = maxGuests - currentBooked;
+
+  // 🟢 자리가 남아있을 때만 리스트에 추가
+  if (remaining > 0) {
+    if (!timeMap[d.date]) timeMap[d.date] = [];
+    timeMap[d.date].push(d.start_time);
+    seatsMap[key] = remaining; // 잔여석 저장
+  }
+});
+
+// 날짜순 정렬 후 상태 업데이트
+const validDates = Object.keys(timeMap).sort();
+setAvailableDates(validDates);
+setDateToTimeMap(timeMap);
+setRemainingSeatsMap(seatsMap); // 🟢 잔여석 상태 저장
+}
 
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', exp.host_id).single();
         const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
@@ -188,6 +221,7 @@ export default function ExperienceClient() {
             experience={experience} 
             availableDates={availableDates} 
             dateToTimeMap={dateToTimeMap} 
+            remainingSeatsMap={remainingSeatsMap} // 🟢 이거 한 줄 추가!
             handleReserve={handleReserve} 
           />
         </div>
