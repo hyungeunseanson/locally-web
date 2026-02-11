@@ -12,14 +12,21 @@ interface HomeHeroProps {
   selectedCategory: string;
   setSelectedCategory: (id: string) => void;
   isScrolled: boolean;
-  activeSearchField: 'location' | 'date' | null;
-  setActiveSearchField: (field: 'location' | 'date' | null) => void;
+  
+  // ✅ [수정] 'language' 타입 추가
+  activeSearchField: 'location' | 'date' | 'language' | null;
+  setActiveSearchField: (field: 'location' | 'date' | 'language' | null) => void;
+  
   locationInput: string;
   setLocationInput: (val: string) => void;
   dateRange: { start: Date | null, end: Date | null };
   setDateRange: (range: any) => void;
   searchRef: React.RefObject<HTMLDivElement | null>;
-  onSearch: () => void; // ✅ 검색 함수 Props 추가
+  onSearch: () => void;
+  
+  // ✅ [추가] 부모(HomePage)에서 보내주는 언어 관련 Props도 받아야 함
+  selectedLanguage?: string;
+  setSelectedLanguage?: (lang: string) => void;
 }
 
 export default function HomeHero({

@@ -115,7 +115,16 @@ export function useGuestTrips() {
     try {
       const { error } = await supabase.from('bookings').update({ status: 'cancellation_requested', cancel_reason: reason }).eq('id', id);
       if (error) throw error;
-      if (hostId) await sendNotification({ recipient_id: hostId, type: 'booking_cancel_request', content: '예약 취소 요청이 있습니다.', link_url: '/host/dashboard' });
+      
+      // ✅ title: '예약 취소 요청' 추가
+      if (hostId) await sendNotification({ 
+        recipient_id: hostId, 
+        type: 'booking_cancel_request', 
+        title: '예약 취소 요청', // 👈 필수 입력값 추가
+        content: '예약 취소 요청이 있습니다.', 
+        link_url: '/host/dashboard' 
+      });
+      
       showToast('취소 요청이 접수되었습니다.', 'success');
       fetchMyTrips(); 
       return true; 
