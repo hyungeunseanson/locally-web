@@ -25,7 +25,7 @@ export function useGuestTrips() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // 1. 예약 정보와 체험 정보, 그리고 연결된 '후기(reviews)' 조회
+      // 1. 예약 정보와 체험 정보 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -35,14 +35,14 @@ export function useGuestTrips() {
             profiles!experiences_host_id_fkey (*) 
           ),
           reviews(id) 
-        `) // 🟢 booking_id로 연결된 후기가 있는지 확인 (id만 가져옴)
+        `) 
         .eq('user_id', user.id)
         .order('date', { ascending: true });
 
       if (error) throw error;
 
       if (bookings) {
-        // 호스트 신청서 정보 매핑 (이전 단계에서 추가한 로직)
+        // 호스트 신청서 정보 매핑
         const hostIds = Array.from(new Set(bookings.map((b: any) => b.experiences?.host_id).filter(Boolean)));
         let appsMap = new Map();
         if (hostIds.length > 0) {
@@ -85,13 +85,11 @@ export function useGuestTrips() {
             image: secureUrl(booking.experiences.photos?.[0]), 
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
-            status: booking.status,
+            status: booking.status, // ✅ 상태값 확인 (여기가 바뀌어야 화면도 바뀜)
             price: booking.amount || booking.total_price || 0,
             guests: booking.guests || 1,
             expId: booking.experience_id,
             orderId: booking.order_id || booking.id.substring(0,8).toUpperCase(),
-            
-            // 🟢 [추가] 후기 작성 여부 (배열이 비어있지 않으면 작성함)
             hasReview: booking.reviews && booking.reviews.length > 0
           };
 
@@ -104,31 +102,48 @@ export function useGuestTrips() {
       }
     } catch (err: any) {
       console.error(err);
-      // 에러 메시지
     } finally {
       setIsLoading(false);
     }
   }, [supabase]);
 
+  // ✅ [수정됨] 취소 요청 로직 강화
   const requestCancel = async (id: number, reason: string, hostId: string) => {
     setIsProcessing(true);
     try {
-      const { error } = await supabase.from('bookings').update({ status: 'cancellation_requested', cancel_reason: reason }).eq('id', id);
+      // 1. DB 업데이트 (상태 변경) 및 결과 확인 (.select() 추가)
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancellation_requested', cancel_reason: reason })
+        .eq('id', id)
+        .select(); // 업데이트된 행 반환
+
       if (error) throw error;
       
-      // ✅ title: '예약 취소 요청' 추가
-      if (hostId) await sendNotification({ 
-        recipient_id: hostId, 
-        type: 'booking_cancel_request', 
-        title: '예약 취소 요청', // 👈 필수값 추가!
-        content: '예약 취소 요청이 있습니다.', 
-        link_url: '/host/dashboard' 
-      });
-      
+      // 업데이트된 행이 없으면 실패로 간주
+      if (!data || data.length === 0) {
+        throw new Error('예약 정보를 찾을 수 없거나 변경 권한이 없습니다.');
+      }
+
+      // 2. 호스트에게 알림 전송 (title 추가하여 에러 방지)
+      if (hostId) {
+        await sendNotification({ 
+          recipient_id: hostId, 
+          type: 'booking_cancel_request', 
+          title: '예약 취소 요청', // ✅ 필수값 추가
+          content: '게스트가 예약 취소를 요청했습니다.', 
+          link_url: '/host/dashboard?tab=reservations' 
+        });
+      }
+
       showToast('취소 요청이 접수되었습니다.', 'success');
-      fetchMyTrips(); 
+      
+      // 3. 목록 새로고침 (화면 갱신)
+      await fetchMyTrips(); 
       return true; 
+
     } catch (err: any) {
+      console.error('취소 요청 오류:', err);
       showToast('요청 실패: ' + err.message, 'error');
       return false; 
     } finally {
