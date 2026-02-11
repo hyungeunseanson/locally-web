@@ -4,11 +4,13 @@ import React, { useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { 
   Search, ChevronDown, ChevronUp, MessageCircle, 
-  User, Briefcase, CreditCard, ShieldCheck, Smile 
+  User, Briefcase, CreditCard, ShieldCheck 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useChat } from '@/app/hooks/useChat';
+import { createClient } from '@/app/utils/supabase/client'; 
+import { useToast } from '@/app/context/ToastContext';
 
+// ... (FAQ_DATA는 그대로 유지) ...
 const FAQ_DATA = {
   guest: [
     {
@@ -55,8 +57,9 @@ export default function HelpCenterPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   
-  const { createAdminInquiry, currentUser } = useChat();
+  const supabase = createClient();
   const router = useRouter();
+  const { showToast } = useToast();
 
   const toggleItem = (catIdx: number, itemIdx: number) => {
     const key = `${catIdx}-${itemIdx}`;
@@ -71,23 +74,66 @@ export default function HelpCenterPage() {
   })).filter(category => category.items.length > 0);
 
   const handleAdminSupport = async () => {
-    console.log("관리자 상담 버튼 클릭");
-    if (!currentUser) {
+    // 1. 로그인 확인
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       alert("로그인이 필요한 서비스입니다.");
+      router.push('/login');
       return;
     }
 
+    // 2. 문의 내용 입력
     const content = prompt("문의하실 내용을 입력해주세요. 관리자가 확인 후 답변드립니다.");
     if (!content) return;
 
     try {
-      await createAdminInquiry(content);
+      // 🟢 [변경] DB에서 관리자(is_admin=true) 찾기
+      const { data: admins, error: adminError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_admin', true); // Table Editor에서 넣으신 값 활용!
+
+      if (adminError) throw adminError;
+      if (!admins || admins.length === 0) {
+        throw new Error("현재 상담 가능한 관리자가 없습니다. (is_admin 설정 확인 필요)");
+      }
+
+      // 관리자 중 한 명 랜덤 선택 (부하 분산)
+      const randomAdmin = admins[Math.floor(Math.random() * admins.length)];
+      const ADMIN_ID = randomAdmin.id;
+
+      console.log(`[Help] 관리자 연결됨: ${ADMIN_ID}`);
+
+      // 4. 채팅방 생성 (admin과의 대화)
+      const { data: room, error: roomError } = await supabase
+        .from('inquiries') 
+        .insert({
+          host_id: ADMIN_ID,
+          user_id: user.id,
+          experience_id: null, 
+          content: content,
+          type: 'admin_support' 
+        })
+        .select()
+        .single();
+
+      if (roomError) throw roomError;
+
+      // 5. 메시지 전송
+      await supabase
+        .from('inquiry_messages')
+        .insert({
+          inquiry_id: room.id,
+          sender_id: user.id,
+          content: content
+        });
+
       if (confirm("문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?")) {
         router.push('/guest/inbox');
       }
     } catch (e: any) {
-      console.error("상담 생성 실패:", e);
-      alert("문의 접수 실패: " + e.message);
+      console.error("문의 접수 실패:", e);
+      showToast("문의 접수 실패: " + e.message, 'error');
     }
   };
 

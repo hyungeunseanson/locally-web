@@ -88,7 +88,8 @@ export function useGuestTrips() {
             price: booking.amount || booking.total_price || 0,
             guests: booking.guests || 1,
             expId: booking.experience_id,
-            orderId: booking.order_id || booking.id.substring(0,8).toUpperCase(),
+            orderId: booking.order_id || booking.id,
+            paymentDate: booking.created_at,
             hasReview: booking.reviews && booking.reviews.length > 0
           };
 
