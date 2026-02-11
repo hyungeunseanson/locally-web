@@ -16,6 +16,7 @@ import GuestProfileModal from './GuestProfileModal';
 export default function ReservationManager() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<any[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<number | null>(null);
@@ -29,6 +30,9 @@ export default function ReservationManager() {
   const { showToast } = useToast();
 
   useEffect(() => {
+    // ✅ [수정 2] 컴포넌트가 브라우저에 마운트된 후에만 true로 변경
+    setIsMounted(true);
+    
     const saved = localStorage.getItem('host_checked_reservations');
     if (saved) {
       setCheckedIds(JSON.parse(saved));
@@ -44,7 +48,10 @@ export default function ReservationManager() {
   };
 
   const isNewReservation = (createdAt: string, id: number) => {
+    // ✅ [수정 3] 서버 렌더링 중이거나 확인된 예약이면 false 반환 (에러 방지 핵심)
+    if (!isMounted) return false; 
     if (checkedIds.includes(id)) return false; 
+    
     const created = new Date(createdAt).getTime();
     const now = new Date().getTime();
     return (now - created) / (1000 * 60 * 60) < 24; 
@@ -235,6 +242,8 @@ export default function ReservationManager() {
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
   };
+
+  if (!isMounted) return <Skeleton className="w-full h-64 rounded-2xl" />;
 
   const filteredList = getFilteredList();
 
