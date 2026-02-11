@@ -15,11 +15,12 @@ interface Props {
   onCancelQuery: (res: any) => void;
   onApproveCancel: (res: any) => void;
   onShowProfile: (guest: any) => void;
+  onCheck: (id: number) => void; // 👈 이거 한 줄 추가
 }
 
 export default function ReservationCard({ 
   res, isNew, processingId, 
-  onCalendar, onMessage, onCancelQuery, onApproveCancel, onShowProfile 
+  onCalendar, onMessage, onCancelQuery, onApproveCancel, onShowProfile, onCheck // 👈 여기에 추가
 }: Props) {
 
   const secureUrl = (url: string | null) => {
@@ -103,11 +104,17 @@ export default function ReservationCard({
               <div className="flex items-center gap-2">
                  <h4 className="text-lg font-bold text-slate-900">예약 #{String(res.id).slice(0, 8)}</h4>
                  
-                 {/* ✅ [복구] 심플한 'N' 배지 (다른 페이지 UX 통일) */}
                  {isNew && (
-                   <span className="bg-rose-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold animate-pulse">
+                   <button 
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       onCheck(res.id); // ✅ 누르면 사라짐
+                     }}
+                     className="bg-rose-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold animate-pulse hover:bg-rose-600 cursor-pointer"
+                     title="클릭하여 확인 표시 제거"
+                   >
                      N
-                   </span>
+                   </button>
                  )}
                  
                  {renderStatusBadge(res.status, res.date)}
@@ -126,6 +133,7 @@ export default function ReservationCard({
               className="flex items-center gap-4 cursor-pointer group/profile"
               onClick={(e) => {
                 e.stopPropagation();
+                onCheck(res.id); // ✅ 프로필 열면 확인 처리
                 onShowProfile(res.guest);
               }}
             >

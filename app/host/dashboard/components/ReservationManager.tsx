@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { sendNotification } from '@/app/utils/notification'; // 알림 함수
+import { sendNotification } from '@/app/utils/notification';
 import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState';
 import { useToast } from '@/app/context/ToastContext';
@@ -21,12 +21,33 @@ export default function ReservationManager() {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<any>(null);
   
+  // ✅ 확인된 예약 ID 저장
+  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+
   const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
 
-  // ✅ 신규 예약 판별 (생성된지 24시간 이내)
-  const isNewReservation = (createdAt: string) => {
+  // 초기 로드시 확인된 예약 목록 가져오기
+  useEffect(() => {
+    const saved = localStorage.getItem('host_checked_reservations');
+    if (saved) {
+      setCheckedIds(JSON.parse(saved));
+    }
+  }, []);
+
+  // ✅ 예약 확인 도장 찍기 함수
+  const markAsRead = (id: number) => {
+    if (!checkedIds.includes(id)) {
+      const newChecked = [...checkedIds, id];
+      setCheckedIds(newChecked);
+      localStorage.setItem('host_checked_reservations', JSON.stringify(newChecked));
+    }
+  };
+
+  // 신규 예약 판별 (24시간 이내 AND 확인 안 함)
+  const isNewReservation = (createdAt: string, id: number) => {
+    if (checkedIds.includes(id)) return false; 
     const created = new Date(createdAt).getTime();
     const now = new Date().getTime();
     return (now - created) / (1000 * 60 * 60) < 24; 
@@ -77,7 +98,7 @@ export default function ReservationManager() {
     }
   }, [supabase]);
 
-  // ✅ 실시간 예약 감지 및 알림 전송 (종 아이콘 스택 쌓기용)
+  // 실시간 예약 감지 및 알림
   useEffect(() => {
     fetchReservations();
 
@@ -93,11 +114,11 @@ export default function ReservationManager() {
           if (payload.eventType === 'INSERT') {
              showToast('🎉 새로운 예약이 도착했습니다!', 'success');
              
-             // 🚨 [핵심] 여기서 알림 테이블에 데이터를 넣어줘야 종(Bell)에 불이 들어옵니다.
+             // 알림 종(Bell)에 빨간 불 들어오게 하기
              const { data: { user } } = await supabase.auth.getUser();
              if (user) {
                await sendNotification({
-                 userId: user.id, // 나 자신에게 알림 발송
+                 userId: user.id,
                  type: 'new_booking',
                  title: '새로운 예약 도착',
                  message: '새로운 예약이 접수되었습니다. 확인해보세요!',
@@ -178,8 +199,8 @@ export default function ReservationManager() {
     });
 
     return filtered.sort((a, b) => {
-      const aNew = isNewReservation(a.created_at);
-      const bNew = isNewReservation(b.created_at);
+      const aNew = isNewReservation(a.created_at, a.id);
+      const bNew = isNewReservation(b.created_at, b.id);
       if (aNew && !bNew) return -1;
       if (!aNew && bNew) return 1;
       return new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -263,13 +284,14 @@ export default function ReservationManager() {
               <ReservationCard 
                 key={res.id}
                 res={res}
-                isNew={isNewReservation(res.created_at)}
+                isNew={isNewReservation(res.created_at, res.id)} 
                 processingId={processingId}
                 onCalendar={addToGoogleCalendar}
                 onMessage={(userId) => router.push(`/host/dashboard?tab=inquiries&guestId=${userId}`)}
                 onCancelQuery={handleRequestUserCancel}
                 onApproveCancel={handleApproveCancellation}
                 onShowProfile={setSelectedGuest}
+                onCheck={markAsRead} 
               />
             ))}
           </div>
