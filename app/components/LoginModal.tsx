@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { X, Chrome } from 'lucide-react';
+import { X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
@@ -13,18 +13,18 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
-  // 1. 모든 Hooks(useState, useRouter 등)를 최상단에 선언
+  // 1. Hooks 선언 (최상단 유지)
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [isFocused, setIsFocused] = useState<'EMAIL' | 'PASSWORD' | null>(null); // 포커스 효과용
   
-  // supabase client는 컴포넌트 내부에서 생성해도 되지만, useMemo를 쓰거나 그냥 써도 무방 (여기선 그냥 유지)
+  const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
 
-  // 2. Helper 함수들 정의
+  // 2. Helper Functions
   const ensureProfileExists = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -44,10 +44,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     }
   };
 
-  // 3. useCallback 훅 선언 (반드시 조건문보다 위에 있어야 함!)
   const handleAuth = useCallback(async () => {
     if (!email || !password) {
-        showToast('이메일과 비밀번호를 모두 입력해주세요.', 'error');
+        showToast('이메일과 비밀번호를 입력해주세요.', 'error');
         return;
     }
 
@@ -60,16 +59,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           options: { data: { full_name: email.split('@')[0] } }
         });
         if (error) throw error;
-        
-        showToast('회원가입 성공! 이메일 확인 후 로그인해주세요.', 'success');
+        showToast('가입 성공! 이메일을 확인해주세요.', 'success');
         setMode('LOGIN');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        
         await ensureProfileExists();
-        showToast('환영합니다! 성공적으로 로그인되었습니다.', 'success');
-
+        showToast('로그인 되었습니다.', 'success');
         onClose();
         if (onLoginSuccess) onLoginSuccess();
         router.refresh();
@@ -82,9 +78,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   }, [email, password, mode, supabase, router, onClose, onLoginSuccess, showToast]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-        handleAuth();
-    }
+    if (e.key === 'Enter') handleAuth();
   };
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
@@ -95,99 +89,135 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     if (error) showToast(error.message, 'error');
   };
 
-  // 4. 🚨 조건부 렌더링은 모든 훅 선언이 끝난 뒤, 가장 마지막에!
+  // 3. 조건부 렌더링 (가장 마지막)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-0 animate-in fade-in duration-300">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity" onClick={onClose}></div>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose}></div>
 
-      <div className="bg-white w-full max-w-[440px] mx-auto rounded-[32px] shadow-2xl overflow-hidden relative z-10 animate-in slide-in-from-bottom-4 fade-in duration-300 ease-out sm:my-8">
+      {/* 모달 컨테이너 (에어비앤비 스타일: 둥근 모서리, 깔끔한 헤더, 컴팩트한 너비) */}
+      <div className="bg-white w-full max-w-[568px] md:w-[568px] rounded-xl shadow-xl overflow-hidden relative z-10 animate-in slide-in-from-bottom-2 fade-in duration-300">
         
-        <div className="relative h-16 flex items-center justify-end px-6 pt-6">
+        {/* 1. 헤더: 닫기 버튼 왼쪽, 제목 중앙, 하단 라인 */}
+        <div className="h-16 border-b border-gray-200 flex items-center px-6 relative justify-center">
           <button 
             onClick={onClose} 
-            className="group p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="absolute left-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <X size={20} className="text-slate-600 group-hover:text-slate-900 transition-colors" />
+            <X size={18} className="text-gray-900" />
           </button>
+          <span className="font-bold text-base text-gray-900">
+            {mode === 'LOGIN' ? '로그인 또는 회원가입' : '회원가입'}
+          </span>
         </div>
 
-        <div className="px-8 pb-10 pt-2">
-          <h2 className="text-[28px] font-black leading-tight mb-3 text-slate-900 tracking-tight">
-            Locally에 오신 것을<br/>환영합니다 👋
-          </h2>
-          <p className="text-slate-500 text-base mb-10 font-medium">현지인처럼 여행하는 가장 쉬운 방법</p>
-          
-          <div className="space-y-4 mb-10">
-            {/* 카카오톡 버튼 */}
-            <button 
-              onClick={() => handleSocialLogin('kakao')}
-              className="w-full h-14 bg-[#FEE500] hover:bg-[#FDD835] rounded-2xl flex items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] text-[#391B1B] font-bold text-lg shadow-sm hover:shadow-md"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3C7.58172 3 4 6.58172 4 11C4 15.4183 7.58172 19 12 19C16.4183 19 20 15.4183 20 11C20 6.58172 16.4183 3 12 3Z" fill="#391B1B" fillOpacity="0"/>
-                <path fillRule="evenodd" clipRule="evenodd" d="M12 4C7.02944 4 3 7.35786 3 11.5C3 14.078 4.66428 16.3685 7.23438 17.707L6.2125 21.465C6.12656 21.782 6.47891 22.029 6.75781 21.845L11.2969 18.845C11.5297 18.868 11.7641 18.88 12 18.88C16.9706 18.88 21 15.522 21 11.38C21 7.238 16.9706 4 12 4Z" fill="currentColor"/>
-              </svg>
-              <span>카카오로 3초 만에 시작하기</span>
-            </button>
-
-            {/* 구글 버튼 */}
-            <button 
-              onClick={() => handleSocialLogin('google')}
-              className="w-full h-14 border-2 border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200 rounded-2xl flex items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] text-slate-700 font-bold text-lg"
-            >
-              <Chrome size={24}/>
-              <span>Google로 계속하기</span>
-            </button>
+        <div className="p-6">
+          {/* 2. 환영 메시지 */}
+          <div className="mb-6">
+            <h3 className="text-[22px] font-semibold text-gray-900 mb-1">Locally에 오신 것을 환영합니다.</h3>
+            <p className="text-sm text-gray-500">현지인처럼 여행하는 가장 쉬운 방법</p>
           </div>
 
-          <div className="relative py-4 mb-6 flex items-center">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="flex-shrink-0 mx-4 text-xs text-slate-400 font-bold uppercase tracking-wider">또는 이메일로</span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="relative">
-                <input 
-                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+          {/* 3. 인풋 그룹 (에어비앤비 스타일: 붙어있는 인풋) */}
+          <div className="border border-gray-400 rounded-lg overflow-hidden mb-4">
+            {/* 이메일 인풋 */}
+            <div className={`relative h-14 border-b border-gray-400 ${isFocused === 'EMAIL' ? 'ring-2 ring-black z-10 border-transparent rounded-t-lg' : ''}`}>
+              <input
+                type="email"
+                className="block w-full h-full pt-4 pb-1 px-3 text-base text-gray-900 bg-transparent appearance-none focus:outline-none placeholder-transparent peer"
+                placeholder="이메일"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setIsFocused('EMAIL')}
+                onBlur={() => setIsFocused(null)}
                 onKeyDown={handleKeyDown}
-                placeholder="이메일 주소" 
-                className="peer w-full h-14 pl-5 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-900 focus:outline-none transition-all duration-200 font-medium text-lg placeholder:text-slate-400"
-                />
+              />
+              <label 
+                htmlFor="email" 
+                className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-3 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3"
+              >
+                이메일
+              </label>
             </div>
-            <div className="relative">
-                <input 
-                type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+
+            {/* 비밀번호 인풋 */}
+            <div className={`relative h-14 ${isFocused === 'PASSWORD' ? 'ring-2 ring-black z-10 rounded-b-lg' : ''}`}>
+              <input
+                type="password"
+                className="block w-full h-full pt-4 pb-1 px-3 text-base text-gray-900 bg-transparent appearance-none focus:outline-none placeholder-transparent peer"
+                placeholder="비밀번호"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setIsFocused('PASSWORD')}
+                onBlur={() => setIsFocused(null)}
                 onKeyDown={handleKeyDown}
-                placeholder="비밀번호" 
-                className="peer w-full h-14 pl-5 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-900 focus:outline-none transition-all duration-200 font-medium text-lg placeholder:text-slate-400"
-                />
+              />
+              <label 
+                htmlFor="password" 
+                className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-3 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3"
+              >
+                비밀번호
+              </label>
             </div>
           </div>
 
+          <div className="text-[12px] text-gray-500 mb-6">
+            전화번호 확인을 위해 전화나 문자로 메시지를 보내드립니다. 일반 문자 메시지 요금 및 데이터 요금이 부과될 수 있습니다.
+          </div>
+
+          {/* 4. 계속하기 버튼 (브랜드 컬러: 에어비앤비 핑크 or 로컬리 블랙) */}
           <button 
             onClick={handleAuth} disabled={loading}
-            className="w-full bg-slate-900 text-white font-bold text-lg h-14 rounded-2xl mt-8 transition-all duration-200 hover:bg-black hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 disabled:hover:translate-y-0 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+            className="w-full bg-[#E51D52] hover:bg-[#D90B3E] text-white font-bold h-12 rounded-lg text-base transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed mb-6"
           >
-            {loading ? (
-                <span className="flex items-center gap-2 justify-center">
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    처리 중...
-                </span>
-            ) : (mode === 'LOGIN' ? '로그인하기' : '회원가입하기')}
+            {loading ? '처리 중...' : '계속하기'}
           </button>
 
-          <div className="mt-8 text-center text-base font-medium">
-             <span className="text-slate-500">{mode === 'LOGIN' ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}</span>
+          {/* 5. 구분선 */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex-1 h-px bg-gray-200"></div>
+            <span className="text-xs text-gray-500 font-medium">또는</span>
+            <div className="flex-1 h-px bg-gray-200"></div>
+          </div>
+
+          {/* 6. 소셜 버튼 (좌측 아이콘, 중앙 텍스트, 얇은 테두리) */}
+          <div className="space-y-4">
+            <button 
+              onClick={() => handleSocialLogin('kakao')}
+              className="w-full h-12 border border-gray-900 hover:bg-gray-50 rounded-lg flex items-center relative transition-all active:scale-[0.98]"
+            >
+              <div className="absolute left-4">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 4C7.02944 4 3 7.35786 3 11.5C3 14.078 4.66428 16.3685 7.23438 17.707L6.2125 21.465C6.12656 21.782 6.47891 22.029 6.75781 21.845L11.2969 18.845C11.5297 18.868 11.7641 18.88 12 18.88C16.9706 18.88 21 15.522 21 11.38C21 7.238 16.9706 4 12 4Z"/>
+                </svg>
+              </div>
+              <span className="w-full text-center text-sm font-semibold text-gray-900">카카오톡으로 계속하기</span>
+            </button>
+
+            <button 
+              onClick={() => handleSocialLogin('google')}
+              className="w-full h-12 border border-gray-900 hover:bg-gray-50 rounded-lg flex items-center relative transition-all active:scale-[0.98]"
+            >
+              <div className="absolute left-4">
+                <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+              </div>
+              <span className="w-full text-center text-sm font-semibold text-gray-900">구글로 계속하기</span>
+            </button>
+          </div>
+
+          {/* 모드 전환 */}
+          <div className="mt-6 text-center text-sm">
              <button 
                 onClick={() => setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN')} 
-                className="font-bold text-slate-900 ml-2 hover:text-blue-600 transition-colors relative py-1 after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-slate-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-left"
+                className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600"
              >
-               {mode === 'LOGIN' ? '회원가입 시작하기' : '로그인하러 가기'}
+               {mode === 'LOGIN' ? '계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인'}
              </button>
           </div>
+
         </div>
       </div>
     </div>
