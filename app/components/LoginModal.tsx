@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { X, Chrome, MessageCircle } from 'lucide-react';
+import { X, Chrome } from 'lucide-react'; // 🟢 MessageCircle 제거 (에러 원인 가능성 차단)
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
@@ -23,7 +23,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
   if (!isOpen) return null;
 
-  // 프로필 존재 여부 확인 및 생성 (기존 로직 유지)
+  // 프로필 확인 및 생성
   const ensureProfileExists = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -43,7 +43,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     }
   };
 
-  // 인증 처리 함수 (기존 로직 유지 + 유효성 검사 추가)
   const handleAuth = useCallback(async () => {
     if (!email || !password) {
         showToast('이메일과 비밀번호를 모두 입력해주세요.', 'error');
@@ -80,11 +79,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     }
   }, [email, password, mode, supabase, router, onClose, onLoginSuccess, showToast]);
 
-  // 🟢 [NEW] 엔터키 입력 핸들러
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-        handleAuth();
-    }
+    if (e.key === 'Enter') handleAuth();
   };
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
@@ -96,14 +92,11 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   };
 
   return (
-    // 배경: 더 깊은 블러와 부드러운 페이드인
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-0 animate-in fade-in duration-300">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity" onClick={onClose}></div>
 
-      {/* 모달 컨테이너: 더 둥글고, 아래에서 부드럽게 올라오는 애니메이션 적용 */}
       <div className="bg-white w-full max-w-[440px] mx-auto rounded-[32px] shadow-2xl overflow-hidden relative z-10 animate-in slide-in-from-bottom-4 fade-in duration-300 ease-out sm:my-8">
         
-        {/* 헤더: 닫기 버튼 디자인 개선 */}
         <div className="relative h-16 flex items-center justify-end px-6 pt-6">
           <button 
             onClick={onClose} 
@@ -114,19 +107,21 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         </div>
 
         <div className="px-8 pb-10 pt-2">
-          {/* 타이틀: 크기 키우고 간격 조정 */}
           <h2 className="text-[28px] font-black leading-tight mb-3 text-slate-900 tracking-tight">
             Locally에 오신 것을<br/>환영합니다 👋
           </h2>
           <p className="text-slate-500 text-base mb-10 font-medium">현지인처럼 여행하는 가장 쉬운 방법</p>
           
-          {/* 소셜 로그인 버튼: 호버 시 살짝 떠오르는 인터랙션 추가 */}
           <div className="space-y-4 mb-10">
+            {/* 🟢 카카오톡 버튼 (아이콘 직접 SVG 사용 -> 에러 없음) */}
             <button 
               onClick={() => handleSocialLogin('kakao')}
               className="w-full h-14 bg-[#FEE500] hover:bg-[#FDD835] rounded-2xl flex items-center justify-center gap-3 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] text-[#391B1B] font-bold text-lg shadow-sm hover:shadow-md"
             >
-              <MessageCircle size={24} fill="currentColor" className="border-none"/>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3C7.58172 3 4 6.58172 4 11C4 15.4183 7.58172 19 12 19C16.4183 19 20 15.4183 20 11C20 6.58172 16.4183 3 12 3Z" fill="#391B1B" fillOpacity="0"/>
+                <path fillRule="evenodd" clipRule="evenodd" d="M12 4C7.02944 4 3 7.35786 3 11.5C3 14.078 4.66428 16.3685 7.23438 17.707L6.2125 21.465C6.12656 21.782 6.47891 22.029 6.75781 21.845L11.2969 18.845C11.5297 18.868 11.7641 18.88 12 18.88C16.9706 18.88 21 15.522 21 11.38C21 7.238 16.9706 4 12 4Z" fill="currentColor"/>
+              </svg>
               <span>카카오로 3초 만에 시작하기</span>
             </button>
 
@@ -139,19 +134,17 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             </button>
           </div>
 
-          {/* 구분선 디자인 개선 */}
           <div className="relative py-4 mb-6 flex items-center">
             <div className="flex-grow border-t border-slate-200"></div>
             <span className="flex-shrink-0 mx-4 text-xs text-slate-400 font-bold uppercase tracking-wider">또는 이메일로</span>
             <div className="flex-grow border-t border-slate-200"></div>
           </div>
 
-          {/* 입력창: 엔터키 적용 및 포커스 디자인 개선 */}
           <div className="space-y-4">
             <div className="relative">
                 <input 
                 type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={handleKeyDown} // 🟢 엔터키 적용
+                onKeyDown={handleKeyDown}
                 placeholder="이메일 주소" 
                 className="peer w-full h-14 pl-5 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-900 focus:outline-none transition-all duration-200 font-medium text-lg placeholder:text-slate-400"
                 />
@@ -159,14 +152,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <div className="relative">
                 <input 
                 type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown} // 🟢 엔터키 적용
+                onKeyDown={handleKeyDown}
                 placeholder="비밀번호" 
                 className="peer w-full h-14 pl-5 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-900 focus:outline-none transition-all duration-200 font-medium text-lg placeholder:text-slate-400"
                 />
             </div>
           </div>
 
-          {/* 메인 버튼: 디자인 및 인터랙션 강화 */}
           <button 
             onClick={handleAuth} disabled={loading}
             className="w-full bg-slate-900 text-white font-bold text-lg h-14 rounded-2xl mt-8 transition-all duration-200 hover:bg-black hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 disabled:hover:translate-y-0 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
@@ -179,7 +171,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             ) : (mode === 'LOGIN' ? '로그인하기' : '회원가입하기')}
           </button>
 
-          {/* 모드 전환 문구 개선 */}
           <div className="mt-8 text-center text-base font-medium">
              <span className="text-slate-500">{mode === 'LOGIN' ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}</span>
              <button 
