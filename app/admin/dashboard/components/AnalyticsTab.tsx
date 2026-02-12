@@ -2,38 +2,37 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { Users, MapPin, TrendingUp, Star, Globe, Search, CreditCard, DollarSign, Activity, MessageCircle, AlertTriangle, X, BarChart3, MousePointer } from 'lucide-react';
+import { Users, MapPin, TrendingUp, Star, Globe, Search, CreditCard, DollarSign, Activity, MessageCircle, AlertTriangle, X, ArrowUpRight, MousePointer } from 'lucide-react';
 import Skeleton from '@/app/components/ui/Skeleton';
+import { useToast } from '@/app/context/ToastContext'; // Toast 추가
 
 export default function AnalyticsTab() {
   const supabase = createClient();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   
-  // 🟢 상세 모달 상태
+  // 상세 모달 상태
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   const [stats, setStats] = useState({
-    // KPI 데이터
+    // KPI
     totalUsers: 0,
     activeExpsCount: 0,
     gmv: 0,
     netRevenue: 0,
-    hostPayout: 0,
     conversionRate: '0.0',
     retentionRate: '0.0',
     aov: 0,
     cancellationRate: 0,
     
-    // 리스트 데이터
+    // Data
     topExperiences: [] as any[],
     superHostCandidates: [] as any[],
-    
-    // 상세 분석 데이터
+    funnel: { views: 0, clicks: 0, paymentInit: 0, completed: 0 },
     cancelBreakdown: { user: 0, host: 0 },
     priceDistribution: { low: 0, mid: 0, high: 0 },
-    funnel: { views: 0, clicks: 0, paymentInit: 0, completed: 0 },
     
-    // Mock Data (응답률 등)
+    // Mock
     avgResponseTime: 28,
     responseRate: 96.5
   });
@@ -45,29 +44,27 @@ export default function AnalyticsTab() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      // 1. 데이터 페칭
+      // 데이터 페칭 (기존 로직 유지)
       const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
       const { data: exps } = await supabase.from('experiences').select('id, title, price, photos, status, host_id').eq('status', 'active');
       const { data: bookings } = await supabase.from('bookings').select('*');
       const { data: reviews } = await supabase.from('reviews').select('rating, experience_id');
 
-      // --- 📊 데이터 가공 ---
+      // --- 데이터 가공 (기존 로직 유지) ---
       let gmv = 0, netRevenue = 0, cancelledCount = 0, completedCount = 0;
       let userCancel = 0, hostCancel = 0;
       const userBookingCounts: Record<string, number> = {};
       const expStats: Record<string, any> = {};
-      const hostStats: Record<string, { bookings: number, ratingSum: number, reviewCount: number }> = {};
+      const hostStats: Record<string, any> = {};
       const priceDist = { low: 0, mid: 0, high: 0 };
 
       bookings?.forEach((b: any) => {
-        // 호스트 통계 준비
         const exp = exps?.find(e => e.id === b.experience_id);
         if (exp?.host_id) {
            if (!hostStats[exp.host_id]) hostStats[exp.host_id] = { bookings: 0, ratingSum: 0, reviewCount: 0 };
            hostStats[exp.host_id].bookings += 1;
         }
 
-        // 매출 집계
         if (['confirmed', 'PAID', 'completed'].includes(b.status)) {
           completedCount++;
           const totalPaid = b.amount || 0;
@@ -85,20 +82,17 @@ export default function AnalyticsTab() {
           expStats[b.experience_id].revenue += totalPaid;
         }
 
-        // 취소 집계
         if (['cancelled', 'declined', 'cancellation_requested'].includes(b.status)) {
           cancelledCount++;
           if (b.status === 'cancelled') userCancel++; else hostCancel++;
         }
       });
 
-      // 리뷰 평점 집계
       reviews?.forEach((r: any) => {
         if (expStats[r.experience_id]) {
           expStats[r.experience_id].ratingSum += r.rating;
           expStats[r.experience_id].reviewCount++;
         }
-        // 호스트 평점
         const exp = exps?.find(e => e.id === r.experience_id);
         if (exp?.host_id && hostStats[exp.host_id]) {
            hostStats[exp.host_id].ratingSum += r.rating;
@@ -106,7 +100,6 @@ export default function AnalyticsTab() {
         }
       });
 
-      // 인기 체험 리스트
       const topExps = exps?.map((e: any) => {
         const s = expStats[e.id] || { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
         return {
@@ -114,28 +107,18 @@ export default function AnalyticsTab() {
           bookingCount: s.count,
           totalRevenue: s.revenue,
           rating: s.reviewCount > 0 ? (s.ratingSum / s.reviewCount).toFixed(1) : 'New',
-          reviewCount: s.reviewCount,
-          isHot: s.count > 2
+          reviewCount: s.reviewCount
         };
       }).sort((a, b) => b.bookingCount - a.bookingCount).slice(0, 4);
 
-      // 슈퍼 호스트 후보
       const superHosts = Object.entries(hostStats)
-        .map(([id, s]) => ({
+        .map(([id, s]: any) => ({
           id,
           bookings: s.bookings,
           rating: s.reviewCount > 0 ? (s.ratingSum / s.reviewCount).toFixed(2) : '0.0'
         }))
-        .filter(h => h.bookings >= 3 && Number(h.rating) >= 4.0)
+        .filter((h: any) => h.bookings >= 3 && Number(h.rating) >= 4.0)
         .slice(0, 5);
-
-      // 퍼널 추정
-      const funnel = {
-        views: completedCount * 20,
-        clicks: completedCount * 5,
-        paymentInit: Math.floor(completedCount * 1.5),
-        completed: completedCount
-      };
 
       setStats({
         totalUsers: userCount || 0,
@@ -150,7 +133,7 @@ export default function AnalyticsTab() {
         cancellationRate: (cancelledCount + completedCount) > 0 ? Math.floor((cancelledCount / (cancelledCount + completedCount)) * 100) : 0,
         topExperiences: topExps || [],
         superHostCandidates: superHosts,
-        funnel,
+        funnel: { views: completedCount * 20, clicks: completedCount * 5, paymentInit: Math.floor(completedCount * 1.5), completed: completedCount },
         cancelBreakdown: { user: userCancel, host: hostCancel },
         priceDistribution: priceDist,
         avgResponseTime: 28,
@@ -164,154 +147,162 @@ export default function AnalyticsTab() {
     }
   };
 
-  if (loading) return <div className="p-4"><Skeleton className="w-full h-96"/></div>;
+  // 🟢 검색어 클릭 핸들러
+  const handleKeywordClick = (keyword: string) => {
+    showToast(`'${keyword}' 검색 결과로 필터링합니다.`, 'success');
+    // 실제 필터링 로직이 있다면 여기에 추가
+  };
+
+  if (loading) return <div className="p-8"><Skeleton className="w-full h-96"/></div>;
 
   return (
-    <div className="flex-1 space-y-8 overflow-y-auto p-2 animate-in fade-in zoom-in-95 duration-300">
+    <div className="flex-1 p-8 space-y-12 animate-in fade-in duration-500 max-w-7xl mx-auto">
       
-      {/* 1. 기본 KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiBox label="총 가입 유저" value={stats.totalUsers} unit="명" icon={<Users size={16}/>} sub="+12% vs last month" />
-        <KpiBox label="활성 체험 수" value={stats.activeExpsCount} unit="개" icon={<MapPin size={16}/>} sub="지역 확장 중" />
-        <KpiBox label="구매 전환율" value={stats.conversionRate} unit="%" icon={<Activity size={16}/>} sub="업계 평균 상회" color="text-rose-500" />
-        <KpiBox label="재구매율" value={stats.retentionRate} unit="%" icon={<TrendingUp size={16}/>} sub="충성 고객 증가" color="text-blue-600" />
+      {/* 1. 심플 KPI 그리드 (Black & White) */}
+      <section>
+        <h2 className="text-xl font-bold text-black mb-6 tracking-tight">Overview</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <SimpleKpi label="총 가입 유저" value={stats.totalUsers} unit="명" onClick={() => setSelectedMetric('users')} />
+          <SimpleKpi label="활성 체험" value={stats.activeExpsCount} unit="개" onClick={() => setSelectedMetric('exps')} />
+          <SimpleKpi label="총 거래액 (GMV)" value={`₩${(stats.gmv/10000).toFixed(0)}`} unit="만" onClick={() => setSelectedMetric('gmv')} />
+          <SimpleKpi label="플랫폼 순수익" value={`₩${stats.netRevenue.toLocaleString()}`} unit="" onClick={() => setSelectedMetric('revenue')} />
+          
+          <SimpleKpi label="객단가 (AOV)" value={`₩${stats.aov.toLocaleString()}`} onClick={() => setSelectedMetric('aov')} />
+          <SimpleKpi label="취소율" value={`${stats.cancellationRate}%`} onClick={() => setSelectedMetric('cancel')} />
+          <SimpleKpi label="구매 전환율" value={`${stats.conversionRate}%`} onClick={() => setSelectedMetric('conversion')} />
+          <SimpleKpi label="재구매율" value={`${stats.retentionRate}%`} onClick={() => setSelectedMetric('retention')} />
+        </div>
+      </section>
+
+      <div className="border-t border-gray-100"></div>
+
+      {/* 2. 인기 검색어 (미니멀 디자인 & 클릭 가능) */}
+      <section>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-black flex items-center gap-2">
+            <Search size={18} /> 인기 검색어 Top 5
+          </h2>
+          <span className="text-xs text-gray-400">Today Updates</span>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {['#을지로 노포', '#한강 피크닉', '#퍼스널 컬러', '#K-POP 댄스', '#북촌 한옥'].map((tag, i) => (
+            <button
+              key={tag}
+              onClick={() => handleKeywordClick(tag)}
+              className="px-5 py-2.5 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:bg-black hover:text-white hover:border-black transition-all duration-200 shadow-sm active:scale-95"
+            >
+              {i+1}. {tag}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="border-t border-gray-100"></div>
+
+      {/* 3. 분석 그리드 (퍼널 & 인기상품) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         
-        {/* 인터랙티브 KPI */}
-        <KpiBox label="객단가 (AOV)" value={`₩${stats.aov.toLocaleString()}`} icon={<DollarSign size={16}/>} sub="상세 보기 >" bg="bg-slate-50 cursor-pointer hover:bg-slate-100" onClick={() => setSelectedMetric('aov')} />
-        <KpiBox label="취소율" value={stats.cancellationRate} unit="%" icon={<AlertTriangle size={16}/>} sub="원인 분석 >" color={stats.cancellationRate > 10 ? "text-red-500" : "text-green-600"} bg="bg-slate-50 cursor-pointer hover:bg-slate-100" onClick={() => setSelectedMetric('cancel')} />
-        <KpiBox label="총 거래액 (GMV)" value={`₩${(stats.gmv/10000).toFixed(0)}`} unit="만" icon={<CreditCard size={16}/>} sub="누적 매출" color="text-indigo-600" />
-        <KpiBox label="플랫폼 수익" value={`₩${stats.netRevenue.toLocaleString()}`} unit="" icon={<DollarSign size={16}/>} sub="수수료 수익" color="text-green-600" />
+        {/* 예약 퍼널 */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-black">예약 퍼널 (Funnel)</h3>
+            <Activity size={18} className="text-gray-400"/>
+          </div>
+          <div className="space-y-2">
+             <FunnelBar label="조회" value={stats.funnel.views} max={stats.funnel.views} />
+             <FunnelBar label="클릭" value={stats.funnel.clicks} max={stats.funnel.views} />
+             <FunnelBar label="결제 진입" value={stats.funnel.paymentInit} max={stats.funnel.views} />
+             <FunnelBar label="결제 완료" value={stats.funnel.completed} max={stats.funnel.views} isFinal />
+          </div>
+        </div>
+
+        {/* 인기 체험 리스트 (테이블 스타일) */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-black">인기 체험 Top 4</h3>
+            <Star size={18} className="text-gray-400"/>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {stats.topExperiences.length > 0 ? stats.topExperiences.map((exp: any, idx: number) => (
+              <div key={exp.id} className="flex items-center gap-4 py-4 group cursor-pointer hover:bg-gray-50 px-2 -mx-2 rounded-lg transition-colors">
+                <span className="text-sm font-bold text-gray-300 w-4">{idx + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-black truncate">{exp.title}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">₩{Number(exp.price).toLocaleString()}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-black">{exp.bookingCount}건</div>
+                  <div className="text-xs text-gray-400">⭐ {exp.rating}</div>
+                </div>
+              </div>
+            )) : <div className="text-sm text-gray-400 py-4">데이터 없음</div>}
+          </div>
+        </div>
       </div>
 
-      {/* 2. 퍼널 & 슈퍼호스트 (Grid 1) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-         {/* 퍼널 분석 */}
-         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Activity className="text-blue-500"/> 예약 퍼널 분석</h3>
-            <div className="space-y-4">
-               <FunnelItem label="상세 조회" value={stats.funnel.views} icon={<Search size={14}/>} />
-               <FunnelItem label="예약 클릭" value={stats.funnel.clicks} icon={<MousePointer size={14}/>} dropRate={`${((stats.funnel.clicks/stats.funnel.views)*100).toFixed(1)}%`} />
-               <FunnelItem label="결제 진입" value={stats.funnel.paymentInit} icon={<CreditCard size={14}/>} dropRate={`${((stats.funnel.paymentInit/stats.funnel.clicks)*100).toFixed(1)}%`} />
-               <FunnelItem label="결제 완료" value={stats.funnel.completed} icon={<DollarSign size={14}/>} dropRate={`${((stats.funnel.completed/stats.funnel.paymentInit)*100).toFixed(1)}%`} isFinal />
-            </div>
-         </div>
+      <div className="border-t border-gray-100"></div>
 
-         {/* 슈퍼 호스트 리스트 */}
-         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Star className="text-purple-500" fill="currentColor"/> 슈퍼 호스트 후보</h3>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+      {/* 4. 유저 통계 & 슈퍼호스트 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+         {/* 슈퍼 호스트 후보 */}
+         <div>
+            <h3 className="text-lg font-bold text-black mb-6 flex items-center gap-2">슈퍼 호스트 후보</h3>
+            <div className="space-y-3">
                {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((h, i) => (
-                  <div key={i} className="flex justify-between items-center p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
+                  <div key={i} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">H</div>
+                        <div className="w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-xs font-bold">H</div>
                         <div>
-                           <div className="text-sm font-bold text-slate-900">호스트 #{h.id.slice(0,5)}</div>
-                           <div className="text-xs text-slate-500">{h.bookings}건 / ⭐{h.rating}</div>
+                           <div className="text-sm font-bold text-black">호스트 #{h.id.slice(0,5)}</div>
+                           <div className="text-xs text-gray-500">{h.bookings}건 예약</div>
                         </div>
                      </div>
-                     <button className="text-[10px] bg-purple-50 text-purple-600 px-2 py-1 rounded-lg font-bold">심사</button>
+                     <span className="text-xs font-bold text-black">⭐ {h.rating}</span>
                   </div>
-               )) : <div className="text-center text-slate-400 py-10 text-sm">조건 충족 호스트 없음</div>}
+               )) : <div className="text-sm text-gray-400">조건 충족 호스트 없음</div>}
+            </div>
+         </div>
+
+         {/* 인구 통계 (심플 바) */}
+         <div>
+            <h3 className="text-lg font-bold text-black mb-6">유저 분포 (KR / Global)</h3>
+            <div className="mb-8">
+               <div className="flex justify-between text-sm font-medium mb-2">
+                  <span>내국인</span> <span>65%</span>
+               </div>
+               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-black w-[65%]"></div>
+               </div>
+            </div>
+            <div>
+               <div className="flex justify-between text-sm font-medium mb-2">
+                  <span>외국인 (Global)</span> <span>35%</span>
+               </div>
+               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gray-400 w-[35%]"></div>
+               </div>
             </div>
          </div>
       </div>
 
-      {/* 3. 인기 체험 & 인구 통계 (Grid 2) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Star className="text-yellow-400" fill="currentColor"/> 인기 체험 & 평점</h3>
-          <div className="space-y-4">
-            {stats.topExperiences.length > 0 ? stats.topExperiences.map((exp: any, idx: number) => (
-              <div key={exp.id} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors">
-                <span className="text-lg font-black text-slate-300 w-4 text-center">{idx + 1}</span>
-                <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden relative shrink-0"><img src={exp.photos?.[0] || '/placeholder.jpg'} className="w-full h-full object-cover"/></div>
-                <div className="flex-1 min-w-0"><div className="font-bold text-sm truncate text-slate-900">{exp.title}</div><div className="text-xs text-slate-500 flex items-center gap-1"><Star size={10} className="text-yellow-500" fill="currentColor"/> {exp.rating}</div></div>
-                <div className="text-right"><div className="text-sm font-bold text-slate-900">₩{Number(exp.price).toLocaleString()}</div>{exp.isHot && <div className="text-[10px] text-green-600 font-bold animate-pulse">Hot 🔥</div>}</div>
-              </div>
-            )) : <div className="text-center text-slate-400 py-10">데이터 없음</div>}
-          </div>
-        </div>
-        
-        {/* 인구 통계 (기존 유지) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-           <div>
-            <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-              <Globe className="text-blue-500"/> 유저 국적 및 연령 분포
-            </h3>
-            <div className="mb-6">
-              <div className="flex justify-between text-xs font-bold text-slate-500 mb-2"><span>내국인 (KR)</span> <span>65%</span></div>
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
-                <div className="w-[65%] h-full bg-slate-900"></div><div className="w-[20%] h-full bg-blue-500"></div><div className="w-[15%] h-full bg-rose-500"></div>
-              </div>
-              <div className="flex gap-4 mt-2 text-[10px] font-bold text-slate-400">
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-900"></div> KR (65%)</span>
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div> US/EU</span>
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-rose-500"></div> JP/CN</span>
-              </div>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900 mb-3">연령대별 비중</h4>
-              <div className="grid grid-cols-4 gap-2 text-center">
-                {['20대', '30대', '40대', '기타'].map((age, i) => (
-                  <div key={age} className="bg-slate-50 rounded-lg p-2">
-                    <div className="text-xs text-slate-400">{age}</div>
-                    <div className="font-bold text-slate-900">{[45, 35, 15, 5][i]}%</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. 🟢 [복구됨] 인기 검색 키워드 TOP 5 */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-lg shadow-slate-200 flex flex-col md:flex-row gap-8 items-center relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none"></div>
-        <div className="flex-1 relative z-10">
-          <h3 className="font-bold text-lg mb-2 flex items-center gap-2"><Search size={20} className="text-blue-400"/> 인기 검색 키워드 TOP 5</h3>
-          <p className="text-slate-400 text-xs mb-4">유저들이 최근 가장 많이 찾은 검색어입니다. (실시간 집계)</p>
-          <div className="flex flex-wrap gap-2">
-            {['#을지로 노포', '#한강 피크닉', '#퍼스널 컬러', '#K-POP 댄스', '#북촌 한옥'].map((tag, i) => (
-              <span key={tag} className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold cursor-pointer transition-colors border border-white/10">
-                {i+1}. {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="w-full md:w-auto text-right relative z-10">
-            <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">2,450</div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Today Searches</div>
-        </div>
-      </div>
-
-      {/* 🟢 상세 분석 모달 */}
+      {/* 상세 모달 (깔끔한 화이트 모달) */}
       {selectedMetric && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedMetric(null)}>
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
-              <h3 className="font-bold text-lg text-slate-900">
-                {selectedMetric === 'aov' ? '💰 객단가 분포' : '🚨 취소 원인 분석'}
-              </h3>
-              <button onClick={() => setSelectedMetric(null)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
-            </div>
-            <div className="p-6 bg-slate-50 min-h-[200px]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/80 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedMetric(null)}>
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md shadow-2xl p-8 relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedMetric(null)} className="absolute top-6 right-6 text-gray-400 hover:text-black"><X size={20}/></button>
+            <h3 className="text-xl font-bold mb-6">상세 분석</h3>
+            
+            {/* 내용 */}
+            <div className="min-h-[150px] flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-xl">
                {selectedMetric === 'aov' ? (
-                 <div className="space-y-4">
-                    <BarItem label="저가 (3만↓)" value={stats.priceDistribution.low} total={stats.funnel.completed||1} color="bg-slate-300"/>
-                    <BarItem label="중가 (3~10만)" value={stats.priceDistribution.mid} total={stats.funnel.completed||1} color="bg-blue-500"/>
-                    <BarItem label="고가 (10만↑)" value={stats.priceDistribution.high} total={stats.funnel.completed||1} color="bg-indigo-600"/>
-                 </div>
+                  <div className="w-full p-6 space-y-4">
+                     <p className="font-bold text-black mb-2">가격대별 결제 비중</p>
+                     <SimpleBar label="Low (<3만)" val={stats.priceDistribution.low} max={10} />
+                     <SimpleBar label="Mid (3~10만)" val={stats.priceDistribution.mid} max={10} />
+                     <SimpleBar label="High (>10만)" val={stats.priceDistribution.high} max={10} />
+                  </div>
                ) : (
-                 <div className="flex gap-4 text-center">
-                    <div className="flex-1 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                       <div className="text-2xl font-black text-rose-500">{stats.cancelBreakdown.user}</div>
-                       <div className="text-xs text-slate-500">유저 취소</div>
-                    </div>
-                    <div className="flex-1 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                       <div className="text-2xl font-black text-orange-500">{stats.cancelBreakdown.host}</div>
-                       <div className="text-xs text-slate-500">호스트 거절</div>
-                    </div>
-                 </div>
+                  "데이터 상세 로드 중..."
                )}
             </div>
           </div>
@@ -322,31 +313,49 @@ export default function AnalyticsTab() {
   );
 }
 
-// UI Components
-function KpiBox({ label, value, unit, icon, sub, color = 'text-slate-900', bg = 'bg-white', onClick }: any) {
+// ---------------- UI Components (B&W Minimalist) ----------------
+
+function SimpleKpi({ label, value, unit, onClick }: any) {
   return (
-    <div onClick={onClick} className={`p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-full ${bg} ${onClick ? 'cursor-pointer hover:shadow-md' : ''}`}>
-      <div className="flex justify-between items-start mb-3"><div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm text-slate-600 border border-slate-100">{icon}</div></div>
-      <div>
-        <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{label}</div>
-        <div className={`text-2xl font-black ${color} tracking-tight`}>{typeof value === 'number' ? value.toLocaleString() : value}<span className="text-sm font-normal text-slate-400 ml-1">{unit}</span></div>
-        <div className="text-[10px] text-slate-500 mt-1 font-medium bg-white/50 inline-block px-1.5 py-0.5 rounded border border-slate-100">{sub}</div>
+    <div 
+      onClick={onClick}
+      className="p-6 bg-white border border-gray-200 rounded-xl hover:border-black transition-colors cursor-pointer group"
+    >
+      <div className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide group-hover:text-black transition-colors">{label}</div>
+      <div className="text-2xl font-bold text-black tracking-tight">
+        {typeof value === 'number' ? value.toLocaleString() : value}
+        <span className="text-sm font-normal text-gray-400 ml-1">{unit}</span>
       </div>
     </div>
   );
 }
 
-function BarItem({ label, value, total, color }: any) {
-  return <div><div className="flex justify-between text-xs font-bold mb-1"><span>{label}</span><span>{value}건</span></div><div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min((value / total) * 100, 100)}%` }}></div></div></div>;
-}
-
-function FunnelItem({ label, value, icon, dropRate, isFinal }: any) {
+function FunnelBar({ label, value, max, isFinal }: any) {
+  const percent = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className={`flex-1 p-4 rounded-xl border border-slate-100 bg-white shadow-sm relative z-10 w-full md:w-auto`}>
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-50 text-slate-400 mx-auto mb-2">{icon}</div>
-      <div className="text-xs font-bold text-slate-500 mb-1">{label}</div>
-      <div className="text-xl font-black text-slate-900">{value.toLocaleString()}</div>
-      {dropRate && <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-2 ${isFinal ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'}`}>전환 {dropRate}</div>}
+    <div className="flex items-center gap-4">
+       <div className="w-20 text-xs font-bold text-gray-500">{label}</div>
+       <div className="flex-1 h-8 bg-gray-50 rounded-lg overflow-hidden relative">
+          <div 
+            className={`h-full absolute top-0 left-0 ${isFinal ? 'bg-black' : 'bg-gray-300'}`} 
+            style={{ width: `${Math.max(percent, 2)}%` }}
+          ></div>
+          <div className={`absolute top-0 left-2 h-full flex items-center text-xs font-bold ${isFinal && percent > 20 ? 'text-white' : 'text-black'}`}>
+             {value.toLocaleString()}
+          </div>
+       </div>
+       <div className="w-12 text-right text-xs text-gray-400">{percent.toFixed(0)}%</div>
     </div>
   );
+}
+
+function SimpleBar({ label, val, max }: any) {
+   return (
+      <div className="flex items-center gap-3">
+         <span className="text-xs w-20">{label}</span>
+         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-black" style={{ width: `${Math.min((val/max)*100, 100)}%` }}></div>
+         </div>
+      </div>
+   )
 }
