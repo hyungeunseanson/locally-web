@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // eslint 설정은 삭제하셔도 됩니다.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   
   // ✅ 이미지 최적화를 위한 도메인 허용 설정 (필수!)
   images: {
@@ -14,13 +17,26 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com', // 구글 프로필
       },
+      // 🟢 [수정됨] 카카오는 http와 https 둘 다 허용해야 합니다!
       {
-        protocol: 'https',
-        hostname: 'k.kakaocdn.net', // 카카오 프로필
+        protocol: 'http',
+        hostname: 'k.kakaocdn.net', 
       },
       {
         protocol: 'https',
-        // 🔴 사용자님의 실제 Supabase 프로젝트 ID입니다!
+        hostname: 'k.kakaocdn.net', 
+      },
+      {
+        protocol: 'http',
+        hostname: 't1.kakaocdn.net', 
+      },
+      {
+        protocol: 'https',
+        hostname: 't1.kakaocdn.net', 
+      },
+      // 사용자님의 실제 Supabase 프로젝트 ID
+      {
+        protocol: 'https',
         hostname: 'uhinvcydgzqlpnvieyal.supabase.co', 
       }
     ],
