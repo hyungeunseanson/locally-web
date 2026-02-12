@@ -9,27 +9,28 @@ import Skeleton from '@/app/components/ui/Skeleton';
 export default function Earnings() {
   const supabase = createClient();
   const router = useRouter();
+  
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
-  const [showSettings, setShowSettings] = useState(false); // 설정 메뉴 토글 상태
+  const [showSettings, setShowSettings] = useState(false); 
   
   const [stats, setStats] = useState({
-    gross: 0,        // 총 매출
-    fee: 0,          // 플랫폼 수수료 (20%)
-    exchangeFee: 0,  // 환전/송금 수수료 (3%)
-    net: 0,          // 최종 정산 예정액 (77%)
+    gross: 0,        // 총 매출 (게스트 결제금액)
+    fee: 0,          // 플랫폼 수수료
+    exchangeFee: 0,  // 결제망 수수료
+    net: 0,          // 최종 정산금
     count: 0
   });
 
   const [chartData, setChartData] = useState<{
-    date: string, 
-    amount: number, 
-    label: string, 
-    isToday: boolean 
+    date: string;
+    amount: number;
+    label: string;
+    isToday: boolean;
   }[]>([]);
 
+  // 설정 메뉴 외부 클릭 시 닫기
   useEffect(() => {
-    // 화면의 다른 곳을 클릭하면 설정 메뉴 닫기
     const closeMenu = () => setShowSettings(false);
     if (showSettings) document.addEventListener('click', closeMenu);
     return () => document.removeEventListener('click', closeMenu);
@@ -41,47 +42,54 @@ export default function Earnings() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         
+        // 1. 예약 데이터 가져오기 (취소된 것 제외)
         const { data: bookings, error } = await supabase
           .from('bookings')
           .select(`
             total_price,
-            date,
+            created_at,
             status,
             experiences!inner ( host_id )
           `)
           .eq('experiences.host_id', user.id)
           .neq('status', 'cancelled') 
           .neq('status', 'declined')
-          .neq('status', 'cancellation_requested'); 
+          .neq('status', 'cancellation_requested'); // 취소 요청 중인 것도 제외할지 결정 필요
 
         if (error) throw error;
         
         let grossRevenue = 0;
         let validCount = 0;
         const dailyIncome: Record<string, number> = {};
-        const today = new Date();
         
         bookings?.forEach((b: any) => {
+          // created_at 기준 (예약 발생일) 또는 date 기준 (체험일) 중 선택
+          // 여기서는 '예약 발생일(매출 발생일)' 기준으로 차트를 그립니다.
+          const dateStr = b.created_at.split('T')[0]; 
           const price = b.total_price || 0; 
+
           grossRevenue += price;
           validCount++;
 
-          // 차트용: 순수익(77%) 기준으로 표시
+          // 차트용: 순수익(약 77%) 기준으로 표시
           const netIncome = Math.floor(price * 0.77);
 
-          if (dailyIncome[b.date]) {
-            dailyIncome[b.date] += netIncome; 
+          if (dailyIncome[dateStr]) {
+            dailyIncome[dateStr] += netIncome; 
           } else {
-            dailyIncome[b.date] = netIncome;
+            dailyIncome[dateStr] = netIncome;
           }
         });
 
+        // 2. 최근 7일 ~ 미래 4일 (총 12일) 차트 데이터 생성
         const chart = [];
+        const today = new Date();
+        
         for (let i = -7; i <= 4; i++) {
           const d = new Date();
           d.setDate(today.getDate() + i);
           const dateStr = d.toISOString().split('T')[0];
-          const dayLabel = d.getDate().toString();
+          const dayLabel = String(d.getDate()); // 일(Day)만 표시
           
           chart.push({
             date: dateStr,
@@ -91,10 +99,10 @@ export default function Earnings() {
           });
         }
 
-        // 수수료 및 정산금 계산
+        // 3. 수수료 및 정산금 계산 (소수점 버림)
         const fee = Math.floor(grossRevenue * 0.2); // 20%
-        const exchangeFee = Math.floor(grossRevenue * 0.027); // 3%
-        const net = grossRevenue - fee - exchangeFee; // 나머지 77%
+        const exchangeFee = Math.floor(grossRevenue * 0.03); // 3% (약 2.7~3.3%)
+        const net = grossRevenue - fee - exchangeFee; 
 
         setStats({
           gross: grossRevenue,
@@ -113,14 +121,15 @@ export default function Earnings() {
       }
     };
     fetchData();
-  }, []);
+  }, [supabase]); // 의존성 배열 수정
 
   if (loading) return <Skeleton className="w-full h-[500px] rounded-3xl" />;
 
+  // 차트 높이 계산용 최대값 (최소 10,000원)
   const maxAmount = Math.max(...chartData.map(d => d.amount), 10000);
 
   return (
-    <div className="max-w-md mx-auto md:max-w-none md:mx-0 min-h-[600px]">
+    <div className="max-w-md mx-auto md:max-w-none md:mx-0 min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* 상단 헤더 & 설정 버튼 */}
       <div className="flex items-center justify-between mb-8 px-2 relative z-50">
@@ -128,7 +137,7 @@ export default function Earnings() {
         <div className="relative">
           <button 
             onClick={(e) => {
-              e.stopPropagation(); // 부모 클릭 이벤트 전파 방지
+              e.stopPropagation(); 
               setShowSettings(!showSettings);
             }}
             className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors"
@@ -146,7 +155,7 @@ export default function Earnings() {
                 <BookOpen size={16} className="text-slate-400"/> 호스트 가이드북
               </button>
               <button 
-                onClick={() => router.push('/host/dashboard?tab=profile')}
+                onClick={() => router.push('/host/dashboard?tab=profile')} // 프로필 탭으로 이동
                 className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-3"
               >
                 <CreditCard size={16} className="text-slate-400"/> 정산 계좌 관리
@@ -159,37 +168,49 @@ export default function Earnings() {
       {/* 메인 카드 (수입 & 차트) */}
       <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
         
-        <div className="text-center mb-8 relative z-10">
-          <p className="text-slate-400 font-bold text-sm mb-2 flex items-center justify-center gap-1">
-             정산 예정 금액 <Info size={14}/>
+        <div className="text-center mb-10 relative z-10">
+          <p className="text-slate-400 font-bold text-xs mb-2 flex items-center justify-center gap-1 uppercase tracking-wider">
+             정산 예정 금액 <Info size={12}/>
           </p>
           <h1 className="text-5xl font-black text-slate-900 tracking-tight">
             ₩{stats.net.toLocaleString()}
           </h1>
         </div>
 
-        <div className="h-48 flex items-end justify-between gap-2 md:gap-4 relative z-10 pt-4">
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
-                <div className="border-t border-slate-900 w-full h-0"></div>
-                <div className="border-t border-slate-900 w-full h-0"></div>
-                <div className="border-t border-slate-900 w-full h-0"></div>
+        {/* 차트 영역 */}
+        <div className="h-48 flex items-end justify-between gap-2 md:gap-4 relative z-10">
+            {/* 배경 가이드 라인 (점선) */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 z-0">
+                <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
+                <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
+                <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
             </div>
 
             {chartData.map((d, i) => {
                const heightPercent = (d.amount / maxAmount) * 100;
+               // 최소 높이 4% 보장 (너무 작으면 안 보이므로)
+               const barHeight = Math.max(heightPercent, 4); 
+
                return (
-                 <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                    <div className="opacity-0 group-hover:opacity-100 absolute -top-2 bg-slate-900 text-white text-[10px] px-2 py-1 rounded transition-opacity whitespace-nowrap z-20">
+                 <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer relative z-10">
+                    {/* 툴팁 (금액 표시) */}
+                    <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-slate-900 text-white text-[10px] px-2 py-1 rounded transition-opacity whitespace-nowrap z-20 shadow-md">
                         ₩{d.amount.toLocaleString()}
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                     </div>
                     
+                    {/* 막대 그래프 */}
                     <div 
-                      className={`w-full max-w-[20px] rounded-t-lg transition-all duration-500 ease-out relative ${d.isToday ? 'bg-slate-900' : 'bg-slate-200 group-hover:bg-slate-300'}`}
-                      style={{ height: `${Math.max(heightPercent, 2)}%` }}
+                      className={`w-full max-w-[20px] rounded-t-lg transition-all duration-500 ease-out relative 
+                        ${d.isToday ? 'bg-slate-900' : 'bg-slate-200 group-hover:bg-slate-300'}`}
+                      style={{ height: `${barHeight}%` }}
                     >
-                        {d.isToday && <div className="absolute -top-1 right-0 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></div>}
+                        {d.isToday && (
+                          <div className="absolute -top-1 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white"></div>
+                        )}
                     </div>
                     
+                    {/* 날짜 라벨 */}
                     <span className={`text-[10px] font-bold ${d.isToday ? 'text-slate-900' : 'text-slate-400'}`}>
                         {d.label}
                     </span>
@@ -199,45 +220,46 @@ export default function Earnings() {
         </div>
       </div>
 
-      {/* 하단 요약 토글 버튼 */}
+      {/* 하단 요약 토글 섹션 */}
       <div className="mt-6">
         <button 
           onClick={() => setShowSummary(!showSummary)}
-          className="w-full bg-slate-50 hover:bg-slate-100 transition-colors py-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-slate-600 group"
+          className="w-full bg-white hover:bg-slate-50 transition-colors py-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-slate-600 border border-slate-200 shadow-sm"
         >
-          {showSummary ? '요약 접기' : '수입 요약 보기'}
+          {showSummary ? '요약 접기' : '수입 상세 내역 보기'}
           {showSummary ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
         </button>
 
         {showSummary && (
           <div className="mt-4 bg-slate-50 rounded-3xl p-6 md:p-8 animate-in slide-in-from-top-4 duration-300 fade-in border border-slate-100">
              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-lg text-slate-800">올해 현재까지 요약</h3>
-                <span className="text-xs font-bold bg-white border px-2 py-1 rounded text-slate-500">
-                    2026.01.01 ~ 현재
+                <h3 className="font-bold text-lg text-slate-800">정산 상세 내역</h3>
+                <span className="text-[10px] font-bold bg-white border px-2 py-1 rounded text-slate-400 uppercase tracking-wide">
+                    Year to Date
                 </span>
              </div>
 
              <div className="space-y-4">
                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">총 수입 (게스트 결제액 기준)</span>
+                    <span className="text-slate-500">총 매출 (게스트 결제액)</span>
                     <span className="font-bold text-slate-900">₩{stats.gross.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">로컬리 서비스 수수료 (20%)</span>
-                    <span className="font-bold text-slate-400">- ₩{stats.fee.toLocaleString()}</span>
+                    <span className="text-slate-500">서비스 수수료 (20%)</span>
+                    <span className="font-bold text-rose-500">- ₩{stats.fee.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">환전 및 송금 수수료 (2.7%)</span>
-                    <span className="font-bold text-slate-400">- ₩{stats.exchangeFee.toLocaleString()}</span>
+                    <span className="text-slate-500">결제망 이용료 (3%)</span>
+                    <span className="font-bold text-rose-500">- ₩{stats.exchangeFee.toLocaleString()}</span>
                 </div>
                 
-                <div className="h-px bg-slate-200 my-4"></div>
+                <div className="border-t border-slate-200 border-dashed my-4"></div>
 
                 <div className="flex justify-between items-center">
-                    <span className="font-black text-base text-slate-900">총 지급액 (KRW)</span>
+                    <span className="font-black text-base text-slate-900">최종 지급액 (Net)</span>
                     <span className="font-black text-2xl text-slate-900">₩{stats.net.toLocaleString()}</span>
                 </div>
+                <p className="text-[10px] text-slate-400 text-right mt-1">* 세금 처리는 호스트 본인의 책임입니다.</p>
              </div>
           </div>
         )}
