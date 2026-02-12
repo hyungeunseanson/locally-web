@@ -61,18 +61,26 @@ export default function HostReviews() {
         .from('reviews')
         .update({ 
             reply: replyText,
-            reply_at: new Date().toISOString() // 답글 단 시간 기록
+            reply_at: new Date().toISOString() 
         })
         .eq('id', reviewId);
 
       if (error) throw error;
 
       showToast('답글이 등록되었습니다!', 'success');
+      
+      // 🟢 [핵심] UI 강제 업데이트 (서버 다시 부르지 않고 로컬 상태 즉시 변경)
+      setReviews(prev => prev.map(r => 
+        r.id === reviewId 
+          ? { ...r, reply: replyText, reply_at: new Date().toISOString() } 
+          : r
+      ));
+
       setReplyingId(null);
       setReplyText('');
-      fetchReviews(); // 목록 갱신
-
+      
     } catch (error) {
+      console.error(error);
       showToast('답글 등록 실패', 'error');
     } finally {
       setIsSubmitting(false);
