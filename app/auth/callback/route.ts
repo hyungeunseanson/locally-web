@@ -2,57 +2,102 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/';
+export async function POST(request: Request) {
+  try {
+    let resCode, amount, orderId, tid;
 
-  if (code) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll(); },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
-
-    // 1. 코드 -> 세션 교환 (로그인 처리)
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    // 🟢 요청 타입(JSON vs FormData)에 따라 데이터 파싱
+    const contentType = request.headers.get('content-type') || '';
     
-    if (!error) {
-      // 2. [핵심 추가] 로그인 성공 시 프로필 존재 여부 확인 및 자동 생성
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // 프로필이 이미 있는지 확인
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user.id)
-          .single();
+    if (contentType.includes('application/json')) {
+      // PC 결제 (Client의 fetch)
+      const json = await request.json();
+      resCode = json.success ? '0000' : '9999'; 
+      amount = json.paid_amount;
+      orderId = json.merchant_uid;
+      tid = json.pg_tid;
+    } else {
+      // 모바일 리다이렉트 (FormData)
+      const formData = await request.formData();
+      resCode = formData.get('resCode') || '0000'; 
+      amount = formData.get('amt');
+      orderId = formData.get('moid');
+      tid = formData.get('tid');
+    }
 
-        // 없으면 생성 (Upsert)
-        if (!existingProfile) {
-          await supabase.from('profiles').insert({
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'New User',
-            avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture,
+    // 1. 결제 성공 확인
+    if (resCode === '0000' || resCode === true) { 
+      const cookieStore = await cookies();
+      
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll() { return cookieStore.getAll() },
+            setAll(cookiesToSet) {
+              try {
+                cookiesToSet.forEach(({ name, value, options }) =>
+                  cookieStore.set(name, value, options)
+                )
+              } catch { }
+            },
+          },
+        }
+      );
+      
+      // 🟢 [핵심] PENDING 상태인 예약을 찾아 PAID로 업데이트 (UPDATE)
+      const { data: bookingData, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'PAID',
+          tid: tid as string,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId) // 주문번호로 찾기
+        .select()
+        .single();
+
+      if (error) {
+        console.error('DB 업데이트 에러:', error);
+        // 이미 결제가 되었으므로 여기서 에러를 내기보다 로그만 찍고 성공 처리할 수도 있음
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      } else if (bookingData) {
+        // 🚀 3. 호스트에게 알림 이메일 발송 트리거
+        const origin = new URL(request.url).origin;
+        try {
+          await fetch(`${origin}/api/notifications/email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'booking_created',
+              booking_id: bookingData.id,
+              // bookingData에 experience_id가 이미 있으므로 안전함
+              user_name: '게스트', 
+              amount: amount
+            })
           });
+          console.log('📧 알림 이메일 발송 요청됨');
+        } catch (emailError) {
+          console.error('📧 이메일 실패:', emailError);
         }
       }
 
-      return NextResponse.redirect(`${origin}${next}`);
+      // 응답 처리
+      if (contentType.includes('application/json')) {
+        return NextResponse.json({ success: true });
+      } else {
+        return NextResponse.redirect(
+          new URL(`/payment/success?orderId=${orderId}&amount=${amount}`, request.url), 
+          303
+        );
+      }
+    } else {
+      // 결제 실패
+      return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
     }
+  } catch (err) {
+    console.error('콜백 처리 중 오류:', err);
+    return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
   }
-
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
 }
