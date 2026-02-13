@@ -5,7 +5,19 @@ import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shie
 import { useChat } from '@/app/hooks/useChat'; 
 
 export default function ChatMonitor() {
-  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, refresh, isLoading, error } = useChat('admin') as any;
+// 🟢 [수정] 타입 단언을 확실하게 하여 error 속성 접근 허용
+const { 
+  inquiries, 
+  selectedInquiry, 
+  messages, 
+  currentUser, 
+  loadMessages, 
+  sendMessage, 
+  refresh, 
+  isLoading, 
+  error 
+} = useChat('admin') as unknown as any;
+
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('monitor');
   const [replyText, setReplyText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -26,10 +38,11 @@ export default function ChatMonitor() {
     return guest.full_name || guest.name || guest.email || '익명 고객';
   };
 
-  const filteredInquiries = inquiries.filter(inq => {
-    if (activeTab === 'monitor') return inq.type !== 'admin';
-    return inq.type === 'admin';
-  });
+// 🟢 [수정] inq 파라미터에 any 타입 지정
+const filteredInquiries = inquiries.filter((inq: any) => {
+  if (activeTab === 'monitor') return inq.type !== 'admin';
+  return inq.type === 'admin';
+});
 
   return (
     <div className="flex h-full gap-6 w-full">
@@ -81,10 +94,10 @@ export default function ChatMonitor() {
               </div>
               <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">새로고침</button>
             </div>
-          ) : (
-            filteredInquiries.map((inq) => (
-              <div 
-                key={inq.id} 
+) : (
+  filteredInquiries.map((inq: any) => (
+    <div 
+      key={inq.id}
                 onClick={() => loadMessages(inq.id)}
                 className={`p-4 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'}`}
               >
@@ -139,12 +152,8 @@ export default function ChatMonitor() {
             </div>
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
-              {messages.map((msg) => {
-                // ✅ [핵심 수정] 정렬 로직
-                // 무조건 "문의자(Guest)가 보낸 것"은 왼쪽.
-                // "그 외(Host, Admin)"가 보낸 것은 오른쪽.
-                // 관리자가 테스트로 보낸 글이라도, 문의자(Guest)의 입장이면 왼쪽에 뜹니다.
-                const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
+  {messages.map((msg: any) => {
+    const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest; 
 
                 return (
