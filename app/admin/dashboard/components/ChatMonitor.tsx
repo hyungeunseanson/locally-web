@@ -4,18 +4,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat'; 
 
-// 🟢 [수정] 타입 단언을 확실하게 변경 (as unknown as any)
-const { 
-  inquiries, 
-  selectedInquiry, 
-  messages, 
-  currentUser, 
-  loadMessages, 
-  sendMessage, 
-  refresh, 
-  isLoading, 
-  error 
-} = useChat('admin') as unknown as any;
+export default function ChatMonitor() {
+  const { 
+    inquiries, 
+    selectedInquiry, 
+    messages, 
+    currentUser, 
+    loadMessages, 
+    sendMessage, 
+    refresh, 
+    isLoading, 
+    error 
+  } = useChat('admin') as unknown as any;
 
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('monitor');
   const [replyText, setReplyText] = useState('');
@@ -37,11 +37,10 @@ const {
     return guest.full_name || guest.name || guest.email || '익명 고객';
   };
 
-// 🟢 [수정] inq 파라미터에 any 타입 지정
-const filteredInquiries = inquiries.filter((inq: any) => {
-  if (activeTab === 'monitor') return inq.type !== 'admin';
-  return inq.type === 'admin';
-});
+  const filteredInquiries = (inquiries || []).filter((inq: any) => {
+    if (activeTab === 'monitor') return inq.type !== 'admin';
+    return inq.type === 'admin';
+  });
 
   return (
     <div className="flex h-full gap-6 w-full">
@@ -93,10 +92,10 @@ const filteredInquiries = inquiries.filter((inq: any) => {
               </div>
               <button onClick={refresh} className="text-xs text-blue-600 underline mt-2">새로고침</button>
             </div>
-) : (
-  filteredInquiries.map((inq: any) => (
-    <div 
-      key={inq.id}
+          ) : (
+            filteredInquiries.map((inq: any) => (
+              <div 
+                key={inq.id} 
                 onClick={() => loadMessages(inq.id)}
                 className={`p-4 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'}`}
               >
@@ -151,13 +150,12 @@ const filteredInquiries = inquiries.filter((inq: any) => {
             </div>
 
             <div className="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
-  {messages.map((msg: any) => {
-    const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
+              {messages.map((msg: any) => {
+                const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest; 
 
                 return (
                   <div key={msg.id} className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}>
-                    {/* 발신자 이름 표시 (모니터링 시 중요) */}
                     <span className="text-[10px] text-slate-400 mb-1 px-1">
                       {msg.sender?.full_name || '알 수 없음'}
                     </span>
@@ -175,7 +173,6 @@ const filteredInquiries = inquiries.filter((inq: any) => {
                 placeholder={activeTab === 'monitor' ? "관리자 권한으로 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                // 한글 중복 방지
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') {
@@ -198,3 +195,4 @@ const filteredInquiries = inquiries.filter((inq: any) => {
       </div>
     </div>
   );
+}
