@@ -22,8 +22,8 @@ function PaymentContent() {
   // 예약자 정보 및 약관 동의 상태
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [message, setMessage] = useState('');
-  const [agreed, setAgreed] = useState(false);
+  const [message, setMessage] = useState(''); // 예약 메시지
+  const [agreed, setAgreed] = useState(false); // 약관 동의
 
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
@@ -34,7 +34,7 @@ function PaymentContent() {
   // 가격 로직
   const expPrice = experience?.price || 50000; 
   const hostPrice = isPrivate ? (experience?.private_price || 300000) : expPrice * guests;
-  const guestFee = hostPrice * 0.1;
+  const guestFee = hostPrice * 0.1; // 수수료 10%
   const finalAmount = hostPrice + guestFee; 
 
   useEffect(() => { 
@@ -107,16 +107,20 @@ function PaymentContent() {
         return;
       }
 
-      // 3. 포트원 결제 요청 시작
+      // 3. 포트원(나이스페이) 결제 요청
       const { IMP } = window as any;
       
-      // 🚨 [매우 중요] 여기에 아까 복사한 'imp'로 시작하는 코드를 직접 넣으세요!
-      // 예시: IMP.init('imp12345678'); 
-      // process.env 쓰지 마세요. 지금은 직접 넣어야 해결됩니다.
-      IMP.init('imp44607000'); 
+      // 🟢 [복구] 환경 변수 사용으로 원상복구
+      // 만약 "결제 연동 코드가 설정되지 않았습니다"라고 뜨면 .env.local 파일을 확인해주세요.
+      if (!process.env.NEXT_PUBLIC_PORTONE_IMP_CODE) {
+          alert('결제 연동 코드가 설정되지 않았습니다.');
+          setIsProcessing(false);
+          return;
+      }
+      IMP.init(process.env.NEXT_PUBLIC_PORTONE_IMP_CODE); 
 
       const data = {
-        pg: 'nice',         // 반드시 'nice' 여야 함 (관리자 설정이 nice니까)
+        pg: 'nice', // 'nice' (나이스페이)
         pay_method: 'card',
         merchant_uid: newOrderId, 
         name: experience?.title || 'Locally 체험 예약',
@@ -127,34 +131,33 @@ function PaymentContent() {
         m_redirect_url: `${window.location.origin}/api/payment/nicepay-callback`, 
       };
 
-      // 4. 결제 창 호출
       IMP.request_pay(data, async (rsp: any) => {
-        console.log('결제 응답:', rsp); 
+        console.log('결제 응답 전체 데이터:', rsp); 
 
-        // 성공 여부 체크 (성공: true, 혹은 paid 상태)
+        // 1. 결제 성공 여부 확인
         const isSuccess = rsp.success === true || rsp.code === '0' || rsp.status === 'paid';
 
         if (isSuccess) {
            try {
-             // 서버에 검증 요청 (결과는 신경 쓰지 않고 무조건 이동시킴)
+             // 2. 서버 검증 요청
              await fetch('/api/payment/nicepay-callback', {
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify(rsp),
              });
-             
-             // 🟢 [핵심] 성공 페이지로 강제 이동 (window.location.href 사용)
+
+             // 🟢 [수정] 결제 성공 시 '확실하게' 페이지 이동 (window.location.href 사용)
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
              
            } catch (err) {
-             console.error('검증 에러났지만 이동함:', err);
-             // 에러가 나도 돈은 나갔으니 성공 페이지로 보냄
+             console.error('검증 에러 무시하고 이동:', err);
+             // 서버 검증이 실패했더라도, 이미 돈은 나갔으니 일단 성공 화면으로 보냅니다.
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
            }
         } else {
-           // 결제 실패/취소 시
+           // 결제 실패 시
            console.error('결제 실패:', rsp);
-           showToast(`결제 실패: ${rsp.error_msg}`, 'error');
+           showToast(`결제 실패: ${rsp.error_msg || '알 수 없는 오류'}`, 'error');
            setIsProcessing(false);
         }
       });
