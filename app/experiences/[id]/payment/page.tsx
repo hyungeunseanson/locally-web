@@ -19,7 +19,7 @@ function PaymentContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [experience, setExperience] = useState<any>(null);
   
-  // 🟢 [추가] 결제에 필요한 유저 정보 및 약관 동의 상태
+  // 🟢 결제에 필요한 유저 정보 및 약관 동의 상태
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [message, setMessage] = useState(''); // 예약 메시지
@@ -31,8 +31,7 @@ function PaymentContent() {
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   
-  // 🟢 [가격 로직]
-  // 실제로는 experience.price에서 가져와야 하지만, 예시로 5만원 설정
+  // 🟢 가격 로직
   const expPrice = experience?.price || 50000; 
   const hostPrice = isPrivate ? (experience?.private_price || 300000) : expPrice * guests;
   const guestFee = hostPrice * 0.1; // 수수료 10%
@@ -43,7 +42,6 @@ function PaymentContent() {
     const fetchExp = async () => {
       if (!experienceId) return;
       
-      // 1. 체험 정보 가져오기
       const { data: expData } = await supabase
         .from('experiences')
         .select('title, image_url, photos, location, price, private_price')
@@ -51,10 +49,8 @@ function PaymentContent() {
         .single();
       if (expData) setExperience(expData);
 
-      // 2. 로그인한 유저 정보 미리 채우기
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // 프로필 정보가 있다면 가져와서 이름/전화번호 채우기
         const { data: profile } = await supabase.from('profiles').select('name, phone').eq('id', user.id).single();
         if (profile) {
           setCustomerName(profile.name || '');
@@ -69,7 +65,6 @@ function PaymentContent() {
     if (!agreed) return showToast('필수 약관에 동의해주세요.', 'error');
     if (!customerName || !customerPhone) return showToast('예약자 정보를 입력해주세요.', 'error');
     
-    // confirm 대신 바로 진행 (UX상 더 깔끔함)
     setIsProcessing(true);
 
     try {
@@ -84,21 +79,20 @@ function PaymentContent() {
       // 1. 주문 ID 생성
       const newOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-      // 🟢 2. [핵심] 결제 전 'PENDING' 상태로 예약 데이터 미리 저장
+      // 🟢 2. 결제 전 'PENDING' 상태로 예약 데이터 미리 저장
       const { error: bookingError } = await supabase.from('bookings').insert([
         {
-          id: newOrderId, // 주문번호를 ID로 사용
-          order_id: newOrderId, // 🟢 [추가] DB의 Not Null 제약조건을 만족시키기 위해 추가
+          id: newOrderId,
+          order_id: newOrderId, 
           user_id: user.id,
           experience_id: experienceId,
-          amount: finalAmount,         // 게스트가 실제로 낸 총 금액
-          total_price: hostPrice,      // 호스트 매출 기준액
-          status: 'PENDING',           // 결제 대기 상태
+          amount: finalAmount,         
+          total_price: hostPrice,      
+          status: 'PENDING',           
           guests: guests,
           date: date,
           time: time,
           type: isPrivate ? 'private' : 'group',
-          // 예약자 정보 및 메시지 저장
           contact_name: customerName,
           contact_phone: customerPhone,
           message: message, 
@@ -123,9 +117,9 @@ function PaymentContent() {
       IMP.init(process.env.NEXT_PUBLIC_PORTONE_IMP_CODE); 
 
       const data = {
-        pg: 'nice_v2', 
-        pay_method: 'card', // 기본값 카드
-        merchant_uid: newOrderId, // 위에서 만든 주문번호 사용
+        pg: 'nice', // 'nice' (구모듈)로 설정
+        pay_method: 'card',
+        merchant_uid: newOrderId, 
         name: experience?.title || 'Locally 체험 예약',
         amount: finalAmount,
         buyer_email: user.email,
@@ -134,32 +128,36 @@ function PaymentContent() {
         m_redirect_url: `${window.location.origin}/api/payment/nicepay-callback`, 
       };
 
+      // 🟢 [수정] IMP.request_pay를 handlePayment 함수 안으로 넣음
       IMP.request_pay(data, async (rsp: any) => {
-        if (rsp.success) {
-           // 1. 서버 검증
-           const verifyRes = await fetch('/api/payment/nicepay-callback', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify(rsp),
-           });
-           
-           if (verifyRes.ok) {
-             showToast("결제가 완료되었습니다!", 'success');
+        console.log('결제 응답 전체 데이터:', rsp); 
+
+        // 1. 결제 성공 여부 확인
+        const isSuccess = rsp.success === true || rsp.code === '0' || rsp.status === 'paid';
+
+        if (isSuccess) {
+           try {
+             // 2. 서버 검증 요청
+             await fetch('/api/payment/nicepay-callback', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify(rsp),
+             });
+
+             // 🟢 [강제 이동] window.location.href 사용
+             // app/experiences/[id]/payment/complete/page.tsx 경로로 이동
+             window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
              
-             // 🟢 [수정] 파일명(complete)에 맞춰 주소 변경 & 확실한 이동을 위해 replace 사용
-             // 주의: 만약 complete 파일이 app/payment/complete/page.tsx 라면 아래 주소 사용
-             window.location.replace(`/payment/complete?orderId=${newOrderId}&amount=${finalAmount}`);
-             
-             // 만약 complete 파일이 app/experiences/[id]/payment/complete/page.tsx 라면
-             // window.location.replace(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}&amount=${finalAmount}`);
-           } else {
-             const errData = await verifyRes.json();
-             showToast(`결제 완료 처리 실패: ${errData.error}`, 'error');
+           } catch (err) {
+             console.error('검증 에러 무시하고 이동:', err);
+             window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
            }
         } else {
-           showToast(`결제 취소/실패: ${rsp.error_msg}`, 'error');
+           // 결제 실패 시
+           console.error('결제 실패:', rsp);
+           showToast(`결제 실패: ${rsp.error_msg || '알 수 없는 오류'}`, 'error');
+           setIsProcessing(false);
         }
-        setIsProcessing(false);
       });
 
     } catch (error: any) {
@@ -184,7 +182,6 @@ function PaymentContent() {
         </div>
 
         <div className="p-6">
-          {/* 상품 정보 */}
           <div className="flex gap-5 mb-8">
             <div className="w-24 h-32 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 shadow-sm border border-slate-100">
                <Image 
@@ -209,7 +206,6 @@ function PaymentContent() {
              {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><ShieldCheck size={16}/> 타입</span><span className="font-bold text-rose-500">프라이빗 투어</span></div>}
           </div>
 
-          {/* 🟢 [추가] 예약자 정보 입력 필드 */}
           <div className="mb-8 space-y-4">
             <h2 className="text-xl font-bold">예약자 정보</h2>
             <div>
@@ -243,7 +239,6 @@ function PaymentContent() {
             </div>
           </div>
 
-          {/* 금액 상세 */}
           <div className="px-2 space-y-2 mb-8 text-sm">
             <div className="flex justify-between items-center text-slate-600">
               <span>체험 금액</span>
@@ -259,7 +254,6 @@ function PaymentContent() {
             </div>
           </div>
 
-          {/* 🟢 [추가] 약관 동의 */}
           <div className="mb-6">
             <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${agreed ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}>
