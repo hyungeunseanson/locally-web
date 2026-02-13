@@ -109,12 +109,9 @@ function PaymentContent() {
 
       // 3. 포트원(나이스페이) 결제 요청
       const { IMP } = window as any;
-      if (!process.env.NEXT_PUBLIC_PORTONE_IMP_CODE) {
-          alert('결제 연동 코드가 설정되지 않았습니다.');
-          setIsProcessing(false);
-          return;
-      }
-      IMP.init(process.env.NEXT_PUBLIC_PORTONE_IMP_CODE); 
+      
+      // 🟢 [하드코딩] 식별코드 직접 입력 (환경변수 문제 배제용)
+      IMP.init('imp44607000'); // 여기에 본인의 식별코드를 넣으세요!
 
       const data = {
         pg: 'nice', // 'nice' (구모듈)로 설정
