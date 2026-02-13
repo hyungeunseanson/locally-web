@@ -153,33 +153,46 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
         )}
 
 {/* 🟣 [EXPS] 체험 상세 정보 (신규 추가) */}
-        {activeTab === 'EXPS' && (
-          <div className="space-y-8">
-            {selectedItem.photos && (
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">등록된 사진</h4>
-                <div className="grid grid-cols-4 gap-2">
-                  {selectedItem.photos.map((url:string, i:number) => (
-                    <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-100"><img src={url} className="w-full h-full object-cover"/></div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-2 gap-4">
-              {/* ✅ 안전한 값 표시 */}
-              <InfoBox label="가격" value={selectedItem.price !== undefined ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
-              <InfoBox label="소요 시간" value={selectedItem.duration ? `${selectedItem.duration}시간` : '-'} />
-              <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
-              <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}` : '-'} />
-            </div>
-            
-            {/* ✅ 관리자 수정 버튼 */}
-            <Link href={`/host/experiences/${selectedItem.id}/edit`}>
-              <button className="w-full py-3 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors mb-4">
-                <Edit size={16}/> 관리자 권한으로 수정하기
-              </button>
-            </Link>
+{/* 🟣 [EXPS] 체험 상세 정보 */}
+{activeTab === 'EXPS' && (
+  <div className="space-y-8">
+    {selectedItem.photos && (
+      <div>
+        <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">등록된 사진</h4>
+        <div className="grid grid-cols-4 gap-2">
+          {selectedItem.photos.map((url:string, i:number) => (
+            <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-100"><img src={url} className="w-full h-full object-cover"/></div>
+          ))}
+        </div>
+      </div>
+    )}
+    
+    <div className="grid grid-cols-2 gap-4">
+      <InfoBox label="가격" value={selectedItem.price !== undefined ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
+      <InfoBox label="소요 시간" value={selectedItem.duration ? `${selectedItem.duration}시간` : '-'} />
+      <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
+      <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}` : '-'} />
+    </div>
+
+    {/* 🟢 [추가] 만나는 장소 표시 */}
+    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
+      <MapPin size={20} className="text-slate-400 mt-0.5 flex-shrink-0" />
+      <div>
+        <div className="text-xs font-bold text-slate-400 uppercase mb-1">만나는 장소 (Meeting Point)</div>
+        <div className="font-bold text-slate-900 text-sm">
+          {selectedItem.meeting_point || '정보 없음'}
+        </div>
+      </div>
+    </div>
+    
+    {/* ✅ 관리자 수정 버튼 */}
+    <Link href={`/host/experiences/${selectedItem.id}/edit`}>
+      <button className="w-full py-3 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors mb-4">
+        <Edit size={16}/> 관리자 권한으로 수정하기
+      </button>
+    </Link>
+
+    {/* ... (이하 기존 코드 동일) ... */}
 
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>
