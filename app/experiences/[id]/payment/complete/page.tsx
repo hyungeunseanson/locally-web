@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, Download, MessageCircle } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, Download, MessageCircle, Clock } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 

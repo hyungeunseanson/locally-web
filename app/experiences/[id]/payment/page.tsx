@@ -136,7 +136,7 @@ function PaymentContent() {
 
       IMP.request_pay(data, async (rsp: any) => {
         if (rsp.success) {
-           // 4. 결제 성공 -> 서버에 검증 및 상태 업데이트 요청
+           // 1. 서버 검증
            const verifyRes = await fetch('/api/payment/nicepay-callback', {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
@@ -145,7 +145,13 @@ function PaymentContent() {
            
            if (verifyRes.ok) {
              showToast("결제가 완료되었습니다!", 'success');
-             router.push(`/payment/success?orderId=${newOrderId}&amount=${finalAmount}`);
+             
+             // 🟢 [수정] 파일명(complete)에 맞춰 주소 변경 & 확실한 이동을 위해 replace 사용
+             // 주의: 만약 complete 파일이 app/payment/complete/page.tsx 라면 아래 주소 사용
+             window.location.replace(`/payment/complete?orderId=${newOrderId}&amount=${finalAmount}`);
+             
+             // 만약 complete 파일이 app/experiences/[id]/payment/complete/page.tsx 라면
+             // window.location.replace(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}&amount=${finalAmount}`);
            } else {
              const errData = await verifyRes.json();
              showToast(`결제 완료 처리 실패: ${errData.error}`, 'error');
