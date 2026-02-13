@@ -10,17 +10,21 @@ import ManagementTab from './components/ManagementTab';
 import ChatMonitor from './components/ChatMonitor'; // ✅ [필수] ChatMonitor 임포트
 import { useSearchParams } from 'next/navigation'; // ✅ [추가] URL 탭 상태 읽기용
 
+import { useToast } from '@/app/context/ToastContext'; // 🟢 [추가]
+
 export default function AdminDashboardPage() {
+  const { showToast } = useToast(); // 🟢 [추가]
   const [filter, setFilter] = useState('ALL'); 
   
   const searchParams = useSearchParams();
   const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPS';
+  
 
   const [apps, setApps] = useState<any[]>([]);
   const [exps, setExps] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
-  // const [messages, setMessages] = useState<any[]>([]); // ❌ 더 이상 사용 안 함
+  const [reviews, setReviews] = useState<any[]>([]); // 🟢 [추가] 리뷰 데이터 상태
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]); 
 
@@ -63,39 +67,62 @@ export default function AdminDashboardPage() {
     
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
     if (bookingData) setBookings(bookingData);
-  };
+// 🟢 [추가] 리뷰 데이터 가져오기
+const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
+if (reviewData) setReviews(reviewData);
+};
 
-  const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
-    let comment = '';
-    
-    if (status === 'rejected' || status === 'revision') {
-      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
-      if (input === null) return;
-      comment = input;
-    } else {
-      if (!confirm(`${status === 'approved' ? '승인' : '활성화'} 처리하시겠습니까?`)) return;
-      if (table === 'experiences' && status === 'approved') status = 'active';
+  // 🟢 [수정됨] 상태 업데이트 함수
+const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
+  let comment = '';
+  let dbStatus = status; // 🟢 DB에 저장될 실제 상태값 별도 관리
+
+  if (status === 'rejected' || status === 'revision') {
+    const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
+    if (input === null) return;
+    comment = input;
+  } else if (status === 'approved') {
+    if (!confirm('승인 처리하시겠습니까?')) return;
+    // 🟢 체험은 승인 시 status가 'active'가 되어야 함
+    if (table === 'experiences') {
+      dbStatus = 'active'; 
+    }
+  }
+
+  try {
+    // 🟢 테이블별 업데이트 데이터 분기 처리 (안전성 확보)
+    let updateData: any = { status: dbStatus };
+
+    // host_applications 테이블에만 코멘트 저장
+    if (table === 'host_applications') {
+        updateData.admin_comment = comment;
     }
 
-    try {
-      const { error } = await supabase.from(table).update({ status, admin_comment: comment }).eq('id', id);
-      if (error) throw error;
+    const { error } = await supabase
+      .from(table)
+      .update(updateData)
+      .eq('id', id);
 
-      if (table === 'host_applications' && status === 'approved') {
-        const app = apps.find(a => a.id === id);
-        if (app) {
-          await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
-        }
+    if (error) throw error;
+
+    // 호스트 권한 부여 (기존 로직 유지)
+    if (table === 'host_applications' && status === 'approved') {
+      const app = apps.find(a => a.id === id);
+      if (app) {
+        await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
       }
-
-      alert('처리되었습니다.');
-      fetchData();
-      setSelectedItem(null);
-    } catch (err: any) {
-      console.error(err);
-      alert('오류가 발생했습니다: ' + err.message);
     }
-  };
+
+    showToast('성공적으로 처리되었습니다.', 'success'); // 🟢 alert -> showToast
+
+    await fetchData(); 
+    setSelectedItem(null); 
+
+  } catch (err: any) {
+    console.error(err);
+    showToast('처리 중 오류 발생: ' + err.message, 'error'); // 🟢 alert -> showToast
+  }
+};
 
   const deleteItem = async (table: string, id: string) => {
     if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
@@ -121,7 +148,7 @@ export default function AdminDashboardPage() {
       ) : activeTab === 'SALES' ? (
 <SalesTab bookings={bookings} apps={apps} />
       ) : activeTab === 'ANALYTICS' ? (
-        <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} />
+<AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} />
       ) : activeTab === 'CHATS' ? (
         <ChatMonitor />
       ) : (
