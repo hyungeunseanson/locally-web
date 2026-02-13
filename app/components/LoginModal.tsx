@@ -13,14 +13,11 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
-  // 1. Hooks
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   
-  // 공통 필드
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  // 회원가입 전용 필드
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -33,7 +30,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const supabase = createClient();
   const { showToast } = useToast();
 
-  // 2. Logic Functions
   const ensureProfileExists = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -70,7 +66,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    // 유효성 검사
     if (!email || !password) {
       showToast('이메일과 비밀번호를 입력해주세요.', 'error');
       return;
@@ -86,7 +81,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     setLoading(true);
     try {
       if (mode === 'SIGNUP') {
-        // --- 회원가입 ---
         const { data, error } = await supabase.auth.signUp({ 
           email, 
           password,
@@ -102,15 +96,17 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         
         if (error) throw error;
 
-        if (data.user && !data.session) {
-          showToast('가입 인증 메일을 보냈습니다! 이메일을 확인해주세요.', 'success');
-          setMode('LOGIN'); 
-        } else {
-          showToast('회원가입이 완료되었습니다.', 'success');
+        // 이메일 인증이 꺼져있거나 완료된 경우
+        if (data.user && data.session) {
+          showToast('회원가입이 완료되었습니다!', 'success');
           await ensureProfileExists();
           onClose();
           if (onLoginSuccess) onLoginSuccess();
           router.refresh();
+        } else {
+          // 이메일 인증이 켜져있는 경우
+          showToast('가입 인증 메일을 보냈습니다! 이메일을 확인해주세요.', 'success');
+          setMode('LOGIN'); 
         }
 
       } else {
@@ -122,7 +118,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
              throw new Error('이메일 또는 비밀번호가 일치하지 않습니다.');
            }
            if (error.message.includes('Email not confirmed')) {
-             throw new Error('이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.');
+             throw new Error('이메일 인증이 완료되지 않았습니다.');
            }
            throw error;
         }
@@ -135,16 +131,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         router.refresh();
       }
     } catch (error: any) {
-      console.error("Auth Error:", error);
-      
-      // 🟢 Rate Limit 에러 처리 (사용자 친화적 메시지)
-      if (error.message.includes('rate limit') || error.status === 429) {
-        showToast('너무 많은 요청을 보냈습니다. 잠시 후(약 15분 뒤) 다시 시도해주세요.', 'error');
+      // 🟢 에러 핸들링 강화
+      // 브라우저 콘솔의 빨간 에러는 네트워크 실패라 막을 수 없지만, 사용자 경험은 여기서 처리합니다.
+      if (error.message?.includes('rate limit') || error.status === 429) {
+        showToast('너무 많은 가입 요청이 감지되었습니다. 잠시 후 다시 시도하거나 소셜 로그인을 이용해주세요.', 'error');
       } else {
         showToast(error.message, 'error');
       }
     } finally {
-      setLoading(false); // 🟢 에러가 나도 로딩 상태를 반드시 꺼야 버튼이 다시 활성화됨
+      setLoading(false);
     }
   };
 
@@ -162,10 +157,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
 
-      {/* 모달 박스 */}
       <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[480px]' : 'max-w-[420px]'} rounded-2xl shadow-2xl overflow-hidden relative z-10 animate-in zoom-in-95 duration-200 transition-all`}>
         
-        {/* 헤더 */}
         <div className="h-14 flex items-center justify-between px-5 border-b border-gray-100">
           <button onClick={onClose} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
             <X size={18} className="text-gray-900" />
@@ -188,24 +181,20 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           </div>
 
           <form onSubmit={handleAuth}>
-            {/* 입력 그룹 */}
             <div className="border border-gray-300 rounded-xl overflow-hidden mb-6">
               
-              {/* 이메일 */}
               <InputItem 
                 type="email" label="이메일" value={email} setValue={setEmail} 
                 isFirst={true} focusKey="EMAIL" currentFocus={isFocused} setFocus={setIsFocused}
                 autoComplete="username"
               />
 
-              {/* 비밀번호 */}
               <InputItem 
                 type="password" label="비밀번호" value={password} setValue={setPassword} 
                 isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
                 autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
               />
 
-              {/* 회원가입 추가 필드 */}
               {mode === 'SIGNUP' && (
                 <>
                   <InputItem 
@@ -221,7 +210,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                   />
                   
                   <div className="flex border-t border-gray-300">
-                     {/* 생년월일 */}
                      <div className={`relative h-14 w-1/2 border-r border-gray-300 ${isFocused === 'BIRTH' ? 'ring-2 ring-black z-10' : ''}`}>
                         <input
                           type="text"
@@ -241,7 +229,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                         </label>
                      </div>
                      
-                     {/* 🟢 성별 선택 (수정됨) */}
                      <div className={`relative h-14 w-1/2 ${isFocused === 'GENDER' ? 'ring-2 ring-black z-10' : ''}`}>
                         <select
                           className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none peer bg-transparent z-10 relative cursor-pointer"
@@ -251,7 +238,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                           onBlur={() => setIsFocused(null)}
                           autoComplete="sex"
                         >
-                           {/* 🟢 비어있는 값에 텍스트 추가 */}
                            <option value="" disabled>성별 선택</option> 
                            <option value="Male">남성</option>
                            <option value="Female">여성</option>
@@ -279,7 +265,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             </button>
           </form>
 
-          {/* 소셜 로그인 */}
           <div className="flex items-center gap-3 mb-6">
             <div className="flex-1 h-px bg-gray-200"></div>
             <span className="text-[11px] text-gray-400 font-bold">또는</span>
@@ -310,7 +295,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   );
 }
 
-// 🧱 입력 아이템
 function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete }: any) {
   const isFocused = currentFocus === focusKey;
   
