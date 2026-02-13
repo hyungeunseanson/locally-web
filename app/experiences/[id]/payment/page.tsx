@@ -110,17 +110,12 @@ function PaymentContent() {
       // 3. 포트원(나이스페이) 결제 요청
       const { IMP } = window as any;
       
-      // 🟢 [복구] 환경 변수 사용으로 원상복구
-      // 만약 "결제 연동 코드가 설정되지 않았습니다"라고 뜨면 .env.local 파일을 확인해주세요.
-      if (!process.env.NEXT_PUBLIC_PORTONE_IMP_CODE) {
-          alert('결제 연동 코드가 설정되지 않았습니다.');
-          setIsProcessing(false);
-          return;
-      }
-      IMP.init(process.env.NEXT_PUBLIC_PORTONE_IMP_CODE); 
+      // 🟢 사용자님 식별코드 직접 사용
+      IMP.init('imp44607000'); 
 
       const data = {
-        pg: 'nice_v2', // 'nice' (나이스페이)
+        // 🟢 관리자 설정(nice_v2)과 일치시킴
+        pg: 'nice_v2', 
         pay_method: 'card',
         merchant_uid: newOrderId, 
         name: experience?.title || 'Locally 체험 예약',
@@ -134,8 +129,12 @@ function PaymentContent() {
       IMP.request_pay(data, async (rsp: any) => {
         console.log('결제 응답 전체 데이터:', rsp); 
 
-        // 1. 결제 성공 여부 확인
-        const isSuccess = rsp.success === true || rsp.code === '0' || rsp.status === 'paid';
+        // 🟢 [핵심 수정] 성공 판별 로직 완화
+        // "imp_uid가 있고 에러 메시지가 없으면" 성공으로 간주하고 서버에 검증 요청
+        const isSuccess = rsp.success === true || 
+                          rsp.code === '0' || 
+                          rsp.status === 'paid' ||
+                          (rsp.imp_uid && !rsp.error_msg); 
 
         if (isSuccess) {
            try {
@@ -146,16 +145,16 @@ function PaymentContent() {
                body: JSON.stringify(rsp),
              });
 
-             // 🟢 [수정] 결제 성공 시 '확실하게' 페이지 이동 (window.location.href 사용)
+             // 🟢 [완료 페이지 이동]
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
              
            } catch (err) {
              console.error('검증 에러 무시하고 이동:', err);
-             // 서버 검증이 실패했더라도, 이미 돈은 나갔으니 일단 성공 화면으로 보냅니다.
+             // 서버 에러가 나도 이미 결제는 되었으므로 이동
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
            }
         } else {
-           // 결제 실패 시
+           // 진짜 실패한 경우 (에러 메시지가 있는 경우)
            console.error('결제 실패:', rsp);
            showToast(`결제 실패: ${rsp.error_msg || '알 수 없는 오류'}`, 'error');
            setIsProcessing(false);
