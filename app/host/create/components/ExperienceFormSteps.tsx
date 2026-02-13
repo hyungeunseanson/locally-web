@@ -155,25 +155,65 @@ export default function ExperienceFormSteps({
     );
   }
 
-  if (step === 3) {
-    return (
-      <div className="w-full space-y-10">
-        <div className="space-y-2"><h1 className="text-3xl font-black text-slate-900">이동 동선 만들기</h1><p className="text-slate-500 text-lg">만나는 곳부터 헤어지는 곳까지, 여정을 그려주세요.</p></div>
+// 🟢 [수정] Step 3: 만나는 장소 + 동선 입력
+if (step === 3) {
+  return (
+    <div className="w-full space-y-10">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-black text-slate-900">어디서 만날까요?</h1>
+        <p className="text-slate-500 text-lg">게스트와 만날 정확한 장소와 이동 경로를 알려주세요.</p>
+      </div>
+
+      {/* 🟢 만나는 장소 입력 필드 추가 */}
+      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block flex items-center gap-1">
+          <MapPin size={12}/> 만나는 장소 (Meeting Point)
+        </label>
+        <input 
+          type="text" 
+          placeholder="예) 홍대입구역 3번 출구 앞" 
+          value={formData.meeting_point || ''} // formData에 meeting_point 추가 필요
+          onChange={(e) => updateData('meeting_point', e.target.value)} 
+          className="w-full p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-bold"
+        />
+        <p className="text-xs text-slate-400 mt-2">* 정확한 주소나 찾기 쉬운 랜드마크를 입력해주세요.</p>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-bold">이동 동선</h3>
         <div className="relative border-l-2 border-slate-100 ml-4 pl-8 space-y-8 py-2">
           {formData.itinerary.map((item: any, idx: number) => (
             <div key={idx} className="relative group animate-in slide-in-from-left-4 fade-in duration-300">
-              <div className={`absolute -left-[41px] top-4 w-6 h-6 rounded-full border-4 border-white shadow-sm flex items-center justify-center z-10 ${idx === 0 ? 'bg-black' : idx === formData.itinerary.length - 1 ? 'bg-slate-900' : 'bg-slate-300'}`}>{idx === 0 && <MapPin size={10} className="text-white"/>}</div>
+              <div className={`absolute -left-[41px] top-4 w-6 h-6 rounded-full border-4 border-white shadow-sm flex items-center justify-center z-10 ${idx === 0 ? 'bg-black' : idx === formData.itinerary.length - 1 ? 'bg-slate-900' : 'bg-slate-300'}`}>
+                {idx === 0 && <MapPin size={10} className="text-white"/>}
+              </div>
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 group-hover:border-slate-300 transition-colors relative">
-                <div className="flex justify-between items-start mb-3"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{idx === 0 ? 'START' : idx === formData.itinerary.length - 1 ? 'END' : `STOP ${idx}`}</span>{formData.itinerary.length > 1 && (<button onClick={() => removeItineraryItem(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>)}</div>
-                <div className="space-y-3"><input type="text" placeholder="장소 이름" value={item.title} onChange={(e) => updateItineraryItem(idx, 'title', e.target.value)} className="w-full bg-transparent text-lg font-bold outline-none"/><textarea placeholder="설명" value={item.description} onChange={(e) => updateItineraryItem(idx, 'description', e.target.value)} className="w-full bg-transparent text-sm text-slate-600 outline-none resize-none h-10"/></div>
+                <div className="flex justify-between items-start mb-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {idx === 0 ? 'START' : idx === formData.itinerary.length - 1 ? 'END' : `STOP ${idx}`}
+                  </span>
+                  {formData.itinerary.length > 1 && (
+                    <button onClick={() => removeItineraryItem(idx)} className="text-slate-300 hover:text-rose-500">
+                      <Trash2 size={16}/>
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <input type="text" placeholder="장소 이름" value={item.title} onChange={(e) => updateItineraryItem(idx, 'title', e.target.value)} className="w-full bg-transparent text-lg font-bold outline-none"/>
+                  <textarea placeholder="설명" value={item.description} onChange={(e) => updateItineraryItem(idx, 'description', e.target.value)} className="w-full bg-transparent text-sm text-slate-600 outline-none resize-none h-10"/>
+                </div>
               </div>
             </div>
           ))}
-          <button onClick={addItineraryItem} className="flex items-center gap-3 text-slate-500 hover:text-black font-bold text-sm pl-1"><div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200"><Plus size={16}/></div>경유지 추가하기</button>
+          <button onClick={addItineraryItem} className="flex items-center gap-3 text-slate-500 hover:text-black font-bold text-sm pl-1">
+            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200"><Plus size={16}/></div>
+            경유지 추가하기
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   if (step === 4) {
     return (

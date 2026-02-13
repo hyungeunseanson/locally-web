@@ -20,6 +20,7 @@ export default function CreateExperiencePage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     ...INITIAL_FORM_DATA,
+    meeting_point: '', // 추가
     is_private_enabled: false, 
     private_price: 0,          
   });
@@ -141,7 +142,7 @@ const handleSubmit = async () => {
           description: formData.description,
           itinerary: formData.itinerary, 
           spots: formData.itinerary.map(i => i.title).join(' -> '), 
-          meeting_point: formData.itinerary[0]?.description || '',
+          meeting_point: formData.meeting_point || formData.itinerary[0]?.title || '',
           photos: photoUrls,
           price: formData.price,
           inclusions: formData.inclusions,
