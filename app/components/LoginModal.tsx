@@ -13,15 +13,18 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
+  // 1. Hooks
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   
-  // 입력 필드 상태
+  // 공통 필드
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // 회원가입 전용 필드
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState('');
-  const [gender, setGender] = useState<'Male' | 'Female' | ''>(''); // 'Other' 제거
+  const [gender, setGender] = useState<'Male' | 'Female' | ''>('');
 
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -30,13 +33,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const supabase = createClient();
   const { showToast } = useToast();
 
-  // 로그인 성공 후 프로필 데이터 동기화
+  // 2. Logic Functions
   const ensureProfileExists = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    // 메타데이터(가입 시 입력한 정보) 가져오기
-    const meta = user.user_metadata || {};
 
     const { data: existingProfile } = await supabase
       .from('profiles')
@@ -44,8 +44,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       .eq('id', user.id)
       .single();
 
+    const meta = user.user_metadata || {};
+
     if (!existingProfile) {
-      // 프로필 없을 시 생성
       await supabase.from('profiles').insert({
         id: user.id,
         email: user.email,
@@ -55,7 +56,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         gender: meta.gender
       });
     } else {
-      // 정보가 비어있다면 업데이트
       const updates: any = {};
       if (!existingProfile.gender && meta.gender) updates.gender = meta.gender;
       if (!existingProfile.birth_date && meta.birth_date) updates.birth_date = meta.birth_date;
@@ -70,7 +70,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    // 1. 유효성 검사
+    // 유효성 검사
     if (!email || !password) {
       showToast('이메일과 비밀번호를 입력해주세요.', 'error');
       return;
@@ -91,7 +91,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           email, 
           password,
           options: { 
-            // 🟢 중요: 여기에 넣어야 유저 메타데이터로 저장됨 (Trigger 연동 시 필수)
             data: { 
               full_name: fullName,
               phone: phone,
@@ -103,13 +102,11 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         
         if (error) throw error;
 
-        // 이메일 인증이 필요한 경우 data.session이 null일 수 있음
         if (data.user && !data.session) {
-          showToast('가입 성공! 가입하신 이메일로 인증 링크를 보냈습니다. 확인 후 로그인해주세요.', 'success');
-          setMode('LOGIN'); // 로그인 화면으로 이동
+          showToast('가입 인증 메일을 보냈습니다! 이메일을 확인해주세요.', 'success');
+          setMode('LOGIN'); 
         } else {
           showToast('회원가입이 완료되었습니다.', 'success');
-          // 바로 로그인 처리 시도
           await ensureProfileExists();
           onClose();
           if (onLoginSuccess) onLoginSuccess();
@@ -121,9 +118,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         
         if (error) {
-           // 🟢 에러 메시지 한글화 및 구체화
            if (error.message.includes('Invalid login credentials')) {
-             throw new Error('이메일 또는 비밀번호가 일치하지 않습니다. (이메일 인증을 하셨나요?)');
+             throw new Error('이메일 또는 비밀번호가 일치하지 않습니다.');
            }
            if (error.message.includes('Email not confirmed')) {
              throw new Error('이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.');
@@ -139,10 +135,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         router.refresh();
       }
     } catch (error: any) {
-      console.error(error); // 콘솔에 자세한 에러 출력
-      showToast(error.message, 'error');
+      console.error("Auth Error:", error);
+      
+      // 🟢 Rate Limit 에러 처리 (사용자 친화적 메시지)
+      if (error.message.includes('rate limit') || error.status === 429) {
+        showToast('너무 많은 요청을 보냈습니다. 잠시 후(약 15분 뒤) 다시 시도해주세요.', 'error');
+      } else {
+        showToast(error.message, 'error');
+      }
     } finally {
-      setLoading(false);
+      setLoading(false); // 🟢 에러가 나도 로딩 상태를 반드시 꺼야 버튼이 다시 활성화됨
     }
   };
 
@@ -193,14 +195,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               <InputItem 
                 type="email" label="이메일" value={email} setValue={setEmail} 
                 isFirst={true} focusKey="EMAIL" currentFocus={isFocused} setFocus={setIsFocused}
-                autoComplete="username" // 🟢 DOM 에러 해결
+                autoComplete="username"
               />
 
               {/* 비밀번호 */}
               <InputItem 
                 type="password" label="비밀번호" value={password} setValue={setPassword} 
                 isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
-                autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"} // 🟢 DOM 에러 해결
+                autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
               />
 
               {/* 회원가입 추가 필드 */}
@@ -239,17 +241,18 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                         </label>
                      </div>
                      
-                     {/* 성별 선택 (남/여) */}
+                     {/* 🟢 성별 선택 (수정됨) */}
                      <div className={`relative h-14 w-1/2 ${isFocused === 'GENDER' ? 'ring-2 ring-black z-10' : ''}`}>
                         <select
-                          className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none peer bg-transparent z-10 relative"
+                          className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none peer bg-transparent z-10 relative cursor-pointer"
                           value={gender}
                           onChange={(e) => setGender(e.target.value as any)}
                           onFocus={() => setIsFocused('GENDER')}
                           onBlur={() => setIsFocused(null)}
                           autoComplete="sex"
                         >
-                           <option value="" disabled></option>
+                           {/* 🟢 비어있는 값에 텍스트 추가 */}
+                           <option value="" disabled>성별 선택</option> 
                            <option value="Male">남성</option>
                            <option value="Female">여성</option>
                         </select>
@@ -307,7 +310,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   );
 }
 
-// 🧱 입력 아이템 (Autocomplete 추가)
+// 🧱 입력 아이템
 function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete }: any) {
   const isFocused = currentFocus === focusKey;
   
@@ -321,7 +324,7 @@ function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFoc
         onChange={(e) => setValue(e.target.value)}
         onFocus={() => setFocus(focusKey)}
         onBlur={() => setFocus(null)}
-        autoComplete={autoComplete} // 🟢 DOM 에러 해결
+        autoComplete={autoComplete}
       />
       <label className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
         {label}
