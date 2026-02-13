@@ -87,8 +87,7 @@ const updateStatus = async (table: 'host_applications' | 'experiences', id: stri
     comment = input;
   } else if (status === 'approved') {
     if (!confirm('승인 처리하시겠습니까?')) return;
-    
-    // 🟢 [핵심] 체험 승인 시 status를 무조건 'active'로 변경
+    // 🟢 [핵심] 체험 승인 시 status를 'active'로 변경
     if (table === 'experiences') {
       dbStatus = 'active'; 
     }
@@ -101,18 +100,28 @@ const updateStatus = async (table: 'host_applications' | 'experiences', id: stri
         updateData.admin_comment = comment;
     }
 
-    const { error } = await supabase
+    // 🟢 [수정] .select()를 추가하여 실제 업데이트 여부 확인
+    const { data, error } = await supabase
       .from(table)
       .update(updateData)
-      .eq('id', id);
+      .eq('id', id)
+      .select();
 
     if (error) throw error;
 
-    // 호스트 권한 부여 로직 (기존 유지)
+    // 🟢 [중요] RLS 정책으로 인해 업데이트가 무시되었는지 확인
+    if (!data || data.length === 0) {
+      alert("⚠️ 업데이트 실패: DB 정책(RLS)으로 인해 수정되지 않았습니다. \n(Supabase에서 'experiences' 테이블의 UPDATE 정책에 관리자 권한을 추가해야 합니다.)");
+      return;
+    }
+
+    // 호스트 권한 부여
     if (table === 'host_applications' && status === 'approved') {
       const app = apps.find(a => a.id === id);
       if (app) {
-        await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
+        // users 테이블 업데이트도 RLS 체크 필요
+        const { error: userError } = await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
+        if (userError) console.error("User Role Update Error:", userError);
       }
     }
 
