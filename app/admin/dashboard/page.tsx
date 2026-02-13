@@ -53,74 +53,78 @@ export default function AdminDashboardPage() {
     };
   }, []);
 
+
   const fetchData = async () => {
-    const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
-    if (appData) setApps(appData);
-    
-    const { data: expData } = await supabase.from('experiences').select('*, bookings(count)').order('created_at', { ascending: false });
-    if (expData) setExps(expData);
-    
-    const { data: userData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-    if (userData) setUsers(userData);
-    
-    const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
-    if (bookingData) setBookings(bookingData);
+    try {
+      const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
+      if (appData) setApps(appData);
+      
+      const { data: expData } = await supabase.from('experiences').select('*, bookings(count)').order('created_at', { ascending: false });
+      if (expData) setExps(expData);
+      
+      const { data: userData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+      if (userData) setUsers(userData);
+      
+      // JOIN 제거하여 500 에러 방지
+      const { data: bookingData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+      if (bookingData) setBookings(bookingData);
 
-    const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
-    if (reviewData) setReviews(reviewData);
+      const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
+      if (reviewData) setReviews(reviewData);
+    } catch (error) {
+      console.error("Fetch Error:", error);
+    }
   };
+  // 🟢 [수정] 상태 업데이트 함수 (체험 승인 로직 강화)
+  const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
+    let comment = '';
+    let dbStatus = status; 
 
-// 🟢 [수정됨] 상태 업데이트 함수
-const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
-  let comment = '';
-  let dbStatus = status; // 기본적으로 전달받은 status 사용
-
-  if (status === 'rejected' || status === 'revision') {
-    const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
-    if (input === null) return; // 취소
-    comment = input;
-  } else if (status === 'approved') {
-    if (!confirm('승인 처리하시겠습니까?')) return;
-    
-    // 🟢 [핵심] 체험 승인 시 status를 'active'로 변경
-    if (table === 'experiences') {
-      dbStatus = 'active'; 
-    }
-  }
-
-  try {
-    // 업데이트할 데이터 구성
-    let updateData: any = { status: dbStatus };
-
-    // host_applications 테이블인 경우에만 코멘트 추가
-    if (table === 'host_applications') {
-        updateData.admin_comment = comment;
-    }
-
-    const { error } = await supabase
-      .from(table)
-      .update(updateData)
-      .eq('id', id);
-
-    if (error) throw error;
-
-    // 호스트 권한 부여 (기존 로직 유지)
-    if (table === 'host_applications' && status === 'approved') {
-      const app = apps.find(a => a.id === id);
-      if (app) {
-        await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
+    if (status === 'rejected' || status === 'revision') {
+      const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
+      if (input === null) return;
+      comment = input;
+    } else if (status === 'approved') {
+      if (!confirm('승인 처리하시겠습니까?')) return;
+      
+      // 🟢 [핵심] 체험 승인 시 status를 무조건 'active'로 변경
+      if (table === 'experiences') {
+        dbStatus = 'active'; 
       }
     }
 
-    showToast('성공적으로 처리되었습니다.', 'success'); 
-    await fetchData(); 
-    setSelectedItem(null); 
+    try {
+      let updateData: any = { status: dbStatus };
 
-  } catch (err: any) {
-    console.error(err);
-    showToast('처리 중 오류 발생: ' + err.message, 'error'); 
-  }
-};
+      // host_applications 테이블에만 admin_comment 업데이트
+      if (table === 'host_applications') {
+          updateData.admin_comment = comment;
+      }
+
+      const { error } = await supabase
+        .from(table)
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // 호스트 권한 부여 로직
+      if (table === 'host_applications' && status === 'approved') {
+        const app = apps.find(a => a.id === id);
+        if (app) {
+          await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
+        }
+      }
+
+      showToast(`성공적으로 ${dbStatus} 처리되었습니다.`, 'success'); 
+      await fetchData(); 
+      setSelectedItem(null); 
+
+    } catch (err: any) {
+      console.error(err);
+      showToast('처리 중 오류 발생: ' + err.message, 'error'); 
+    }
+  };
 
   const deleteItem = async (table: string, id: string) => {
     if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
