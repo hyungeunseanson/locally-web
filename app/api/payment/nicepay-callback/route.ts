@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    // 🟢 [수정] 타입 에러 방지를 위해 변수 초기화 방식 변경
     let resCode: any = '';
     let amount: any = 0;
     let orderId: any = '';
@@ -13,14 +12,14 @@ export async function POST(request: Request) {
     const contentType = request.headers.get('content-type') || '';
     
     if (contentType.includes('application/json')) {
-      // PC 결제 (Client의 fetch)
+      // PC 결제
       const json = await request.json();
       resCode = json.success ? '0000' : '9999'; 
       amount = json.paid_amount;
       orderId = json.merchant_uid;
       tid = json.pg_tid;
     } else {
-      // 모바일 리다이렉트 (FormData)
+      // 모바일 리다이렉트
       const formData = await request.formData();
       resCode = formData.get('resCode') || '0000'; 
       amount = formData.get('amt');
@@ -28,8 +27,6 @@ export async function POST(request: Request) {
       tid = formData.get('tid');
     }
 
-    // 🟢 [수정] 빨간 줄 원인 제거 (boolean 비교 삭제)
-    // 위에서 이미 json.success를 '0000'으로 바꿨으므로 문자열 비교만 하면 됩니다.
     if (resCode === '0000') { 
       const cookieStore = await cookies();
       
@@ -50,39 +47,55 @@ export async function POST(request: Request) {
         }
       );
       
-// PENDING 상태인 예약을 찾아 PAID로 업데이트
-const { data: bookingData, error } = await supabase
-.from('bookings')
-.update({
-  status: 'PAID',
-  tid: tid as string,
-  updated_at: new Date().toISOString()
-})
-.eq('id', orderId)
-.select(`
-  *,
-  experiences (
-    host_id,
-    title
-  )
-`)
-.single();
+      // 🟢 [수정 1] 호스트 정보를 알기 위해 experiences 테이블 조인 (host_id 필수)
+      const { data: bookingData, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'PAID',
+          tid: tid as string,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select(`
+          *,
+          experiences (
+            host_id,
+            title
+          )
+        `)
+        .single();
 
       if (error) {
         console.error('DB 업데이트 에러:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       } else if (bookingData) {
-        // 호스트에게 알림 이메일 발송
+        const hostId = bookingData.experiences?.host_id;
+        const expTitle = bookingData.experiences?.title;
+        const guestName = bookingData.contact_name || '게스트';
+
+        // 🟢 [추가 1] 앱 내 알림 저장 (이게 있어야 종 모양 눌렀을 때 보입니다!)
+        if (hostId) {
+          await supabase.from('notifications').insert({
+            user_id: hostId,
+            type: 'new_booking',
+            title: '🎉 새로운 예약 도착!',
+            message: `[${expTitle}] 체험에 ${guestName}님의 예약이 확정되었습니다.`,
+            link: '/host/dashboard',
+            is_read: false
+          });
+        }
+
+        // 🟢 [수정 2] 이메일 발송 (정보를 모두 채워서 전송)
         const origin = new URL(request.url).origin;
         try {
           await fetch(`${origin}/api/notifications/email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              type: 'booking_created',
-              recipient_id: bookingData.experiences?.host_id, // 🟢 [추가] 받는 사람 필수
+              type: 'new_booking',
+              recipient_id: hostId, // 받는 사람 (호스트)
               title: '🎉 새로운 예약이 도착했습니다!',
-              message: `[${bookingData.experiences?.title}] 체험에 새로운 예약이 확정되었습니다.`,
+              message: `[${expTitle}] 체험에 새로운 예약(게스트: ${guestName})이 확정되었습니다.`,
               link: '/host/dashboard', 
               booking_id: bookingData.id,
               amount: amount
