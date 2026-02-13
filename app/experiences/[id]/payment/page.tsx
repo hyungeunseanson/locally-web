@@ -88,6 +88,7 @@ function PaymentContent() {
       const { error: bookingError } = await supabase.from('bookings').insert([
         {
           id: newOrderId, // 주문번호를 ID로 사용
+          order_id: newOrderId, // 🟢 [추가] DB의 Not Null 제약조건을 만족시키기 위해 추가
           user_id: user.id,
           experience_id: experienceId,
           amount: finalAmount,         // 게스트가 실제로 낸 총 금액
