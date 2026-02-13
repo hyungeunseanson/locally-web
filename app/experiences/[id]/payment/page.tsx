@@ -120,7 +120,7 @@ function PaymentContent() {
       IMP.init(process.env.NEXT_PUBLIC_PORTONE_IMP_CODE); 
 
       const data = {
-        pg: 'nice', // 'nice' (나이스페이)
+        pg: 'nice_v2', // 'nice' (나이스페이)
         pay_method: 'card',
         merchant_uid: newOrderId, 
         name: experience?.title || 'Locally 체험 예약',
