@@ -4,8 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat'; 
 
-export default function ChatMonitor() {
-// 🟢 [수정] 타입 단언을 확실하게 하여 error 속성 접근 허용
+// 🟢 [수정] 타입 단언을 확실하게 변경 (as unknown as any)
 const { 
   inquiries, 
   selectedInquiry, 
@@ -199,4 +198,3 @@ const filteredInquiries = inquiries.filter((inq: any) => {
       </div>
     </div>
   );
-}

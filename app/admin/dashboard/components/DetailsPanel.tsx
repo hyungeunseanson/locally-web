@@ -174,6 +174,17 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
             </div>
 
             {/* 🟢 [추가됨] 만나는 장소 표시 */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3 mt-4">
+              <MapPin size={20} className="text-slate-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-slate-400 uppercase mb-1">만나는 장소 (Meeting Point)</div>
+                <div className="font-bold text-slate-900 text-sm">
+                  {selectedItem.meeting_point || '정보 없음'}
+                </div>
+              </div>
+            </div>
+
+            {/* 🟢 [추가됨] 만나는 장소 표시 */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
               <MapPin size={20} className="text-slate-400 mt-0.5 flex-shrink-0" />
               <div>
