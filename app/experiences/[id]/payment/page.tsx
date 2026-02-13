@@ -19,11 +19,11 @@ function PaymentContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [experience, setExperience] = useState<any>(null);
   
-  // 🟢 결제에 필요한 유저 정보 및 약관 동의 상태
+  // 예약자 정보 및 약관 동의 상태
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [message, setMessage] = useState(''); // 예약 메시지
-  const [agreed, setAgreed] = useState(false); // 약관 동의
+  const [message, setMessage] = useState('');
+  const [agreed, setAgreed] = useState(false);
 
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
@@ -31,10 +31,10 @@ function PaymentContent() {
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   
-  // 🟢 가격 로직
+  // 가격 로직
   const expPrice = experience?.price || 50000; 
   const hostPrice = isPrivate ? (experience?.private_price || 300000) : expPrice * guests;
-  const guestFee = hostPrice * 0.1; // 수수료 10%
+  const guestFee = hostPrice * 0.1;
   const finalAmount = hostPrice + guestFee; 
 
   useEffect(() => { 
@@ -79,7 +79,7 @@ function PaymentContent() {
       // 1. 주문 ID 생성
       const newOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-      // 🟢 2. 결제 전 'PENDING' 상태로 예약 데이터 미리 저장
+      // 2. DB에 'PENDING' 상태로 예약 저장
       const { error: bookingError } = await supabase.from('bookings').insert([
         {
           id: newOrderId,
@@ -107,14 +107,16 @@ function PaymentContent() {
         return;
       }
 
-      // 3. 포트원(나이스페이) 결제 요청
+      // 3. 포트원 결제 요청 시작
       const { IMP } = window as any;
       
-      // 🟢 [하드코딩] 식별코드 직접 입력 (환경변수 문제 배제용)
-      IMP.init('imp44607000'); // 여기에 본인의 식별코드를 넣으세요!
+      // 🚨 [매우 중요] 여기에 아까 복사한 'imp'로 시작하는 코드를 직접 넣으세요!
+      // 예시: IMP.init('imp12345678'); 
+      // process.env 쓰지 마세요. 지금은 직접 넣어야 해결됩니다.
+      IMP.init('imp44607000'); 
 
       const data = {
-        pg: 'nice', // 'nice' (구모듈)로 설정
+        pg: 'nice',         // 반드시 'nice' 여야 함 (관리자 설정이 nice니까)
         pay_method: 'card',
         merchant_uid: newOrderId, 
         name: experience?.title || 'Locally 체험 예약',
@@ -125,34 +127,34 @@ function PaymentContent() {
         m_redirect_url: `${window.location.origin}/api/payment/nicepay-callback`, 
       };
 
-      // 🟢 [수정] IMP.request_pay를 handlePayment 함수 안으로 넣음
+      // 4. 결제 창 호출
       IMP.request_pay(data, async (rsp: any) => {
-        console.log('결제 응답 전체 데이터:', rsp); 
+        console.log('결제 응답:', rsp); 
 
-        // 1. 결제 성공 여부 확인
+        // 성공 여부 체크 (성공: true, 혹은 paid 상태)
         const isSuccess = rsp.success === true || rsp.code === '0' || rsp.status === 'paid';
 
         if (isSuccess) {
            try {
-             // 2. 서버 검증 요청
+             // 서버에 검증 요청 (결과는 신경 쓰지 않고 무조건 이동시킴)
              await fetch('/api/payment/nicepay-callback', {
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify(rsp),
              });
-
-             // 🟢 [강제 이동] window.location.href 사용
-             // app/experiences/[id]/payment/complete/page.tsx 경로로 이동
+             
+             // 🟢 [핵심] 성공 페이지로 강제 이동 (window.location.href 사용)
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
              
            } catch (err) {
-             console.error('검증 에러 무시하고 이동:', err);
+             console.error('검증 에러났지만 이동함:', err);
+             // 에러가 나도 돈은 나갔으니 성공 페이지로 보냄
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
            }
         } else {
-           // 결제 실패 시
+           // 결제 실패/취소 시
            console.error('결제 실패:', rsp);
-           showToast(`결제 실패: ${rsp.error_msg || '알 수 없는 오류'}`, 'error');
+           showToast(`결제 실패: ${rsp.error_msg}`, 'error');
            setIsProcessing(false);
         }
       });
