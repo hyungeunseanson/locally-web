@@ -153,7 +153,6 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
         )}
 
 {/* 🟣 [EXPS] 체험 상세 정보 (신규 추가) */}
-{/* 🟣 [EXPS] 체험 상세 정보 */}
 {activeTab === 'EXPS' && (
   <div className="space-y-8">
     {selectedItem.photos && (
@@ -174,7 +173,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
       <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}` : '-'} />
     </div>
 
-    {/* 🟢 [추가] 만나는 장소 표시 */}
+    {/* 🟢 [추가됨] 만나는 장소 표시 */}
     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
       <MapPin size={20} className="text-slate-400 mt-0.5 flex-shrink-0" />
       <div>
@@ -191,8 +190,6 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
         <Edit size={16}/> 관리자 권한으로 수정하기
       </button>
     </Link>
-
-    {/* ... (이하 기존 코드 동일) ... */}
 
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>

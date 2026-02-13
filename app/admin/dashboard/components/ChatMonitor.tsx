@@ -5,7 +5,7 @@ import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shie
 import { useChat } from '@/app/hooks/useChat'; 
 
 export default function ChatMonitor() {
-  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, refresh, isLoading, error } = useChat('admin');
+  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, refresh, isLoading, error } = useChat('admin') as any;
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('monitor');
   const [replyText, setReplyText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);

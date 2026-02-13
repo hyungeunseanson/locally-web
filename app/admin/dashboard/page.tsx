@@ -54,27 +54,33 @@ export default function AdminDashboardPage() {
   }, []);
 
 
-  const fetchData = async () => {
-    try {
-      const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
-      if (appData) setApps(appData);
-      
-      const { data: expData } = await supabase.from('experiences').select('*, bookings(count)').order('created_at', { ascending: false });
-      if (expData) setExps(expData);
-      
-      const { data: userData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-      if (userData) setUsers(userData);
-      
-      // JOIN 제거하여 500 에러 방지
-      const { data: bookingData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
-      if (bookingData) setBookings(bookingData);
+// 🟢 [수정됨] 최적화된 fetchData (중복 선언 주의: 기존 함수 지우고 이것만 쓰세요)
+const fetchData = async () => {
+  try {
+    // 1. 호스트 신청
+    const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
+    if (appData) setApps(appData);
+    
+    // 🟢 [수정] 단순 조회로 변경 (500 에러 방지 및 갱신 속도 향상)
+    const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
+    if (expData) setExps(expData);
+    
+    // 3. 유저
+    const { data: userData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+    if (userData) setUsers(userData);
+    
+    // 🟢 [수정] 단순 조회로 변경
+    const { data: bookingData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+    if (bookingData) setBookings(bookingData);
 
-      const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
-      if (reviewData) setReviews(reviewData);
-    } catch (error) {
-      console.error("Fetch Error:", error);
-    }
-  };
+    // 5. 리뷰
+    const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
+    if (reviewData) setReviews(reviewData);
+
+  } catch (error) {
+    console.error("Data Fetch Error:", error);
+  }
+};
   // 🟢 [수정] 상태 업데이트 함수 (체험 승인 로직 강화)
   const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
     let comment = '';
