@@ -9,6 +9,7 @@ import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
 import ChatMonitor from './components/ChatMonitor'; // ✅ [필수] ChatMonitor 임포트
 import { useSearchParams } from 'next/navigation'; // ✅ [추가] URL 탭 상태 읽기용
+const [reviews, setReviews] = useState<any[]>([]); // 🟢 [필수] 리뷰 데이터 상태
 
 import { useToast } from '@/app/context/ToastContext'; // 🟢 [추가]
 
@@ -67,15 +68,15 @@ export default function AdminDashboardPage() {
     
     const { data: bookingData } = await supabase.from('bookings').select('*, experiences(title, price)').order('created_at', { ascending: false });
     if (bookingData) setBookings(bookingData);
-// 🟢 [추가] 리뷰 데이터 가져오기
+// 🟢 [필수] AnalyticsTab에 전달할 리뷰 데이터 가져오기
 const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
 if (reviewData) setReviews(reviewData);
 };
 
-  // 🟢 [수정됨] 상태 업데이트 함수
+// 🟢 [수정됨] 상태 업데이트 함수 (승인/거절 처리)
 const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
   let comment = '';
-  let dbStatus = status; // 🟢 DB에 저장될 실제 상태값 별도 관리
+  let dbStatus = status; 
 
   if (status === 'rejected' || status === 'revision') {
     const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);

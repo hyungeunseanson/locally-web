@@ -5,7 +5,7 @@ import { Search, Activity, Star, X } from 'lucide-react';
 import Skeleton from '@/app/components/ui/Skeleton';
 import { useToast } from '@/app/context/ToastContext';
 
-// 🟢 [핵심] 부모로부터 받을 데이터 타입 정의
+// 🟢 [핵심] Props 인터페이스 정의 (부모로부터 받을 데이터)
 interface AnalyticsTabProps {
   bookings: any[];
   users: any[];
@@ -14,7 +14,6 @@ interface AnalyticsTabProps {
   reviews: any[];
 }
 
-// 🟢 [핵심] Props를 받도록 함수 시그니처 변경
 export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: AnalyticsTabProps) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -26,7 +25,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
     activeExpsCount: 0,
     gmv: 0,
     netRevenue: 0,
-    hostPayout: 0, 
+    hostPayout: 0, // 🟢 [수정] 초기값 추가 (타입 에러 해결)
     conversionRate: '0.0',
     retentionRate: '0.0',
     aov: 0,
@@ -44,10 +43,12 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
     responseRate: 96.5
   });
 
-  // 🟢 [핵심] 데이터가 들어오면 가공 시작 (fetch 아님!)
+  // 🟢 [수정] Props 데이터 변경 시 로직 실행 (내부 fetch 제거됨)
   useEffect(() => {
     if (bookings && users && exps && reviews) {
       processData();
+    } else {
+      setLoading(false); // 데이터가 없어도 로딩 상태 해제
     }
   }, [bookings, users, exps, reviews]);
 
@@ -55,7 +56,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
     try {
       setLoading(true);
       
-      // --- 데이터 가공 로직 ---
       let gmv = 0, netRevenue = 0, cancelledCount = 0, completedCount = 0;
       let userCancel = 0, hostCancel = 0;
       const userBookingCounts: Record<string, number> = {};
@@ -63,58 +63,52 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
       const hostStats: Record<string, any> = {};
       const priceDist = { low: 0, mid: 0, high: 0 };
 
-      // 1. Bookings 분석
-      bookings.forEach((b: any) => {
-        // 호스트 통계
-        const exp = exps.find(e => e.id === b.experience_id);
+      // 1. Bookings 데이터 분석
+      bookings?.forEach((b: any) => {
+        const exp = exps?.find(e => e.id === b.experience_id);
         if (exp?.host_id) {
            if (!hostStats[exp.host_id]) hostStats[exp.host_id] = { bookings: 0, ratingSum: 0, reviewCount: 0 };
            hostStats[exp.host_id].bookings += 1;
         }
 
-        // 매출 및 상태
         if (['confirmed', 'PAID', 'completed'].includes(b.status)) {
           completedCount++;
           const totalPaid = b.amount || 0; 
           gmv += totalPaid;
           netRevenue += (totalPaid - Math.floor((b.total_price || 0) * 0.8));
 
-          // 가격 분포
           if (totalPaid < 30000) priceDist.low++;
           else if (totalPaid < 100000) priceDist.mid++;
           else priceDist.high++;
 
-          // 재구매율
           if (b.user_id) userBookingCounts[b.user_id] = (userBookingCounts[b.user_id] || 0) + 1;
           
-          // 인기 체험
           if (!expStats[b.experience_id]) expStats[b.experience_id] = { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
           expStats[b.experience_id].count++;
           expStats[b.experience_id].revenue += totalPaid;
         }
 
-        // 취소
         if (['cancelled', 'declined', 'cancellation_requested'].includes(b.status)) {
           cancelledCount++;
           if (b.status === 'cancelled') userCancel++; else hostCancel++;
         }
       });
 
-      // 2. Reviews 분석
-      reviews.forEach((r: any) => {
+      // 2. Reviews 데이터 분석
+      reviews?.forEach((r: any) => {
         if (expStats[r.experience_id]) {
           expStats[r.experience_id].ratingSum += r.rating;
           expStats[r.experience_id].reviewCount++;
         }
-        const exp = exps.find(e => e.id === r.experience_id);
+        const exp = exps?.find(e => e.id === r.experience_id);
         if (exp?.host_id && hostStats[exp.host_id]) {
            hostStats[exp.host_id].ratingSum += r.rating;
            hostStats[exp.host_id].reviewCount++;
         }
       });
 
-      // 3. Top Experiences
-      const topExps = exps.map((e: any) => {
+      // 3. Top Experiences 선정
+      const topExps = exps?.map((e: any) => {
         const s = expStats[e.id] || { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
         return {
           ...e,
@@ -125,7 +119,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
         };
       }).sort((a, b) => b.bookingCount - a.bookingCount).slice(0, 4);
 
-      // 4. Super Host Candidates
+      // 4. Super Host Candidates 선정
       const superHosts = Object.entries(hostStats)
         .map(([id, s]: any) => ({
           id,
@@ -135,11 +129,11 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
         .filter((h: any) => h.bookings >= 3 && Number(h.rating) >= 4.0)
         .slice(0, 5);
 
-      const userCount = users.length;
+      const userCount = users?.length || 0;
 
       setStats({
         totalUsers: userCount,
-        activeExpsCount: exps.length,
+        activeExpsCount: exps?.length || 0,
         gmv,
         netRevenue,
         hostPayout: 0, 
@@ -148,7 +142,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
           ? ((Object.values(userBookingCounts).filter(c => c > 1).length / Object.keys(userBookingCounts).length) * 100).toFixed(1) : '0.0',
         aov: completedCount > 0 ? Math.floor(gmv / completedCount) : 0,
         cancellationRate: (cancelledCount + completedCount) > 0 ? Math.floor((cancelledCount / (cancelledCount + completedCount)) * 100) : 0,
-        topExperiences: topExps,
+        topExperiences: topExps || [],
         superHostCandidates: superHosts,
         funnel: { views: completedCount * 20, clicks: completedCount * 5, paymentInit: Math.floor(completedCount * 1.5), completed: completedCount },
         cancelBreakdown: { user: userCancel, host: hostCancel },
@@ -216,8 +210,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
 
       {/* 3. 분석 그리드 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        
-        {/* 예약 퍼널 */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-black">예약 퍼널 (Funnel)</h3>
@@ -231,7 +223,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
           </div>
         </div>
 
-        {/* 인기 체험 */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-black">인기 체험 Top 4</h3>
@@ -259,7 +250,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
 
       {/* 4. 유저 통계 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-         {/* 슈퍼 호스트 */}
          <div>
             <h3 className="text-lg font-bold text-black mb-6 flex items-center gap-2">슈퍼 호스트 후보</h3>
             <div className="space-y-3">
@@ -278,7 +268,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
             </div>
          </div>
 
-         {/* 인구 통계 */}
          <div>
             <h3 className="text-lg font-bold text-black mb-6">유저 분포 (KR / Global)</h3>
             <div className="mb-8">
@@ -325,7 +314,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
   );
 }
 
-// UI Components
+// --- UI Components ---
 function SimpleKpi({ label, value, unit, onClick }: any) {
   return (
     <div onClick={onClick} className="p-6 bg-white border border-gray-200 rounded-xl hover:border-black transition-colors cursor-pointer group">
