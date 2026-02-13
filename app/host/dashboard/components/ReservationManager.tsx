@@ -194,16 +194,26 @@ export default function ReservationManager() {
     if (activeTab === 'completed') return tripDate < today && !isRequesting;
     return true;
   }).sort((a, b) => {
-    if (isNew(a.created_at, a.id) !== isNew(b.created_at, b.id)) return isNew(a.created_at, a.id) ? -1 : 1;
+    // 🟢 [수정] 정렬 로직 명시화
+    const newA = isNew(a.created_at, a.id);
+    const newB = isNew(b.created_at, b.id);
+    
+    // 1순위: 안 읽은 신규 예약
+    if (newA !== newB) return newA ? -1 : 1; 
+    
+    // 2순위: 취소 요청
     if ((a.status === 'cancellation_requested') !== (b.status === 'cancellation_requested')) return a.status === 'cancellation_requested' ? -1 : 1;
+    
+    // 3순위: 날짜순
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
-  // ✅ 기존 승: 마운트 전에는 스켈레톤 (깜빡임 방지)
-  if (!isMounted) return <Skeleton className="w-full h-96 rounded-3xl" />;
+// ✅ 기존 승: 마운트 전에는 스켈레톤 (깜빡임 방지)
+if (!isMounted) return <Skeleton className="w-full h-96 rounded-3xl" />;
 
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[600px] flex flex-col">
+return (
+  // 🟢 [수정] 높이 제한(h-[80vh]) 설정하여 스크롤 뚫림 방지
+  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-[80vh] flex flex-col">
       
       {/* 1. 헤더 (제목 + 설명 + 새로고침) */}
       <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white sticky top-0 z-10">
@@ -268,14 +278,15 @@ export default function ReservationManager() {
               </div>
             ))}
           </div>
-        ) : filteredList.length === 0 ? (
-          // ✅ 기존 승: EmptyState 컴포넌트 사용 (마케팅 문구)
-          <EmptyState 
-            label={activeTab === 'upcoming' 
-              ? "매력적인 체험을 등록하고 첫 손님을 맞이해보세요!" 
-              : "해당하는 예약 내역이 없습니다."}
-          />
-        ) : (
+) : filteredList.length === 0 ? (
+  // 🟢 [수정] label 속성 제거 -> title과 subtitle로 변경 (타입 에러 해결)
+  <EmptyState 
+    title="예약 내역이 없습니다."
+    subtitle={activeTab === 'upcoming' 
+      ? "매력적인 체험을 등록하고 첫 손님을 맞이해보세요!" 
+      : "해당하는 예약 내역이 없습니다."}
+  />
+) : (
           <div className="space-y-4">
             {filteredList.map(res => (
               <ReservationCard 

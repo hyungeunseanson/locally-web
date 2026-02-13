@@ -58,6 +58,11 @@ export default function ReservationCard({
 
   const dDay = getDDay(res.date);
   const isConfirmed = res.status === 'confirmed' || res.status === 'PAID';
+  
+  // 🟢 [추가] 결제 시간 포맷팅 (한국 시간)
+  const paymentTime = res.created_at ? new Date(res.created_at).toLocaleString('ko-KR', { 
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+  }) : '';
 
   return (
     // 🎨 테두리 색상 빨간색 제거 -> 깔끔한 스타일 유지
@@ -87,6 +92,13 @@ export default function ReservationCard({
           <div className="mt-2 text-xs font-medium text-slate-400 flex items-center gap-1">
             <Clock size={12}/> {res.time}
           </div>
+          
+          {/* 🟢 [추가] 결제 일시 표시 */}
+          <div className="mt-2 pt-2 border-t border-slate-200 w-full text-center">
+            <p className="text-[10px] text-slate-400">결제 일시</p>
+            <p className="text-[10px] font-bold text-slate-600">{paymentTime}</p>
+          </div>
+
           {isConfirmed && (
             <button 
               onClick={(e) => { e.stopPropagation(); onCalendar(); }}

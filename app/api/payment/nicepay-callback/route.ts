@@ -50,17 +50,23 @@ export async function POST(request: Request) {
         }
       );
       
-      // PENDING 상태인 예약을 찾아 PAID로 업데이트
-      const { data: bookingData, error } = await supabase
-        .from('bookings')
-        .update({
-          status: 'PAID',
-          tid: tid as string,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId)
-        .select()
-        .single();
+// PENDING 상태인 예약을 찾아 PAID로 업데이트
+const { data: bookingData, error } = await supabase
+.from('bookings')
+.update({
+  status: 'PAID',
+  tid: tid as string,
+  updated_at: new Date().toISOString()
+})
+.eq('id', orderId)
+.select(`
+  *,
+  experiences (
+    host_id,
+    title
+  )
+`)
+.single();
 
       if (error) {
         console.error('DB 업데이트 에러:', error);
@@ -74,8 +80,11 @@ export async function POST(request: Request) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: 'booking_created',
+              recipient_id: bookingData.experiences?.host_id, // 🟢 [추가] 받는 사람 필수
+              title: '🎉 새로운 예약이 도착했습니다!',
+              message: `[${bookingData.experiences?.title}] 체험에 새로운 예약이 확정되었습니다.`,
+              link: '/host/dashboard', 
               booking_id: bookingData.id,
-              user_name: '게스트', 
               amount: amount
             })
           });
