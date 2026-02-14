@@ -20,7 +20,6 @@ export async function POST(request: Request) {
     let resCode: any = '';
     let amount: any = 0;
     let orderId: any = '';
-    let tid: any = '';
     let rawJson: any = {};
 
     const contentType = request.headers.get('content-type') || '';
@@ -29,30 +28,24 @@ export async function POST(request: Request) {
       const json = await request.json();
       rawJson = json;
       
-      // 🟢 [핵심 수정] 성공 판단 로직을 클라이언트와 동일하게 유연하게 변경
-      // success가 없더라도 imp_uid가 있고 에러가 없으면 성공으로 간주
       const isSuccess = json.success === true || 
                         json.code === '0' || 
                         json.status === 'paid' || 
                         (json.imp_uid && !json.error_msg);
       
       resCode = isSuccess ? '0000' : '9999';
-      
       amount = json.paid_amount || json.amount;
       orderId = json.merchant_uid || json.orderId;
-      tid = json.pg_tid || json.imp_uid; // 포트원 고유번호(imp_uid)를 tid로 사용 가능
+      // tid = json.pg_tid || json.imp_uid; // 🟢 DB에 컬럼이 없어서 삭제함
     } else {
       const formData = await request.formData();
       resCode = formData.get('resCode') || '0000'; 
       amount = formData.get('amt');
       orderId = formData.get('moid');
-      tid = formData.get('tid');
+      // tid = formData.get('tid'); // 🟢 DB에 컬럼이 없어서 삭제함
     }
 
     console.log(`🔍 [DEBUG] 파싱된 데이터 - 주문ID: ${orderId}, 코드: ${resCode}`);
-    if (resCode !== '0000') {
-      console.log('⚠️ [DEBUG] 들어온 데이터:', JSON.stringify(rawJson));
-    }
 
     if (resCode === '0000') { 
       // 3. 관리자 권한 DB 접속
@@ -60,11 +53,12 @@ export async function POST(request: Request) {
       
       // 4. 예약 상태 업데이트 (PAID)
       console.log('⏳ [DEBUG] DB 상태 업데이트 시도...');
+      
+      // 🟢 [수정됨] tid 저장 로직을 제거했습니다. (에러 해결)
       const { data: bookingData, error: dbError } = await supabase
         .from('bookings')
         .update({
           status: 'PAID',
-          tid: tid as string,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
@@ -106,7 +100,6 @@ export async function POST(request: Request) {
           if (hostProfile?.email) {
             hostEmail = hostProfile.email;
           } else {
-             // 없으면 Auth 정보 뒤지기
              console.log('⚠️ [DEBUG] 프로필에 이메일 없음. Auth User 조회...');
              const { data: authData } = await supabase.auth.admin.getUserById(hostId);
              if (authData?.user?.email) hostEmail = authData.user.email;
@@ -143,19 +136,17 @@ export async function POST(request: Request) {
         }
       }
 
-      // 7. 성공 응답 (클라이언트가 200 OK를 받아야 성공 처리함)
+      // 7. 성공 응답
       console.log('✅ [DEBUG] 모든 처리 완료. 성공 응답 반환.');
       return NextResponse.json({ success: true });
 
     } else {
-      // resCode가 0000이 아닐 때
       console.log(`⚠️ [DEBUG] 결제 실패 처리 (코드: ${resCode})`);
       throw new Error(`PG사 응답코드 실패: ${resCode}`);
     }
 
   } catch (err: any) {
-    console.error('🔥 [DEBUG] 알 수 없는 시스템 에러:', err.message);
-    // 🟢 [핵심] 에러 내용을 JSON으로 보내서 클라이언트가 alert를 띄울 수 있게 함
+    console.error('🔥 [DEBUG] 시스템 에러:', err.message);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
