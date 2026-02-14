@@ -2,7 +2,6 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import SiteFooter from '@/app/components/SiteFooter';
 import { Heart, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 
@@ -43,7 +42,6 @@ export default function CommunityPage() {
           ))}
         </div>
       </div>
-      <SiteFooter />
     </div>
   );
 }

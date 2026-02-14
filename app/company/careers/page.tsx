@@ -2,7 +2,6 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import SiteFooter from '@/app/components/SiteFooter';
 import { ArrowRight } from 'lucide-react';
 
 export default function CareersPage() {
@@ -31,7 +30,6 @@ export default function CareersPage() {
           ))}
         </div>
       </div>
-      <SiteFooter />
     </div>
   );
 }

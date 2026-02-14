@@ -2,7 +2,6 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import SiteFooter from '@/app/components/SiteFooter';
 import Image from 'next/image';
 
 export default function NewsPage() {
@@ -36,7 +35,6 @@ export default function NewsPage() {
           ))}
         </div>
       </div>
-      <SiteFooter />
     </div>
   );
 }

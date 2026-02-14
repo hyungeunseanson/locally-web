@@ -2,7 +2,6 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import SiteFooter from '@/app/components/SiteFooter';
 
 export default function InvestorsPage() {
   return (
@@ -33,7 +32,6 @@ export default function InvestorsPage() {
           ))}
         </div>
       </div>
-      <SiteFooter />
     </div>
   );
 }
