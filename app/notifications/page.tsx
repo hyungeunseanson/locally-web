@@ -10,7 +10,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import Skeleton from '@/app/components/ui/Skeleton';
-import EmptyState from '@/app/components/EmptyState'; // EmptyState가 있다면 활용
 
 export default function NotificationsPage() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
@@ -21,18 +20,79 @@ export default function NotificationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // 초기 로딩 시 Context 데이터와 동기화 (또는 직접 fetch)
+  // 🟢 [핵심 수정] 예약 정보 직접 가져와서 알림과 합치기
   useEffect(() => {
-    // Context에 있는 알림을 로컬 상태로 가져옴
-    setLocalNotifications(notifications);
-    setIsLoading(false);
-  }, [notifications]);
+    const fetchCombinedNotifications = async () => {
+      setIsLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
 
-  // 알림 삭제 함수 (DB 영구 삭제)
-  const deleteNotification = async (id: number) => {
-    // UI 즉시 반영
+      // 1. 기존 알림 가져오기 (DB notifications 테이블)
+      const { data: dbNotis } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      // 2. 예약 정보 가져오기 (호스트 대시보드 로직 이식)
+      // -> 알림 테이블에 저장이 안 됐어도, 예약 테이블에는 있으니까 이걸 가져와서 보여줍니다.
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          created_at,
+          status,
+          experiences!inner ( title, host_id ),
+          guest:profiles!bookings_user_id_fkey ( full_name )
+        `)
+        .eq('experiences.host_id', user.id) // 내가 호스트인 예약만
+        .neq('status', 'PENDING') // 결제 대기중인 건 제외
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // 3. 예약 데이터를 '알림 형식'으로 변환 (Virtual Notification)
+      const bookingNotis = (bookings || []).map((booking: any) => {
+        return {
+          id: `booking-${booking.id}`, // 고유 ID 생성 (문자열)
+          user_id: user.id,
+          type: 'booking_created', 
+          title: '🎉 새로운 예약이 도착했습니다!',
+          message: `[${booking.experiences?.title}] 체험에 ${booking.guest?.full_name || '게스트'}님의 예약이 확정되었습니다.`,
+          link: '/host/dashboard',
+          is_read: false, // 일단 안 읽음으로 표시 (강조)
+          created_at: booking.created_at,
+          is_virtual: true // 가짜 알림임을 표시 (삭제 시 구분용)
+        };
+      });
+
+      // 4. 두 리스트 합치기 & 날짜순 정렬
+      // (기존 알림 + 예약 기반 가짜 알림)
+      const combined = [
+        ...(dbNotis || []),
+        ...bookingNotis
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setLocalNotifications(combined);
+      setIsLoading(false);
+    };
+
+    fetchCombinedNotifications();
+  }, [notifications]); // 컨텍스트 알림이 바뀌면 재실행
+
+  // 알림 삭제 함수
+  const deleteNotification = async (id: any) => {
+    // 가짜 알림(예약 데이터 기반)은 DB에 없으므로 삭제 흉내만 냄 (UI 제거)
+    if (String(id).startsWith('booking-')) {
+      setLocalNotifications(prev => prev.filter(n => n.id !== id));
+      return;
+    }
+
+    // 진짜 알림은 DB에서 삭제
     setLocalNotifications(prev => prev.filter(n => n.id !== id));
-    
     try {
       await supabase.from('notifications').delete().eq('id', id);
     } catch (error) {
@@ -42,7 +102,8 @@ export default function NotificationsPage() {
 
   // 알림 클릭 핸들러
   const handleNotificationClick = async (noti: any) => {
-    if (!noti.is_read) {
+    // 가짜 알림은 DB 업데이트 불가능하므로 스킵
+    if (!noti.is_read && !noti.is_virtual) {
       await markAsRead(noti.id);
     }
     if (noti.link) {
@@ -50,13 +111,11 @@ export default function NotificationsPage() {
     }
   };
 
-  // 필터링된 목록
   const filteredList = localNotifications.filter(n => {
     if (filter === 'unread') return !n.is_read;
     return true;
   });
 
-  // 알림 아이콘 결정 도우미
   const getIcon = (type: string) => {
     if (type.includes('booking')) return <Calendar size={18} className="text-blue-500"/>;
     if (type.includes('message')) return <MessageSquare size={18} className="text-indigo-500"/>;
@@ -69,7 +128,6 @@ export default function NotificationsPage() {
       <SiteHeader />
       
       <main className="max-w-2xl mx-auto px-6 py-12">
-        {/* 헤더 영역 */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
@@ -99,7 +157,6 @@ export default function NotificationsPage() {
           </div>
         </div>
 
-        {/* 액션 바 */}
         <div className="flex justify-end mb-4">
           <button 
             onClick={markAllAsRead}
@@ -110,7 +167,6 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        {/* 알림 리스트 */}
         <div className="space-y-4">
           {isLoading ? (
             [1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)
@@ -134,14 +190,12 @@ export default function NotificationsPage() {
                 onClick={() => handleNotificationClick(noti)}
               >
                 <div className="flex gap-4">
-                  {/* 아이콘 박스 */}
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
                     !noti.is_read ? 'bg-white shadow-sm' : 'bg-slate-100'
                   }`}>
                     {getIcon(noti.type)}
                   </div>
 
-                  {/* 내용 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                       <h3 className={`font-bold text-base mb-1 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
@@ -157,13 +211,11 @@ export default function NotificationsPage() {
                     </p>
                   </div>
 
-                  {/* 화살표 (호버 시 표시) */}
                   <div className="hidden md:flex items-center text-slate-300 group-hover:text-slate-400 group-hover:translate-x-1 transition-all">
                     <ChevronRight size={20}/>
                   </div>
                 </div>
 
-                {/* 삭제 버튼 (우측 상단, 그룹 호버 시 노출) */}
                 <button 
                   onClick={(e) => { e.stopPropagation(); deleteNotification(noti.id); }}
                   className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
