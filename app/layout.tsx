@@ -10,13 +10,12 @@ import Script from "next/script"; // 🟢 Script 컴포넌트 사용
 
 const inter = Inter({ subsets: ["latin"] });
 
-// 🟢 [SEO 최적화] 메타데이터 (기존 내용 유지)
 export const metadata: Metadata = {
   title: {
     template: '%s | Locally',
     default: 'Locally - 현지인과 함께하는 특별한 여행',
   },
-  description: "현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요. 현지인처럼 여행하고 싶다면 현지인과 함께.",
+  description: "현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.",
   openGraph: {
     title: 'Locally - 현지인과 함께하는 특별한 여행',
     description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
@@ -49,10 +48,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning={true}>
-      {/* 🔴 [삭제됨] <head> 태그 내의 script 태그가 에러의 원인이었으므로 제거했습니다. */}
+      {/* 🟢 [수정] head 태그 삭제함 (Next.js에서는 불필요) */}
       
       <body className={inter.className}>
-        {/* 🟢 [수정됨] Next.js 전용 Script 컴포넌트로 교체 (에러 해결 핵심) */}
+        {/* 🟢 [수정] 카카오맵 스크립트를 body 안으로 옮기고 Script 컴포넌트 사용 */}
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script 
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
@@ -63,16 +62,13 @@ export default function RootLayout({
         <ToastProvider>
           <NotificationProvider>
             <LanguageProvider>
-              
               <UserPresenceTracker />
-              
               <div className="flex flex-col min-h-screen">
                 <main className="flex-1">
                   {children}
                 </main>
                 <SiteFooter />
               </div>
-
             </LanguageProvider>
           </NotificationProvider>
         </ToastProvider>
