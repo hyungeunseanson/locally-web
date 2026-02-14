@@ -2,49 +2,53 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
+// 🟢 Vercel 로그에서 확인하기 쉽게 [DEBUG] 태그를 붙였습니다.
 export async function POST(request: Request) {
-  console.log('🚨 [DEBUG] 나이스페이 콜백 시작됨!'); // 1. 시작 확인
+  console.log('🚨 [DEBUG] 결제 콜백 시작 (Nicepay Callback Triggered)');
 
   try {
-    // 환경변수 검사
+    // 1. 필수 환경변수 생존 확인
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!SUPABASE_URL || !SERVICE_KEY) {
-      console.error('🔥 [DEBUG] 치명적 에러: 환경변수(SUPABASE_SERVICE_ROLE_KEY)가 없음!');
-      return NextResponse.json({ error: 'Env Missing' }, { status: 500 });
+      console.error('🔥 [DEBUG] 치명적 오류: SUPABASE_SERVICE_ROLE_KEY 환경변수가 없습니다!');
+      // 여기서 멈추면 아무것도 안 됨. 로그 꼭 확인하세요.
+      return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
     }
 
-    // 데이터 파싱
+    // 2. 데이터 파싱 (나이스페이는 주로 formData로 보냄)
     let resCode: any = '';
     let amount: any = 0;
     let orderId: any = '';
     let tid: any = '';
 
     const contentType = request.headers.get('content-type') || '';
+    
     if (contentType.includes('application/json')) {
       const json = await request.json();
-      resCode = json.success ? '0000' : '9999';
+      resCode = json.success ? '0000' : '9999'; 
       amount = json.paid_amount;
       orderId = json.merchant_uid;
       tid = json.pg_tid;
     } else {
+      // 🟢 실제 결제는 이쪽을 탈 확률 99%
       const formData = await request.formData();
-      resCode = formData.get('resCode') || '0000';
+      resCode = formData.get('resCode') || '0000'; 
       amount = formData.get('amt');
       orderId = formData.get('moid');
       tid = formData.get('tid');
     }
 
-    console.log(`🔍 [DEBUG] 결제 정보 수신 - 주문ID: ${orderId}, 결과코드: ${resCode}`);
+    console.log(`🔍 [DEBUG] 파싱된 데이터 - 주문ID: ${orderId}, 코드: ${resCode}`);
 
-    if (resCode === '0000') {
-      // DB 접속
+    if (resCode === '0000') { 
+      // 3. 관리자 권한 DB 접속
       const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-
-      // 1. 예약 상태 업데이트
-      console.log('⏳ [DEBUG] 예약 상태 업데이트 시도...');
-      const { data: bookingData, error: updateError } = await supabase
+      
+      // 4. 예약 상태 업데이트 (PAID)
+      console.log('⏳ [DEBUG] DB 상태 업데이트 시도...');
+      const { data: bookingData, error: dbError } = await supabase
         .from('bookings')
         .update({
           status: 'PAID',
@@ -52,22 +56,21 @@ export async function POST(request: Request) {
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
-        .select(`*, experiences (host_id, title)`).single();
+        .select(`*, experiences (host_id, title)`)
+        .single();
 
-      if (updateError) {
-        console.error('🔥 [DEBUG] DB 업데이트 실패:', updateError);
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
-      }
-      
-      console.log('✅ [DEBUG] 예약 상태 업데이트 성공!');
+      if (dbError) {
+        console.error('🔥 [DEBUG] DB 업데이트 실패:', dbError);
+        // DB 에러나도 결제 취소시키지 않으려면 여기서 에러 반환하면 안 되지만, 일단 원인 파악을 위해 로그 남김
+      } else if (bookingData) {
+        console.log('✅ [DEBUG] DB 상태 업데이트 완료!');
 
-      if (bookingData) {
         const hostId = bookingData.experiences?.host_id;
         const expTitle = bookingData.experiences?.title;
         const guestName = bookingData.contact_name || '게스트';
 
         if (hostId) {
-          // 2. 알림 저장 (DB Insert)
+          // 5. 알림 저장 (직접 수행)
           console.log('⏳ [DEBUG] 알림 저장 시도...');
           const { error: notiError } = await supabase.from('notifications').insert({
             user_id: hostId,
@@ -77,31 +80,27 @@ export async function POST(request: Request) {
             link: '/host/dashboard',
             is_read: false
           });
-
+          
           if (notiError) console.error('🔥 [DEBUG] 알림 저장 실패:', notiError);
           else console.log('✅ [DEBUG] 알림 저장 성공!');
-
-          // 3. 메일 발송
-          console.log('⏳ [DEBUG] 호스트 이메일 조회 시도...');
+          
+          // 6. 메일 발송 (직접 수행)
+          console.log('⏳ [DEBUG] 메일 발송 준비...');
           let hostEmail = '';
+          
+          // 프로필에서 이메일 찾기
           const { data: hostProfile } = await supabase.from('profiles').select('email').eq('id', hostId).single();
           
           if (hostProfile?.email) {
             hostEmail = hostProfile.email;
-            console.log('✅ [DEBUG] 프로필에서 이메일 찾음:', hostEmail);
           } else {
-             console.log('⚠️ [DEBUG] 프로필에 이메일 없음. Auth 조회 시도...');
+             // 없으면 Auth 정보 뒤지기
+             console.log('⚠️ [DEBUG] 프로필에 이메일 없음. Auth User 조회...');
              const { data: authData } = await supabase.auth.admin.getUserById(hostId);
-             if (authData?.user?.email) {
-                hostEmail = authData.user.email;
-                console.log('✅ [DEBUG] Auth에서 이메일 찾음:', hostEmail);
-             } else {
-                console.error('🔥 [DEBUG] 이메일 찾기 완전 실패. 메일 못 보냄.');
-             }
+             if (authData?.user?.email) hostEmail = authData.user.email;
           }
 
           if (hostEmail) {
-            console.log('⏳ [DEBUG] 메일 발송 시작 (Nodemailer)...');
             try {
               const transporter = nodemailer.createTransport({
                 service: 'gmail',
@@ -112,30 +111,44 @@ export async function POST(request: Request) {
                 from: `"Locally Team" <${process.env.GMAIL_USER}>`,
                 to: hostEmail,
                 subject: `[Locally] 🎉 새로운 예약이 도착했습니다!`,
-                html: `<p>안녕하세요!</p><p>[${expTitle}] 체험에 <b>${guestName}</b>님의 예약이 확정되었습니다.</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard">호스트 대시보드 확인하기</a>`,
+                html: `
+                  <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2>Locally 예약 알림 🔔</h2>
+                    <p>호스트님! <b>[${expTitle}]</b> 체험에 <b>${guestName}</b>님의 예약이 확정되었습니다.</p>
+                    <p>지금 바로 대시보드에서 확인해보세요.</p>
+                    <br/>
+                    <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard" style="background: black; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">확인하기</a>
+                  </div>
+                `,
               });
-              console.log(`🚀 [DEBUG] 메일 발송 최종 성공!! (${hostEmail})`);
+              console.log(`🚀 [DEBUG] 메일 발송 성공! (${hostEmail})`);
             } catch (mailError) {
-              console.error('🔥 [DEBUG] 메일 발송 중 에러 발생:', mailError);
+              console.error('🔥 [DEBUG] 메일 발송 실패 (Nodemailer 에러):', mailError);
             }
+          } else {
+            console.error('🔥 [DEBUG] 호스트 이메일을 도저히 찾을 수 없음');
           }
         }
       }
 
-      // 성공 페이지 리다이렉트
+      // 7. 성공 페이지로 이동
+      console.log('✅ [DEBUG] 모든 처리 완료. 성공 페이지로 리다이렉트.');
+      
       if (contentType.includes('application/json')) {
         return NextResponse.json({ success: true });
       } else {
-        return NextResponse.redirect(new URL(`/payment/success?orderId=${orderId}&amount=${amount}`, request.url), 303);
+        return NextResponse.redirect(
+          new URL(`/payment/success?orderId=${orderId}&amount=${amount}`, request.url), 
+          303
+        );
       }
-
     } else {
-      console.log('⚠️ [DEBUG] 결제 실패 응답 수신');
+      console.log('⚠️ [DEBUG] 결제 실패 응답 (PG사 거절)');
       return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
     }
-
   } catch (err) {
-    console.error('🔥 [DEBUG] 알 수 없는 치명적 에러:', err);
+    console.error('🔥 [DEBUG] 알 수 없는 시스템 에러:', err);
+    // 에러가 나도 유저를 에러 페이지로 보내야 함
     return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
   }
 }
