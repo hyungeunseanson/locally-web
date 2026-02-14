@@ -51,9 +51,9 @@ function PaymentContent() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase.from('profiles').select('name, phone').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('full_name, phone').eq('id', user.id).single();
         if (profile) {
-          setCustomerName(profile.name || '');
+          setCustomerName(profile.full_name || '');
           setCustomerPhone(profile.phone || '');
         }
       }
