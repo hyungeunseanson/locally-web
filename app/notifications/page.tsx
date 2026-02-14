@@ -5,7 +5,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useNotification } from '@/app/context/NotificationContext';
 import { 
   Bell, Check, Trash2, Calendar, MessageSquare, 
-  Info, AlertTriangle, ChevronRight, X 
+  Info, AlertTriangle, ChevronRight 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -20,15 +20,17 @@ export default function NotificationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // 🟢 [정석] Context 데이터와 동기화 (좀비 코드 삭제)
+  // 🟢 [정석] Context(DB) 데이터와 동기화
+  // 더 이상 booking 테이블을 직접 조회하지 않습니다.
   useEffect(() => {
     setLocalNotifications(notifications);
     setIsLoading(false);
   }, [notifications]);
 
-  // 🟢 [정석] DB 삭제
+  // 🟢 [정석] 알림 삭제 (DB에서 영구 삭제)
   const deleteNotification = async (id: number) => {
-    setLocalNotifications(prev => prev.filter(n => n.id !== id));
+    // UI 즉시 반영 (낙관적 업데이트)
+    setLocalNotifications(prev => prev.filter(n => n.id !== id)); 
     try {
       await supabase.from('notifications').delete().eq('id', id);
     } catch (error) {
@@ -145,7 +147,6 @@ export default function NotificationsPage() {
                     </p>
                   </div>
 
-                  {/* 화살표 추가 */}
                   <div className="hidden md:flex items-center text-slate-300 group-hover:text-slate-400 group-hover:translate-x-1 transition-all">
                     <ChevronRight size={20}/>
                   </div>
