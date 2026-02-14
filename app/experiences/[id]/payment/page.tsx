@@ -31,11 +31,14 @@ function PaymentContent() {
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   
-  // 가격 로직
-  const expPrice = experience?.price || 50000; 
-  const hostPrice = isPrivate ? (experience?.private_price || 300000) : expPrice * guests;
-  const guestFee = hostPrice * 0.1; // 수수료 10%
-  const finalAmount = hostPrice + guestFee; 
+// 가격 로직
+const expPrice = experience?.price || 50000; 
+const hostPrice = isPrivate ? (experience?.private_price || 300000) : expPrice * guests;
+
+// 🟢 수수료 계산 시 무조건 소수점을 버리도록 수정 (DB 에러 방지)
+const guestFee = Math.floor(hostPrice * 0.1); 
+
+const finalAmount = hostPrice + guestFee;
 
   useEffect(() => { 
     setMounted(true); 
