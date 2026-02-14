@@ -92,7 +92,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // 응답 처리
+      // 응답 제발 처리
       if (contentType.includes('application/json')) {
         return NextResponse.json({ success: true });
       } else {
