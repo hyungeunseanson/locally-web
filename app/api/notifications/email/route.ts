@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/app/utils/supabase/server';
-import nodemailer from 'nodemailer'; // 🟢 추가됨
+import { createClient } from '@supabase/supabase-js'; // 🟢 [변경] supabase-js 직접 사용
+import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
+    // 🟢 [변경] 관리자 권한으로 Supabase 생성 (RLS 우회하여 이메일 조회 가능)
+    // 주의: process.env.SUPABASE_SERVICE_ROLE_KEY 가 .env 파일에 있어야 합니다.
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY! 
+    );
     
     // 1. 요청 데이터 파싱
     const body = await request.json();
@@ -14,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Recipient ID is required' }, { status: 400 });
     }
 
-    // 🟢 10분 쿨타임 체크 (채팅 알림일 경우)
+    // 10분 쿨타임 체크 (채팅 알림일 경우만)
     if (type === 'new_message' && inquiry_id) {
       const { data: inquiry } = await supabase
         .from('inquiries')
@@ -25,22 +30,14 @@ export async function POST(request: Request) {
       if (inquiry?.last_email_sent_at) {
         const lastSent = new Date(inquiry.last_email_sent_at).getTime();
         const now = new Date().getTime();
-        const diffMinutes = (now - lastSent) / (1000 * 60);
-
-        if (diffMinutes < 10) {
-          console.log(`⏳ Skipped email for inquiry ${inquiry_id} (Throttled)`);
+        if ((now - lastSent) / (1000 * 60) < 10) {
           return NextResponse.json({ skipped: true, reason: 'Throttled' });
         }
       }
-      
-      // 시간 업데이트
-      await supabase
-        .from('inquiries')
-        .update({ last_email_sent_at: new Date().toISOString() })
-        .eq('id', inquiry_id);
+      await supabase.from('inquiries').update({ last_email_sent_at: new Date().toISOString() }).eq('id', inquiry_id);
     }
 
-    // 2. 수신자 이메일 조회
+    // 2. 수신자 이메일 조회 (관리자 권한이라 이제 무조건 성공합니다!)
     const { data: userProfile, error: userError } = await supabase
       .from('profiles')
       .select('email, full_name')
@@ -48,21 +45,21 @@ export async function POST(request: Request) {
       .single();
 
     if (userError || !userProfile?.email) {
+      console.error('❌ User email lookup failed:', userError);
       return NextResponse.json({ error: 'User email not found' }, { status: 404 });
     }
 
-    // 🟢 [핵심] Nodemailer 전송 설정
+    // 3. Nodemailer 전송 설정
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.GMAIL_USER, // .env에서 가져옴
-        pass: process.env.GMAIL_APP_PASSWORD, // .env에서 가져옴
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
 
-    // 이메일 본문 HTML 꾸미기
     const mailOptions = {
-      from: `"Locally Team" <${process.env.GMAIL_USER}>`, // 보내는 사람 표시
+      from: `"Locally Team" <${process.env.GMAIL_USER}>`,
       to: userProfile.email,
       subject: `[Locally] ${title}`,
       html: `
@@ -89,7 +86,6 @@ export async function POST(request: Request) {
       `,
     };
 
-    // 🟢 실제 전송
     await transporter.sendMail(mailOptions);
     console.log(`📧 Email sent to ${userProfile.email}`);
 
