@@ -4,11 +4,10 @@ import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
-    // 🟢 [변경] 관리자 권한으로 Supabase 생성 (RLS 우회하여 이메일 조회 가능)
-    // 주의: process.env.SUPABASE_SERVICE_ROLE_KEY 가 .env 파일에 있어야 합니다.
+    // 🟢 [수정] 관리자 권한 생성
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
     
     // 1. 요청 데이터 파싱

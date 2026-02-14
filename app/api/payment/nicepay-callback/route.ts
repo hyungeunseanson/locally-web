@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js'; // 🟢 관리자 권한용 패키지
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -28,26 +27,14 @@ export async function POST(request: Request) {
     }
 
     if (resCode === '0000') { 
-      const cookieStore = await cookies();
-      
-      const supabase = createServerClient(
+      // 🟢 [수정] 관리자 권한으로 DB 접속 (쿠키 설정 코드 삭제함)
+      // .env.local 파일에 SUPABASE_SERVICE_ROLE_KEY가 꼭 있어야 합니다!
+      const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          cookies: {
-            getAll() { return cookieStore.getAll() },
-            setAll(cookiesToSet) {
-              try {
-                cookiesToSet.forEach(({ name, value, options }) =>
-                  cookieStore.set(name, value, options)
-                )
-              } catch { }
-            },
-          },
-        }
+        process.env.SUPABASE_SERVICE_ROLE_KEY! 
       );
       
-      // 🟢 [수정 1] 호스트 정보를 알기 위해 experiences 테이블 조인 (host_id 필수)
+      // 🟢 [수정] 호스트 정보를 알기 위해 experiences 테이블 조인
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .update({
@@ -73,7 +60,7 @@ export async function POST(request: Request) {
         const expTitle = bookingData.experiences?.title;
         const guestName = bookingData.contact_name || '게스트';
 
-        // 🟢 [추가 1] 앱 내 알림 저장 (이게 있어야 종 모양 눌렀을 때 보입니다!)
+        // 🟢 [추가] 앱 내 알림 저장 (관리자 권한이라 로그인 없어도 저장됨)
         if (hostId) {
           await supabase.from('notifications').insert({
             user_id: hostId,
@@ -85,7 +72,7 @@ export async function POST(request: Request) {
           });
         }
 
-        // 🟢 [수정 2] 이메일 발송 (정보를 모두 채워서 전송)
+        // 🟢 [수정] 이메일 발송 (받는 사람 hostId 전달)
         const origin = new URL(request.url).origin;
         try {
           await fetch(`${origin}/api/notifications/email`, {
@@ -93,7 +80,7 @@ export async function POST(request: Request) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: 'new_booking',
-              recipient_id: hostId, // 받는 사람 (호스트)
+              recipient_id: hostId, // 필수: 받는 사람
               title: '🎉 새로운 예약이 도착했습니다!',
               message: `[${expTitle}] 체험에 새로운 예약(게스트: ${guestName})이 확정되었습니다.`,
               link: '/host/dashboard', 
@@ -117,7 +104,7 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      // 결제 실패
+      // 결제 실패 시
       return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
     }
   } catch (err) {
