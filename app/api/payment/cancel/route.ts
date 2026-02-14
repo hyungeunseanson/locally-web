@@ -2,16 +2,20 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  console.log('🚨 [Cancel API] 안전 모드 실행');
+  console.log('🚨 [Cancel API] 안전 모드 v2 실행');
 
   try {
-    // 1. 환경변수 체크
+    // 1. 환경변수 체크 (가장 흔한 500 원인)
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!SUPABASE_URL || !SERVICE_KEY) {
-      console.error('🔥 [Cancel API] 환경변수 누락');
-      return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
+    if (!SUPABASE_URL) {
+      console.error('🔥 [Cancel API] NEXT_PUBLIC_SUPABASE_URL 없음');
+      return NextResponse.json({ error: 'Env Error: URL missing' }, { status: 500 });
+    }
+    if (!SERVICE_KEY) {
+      console.error('🔥 [Cancel API] SUPABASE_SERVICE_ROLE_KEY 없음');
+      return NextResponse.json({ error: 'Env Error: Service Key missing' }, { status: 500 });
     }
 
     // 2. 데이터 파싱
@@ -20,7 +24,7 @@ export async function POST(request: Request) {
       body = await request.json();
     } catch (e) {
       console.error('🔥 [Cancel API] JSON 파싱 실패');
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
     const { bookingId, reason } = body;
@@ -42,7 +46,7 @@ export async function POST(request: Request) {
 
     if (dbError || !booking) {
       console.error('🔥 [Cancel API] 예약 조회 실패:', dbError);
-      return NextResponse.json({ error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
     // 5. TID 확인 및 처리
@@ -98,7 +102,9 @@ export async function POST(request: Request) {
         
         return NextResponse.json({ success: true });
       } else {
-        console.error('🔥 [Cancel API] 환불 실패');
+        console.error('🔥 [Cancel API] 환불 실패 (PG 응답)');
+        // 200 OK로 보내되, 실패 메시지를 담아서 클라이언트가 alert를 띄우지 않게 하거나,
+        // 400을 보내서 에러를 띄우게 할 수 있음. 여기서는 에러 처리가 명확하도록 400 유지.
         return NextResponse.json({ error: 'PG사 환불 실패', details: niceData }, { status: 400 });
       }
     } catch (fetchError) {
@@ -108,6 +114,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('🔥 [Cancel API] 시스템 에러:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Unknown Server Error' }, { status: 500 });
   }
 }
