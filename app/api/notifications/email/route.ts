@@ -4,28 +4,49 @@ import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
-    // 1. 환경변수 체크 (서버 크래시 방지)
+    console.log('📨 [Email API] 요청 시작');
+
+    // 1. 환경변수 체크
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error('❌ [Email API] 필수 환경변수 누락 (SUPABASE_SERVICE_ROLE_KEY 확인 필요)');
-      return NextResponse.json({ error: 'Server Configuration Error' }, { status: 500 });
+      console.error('❌ [Email API] 필수 환경변수 누락 (SUPABASE_SERVICE_ROLE_KEY)');
+      return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     
     const body = await request.json();
-    const { recipient_id, title, message, link } = body;
+    const { recipient_id, title, message, link, type } = body; 
+
+    console.log(`🔍 [Email API] 수신자ID: ${recipient_id}, 타입: ${type}`);
 
     if (!recipient_id) {
-      return NextResponse.json({ error: 'Recipient ID is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Recipient ID missing' }, { status: 400 });
     }
 
-    // 2. 수신자 이메일 조회 (비상 로직 추가)
+    // 🟢 2. [핵심] 알림 DB 저장 (서버가 관리자 권한으로 수행 -> 권한 에러 해결)
+    const { error: insertError } = await supabase.from('notifications').insert({
+      user_id: recipient_id,
+      type: type || 'system',
+      title,
+      message,
+      link,
+      is_read: false
+    });
+
+    if (insertError) {
+      console.error('❌ [Email API] 알림 DB 저장 실패:', insertError);
+      // 알림 저장은 실패해도 이메일 발송은 시도하도록 계속 진행
+    } else {
+      console.log('✅ [Email API] 알림 DB 저장 성공');
+    }
+
+    // 🟢 3. 수신자 이메일 조회 (비상 로직 포함)
     let emailToSend = '';
     
-    // (A) 프로필 테이블 조회
+    // (A) profiles 테이블 조회
     const { data: userProfile } = await supabase
       .from('profiles')
       .select('email')
@@ -34,20 +55,22 @@ export async function POST(request: Request) {
 
     if (userProfile?.email) {
       emailToSend = userProfile.email;
+      console.log('✅ [Email API] Profiles 테이블에서 이메일 찾음');
     } else {
-      // (B) 프로필에 없으면 Auth 유저 정보 직접 조회 (관리자 권한)
-      console.log(`⚠️ 프로필에 이메일 없음. Auth User 조회 시도: ${recipient_id}`);
+      // (B) Auth 유저 정보 직접 조회
+      console.log('⚠️ [Email API] Profiles에 이메일 없음. Auth 조회 시도...');
       const { data: userData, error: authError } = await supabase.auth.admin.getUserById(recipient_id);
       
       if (userData?.user?.email) {
         emailToSend = userData.user.email;
+        console.log('✅ [Email API] Auth 정보에서 이메일 찾음');
       } else {
-        console.error('❌ Auth 정보에서도 이메일 찾을 수 없음:', authError);
-        return NextResponse.json({ error: 'User email not found' }, { status: 404 });
+        console.error('❌ [Email API] 이메일 찾기 완전 실패:', authError);
+        return NextResponse.json({ success: true, warning: 'Email not found' });
       }
     }
 
-    // 3. Nodemailer 설정 및 발송
+    // 4. 메일 발송
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -70,7 +93,7 @@ export async function POST(request: Request) {
       `,
     });
 
-    console.log(`✅ [Email API] 발송 성공: ${emailToSend}`);
+    console.log(`🚀 [Email API] 메일 발송 완료: ${emailToSend}`);
     return NextResponse.json({ success: true });
 
   } catch (error: any) {

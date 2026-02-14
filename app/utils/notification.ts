@@ -1,6 +1,4 @@
-import { createClient } from '@/app/utils/supabase/client';
-import { SupabaseClient } from '@supabase/supabase-js';
-
+// app/utils/notification.ts
 export type NotificationType = 
   | 'booking_request' 
   | 'booking_confirmed' 
@@ -8,85 +6,67 @@ export type NotificationType =
   | 'booking_cancel_request'
   | 'cancellation_requested'
   | 'cancellation_approved'
-  | 'new_booking' // ✅ 이 부분을 추가하면 빨간 줄이 사라집니다.
+  | 'new_booking' 
   | 'new_message' 
   | 'admin_alert';
 
 interface SendNotificationParams {
-  userId?: string;        
   recipient_id?: string;  
-  senderId?: string;      
+  userId?: string; 
+  senderId?: string; // API에서는 안 쓰지만 호환성 위해 남김
   type: NotificationType;
   title: string;          
   message?: string;       
   content?: string;       
   link?: string;          
   link_url?: string;      
-  supabaseClient?: SupabaseClient;
-  
-  // 🟢 [추가됨] 채팅방 ID (쿨타임 체크용)
   inquiry_id?: number; 
+  supabaseClient?: any; // 호환성용
 }
 
 export const sendNotification = async ({
-  userId, recipient_id,
-  senderId,
+  recipient_id, userId,
   type,
-  title = '새로운 알림',
+  title,
   message, content,
   link, link_url,
-  supabaseClient,
-  inquiry_id // 🟢 인자 추가
+  inquiry_id
 }: SendNotificationParams) => {
   
-  const supabase = supabaseClient || createClient();
-  const finalUserId = userId || recipient_id;
+  const finalUserId = recipient_id || userId;
   const finalMessage = message || content || '';
   const finalLink = link || link_url;
 
   if (!finalUserId) {
-    console.error('❌ Notification failed: Missing recipient ID');
+    console.error('❌ [Notification] 수신자 ID 누락');
     return;
   }
 
   try {
-    // (1) DB 알림 저장 (앱 내 알림 - 이건 무조건 저장)
-    const { error } = await supabase.from('notifications').insert({
-      user_id: finalUserId,
-      sender_id: senderId || null,
-      type,
-      title,
-      message: finalMessage,
-      link: finalLink,
-      is_read: false
+    console.log('🚀 [Notification] 알림 API 호출 시도...');
+    
+    // 🟢 클라이언트가 직접 DB에 넣지 않고, API에게 모든 처리를 위임함
+    const response = await fetch('/api/notifications/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient_id: finalUserId,
+        title,
+        message: finalMessage,
+        link: finalLink,
+        type, 
+        inquiry_id
+      })
     });
 
-    if (error) throw error;
-
-    // (2) 이메일 발송 API 호출 (여기에 쿨타임 로직 적용됨)
-    const emailTypes: NotificationType[] = [
-      'booking_request', 
-      'booking_confirmed', 
-      'booking_cancelled', 
-      'new_message' 
-    ];
-
-    if (emailTypes.includes(type)) {
-      fetch('/api/notifications/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient_id: finalUserId,
-          title,
-          message: finalMessage,
-          link: finalLink,
-          type,        // 🟢 타입 전달
-          inquiry_id   // 🟢 ID 전달
-        })
-      }).catch(err => console.error('⚠️ Failed to trigger email API:', err));
+    if (!response.ok) {
+      const errData = await response.json();
+      console.error('❌ [Notification] API 호출 실패:', errData);
+    } else {
+      console.log('✅ [Notification] API 호출 성공');
     }
 
   } catch (error) {
-    console.error('❌ Failed to send notification:', error);
+    console.error('❌ [Notification] 네트워크 오류:', error);
   }
 };
