@@ -5,14 +5,13 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useNotification } from '@/app/context/NotificationContext';
 import { 
   Bell, Check, Trash2, Calendar, MessageSquare, 
-  Info, AlertTriangle, ChevronRight 
+  Info, AlertTriangle, ChevronRight, X 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import Skeleton from '@/app/components/ui/Skeleton';
 
 export default function NotificationsPage() {
-  // Context에서 전역 상태를 가져옴 (여기가 핵심!)
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [localNotifications, setLocalNotifications] = useState<any[]>([]);
@@ -21,15 +20,15 @@ export default function NotificationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // 🟢 [정석] Context 데이터와 동기화
+  // 🟢 [정석] Context(DB) 데이터와 동기화 (좀비 코드 삭제됨)
   useEffect(() => {
     setLocalNotifications(notifications);
     setIsLoading(false);
   }, [notifications]);
 
-  // 🟢 [정석] DB에서 진짜로 삭제
+  // 🟢 [정석] 알림 삭제 (DB에서 영구 삭제)
   const deleteNotification = async (id: number) => {
-    setLocalNotifications(prev => prev.filter(n => n.id !== id)); // UI 즉시 반영
+    setLocalNotifications(prev => prev.filter(n => n.id !== id)); // UI 반영
     try {
       await supabase.from('notifications').delete().eq('id', id);
     } catch (error) {
@@ -146,18 +145,14 @@ export default function NotificationsPage() {
                     </p>
                   </div>
 
-                  <div className="hidden md:flex items-center text-slate-300 group-hover:text-slate-400 group-hover:translate-x-1 transition-all">
-                    <ChevronRight size={20}/>
-                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteNotification(noti.id); }}
+                    className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                    title="알림 삭제"
+                  >
+                    <Trash2 size={16}/>
+                  </button>
                 </div>
-
-                <button 
-                  onClick={(e) => { e.stopPropagation(); deleteNotification(noti.id); }}
-                  className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                  title="알림 삭제"
-                >
-                  <Trash2 size={16}/>
-                </button>
               </div>
             ))
           )}

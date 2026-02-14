@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'; // 🟢 관리자 권한용 패키지
+import { createClient } from '@supabase/supabase-js'; 
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -26,13 +26,13 @@ export async function POST(request: Request) {
     }
 
     if (resCode === '0000') { 
-      // 2. 관리자 권한으로 DB 접속
+      // 🟢 [관리자 권한] DB 접속
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY! 
       );
       
-      // 3. 결제 상태 업데이트 (PAID)
+      // 🟢 2. 결제 상태 업데이트 (PAID)
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .update({
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
-        .select('*, experiences(host_id, title)') // 호스트 정보 가져오기
+        .select('*, experiences(host_id, title)')
         .single();
 
       if (error) {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         const expTitle = bookingData.experiences?.title;
         const guestName = bookingData.contact_name || '게스트';
 
-        // 4. [알림] 앱 내 알림 저장 (INSERT)
+        // 🟢 3. [알림] 앱 내 알림 저장 (INSERT) -> 여기서 저장하므로 Page에서 불러올 필요 없음
         if (hostId) {
           const { error: notiError } = await supabase.from('notifications').insert({
             user_id: hostId,
@@ -65,10 +65,10 @@ export async function POST(request: Request) {
           if (notiError) console.error('알림 저장 실패:', notiError);
         }
 
-        // 5. [메일] 이메일 발송 요청
-        const origin = new URL(request.url).origin;
-        // 비동기로 요청만 보내고 결과는 기다리지 않음 (응답 속도 향상)
-        fetch(`${origin}/api/notifications/email`, {
+        // 🟢 4. [메일] 이메일 발송 요청 (절대 경로 사용!)
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        
+        fetch(`${siteUrl}/api/notifications/email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -80,7 +80,6 @@ export async function POST(request: Request) {
         }).catch(err => console.error('이메일 요청 실패:', err));
       }
 
-      // 6. 성공 페이지 이동
       if (contentType.includes('application/json')) {
         return NextResponse.json({ success: true });
       } else {
