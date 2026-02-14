@@ -2,36 +2,50 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
+import { ArrowDown } from 'lucide-react';
 
 export default function InvestorsPage() {
   return (
-    <div className="min-h-screen bg-white font-sans flex flex-col">
+    <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
-      <div className="flex-1 max-w-4xl mx-auto px-6 py-20 w-full">
-        <h1 className="text-3xl font-black mb-4">Investor Relations</h1>
-        <p className="text-slate-500 mb-12">로컬리의 재무 정보와 공시 자료를 확인하실 수 있습니다.</p>
+      
+      <main className="max-w-[1040px] mx-auto px-6 py-24">
+        <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-24">
+          Investors
+        </h1>
 
-        <div className="grid md:grid-cols-2 gap-8 mb-16">
-          <div className="p-8 bg-slate-50 rounded-3xl">
-            <h3 className="text-4xl font-black mb-2">200%</h3>
-            <p className="text-slate-500 font-medium">YoY Growth Rate</p>
-          </div>
-          <div className="p-8 bg-slate-50 rounded-3xl">
-            <h3 className="text-4xl font-black mb-2">150K+</h3>
-            <p className="text-slate-500 font-medium">Active Monthly Users</p>
-          </div>
-        </div>
-
-        <h2 className="text-xl font-bold mb-6">IR 자료실</h2>
-        <div className="space-y-4">
-          {[2025, 2024, 2023].map((year) => (
-            <div key={year} className="flex items-center justify-between p-5 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer">
-              <span className="font-bold">FY {year} Earnings Release</span>
-              <button className="text-sm font-bold text-blue-600 hover:underline">Download PDF</button>
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 border-t border-b border-black py-16 mb-24">
+          {[
+            { label: 'YoY Growth', value: '240%' },
+            { label: 'Active Users', value: '1.2M+' },
+            { label: 'Global Cities', value: '45' },
+          ].map((metric, i) => (
+            <div key={i} className="text-center md:text-left">
+              <h3 className="text-6xl md:text-7xl font-black mb-2 tracking-tight">{metric.value}</h3>
+              <p className="text-sm font-bold uppercase tracking-widest text-[#717171]">{metric.label}</p>
             </div>
           ))}
         </div>
-      </div>
+
+        {/* Financial Reports */}
+        <div>
+          <h2 className="text-3xl font-bold mb-10">Financial Reports</h2>
+          <div className="border-t border-black">
+            {[2025, 2024, 2023].map((year) => (
+              <div key={year} className="flex items-center justify-between py-8 border-b border-[#EBEBEB] group hover:bg-[#F9F9F9] -mx-4 px-4 transition-colors cursor-pointer">
+                <div>
+                  <span className="block text-xs font-bold text-[#717171] mb-1">FISCAL YEAR</span>
+                  <span className="text-2xl font-bold group-hover:underline decoration-2 underline-offset-4">{year} Annual Report</span>
+                </div>
+                <div className="w-12 h-12 rounded-full border border-[#DDDDDD] flex items-center justify-center group-hover:bg-black group-hover:border-black transition-all">
+                   <ArrowDown size={20} className="group-hover:text-white transition-colors" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

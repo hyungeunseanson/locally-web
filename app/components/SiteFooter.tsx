@@ -84,9 +84,32 @@ export default function SiteFooter() {
                 )}
               </li>
 
-              <li>
-                <Link href="https://blog.naver.com/locally-travel" target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
-                   Naver Blog
+{/* 네이버 블로그 아이콘 (커스텀 SVG) */}
+<li>
+                <Link 
+                  href="https://blog.naver.com/locally-travel" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="hover:text-black flex items-center gap-2 group text-[#717171]"
+                  title="Naver Blog"
+                >
+                  {/* 직접 만든 네이버 아이콘 (N자) */}
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="group-hover:stroke-black transition-colors"
+                  >
+                    <path d="M3 3h4l10 18h4" /> {/* N자 모양 */}
+                    <path d="M3 3v18" />
+                    <path d="M21 3v18" />
+                  </svg>
+                  <span className="group-hover:underline">Naver Blog</span>
                 </Link>
               </li>
             </ul>
