@@ -2,43 +2,64 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
+// 🟢 Vercel 로그에서 확인하기 쉽게 [DEBUG] 태그를 붙였습니다.
 export async function POST(request: Request) {
+  console.log('🚨 [DEBUG] 결제 콜백 시작 (Nicepay Callback Triggered)');
+
   try {
-    // 1. 데이터 파싱
+    // 1. 필수 환경변수 생존 확인
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      console.error('🔥 [DEBUG] 치명적 오류: SUPABASE_SERVICE_ROLE_KEY 환경변수가 없습니다!');
+      return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
+    }
+
+    // 2. 데이터 파싱
     let resCode: any = '';
+    let amount: any = 0;
     let orderId: any = '';
     let tid: any = '';
-    
-    // 나이스페이/포트원 데이터 수신
+    let rawJson: any = {};
+
     const contentType = request.headers.get('content-type') || '';
+    
     if (contentType.includes('application/json')) {
       const json = await request.json();
-      resCode = json.success ? '0000' : '9999';
-      // 포트원 V1/V2 호환성 처리
+      rawJson = json;
+      
+      // 🟢 [핵심 수정] 성공 판단 로직을 클라이언트와 동일하게 유연하게 변경
+      // success가 없더라도 imp_uid가 있고 에러가 없으면 성공으로 간주
+      const isSuccess = json.success === true || 
+                        json.code === '0' || 
+                        json.status === 'paid' || 
+                        (json.imp_uid && !json.error_msg);
+      
+      resCode = isSuccess ? '0000' : '9999';
+      
+      amount = json.paid_amount || json.amount;
       orderId = json.merchant_uid || json.orderId;
-      tid = json.pg_tid || json.imp_uid;
+      tid = json.pg_tid || json.imp_uid; // 포트원 고유번호(imp_uid)를 tid로 사용 가능
     } else {
       const formData = await request.formData();
-      resCode = formData.get('resCode') || '0000';
+      resCode = formData.get('resCode') || '0000'; 
+      amount = formData.get('amt');
       orderId = formData.get('moid');
       tid = formData.get('tid');
     }
 
-    // 2. 환경변수 체크 (가장 흔한 에러 원인)
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('서버 환경변수 누락: SUPABASE_SERVICE_ROLE_KEY');
-    }
-    if (!process.env.GMAIL_APP_PASSWORD) {
-      throw new Error('서버 환경변수 누락: GMAIL_APP_PASSWORD');
+    console.log(`🔍 [DEBUG] 파싱된 데이터 - 주문ID: ${orderId}, 코드: ${resCode}`);
+    if (resCode !== '0000') {
+      console.log('⚠️ [DEBUG] 들어온 데이터:', JSON.stringify(rawJson));
     }
 
-    if (resCode === '0000') {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-
-      // 3. 예약 상태 업데이트
+    if (resCode === '0000') { 
+      // 3. 관리자 권한 DB 접속
+      const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+      
+      // 4. 예약 상태 업데이트 (PAID)
+      console.log('⏳ [DEBUG] DB 상태 업데이트 시도...');
       const { data: bookingData, error: dbError } = await supabase
         .from('bookings')
         .update({
@@ -47,20 +68,23 @@ export async function POST(request: Request) {
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
-        .select('*, experiences(host_id, title)')
+        .select(`*, experiences (host_id, title)`)
         .single();
 
-      if (dbError) throw new Error(`DB 업데이트 실패: ${dbError.message}`);
+      if (dbError) {
+        console.error('🔥 [DEBUG] DB 업데이트 실패:', dbError);
+        throw new Error(`DB Error: ${dbError.message}`);
+      } else if (bookingData) {
+        console.log('✅ [DEBUG] DB 상태 업데이트 완료!');
 
-      // 4. 알림 및 메일 발송
-      if (bookingData) {
         const hostId = bookingData.experiences?.host_id;
         const expTitle = bookingData.experiences?.title;
         const guestName = bookingData.contact_name || '게스트';
 
         if (hostId) {
-          // (A) 알림 저장
-          await supabase.from('notifications').insert({
+          // 5. 알림 저장 (직접 수행)
+          console.log('⏳ [DEBUG] 알림 저장 시도...');
+          const { error: notiError } = await supabase.from('notifications').insert({
             user_id: hostId,
             type: 'new_booking',
             title: '🎉 새로운 예약 도착!',
@@ -68,47 +92,70 @@ export async function POST(request: Request) {
             link: '/host/dashboard',
             is_read: false
           });
-
-          // (B) 메일 발송 (호스트 정보 조회)
-          const { data: hostData } = await supabase.auth.admin.getUserById(hostId);
-          const { data: profileData } = await supabase.from('profiles').select('email').eq('id', hostId).single();
           
-          // 프로필 or Auth에서 이메일 확보
-          const hostEmail = profileData?.email || hostData?.user?.email;
+          if (notiError) console.error('🔥 [DEBUG] 알림 저장 실패:', notiError);
+          else console.log('✅ [DEBUG] 알림 저장 성공!');
+          
+          // 6. 메일 발송 (직접 수행)
+          console.log('⏳ [DEBUG] 메일 발송 준비...');
+          let hostEmail = '';
+          
+          // 프로필에서 이메일 찾기
+          const { data: hostProfile } = await supabase.from('profiles').select('email').eq('id', hostId).single();
+          
+          if (hostProfile?.email) {
+            hostEmail = hostProfile.email;
+          } else {
+             // 없으면 Auth 정보 뒤지기
+             console.log('⚠️ [DEBUG] 프로필에 이메일 없음. Auth User 조회...');
+             const { data: authData } = await supabase.auth.admin.getUserById(hostId);
+             if (authData?.user?.email) hostEmail = authData.user.email;
+          }
 
           if (hostEmail) {
-            const transporter = nodemailer.createTransport({
-              service: 'gmail',
-              auth: {
-                user: process.env.GMAIL_USER,
-                pass: process.env.GMAIL_APP_PASSWORD,
-              },
-            });
-
-            await transporter.sendMail({
-              from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-              to: hostEmail,
-              subject: `[Locally] 🎉 새로운 예약 확정: ${expTitle}`,
-              html: `
-                <h2>새로운 예약이 들어왔습니다!</h2>
-                <p>게스트: ${guestName}</p>
-                <p>체험: ${expTitle}</p>
-                <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard">호스트 대시보드 바로가기</a>
-              `
-            });
+            try {
+              const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+              });
+              
+              await transporter.sendMail({
+                from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+                to: hostEmail,
+                subject: `[Locally] 🎉 새로운 예약이 도착했습니다!`,
+                html: `
+                  <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2>Locally 예약 알림 🔔</h2>
+                    <p>호스트님! <b>[${expTitle}]</b> 체험에 <b>${guestName}</b>님의 예약이 확정되었습니다.</p>
+                    <p>지금 바로 대시보드에서 확인해보세요.</p>
+                    <br/>
+                    <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard" style="background: black; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">확인하기</a>
+                  </div>
+                `,
+              });
+              console.log(`🚀 [DEBUG] 메일 발송 성공! (${hostEmail})`);
+            } catch (mailError: any) {
+              console.error('🔥 [DEBUG] 메일 발송 실패 (Nodemailer 에러):', mailError);
+            }
+          } else {
+            console.error('🔥 [DEBUG] 호스트 이메일을 도저히 찾을 수 없음');
           }
         }
       }
 
-      // 성공 응답
+      // 7. 성공 응답 (클라이언트가 200 OK를 받아야 성공 처리함)
+      console.log('✅ [DEBUG] 모든 처리 완료. 성공 응답 반환.');
       return NextResponse.json({ success: true });
+
     } else {
-      throw new Error(`결제 실패 (PG사 응답코드: ${resCode})`);
+      // resCode가 0000이 아닐 때
+      console.log(`⚠️ [DEBUG] 결제 실패 처리 (코드: ${resCode})`);
+      throw new Error(`PG사 응답코드 실패: ${resCode}`);
     }
 
-  } catch (error: any) {
-    console.error('🔥 결제 처리 중 에러 발생:', error.message);
-    // 🟢 [핵심] 리다이렉트 대신 에러 내용을 JSON으로 보냄 (클라이언트가 alert 띄우게)
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (err: any) {
+    console.error('🔥 [DEBUG] 알 수 없는 시스템 에러:', err.message);
+    // 🟢 [핵심] 에러 내용을 JSON으로 보내서 클라이언트가 alert를 띄울 수 있게 함
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
