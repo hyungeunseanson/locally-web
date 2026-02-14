@@ -5,7 +5,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useNotification } from '@/app/context/NotificationContext';
 import { 
   Bell, Check, Trash2, Calendar, MessageSquare, 
-  Info, AlertTriangle, ChevronRight, X 
+  Info, AlertTriangle, ChevronRight 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -20,7 +20,6 @@ export default function NotificationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // 🟢 [핵심 수정] 예약 정보 직접 가져와서 알림과 합치기
   useEffect(() => {
     const fetchCombinedNotifications = async () => {
       setIsLoading(true);
@@ -31,15 +30,14 @@ export default function NotificationsPage() {
         return;
       }
 
-      // 1. 기존 알림 가져오기 (DB notifications 테이블)
+      // 1. 기존 알림 가져오기
       const { data: dbNotis } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      // 2. 예약 정보 가져오기 (호스트 대시보드 로직 이식)
-      // -> 알림 테이블에 저장이 안 됐어도, 예약 테이블에는 있으니까 이걸 가져와서 보여줍니다.
+      // 2. 예약 정보 가져오기
       const { data: bookings } = await supabase
         .from('bookings')
         .select(`
@@ -49,28 +47,27 @@ export default function NotificationsPage() {
           experiences!inner ( title, host_id ),
           guest:profiles!bookings_user_id_fkey ( full_name )
         `)
-        .eq('experiences.host_id', user.id) // 내가 호스트인 예약만
-        .neq('status', 'PENDING') // 결제 대기중인 건 제외
+        .eq('experiences.host_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
-      // 3. 예약 데이터를 '알림 형식'으로 변환 (Virtual Notification)
+      // 3. 예약 데이터를 '알림 형식'으로 변환
       const bookingNotis = (bookings || []).map((booking: any) => {
+        // 🟢 [수정] 상태 구분 없이 무조건 "예약 확정"으로 표시 (즉시 예약 정책 반영)
         return {
-          id: `booking-${booking.id}`, // 고유 ID 생성 (문자열)
+          id: `booking-${booking.id}`,
           user_id: user.id,
-          type: 'booking_created', 
-          title: '🎉 새로운 예약이 도착했습니다!',
-          message: `[${booking.experiences?.title}] 체험에 ${booking.guest?.full_name || '게스트'}님의 예약이 확정되었습니다.`,
+          type: 'booking_created', // 아이콘 통일
+          title: '🎉 새로운 예약이 도착했습니다!', // 제목 통일
+          message: `[${booking.experiences?.title}] 체험에 ${booking.guest?.full_name || '게스트'}님의 예약이 확정되었습니다.`, // 메시지 통일
           link: '/host/dashboard',
-          is_read: false, // 일단 안 읽음으로 표시 (강조)
+          is_read: false,
           created_at: booking.created_at,
-          is_virtual: true // 가짜 알림임을 표시 (삭제 시 구분용)
+          is_virtual: true
         };
       });
 
-      // 4. 두 리스트 합치기 & 날짜순 정렬
-      // (기존 알림 + 예약 기반 가짜 알림)
+      // 4. 합치기 & 정렬
       const combined = [
         ...(dbNotis || []),
         ...bookingNotis
@@ -81,17 +78,13 @@ export default function NotificationsPage() {
     };
 
     fetchCombinedNotifications();
-  }, [notifications]); // 컨텍스트 알림이 바뀌면 재실행
+  }, [notifications]);
 
-  // 알림 삭제 함수
   const deleteNotification = async (id: any) => {
-    // 가짜 알림(예약 데이터 기반)은 DB에 없으므로 삭제 흉내만 냄 (UI 제거)
     if (String(id).startsWith('booking-')) {
       setLocalNotifications(prev => prev.filter(n => n.id !== id));
       return;
     }
-
-    // 진짜 알림은 DB에서 삭제
     setLocalNotifications(prev => prev.filter(n => n.id !== id));
     try {
       await supabase.from('notifications').delete().eq('id', id);
@@ -100,9 +93,7 @@ export default function NotificationsPage() {
     }
   };
 
-  // 알림 클릭 핸들러
   const handleNotificationClick = async (noti: any) => {
-    // 가짜 알림은 DB 업데이트 불가능하므로 스킵
     if (!noti.is_read && !noti.is_virtual) {
       await markAsRead(noti.id);
     }
