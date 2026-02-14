@@ -203,7 +203,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
         const targetLink = currentUser.id === currentInquiry.host_id 
           ? '/guest/inbox'            
-          : '/host/dashboard?tab=chat';
+          : '/host/dashboard?tab=inquiries';
 
         const senderName = currentUser.user_metadata?.full_name || '상대방';
 

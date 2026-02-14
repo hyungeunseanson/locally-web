@@ -244,15 +244,6 @@ const finalAmount = hostPrice + guestFee;
                   placeholder="010-0000-0000"
                 />
             </div>
-            <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">호스트에게 남길 메시지 (선택)</label>
-                <textarea 
-                  value={message} 
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors h-20 resize-none"
-                  placeholder="특이사항이나 요청사항이 있다면 적어주세요."
-                />
-            </div>
           </div>
 
           <div className="px-2 space-y-2 mb-8 text-sm">
