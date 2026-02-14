@@ -155,7 +155,7 @@ export default function SiteFooter() {
               </button>
 
               <span className="hidden md:inline mx-1">·</span>
-              <Link href="#" className="hover:underline hover:text-black transition-colors">
+              <Link href="/sitemap" className="hover:underline hover:text-black transition-colors">
                 사이트맵
               </Link>
             </div>
