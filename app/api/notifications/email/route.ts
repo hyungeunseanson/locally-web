@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
+    // 1. 관리자 권한으로 DB 접속 (수신자 이메일 조회용)
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Recipient ID is required' }, { status: 400 });
     }
 
+    // 2. 수신자 정보 조회
     const { data: userProfile, error: userError } = await supabase
       .from('profiles')
       .select('email, full_name')
@@ -26,6 +28,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User email not found' }, { status: 404 });
     }
 
+    // 3. Nodemailer 설정
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -34,6 +37,7 @@ export async function POST(request: Request) {
       },
     });
 
+    // 4. 발송
     await transporter.sendMail({
       from: `"Locally Team" <${process.env.GMAIL_USER}>`,
       to: userProfile.email,
@@ -48,11 +52,11 @@ export async function POST(request: Request) {
       `,
     });
 
-    console.log(`📧 Email sent to ${userProfile.email}`);
+    console.log(`✅ 이메일 발송 성공: ${userProfile.email}`);
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error('❌ Email API Error:', error);
+    console.error('❌ 이메일 API 에러:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
