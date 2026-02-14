@@ -12,6 +12,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import Skeleton from '@/app/components/ui/Skeleton';
 
 export default function NotificationsPage() {
+  // Context에서 전역 상태를 가져옴 (여기가 핵심!)
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [localNotifications, setLocalNotifications] = useState<any[]>([]);
@@ -20,72 +21,15 @@ export default function NotificationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // 🟢 [정석] Context 데이터와 동기화
   useEffect(() => {
-    const fetchCombinedNotifications = async () => {
-      setIsLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
-
-      // 1. 기존 알림 가져오기
-      const { data: dbNotis } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      // 2. 예약 정보 가져오기
-      const { data: bookings } = await supabase
-        .from('bookings')
-        .select(`
-          id,
-          created_at,
-          status,
-          experiences!inner ( title, host_id ),
-          guest:profiles!bookings_user_id_fkey ( full_name )
-        `)
-        .eq('experiences.host_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      // 3. 예약 데이터를 '알림 형식'으로 변환
-      const bookingNotis = (bookings || []).map((booking: any) => {
-        // 🟢 [수정] 상태 구분 없이 무조건 "예약 확정"으로 표시 (즉시 예약 정책 반영)
-        return {
-          id: `booking-${booking.id}`,
-          user_id: user.id,
-          type: 'booking_created', // 아이콘 통일
-          title: '🎉 새로운 예약이 도착했습니다!', // 제목 통일
-          message: `[${booking.experiences?.title}] 체험에 ${booking.guest?.full_name || '게스트'}님의 예약이 확정되었습니다.`, // 메시지 통일
-          link: '/host/dashboard',
-          is_read: false,
-          created_at: booking.created_at,
-          is_virtual: true
-        };
-      });
-
-      // 4. 합치기 & 정렬
-      const combined = [
-        ...(dbNotis || []),
-        ...bookingNotis
-      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      setLocalNotifications(combined);
-      setIsLoading(false);
-    };
-
-    fetchCombinedNotifications();
+    setLocalNotifications(notifications);
+    setIsLoading(false);
   }, [notifications]);
 
-  const deleteNotification = async (id: any) => {
-    if (String(id).startsWith('booking-')) {
-      setLocalNotifications(prev => prev.filter(n => n.id !== id));
-      return;
-    }
-    setLocalNotifications(prev => prev.filter(n => n.id !== id));
+  // 🟢 [정석] DB에서 진짜로 삭제
+  const deleteNotification = async (id: number) => {
+    setLocalNotifications(prev => prev.filter(n => n.id !== id)); // UI 즉시 반영
     try {
       await supabase.from('notifications').delete().eq('id', id);
     } catch (error) {
@@ -94,7 +38,7 @@ export default function NotificationsPage() {
   };
 
   const handleNotificationClick = async (noti: any) => {
-    if (!noti.is_read && !noti.is_virtual) {
+    if (!noti.is_read) {
       await markAsRead(noti.id);
     }
     if (noti.link) {
