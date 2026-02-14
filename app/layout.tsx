@@ -6,25 +6,25 @@ import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
-import Script from "next/script"; // 외부 스크립트 에러 방지용
+import Script from "next/script"; // 🟢 Script 컴포넌트 사용
 
 const inter = Inter({ subsets: ["latin"] });
 
-// 🟢 [SEO 최적화] 메타데이터 강화
+// 🟢 [SEO 최적화] 메타데이터 (기존 내용 유지)
 export const metadata: Metadata = {
   title: {
     template: '%s | Locally',
-    default: 'Locally - 현지인과 함께하는 특별한 여행', // 기본 제목
+    default: 'Locally - 현지인과 함께하는 특별한 여행',
   },
   description: "현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요. 현지인처럼 여행하고 싶다면 현지인과 함께.",
   openGraph: {
     title: 'Locally - 현지인과 함께하는 특별한 여행',
     description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
-    url: 'https://locally.vercel.app', // 실제 배포 주소로 변경 권장
+    url: 'https://locally.vercel.app',
     siteName: '로컬리 Locally',
     images: [
       {
-        url: 'https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png', // 대표 이미지 (오픈 그래프)
+        url: 'https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png',
         width: 1200,
         height: 630,
         alt: 'Locally Hero Image',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Locally - 현지인과 함께하는 특별한 여행',
     description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
-    images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'], // 트위터용 이미지
+    images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'],
   },
   keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', 'Locally'],
 };
@@ -49,16 +49,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning={true}>
-      <head>
-        {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
-          <script 
-            type="text/javascript" 
-            src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer`}
-          ></script>
-        )}
-      </head>
+      {/* 🔴 [삭제됨] <head> 태그 내의 script 태그가 에러의 원인이었으므로 제거했습니다. */}
+      
       <body className={inter.className}>
-        {/* Provider 순서: Toast(최상위) -> Notification -> Language */}
+        {/* 🟢 [수정됨] Next.js 전용 Script 컴포넌트로 교체 (에러 해결 핵심) */}
+        {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
+          <Script 
+            src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
+            strategy="beforeInteractive" 
+          />
+        )}
+
         <ToastProvider>
           <NotificationProvider>
             <LanguageProvider>
