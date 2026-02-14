@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 export async function POST(request: Request) {
   try {
     // 1. 관리자 권한으로 DB 접속 (받는 사람 이메일 조회용)
+    // .env.local에 SUPABASE_SERVICE_ROLE_KEY가 반드시 있어야 합니다.
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Recipient ID is required' }, { status: 400 });
     }
 
-    // 3. 수신자(호스트) 이메일 조회
+    // 3. 수신자(호스트/게스트) 이메일 조회
     const { data: userProfile, error: userError } = await supabase
       .from('profiles')
       .select('email, full_name')
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     }
 
     // 4. Nodemailer 전송 설정
+    // .env.local에 GMAIL_USER, GMAIL_APP_PASSWORD가 있어야 합니다.
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
