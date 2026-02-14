@@ -7,72 +7,92 @@ import { ArrowUpRight } from 'lucide-react';
 const NEWS_ITEMS = [
   {
     id: 1,
-    tag: 'PRESS',
-    title: '로컬리, 시리즈 A 투자 유치 성공... 글로벌 확장 가속화',
-    source: '한국경제',
+    source: 'TechCrunch',
+    title: 'Locally secures Series A funding to expand hyper-local experiences globally.',
     date: '2026.02.14'
   },
   {
     id: 2,
-    tag: 'INTERVIEW',
-    title: '"여행은 살아보는 것" 로컬리 CEO가 말하는 여행의 미래',
-    source: '매일경제',
+    source: 'The Korea Economic Daily',
+    title: '로컬리, "여행은 살아보는 것"... 현지 체험 시장의 새로운 유니콘',
     date: '2026.01.28'
   },
   {
     id: 3,
-    tag: 'UPDATE',
-    title: '로컬리 앱 3.0 업데이트: AI 기반 맞춤형 여행 추천 기능 도입',
-    source: 'Locally Blog',
+    source: 'Fast Company',
+    title: 'How Locally is using AI to curate perfect travel itineraries.',
     date: '2026.01.10'
   },
   {
     id: 4,
-    tag: 'CAMPAIGN',
-    title: '로컬리 X 서울관광재단, "서울의 숨은 매력 찾기" 캠페인 성료',
-    source: '여행신문',
+    source: 'Maeil Business',
+    title: '서울관광재단 X 로컬리, 골목상권 활성화 캠페인 성료',
     date: '2025.12.20'
   }
 ];
 
 export default function NewsPage() {
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900">
+    <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
       
-      <div className="max-w-3xl mx-auto px-6 py-16">
-        <h1 className="text-2xl font-bold mb-2">뉴스룸</h1>
-        <p className="text-slate-500 text-sm mb-10">Locally의 언론 보도와 소식을 전해드립니다.</p>
-        
-        <div className="border-t border-slate-200">
+      <main className="max-w-[1040px] mx-auto px-6 py-24">
+        {/* 헤더 */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-24 border-b border-black pb-8">
+          <div>
+            <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-2">
+              Newsroom
+            </h1>
+          </div>
+          <p className="text-right text-[#717171] font-medium mt-4 md:mt-0">
+            Press & Media Coverage
+          </p>
+        </div>
+
+        {/* 뉴스 리스트 */}
+        <div className="flex flex-col">
           {NEWS_ITEMS.map((item) => (
             <a 
               key={item.id} 
               href="#" 
-              className="group block border-b border-slate-100 py-6 hover:bg-slate-50 transition-colors px-3 -mx-3 rounded-lg"
+              className="group py-12 border-b border-[#EBEBEB] hover:border-black transition-colors duration-300 block"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-wide">
-                      {item.tag}
-                    </span>
-                    <span className="text-xs text-slate-400">{item.date}</span>
-                  </div>
-                  <h3 className="text-lg font-medium text-slate-800 group-hover:text-black group-hover:underline decoration-1 underline-offset-4 mb-1">
-                    {item.title}
-                  </h3>
-                  <span className="text-xs text-slate-400">{item.source}</span>
-                </div>
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                 
-                <div className="text-slate-300 group-hover:text-black transition-colors mt-1">
-                  <ArrowUpRight size={18} />
+                {/* 내용 영역 */}
+                <div className="flex-1 max-w-3xl">
+                  <div className="flex items-center gap-3 mb-3 text-sm font-bold tracking-widest uppercase">
+                    <span className="text-black">{item.source}</span>
+                    <span className="w-1 h-1 bg-[#DDDDDD] rounded-full"></span>
+                    <span className="text-[#999999] font-medium">{item.date}</span>
+                  </div>
+                  
+                  <h2 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight group-hover:text-[#484848] transition-colors">
+                    {item.title}
+                  </h2>
+                </div>
+
+                {/* 화살표 아이콘 (호버 시 움직임) */}
+                <div className="mt-2 md:mt-0">
+                  <div className="w-12 h-12 rounded-full border border-[#DDDDDD] flex items-center justify-center group-hover:bg-black group-hover:border-black transition-all duration-300">
+                    <ArrowUpRight 
+                      size={24} 
+                      className="text-black group-hover:text-white group-hover:rotate-45 transition-transform duration-300" 
+                    />
+                  </div>
                 </div>
               </div>
             </a>
           ))}
         </div>
-      </div>
+
+        {/* 하단 더보기 버튼 */}
+        <div className="mt-20 text-center">
+          <button className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-[#717171] transition-colors uppercase tracking-widest">
+            Load More News
+          </button>
+        </div>
+      </main>
     </div>
   );
 }
