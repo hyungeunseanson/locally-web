@@ -4,36 +4,42 @@ import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
+    // 1. 데이터 파싱
     let resCode: any = '';
-    let amount: any = 0;
     let orderId: any = '';
     let tid: any = '';
-
-    const contentType = request.headers.get('content-type') || '';
     
+    // 나이스페이/포트원 데이터 수신
+    const contentType = request.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       const json = await request.json();
-      resCode = json.success ? '0000' : '9999'; 
-      amount = json.paid_amount;
-      orderId = json.merchant_uid;
-      tid = json.pg_tid;
+      resCode = json.success ? '0000' : '9999';
+      // 포트원 V1/V2 호환성 처리
+      orderId = json.merchant_uid || json.orderId;
+      tid = json.pg_tid || json.imp_uid;
     } else {
       const formData = await request.formData();
-      resCode = formData.get('resCode') || '0000'; 
-      amount = formData.get('amt');
+      resCode = formData.get('resCode') || '0000';
       orderId = formData.get('moid');
       tid = formData.get('tid');
     }
 
-    if (resCode === '0000') { 
-      // 관리자 권한 DB 접속 (Vercel 환경변수 필수)
+    // 2. 환경변수 체크 (가장 흔한 에러 원인)
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('서버 환경변수 누락: SUPABASE_SERVICE_ROLE_KEY');
+    }
+    if (!process.env.GMAIL_APP_PASSWORD) {
+      throw new Error('서버 환경변수 누락: GMAIL_APP_PASSWORD');
+    }
+
+    if (resCode === '0000') {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY! 
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
-      
-      // 결제 완료(PAID) 업데이트
-      const { data: bookingData, error } = await supabase
+
+      // 3. 예약 상태 업데이트
+      const { data: bookingData, error: dbError } = await supabase
         .from('bookings')
         .update({
           status: 'PAID',
@@ -41,19 +47,19 @@ export async function POST(request: Request) {
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
-        .select(`*, experiences (host_id, title)`).single();
+        .select('*, experiences(host_id, title)')
+        .single();
 
-      if (error) {
-        console.error('DB Update Error:', error);
-        // 에러가 나도 결제 취소는 아니므로 500 리턴하고 종료
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      } else if (bookingData) {
+      if (dbError) throw new Error(`DB 업데이트 실패: ${dbError.message}`);
+
+      // 4. 알림 및 메일 발송
+      if (bookingData) {
         const hostId = bookingData.experiences?.host_id;
         const expTitle = bookingData.experiences?.title;
         const guestName = bookingData.contact_name || '게스트';
 
         if (hostId) {
-          // 1. 앱 알림 저장 (무조건 실행)
+          // (A) 알림 저장
           await supabase.from('notifications').insert({
             user_id: hostId,
             type: 'new_booking',
@@ -62,60 +68,47 @@ export async function POST(request: Request) {
             link: '/host/dashboard',
             is_read: false
           });
+
+          // (B) 메일 발송 (호스트 정보 조회)
+          const { data: hostData } = await supabase.auth.admin.getUserById(hostId);
+          const { data: profileData } = await supabase.from('profiles').select('email').eq('id', hostId).single();
           
-          // 2. 이메일 발송 (실패해도 서버 죽지 않도록 방어)
-          try {
-            const { data: hostProfile } = await supabase
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', hostId)
-              .single();
+          // 프로필 or Auth에서 이메일 확보
+          const hostEmail = profileData?.email || hostData?.user?.email;
 
-            if (hostProfile?.email) {
-              const transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                  user: process.env.GMAIL_USER,
-                  pass: process.env.GMAIL_APP_PASSWORD,
-                },
-              });
+          if (hostEmail) {
+            const transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: {
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_APP_PASSWORD,
+              },
+            });
 
-              await transporter.sendMail({
-                from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-                to: hostProfile.email,
-                subject: `[Locally] 🎉 새로운 예약이 도착했습니다!`,
-                html: `
-                  <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                    <h2>Locally 알림 🔔</h2>
-                    <p>안녕하세요, <b>${hostProfile.full_name || '호스트'}</b>님!</p>
-                    <p>[${expTitle}] 체험에 <b>${guestName}</b>님의 예약이 확정되었습니다.</p>
-                    <br/>
-                    <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard" style="background: black; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">대시보드 확인</a>
-                  </div>
-                `,
-              });
-              console.log('📧 예약 메일 발송 성공');
-            }
-          } catch (mailError) {
-            console.error('⚠️ 이메일 발송 실패 (알림은 저장됨):', mailError);
-            // 메일 실패해도 코드는 계속 진행됨
+            await transporter.sendMail({
+              from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+              to: hostEmail,
+              subject: `[Locally] 🎉 새로운 예약 확정: ${expTitle}`,
+              html: `
+                <h2>새로운 예약이 들어왔습니다!</h2>
+                <p>게스트: ${guestName}</p>
+                <p>체험: ${expTitle}</p>
+                <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard">호스트 대시보드 바로가기</a>
+              `
+            });
           }
         }
       }
 
-      if (contentType.includes('application/json')) {
-        return NextResponse.json({ success: true });
-      } else {
-        return NextResponse.redirect(
-          new URL(`/payment/success?orderId=${orderId}&amount=${amount}`, request.url), 
-          303
-        );
-      }
+      // 성공 응답
+      return NextResponse.json({ success: true });
     } else {
-      return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
+      throw new Error(`결제 실패 (PG사 응답코드: ${resCode})`);
     }
-  } catch (err) {
-    console.error('Callback Fatal Error:', err);
-    return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
+
+  } catch (error: any) {
+    console.error('🔥 결제 처리 중 에러 발생:', error.message);
+    // 🟢 [핵심] 리다이렉트 대신 에러 내용을 JSON으로 보냄 (클라이언트가 alert 띄우게)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

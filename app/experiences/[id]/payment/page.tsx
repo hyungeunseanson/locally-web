@@ -51,6 +51,7 @@ function PaymentContent() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // 🟢 [수정] name 컬럼이 없을 수 있으므로 full_name 사용
         const { data: profile } = await supabase.from('profiles').select('full_name, phone').eq('id', user.id).single();
         if (profile) {
           setCustomerName(profile.full_name || '');
@@ -138,19 +139,30 @@ function PaymentContent() {
 
         if (isSuccess) {
            try {
-             // 2. 서버 검증 요청
-             await fetch('/api/payment/nicepay-callback', {
+             // 🟢 [핵심] 서버에 처리 요청 (fetch)
+             const response = await fetch('/api/payment/nicepay-callback', {
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify(rsp),
              });
 
-             // 🟢 [완료 페이지 이동]
-             window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
-             
-           } catch (err) {
+             const result = await response.json();
+
+             // 🟢 [핵심] 서버가 에러를 뱉었는지 확인 (여기가 추가됨!)
+             if (!response.ok || !result.success) {
+               // 실패 시 경고창 띄우기
+               alert(`⚠️ 결제는 완료되었으나 처리 중 오류가 발생했습니다.\n오류 내용: ${result.error || '알 수 없는 서버 오류'}\n\n관리자에게 문의해주세요.`);
+               // 그래도 일단 완료 페이지로는 이동 (돈은 냈으니까)
+               window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
+             } else {
+               // 완벽 성공
+               window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
+             }
+
+           } catch (err: any) {
              console.error('검증 에러 무시하고 이동:', err);
-             // 서버 에러가 나도 이미 결제는 되었으므로 이동
+             // 네트워크 에러 시에도 일단 이동
+             alert(`⚠️ 네트워크 통신 오류가 발생했습니다.\n내용: ${err.message}`);
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
            }
         } else {
