@@ -59,7 +59,6 @@ const { data: bookingData, error: dbError } = await supabase
 .update({
   status: 'PAID',
   tid: tid, // 🟢 TID 저장 복구
-  updated_at: new Date().toISOString() // 🟢 (선택) updated_at도 컬럼이 있다면 추가
 })
         .eq('id', orderId)
         .select(`*, experiences (host_id, title)`)
