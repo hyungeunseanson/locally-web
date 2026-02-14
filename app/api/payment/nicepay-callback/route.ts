@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     let amount: any = 0;
     let orderId: any = '';
     let rawJson: any = {};
+    let tid: any = '';
 
     const contentType = request.headers.get('content-type') || '';
     
@@ -34,11 +35,13 @@ export async function POST(request: Request) {
       resCode = isSuccess ? '0000' : '9999';
       amount = json.paid_amount || json.amount;
       orderId = json.merchant_uid || json.orderId;
+      tid = json.pg_tid || json.imp_uid;
     } else {
       const formData = await request.formData();
       resCode = formData.get('resCode') || '0000'; 
       amount = formData.get('amt');
       orderId = formData.get('moid');
+      tid = formData.get('tid');
     }
 
     console.log(`🔍 [DEBUG] 주문ID: ${orderId}, 코드: ${resCode}`);
@@ -50,14 +53,14 @@ export async function POST(request: Request) {
       // 4. 예약 상태 업데이트 (PAID)
       console.log('⏳ [DEBUG] DB 상태 업데이트 시도 (Only Status)...');
       
-      // 🟢 [최종 수정] 에러 유발하는 tid, updated_at 모두 제거하고 status만 업데이트
-      const { data: bookingData, error: dbError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'PAID' 
-          // updated_at 제거함 (컬럼 없음 에러 방지)
-          // tid 제거함 (컬럼 없음 에러 방지)
-        })
+// 🟢 [수정] 이제 TID도 함께 저장합니다!
+const { data: bookingData, error: dbError } = await supabase
+.from('bookings')
+.update({
+  status: 'PAID',
+  tid: tid, // 🟢 TID 저장 복구
+  updated_at: new Date().toISOString() // 🟢 (선택) updated_at도 컬럼이 있다면 추가
+})
         .eq('id', orderId)
         .select(`*, experiences (host_id, title)`)
         .single();

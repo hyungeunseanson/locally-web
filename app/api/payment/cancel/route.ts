@@ -1,8 +1,8 @@
-import { createClient } from '@supabase/supabase-js'; // ✅ 500 에러 잡는 핵심 (ssr 대신 이거 사용)
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  console.log('🚨 [Cancel API] 정석 취소 로직 실행 (PG사 연동)');
+  console.log('🚨 [Cancel API] 스마트 취소 로직 실행');
 
   try {
     // 1. 환경변수 체크
@@ -14,11 +14,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
     }
 
-    // 2. 요청 데이터 파싱
+    // 2. 데이터 파싱
     const { bookingId, reason } = await request.json();
     console.log(`🔍 [Cancel API] 요청 ID: ${bookingId}, 사유: ${reason}`);
 
-    // 3. 관리자 권한 DB 접속 (쿠키 인증 제거 -> 500 에러 원천 차단)
+    // 3. 관리자 권한 DB 접속
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // 4. 예약 정보 조회
@@ -33,22 +33,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 5. TID 유효성 검사 (강제 실행 로직 삭제함 -> 정석대로 검사)
+    // 5. TID 확인 및 처리
+    // (A) TID가 없는 경우 (구버전 데이터) -> DB만 취소 처리
     if (!booking.tid) {
-      console.error('⚠️ [Cancel API] 실패: TID(결제번호)가 없습니다.');
-      // 500 에러가 아니라 '400'을 리턴하여 클라이언트가 "실패"임을 알게 함
-      return NextResponse.json({ error: '결제 번호(TID)가 없어 취소할 수 없습니다.' }, { status: 400 });
+      console.warn('⚠️ TID 없음. PG사 연동 건너뛰고 DB 상태만 변경합니다.');
+      
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'cancelled', 
+          cancelled_at: new Date().toISOString() 
+        })
+        .eq('id', bookingId);
+        
+      if (updateError) {
+        return NextResponse.json({ error: 'DB 업데이트 실패' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, message: 'TID 없이 취소 처리됨 (수동 환불 필요)' });
     }
 
-    // 6. 나이스페이 취소 요청 (정석 로직 복구)
-    console.log(`⏳ [Cancel API] 나이스페이로 취소 요청 전송 (TID: ${booking.tid})`);
-    
+    // (B) TID가 있는 경우 (정상 데이터) -> 나이스페이 취소 요청
+    console.log(`⏳ 나이스페이 환불 요청 (TID: ${booking.tid})`);
+
     const formBody = new URLSearchParams({
       TID: booking.tid,
-      MID: process.env.NICEPAY_MID || 'nicepay00m', // 환경변수 없으면 테스트 ID
+      MID: process.env.NICEPAY_MID || 'nicepay00m',
       Moid: booking.order_id,
       CancelAmt: booking.amount.toString(),
-      CancelMsg: reason || '호스트 승인에 의한 취소',
+      CancelMsg: reason || '호스트 승인 취소',
       PartialCancelCode: '0', 
     });
 
@@ -61,27 +74,19 @@ export async function POST(request: Request) {
     const niceData = await niceRes.text();
     console.log('📝 [Cancel API] 나이스페이 응답:', niceData);
 
-    // 7. 결과 처리 (2001:성공, 2211:이미취소됨)
+    // 결과 처리 (2001: 성공, 2211: 이미 취소됨)
     if (niceData.includes('"ResultCode":"2001"') || niceData.includes('ResultCode=2001') || niceData.includes('2211')) {
-      console.log('✅ [Cancel API] PG사 취소 성공! DB 업데이트 진행.');
+      console.log('✅ [Cancel API] 환불 성공! DB 업데이트.');
       
-      const { error: finalError } = await supabase
+      await supabase
         .from('bookings')
-        .update({ 
-          status: 'cancelled', 
-          cancelled_at: new Date().toISOString() 
-        })
+        .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
         .eq('id', bookingId);
-        
-      if (finalError) {
-        console.error('🔥 [Cancel API] DB 업데이트 실패:', finalError);
-        return NextResponse.json({ error: '취소는 됐으나 DB 반영 실패' }, { status: 500 });
-      }
       
       return NextResponse.json({ success: true });
     } else {
-      console.error('🔥 [Cancel API] PG사 취소 실패');
-      return NextResponse.json({ error: 'PG사에서 취소를 거절했습니다.', details: niceData }, { status: 400 });
+      console.error('🔥 [Cancel API] 환불 실패');
+      return NextResponse.json({ error: 'PG사 환불 실패', details: niceData }, { status: 400 });
     }
 
   } catch (error: any) {

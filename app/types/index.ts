@@ -32,3 +32,20 @@ export interface Experience {
     phone?: string;
     role?: string;
   }
+
+  // 👇 새로 추가: Booking 인터페이스
+export interface Booking {
+  id: string;
+  order_id: string;
+  tid?: string; // 🟢 결제 고유 번호 (환불 필수)
+  user_id: string;
+  experience_id: number;
+  amount: number;
+  total_price: number;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'PAID';
+  guests: number;
+  date: string;
+  time: string;
+  created_at: string;
+  user_email?: string; // 조인된 데이터용
+}

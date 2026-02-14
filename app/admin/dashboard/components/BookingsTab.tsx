@@ -150,8 +150,17 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                   <span>총 결제금액</span>
                   <span className="text-rose-600">₩{Number(selectedBooking.total_price).toLocaleString()}</span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                  <CreditCard size={12}/> 카드 결제 (************1234)
+                
+                {/* 🟢 TID 표시 추가 */}
+                <div className="mt-3 flex flex-col gap-1 text-xs text-slate-500">
+                  <div className="flex items-center gap-2">
+                    <CreditCard size={12}/> 카드 결제
+                  </div>
+                  {selectedBooking.tid ? (
+                    <div className="font-mono text-slate-400">TID: {selectedBooking.tid}</div>
+                  ) : (
+                    <div className="text-red-400 font-bold">⚠️ TID 없음 (자동환불 불가)</div>
+                  )}
                 </div>
               </div>
             </div>
