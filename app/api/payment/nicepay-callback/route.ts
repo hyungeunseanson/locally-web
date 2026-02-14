@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer'; // 🟢 직접 발송을 위해 임포트
+import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
@@ -27,13 +27,19 @@ export async function POST(request: Request) {
     }
 
     if (resCode === '0000') { 
-      // 🟢 [관리자 권한] DB 접속
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY! 
-      );
+      // 🟢 관리자 권한 DB 접속 (환경변수 체크)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      if (!supabaseUrl || !serviceRoleKey) {
+        console.error('❌ [Nicepay] 환경변수 누락. 알림 실패.');
+        // 결제는 성공 처리하되 알림은 못 보냄 (로그 확인용)
+        return NextResponse.redirect(new URL(`/payment/success?orderId=${orderId}&amount=${amount}`, request.url), 303);
+      }
+
+      const supabase = createClient(supabaseUrl, serviceRoleKey);
       
-      // 🟢 2. 결제 상태 업데이트 (PAID)
+      // 2. 결제 상태 업데이트 (PAID)
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .update({
@@ -42,24 +48,17 @@ export async function POST(request: Request) {
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
-        .select(`
-          *,
-          experiences (
-            host_id,
-            title
-          )
-        `)
-        .single();
+        .select(`*, experiences (host_id, title)`).single();
 
       if (error) {
-        console.error('DB 업데이트 에러:', error);
+        console.error('❌ [Nicepay] DB 업데이트 에러:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       } else if (bookingData) {
         const hostId = bookingData.experiences?.host_id;
         const expTitle = bookingData.experiences?.title;
         const guestName = bookingData.contact_name || '게스트';
 
-        // 🟢 3. [알림] 앱 내 알림 저장 (DB Insert)
+        // 3. [알림] 앱 내 알림 저장
         if (hostId) {
           await supabase.from('notifications').insert({
             user_id: hostId,
@@ -70,8 +69,10 @@ export async function POST(request: Request) {
             is_read: false
           });
           
-          // 🟢 4. [메일] 이메일 직접 발송 (fetch 아님!)
-          // 호스트 이메일 조회
+          // 4. [메일] 이메일 직접 발송 (비상 로직 포함)
+          let hostEmail = '';
+          
+          // (A) 프로필 조회
           const { data: hostProfile } = await supabase
             .from('profiles')
             .select('email, full_name')
@@ -79,6 +80,15 @@ export async function POST(request: Request) {
             .single();
 
           if (hostProfile?.email) {
+            hostEmail = hostProfile.email;
+          } else {
+            // (B) Auth 정보 조회
+            console.log(`⚠️ 호스트 프로필 이메일 없음. Auth 조회: ${hostId}`);
+            const { data: authData } = await supabase.auth.admin.getUserById(hostId);
+            if (authData?.user?.email) hostEmail = authData.user.email;
+          }
+
+          if (hostEmail) {
             const transporter = nodemailer.createTransport({
               service: 'gmail',
               auth: {
@@ -87,25 +97,23 @@ export async function POST(request: Request) {
               },
             });
 
-            // await를 사용하여 발송 완료를 보장함
             await transporter.sendMail({
               from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-              to: hostProfile.email,
+              to: hostEmail,
               subject: `[Locally] 🎉 새로운 예약이 도착했습니다!`,
               html: `
                 <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
                   <h2>Locally 알림 🔔</h2>
-                  <p>안녕하세요, <b>${hostProfile.full_name || '호스트'}</b>님!</p>
+                  <p>안녕하세요!</p>
                   <p>[${expTitle}] 체험에 <b>${guestName}</b>님의 예약이 확정되었습니다.</p>
                   <br/>
-                  <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard" 
-                     style="background: black; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                    호스트 대시보드 확인하기
-                  </a>
+                  <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard" style="background: black; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">호스트 대시보드 확인하기</a>
                 </div>
               `,
             });
-            console.log(`📧 예약 알림 메일 발송 성공: ${hostProfile.email}`);
+            console.log(`📧 [Nicepay] 예약 메일 발송 성공: ${hostEmail}`);
+          } else {
+            console.error(`❌ [Nicepay] 호스트 이메일을 찾을 수 없음 (ID: ${hostId})`);
           }
         }
       }
@@ -123,7 +131,7 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
     }
   } catch (err) {
-    console.error('콜백 처리 중 오류:', err);
+    console.error('❌ [Nicepay] 콜백 처리 중 치명적 오류:', err);
     return NextResponse.redirect(new URL('/payment/fail', request.url), 303);
   }
 }
