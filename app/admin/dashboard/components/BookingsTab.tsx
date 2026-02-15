@@ -1,270 +1,355 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, User, DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, FileText, MessageCircle, X, Ban, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  CheckCircle2, XCircle, Search, Copy, Calendar, 
+  MoreHorizontal, CreditCard, Phone, MapPin, Download, 
+  TrendingUp, Mail, User, Fingerprint, ExternalLink, Code, AlertTriangle 
+} from 'lucide-react';
+import { useToast } from '@/app/context/ToastContext';
 
 export default function BookingsTab({ bookings }: { bookings: any[] }) {
+  const { showToast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'ALL' | 'UPCOMING' | 'PAST'>('ALL');
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [showRawData, setShowRawData] = useState(false); // 🟢 RAW 데이터 토글
 
-  // 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  // 1. 유효 데이터 필터링
+  const validBookings = bookings.filter(b => b.status === 'PAID' || b.status === 'confirmed' || b.status === 'CANCELLED');
 
-  // 필터링 및 정렬
-  const filteredBookings = bookings
-    .filter(b => filterStatus === 'ALL' || b.status === filterStatus)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  // 2. 검색 및 날짜 필터
+  const filteredBookings = validBookings.filter(b => {
+    const searchString = `${b.contact_name} ${b.contact_phone} ${b.experiences?.title} ${b.id} ${b.profiles?.email || ''}`.toLowerCase();
+    const matchesSearch = searchString.includes(searchTerm.toLowerCase());
+    
+    const expDate = new Date(`${b.date} ${b.time}`);
+    const now = new Date();
+    const isUpcoming = expDate >= now;
 
-  // 페이지네이션 계산
-  const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
-  const paginatedBookings = filteredBookings.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+    if (filterType === 'UPCOMING') return matchesSearch && isUpcoming;
+    if (filterType === 'PAST') return matchesSearch && !isUpcoming;
+    return matchesSearch;
+  });
 
-  // 상태 뱃지 컴포넌트
-  const StatusBadge = ({ status }: { status: string }) => {
-    switch(status) {
-      case 'confirmed': return <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded text-xs font-bold border border-green-100"><CheckCircle2 size={12}/> 예약 확정</span>;
-      case 'cancelled': return <span className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded text-xs font-bold border border-red-100"><XCircle size={12}/> 취소됨</span>;
-      case 'pending': return <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 px-2 py-1 rounded text-xs font-bold border border-yellow-100"><Clock size={12}/> 승인 대기</span>;
-      default: return <span className="text-slate-500 bg-slate-100 px-2 py-1 rounded text-xs">상태 미정</span>;
-    }
+  // 3. 정산 시뮬레이션
+  const paidBookings = validBookings.filter(b => b.status === 'PAID' || b.status === 'confirmed');
+  const stats = paidBookings.reduce((acc, b) => {
+    const guestPay = b.amount || 0;
+    const hostPrice = b.total_price || 0;
+    const platformProfit = (guestPay - hostPrice) + (hostPrice * 0.2);
+    const hostPayout = hostPrice * 0.8;
+    return {
+      gmv: acc.gmv + guestPay,
+      revenue: acc.revenue + platformProfit,
+      payout: acc.payout + hostPayout
+    };
+  }, { gmv: 0, revenue: 0, payout: 0 });
+
+  // 4. 엑셀 다운로드
+  const downloadCSV = () => {
+    const headers = ['주문번호', '예약자명', '이메일', '전화번호', '체험명', '날짜', '시간', '인원', '결제금액', '상태', '생성일'];
+    const rows = filteredBookings.map(b => [
+      b.id,
+      b.contact_name,
+      b.profiles?.email || 'N/A', // 이메일 추가
+      b.contact_phone,
+      b.experiences?.title,
+      b.date,
+      b.time,
+      b.guests,
+      b.amount,
+      b.status,
+      b.created_at
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `예약상세내역_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showToast('복사되었습니다.', 'success');
   };
 
   return (
-    <div className="flex-1 h-full flex overflow-hidden relative">
+    <div className="flex h-full gap-6">
       
-      {/* 메인 리스트 영역 */}
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${selectedBooking ? 'w-2/3 pr-4' : 'w-full'}`}>
+      {/* 🟢 왼쪽: 리스트 (요약 정보) */}
+      <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         
-        {/* 상단 요약 & 필터 */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm shrink-0">
-          <div className="flex justify-between items-end mb-6">
+        {/* 상단 통계 바 */}
+        <div className="bg-slate-900 text-white p-4 flex justify-between items-center px-6 shrink-0">
+          <div className="flex gap-8">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">예약 통합 관리</h2>
-              <p className="text-sm text-slate-500">전체 예약 내역을 모니터링하고 이슈를 처리합니다.</p>
+              <div className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">총 거래액 (GMV)</div>
+              <div className="text-xl font-black">₩{stats.gmv.toLocaleString()}</div>
             </div>
-            <div className="flex gap-2">
-              {['ALL', 'pending', 'confirmed', 'cancelled'].map(status => (
-                <button 
-                  key={status} 
-                  onClick={() => { setFilterStatus(status); setCurrentPage(1); }}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filterStatus === status ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  {status === 'ALL' ? '전체 보기' : status}
-                </button>
-              ))}
+            <div className="h-10 w-[1px] bg-slate-700 mx-2"></div>
+            <div>
+              <div className="text-[10px] text-emerald-400 font-bold uppercase mb-0.5">순매출 (Net Revenue)</div>
+              <div className="text-xl font-black text-emerald-400">₩{stats.revenue.toLocaleString()}</div>
             </div>
           </div>
-          
-          <div className="grid grid-cols-4 gap-4 text-center">
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <div className="text-[10px] text-slate-400 font-bold uppercase">총 예약액(GMV)</div>
-              <div className="text-lg font-black text-slate-900">₩{filteredBookings.reduce((acc, b) => acc + (b.total_price||0), 0).toLocaleString()}</div>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <div className="text-[10px] text-slate-400 font-bold uppercase">확정율</div>
-              <div className="text-lg font-black text-blue-600">
-                {bookings.length > 0 ? Math.round((bookings.filter(b=>b.status==='confirmed').length / bookings.length) * 100) : 0}%
-              </div>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <div className="text-[10px] text-slate-400 font-bold uppercase">취소/환불</div>
-              <div className="text-lg font-black text-red-500">{bookings.filter(b=>b.status==='cancelled').length}건</div>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <div className="text-[10px] text-slate-400 font-bold uppercase">대기 중</div>
-              <div className="text-lg font-black text-yellow-600">{bookings.filter(b=>b.status==='pending').length}건</div>
-            </div>
+          <button onClick={downloadCSV} className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition-colors">
+            <Download size={14}/> 엑셀 다운로드
+          </button>
+        </div>
+
+        {/* 툴바 */}
+        <div className="p-4 border-b border-slate-100 flex gap-3 bg-slate-50 shrink-0">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="이름, 이메일, 주문번호, 체험명 검색..." 
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-black transition-colors"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex bg-white border border-slate-200 p-1 rounded-xl">
+            {['ALL', 'UPCOMING', 'PAST'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type as any)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${filterType === type ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {type === 'ALL' ? '전체' : type === 'UPCOMING' ? '예정' : '완료'}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* 리스트 테이블 */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 overflow-hidden flex flex-col">
-          <div className="overflow-y-auto flex-1">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 font-bold">
-                <tr>
-                  <th className="px-6 py-3">예약 번호/일시</th>
-                  <th className="px-6 py-3">체험 정보</th>
-                  <th className="px-6 py-3">게스트</th>
-                  <th className="px-6 py-3">결제 금액</th>
-                  <th className="px-6 py-3">상태</th>
-                  <th className="px-6 py-3 text-right">액션</th>
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-white text-xs font-bold text-slate-500 uppercase sticky top-0 z-10 border-b border-slate-100 shadow-sm">
+              <tr>
+                <th className="px-6 py-3">체험 정보</th>
+                <th className="px-6 py-3">게스트</th>
+                <th className="px-6 py-3">결제 금액</th>
+                <th className="px-6 py-3">상태</th>
+                <th className="px-6 py-3 text-right">상세</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 text-sm bg-white">
+              {filteredBookings.map((bk) => (
+                <tr 
+                  key={bk.id} 
+                  onClick={() => setSelectedBooking(bk)}
+                  className={`hover:bg-blue-50 cursor-pointer transition-colors ${selectedBooking?.id === bk.id ? 'bg-blue-50' : ''}`}
+                >
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-slate-900 line-clamp-1 mb-1">{bk.experiences?.title}</div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <span className={new Date(`${bk.date} ${bk.time}`) < new Date() ? "line-through opacity-50" : "text-blue-600 font-bold"}>
+                        {bk.date} · {bk.time}
+                      </span>
+                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">{bk.guests}명</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-slate-900">{bk.contact_name || '이름 없음'}</div>
+                    <div className="text-xs text-slate-500">{bk.contact_phone}</div>
+                  </td>
+                  <td className="px-6 py-4 font-mono font-bold">
+                    ₩{Number(bk.amount).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4">
+                    {bk.status === 'PAID' || bk.status === 'confirmed' ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                        <CheckCircle2 size={12}/> 확정
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                        <XCircle size={12}/> 취소
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <MoreHorizontal size={16} className="text-slate-400"/>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginatedBookings.map((bk) => (
-                  <tr key={bk.id} onClick={() => setSelectedBooking(bk)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedBooking?.id === bk.id ? 'bg-blue-50' : ''}`}>
-                    <td className="px-6 py-4">
-                      <div className="font-mono text-xs text-slate-400 mb-1">#{String(bk.id).substring(0,8)}</div>
-                      <div className="text-slate-900 font-medium">{new Date(bk.created_at).toLocaleDateString()}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900 line-clamp-1">{bk.experiences?.title}</div>
-                      <div className="text-xs text-slate-500">{bk.date} · {bk.guests}명</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold">G</div>
-                        <span className="truncate max-w-[100px]">{bk.user_email || '게스트'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-900">₩{Number(bk.total_price).toLocaleString()}</td>
-                    <td className="px-6 py-4"><StatusBadge status={bk.status} /></td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-slate-400 hover:text-slate-900 underline text-xs">상세</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            {/* 데이터 없을 때 메시지 */}
-            {paginatedBookings.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-40 text-slate-400">
-                <p>예약 내역이 없습니다.</p>
-              </div>
-            )}
-          </div>
-
-          {/* 페이지네이션 버튼 */}
-          {totalPages > 1 && (
-            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
-              <span className="text-xs text-slate-500">
-                Total <b>{filteredBookings.length}</b> items (Page {currentPage} of {totalPages})
-              </span>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50"
-                >
-                  <ChevronLeft size={16}/>
-                </button>
-                <button 
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50"
-                >
-                  <ChevronRight size={16}/>
-                </button>
-              </div>
-            </div>
-          )}
+              ))}
+              {filteredBookings.length === 0 && (
+                <tr><td colSpan={5} className="py-20 text-center text-slate-400">데이터가 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* 🟢 상세 보기 슬라이드 패널 */}
-      {selectedBooking && (
-        <div className="w-[450px] bg-white border-l border-slate-200 h-full shadow-2xl absolute right-0 top-0 z-20 flex flex-col animate-in slide-in-from-right duration-300">
+      {/* 🟢 오른쪽: 상세 패널 (Excessive Detail Mode) */}
+      {selectedBooking ? (
+        <div className="w-[450px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 relative z-20">
           
           {/* 헤더 */}
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
             <div>
-              <h3 className="font-bold text-lg text-slate-900">Booking Detail</h3>
-              <div className="text-[10px] text-slate-400 font-mono">ID: {selectedBooking.id}</div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Booking Detail</div>
+              <h3 className="font-bold text-lg leading-tight">{selectedBooking.contact_name}님의 예약</h3>
             </div>
-            <button onClick={() => setSelectedBooking(null)} className="p-2 hover:bg-slate-200 rounded-full"><X size={20}/></button>
+            <button onClick={() => setSelectedBooking(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><XCircle size={24} className="text-slate-400"/></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <div className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-slate-200">
             
-            {/* 1. 예약 상태 및 결제 요약 */}
+            {/* 1. 취소된 경우 경고 박스 */}
+            {(selectedBooking.status === 'CANCELLED' || selectedBooking.status === 'cancellation_requested') && (
+              <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3 items-start">
+                <AlertTriangle className="text-red-500 shrink-0" size={20}/>
+                <div>
+                  <h4 className="font-bold text-red-700 text-sm">취소된 예약입니다</h4>
+                  <p className="text-xs text-red-600 mt-1">
+                    사유: {selectedBooking.cancel_reason || '사용자 또는 관리자 취소'}
+                  </p>
+                  <p className="text-[10px] text-red-400 mt-2 font-mono">
+                    취소 일시: {new Date(selectedBooking.updated_at || new Date()).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 2. 수익 분석 (카드 형태) */}
+            <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-3 opacity-10"><TrendingUp size={120}/></div>
+               
+               {/* 게스트 결제 */}
+               <div className="flex justify-between items-end mb-4">
+                 <div className="text-xs text-slate-400">게스트 총 결제금액</div>
+                 <div className="text-2xl font-black">₩{Number(selectedBooking.amount).toLocaleString()}</div>
+               </div>
+               
+               <div className="bg-white/10 p-3 rounded-lg space-y-2 text-sm backdrop-blur-sm">
+                 <div className="flex justify-between opacity-80">
+                    <span>호스트 공급가</span>
+                    <span>₩{(selectedBooking.total_price || 0).toLocaleString()}</span>
+                 </div>
+                 <div className="flex justify-between opacity-80">
+                    <span>플랫폼 수수료 (Total)</span>
+                    <span className="text-emerald-300">+ ₩{((selectedBooking.amount - selectedBooking.total_price) + (selectedBooking.total_price * 0.2)).toLocaleString()}</span>
+                 </div>
+                 <div className="h-[1px] bg-white/20 my-2"></div>
+                 <div className="flex justify-between font-bold">
+                    <span>호스트 정산액 (Payout)</span>
+                    <span>₩{(selectedBooking.total_price * 0.8).toLocaleString()}</span>
+                 </div>
+               </div>
+
+               {/* PG사 정보 */}
+               <div className="mt-4 flex justify-between items-center">
+                 <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                   <CreditCard size={12}/> {selectedBooking.tid || 'TID 없음'}
+                 </div>
+                 {selectedBooking.tid && (
+                   <button className="text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded flex items-center gap-1 transition-colors">
+                     영수증 <ExternalLink size={10}/>
+                   </button>
+                 )}
+               </div>
+            </div>
+
+            {/* 3. 과한 상세 정보 (User Info) */}
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <StatusBadge status={selectedBooking.status} />
-                <span className="text-xs text-slate-400 font-mono">{new Date(selectedBooking.created_at).toLocaleString()}</span>
+              <h4 className="font-bold text-sm flex items-center gap-2 border-b pb-2"><User size={16}/> 예약자 상세 정보</h4>
+              
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                   <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center"><User size={16} className="text-slate-500"/></div>
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">Name</div>
+                        <div className="text-sm font-bold text-slate-900">{selectedBooking.contact_name}</div>
+                      </div>
+                   </div>
+                   <button onClick={() => handleCopy(selectedBooking.contact_name)}><Copy size={14} className="text-slate-400 hover:text-black"/></button>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                   <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center"><Phone size={16} className="text-slate-500"/></div>
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">Phone</div>
+                        <div className="text-sm font-bold text-slate-900">{selectedBooking.contact_phone}</div>
+                      </div>
+                   </div>
+                   <button onClick={() => handleCopy(selectedBooking.contact_phone)}><Copy size={14} className="text-slate-400 hover:text-black"/></button>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                   <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center"><Mail size={16} className="text-slate-500"/></div>
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">Email (Profile)</div>
+                        {/* 🟢 [주의] select에서 profiles(email) 조인해와야 보임 */}
+                        <div className="text-sm font-bold text-slate-900">{selectedBooking.profiles?.email || '이메일 정보 없음'}</div>
+                      </div>
+                   </div>
+                   <button onClick={() => handleCopy(selectedBooking.profiles?.email)}><Copy size={14} className="text-slate-400 hover:text-black"/></button>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                   <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center"><Fingerprint size={16} className="text-slate-500"/></div>
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">User UUID</div>
+                        <div className="text-xs font-mono text-slate-600 truncate max-w-[150px]">{selectedBooking.user_id}</div>
+                      </div>
+                   </div>
+                   <button onClick={() => handleCopy(selectedBooking.user_id)}><Copy size={14} className="text-slate-400 hover:text-black"/></button>
+                </div>
               </div>
-              <div className="p-4 border border-slate-200 rounded-xl bg-slate-50">
-                <div className="flex justify-between text-sm mb-2 text-slate-600">
-                  <span>체험 기본료 (x{selectedBooking.guests})</span>
-                  <span>₩{(selectedBooking.total_price * 0.9).toLocaleString()}</span>
+
+              {selectedBooking.message && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl">
+                   <div className="text-[10px] font-bold text-yellow-600 uppercase mb-1">Guest Message</div>
+                   <div className="text-sm text-yellow-900">{selectedBooking.message}</div>
                 </div>
-                <div className="flex justify-between text-sm mb-2 text-slate-600">
-                  <span>플랫폼 수수료 (10%)</span>
-                  <span>₩{(selectedBooking.total_price * 0.1).toLocaleString()}</span>
-                </div>
-                <div className="border-t border-slate-200 my-2"></div>
-                <div className="flex justify-between font-bold text-lg">
-                  <span>총 결제금액</span>
-                  <span className="text-rose-600">₩{Number(selectedBooking.total_price).toLocaleString()}</span>
-                </div>
-                
-                <div className="mt-3 flex flex-col gap-1 text-xs text-slate-500">
-                  <div className="flex items-center gap-2">
-                    <CreditCard size={12}/> 카드 결제
-                  </div>
-                  {selectedBooking.tid ? (
-                    <div className="font-mono text-slate-400">TID: {selectedBooking.tid}</div>
-                  ) : (
-                    <div className="text-red-400 font-bold">⚠️ TID 없음 (자동환불 불가)</div>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* 2. 게스트 & 호스트 정보 */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 border border-slate-100 rounded-xl">
-                <div className="text-xs font-bold text-slate-400 uppercase mb-2">Guest</div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">G</div>
-                  <span className="text-sm font-bold truncate">게스트 이름</span>
-                </div>
-                <div className="text-xs text-slate-500">+82 10-1234-5678</div>
-              </div>
-              <div className="p-4 border border-slate-100 rounded-xl">
-                <div className="text-xs font-bold text-slate-400 uppercase mb-2">Host</div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xs font-bold">H</div>
-                  <span className="text-sm font-bold truncate">호스트 이름</span>
-                </div>
-                <div className="text-xs text-slate-500">010-9876-5432</div>
-              </div>
+            {/* 4. 시스템 데이터 (RAW JSON) */}
+            <div className="border-t pt-4">
+               <button 
+                 onClick={() => setShowRawData(!showRawData)}
+                 className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-700 mb-3"
+               >
+                 <Code size={14}/> Raw Data (Developer Mode) {showRawData ? '▲' : '▼'}
+               </button>
+               
+               {showRawData && (
+                 <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
+                    <pre className="text-[10px] font-mono text-emerald-400 leading-relaxed">
+                      {JSON.stringify(selectedBooking, null, 2)}
+                    </pre>
+                 </div>
+               )}
             </div>
 
-            {/* 3. 예약 로그 (타임라인) */}
-            <div>
-              <h4 className="font-bold text-sm mb-4 flex items-center gap-2"><FileText size={16}/> 예약 처리 로그</h4>
-              <div className="pl-2 border-l-2 border-slate-100 space-y-6 ml-1">
-                <div className="relative pl-6">
-                  <div className="absolute -left-[5px] top-1 w-3 h-3 rounded-full bg-slate-300"></div>
-                  <div className="text-xs text-slate-400 mb-0.5">{new Date(selectedBooking.created_at).toLocaleString()}</div>
-                  <div className="text-sm font-bold">예약 접수 및 결제 완료</div>
-                </div>
-                {selectedBooking.status === 'confirmed' && (
-                  <div className="relative pl-6">
-                    <div className="absolute -left-[5px] top-1 w-3 h-3 rounded-full bg-green-500"></div>
-                    <div className="text-xs text-slate-400 mb-0.5">{new Date(selectedBooking.created_at).toLocaleString()}</div>
-                    <div className="text-sm font-bold text-green-700">예약 자동 확정 (즉시 예약)</div>
-                  </div>
-                )}
-                {selectedBooking.status === 'cancelled' && (
-                  <div className="relative pl-6">
-                    <div className="absolute -left-[5px] top-1 w-3 h-3 rounded-full bg-red-500"></div>
-                    <div className="text-xs text-slate-400 mb-0.5">{new Date().toLocaleString()}</div>
-                    <div className="text-sm font-bold text-red-600">예약 취소됨 (사유: 게스트 요청)</div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
-
-          {/* 하단 관리자 액션 버튼 */}
-          <div className="p-5 border-t border-slate-100 bg-slate-50 grid grid-cols-2 gap-3">
-            <button className="bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-100 text-sm flex items-center justify-center gap-2">
-              <MessageCircle size={16}/> 메시지 보내기
-            </button>
-            <button 
-              onClick={() => { if(confirm('결제를 취소하고 전액 환불하시겠습니까?')) alert('환불 처리되었습니다.'); }}
-              className="bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-red-600 transition-colors text-sm flex items-center justify-center gap-2"
-            >
-              <Ban size={16}/> 예약 취소/환불
-            </button>
+          
+          {/* 하단 액션 버튼 */}
+          <div className="p-5 border-t border-slate-100 bg-slate-50 shrink-0">
+             <button 
+                onClick={() => { if(confirm('Phase 5에서 환불 API 연동 예정입니다.')) {} }}
+                className="w-full py-4 bg-white border-2 border-slate-200 text-slate-400 font-bold rounded-xl hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+              >
+                예약 취소 및 강제 환불
+              </button>
           </div>
+        </div>
+      ) : (
+        <div className="w-[450px] bg-slate-50 border border-slate-200 border-dashed rounded-2xl flex items-center justify-center flex-col text-slate-400 gap-3">
+           <Search size={48} className="opacity-10"/>
+           <span className="text-sm font-bold">리스트에서 예약을 선택하세요</span>
+           <span className="text-xs opacity-50">상세 정보를 볼 수 있습니다</span>
         </div>
       )}
     </div>
