@@ -1,121 +1,55 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Share, Heart, MapPin, Check, X, Grid } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat'; 
-import { useWishlist } from '@/app/hooks/useWishlist'; // 🟢 훅 임포트
+import { useWishlist } from '@/app/hooks/useWishlist';
 import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
 import Image from 'next/image'; 
 import { useToast } from '@/app/context/ToastContext'; 
-import { ExperienceDetailSkeleton } from '@/app/components/skeletons/ExperienceDetailSkeleton';
 
-export default function ExperienceClient() {
+type Props = {
+  initialUser: any;
+  initialExperience: any;
+  initialHostProfile: any;
+  initialAvailableDates: string[];
+  initialDateToTimeMap: Record<string, string[]>;
+  initialRemainingSeatsMap: Record<string, number>;
+};
+
+export default function ExperienceClient({ 
+  initialUser, 
+  initialExperience, 
+  initialHostProfile,
+  initialAvailableDates, 
+  initialDateToTimeMap, 
+  initialRemainingSeatsMap 
+}: Props) {
   const [isCopySuccess, setIsCopySuccess] = useState(false);
   const { showToast } = useToast(); 
   const router = useRouter();
   const params = useParams();
-  const supabase = createClient();
   const { createInquiry } = useChat(); 
   
-  // 🟢 훅 사용 (복잡한 로직 제거됨)
   const experienceId = params?.id as string;
   const { isSaved, toggleWishlist, isLoading: isSaveLoading } = useWishlist(experienceId);
   
-  const [user, setUser] = useState<any>(null);
-  const [experience, setExperience] = useState<any>(null);
-  const [hostProfile, setHostProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // 🟢 [핵심] 서버에서 받은 데이터를 바로 초기값으로 사용 (로딩 X)
+  const [user] = useState(initialUser);
+  const [experience] = useState(initialExperience);
+  const [hostProfile] = useState(initialHostProfile);
   
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>({});
-  const [remainingSeatsMap, setRemainingSeatsMap] = useState<Record<string, number>>({}); // 🟢 잔여석 정보 추가
+  const [availableDates] = useState<string[]>(initialAvailableDates);
+  const [dateToTimeMap] = useState<Record<string, string[]>>(initialDateToTimeMap);
+  const [remainingSeatsMap] = useState<Record<string, number>>(initialRemainingSeatsMap);
+  
   const [inquiryText, setInquiryText] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
-      const { data: exp, error } = await supabase.from('experiences').select('*').eq('id', params.id).single();
-      if (error) { console.error(error); } 
-      else {
-        setExperience(exp);
-        
-        // 날짜 정보
-// 2. 예약 가능한 날짜 가져오기 (호스트가 오픈한 날짜)
-const { data: dates } = await supabase
-.from('experience_availability')
-.select('date, start_time')
-.eq('experience_id', exp.id)
-.eq('is_booked', false);
-
-// 3. 🟢 [핵심] 이미 완료된 예약 가져오기 (정원 계산용)
-const { data: bookings } = await supabase
-.from('bookings')
-.select('date, time, guests')
-.eq('experience_id', exp.id)
-.in('status', ['PAID', 'confirmed']); // 🟢 PAID 또는 confirmed 상태 모두 체크
-
-if (dates) {
-const timeMap: Record<string, string[]> = {};
-const seatsMap: Record<string, number> = {}; // 잔여석 저장용
-const maxGuests = exp.max_guests || 10; // 기본값 10명
-
-dates.forEach((d: any) => {
-  const availTime = d.start_time.substring(0, 5);
-  
-  const currentBooked = bookings
-  ?.filter((b: any) => {
-    const bookingTime = b.time.substring(0, 5); // 예약 시간도 앞 5자리만
-    return b.date === d.date && bookingTime === availTime;
-  })
-  .reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
-
-const remaining = maxGuests - currentBooked;
-
-// 키 생성 시에도 앞 5자리 사용
-const key = `${d.date}_${availTime}`; 
-
-if (remaining > 0) {
-  if (!timeMap[d.date]) timeMap[d.date] = [];
-  // 중복 방지 체크 후 추가
-  if (!timeMap[d.date].includes(availTime)) {
-     timeMap[d.date].push(availTime);
-  }
-  seatsMap[key] = remaining;
-}
-});
-
-// 날짜순 정렬 후 상태 업데이트
-const validDates = Object.keys(timeMap).sort();
-setAvailableDates(validDates);
-setDateToTimeMap(timeMap);
-setRemainingSeatsMap(seatsMap); // 🟢 잔여석 상태 저장
-}
-
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', exp.host_id).single();
-        const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', exp.host_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
-        
-        setHostProfile({
-          id: exp.host_id, 
-          name: app?.name || profile?.name || profile?.full_name || 'Locally Host',
-          avatar_url: app?.profile_photo || profile?.avatar_url || null,
-          languages: (profile?.languages && profile.languages.length > 0) ? profile.languages : (app?.languages || []),
-          introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
-          job: profile?.job,
-          dream_destination: profile?.dream_destination,
-          favorite_song: profile?.favorite_song
-        });
-      }
-      setLoading(false);
-    };
-    fetchData();
-  }, [params.id, supabase]);
+  // 🟢 [삭제됨] useEffect로 데이터 가져오는 로직은 이제 필요 없습니다!
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -152,7 +86,6 @@ setRemainingSeatsMap(seatsMap); // 🟢 잔여석 상태 저장
     router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
 
-  if (loading) return <ExperienceDetailSkeleton />;
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
 
   const photos = experience.photos && experience.photos.length > 0 
@@ -175,7 +108,6 @@ setRemainingSeatsMap(seatsMap); // 🟢 잔여석 상태 저장
             </div>
             <div className="flex gap-2">
                <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Share size={16} /> 공유하기</button>
-               {/* 🟢 훅 연결 완료 */}
                <button onClick={toggleWishlist} disabled={isSaveLoading} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
                  <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} /> 
                  {isSaved ? '저장됨' : '저장'}
@@ -184,7 +116,7 @@ setRemainingSeatsMap(seatsMap); // 🟢 잔여석 상태 저장
           </div>
         </section>
 
-        {/* 사진 그리드 등 나머지 UI 유지 */}
+        {/* 사진 그리드 */}
         <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
           {photos.length === 1 && (
              <div className="w-full h-full relative cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
@@ -228,7 +160,7 @@ setRemainingSeatsMap(seatsMap); // 🟢 잔여석 상태 저장
             experience={experience} 
             availableDates={availableDates} 
             dateToTimeMap={dateToTimeMap} 
-            remainingSeatsMap={remainingSeatsMap} // 🟢 이거 한 줄 추가!
+            remainingSeatsMap={remainingSeatsMap} 
             handleReserve={handleReserve} 
           />
         </div>

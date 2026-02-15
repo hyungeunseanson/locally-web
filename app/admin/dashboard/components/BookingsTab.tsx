@@ -1,18 +1,29 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, User, DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, FileText, MessageCircle, X, Ban, CreditCard } from 'lucide-react';
+import { Calendar, User, DollarSign, Clock, CheckCircle2, XCircle, AlertCircle, FileText, MessageCircle, X, Ban, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function BookingsTab({ bookings }: { bookings: any[] }) {
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState('ALL');
+
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // 필터링 및 정렬
   const filteredBookings = bookings
     .filter(b => filterStatus === 'ALL' || b.status === filterStatus)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  // 상태 뱃지
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
+  const paginatedBookings = filteredBookings.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // 상태 뱃지 컴포넌트
   const StatusBadge = ({ status }: { status: string }) => {
     switch(status) {
       case 'confirmed': return <span className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded text-xs font-bold border border-green-100"><CheckCircle2 size={12}/> 예약 확정</span>;
@@ -39,7 +50,7 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
               {['ALL', 'pending', 'confirmed', 'cancelled'].map(status => (
                 <button 
                   key={status} 
-                  onClick={() => setFilterStatus(status)}
+                  onClick={() => { setFilterStatus(status); setCurrentPage(1); }}
                   className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filterStatus === status ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 >
                   {status === 'ALL' ? '전체 보기' : status}
@@ -85,10 +96,9 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredBookings.map((bk) => (
+                {paginatedBookings.map((bk) => (
                   <tr key={bk.id} onClick={() => setSelectedBooking(bk)} className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedBooking?.id === bk.id ? 'bg-blue-50' : ''}`}>
                     <td className="px-6 py-4">
-                      {/* ✅ String() 처리로 BigInt 에러 방지 */}
                       <div className="font-mono text-xs text-slate-400 mb-1">#{String(bk.id).substring(0,8)}</div>
                       <div className="text-slate-900 font-medium">{new Date(bk.created_at).toLocaleDateString()}</div>
                     </td>
@@ -111,11 +121,43 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                 ))}
               </tbody>
             </table>
+            
+            {/* 데이터 없을 때 메시지 */}
+            {paginatedBookings.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+                <p>예약 내역이 없습니다.</p>
+              </div>
+            )}
           </div>
+
+          {/* 페이지네이션 버튼 */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <span className="text-xs text-slate-500">
+                Total <b>{filteredBookings.length}</b> items (Page {currentPage} of {totalPages})
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50"
+                >
+                  <ChevronLeft size={16}/>
+                </button>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50"
+                >
+                  <ChevronRight size={16}/>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 🟢 [신규] 상세 보기 슬라이드 패널 (누락된 부분 복구 완료) */}
+      {/* 🟢 상세 보기 슬라이드 패널 */}
       {selectedBooking && (
         <div className="w-[450px] bg-white border-l border-slate-200 h-full shadow-2xl absolute right-0 top-0 z-20 flex flex-col animate-in slide-in-from-right duration-300">
           
@@ -151,7 +193,6 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                   <span className="text-rose-600">₩{Number(selectedBooking.total_price).toLocaleString()}</span>
                 </div>
                 
-                {/* 🟢 TID 표시 추가 */}
                 <div className="mt-3 flex flex-col gap-1 text-xs text-slate-500">
                   <div className="flex items-center gap-2">
                     <CreditCard size={12}/> 카드 결제
