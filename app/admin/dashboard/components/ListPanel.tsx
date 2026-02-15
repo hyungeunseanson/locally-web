@@ -31,6 +31,13 @@ export default function ListPanel({
       {/* 🟢 리스트 아이템 (스크롤 영역) */}
       <div className="overflow-y-auto flex-1 p-3 space-y-2">
         {listItems.map((item:any) => {
+          
+          // 🟢 [이미지 소스 결정 로직 추가] 탭에 따라 올바른 이미지 필드를 가져옵니다.
+          let imgSrc = null;
+          if (activeTab === 'APPS') imgSrc = item.profile_photo || item.avatar_url; // 호스트 지원서
+          else if (activeTab === 'USERS') imgSrc = item.avatar_url; // 일반 유저
+          else if (activeTab === 'EXPS') imgSrc = item.photos?.[0]; // 체험 (첫 번째 사진)
+
           // A. 채팅 메시지 리스트
           if (activeTab === 'CHATS') {
             return (
@@ -55,11 +62,9 @@ export default function ListPanel({
               onClick={() => setSelectedItem(item)} 
               className={`p-4 rounded-xl border cursor-pointer transition-all flex gap-4 items-center ${selectedItem?.id === item.id ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900' : 'border-slate-100 hover:border-slate-300 hover:bg-white bg-white'}`}
             >
-              {/* 썸네일 이미지 */}
-              {activeTab === 'USERS' ? (
-                item.avatar_url ? <img src={item.avatar_url} className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0"/> : <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0"><User size={20}/></div>
-              ) : item.photos?.[0] ? (
-                <img src={item.photos[0]} className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0"/>
+              {/* 🟢 [수정됨] 위에서 구한 imgSrc 사용 */}
+              {imgSrc ? (
+                <img src={imgSrc} className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0"/>
               ) : (
                 <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0"><User size={20}/></div>
               )}
@@ -73,7 +78,11 @@ export default function ListPanel({
                   </span>
                 </div>
                 <div className="flex justify-between text-xs text-slate-500">
-                  <span>{activeTab === 'APPS' ? `${item.host_nationality} / ${item.target_language}` : activeTab === 'EXPS' ? `₩${item.price?.toLocaleString()}` : item.email}</span>
+                  <span>
+                    {activeTab === 'APPS' ? `${item.host_nationality} / ${item.target_language}` 
+                     : activeTab === 'EXPS' ? `₩${item.price?.toLocaleString()}` 
+                     : item.email}
+                  </span>
                   <span className="text-slate-400 font-mono">{new Date(item.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
