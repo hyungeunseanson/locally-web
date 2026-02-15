@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react'; // 🟢 Suspense 추가
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -9,14 +9,14 @@ import ExperienceCard from '@/app/components/ExperienceCard';
 import SearchFilter from './components/SearchFilter';
 import { Map, List, Ghost } from 'lucide-react';
 
-// 🟢 1. 검색 로직을 별도 컴포넌트로 분리
+// 🟢 검색 로직 컴포넌트
 function SearchResults() {
   const searchParams = useSearchParams();
   const supabase = createClient();
   
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(true); // 기본값은 지도 보기 활성화 (기존 유지)
 
   const location = searchParams.get('location') || '';
   const language = searchParams.get('language') || 'all';
@@ -30,15 +30,31 @@ function SearchResults() {
         let query = supabase
           .from('experiences')
           .select('*')
-          .eq('status', 'active');
+          .eq('status', 'active'); // 활성화된 체험만 검색
 
+        // 🟢 [업그레이드] 다국어 검색 로직 적용
         if (location) {
-          query = query.or(`title.ilike.%${location}%,location.ilike.%${location}%,description.ilike.%${location}%`);
+          // 검색 대상 컬럼 목록 (기존 + 다국어)
+          const searchFields = [
+            'title', 'description', 'city', 'country', // 기본(한국어) 및 공통
+            'title_en', 'description_en', 'category_en', // 영어
+            'title_ja', 'description_ja', 'category_ja', // 일본어
+            'title_zh', 'description_zh', 'category_zh'  // 중국어
+          ];
+
+          // "컬럼명.ilike.%검색어%" 형태의 문자열을 쉼표로 연결하여 OR 조건 생성
+          const orQuery = searchFields.map(field => `${field}.ilike.%${location}%`).join(',');
+          
+          query = query.or(orQuery);
         }
 
+        // 언어 필터 (호스트가 진행 가능한 언어)
         if (language !== 'all') {
           query = query.contains('languages', [language]);
         }
+
+        // 날짜 필터 (예약 가능한 날짜가 있는지 확인하는 로직이 필요하다면 추가)
+        // 현재는 메타데이터 검색 위주이므로 패스
 
         const { data, error } = await query;
         if (error) throw error;
@@ -97,6 +113,7 @@ function SearchResults() {
           ) : (
             <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
               {experiences.map((item) => (
+                // 🟢 [확인완료] data={item} 사용 (ExperienceCard 최신 스펙 준수)
                 <ExperienceCard key={item.id} data={item} />
               ))}
             </div>
@@ -106,7 +123,7 @@ function SearchResults() {
           </div>
         </div>
 
-        {/* 지도 영역 */}
+        {/* 지도 영역 (기존 디자인 유지) */}
         {showMap && (
           <div className="hidden lg:block flex-1 bg-slate-100 relative h-full border-l border-slate-200">
             <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-400 bg-slate-50">
@@ -121,7 +138,7 @@ function SearchResults() {
   );
 }
 
-// 🟢 2. 메인 페이지 컴포넌트 (Suspense 적용)
+// 🟢 메인 페이지 컴포넌트 (Suspense 적용 유지)
 export default function SearchPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
