@@ -10,6 +10,8 @@ import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
 import Image from 'next/image'; 
 import { useToast } from '@/app/context/ToastContext'; 
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
+import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 
 type Props = {
   initialUser: any;
@@ -33,11 +35,11 @@ export default function ExperienceClient({
   const router = useRouter();
   const params = useParams();
   const { createInquiry } = useChat(); 
+  const { language } = useLanguage(); // 🟢 현재 언어 가져오기
   
   const experienceId = params?.id as string;
   const { isSaved, toggleWishlist, isLoading: isSaveLoading } = useWishlist(experienceId);
   
-  // 🟢 [핵심] 서버에서 받은 데이터를 바로 초기값으로 사용 (로딩 X)
   const [user] = useState(initialUser);
   const [experience] = useState(initialExperience);
   const [hostProfile] = useState(initialHostProfile);
@@ -49,7 +51,10 @@ export default function ExperienceClient({
   const [inquiryText, setInquiryText] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
-  // 🟢 [삭제됨] useEffect로 데이터 가져오는 로직은 이제 필요 없습니다!
+  // 🟢 [핵심] 제목을 언어에 맞춰서 변환!
+  const translatedTitle = getContent(experience, 'title', language);
+  // 🟢 [핵심] 위치 정보는 아직 번역이 없으므로 한국어 사용 (나중에 location_en 추가 가능)
+  const location = experience.location; 
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -99,12 +104,13 @@ export default function ExperienceClient({
 
       <main className="max-w-[1120px] mx-auto px-6 py-8">
         <section className="mb-6">
-          <h1 className="text-3xl font-black mb-2 tracking-tight">{experience.title}</h1>
+          {/* 🟢 변환된 제목 표시 */}
+          <h1 className="text-3xl font-black mb-2 tracking-tight">{translatedTitle}</h1>
           <div className="flex justify-between items-end">
             <div className="flex items-center gap-4 text-sm font-medium text-slate-800">
               <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4"><span className="font-bold">★ 4.98</span> <span className="text-slate-500 underline">후기 15개</span></button>
               <span className="text-slate-300">|</span>
-              <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700"><MapPin size={14}/> {experience.location}</button>
+              <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700"><MapPin size={14}/> {location}</button>
             </div>
             <div className="flex gap-2">
                <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Share size={16} /> 공유하기</button>

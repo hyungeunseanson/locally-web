@@ -5,13 +5,15 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Save, MapPin, Plus, Trash2, X, Camera, Check } from 'lucide-react';
-import { CATEGORIES, SUPPORTED_LANGUAGES, MAJOR_CITIES } from '@/app/host/create/config';
+import { ChevronLeft, Save, MapPin, Plus, Trash2, X, Camera, Check, Globe, Loader2, Type, FileText } from 'lucide-react';
+import { CATEGORIES, SUPPORTED_LANGUAGES } from '@/app/host/create/config';
+import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개선
 
 export default function EditExperiencePage() {
   const supabase = createClient();
   const router = useRouter();
   const params = useParams();
+  const { showToast } = useToast();
   
   const [formData, setFormData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -22,17 +24,32 @@ export default function EditExperiencePage() {
   // 데이터 불러오기
   useEffect(() => {
     const fetchExp = async () => {
-      const { data } = await supabase.from('experiences').select('*').eq('id', params.id).single();
+      const { data, error } = await supabase.from('experiences').select('*').eq('id', params.id).single();
+      if (error) {
+        showToast('데이터를 불러오지 못했습니다.', 'error');
+        return;
+      }
       if (data) {
         setFormData({
           ...data,
-          // 배열 데이터 안전하게 초기화
+          // ✅ 기존 데이터 초기화 (Null 방지)
           photos: data.photos || [],
           languages: data.languages || [],
           inclusions: data.inclusions || [],
           exclusions: data.exclusions || [],
           itinerary: data.itinerary || [],
-          rules: data.rules || { age_limit: '', activity_level: '보통', refund_policy: '' }
+          rules: data.rules || { age_limit: '', activity_level: '보통', refund_policy: '' },
+          
+          // 🟢 [추가됨] 다국어 필드 초기화
+          title_en: data.title_en || '',
+          title_ja: data.title_ja || '',
+          title_zh: data.title_zh || '',
+          description_en: data.description_en || '',
+          description_ja: data.description_ja || '',
+          description_zh: data.description_zh || '',
+          category_en: data.category_en || '',
+          category_ja: data.category_ja || '',
+          category_zh: data.category_zh || '',
         });
       }
       setLoading(false);
@@ -47,6 +64,7 @@ export default function EditExperiencePage() {
       const { error } = await supabase
         .from('experiences')
         .update({ 
+          // ✅ 기존 필드
           title: formData.title, 
           price: formData.price, 
           country: formData.country,
@@ -62,21 +80,32 @@ export default function EditExperiencePage() {
           rules: formData.rules,
           meeting_point: formData.meeting_point,
           max_guests: formData.max_guests,
-          duration: formData.duration
+          duration: formData.duration,
+
+          // 🟢 [추가됨] 다국어 필드 업데이트
+          title_en: formData.title_en,
+          title_ja: formData.title_ja,
+          title_zh: formData.title_zh,
+          description_en: formData.description_en,
+          description_ja: formData.description_ja,
+          description_zh: formData.description_zh,
+          category_en: formData.category_en,
+          category_ja: formData.category_ja,
+          category_zh: formData.category_zh,
         })
         .eq('id', params.id);
       
       if (error) throw error;
-      alert('성공적으로 수정되었습니다.');
+      showToast('성공적으로 수정되었습니다.', 'success');
       router.refresh();
     } catch (e: any) {
-      alert('수정 실패: ' + e.message);
+      showToast('수정 실패: ' + e.message, 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  // 📸 사진 업로드 핸들러 (즉시 업로드)
+  // 📸 사진 업로드 핸들러 (기존 로직 유지)
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setUploading(true);
@@ -92,13 +121,13 @@ export default function EditExperiencePage() {
       setFormData((prev: any) => ({ ...prev, photos: [...prev.photos, data.publicUrl] }));
       
     } catch (err: any) {
-      alert('사진 업로드 실패: ' + err.message);
+      showToast('사진 업로드 실패: ' + err.message, 'error');
     } finally {
       setUploading(false);
     }
   };
 
-  // 🗑️ 사진 삭제 핸들러
+  // 🗑️ 사진 삭제 핸들러 (기존 로직 유지)
   const removePhoto = (indexToRemove: number) => {
     if (confirm('이 사진을 삭제하시겠습니까?')) {
       setFormData((prev: any) => ({
@@ -108,7 +137,7 @@ export default function EditExperiencePage() {
     }
   };
 
-  // 언어 토글
+  // 진행 언어 토글 (기존 로직 유지)
   const toggleLanguage = (lang: string) => {
     const current = formData.languages || [];
     if (current.includes(lang)) {
@@ -136,7 +165,7 @@ export default function EditExperiencePage() {
   const addItineraryItem = () => setFormData({ ...formData, itinerary: [...formData.itinerary, { title: '', description: '', type: 'spot' }] });
   const removeItineraryItem = (idx: number) => setFormData({ ...formData, itinerary: formData.itinerary.filter((_:any, i:number) => i !== idx) });
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-black"></div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-slate-300"/></div>;
   if (!formData) return <div className="p-10 text-center">데이터를 불러올 수 없습니다.</div>;
 
   return (
@@ -150,7 +179,7 @@ export default function EditExperiencePage() {
           <h1 className="text-lg font-black truncate max-w-md">{formData.title}</h1>
         </div>
         <button onClick={handleUpdate} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:scale-105 transition-transform flex items-center gap-2 shadow-lg disabled:opacity-50">
-          {saving ? '저장 중...' : <><Save size={16}/> 저장하기</>}
+          {saving ? <><Loader2 className="animate-spin" size={16}/> 저장 중...</> : <><Save size={16}/> 저장하기</>}
         </button>
       </div>
 
@@ -176,13 +205,13 @@ export default function EditExperiencePage() {
         {/* 1. 기본 정보 & 사진 탭 */}
         {activeTab === 'basic' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* 📸 사진 관리 섹션 */}
+            {/* 📸 사진 관리 섹션 (기존 기능 복구) */}
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                 <label className="block text-sm font-bold text-slate-900 mb-4">사진 관리 ({formData.photos.length}장)</label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
                     {/* 업로드 버튼 */}
                     <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-white transition-all bg-white">
-                        {uploading ? <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-300 border-t-black"/> : <Camera size={24} className="text-slate-400 mb-2"/>}
+                        {uploading ? <Loader2 className="animate-spin text-slate-400 mb-2"/> : <Camera size={24} className="text-slate-400 mb-2"/>}
                         <span className="text-xs font-bold text-slate-500">{uploading ? '업로드 중' : '추가하기'}</span>
                         <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading}/>
                     </label>
@@ -198,9 +227,20 @@ export default function EditExperiencePage() {
                 </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2">체험 제목</label>
-              <input className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold focus:border-black outline-none transition-all" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+            {/* 🟢 제목 (다국어 지원) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2"><Type size={16}/> 체험 제목 (다국어)</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">🇰🇷 한국어 (기본)</label>
+                  <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:border-black outline-none" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <InputTrans label="🇺🇸 English" value={formData.title_en} onChange={(e:any) => setFormData({...formData, title_en: e.target.value})} placeholder="Title in English" />
+                  <InputTrans label="🇯🇵 日本語" value={formData.title_ja} onChange={(e:any) => setFormData({...formData, title_ja: e.target.value})} placeholder="日本語のタイトル" />
+                  <InputTrans label="🇨🇳 中文" value={formData.title_zh} onChange={(e:any) => setFormData({...formData, title_zh: e.target.value})} placeholder="中文标题" />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -217,9 +257,9 @@ export default function EditExperiencePage() {
                 </div>
             </div>
 
-            {/* 언어 선택 */}
+            {/* 진행 언어 선택 (기존 기능 복구) */}
             <div>
-                <label className="block text-xs font-bold text-slate-500 mb-3">진행 언어</label>
+                <label className="block text-xs font-bold text-slate-500 mb-3">진행 가능 언어 (호스트)</label>
                 <div className="flex flex-wrap gap-2">
                     {SUPPORTED_LANGUAGES.map((lang) => (
                         <button key={lang} onClick={() => toggleLanguage(lang)} className={`px-4 py-2 rounded-full text-sm font-bold border flex items-center gap-2 transition-all ${formData.languages.includes(lang) ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-600 hover:border-black'}`}>
@@ -229,15 +269,21 @@ export default function EditExperiencePage() {
                 </div>
             </div>
 
-            {/* 카테고리 */}
+            {/* 카테고리 (기존 기능 + 다국어) */}
             <div>
                 <label className="block text-xs font-bold text-slate-500 mb-3">카테고리</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mb-4">
                     {CATEGORIES.map((cat) => (
                         <button key={cat} onClick={() => setFormData({...formData, category: cat})} className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${formData.category === cat ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-600 hover:border-black'}`}>
                             {cat}
                         </button>
                     ))}
+                </div>
+                {/* 🟢 카테고리 다국어 입력 (선택사항) */}
+                <div className="grid grid-cols-3 gap-2">
+                   <InputTrans label="English Category" value={formData.category_en} onChange={(e:any) => setFormData({...formData, category_en: e.target.value})} />
+                   <InputTrans label="日本語 カテゴリー" value={formData.category_ja} onChange={(e:any) => setFormData({...formData, category_ja: e.target.value})} />
+                   <InputTrans label="中文 类别" value={formData.category_zh} onChange={(e:any) => setFormData({...formData, category_zh: e.target.value})} />
                 </div>
             </div>
 
@@ -267,9 +313,20 @@ export default function EditExperiencePage() {
         {/* 2. 상세 설명 탭 */}
         {activeTab === 'detail' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2">상세 소개글</label>
-              <textarea className="w-full p-4 h-64 bg-white border border-slate-200 rounded-xl leading-relaxed focus:border-black outline-none resize-none" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+            {/* 🟢 설명 (다국어 지원) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2"><FileText size={16}/> 상세 소개글 (다국어)</h3>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2">🇰🇷 한국어 (필수)</label>
+                  <textarea className="w-full p-4 h-40 bg-slate-50 border border-slate-200 rounded-xl leading-relaxed focus:border-black outline-none resize-none" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+                </div>
+                <div className="space-y-4">
+                  <TextAreaTrans label="🇺🇸 English Description" value={formData.description_en} onChange={(e:any) => setFormData({...formData, description_en: e.target.value})} />
+                  <TextAreaTrans label="🇯🇵 日本語 説明" value={formData.description_ja} onChange={(e:any) => setFormData({...formData, description_ja: e.target.value})} />
+                  <TextAreaTrans label="🇨🇳 中文 说明" value={formData.description_zh} onChange={(e:any) => setFormData({...formData, description_zh: e.target.value})} />
+                </div>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -306,7 +363,7 @@ export default function EditExperiencePage() {
           </div>
         )}
 
-        {/* 3. 코스 및 규칙 탭 */}
+        {/* 3. 코스 및 규칙 탭 (기존 기능 복구) */}
         {activeTab === 'course' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
@@ -353,6 +410,25 @@ export default function EditExperiencePage() {
         )}
 
       </main>
+    </div>
+  );
+}
+
+// 🟡 헬퍼 컴포넌트
+function InputTrans({ label, value, onChange, placeholder }: any) {
+  return (
+    <div>
+      <label className="block text-[10px] font-bold text-slate-400 mb-1">{label}</label>
+      <input className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-black outline-none" value={value || ''} onChange={onChange} placeholder={placeholder} />
+    </div>
+  );
+}
+
+function TextAreaTrans({ label, value, onChange }: any) {
+  return (
+    <div>
+      <label className="block text-[10px] font-bold text-slate-400 mb-1">{label}</label>
+      <textarea className="w-full p-3 h-24 bg-white border border-slate-200 rounded-lg text-sm focus:border-black outline-none resize-none" value={value || ''} onChange={onChange} />
     </div>
   );
 }

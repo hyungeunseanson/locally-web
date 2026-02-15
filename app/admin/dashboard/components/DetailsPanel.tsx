@@ -1,14 +1,46 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Search, User, Mail, Globe, MessageCircle, Phone, Smile, Clock, 
   MapPin, Cake, CheckCircle2, ShoppingBag, StickyNote, Star, Trash2, Link as LinkIcon, Edit,
-  CreditCard, FileText, Camera
+  CreditCard, FileText, Camera, Shield, Download, AlertTriangle, Check, X
 } from 'lucide-react';
+import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 
 export default function DetailsPanel({ activeTab, selectedItem, updateStatus, deleteItem }: any) {
+  const supabase = createClient();
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
+  // 🟢 [추가됨] 신분증 보안 URL 발급 로직
+  // 'verification-docs' 버킷에 있는 파일은 그냥 <img> 태그로 못 봅니다. (403 에러)
+  // 관리자 권한으로 '서명된 URL(Signed URL)'을 받아와야 볼 수 있습니다.
+  useEffect(() => {
+    if (activeTab === 'APPS' && selectedItem?.id_card_file) {
+      const fetchSignedUrl = async () => {
+        try {
+          // 파일 경로 추출 (URL에서 파일명만 따오기)
+          // 예: .../verification-docs/user_123_idcard.jpg -> user_123_idcard.jpg
+          const path = selectedItem.id_card_file.split('/').pop();
+          if (!path) return;
+
+          const { data, error } = await supabase
+            .storage
+            .from('verification-docs')
+            .createSignedUrl(path, 3600); // 3600초(1시간) 동안 유효
+
+          if (data) setSignedUrl(data.signedUrl);
+          if (error) console.error("신분증 로드 실패:", error);
+        } catch (e) {
+          console.error("URL 파싱 에러:", e);
+        }
+      };
+      fetchSignedUrl();
+    } else {
+      setSignedUrl(null);
+    }
+  }, [selectedItem, activeTab]);
   
   if (!selectedItem) {
     return (
@@ -33,7 +65,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
     <div className="flex-[1.5] bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col p-8 overflow-y-auto shadow-sm">
       <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
         
-        {/* 🟢 공통 헤더 */}
+        {/* 공통 헤더 */}
         <div className="border-b border-slate-100 pb-6 flex justify-between items-start">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
@@ -73,7 +105,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
                 <InfoBox label="MBTI" value={selectedItem.mbti} icon={<Smile size={14}/>} />
               </div>
             </div>
-            {/* 구매 활동, 리뷰, 메모 등 (기존 로직 포함) */}
+            
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><ShoppingBag size={12}/> 구매 활동</h4>
               <div className="grid grid-cols-3 gap-4 mb-4">
@@ -98,7 +130,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
               <InfoBox label="생년월일" value={selectedItem.dob} icon={<Cake size={14}/>} />
             </div>
 
-            {/* 프로필 사진 확인 */}
+            {/* 프로필 사진 */}
             <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                <div className="w-20 h-20 rounded-full bg-white overflow-hidden border border-slate-200 flex-shrink-0">
                  {selectedItem.profile_photo ? <img src={selectedItem.profile_photo} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={32}/></div>}
@@ -109,6 +141,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
                </div>
             </div>
 
+            {/* 언어 */}
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase mb-2"><MessageCircle size={14}/> 언어</div>
                <div className="flex flex-wrap gap-2">
@@ -137,23 +170,41 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
                </div>
             </div>
 
-            {/* 신분증 */}
-            <div>
-               <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><FileText size={14}/> 제출된 신분증</h4>
-               {selectedItem.id_card_file ? (<a href={selectedItem.id_card_file} target="_blank" rel="noreferrer" className="block w-full h-48 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 relative group"><img src={selectedItem.id_card_file} className="w-full h-full object-contain"/><div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold text-sm">크게 보기</div></a>) : (<div className="w-full h-24 bg-slate-50 rounded-xl border border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-sm">신분증 없음</div>)}
+            {/* 🟢 [수정됨] 신분증 확인 섹션 (보안 URL 적용) */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+               <h4 className="text-xs font-bold text-purple-700 uppercase mb-3 flex items-center gap-1">
+                 <Shield size={14}/> 신분증/자격증 확인 (관리자 전용)
+               </h4>
+               {signedUrl ? (
+                 <div className="space-y-3">
+                   <div className="relative aspect-[1.6] w-full bg-slate-200 rounded-lg overflow-hidden border border-slate-300 group">
+                     <img src={signedUrl} className="w-full h-full object-contain bg-black/5"/>
+                     <a href={signedUrl} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm">
+                       <Download size={16} className="mr-2"/> 원본 다운로드
+                     </a>
+                   </div>
+                   <p className="text-[10px] text-slate-400 text-center">* 보안을 위해 1시간 후 링크가 만료됩니다.</p>
+                 </div>
+               ) : (
+                 <div className="w-full h-24 bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 text-sm">
+                   <FileText size={20} className="mb-2 opacity-50"/>
+                   {selectedItem.id_card_file ? '이미지 로딩 중...' : '제출된 신분증이 없습니다.'}
+                 </div>
+               )}
             </div>
 
+            {/* 승인/거절 버튼 */}
             <div className="pt-8 mt-8 border-t border-slate-100 grid grid-cols-2 gap-4 sticky bottom-0 bg-white pb-4 z-10">
               <button onClick={()=>updateStatus('host_applications', selectedItem.id, 'revision')} className="py-4 rounded-xl font-bold text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100">보완 요청</button>
               <button onClick={()=>updateStatus('host_applications', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100">거절</button>
-              <button onClick={()=>updateStatus('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg">승인</button>
+              <button onClick={()=>updateStatus('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2"><Check size={18}/> 승인 (호스트 권한 부여)</button>
               <button onClick={()=>deleteItem('host_applications', selectedItem.id)} className="col-span-2 text-xs text-slate-400 hover:text-red-500 py-2 flex items-center justify-center gap-1"><Trash2 size={12}/> 영구 삭제</button>
             </div>
           </div>
         )}
 
-{/* 🟣 [EXPS] 체험 상세 정보 */}
-{activeTab === 'EXPS' && (
+        {/* 🟣 [EXPS] 체험 상세 정보 */}
+        {activeTab === 'EXPS' && (
           <div className="space-y-8">
             {selectedItem.photos && (
               <div>
@@ -172,19 +223,7 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
               <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
               <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}` : '-'} />
             </div>
-
-            {/* 🟢 [추가됨] 만나는 장소 표시 */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3 mt-4">
-              <MapPin size={20} className="text-slate-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-xs font-bold text-slate-400 uppercase mb-1">만나는 장소 (Meeting Point)</div>
-                <div className="font-bold text-slate-900 text-sm">
-                  {selectedItem.meeting_point || '정보 없음'}
-                </div>
-              </div>
-            </div>
-
-            {/* 🟢 [추가됨] 만나는 장소 표시 */}
+            
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
               <MapPin size={20} className="text-slate-400 mt-0.5 flex-shrink-0" />
               <div>
@@ -222,15 +261,15 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
 
             <div className="pt-8 mt-8 border-t border-slate-100 grid grid-cols-2 gap-4 sticky bottom-0 bg-white pb-4">
               <button onClick={()=>updateStatus('experiences', selectedItem.id, 'revision')} className="py-4 rounded-xl font-bold text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
-              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절 (Reject)</button>
-              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'approved')} className="col-span-2 py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인 (Approve)</button>
+              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절</button>
+              <button onClick={()=>updateStatus('experiences', selectedItem.id, 'approved')} className="col-span-2 py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>
               <button onClick={()=>deleteItem('experiences', selectedItem.id)} className="col-span-2 text-xs text-slate-400 hover:text-red-500 py-2 flex items-center justify-center gap-1"><Trash2 size={12}/> 체험 영구 삭제</button>
             </div>
           </div>
         )}
 
-{/* 🟢 [BOOKINGS] 실시간/예약 상세 (여기서부터 추가하세요) */}
-{(activeTab === 'BOOKINGS' || activeTab === 'REALTIME') && (
+        {/* 🟢 [BOOKINGS] 실시간/예약 상세 */}
+        {(activeTab === 'BOOKINGS' || activeTab === 'REALTIME') && (
           <div className="space-y-6">
             <div>
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><Clock size={12}/> 예약 정보</h4>
