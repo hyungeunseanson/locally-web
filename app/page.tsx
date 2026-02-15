@@ -98,7 +98,7 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
               {filteredExperiences.map((item) => (
-                // 🟢 [수정 완료] 이제 data={item}으로 정확히 전달합니다.
+                // 🟢 [수정 완료] 원본 디자인 카드로 데이터 전달
                 <ExperienceCard key={item.id} data={item} />
               ))}
             </div>
