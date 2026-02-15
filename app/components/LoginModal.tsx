@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Mail, Loader2, ArrowRight, ChevronDown } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { X, ChevronDown } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
@@ -24,172 +24,267 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [gender, setGender] = useState<'Male' | 'Female' | ''>('');
 
   const [loading, setLoading] = useState(false);
-  const [isSocialLoading, setIsSocialLoading] = useState(false); // 🟢 소셜 로딩 상태 추가
   const [isFocused, setIsFocused] = useState<string | null>(null);
   
   const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
 
-  // ... (ensureProfileExists 함수는 기존과 동일하게 유지) ...
   const ensureProfileExists = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: existingProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
     const meta = user.user_metadata || {};
 
     if (!existingProfile) {
       await supabase.from('profiles').insert({
-        id: user.id, email: user.email, full_name: meta.full_name || 'User',
-        phone: meta.phone, birth_date: meta.birth_date, gender: meta.gender
+        id: user.id,
+        email: user.email,
+        full_name: meta.full_name || 'User',
+        phone: meta.phone,
+        birth_date: meta.birth_date,
+        gender: meta.gender
       });
     } else {
       const updates: any = {};
       if (!existingProfile.gender && meta.gender) updates.gender = meta.gender;
       if (!existingProfile.birth_date && meta.birth_date) updates.birth_date = meta.birth_date;
       if (!existingProfile.phone && meta.phone) updates.phone = meta.phone;
-      if (Object.keys(updates).length > 0) await supabase.from('profiles').update(updates).eq('id', user.id);
+
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('profiles').update(updates).eq('id', user.id);
+      }
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // ... (기존 유효성 검사 로직 유지) ...
-    if (!email || !password) return showToast('이메일과 비밀번호를 입력해주세요.', 'error');
-    if (mode === 'SIGNUP' && (!fullName || !phone || !birthDate || !gender)) return showToast('모든 정보를 입력해주세요.', 'error');
+  const handleAuth = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (!email || !password) {
+      showToast('이메일과 비밀번호를 입력해주세요.', 'error');
+      return;
+    }
+
+    if (mode === 'SIGNUP') {
+      if (!fullName || !phone || !birthDate || !gender) {
+        showToast('이름, 연락처, 생년월일, 성별을 모두 입력해주세요.', 'error');
+        return;
+      }
+    }
 
     setLoading(true);
     try {
       if (mode === 'SIGNUP') {
         const { data, error } = await supabase.auth.signUp({ 
-          email, password, options: { data: { full_name: fullName, phone, birth_date: birthDate, gender } } 
+          email, 
+          password,
+          options: { 
+            data: { 
+              full_name: fullName,
+              phone: phone,
+              birth_date: birthDate,
+              gender: gender 
+            } 
+          }
         });
+        
         if (error) throw error;
+
+        // 이메일 인증이 꺼져있거나 완료된 경우
         if (data.user && data.session) {
-          showToast('회원가입 완료!', 'success');
+          showToast('회원가입이 완료되었습니다!', 'success');
           await ensureProfileExists();
-          onClose(); if (onLoginSuccess) onLoginSuccess(); router.refresh();
+          onClose();
+          if (onLoginSuccess) onLoginSuccess();
+          router.refresh();
         } else {
-          showToast('인증 메일을 확인해주세요.', 'success'); setMode('LOGIN');
+          // 이메일 인증이 켜져있는 경우
+          showToast('가입 인증 메일을 보냈습니다! 이메일을 확인해주세요.', 'success');
+          setMode('LOGIN'); 
         }
+
       } else {
+        // --- 로그인 ---
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        
+        if (error) {
+           if (error.message.includes('Invalid login credentials')) {
+             throw new Error('이메일 또는 비밀번호가 일치하지 않습니다.');
+           }
+           if (error.message.includes('Email not confirmed')) {
+             throw new Error('이메일 인증이 완료되지 않았습니다.');
+           }
+           throw error;
+        }
+        
         await ensureProfileExists();
-        showToast('환영합니다!', 'success');
-        onClose(); if (onLoginSuccess) onLoginSuccess(); router.refresh();
+        
+        showToast('환영합니다! 로그인 되었습니다.', 'success');
+        onClose();
+        if (onLoginSuccess) onLoginSuccess();
+        router.refresh();
       }
     } catch (error: any) {
-      showToast(error.message, 'error');
+      // 🟢 에러 핸들링 강화
+      // 브라우저 콘솔의 빨간 에러는 네트워크 실패라 막을 수 없지만, 사용자 경험은 여기서 처리합니다.
+      if (error.message?.includes('rate limit') || error.status === 429) {
+        showToast('너무 많은 가입 요청이 감지되었습니다. 잠시 후 다시 시도하거나 소셜 로그인을 이용해주세요.', 'error');
+      } else {
+        showToast(error.message, 'error');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSocialLogin = async (provider: 'kakao' | 'google') => {
-    setIsSocialLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: `${window.location.origin}/api/auth/callback` }, // 🟢 경로 수정됨
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      showToast(`로그인 실패: ${error.message}`, 'error');
-      setIsSocialLoading(false);
-    }
+  const handleSocialLogin = async (provider: 'google' | 'kakao') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (error) showToast(error.message, 'error');
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
 
-      <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[480px]' : 'max-w-[420px]'} rounded-3xl shadow-2xl overflow-hidden relative z-10 animate-in zoom-in-95 duration-200`}>
+      <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[480px]' : 'max-w-[420px]'} rounded-2xl shadow-2xl overflow-hidden relative z-10 animate-in zoom-in-95 duration-200 transition-all`}>
         
-        {/* 헤더 */}
-        <div className="px-6 pt-6 pb-2 flex justify-between items-center">
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
-          <div className="font-bold text-lg">{mode === 'LOGIN' ? '로그인' : '회원가입'}</div>
-          <div className="w-9"></div>
+        <div className="h-14 flex items-center justify-between px-5 border-b border-gray-100">
+          <button onClick={onClose} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
+            <X size={18} className="text-gray-900" />
+          </button>
+          <span className="font-bold text-[15px] text-gray-900">
+            {mode === 'LOGIN' ? '로그인' : '회원가입'}
+          </span>
+          <div className="w-8"></div>
         </div>
 
-        <div className={`p-6 ${mode === 'SIGNUP' ? 'max-h-[80vh] overflow-y-auto custom-scrollbar' : ''}`}>
+        <div className={`p-6 ${mode === 'SIGNUP' ? 'max-h-[80vh] overflow-y-auto' : ''}`}>
           
-          <h3 className="text-2xl font-black text-slate-900 mb-2">Locally에 오신 것을 환영합니다.</h3>
-          <p className="text-slate-500 font-medium mb-8">여행을 더 특별하게 만드는 로컬 체험 플랫폼</p>
+          <div className="mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-1">
+              {mode === 'LOGIN' ? 'Locally에 오신 것을 환영합니다.' : '계정 생성하기'}
+            </h3>
+            <p className="text-sm text-gray-500 font-medium">
+              {mode === 'LOGIN' ? '현지인처럼 여행하는 가장 쉬운 방법' : '빠르고 간편하게 가입하세요.'}
+            </p>
+          </div>
 
-          {/* 🟢 이메일 폼 */}
-          <form onSubmit={handleAuth} className="space-y-4 mb-8">
-            <div className="border border-slate-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-black focus-within:border-transparent transition-all">
-              <input 
-                type="email" placeholder="이메일" className="w-full h-14 px-4 text-lg outline-none border-b border-slate-200" 
-                value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username"
+          <form onSubmit={handleAuth}>
+            <div className="border border-gray-300 rounded-xl overflow-hidden mb-6">
+              
+              <InputItem 
+                type="email" label="이메일" value={email} setValue={setEmail} 
+                isFirst={true} focusKey="EMAIL" currentFocus={isFocused} setFocus={setIsFocused}
+                autoComplete="username"
               />
-              <input 
-                type="password" placeholder="비밀번호" className="w-full h-14 px-4 text-lg outline-none" 
-                value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
+
+              <InputItem 
+                type="password" label="비밀번호" value={password} setValue={setPassword} 
+                isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
+                autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
               />
-              {/* 회원가입 추가 필드는 기존 로직과 동일하게 유지... (생략 가능하지만 필요하면 넣어드립니다) */}
+
               {mode === 'SIGNUP' && (
-                 <>
-                   <input type="text" placeholder="이름 (실명)" className="w-full h-14 px-4 text-lg outline-none border-t border-slate-200" value={fullName} onChange={(e)=>setFullName(e.target.value)} />
-                   <input type="tel" placeholder="연락처" className="w-full h-14 px-4 text-lg outline-none border-t border-slate-200" value={phone} onChange={(e)=>setPhone(e.target.value)} />
-                   <div className="flex border-t border-slate-200">
-                     <input type="text" placeholder="생년월일(8자리)" className="w-1/2 h-14 px-4 outline-none border-r border-slate-200" value={birthDate} onChange={(e)=>setBirthDate(e.target.value)} />
-                     <select className="w-1/2 h-14 px-4 outline-none bg-white" value={gender} onChange={(e)=>setGender(e.target.value as any)}>
-                       <option value="">성별 선택</option><option value="Male">남성</option><option value="Female">여성</option>
-                     </select>
-                   </div>
-                 </>
+                <>
+                  <InputItem 
+                    type="text" label="이름 (실명)" value={fullName} setValue={setFullName} 
+                    isFirst={false} focusKey="NAME" currentFocus={isFocused} setFocus={setIsFocused}
+                    autoComplete="name"
+                  />
+                  
+                  <InputItem 
+                    type="tel" label="휴대폰 번호 (- 없이 입력)" value={phone} setValue={setPhone} 
+                    isFirst={false} focusKey="PHONE" currentFocus={isFocused} setFocus={setIsFocused}
+                    autoComplete="tel"
+                  />
+                  
+                  <div className="flex border-t border-gray-300">
+                     <div className={`relative h-14 w-1/2 border-r border-gray-300 ${isFocused === 'BIRTH' ? 'ring-2 ring-black z-10' : ''}`}>
+                        <input
+                          type="text"
+                          className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none placeholder-transparent peer"
+                          placeholder="생년월일 (YYYYMMDD)"
+                          value={birthDate}
+                          onChange={(e) => {
+                             const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                             setBirthDate(val);
+                          }}
+                          onFocus={() => setIsFocused('BIRTH')}
+                          onBlur={() => setIsFocused(null)}
+                          autoComplete="bday"
+                        />
+                        <label className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
+                          생년월일 (8자리)
+                        </label>
+                     </div>
+                     
+                     <div className={`relative h-14 w-1/2 ${isFocused === 'GENDER' ? 'ring-2 ring-black z-10' : ''}`}>
+                        <select
+                          className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none peer bg-transparent z-10 relative cursor-pointer"
+                          value={gender}
+                          onChange={(e) => setGender(e.target.value as any)}
+                          onFocus={() => setIsFocused('GENDER')}
+                          onBlur={() => setIsFocused(null)}
+                          autoComplete="sex"
+                        >
+                           <option value="" disabled>성별 선택</option> 
+                           <option value="Male">남성</option>
+                           <option value="Female">여성</option>
+                        </select>
+                        <label className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-0 origin-[0] left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
+                          성별
+                        </label>
+                        <ChevronDown size={16} className="absolute right-3 top-5 text-gray-500 pointer-events-none"/>
+                     </div>
+                  </div>
+                </>
               )}
             </div>
 
-            <button disabled={loading || isSocialLoading} className="w-full h-14 bg-[#FF385C] hover:bg-[#D90B3E] text-white rounded-xl font-bold text-lg transition-colors flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="animate-spin"/> : '계속하기'}
+            <div className="text-[11px] text-gray-500 mb-6 leading-relaxed">
+              계속 진행하면 Locally의 <span className="font-bold underline cursor-pointer">서비스 약관</span> 및 <span className="font-bold underline cursor-pointer">개인정보 처리방침</span>에 동의하는 것으로 간주됩니다.
+            </div>
+
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#111] hover:bg-black text-white font-bold h-12 rounded-xl text-[15px] transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed mb-6 shadow-md"
+            >
+              {loading ? '처리 중...' : (mode === 'LOGIN' ? '로그인' : '가입하기')}
             </button>
           </form>
 
-          {/* 구분선 */}
-          <div className="flex items-center gap-4 mb-8">
-            <div className="h-px bg-slate-200 flex-1"></div>
-            <span className="text-xs text-slate-400 font-bold">또는</span>
-            <div className="h-px bg-slate-200 flex-1"></div>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex-1 h-px bg-gray-200"></div>
+            <span className="text-[11px] text-gray-400 font-bold">또는</span>
+            <div className="flex-1 h-px bg-gray-200"></div>
           </div>
 
-          {/* 🟢 소셜 로그인 버튼 (디자인 개선됨) */}
           <div className="space-y-3">
-            {/* 카카오 */}
-            <button 
-              onClick={() => handleSocialLogin('kakao')}
-              disabled={isSocialLoading}
-              className="w-full h-12 bg-[#FEE500] hover:bg-[#FDD835] text-[#3c1e1e] rounded-xl font-bold flex items-center relative transition-transform active:scale-[0.98]"
-            >
-              <div className="absolute left-4">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 3C5.925 3 1 6.925 1 11.75C1 14.875 3.025 17.625 6.125 19.125C5.95 19.725 5.35 21.875 5.225 22.375C5.225 22.375 5.15 22.575 5.3 22.65C5.45 22.725 5.625 22.625 5.625 22.625C7.9 21.125 10.6 19.3 10.6 19.3C11.05 19.375 11.525 19.4 12 19.4C18.075 19.4 23 15.475 23 10.625C23 5.8 18.075 3 12 3Z"/>
-                </svg>
-              </div>
-              <span className="w-full text-center">카카오로 로그인</span>
-            </button>
-
-            {/* 구글 */}
-            <button 
-              onClick={() => handleSocialLogin('google')}
-              disabled={isSocialLoading}
-              className="w-full h-12 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl font-bold flex items-center relative transition-transform active:scale-[0.98]"
-            >
-              <div className="absolute left-4">
-                <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-              </div>
-              <span className="w-full text-center">구글로 로그인</span>
-            </button>
+            <SocialButton provider="kakao" onClick={() => handleSocialLogin('kakao')} />
+            <SocialButton provider="google" onClick={() => handleSocialLogin('google')} />
           </div>
 
-          <div className="mt-6 text-center">
-             <button onClick={() => setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN')} className="text-sm font-semibold text-slate-600 hover:text-black hover:underline transition-colors">
+          <div className="mt-6 text-center text-sm">
+             <button 
+                type="button"
+                onClick={() => {
+                  setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
+                  setIsFocused(null);
+                }} 
+                className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600 transition-colors"
+             >
                {mode === 'LOGIN' ? '계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인'}
              </button>
           </div>
@@ -197,5 +292,51 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         </div>
       </div>
     </div>
+  );
+}
+
+function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete }: any) {
+  const isFocused = currentFocus === focusKey;
+  
+  return (
+    <div className={`relative h-14 ${!isFirst ? 'border-t border-gray-300' : ''} ${isFocused ? 'ring-2 ring-black z-10 rounded-none' : ''}`}>
+      <input
+        type={type}
+        className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none placeholder-transparent peer"
+        placeholder={label}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onFocus={() => setFocus(focusKey)}
+        onBlur={() => setFocus(null)}
+        autoComplete={autoComplete}
+      />
+      <label className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
+        {label}
+      </label>
+    </div>
+  );
+}
+
+function SocialButton({ provider, onClick }: { provider: 'kakao' | 'google', onClick: () => void }) {
+  const isKakao = provider === 'kakao';
+  return (
+    <button 
+      type="button"
+      onClick={onClick}
+      className="w-full h-12 border border-gray-900 hover:bg-gray-50 rounded-xl flex items-center relative transition-all active:scale-[0.98]"
+    >
+      <div className="absolute left-4">
+        {isKakao ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" clipRule="evenodd" d="M12 4C7.02944 4 3 7.35786 3 11.5C3 14.078 4.66428 16.3685 7.23438 17.707L6.2125 21.465C6.12656 21.782 6.47891 22.029 6.75781 21.845L11.2969 18.845C11.5297 18.868 11.7641 18.88 12 18.88C16.9706 18.88 21 15.522 21 11.38C21 7.238 16.9706 4 12 4Z"/>
+          </svg>
+        ) : (
+          <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+        )}
+      </div>
+      <span className="w-full text-center text-sm font-bold text-gray-900">
+        {isKakao ? '카카오톡으로 계속하기' : '구글로 계속하기'}
+      </span>
+    </button>
   );
 }
