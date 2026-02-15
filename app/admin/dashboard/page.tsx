@@ -66,8 +66,19 @@ export default function AdminDashboardPage() {
       if (userData) setUsers(userData);
       
       // 🟢 [수정] experiences(title, price) 제거 (단순 조회)
-      const { data: bookingData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
-      if (bookingData) setBookings(bookingData);
+// 🟢 [핵심 수정] 예약 데이터 조회 강화
+      // - experiences(title): 체험 제목도 같이 가져옴 (관리 편의성)
+      // - limit(1000): 기본 100개 제한을 풀어서 최신 1000개까지 가져오도록 설정
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('*, experiences (title)') 
+        .order('created_at', { ascending: false }) // 최신순 정렬
+        .limit(1000); // 🟢 데이터 짤림 방지
+
+if (bookingData) {
+        console.log(`✅ 예약 데이터 ${bookingData.length}개 로드 완료`); // 디버깅용 로그
+        setBookings(bookingData);
+      }
 
       const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
       if (reviewData) setReviews(reviewData);
