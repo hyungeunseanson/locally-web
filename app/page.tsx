@@ -6,7 +6,7 @@ import HomeHero from '@/app/components/HomeHero';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
 import { LOCALLY_SERVICES } from '@/app/constants'; 
-import { useExperienceFilter } from '@/app/hooks/useExperienceFilter'; // 🟢 훅 임포트
+import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { ExperienceCardSkeleton } from '@/app/components/skeletons/ExperienceCardSkeleton';
 
 export default function HomePage() {
@@ -15,7 +15,6 @@ export default function HomePage() {
   const [scrollY, setScrollY] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // 🟢 훅 사용 (로직 위임)
   const {
     loading, filteredExperiences, allExperiences,
     locationInput, setLocationInput,
@@ -68,19 +67,18 @@ export default function HomePage() {
         selectedLanguage={selectedLanguage}
         setSelectedLanguage={setSelectedLanguage}
         searchRef={searchRef}
-        onSearch={applyFilters} // 🟢 필터 적용 함수 연결
+        onSearch={applyFilters}
       />
 
       <main className="max-w-[1760px] mx-auto px-6 md:px-12 py-8 min-h-screen">
         {activeTab === 'experience' && (
           loading ? (
-    // 🟢 [수정] 멋진 스켈레톤으로 교체!
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-      <ExperienceCardSkeleton key={i} />
-    ))}
-  </div>
-) : filteredExperiences.length === 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <ExperienceCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : filteredExperiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-40 text-center">
               <Ghost size={48} className="text-slate-300 mb-4"/>
               <h3 className="text-lg font-bold text-slate-900 mb-2">검색 결과가 없습니다.</h3>
@@ -99,7 +97,10 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-              {filteredExperiences.map((item) => <ExperienceCard key={item.id} data={item} />)}
+              {filteredExperiences.map((item) => (
+                // 🟢 [수정 완료] 이제 data={item}으로 정확히 전달합니다.
+                <ExperienceCard key={item.id} data={item} />
+              ))}
             </div>
           )
         )}
@@ -110,8 +111,6 @@ export default function HomePage() {
           </div>
         )}
       </main>
-    
     </div>
-  
   );
 }
