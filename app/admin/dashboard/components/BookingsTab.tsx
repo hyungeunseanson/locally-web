@@ -11,29 +11,56 @@ import { useToast } from '@/app/context/ToastContext';
 export default function BookingsTab({ bookings }: { bookings: any[] }) {
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'ALL' | 'UPCOMING' | 'PAST'>('ALL');
+  
+  // 🟢 [수정 1] 필터 탭에 'CANCELLED' 추가
+  const [filterType, setFilterType] = useState<'ALL' | 'UPCOMING' | 'PAST' | 'CANCELLED'>('ALL');
+  
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [showRawData, setShowRawData] = useState(false); // 🟢 RAW 데이터 토글
+  const [showRawData, setShowRawData] = useState(false);
 
-  // 1. 유효 데이터 필터링
-  const validBookings = bookings.filter(b => b.status === 'PAID' || b.status === 'confirmed' || b.status === 'CANCELLED');
+  // 🟢 [수정 2] 유효 데이터 필터링 (대소문자 모두 허용)
+  // DB에 'cancelled' 소문자로 저장된 데이터도 포함시킴
+  const validBookings = bookings.filter(b => {
+    const s = b.status?.toUpperCase();
+    return s === 'PAID' || s === 'CONFIRMED' || s === 'CANCELLED' || s === 'CANCELLATION_REQUESTED';
+  });
 
-  // 2. 검색 및 날짜 필터
+  // 🟢 [수정 3] 검색 및 탭 필터링 로직 강화
   const filteredBookings = validBookings.filter(b => {
+    // 검색
     const searchString = `${b.contact_name} ${b.contact_phone} ${b.experiences?.title} ${b.id} ${b.profiles?.email || ''}`.toLowerCase();
     const matchesSearch = searchString.includes(searchTerm.toLowerCase());
     
+    // 날짜 계산
     const expDate = new Date(`${b.date} ${b.time}`);
     const now = new Date();
     const isUpcoming = expDate >= now;
+    const status = b.status?.toUpperCase();
 
-    if (filterType === 'UPCOMING') return matchesSearch && isUpcoming;
-    if (filterType === 'PAST') return matchesSearch && !isUpcoming;
+    // 탭별 로직
+    if (filterType === 'UPCOMING') {
+      // 예정된 예약은 '취소되지 않은' 미래의 예약
+      return matchesSearch && isUpcoming && status !== 'CANCELLED' && status !== 'CANCELLATION_REQUESTED';
+    }
+    if (filterType === 'PAST') {
+      // 지난 예약은 '취소되지 않은' 과거의 예약
+      return matchesSearch && !isUpcoming && status !== 'CANCELLED' && status !== 'CANCELLATION_REQUESTED';
+    }
+    if (filterType === 'CANCELLED') {
+      // 취소된 건만 보기
+      return matchesSearch && (status === 'CANCELLED' || status === 'CANCELLATION_REQUESTED');
+    }
+    
+    // 전체 보기 (모두 포함)
     return matchesSearch;
   });
 
-  // 3. 정산 시뮬레이션
-  const paidBookings = validBookings.filter(b => b.status === 'PAID' || b.status === 'confirmed');
+  // 정산 통계 (결제 완료된 건만)
+  const paidBookings = validBookings.filter(b => {
+    const s = b.status?.toUpperCase();
+    return s === 'PAID' || s === 'CONFIRMED';
+  });
+
   const stats = paidBookings.reduce((acc, b) => {
     const guestPay = b.amount || 0;
     const hostPrice = b.total_price || 0;
@@ -46,13 +73,12 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
     };
   }, { gmv: 0, revenue: 0, payout: 0 });
 
-  // 4. 엑셀 다운로드
   const downloadCSV = () => {
     const headers = ['주문번호', '예약자명', '이메일', '전화번호', '체험명', '날짜', '시간', '인원', '결제금액', '상태', '생성일'];
     const rows = filteredBookings.map(b => [
       b.id,
       b.contact_name,
-      b.profiles?.email || 'N/A', // 이메일 추가
+      b.profiles?.email || 'N/A',
       b.contact_phone,
       b.experiences?.title,
       b.date,
@@ -81,10 +107,10 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
   return (
     <div className="flex h-full gap-6">
       
-      {/* 🟢 왼쪽: 리스트 (요약 정보) */}
+      {/* 리스트 영역 */}
       <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         
-        {/* 상단 통계 바 */}
+        {/* 상단 통계 */}
         <div className="bg-slate-900 text-white p-4 flex justify-between items-center px-6 shrink-0">
           <div className="flex gap-8">
             <div>
@@ -102,7 +128,7 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
           </button>
         </div>
 
-        {/* 툴바 */}
+        {/* 툴바 & 탭 */}
         <div className="p-4 border-b border-slate-100 flex gap-3 bg-slate-50 shrink-0">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -114,26 +140,27 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
+          {/* 🟢 [수정 4] 탭 메뉴 확장 */}
           <div className="flex bg-white border border-slate-200 p-1 rounded-xl">
-            {['ALL', 'UPCOMING', 'PAST'].map((type) => (
+            {['ALL', 'UPCOMING', 'PAST', 'CANCELLED'].map((type) => (
               <button
                 key={type}
                 onClick={() => setFilterType(type as any)}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${filterType === type ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                {type === 'ALL' ? '전체' : type === 'UPCOMING' ? '예정' : '완료'}
+                {type === 'ALL' ? '전체' : type === 'UPCOMING' ? '예정' : type === 'PAST' ? '완료' : '취소됨'}
               </button>
             ))}
           </div>
         </div>
 
-        {/* 리스트 테이블 */}
+        {/* 테이블 */}
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-white text-xs font-bold text-slate-500 uppercase sticky top-0 z-10 border-b border-slate-100 shadow-sm">
               <tr>
                 <th className="px-6 py-3">체험 정보</th>
-                <th className="px-6 py-3">게스트</th>
+                <th className="px-6 py-3">예약자</th>
                 <th className="px-6 py-3">결제 금액</th>
                 <th className="px-6 py-3">상태</th>
                 <th className="px-6 py-3 text-right">상세</th>
@@ -149,7 +176,8 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                   <td className="px-6 py-4">
                     <div className="font-bold text-slate-900 line-clamp-1 mb-1">{bk.experiences?.title}</div>
                     <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <span className={new Date(`${bk.date} ${bk.time}`) < new Date() ? "line-through opacity-50" : "text-blue-600 font-bold"}>
+                      {/* 취소된 건은 날짜에 취소선 표시 */}
+                      <span className={bk.status?.toUpperCase() === 'CANCELLED' ? "line-through opacity-50" : (new Date(`${bk.date} ${bk.time}`) < new Date() ? "opacity-50" : "text-blue-600 font-bold")}>
                         {bk.date} · {bk.time}
                       </span>
                       <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">{bk.guests}명</span>
@@ -163,15 +191,16 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                     ₩{Number(bk.amount).toLocaleString()}
                   </td>
                   <td className="px-6 py-4">
-                    {bk.status === 'PAID' || bk.status === 'confirmed' ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                        <CheckCircle2 size={12}/> 확정
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                        <XCircle size={12}/> 취소
-                      </span>
-                    )}
+                    {(() => {
+                      const s = bk.status?.toUpperCase();
+                      if (s === 'PAID' || s === 'CONFIRMED') {
+                        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700"><CheckCircle2 size={12}/> 확정</span>;
+                      } else if (s === 'CANCELLED' || s === 'CANCELLATION_REQUESTED') {
+                        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700"><XCircle size={12}/> 취소</span>;
+                      } else {
+                        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">{s}</span>;
+                      }
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <MoreHorizontal size={16} className="text-slate-400"/>
@@ -186,7 +215,7 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
         </div>
       </div>
 
-      {/* 🟢 오른쪽: 상세 패널 (Excessive Detail Mode) */}
+      {/* 오른쪽: 상세 패널 */}
       {selectedBooking ? (
         <div className="w-[450px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 relative z-20">
           
@@ -201,8 +230,8 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
 
           <div className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-slate-200">
             
-            {/* 1. 취소된 경우 경고 박스 */}
-            {(selectedBooking.status === 'CANCELLED' || selectedBooking.status === 'cancellation_requested') && (
+            {/* 취소 상태 경고 */}
+            {(selectedBooking.status?.toUpperCase() === 'CANCELLED' || selectedBooking.status?.toUpperCase() === 'CANCELLATION_REQUESTED') && (
               <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex gap-3 items-start">
                 <AlertTriangle className="text-red-500 shrink-0" size={20}/>
                 <div>
@@ -210,18 +239,14 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                   <p className="text-xs text-red-600 mt-1">
                     사유: {selectedBooking.cancel_reason || '사용자 또는 관리자 취소'}
                   </p>
-                  <p className="text-[10px] text-red-400 mt-2 font-mono">
-                    취소 일시: {new Date(selectedBooking.updated_at || new Date()).toLocaleString()}
-                  </p>
                 </div>
               </div>
             )}
 
-            {/* 2. 수익 분석 (카드 형태) */}
+            {/* 수익 분석 카드 */}
             <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
                <div className="absolute top-0 right-0 p-3 opacity-10"><TrendingUp size={120}/></div>
                
-               {/* 게스트 결제 */}
                <div className="flex justify-between items-end mb-4">
                  <div className="text-xs text-slate-400">게스트 총 결제금액</div>
                  <div className="text-2xl font-black">₩{Number(selectedBooking.amount).toLocaleString()}</div>
@@ -243,7 +268,6 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                  </div>
                </div>
 
-               {/* PG사 정보 */}
                <div className="mt-4 flex justify-between items-center">
                  <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
                    <CreditCard size={12}/> {selectedBooking.tid || 'TID 없음'}
@@ -256,7 +280,7 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                </div>
             </div>
 
-            {/* 3. 과한 상세 정보 (User Info) */}
+            {/* 상세 정보 (User Info) */}
             <div className="space-y-4">
               <h4 className="font-bold text-sm flex items-center gap-2 border-b pb-2"><User size={16}/> 예약자 상세 정보</h4>
               
@@ -287,23 +311,11 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
                    <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center"><Mail size={16} className="text-slate-500"/></div>
                       <div>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase">Email (Profile)</div>
-                        {/* 🟢 [주의] select에서 profiles(email) 조인해와야 보임 */}
-                        <div className="text-sm font-bold text-slate-900">{selectedBooking.profiles?.email || '이메일 정보 없음'}</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">Email</div>
+                        <div className="text-sm font-bold text-slate-900">{selectedBooking.profiles?.email || 'N/A'}</div>
                       </div>
                    </div>
                    <button onClick={() => handleCopy(selectedBooking.profiles?.email)}><Copy size={14} className="text-slate-400 hover:text-black"/></button>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                   <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center"><Fingerprint size={16} className="text-slate-500"/></div>
-                      <div>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase">User UUID</div>
-                        <div className="text-xs font-mono text-slate-600 truncate max-w-[150px]">{selectedBooking.user_id}</div>
-                      </div>
-                   </div>
-                   <button onClick={() => handleCopy(selectedBooking.user_id)}><Copy size={14} className="text-slate-400 hover:text-black"/></button>
                 </div>
               </div>
 
@@ -315,15 +327,14 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
               )}
             </div>
 
-            {/* 4. 시스템 데이터 (RAW JSON) */}
+            {/* RAW DATA */}
             <div className="border-t pt-4">
                <button 
                  onClick={() => setShowRawData(!showRawData)}
                  className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-700 mb-3"
                >
-                 <Code size={14}/> Raw Data (Developer Mode) {showRawData ? '▲' : '▼'}
+                 <Code size={14}/> Raw Data {showRawData ? '▲' : '▼'}
                </button>
-               
                {showRawData && (
                  <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
                     <pre className="text-[10px] font-mono text-emerald-400 leading-relaxed">
@@ -335,7 +346,7 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
 
           </div>
           
-          {/* 하단 액션 버튼 */}
+          {/* 액션 버튼 */}
           <div className="p-5 border-t border-slate-100 bg-slate-50 shrink-0">
              <button 
                 onClick={() => { if(confirm('Phase 5에서 환불 API 연동 예정입니다.')) {} }}
@@ -349,7 +360,6 @@ export default function BookingsTab({ bookings }: { bookings: any[] }) {
         <div className="w-[450px] bg-slate-50 border border-slate-200 border-dashed rounded-2xl flex items-center justify-center flex-col text-slate-400 gap-3">
            <Search size={48} className="opacity-10"/>
            <span className="text-sm font-bold">리스트에서 예약을 선택하세요</span>
-           <span className="text-xs opacity-50">상세 정보를 볼 수 있습니다</span>
         </div>
       )}
     </div>

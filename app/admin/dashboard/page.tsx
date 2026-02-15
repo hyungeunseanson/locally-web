@@ -71,7 +71,7 @@ export default function AdminDashboardPage() {
       // - limit(1000): 기본 100개 제한을 풀어서 최신 1000개까지 가져오도록 설정
       const { data: bookingData } = await supabase
         .from('bookings')
-        .select('*, experiences (title)') 
+        .select('*, experiences (title), profiles (email)') 
         .order('created_at', { ascending: false }) // 최신순 정렬
         .limit(1000); // 🟢 데이터 짤림 방지
 
