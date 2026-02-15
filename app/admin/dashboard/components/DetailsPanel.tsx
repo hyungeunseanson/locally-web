@@ -16,31 +16,34 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
   // 🟢 [추가됨] 신분증 보안 URL 발급 로직
   // 'verification-docs' 버킷에 있는 파일은 그냥 <img> 태그로 못 봅니다. (403 에러)
   // 관리자 권한으로 '서명된 URL(Signed URL)'을 받아와야 볼 수 있습니다.
-  useEffect(() => {
-    if (activeTab === 'APPS' && selectedItem?.id_card_file) {
-      const fetchSignedUrl = async () => {
-        try {
-          // 파일 경로 추출 (URL에서 파일명만 따오기)
-          // 예: .../verification-docs/user_123_idcard.jpg -> user_123_idcard.jpg
-          const path = selectedItem.id_card_file.split('/').pop();
-          if (!path) return;
+// DetailsPanel.tsx 내 useEffect 수정
+useEffect(() => {
+  if (activeTab === 'APPS' && selectedItem?.id_card_file) {
+    const fetchSignedUrl = async () => {
+      try {
+        // 🟢 수정: 파일명이 전체 URL인지 단순 파일명인지 체크
+        const fileName = selectedItem.id_card_file.includes('/') 
+          ? selectedItem.id_card_file.split('/').pop() 
+          : selectedItem.id_card_file;
 
-          const { data, error } = await supabase
-            .storage
-            .from('verification-docs')
-            .createSignedUrl(path, 3600); // 3600초(1시간) 동안 유효
+        if (!fileName) return;
 
-          if (data) setSignedUrl(data.signedUrl);
-          if (error) console.error("신분증 로드 실패:", error);
-        } catch (e) {
-          console.error("URL 파싱 에러:", e);
-        }
-      };
-      fetchSignedUrl();
-    } else {
-      setSignedUrl(null);
-    }
-  }, [selectedItem, activeTab]);
+        const { data, error } = await supabase
+          .storage
+          .from('verification-docs')
+          .createSignedUrl(fileName, 3600); 
+
+        if (data) setSignedUrl(data.signedUrl);
+        if (error) console.error("신분증 로드 실패:", error);
+      } catch (e) {
+        console.error("URL 파싱 에러:", e);
+      }
+    };
+    fetchSignedUrl();
+  } else {
+    setSignedUrl(null);
+  }
+}, [selectedItem, activeTab]);
   
   if (!selectedItem) {
     return (
