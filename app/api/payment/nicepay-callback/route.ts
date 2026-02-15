@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
-// 🟢 Vercel 로그에서 확인하기 쉽게 [DEBUG] 태그를 붙였습니다.
+// 🟢 Vercel 로그 확인용 [DEBUG] 태그 유지
 export async function POST(request: Request) {
   console.log('🚨 [DEBUG] 결제 콜백 시작');
 
@@ -20,14 +20,12 @@ export async function POST(request: Request) {
     let resCode: any = '';
     let amount: any = 0;
     let orderId: any = '';
-    let rawJson: any = {};
     let tid: any = '';
 
     const contentType = request.headers.get('content-type') || '';
     
     if (contentType.includes('application/json')) {
       const json = await request.json();
-      rawJson = json;
       const isSuccess = json.success === true || 
                         json.code === '0' || 
                         json.status === 'paid' || 
@@ -50,23 +48,21 @@ export async function POST(request: Request) {
       // 3. 관리자 권한 DB 접속
       const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
       
-      // 4. 예약 상태 업데이트 (PAID)
-      console.log('⏳ [DEBUG] DB 상태 업데이트 시도 (Only Status)...');
+      // 4. 예약 상태 업데이트 (PAID) 및 TID 저장
+      console.log('⏳ [DEBUG] DB 상태 업데이트 시도...');
       
-// 🟢 [수정] 이제 TID도 함께 저장합니다!
-const { data: bookingData, error: dbError } = await supabase
-.from('bookings')
-.update({
-  status: 'PAID',
-  tid: tid, // 🟢 TID 저장 복구
-})
+      const { data: bookingData, error: dbError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'PAID',
+          tid: tid, 
+        })
         .eq('id', orderId)
         .select(`*, experiences (host_id, title)`)
         .single();
 
       if (dbError) {
         console.error('🔥 [DEBUG] DB 업데이트 실패:', dbError);
-        // 여기서 에러나면 바로 throw해서 클라이언트에게 알림
         throw new Error(`DB Error: ${dbError.message}`);
       } 
       
