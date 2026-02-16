@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
 
 export function useGuestTrips() {
@@ -10,6 +9,9 @@ export function useGuestTrips() {
   const [pastTrips, setPastTrips] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // 🟢 [수정 1] page.tsx 에러 해결을 위한 상태 추가
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   const supabase = createClient();
   const { showToast } = useToast();
@@ -22,10 +24,11 @@ export function useGuestTrips() {
   const fetchMyTrips = useCallback(async () => {
     try {
       setIsLoading(true);
+      setErrorMsg(null); // 초기화
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
 
-      // 1. 예약 정보와 체험 정보 조회
       const { data: bookings, error } = await supabase
         .from('bookings')
         .select(`
@@ -42,6 +45,7 @@ export function useGuestTrips() {
       if (error) throw error;
 
       if (bookings) {
+        // 호스트 정보 매핑 로직 유지
         const hostIds = Array.from(new Set(bookings.map((b: any) => b.experiences?.host_id).filter(Boolean)));
         let appsMap = new Map();
         if (hostIds.length > 0) {
@@ -69,6 +73,7 @@ export function useGuestTrips() {
           const finalHostName = hostApp?.name || profileData?.name || profileData?.full_name || 'Locally Host';
           const finalHostAvatar = hostApp?.profile_photo || profileData?.avatar_url;
 
+          // 🟢 [수정 2] 금액(amount)과 결제일(paymentDate) 명확히 매핑
           const formattedTrip = {
             id: booking.id,
             title: booking.experiences.title,
@@ -85,16 +90,27 @@ export function useGuestTrips() {
             dDay: isFuture ? `D-${Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))}` : null,
             isPrivate: booking.type === 'private',
             status: booking.status,
-            price: booking.amount || booking.total_price || 0,
+            
+            // 여기가 핵심: 0원 문제 해결
+            amount: booking.amount, 
+            totalPrice: booking.amount || booking.total_price || 0, 
+            
             guests: booking.guests || 1,
             expId: booking.experience_id,
             orderId: booking.order_id || booking.id,
-            paymentDate: booking.created_at,
+            paymentDate: booking.created_at, // 환불 계산 시 사용됨
             hasReview: booking.reviews && booking.reviews.length > 0
           };
 
-          if (isFuture) upcoming.push(formattedTrip);
-          else past.push(formattedTrip);
+          // 완료된 건이나 취소된 건은 과거 내역으로
+          if (isFuture && booking.status !== 'cancelled' && booking.status !== 'cancellation_requested') {
+             upcoming.push(formattedTrip);
+          } else {
+             // 미래 날짜라도 취소된 건은 지난 여행(또는 취소 내역)으로 보낼 수 있음
+             // 현재 로직상 날짜 기준 분류 유지
+             if(isFuture) upcoming.push(formattedTrip);
+             else past.push(formattedTrip);
+          }
         });
 
         setUpcomingTrips(upcoming);
@@ -102,43 +118,42 @@ export function useGuestTrips() {
       }
     } catch (err: any) {
       console.error(err);
+      setErrorMsg(err.message); // 에러 설정
     } finally {
       setIsLoading(false);
     }
   }, [supabase]);
 
-  // ✅ [수정 완료] 과도한 검증 로직 제거 + 알림 정상화
+  // 🟢 [수정 3] API 호출 방식으로 변경 (환불 자동 계산 및 PG 연동)
   const requestCancel = async (id: number, reason: string, hostId: string) => {
     setIsProcessing(true);
     try {
-      // 1. DB 업데이트 (검증 로직 제거, 에러만 체크)
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancellation_requested', cancel_reason: reason })
-        .eq('id', id);
+      // API 호출
+      const res = await fetch('/api/payments/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          bookingId: id, 
+          reason: reason, 
+          isHostCancel: false 
+        }),
+      });
 
-      if (error) throw error;
-      
-      // 2. 호스트 알림 전송 (title 필수값 포함)
-      if (hostId) {
-        await sendNotification({ 
-          recipient_id: hostId, 
-          type: 'booking_cancel_request', 
-          title: '예약 취소 요청', 
-          content: '게스트가 예약 취소를 요청했습니다.', 
-          link_url: '/host/dashboard?tab=cancelled' 
-        });
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || '취소 요청에 실패했습니다.');
       }
-
-      showToast('취소 요청이 접수되었습니다.', 'success');
       
-      // 3. 목록 새로고침 (즉시 UI 반영)
+      showToast('취소 처리가 완료되었습니다.', 'success');
+      
+      // 목록 새로고침
       await fetchMyTrips(); 
       return true; 
 
     } catch (err: any) {
       console.error('취소 요청 오류:', err);
-      showToast('요청 실패: ' + err.message, 'error');
+      showToast(err.message || '요청 실패', 'error');
       return false; 
     } finally {
       setIsProcessing(false);
@@ -147,5 +162,14 @@ export function useGuestTrips() {
 
   useEffect(() => { fetchMyTrips(); }, [fetchMyTrips]);
 
-  return { upcomingTrips, pastTrips, isLoading, isProcessing, requestCancel, refreshTrips: fetchMyTrips };
+  // 🟢 [수정 4] errorMsg 반환 추가
+  return { 
+    upcomingTrips, 
+    pastTrips, 
+    isLoading, 
+    isProcessing, 
+    errorMsg, // 반환
+    requestCancel, 
+    refreshTrips: fetchMyTrips 
+  };
 }

@@ -45,31 +45,45 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   };
 
   // 🟢 [환불 계산기] 프론트엔드용 (API 로직과 동일하게 유지)
-  const calculateRefundFront = () => {
-    const now = new Date();
-    const tourDate = new Date(`${trip.date}T${trip.time || '00:00'}:00`);
-    const paymentDate = new Date(trip.paymentDate || trip.created_at); // 결제일
+// TripCard.tsx 내부 calculateRefundFront 함수 교체
 
-    const diffTime = tourDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-    const hoursSincePayment = (now.getTime() - paymentDate.getTime()) / (1000 * 60 * 60);
+const calculateRefundFront = () => {
+  // 🔍 [디버깅] 들어오는 데이터 전체 확인 (F12 개발자 도구 콘솔에서 확인 필수!)
+  console.log("🔍 Trip 전체 데이터:", trip);
 
-    // 🟢 [수정] 데이터 컬럼명 매핑 강화 (total_price가 Supabase 원본 컬럼)
-    const totalAmount = trip.total_price || trip.amount || trip.totalPrice || 0;
-    console.log('환불 계산 기준 금액:', totalAmount);
-    // 1. 결제 후 24시간 이내 철회 (단, 투어일 1일 전까지만)
-    if (hoursSincePayment <= 24 && diffDays > 1) {
-      return { percent: 100, amount: totalAmount, reason: '결제 후 24시간 이내 철회 (전액 환불)' };
-    }
+  const now = new Date();
+  // 날짜 형식이 안맞을 경우를 대비한 방어 코드
+  const dateString = trip.date || new Date().toISOString().split('T')[0];
+  const timeString = trip.time || '00:00';
+  const tourDate = new Date(`${dateString}T${timeString}:00`);
+  
+  // paymentDate가 없으면 created_at 사용
+  const payDateString = trip.paymentDate || trip.created_at || new Date().toISOString();
+  const paymentDate = new Date(payDateString); 
 
-    // 2. 날짜별 규정
-    if (diffDays <= 0) return { percent: 0, amount: 0, reason: '투어 당일/경과 (환불 불가)' };
-    if (diffDays === 1) return { percent: 40, amount: Math.floor(totalAmount * 0.4), reason: '1일 전 취소 (40% 환불)' };
-    if (diffDays >= 2 && diffDays <= 7) return { percent: 70, amount: Math.floor(totalAmount * 0.7), reason: '2~7일 전 취소 (70% 환불)' };
-    if (diffDays >= 8 && diffDays <= 19) return { percent: 80, amount: Math.floor(totalAmount * 0.8), reason: '8~19일 전 취소 (80% 환불)' };
-    
-    return { percent: 100, amount: totalAmount, reason: '20일 전 취소 (전액 환불)' };
-  };
+  const diffTime = tourDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+  const hoursSincePayment = (now.getTime() - paymentDate.getTime()) / (1000 * 60 * 60);
+
+  // 🟢 [핵심 수정] 금액 변수명 전부 체크 (문자열일 경우 숫자로 변환)
+  const rawPrice = trip.amount || trip.totalPrice || trip.total_price || trip.price || 0;
+  const totalAmount = Number(rawPrice);
+
+  console.log(`💰 추출된 금액: ${totalAmount} (원본: ${rawPrice})`);
+
+  // 1. 결제 후 24시간 이내 철회 (단, 투어일 2일 전까지만 - 규정 재확인)
+  if (hoursSincePayment <= 24 && diffDays > 1) {
+    return { percent: 100, amount: totalAmount, reason: '결제 후 24시간 이내 철회 (전액 환불)' };
+  }
+
+  // 2. 날짜별 규정
+  if (diffDays <= 0) return { percent: 0, amount: 0, reason: '투어 당일/경과 (환불 불가)' };
+  if (diffDays === 1) return { percent: 40, amount: Math.floor(totalAmount * 0.4), reason: '1일 전 취소 (40% 환불)' };
+  if (diffDays >= 2 && diffDays <= 7) return { percent: 70, amount: Math.floor(totalAmount * 0.7), reason: '2~7일 전 취소 (70% 환불)' };
+  if (diffDays >= 8 && diffDays <= 19) return { percent: 80, amount: Math.floor(totalAmount * 0.8), reason: '8~19일 전 취소 (80% 환불)' };
+  
+  return { percent: 100, amount: totalAmount, reason: '20일 전 취소 (전액 환불)' };
+};
 
   // 취소 버튼 클릭 시 계산 수행
   const handleCancelClick = () => {
