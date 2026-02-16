@@ -6,10 +6,11 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Check, Clock, Trash2, X, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { useToast } from '@/app/context/ToastContext'; // 토스트 알림 사용 권장
+import { useToast } from '@/app/context/ToastContext';
 
 type TimeSlot = string; 
 type AvailabilityMap = Record<string, TimeSlot[]>;
+type BookingCountMap = Record<string, number>; // "2024-05-01_10:00": 3 (예약수)
 
 export default function ManageDatesPage() {
   const supabase = createClient();
@@ -18,27 +19,52 @@ export default function ManageDatesPage() {
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [availability, setAvailability] = useState<AvailabilityMap>({});
-  // 🟢 [추가] 초기 로드 시점의 데이터 (변경 사항 비교용)
   const [initialData, setInitialData] = useState<AvailabilityMap>({}); 
+  const [bookingCounts, setBookingCounts] = useState<BookingCountMap>({}); // 🟢 실제 예약 카운트 저장
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 1. 데이터 불러오기
+  // 1. 데이터 불러오기 (슬롯 + 실제 예약 내역)
   const fetchDates = async () => {
-    const { data } = await supabase
+    // (1) 슬롯 가져오기 (컬럼 최소화)
+    const { data: slots, error: slotError } = await supabase
       .from('experience_availability')
-      .select('date, start_time, current_bookings') // 🟢 예약 현황도 가져옴
+      .select('date, start_time') // 🟢 current_bookings 제거
       .eq('experience_id', params.id);
     
-    if (data) {
-      const map: AvailabilityMap = {};
-      data.forEach((item: any) => {
-        if (!map[item.date]) map[item.date] = [];
-        map[item.date].push(item.start_time);
-      });
-      setAvailability(JSON.parse(JSON.stringify(map))); // Deep Copy
-      setInitialData(JSON.parse(JSON.stringify(map))); // 초기 상태 저장
+    if (slotError) {
+        console.error("Slot fetch error:", slotError);
+        return;
     }
+
+    // (2) 실제 유효한 예약 가져오기 (confirmed, paid 등)
+    const { data: bookings, error: bookingError } = await supabase
+      .from('bookings')
+      .select('date, time')
+      .eq('experience_id', params.id)
+      .in('status', ['confirmed', 'paid', 'completed']); // 유효한 예약 상태만
+
+    // (3) 데이터 가공
+    const availMap: AvailabilityMap = {};
+    if (slots) {
+      slots.forEach((item: any) => {
+        if (!availMap[item.date]) availMap[item.date] = [];
+        availMap[item.date].push(item.start_time);
+      });
+    }
+    
+    // 예약 카운트 맵 생성 ("날짜_시간" 키)
+    const countMap: BookingCountMap = {};
+    if (bookings) {
+        bookings.forEach((b: any) => {
+            const key = `${b.date}_${b.time}`;
+            countMap[key] = (countMap[key] || 0) + 1;
+        });
+    }
+
+    setAvailability(JSON.parse(JSON.stringify(availMap))); 
+    setInitialData(JSON.parse(JSON.stringify(availMap))); 
+    setBookingCounts(countMap); // 🟢 예약 상태 저장
   };
 
   useEffect(() => { fetchDates(); }, []);
@@ -56,6 +82,14 @@ export default function ManageDatesPage() {
 
   const removeTimeSlot = (time: string) => {
     if (!selectedDate) return;
+    
+    // 🟢 UI에서 삭제 시도 시 예약 확인 (UX 강화)
+    const bookingKey = `${selectedDate}_${time}`;
+    if (bookingCounts[bookingKey] > 0) {
+        alert(`⚠️ 해당 시간(${time})에는 확정된 예약이 ${bookingCounts[bookingKey]}건 있어 삭제할 수 없습니다.`);
+        return;
+    }
+
     setAvailability(prev => {
       const newSlots = (prev[selectedDate] || []).filter(t => t !== time);
       const newMap = { ...prev, [selectedDate]: newSlots };
@@ -64,7 +98,7 @@ export default function ManageDatesPage() {
     });
   };
 
-  // 🟢 [핵심] 스마트 저장 로직 (Diff Algorithm)
+  // 🟢 스마트 저장 로직 (DB 수정 없이 bookings 테이블 조회로 안전장치 마련)
   const handleSave = async () => {
     if (!confirm('일정을 저장하시겠습니까?')) return;
     setLoading(true);
@@ -73,7 +107,7 @@ export default function ManageDatesPage() {
       const toInsert: any[] = [];
       const toDelete: { date: string, time: string }[] = [];
 
-      // 1. 추가해야 할 것 찾기 (Current에는 있는데 Initial에는 없는 것)
+      // 1. 추가할 슬롯 찾기
       for (const [date, times] of Object.entries(availability)) {
         const initialTimes = initialData[date] || [];
         times.forEach(time => {
@@ -82,14 +116,14 @@ export default function ManageDatesPage() {
               experience_id: params.id,
               date: date,
               start_time: time,
-              is_booked: false,
-              current_bookings: 0 // 초기값
+              is_booked: false 
+              // 🟢 current_bookings 필드 제거 (에러 원인)
             });
           }
         });
       }
 
-      // 2. 삭제해야 할 것 찾기 (Initial에는 있는데 Current에는 없는 것)
+      // 2. 삭제할 슬롯 찾기
       for (const [date, times] of Object.entries(initialData)) {
         const currentTimes = availability[date] || [];
         times.forEach(time => {
@@ -99,28 +133,28 @@ export default function ManageDatesPage() {
         });
       }
 
-      // 3. 실행 (순차 처리)
+      // 3. 실행
       // (1) Insert
       if (toInsert.length > 0) {
         const { error } = await supabase.from('experience_availability').insert(toInsert);
         if (error) throw error;
       }
 
-      // (2) Delete (안전 삭제: 예약이 없는 것만 삭제)
+      // (2) Delete (DB체크 한 번 더 - 안전 삭제)
       for (const item of toDelete) {
-        // 예약이 있는지 먼저 확인 (안전장치)
-        const { data: slot } = await supabase
-          .from('experience_availability')
-          .select('id, current_bookings')
+        // 실제 bookings 테이블에 예약이 있는지 확인 (더 확실한 안전장치)
+        const { count } = await supabase
+          .from('bookings')
+          .select('*', { count: 'exact', head: true })
           .eq('experience_id', params.id)
           .eq('date', item.date)
-          .eq('start_time', item.time)
-          .single();
+          .eq('time', item.time)
+          .in('status', ['confirmed', 'paid', 'completed']);
 
-        if (slot && slot.current_bookings > 0) {
-          alert(`⚠️ [${item.date} ${item.time}] 스케줄은 이미 예약이 있어 삭제할 수 없습니다.`);
-          // UI 롤백 (삭제 취소)
-          addTimeSlot(item.time); 
+        if (count && count > 0) {
+           // 예약이 있으면 삭제 스킵하고 경고
+           console.warn(`Skipped deletion for ${item.date} ${item.time} due to active bookings.`);
+           // (선택사항) 사용자에게 알림을 줄 수도 있음
         } else {
           await supabase
             .from('experience_availability')
@@ -132,7 +166,7 @@ export default function ManageDatesPage() {
       }
 
       showToast('일정이 성공적으로 업데이트되었습니다.', 'success');
-      await fetchDates(); // 데이터 최신화 (중요)
+      await fetchDates(); 
 
     } catch (e: any) {
       console.error(e);
@@ -142,10 +176,6 @@ export default function ManageDatesPage() {
     }
   };
 
-  // ... (달력 렌더링 등 나머지 UI 코드는 기존 유지) ...
-  // (generateTimeOptions, renderCalendar 등은 그대로 두셔도 됩니다)
-  
-  // (아래는 전체 코드 흐름 유지를 위한 return 부분입니다. 필요한 부분만 복붙하세요)
   const generateTimeOptions = () => {
     const times = [];
     for (let h = 8; h <= 21; h++) {
@@ -172,28 +202,42 @@ export default function ManageDatesPage() {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const hasSlots = availability[dateStr] && availability[dateStr].length > 0;
       const isSelected = selectedDate === dateStr;
+      
+      // 🟢 해당 날짜의 총 타임 수
+      const slotCount = availability[dateStr]?.length || 0;
+      // 🟢 해당 날짜의 총 예약 건수 계산 (bookingCounts 활용)
+      let bookedCount = 0;
+      availability[dateStr]?.forEach(t => {
+          if (bookingCounts[`${dateStr}_${t}`]) bookedCount += bookingCounts[`${dateStr}_${t}`];
+      });
 
       days.push(
         <div 
           key={day} 
           onClick={() => handleDateClick(dateStr)}
-          className={`h-16 border border-slate-100 flex flex-col items-center justify-start pt-2 cursor-pointer transition-all rounded-xl m-1 relative group ${
+          className={`h-20 border border-slate-100 flex flex-col items-center justify-start pt-2 cursor-pointer transition-all rounded-xl m-1 relative group ${
             isSelected ? 'ring-2 ring-black bg-slate-50 z-10' : 'hover:bg-slate-50 text-slate-700'
           }`}
         >
           <span className={`text-sm font-bold ${isSelected ? 'text-black' : ''}`}>{day}</span>
+          
+          {/* 예약 가능 표시 (점) */}
           {hasSlots && (
-            <div className="flex gap-0.5 mt-1.5">
+            <div className="flex gap-0.5 mt-1">
               <div className="w-1.5 h-1.5 rounded-full bg-black"></div>
-              {availability[dateStr].length > 1 && <div className="w-1.5 h-1.5 rounded-full bg-black/30"></div>}
+              {slotCount > 1 && <div className="w-1.5 h-1.5 rounded-full bg-black/30"></div>}
             </div>
           )}
-
-          {/* 🟢 [복구됨] 몇 개의 타임이 있는지 텍스트로 표시 */}
+          
+          {/* 타임 수 표시 */}
           {hasSlots && (
-            <span className="text-[10px] text-slate-400 mt-auto mb-1 font-bold bg-slate-100 px-1.5 py-0.5 rounded-md group-hover:text-black group-hover:bg-white transition-colors">
-              {availability[dateStr].length} 타임
-            </span>
+            <div className="mt-auto mb-1 flex flex-col items-center">
+                <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded-md group-hover:bg-white transition-colors">
+                {slotCount} 타임
+                </span>
+                {/* 예약이 있으면 빨간 점 표시 등으로 알림 가능 */}
+                {bookedCount > 0 && <span className="text-[8px] text-rose-500 font-bold mt-0.5">{bookedCount} 예약됨</span>}
+            </div>
           )}
         </div>
       );
@@ -240,23 +284,46 @@ export default function ManageDatesPage() {
                   </div>
                   <div className="space-y-2 mb-8">
                     {availability[selectedDate]?.length > 0 ? (
-                      availability[selectedDate].map(time => (
-                        <div key={time} className="flex justify-between items-center bg-white p-3 px-4 rounded-xl border border-slate-200 shadow-sm">
-                          <div className="flex items-center gap-3"><Clock size={16} className="text-slate-400"/><span className="font-bold text-slate-800">{time}</span></div>
-                          <button onClick={() => removeTimeSlot(time)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
-                        </div>
-                      ))
+                      availability[selectedDate].map(time => {
+                        // 🟢 예약 여부 확인
+                        const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
+                        return (
+                            <div key={time} className={`flex justify-between items-center bg-white p-3 px-4 rounded-xl border shadow-sm ${isBooked ? 'border-rose-200 bg-rose-50' : 'border-slate-200'}`}>
+                            <div className="flex items-center gap-3">
+                                <Clock size={16} className={isBooked ? "text-rose-400" : "text-slate-400"}/>
+                                <span className={`font-bold ${isBooked ? "text-rose-700" : "text-slate-800"}`}>{time}</span>
+                                {isBooked && <span className="text-[10px] font-bold bg-rose-200 text-rose-700 px-1.5 py-0.5 rounded">예약됨</span>}
+                            </div>
+                            <button 
+                                onClick={() => removeTimeSlot(time)} 
+                                className={`text-slate-300 p-1 rounded-full transition-all ${isBooked ? 'opacity-30 cursor-not-allowed' : 'hover:text-rose-500 hover:bg-rose-50'}`}
+                                disabled={isBooked} // 예약 있으면 버튼 비활성화 (UX 보호)
+                            >
+                                <Trash2 size={16}/>
+                            </button>
+                            </div>
+                        )
+                      })
                     ) : <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">시간을 추가해주세요.</div>}
                   </div>
                   <div className="border-t border-slate-200 pt-6">
                     <label className="text-xs font-bold text-slate-500 mb-3 block uppercase">시간 추가 (08:00 ~ 21:00)</label>
                     <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
-                      {timeOptions.map(time => (
-                        <button key={time} onClick={() => availability[selectedDate]?.includes(time) ? removeTimeSlot(time) : addTimeSlot(time)}
-                          className={`py-2 text-sm font-bold rounded-lg border transition-all ${availability[selectedDate]?.includes(time) ? 'bg-black text-white border-black' : 'bg-white text-slate-600 border-slate-200 hover:border-black'}`}>
-                          {time}
-                        </button>
-                      ))}
+                      {timeOptions.map(time => {
+                        const isAdded = availability[selectedDate]?.includes(time);
+                        const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
+                        return (
+                          <button key={time} onClick={() => isAdded ? removeTimeSlot(time) : addTimeSlot(time)}
+                            disabled={isBooked} // 예약된 시간은 토글 불가
+                            className={`py-2 text-sm font-bold rounded-lg border transition-all ${
+                                isAdded 
+                                ? (isBooked ? 'bg-rose-100 text-rose-400 border-rose-200 cursor-not-allowed' : 'bg-black text-white border-black') 
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-black'
+                            }`}>
+                            {time}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
