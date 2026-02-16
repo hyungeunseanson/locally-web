@@ -16,25 +16,39 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
   // 🟢 [추가됨] 신분증 보안 URL 발급 로직
   // 'verification-docs' 버킷에 있는 파일은 그냥 <img> 태그로 못 봅니다. (403 에러)
   // 관리자 권한으로 '서명된 URL(Signed URL)'을 받아와야 볼 수 있습니다.
-// DetailsPanel.tsx 내 useEffect 수정
+// 신분증 보안 URL 발급
 useEffect(() => {
   if (activeTab === 'APPS' && selectedItem?.id_card_file) {
     const fetchSignedUrl = async () => {
       try {
-        // 🟢 수정: 파일명이 전체 URL인지 단순 파일명인지 체크
-        const fileName = selectedItem.id_card_file.includes('/') 
-          ? selectedItem.id_card_file.split('/').pop() 
-          : selectedItem.id_card_file;
+        // 1. 파일명만 깔끔하게 추출
+        // (URL이든 경로든 맨 뒤에 있는 게 파일명입니다)
+        const fullPath = selectedItem.id_card_file;
+        let fileName = fullPath.split('/').pop(); 
+        
+        // 혹시 URL 뒤에 ?token=... 같은 게 붙어있으면 떼어냅니다.
+        if (fileName?.includes('?')) {
+          fileName = fileName.split('?')[0];
+        }
 
         if (!fileName) return;
 
+        // 2. 사용자가 확인한 정확한 경로로 조립 ('id_card' 폴더 안의 파일)
+        const realPath = `id_card/${fileName}`;
+
+        console.log("🔍 스토리지 요청:", "images", realPath);
+
         const { data, error } = await supabase
           .storage
-          .from('verification-docs')
-          .createSignedUrl(fileName, 3600); 
+          .from('images') // 🟢 [수정됨] 버킷 이름을 'images'로 변경
+          .createSignedUrl(realPath, 3600); 
 
         if (data) setSignedUrl(data.signedUrl);
-        if (error) console.error("신분증 로드 실패:", error);
+        if (error) {
+          console.error("🔥 스토리지 에러:", error);
+          // 만약 Public 버킷이라 서명이 안 먹힌다면, 그냥 원본 URL을 보여주는 게 나을 수도 있습니다.
+          // setSignedUrl(fullPath); 
+        }
       } catch (e) {
         console.error("URL 파싱 에러:", e);
       }
