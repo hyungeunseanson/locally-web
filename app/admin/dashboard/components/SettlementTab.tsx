@@ -35,8 +35,11 @@ export default function SettlementTab() {
         return;
     }
 
+    // 🟢 [수정] 타입 오류 해결을 위해 any[]로 캐스팅
+    const safeBookings = (bookings || []) as any[];
+
     // 2. 호스트 정보 가져오기 (계좌 포함)
-    const hostIds = Array.from(new Set(bookings?.map(b => b.experiences?.host_id).filter(Boolean)));
+const hostIds = Array.from(new Set(safeBookings.map(b => b.experiences?.host_id).filter(Boolean)));
     let hostsMap = new Map();
     
     if (hostIds.length > 0) {

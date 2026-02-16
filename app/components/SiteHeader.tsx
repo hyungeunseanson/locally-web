@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-import LoginModal from './LoginModal';
+// 🟢 [수정] 상대 경로 (같은 폴더)
+import LoginModal from './LoginModal'; 
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
@@ -15,17 +16,21 @@ export default function SiteHeader() {
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
+  // 알림 관련
   const { unreadCount } = useNotification();
-  const [showNoti, setShowNoti] = useState(false);
-
+  
+  // 🟢 [복구] 상태 변수 선언
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [showNoti, setShowNoti] = useState(false); // (필요 시 사용)
   
   const menuRef = useRef<HTMLElement>(null);
 
+  // 번역 훅
   const languageContext = useLanguage();
   const setLang = languageContext?.setLang || (() => {});
   const lang = languageContext?.lang || 'ko';
+  const t = languageContext?.t || ((k: string) => k);
 
   const languages = [
     { label: '한국어', value: 'ko' }, { label: 'English', value: 'en' },
@@ -113,8 +118,9 @@ export default function SiteHeader() {
   };
 
   const getButtonLabel = () => {
-    if (pathname?.startsWith('/host')) return '게스트 모드';
-    return '호스트 등록하기';
+    // 🟢 번역 적용
+    if (pathname?.startsWith('/host')) return t('guest_mode');
+    return t('become_host');
   };
 
   const getAvatarUrl = () => user?.user_metadata?.avatar_url || null;
@@ -137,6 +143,7 @@ export default function SiteHeader() {
                {getButtonLabel()}
             </button>
 
+            {/* 언어 선택 드롭다운 */}
             <div className="relative hidden sm:block">
               <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
                 <Globe size={18} />
@@ -152,6 +159,7 @@ export default function SiteHeader() {
               )}
             </div>
 
+            {/* 알림 벨 */}
             {user && (
               <Link 
                 href="/notifications" 
@@ -164,6 +172,7 @@ export default function SiteHeader() {
               </Link>
             )}
 
+            {/* 유저 메뉴 */}
             <div className="relative ml-1">
               <div 
                 onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
@@ -183,31 +192,31 @@ export default function SiteHeader() {
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
-                       <span className="flex items-center gap-3"><MessageSquare size={18}/> 메시지</span>
+                       <span className="flex items-center gap-3"><MessageSquare size={18}/> {t('messages')}</span>
                     </Link>
                     <Link href="/guest/trips" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                       <Briefcase size={18}/> 여행
+                       <Briefcase size={18}/> {t('my_trips')}
                     </Link>
                     <Link href="/guest/wishlists" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                       <Heart size={18}/> 위시리스트
+                       <Heart size={18}/> {t('wishlist')}
                     </Link>
                   </div>
 
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                       <User size={18}/> 프로필 및 계정
+                       <User size={18}/> {t('account')}
                     </Link>
                     <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                       <Settings size={18}/> {pathname?.startsWith('/host') ? '게스트 모드' : '호스트 모드'}
+                       <Settings size={18}/> {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
                     </button>
                   </div>
 
                   <div className="py-2">
                     <Link href="/help" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                       <HelpCircle size={18}/> 도움말 센터
+                       <HelpCircle size={18}/> {t('help')}
                     </Link>
                     <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                      <LogOut size={18}/> 로그아웃
+                      <LogOut size={18}/> {t('logout')}
                     </button>
                   </div>
                 </div>

@@ -1,7 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
-
+import React, { createContext, useContext, useState, useEffect } from 'react';
 // 📚 4개 국어 사전
 const dictionary: any = {
   ko: {
@@ -11,6 +10,10 @@ const dictionary: any = {
     login: "로그인",
     logout: "로그아웃",
     my_trips: "나의 여행",
+    messages: "메시지",        // 🟢 추가
+    wishlist: "위시리스트",    // 🟢 추가
+    account: "프로필 및 계정", // 🟢 추가
+    help: "도움말 센터",       // 🟢 추가
     filter: "필터",
     all: "전체",
     culture: "문화/예술",
@@ -34,6 +37,10 @@ const dictionary: any = {
     login: "Log in",
     logout: "Log out",
     my_trips: "My Trips",
+    messages: "Messages",      // 🟢 추가
+    wishlist: "Wishlist",      // 🟢 추가
+    account: "Account",        // 🟢 추가
+    help: "Help Center",       // 🟢 추가
     filter: "Filter",
     all: "All",
     culture: "Culture/Art",
@@ -57,6 +64,10 @@ const dictionary: any = {
     login: "ログイン",
     logout: "ログアウト",
     my_trips: "私の旅行",
+    messages: "メッセージ",    // 🟢 추가
+    wishlist: "ウィッシュリスト", // 🟢 추가
+    account: "アカウント",     // 🟢 추가
+    help: "ヘルプセンター",    // 🟢 추가
     filter: "フィルター",
     all: "すべて",
     culture: "文化/芸術",
@@ -80,6 +91,10 @@ const dictionary: any = {
     login: "登录",
     logout: "退出",
     my_trips: "我的行程",
+    messages: "消息",          // 🟢 추가
+    wishlist: "心愿单",        // 🟢 추가
+    account: "账户",           // 🟢 추가
+    help: "帮助中心",          // 🟢 추가
     filter: "筛选",
     all: "全部",
     culture: "文化/艺术",
@@ -103,12 +118,23 @@ const LanguageContext = createContext<any>(null);
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState('ko');
 
+  // 🟢 [추가] 새로고침해도 언어 유지하기 (localStorage)
+  useEffect(() => {
+    const saved = localStorage.getItem('app_lang');
+    if (saved) setLang(saved);
+  }, []);
+
+  const changeLang = (newLang: string) => {
+    setLang(newLang);
+    localStorage.setItem('app_lang', newLang);
+  };
+
   const t = (key: string) => {
     return dictionary[lang]?.[key] || key;
   };
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>
+    <LanguageContext.Provider value={{ lang, setLang: changeLang, t }}>
       {children}
     </LanguageContext.Provider>
   );

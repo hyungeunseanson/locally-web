@@ -261,12 +261,12 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           if (now - lastUpdateRef.current < 500) return;
           lastUpdateRef.current = now;
 
+          const newData = payload.new as any;
           // 내가 보낸 게 아닐 때만 갱신 (나는 이미 낙관적 업데이트 함)
-          if (payload.new && payload.new.sender_id !== currentUser.id) {
-             fetchInquiries(false); // 로딩바 없이 조용히 갱신
-             
-             if (selectedInquiry && payload.new.inquiry_id === selectedInquiry.id) {
-               loadMessages(selectedInquiry.id);
+          if (newData && newData.sender_id !== currentUser.id) {
+            fetchInquiries(false);
+            if (selectedInquiry && newData.inquiry_id === selectedInquiry.id) {
+              loadMessages(selectedInquiry.id);
              }
           }
         }
