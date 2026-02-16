@@ -194,7 +194,7 @@ export default function ReservationManager() {
     if (activeTab === 'completed') return tripDate < today && !isRequesting;
     return true;
   }).sort((a, b) => {
-    // 🟢 [수정] 정렬 로직 명시화
+    // 🟢 [변경] 정렬 우선순위 명확화
     const newA = isNew(a.created_at, a.id);
     const newB = isNew(b.created_at, b.id);
     
@@ -231,25 +231,46 @@ return (
           <p className="text-sm text-slate-500 mt-1">게스트의 예약을 관리하고 준비하세요.</p>
         </div>
         
-        {/* 탭 버튼 */}
         <div className="flex bg-slate-100 p-1.5 rounded-xl">
           {[
             { id: 'upcoming', label: '다가오는 일정' },
             { id: 'completed', label: '지난 일정' },
             { id: 'cancelled', label: '취소/환불' }
           ].map(tab => {
-             const count = (tab.id === 'cancelled' || tab.id === 'upcoming') 
+             // 1. 취소 요청 건수 (주황색)
+             const cancelCount = (tab.id === 'cancelled' || tab.id === 'upcoming') 
                ? reservations.filter(r => r.status === 'cancellation_requested').length : 0;
+             
+             // 🟢 2. [추가] 해당 탭에 '새로운 예약(24시간 내)'이 있는지 확인 (빨간색 N)
+             const hasNew = reservations.some(r => {
+                const isTabMatch = 
+                  tab.id === 'upcoming' ? ['PAID', 'confirmed'].includes(r.status) :
+                  tab.id === 'completed' ? r.status === 'completed' :
+                  tab.id === 'cancelled' ? ['cancelled', 'cancellation_requested'].includes(r.status) : true;
+                
+                // isNew 함수 활용 (기존에 정의된 함수)
+                return isTabMatch && isNew(r.created_at, r.id);
+             });
+
              return (
                <button
                  key={tab.id}
                  onClick={() => setActiveTab(tab.id as any)}
-                 className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                 className={`relative px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                    activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
                  }`}
                >
                  {tab.label}
-                 {count > 0 && <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{count}</span>}
+                 
+                 {/* 기존: 취소 요청 카운트 */}
+                 {cancelCount > 0 && <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{cancelCount}</span>}
+                 
+                 {/* 🟢 [추가] 빨간색 N 뱃지 (우측 상단) */}
+                 {hasNew && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] text-white ring-2 ring-white shadow-sm">
+                      N
+                    </span>
+                 )}
                </button>
              );
           })}
