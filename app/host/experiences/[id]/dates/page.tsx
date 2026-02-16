@@ -4,13 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Check, Clock, Trash2, X, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Clock, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/app/context/ToastContext';
 
 type TimeSlot = string; 
 type AvailabilityMap = Record<string, TimeSlot[]>;
-type BookingCountMap = Record<string, number>; // "2024-05-01_10:00": 3 (예약수)
+type BookingCountMap = Record<string, number>; 
 
 export default function ManageDatesPage() {
   const supabase = createClient();
@@ -20,16 +20,16 @@ export default function ManageDatesPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [availability, setAvailability] = useState<AvailabilityMap>({});
   const [initialData, setInitialData] = useState<AvailabilityMap>({}); 
-  const [bookingCounts, setBookingCounts] = useState<BookingCountMap>({}); // 🟢 실제 예약 카운트 저장
+  const [bookingCounts, setBookingCounts] = useState<BookingCountMap>({}); 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 1. 데이터 불러오기 (슬롯 + 실제 예약 내역)
+  // 1. 데이터 불러오기
   const fetchDates = async () => {
-    // (1) 슬롯 가져오기 (컬럼 최소화)
+    // (1) 슬롯 조회
     const { data: slots, error: slotError } = await supabase
       .from('experience_availability')
-      .select('date, start_time') // 🟢 current_bookings 제거
+      .select('date, start_time') 
       .eq('experience_id', params.id);
     
     if (slotError) {
@@ -37,14 +37,13 @@ export default function ManageDatesPage() {
         return;
     }
 
-    // (2) 실제 유효한 예약 가져오기 (confirmed, paid 등)
-    const { data: bookings, error: bookingError } = await supabase
+    // (2) 실제 예약 조회 (안전 삭제를 위해)
+    const { data: bookings } = await supabase
       .from('bookings')
       .select('date, time')
       .eq('experience_id', params.id)
-      .in('status', ['confirmed', 'paid', 'completed']); // 유효한 예약 상태만
+      .in('status', ['confirmed', 'paid', 'completed']); 
 
-    // (3) 데이터 가공
     const availMap: AvailabilityMap = {};
     if (slots) {
       slots.forEach((item: any) => {
@@ -53,7 +52,6 @@ export default function ManageDatesPage() {
       });
     }
     
-    // 예약 카운트 맵 생성 ("날짜_시간" 키)
     const countMap: BookingCountMap = {};
     if (bookings) {
         bookings.forEach((b: any) => {
@@ -64,7 +62,7 @@ export default function ManageDatesPage() {
 
     setAvailability(JSON.parse(JSON.stringify(availMap))); 
     setInitialData(JSON.parse(JSON.stringify(availMap))); 
-    setBookingCounts(countMap); // 🟢 예약 상태 저장
+    setBookingCounts(countMap); 
   };
 
   useEffect(() => { fetchDates(); }, []);
@@ -83,7 +81,6 @@ export default function ManageDatesPage() {
   const removeTimeSlot = (time: string) => {
     if (!selectedDate) return;
     
-    // 🟢 UI에서 삭제 시도 시 예약 확인 (UX 강화)
     const bookingKey = `${selectedDate}_${time}`;
     if (bookingCounts[bookingKey] > 0) {
         alert(`⚠️ 해당 시간(${time})에는 확정된 예약이 ${bookingCounts[bookingKey]}건 있어 삭제할 수 없습니다.`);
@@ -98,7 +95,7 @@ export default function ManageDatesPage() {
     });
   };
 
-  // 🟢 스마트 저장 로직 (DB 수정 없이 bookings 테이블 조회로 안전장치 마련)
+  // 🟢 [핵심] 안전한 저장 로직 (Diff Algorithm)
   const handleSave = async () => {
     if (!confirm('일정을 저장하시겠습니까?')) return;
     setLoading(true);
@@ -107,7 +104,7 @@ export default function ManageDatesPage() {
       const toInsert: any[] = [];
       const toDelete: { date: string, time: string }[] = [];
 
-      // 1. 추가할 슬롯 찾기
+      // 추가할 것 찾기
       for (const [date, times] of Object.entries(availability)) {
         const initialTimes = initialData[date] || [];
         times.forEach(time => {
@@ -117,13 +114,12 @@ export default function ManageDatesPage() {
               date: date,
               start_time: time,
               is_booked: false 
-              // 🟢 current_bookings 필드 제거 (에러 원인)
             });
           }
         });
       }
 
-      // 2. 삭제할 슬롯 찾기
+      // 삭제할 것 찾기
       for (const [date, times] of Object.entries(initialData)) {
         const currentTimes = availability[date] || [];
         times.forEach(time => {
@@ -133,16 +129,14 @@ export default function ManageDatesPage() {
         });
       }
 
-      // 3. 실행
-      // (1) Insert
+      // 실행
       if (toInsert.length > 0) {
         const { error } = await supabase.from('experience_availability').insert(toInsert);
         if (error) throw error;
       }
 
-      // (2) Delete (DB체크 한 번 더 - 안전 삭제)
       for (const item of toDelete) {
-        // 실제 bookings 테이블에 예약이 있는지 확인 (더 확실한 안전장치)
+        // 예약 체크 (Double Check)
         const { count } = await supabase
           .from('bookings')
           .select('*', { count: 'exact', head: true })
@@ -152,9 +146,7 @@ export default function ManageDatesPage() {
           .in('status', ['confirmed', 'paid', 'completed']);
 
         if (count && count > 0) {
-           // 예약이 있으면 삭제 스킵하고 경고
            console.warn(`Skipped deletion for ${item.date} ${item.time} due to active bookings.`);
-           // (선택사항) 사용자에게 알림을 줄 수도 있음
         } else {
           await supabase
             .from('experience_availability')
@@ -176,6 +168,7 @@ export default function ManageDatesPage() {
     }
   };
 
+  // ... (UI 렌더링 부분은 기존 코드와 동일하여 생략, 아래 return 사용) ...
   const generateTimeOptions = () => {
     const times = [];
     for (let h = 8; h <= 21; h++) {
@@ -202,10 +195,8 @@ export default function ManageDatesPage() {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const hasSlots = availability[dateStr] && availability[dateStr].length > 0;
       const isSelected = selectedDate === dateStr;
-      
-      // 🟢 해당 날짜의 총 타임 수
       const slotCount = availability[dateStr]?.length || 0;
-      // 🟢 해당 날짜의 총 예약 건수 계산 (bookingCounts 활용)
+      
       let bookedCount = 0;
       availability[dateStr]?.forEach(t => {
           if (bookingCounts[`${dateStr}_${t}`]) bookedCount += bookingCounts[`${dateStr}_${t}`];
@@ -221,7 +212,6 @@ export default function ManageDatesPage() {
         >
           <span className={`text-sm font-bold ${isSelected ? 'text-black' : ''}`}>{day}</span>
           
-          {/* 예약 가능 표시 (점) */}
           {hasSlots && (
             <div className="flex gap-0.5 mt-1">
               <div className="w-1.5 h-1.5 rounded-full bg-black"></div>
@@ -229,13 +219,11 @@ export default function ManageDatesPage() {
             </div>
           )}
           
-          {/* 타임 수 표시 */}
           {hasSlots && (
             <div className="mt-auto mb-1 flex flex-col items-center">
                 <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded-md group-hover:bg-white transition-colors">
                 {slotCount} 타임
                 </span>
-                {/* 예약이 있으면 빨간 점 표시 등으로 알림 가능 */}
                 {bookedCount > 0 && <span className="text-[8px] text-rose-500 font-bold mt-0.5">{bookedCount} 예약됨</span>}
             </div>
           )}
@@ -285,7 +273,6 @@ export default function ManageDatesPage() {
                   <div className="space-y-2 mb-8">
                     {availability[selectedDate]?.length > 0 ? (
                       availability[selectedDate].map(time => {
-                        // 🟢 예약 여부 확인
                         const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
                         return (
                             <div key={time} className={`flex justify-between items-center bg-white p-3 px-4 rounded-xl border shadow-sm ${isBooked ? 'border-rose-200 bg-rose-50' : 'border-slate-200'}`}>
@@ -297,7 +284,7 @@ export default function ManageDatesPage() {
                             <button 
                                 onClick={() => removeTimeSlot(time)} 
                                 className={`text-slate-300 p-1 rounded-full transition-all ${isBooked ? 'opacity-30 cursor-not-allowed' : 'hover:text-rose-500 hover:bg-rose-50'}`}
-                                disabled={isBooked} // 예약 있으면 버튼 비활성화 (UX 보호)
+                                disabled={isBooked} 
                             >
                                 <Trash2 size={16}/>
                             </button>
@@ -314,7 +301,7 @@ export default function ManageDatesPage() {
                         const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
                         return (
                           <button key={time} onClick={() => isAdded ? removeTimeSlot(time) : addTimeSlot(time)}
-                            disabled={isBooked} // 예약된 시간은 토글 불가
+                            disabled={isBooked}
                             className={`py-2 text-sm font-bold rounded-lg border transition-all ${
                                 isAdded 
                                 ? (isBooked ? 'bg-rose-100 text-rose-400 border-rose-200 cursor-not-allowed' : 'bg-black text-white border-black') 
