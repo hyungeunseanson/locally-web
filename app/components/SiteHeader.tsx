@@ -1,6 +1,5 @@
 'use client';
 
-// 🟢 [필수] Suspense 다시 추가
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell } from 'lucide-react';
@@ -10,13 +9,13 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
 import dynamic from 'next/dynamic';
 
-// 🟢 [유지] Dynamic Import (SSR False)
+// 🟢 LoginModal 동적 로딩 (SSR false)
 const LoginModal = dynamic(() => import('./LoginModal'), { 
   ssr: false, 
   loading: () => null 
 });
 
-// 🟢 [추가] 내부 컴포넌트로 분리 (Suspense 적용을 위해)
+// 🟢 [핵심] 실제 헤더의 모든 로직은 여기에 다 넣습니다. (이름이 Content임에 주의!)
 function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -24,6 +23,7 @@ function SiteHeaderContent() {
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
   const { unreadCount } = useNotification();
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   
@@ -226,7 +226,8 @@ function SiteHeaderContent() {
   );
 }
 
-// 🟢 [최종 방어] SiteHeader 전체를 Suspense로 감싸서 export
+// 🟢 [최종 방어] 진짜 SiteHeader는 이것입니다.
+// 이 코드가 있어야 빌드 에러가 안 납니다. 
 export default function SiteHeader() {
   return (
     <Suspense fallback={<div className="h-20 bg-white border-b border-slate-100" />}>
