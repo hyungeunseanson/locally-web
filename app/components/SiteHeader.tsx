@@ -1,38 +1,34 @@
 'use client';
 
+// 🟢 [필수] Suspense 다시 추가
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
-
 import dynamic from 'next/dynamic';
-// 🟢 [추가] LoginModal을 동적으로 불러오기 (SSR false 옵션으로 빌드 에러 해결)
+
+// 🟢 [유지] Dynamic Import (SSR False)
 const LoginModal = dynamic(() => import('./LoginModal'), { 
   ssr: false, 
   loading: () => null 
 });
 
-export default function SiteHeader() {
+// 🟢 [추가] 내부 컴포넌트로 분리 (Suspense 적용을 위해)
+function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   
-  // 알림 관련
   const { unreadCount } = useNotification();
-  
-  // 🟢 [복구] 상태 변수 선언
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const [showNoti, setShowNoti] = useState(false); // (필요 시 사용)
   
   const menuRef = useRef<HTMLElement>(null);
 
-  // 번역 훅
   const languageContext = useLanguage();
   const setLang = languageContext?.setLang || (() => {});
   const lang = languageContext?.lang || 'ko';
@@ -52,7 +48,6 @@ export default function SiteHeader() {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
         setIsLangOpen(false);
-        setShowNoti(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -124,7 +119,6 @@ export default function SiteHeader() {
   };
 
   const getButtonLabel = () => {
-    // 🟢 번역 적용
     if (pathname?.startsWith('/host')) return t('guest_mode');
     return t('become_host');
   };
@@ -133,7 +127,6 @@ export default function SiteHeader() {
 
   return (
     <>
-      {/* 🟢 [수정] dynamic import를 적용했으므로 Suspense 불필요 */}
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
       
       <header className="sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
@@ -150,7 +143,6 @@ export default function SiteHeader() {
                {getButtonLabel()}
             </button>
 
-            {/* 언어 선택 드롭다운 */}
             <div className="relative hidden sm:block">
               <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
                 <Globe size={18} />
@@ -166,7 +158,6 @@ export default function SiteHeader() {
               )}
             </div>
 
-            {/* 알림 벨 */}
             {user && (
               <Link 
                 href="/notifications" 
@@ -179,7 +170,6 @@ export default function SiteHeader() {
               </Link>
             )}
 
-            {/* 유저 메뉴 */}
             <div className="relative ml-1">
               <div 
                 onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
@@ -233,5 +223,14 @@ export default function SiteHeader() {
         </div>
       </header>
     </>
+  );
+}
+
+// 🟢 [최종 방어] SiteHeader 전체를 Suspense로 감싸서 export
+export default function SiteHeader() {
+  return (
+    <Suspense fallback={<div className="h-20 bg-white border-b border-slate-100" />}>
+      <SiteHeaderContent />
+    </Suspense>
   );
 }
