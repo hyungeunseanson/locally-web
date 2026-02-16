@@ -19,11 +19,11 @@ function PaymentContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [experience, setExperience] = useState<any>(null);
   
-  // 예약자 정보 및 약관 동의 상태
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [message, setMessage] = useState(''); // 예약 메시지
-  const [agreed, setAgreed] = useState(false); // 약관 동의
+  // 🟢 message state는 DB 저장을 위해 남겨두되, 입력란은 삭제했으므로 빈 값으로 유지
+  const [message, setMessage] = useState(''); 
+  const [agreed, setAgreed] = useState(false);
 
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
@@ -31,14 +31,10 @@ function PaymentContent() {
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   
-// 가격 로직
-const expPrice = experience?.price || 50000; 
-const hostPrice = isPrivate ? (experience?.private_price || 300000) : expPrice * guests;
-
-// 🟢 수수료 계산 시 무조건 소수점을 버리도록 수정 (DB 에러 방지)
-const guestFee = Math.floor(hostPrice * 0.1); 
-
-const finalAmount = hostPrice + guestFee;
+  const expPrice = experience?.price || 50000; 
+  const hostPrice = isPrivate ? (experience?.private_price || 300000) : expPrice * guests;
+  const guestFee = Math.floor(hostPrice * 0.1); 
+  const finalAmount = hostPrice + guestFee;
 
   useEffect(() => { 
     setMounted(true); 
@@ -47,14 +43,13 @@ const finalAmount = hostPrice + guestFee;
       
       const { data: expData } = await supabase
         .from('experiences')
-        .select('title, image_url, photos, location, price, private_price')
+        .select('title, image_url, photos, location, price, private_price, max_guests')
         .eq('id', experienceId)
         .single();
       if (expData) setExperience(expData);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // 🟢 [수정] name 컬럼이 없을 수 있으므로 full_name 사용
         const { data: profile } = await supabase.from('profiles').select('full_name, phone').eq('id', user.id).single();
         if (profile) {
           setCustomerName(profile.full_name || '');
@@ -64,6 +59,30 @@ const finalAmount = hostPrice + guestFee;
     };
     fetchExp();
   }, [experienceId]);
+
+  // 🟢 [핵심] 가용성 체크 (프라이빗 로직 포함)
+  const checkAvailability = async () => {
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('guests, type')
+      .eq('experience_id', experienceId)
+      .eq('date', date)
+      .eq('time', time)
+      .in('status', ['PAID', 'confirmed']);
+
+    const currentBookedCount = bookings?.reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
+    const hasPrivateBooking = bookings?.some(b => b.type === 'private');
+    const maxGuests = experience?.max_guests || 10;
+
+    // 이미 프라이빗 예약이 있으면 불가
+    if (hasPrivateBooking) return false;
+    // 내가 프라이빗인데 이미 예약이 있으면 불가
+    if (isPrivate && currentBookedCount > 0) return false;
+    // 일반 예약 정원 초과 시 불가
+    if (!isPrivate && (currentBookedCount + guests > maxGuests)) return false;
+
+    return true; 
+  };
 
   const handlePayment = async () => {
     if (!agreed) return showToast('필수 약관에 동의해주세요.', 'error');
@@ -80,10 +99,18 @@ const finalAmount = hostPrice + guestFee;
         return; 
       }
 
-      // 1. 주문 ID 생성
+      const isAvailable = await checkAvailability();
+      if (!isAvailable) {
+        alert(isPrivate 
+          ? '해당 시간대에 이미 다른 예약이 있어 단독 투어 진행이 어렵습니다.' 
+          : '죄송합니다. 잔여석이 부족하여 예약할 수 없습니다.');
+        setIsProcessing(false);
+        router.back();
+        return;
+      }
+
       const newOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-      // 2. DB에 'PENDING' 상태로 예약 저장
       const { error: bookingError } = await supabase.from('bookings').insert([
         {
           id: newOrderId,
@@ -99,7 +126,7 @@ const finalAmount = hostPrice + guestFee;
           type: isPrivate ? 'private' : 'group',
           contact_name: customerName,
           contact_phone: customerPhone,
-          message: message, 
+          message: message, // 빈 값 저장
           created_at: new Date().toISOString()
         }
       ]);
@@ -111,14 +138,10 @@ const finalAmount = hostPrice + guestFee;
         return;
       }
 
-      // 3. 포트원(나이스페이) 결제 요청
       const { IMP } = window as any;
-      
-      // 🟢 사용자님 식별코드 직접 사용
       IMP.init('imp44607000'); 
 
       const data = {
-        // 🟢 관리자 설정(nice_v2)과 일치시킴
         pg: 'nice_v2', 
         pay_method: 'card',
         merchant_uid: newOrderId, 
@@ -131,47 +154,29 @@ const finalAmount = hostPrice + guestFee;
       };
 
       IMP.request_pay(data, async (rsp: any) => {
-        console.log('결제 응답 전체 데이터:', rsp); 
-
-        // 🟢 [핵심 수정] 성공 판별 로직 완화
-        // "imp_uid가 있고 에러 메시지가 없으면" 성공으로 간주하고 서버에 검증 요청
-        const isSuccess = rsp.success === true || 
-                          rsp.code === '0' || 
-                          rsp.status === 'paid' ||
-                          (rsp.imp_uid && !rsp.error_msg); 
+        const isSuccess = rsp.success === true || rsp.code === '0' || rsp.status === 'paid' || (rsp.imp_uid && !rsp.error_msg); 
 
         if (isSuccess) {
            try {
-             // 🟢 [핵심] 서버에 처리 요청 (fetch)
              const response = await fetch('/api/payment/nicepay-callback', {
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify(rsp),
              });
-
              const result = await response.json();
 
-             // 🟢 [핵심] 서버가 에러를 뱉었는지 확인 (여기가 추가됨!)
              if (!response.ok || !result.success) {
-               // 실패 시 경고창 띄우기
-               alert(`⚠️ 결제는 완료되었으나 처리 중 오류가 발생했습니다.\n오류 내용: ${result.error || '알 수 없는 서버 오류'}\n\n관리자에게 문의해주세요.`);
-               // 그래도 일단 완료 페이지로는 이동 (돈은 냈으니까)
+               alert(`⚠️ 결제 검증 중 오류가 발생했습니다.\n${result.error}`);
                window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
              } else {
-               // 완벽 성공
                window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
              }
-
            } catch (err: any) {
-             console.error('검증 에러 무시하고 이동:', err);
-             // 네트워크 에러 시에도 일단 이동
-             alert(`⚠️ 네트워크 통신 오류가 발생했습니다.\n내용: ${err.message}`);
+             alert(`⚠️ 네트워크 통신 오류: ${err.message}`);
              window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
            }
         } else {
-           // 진짜 실패한 경우 (에러 메시지가 있는 경우)
-           console.error('결제 실패:', rsp);
-           showToast(`결제 실패: ${rsp.error_msg || '알 수 없는 오류'}`, 'error');
+           showToast(`결제 실패: ${rsp.error_msg}`, 'error');
            setIsProcessing(false);
         }
       });
@@ -184,7 +189,6 @@ const finalAmount = hostPrice + guestFee;
   };
 
   if (!mounted) return <div className="min-h-screen bg-white flex items-center justify-center"><Loader2 className="animate-spin text-black" /></div>;
-
   const imageUrl = experience?.photos?.[0] || experience?.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
 
   return (
@@ -200,17 +204,11 @@ const finalAmount = hostPrice + guestFee;
         <div className="p-6">
           <div className="flex gap-5 mb-8">
             <div className="w-24 h-32 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 shadow-sm border border-slate-100">
-               <Image 
-                 src={imageUrl} 
-                 alt="Experience" 
-                 fill 
-                 className="object-cover" 
-                 sizes="100px"
-               />
+               <Image src={imageUrl} alt="Experience" fill className="object-cover" sizes="100px" />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
                <span className="text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">{experience?.location || 'SEOUL'}</span>
-               <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-lg">{experience?.title || '체험 정보를 불러오는 중...'}</h3>
+               <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-lg">{experience?.title || '로딩 중...'}</h3>
             </div>
           </div>
 
@@ -226,54 +224,31 @@ const finalAmount = hostPrice + guestFee;
             <h2 className="text-xl font-bold">예약자 정보</h2>
             <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">이름</label>
-                <input 
-                  type="text" 
-                  value={customerName} 
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors"
-                  placeholder="예약자 성함"
-                />
+                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors" placeholder="예약자 성함"/>
             </div>
             <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">연락처</label>
-                <input 
-                  type="tel" 
-                  value={customerPhone} 
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors"
-                  placeholder="010-0000-0000"
-                />
+                <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors" placeholder="010-0000-0000"/>
             </div>
+            {/* 🟢 [제거 완료] 메시지 입력란 삭제됨 */}
           </div>
 
           <div className="px-2 space-y-2 mb-8 text-sm">
-            <div className="flex justify-between items-center text-slate-600">
-              <span>체험 금액</span>
-              <span>₩{hostPrice.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-center text-blue-600">
-              <span className="flex items-center gap-1">서비스 수수료 (10%) <Info size={12}/></span>
-              <span>+ ₩{guestFee.toLocaleString()}</span>
-            </div>
-            <div className="border-t border-slate-100 pt-4 mt-2 flex justify-between items-center">
-              <span className="font-bold text-slate-900">총 결제금액</span>
-              <span className="text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span>
-            </div>
+            <div className="flex justify-between items-center text-slate-600"><span>체험 금액</span><span>₩{hostPrice.toLocaleString()}</span></div>
+            <div className="flex justify-between items-center text-blue-600"><span className="flex items-center gap-1">서비스 수수료 (10%) <Info size={12}/></span><span>+ ₩{guestFee.toLocaleString()}</span></div>
+            <div className="border-t border-slate-100 pt-4 mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
           </div>
 
           <div className="mb-6">
             <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${agreed ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}>
-                    <CheckCircle2 size={14} />
-                </div>
+                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${agreed ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}><CheckCircle2 size={14} /></div>
                 <input type="checkbox" className="hidden" checked={agreed} onChange={() => setAgreed(!agreed)} />
-                <span className="text-sm font-medium text-slate-600">
-                    [필수] 구매 조건 및 취소/환불 규정에 동의합니다.
-                </span>
+                <span className="text-sm font-medium text-slate-600">[필수] 구매 조건 및 취소/환불 규정에 동의합니다.</span>
             </label>
           </div>
 
-          <button onClick={handlePayment} disabled={isProcessing} className="w-full h-14 rounded-2xl font-bold text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100">
+          <button onClick={handlePayment} disabled={isProcessing} 
+            className="w-full h-14 rounded-2xl font-bold text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100">
             {isProcessing ? <Loader2 className="animate-spin" /> : <><CreditCard size={20}/> ₩{finalAmount.toLocaleString()} 결제하기</>}
           </button>
         </div>

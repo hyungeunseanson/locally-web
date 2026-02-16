@@ -10,15 +10,15 @@ interface ReservationCardProps {
   duration: number;
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
-  maxGuests?: number; // 🟢 추가
-  remainingSeatsMap?: Record<string, number>; // 🟢 추가
+  maxGuests?: number; // 🟢 추가됨
+  remainingSeatsMap?: Record<string, number>; // 🟢 추가됨
   onReserve: (date: string, time: string, guests: number, isPrivate: boolean) => void;
 }
 
 export default function ReservationCard({ 
   price, privatePrice = 0, isPrivateEnabled = false, 
   duration, availableDates, dateToTimeMap, onReserve, 
-  maxGuests = 10, remainingSeatsMap = {} // 🟢 기본값 설정하며 추가
+  maxGuests = 10, remainingSeatsMap = {} 
 }: ReservationCardProps) {
   
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -28,14 +28,18 @@ export default function ReservationCard({
   const [isSoloGuaranteed, setIsSoloGuaranteed] = useState(false);
   const SOLO_GUARANTEE_PRICE = 30000;
 
-  // 🟢 [핵심] 잔여석 계산 로직 추가 (이 코드를 useState 아래에 붙여넣으세요)
-  const currentKey = `${selectedDate}_${selectedTime}`;
+  // 🟢 [핵심] 잔여석 계산 로직 (시간 문자열 HH:MM 포맷 주의)
+  const cleanTime = selectedTime.substring(0, 5); 
+  const currentKey = `${selectedDate}_${cleanTime}`;
+  
+  // 선택된 시간의 잔여석 (없으면 최대 정원)
   const remainingSeats = (selectedDate && selectedTime) 
     ? (remainingSeatsMap[currentKey] ?? maxGuests) 
     : maxGuests;
 
-  // 선택 가능한 최대 인원 (잔여석과 최대정원 중 작은 값)
-  const maxSelectable = Math.min(remainingSeats, maxGuests);
+  // 인원 선택 최대값 제한 (잔여석 vs 최대정원 중 작은 값)
+  const maxSelectable = Math.max(1, Math.min(remainingSeats, maxGuests));
+
   // 날짜 계산 헬퍼
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
@@ -106,15 +110,14 @@ export default function ReservationCard({
           </div>
         </div>
 
-        {/* ✅ 인원 선택 (단독 투어 옵션 포함) */}
-{/* 🟢 인원 선택 (잔여석 반영 수정됨) */}
-<div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
+        {/* 🟢 인원 선택 (잔여석 반영 로직 적용됨) */}
+        <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
           <div className="flex flex-col w-full">
             <div className="flex justify-between items-center mb-1">
               <span className="text-[10px] font-bold uppercase text-slate-800">인원</span>
               {selectedTime && (
                 <span className="text-[10px] text-rose-500 font-bold">
-                  {remainingSeats <= 3 ? `${remainingSeats}자리 남음` : ''}
+                  {remainingSeats <= 0 ? '매진' : remainingSeats <= 3 ? `${remainingSeats}자리 남음` : ''}
                 </span>
               )}
             </div>
@@ -125,7 +128,7 @@ export default function ReservationCard({
               className="text-sm outline-none bg-transparent font-bold w-full cursor-pointer py-1"
             >
               <optgroup label="일반 예약">
-                {/* 🟢 남은 자리까지만 옵션 생성 (최대 6명 제한) */}
+                {/* 🟢 남은 자리까지만 선택 가능하게 제한 (최대 6명 UI 제한 유지) */}
                 {Array.from({ length: Math.min(maxSelectable, 6) }, (_, i) => i + 1).map(n => (
                   <option key={n} value={String(n)}>게스트 {n}명</option>
                 ))}
@@ -145,27 +148,27 @@ export default function ReservationCard({
         <div className="mb-4 animate-in fade-in zoom-in-95 duration-200">
           <p className="text-xs font-bold text-slate-500 mb-2">시간 선택 ({formatDateDisplay(selectedDate)})</p>
           <div className="grid grid-cols-2 gap-2">
-{/* ▼▼▼ 새로 넣을 코드 (잔여석 표시 기능 추가됨) ▼▼▼ */}
-{dateToTimeMap[selectedDate]?.map(time => {
-              // 🟢 1. 이 날짜, 이 시간의 남은 자리를 확인합니다.
-// 🟢 [수정] 시간 형식이 HH:MM:SS로 들어올 수도 있으므로 앞 5자리만 사용
-const cleanTime = time.substring(0, 5);
-const key = `${selectedDate}_${cleanTime}`;
-const seats = remainingSeatsMap[key] ?? maxGuests;
+            {dateToTimeMap[selectedDate]?.map(time => {
+              // 🟢 시간대별 잔여석 확인 및 매진 처리
+              const tClean = time.substring(0, 5);
+              const tKey = `${selectedDate}_${tClean}`;
+              const tSeats = remainingSeatsMap[tKey] ?? maxGuests;
               
               return (
                 <button 
                   key={time} 
-                  onClick={() => setSelectedTime(cleanTime)} // 클릭 시에도 cleanTime 저장
-                  // 디자인 클래스는 기존과 동일합니다.
+                  onClick={() => setSelectedTime(tClean)}
+                  disabled={tSeats <= 0} // 🟢 매진 시 클릭 불가
                   className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all flex flex-col items-center 
-                    ${selectedTime === time ? 'bg-black text-white border-black' : 'bg-white text-slate-700 border-slate-200 hover:border-black'}`}
+                    ${selectedTime === tClean ? 'bg-black text-white border-black' : 
+                      tSeats <= 0 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed line-through' :
+                      'bg-white text-slate-700 border-slate-200 hover:border-black'}`}
                 >
                   <span>{time}</span>
-                  <span className={`text-[10px] font-normal ${selectedTime === time ? 'text-slate-300' : 'text-slate-400'}`}>
-                    ~ {calculateEndTime(time)} 
-                    {/* 🟢 2. 남은 자리가 5자리 이하면 빨간색으로 '(3석)' 처럼 표시합니다. */}
-                    {seats <= 5 && <span className="ml-1 text-rose-500">({seats}석)</span>}
+                  <span className={`text-[10px] font-normal ${selectedTime === tClean ? 'text-slate-300' : 'text-slate-400'}`}>
+                    {tSeats <= 0 ? '매진' : `~ ${calculateEndTime(time)}`} 
+                    {/* 🟢 5석 이하 시 강조 */}
+                    {tSeats > 0 && tSeats <= 5 && <span className="ml-1 text-rose-500">({tSeats}석)</span>}
                   </span>
                 </button>
               );
