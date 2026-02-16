@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'via.placeholder.com', // 🟢 에러 원인 해결
+      },
+      {
+        protocol: 'https',
         hostname: 'images.unsplash.com', 
       },
       {
@@ -40,6 +44,7 @@ const nextConfig: NextConfig = {
         hostname: 'uhinvcydgzqlpnvieyal.supabase.co', 
       }
     ],
+    dangerouslyAllowSVG: true, // 🟢 SVG 아이콘 허용 (window.svg 등)
   },
   
   // 타입 에러 무시 (빌드 성공을 위해 유지)

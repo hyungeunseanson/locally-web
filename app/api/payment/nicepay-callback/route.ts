@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     if (resCode === '0000') { 
       const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
       
-      // 🟢 [보안 핵심] DB 원본 데이터와 비교
+      // 🟢 [보안] DB 원본 데이터와 비교
       const { data: originalBooking } = await supabase
         .from('bookings')
         .select('amount, status')
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, message: 'Already processed' });
       }
 
-      // 🟢 [보안 핵심] 금액 불일치 시 에러 (해킹 방지)
+      // 🟢 [보안] 금액 불일치 시 에러
       if (Number(originalBooking.amount) !== Number(amount)) {
         console.error(`🔥 [CRITICAL] 금액 위변조 감지! 예상: ${originalBooking.amount}, 실제: ${amount}`);
         throw new Error('Payment amount mismatch.');
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
             is_read: false
           });
           
-          // 🟢 6. [복구됨] 이메일 발송 로직 (호스트 조회 + Nodemailer)
+          // 🟢 6. [복구됨] 이메일 발송 로직
           console.log('⏳ [DEBUG] 호스트 이메일 조회 중...');
           let hostEmail = '';
           
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
           if (hostProfile?.email) {
             hostEmail = hostProfile.email;
           } else {
-             // (2) Auth User 테이블 조회 (Admin 권한)
+             // (2) Auth User 테이블 조회
              console.log('⚠️ [DEBUG] 프로필 이메일 없음. Auth User 조회...');
              const { data: authData } = await supabase.auth.admin.getUserById(hostId);
              if (authData?.user?.email) hostEmail = authData.user.email;

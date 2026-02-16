@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import nodemailer from 'nodemailer'; // 🟢 추가됨
 
 // 환불률 계산기 (기존 동일)
 function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDateStr: string) {
@@ -11,7 +12,6 @@ function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDa
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const hoursSincePayment = (now.getTime() - paymentDate.getTime()) / (1000 * 60 * 60);
 
-  // 규정: 24시간 이내 100%, 당일 불가, 1일전 40%, 2~7일전 70%, 8~19일전 80%
   if (hoursSincePayment <= 24 && diffDays > 1) return { rate: 100, reason: '24시간 이내 철회' };
   if (diffDays <= 0) return { rate: 0, reason: '당일/지난 일정' };
   if (diffDays === 1) return { rate: 40, reason: '1일 전 취소' };
@@ -26,11 +26,16 @@ export async function POST(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
     // 1. 예약 조회
-    const { data: booking, error } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .select('*, experiences(host_id, title)') // 🟢 experiences 정보 추가 조회
+      .eq('id', bookingId)
+      .single();
+
     if (error || !booking) return NextResponse.json({ error: '예약 없음' }, { status: 404 });
     if (booking.status === 'cancelled') return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
 
-    // 2. 환불액 및 정산액 계산 (핵심 🔥)
+    // 2. 환불액 및 정산액 계산
     let refundRate = 0;
     let reasonText = '';
 
@@ -43,34 +48,28 @@ export async function POST(request: Request) {
       reasonText = calc.reason;
     }
 
-    const totalAmount = booking.amount; // 예: 11,000원
-    const refundAmount = Math.floor(totalAmount * (refundRate / 100)); // 게스트 환불액 (7,700원)
-    const penaltyAmount = totalAmount - refundAmount; // 남은 위약금 (3,300원)
+    const totalAmount = booking.amount; 
+    const refundAmount = Math.floor(totalAmount * (refundRate / 100));
+    const penaltyAmount = totalAmount - refundAmount;
 
-    // 💰 [정산 로직 적용] 위약금 분배 (대표님 확정 정책)
+    // 💰 [정산 로직] 위약금 분배
     let hostPayout = 0;
     let platformRevenue = 0;
 
     if (penaltyAmount > 0) {
-      // 1. 위약금 중 호스트의 원래 지분 발라내기 (11,000원 중 10,000원이 호스트 몫이었음 -> 약 90.9%)
-      // 수식이 복잡하면 단순하게: (위약금 / 1.1) = 호스트 몫 원금
-      const hostPrincipal = Math.floor(penaltyAmount / 1.1); // 3,000원
-
-      // 2. 여기서 수수료 20% 떼기
-      const commission = Math.floor(hostPrincipal * 0.2); // 600원 (플랫폼 추가 수익)
+      const hostPrincipal = Math.floor(penaltyAmount / 1.1); 
+      const commission = Math.floor(hostPrincipal * 0.2); 
       
-      hostPayout = hostPrincipal - commission; // 2,400원 (최종 호스트 지급액)
-      platformRevenue = penaltyAmount - hostPayout; // 900원 (나머지 싹 다 플랫폼 수익)
+      hostPayout = hostPrincipal - commission; 
+      platformRevenue = penaltyAmount - hostPayout; 
     }
 
-    console.log(`🧾 정산 내역 - 환불: ${refundAmount}, 호스트지급: ${hostPayout}, 플랫폼수익: ${platformRevenue}`);
-
-    // 3. PG사 취소 요청 (실제 돈 돌려주기)
+    // 3. PG사 취소 요청
     if (refundAmount > 0 && booking.tid) {
         const isPartial = refundAmount < totalAmount ? '1' : '0';
         const formBody = new URLSearchParams({
             TID: booking.tid,
-            MID: process.env.NICEPAY_MID || 'nicepay00m',
+            MID: process.env.NICEPAY_MID || 'nicepay00m', // 🟢 환경변수 확인 필요
             Moid: booking.order_id,
             CancelAmt: refundAmount.toString(),
             CancelMsg: userReason || reasonText,
@@ -84,14 +83,70 @@ export async function POST(request: Request) {
         });
     }
 
-    // 4. DB 업데이트 (계산된 정산 내역 저장)
+    // 4. DB 업데이트
     await supabase.from('bookings').update({ 
       status: 'cancelled',
       cancel_reason: `${userReason} (${reasonText})`,
-      refund_amount: refundAmount,          // ✅ 추가
-      host_payout_amount: hostPayout,       // ✅ 추가 (정산 시 이것만 주면 됨)
-      platform_revenue: platformRevenue     // ✅ 추가 (매출 통계용)
+      refund_amount: refundAmount,          
+      host_payout_amount: hostPayout,       
+      platform_revenue: platformRevenue     
     }).eq('id', bookingId);
+
+    // 🟢 5. [추가됨] 알림 및 이메일 발송 로직
+    const hostId = booking.experiences?.host_id;
+    const expTitle = booking.experiences?.title;
+
+    if (hostId) {
+      // (A) 알림 저장
+      await supabase.from('notifications').insert({
+        user_id: hostId,
+        type: 'cancellation',
+        title: '😢 예약이 취소되었습니다.',
+        message: `[${expTitle}] 예약이 취소되었습니다. 환불액: ₩${refundAmount.toLocaleString()}`,
+        link: '/host/dashboard',
+        is_read: false
+      });
+
+      // (B) 이메일 발송
+      console.log('⏳ [DEBUG] 취소 알림 메일 발송 준비...');
+      let hostEmail = '';
+      const { data: hostProfile } = await supabase.from('profiles').select('email').eq('id', hostId).single();
+      
+      if (hostProfile?.email) {
+        hostEmail = hostProfile.email;
+      } else {
+         const { data: authData } = await supabase.auth.admin.getUserById(hostId);
+         if (authData?.user?.email) hostEmail = authData.user.email;
+      }
+
+      if (hostEmail) {
+        try {
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+          });
+          
+          await transporter.sendMail({
+            from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+            to: hostEmail,
+            subject: `[Locally] 예약 취소 알림`,
+            html: `
+              <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #000;">예약 취소 알림 😢</h2>
+                <p><b>[${expTitle}]</b> 예약이 취소되었습니다.</p>
+                <p>사유: ${userReason}</p>
+                <p>환불 금액: ₩${refundAmount.toLocaleString()}</p>
+                <br/>
+                <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard" style="background: #f0f0f0; color: #333; padding: 10px 20px; text-decoration: none; border-radius: 5px;">대시보드 확인</a>
+              </div>
+            `,
+          });
+          console.log(`🚀 [DEBUG] 취소 메일 발송 성공!`);
+        } catch (mailError) {
+          console.error('🔥 [DEBUG] 메일 발송 실패:', mailError);
+        }
+      }
+    }
 
     return NextResponse.json({ success: true, refundAmount, hostPayout });
 
