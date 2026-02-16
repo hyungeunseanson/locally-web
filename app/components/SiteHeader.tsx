@@ -4,26 +4,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-import LoginModal from '@/app/components/LoginModal';
+import LoginModal from './LoginModal';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { useNotification } from '@/app/context/NotificationContext'; // ✅ 절대 경로 확인
+import { useNotification } from '@/app/context/NotificationContext';
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
+  
   const { unreadCount } = useNotification();
-
-  // ✅ 알림 관련 훅
-  const { notifications, markAsRead, markAllAsRead } = useNotification();
   const [showNoti, setShowNoti] = useState(false);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   
-  // 🚨 [수정됨] HTMLHeaderElement -> HTMLElement (호환성 해결)
   const menuRef = useRef<HTMLElement>(null);
 
   const languageContext = useLanguage();
@@ -155,9 +152,8 @@ export default function SiteHeader() {
               )}
             </div>
 
-{/* ▼▼▼ 새로 넣을 코드 ▼▼▼ */}
-{user && (
-  <Link 
+            {user && (
+              <Link 
                 href="/notifications" 
                 className="relative mx-1 p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors inline-block"
               >
@@ -168,7 +164,7 @@ export default function SiteHeader() {
               </Link>
             )}
 
-<div className="relative ml-1">
+            <div className="relative ml-1">
               <div 
                 onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
                 className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white select-none"

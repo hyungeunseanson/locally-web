@@ -6,7 +6,7 @@ import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
-import Script from "next/script"; // 🟢 Script 컴포넌트 사용
+import Script from "next/script"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -48,10 +48,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning={true}>
-      {/* 🟢 [수정] head 태그 삭제함 (Next.js에서는 불필요) */}
-      
       <body className={inter.className}>
-        {/* 🟢 [수정] 카카오맵 스크립트를 body 안으로 옮기고 Script 컴포넌트 사용 */}
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script 
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
