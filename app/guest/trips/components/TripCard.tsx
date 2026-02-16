@@ -17,8 +17,11 @@ interface TripCardProps {
 export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProcessing }: TripCardProps) {
   const router = useRouter();
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // 🟢 메뉴 토글 상태
+  const [isMenuOpen, setIsMenuOpen] = useState(false); 
   
+  // 🟢 [추가] 환불 예상 정보 상태
+  const [refundInfo, setRefundInfo] = useState({ percent: 0, amount: 0, reason: '' });
+
   // 사진 슬라이더 상태
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const photos = trip.photos && trip.photos.length > 0 
@@ -41,18 +44,45 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
     });
   };
 
-  // 🟢 상태 뱃지 로직 (승인대기 삭제, 단순화)
-  const getStatusInfo = () => {
-    // 1. 취소 요청 중
-    if (trip.status === 'cancellation_requested') {
-        return { label: '취소 요청중', color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12}/> };
+  // 🟢 [환불 계산기] 프론트엔드용 (API 로직과 동일하게 유지)
+  const calculateRefundFront = () => {
+    const now = new Date();
+    const tourDate = new Date(`${trip.date}T${trip.time || '00:00'}:00`);
+    const paymentDate = new Date(trip.paymentDate || trip.created_at); // 결제일
+
+    const diffTime = tourDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    const hoursSincePayment = (now.getTime() - paymentDate.getTime()) / (1000 * 60 * 60);
+
+    const totalAmount = trip.totalPrice || trip.amount || 0;
+
+    // 1. 결제 후 24시간 이내 철회 (단, 투어일 1일 전까지만)
+    if (hoursSincePayment <= 24 && diffDays > 1) {
+      return { percent: 100, amount: totalAmount, reason: '결제 후 24시간 이내 철회 (전액 환불)' };
     }
-    // 2. 취소 완료
-    if (trip.status === 'cancelled') {
-        return { label: '취소됨', color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12}/> };
-    }
+
+    // 2. 날짜별 규정
+    if (diffDays <= 0) return { percent: 0, amount: 0, reason: '투어 당일/경과 (환불 불가)' };
+    if (diffDays === 1) return { percent: 40, amount: Math.floor(totalAmount * 0.4), reason: '1일 전 취소 (40% 환불)' };
+    if (diffDays >= 2 && diffDays <= 7) return { percent: 70, amount: Math.floor(totalAmount * 0.7), reason: '2~7일 전 취소 (70% 환불)' };
+    if (diffDays >= 8 && diffDays <= 19) return { percent: 80, amount: Math.floor(totalAmount * 0.8), reason: '8~19일 전 취소 (80% 환불)' };
     
-    // 3. 예약 확정 (기본) - D-Day 계산
+    return { percent: 100, amount: totalAmount, reason: '20일 전 취소 (전액 환불)' };
+  };
+
+  // 취소 버튼 클릭 시 계산 수행
+  const handleCancelClick = () => {
+    const info = calculateRefundFront();
+    setRefundInfo(info);
+    setIsMenuOpen(false);
+    setShowCancelModal(true);
+  };
+
+  // 상태 뱃지 로직
+  const getStatusInfo = () => {
+    if (trip.status === 'cancellation_requested') return { label: '취소 요청중', color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12}/> };
+    if (trip.status === 'cancelled') return { label: '취소됨', color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12}/> };
+    
     const today = new Date();
     const tripDate = new Date(trip.date);
     const diffTime = tripDate.getTime() - today.getTime();
@@ -78,9 +108,9 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 
   return (
     <>
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64">
+      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64 relative">
         
-        {/* 왼쪽: 이미지 섹션 (슬라이더) */}
+        {/* 왼쪽: 이미지 섹션 */}
         <div className="w-full md:w-72 h-56 md:h-full relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide">
            <Link href={`/experiences/${trip.expId}`} className="block w-full h-full relative">
              <Image 
@@ -116,7 +146,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 <div className="flex flex-col gap-1">
                    <div className="flex items-center gap-2 text-[10px] text-slate-400">
                      <span className="font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">#{trip.orderId}</span>
-                     <span>결제: {formatPaymentDate(trip.paymentDate)}</span>
+                     <span>결제: {formatPaymentDate(trip.paymentDate || trip.created_at)}</span>
                    </div>
                    
                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mt-1">
@@ -124,7 +154,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                    </div>
                 </div>
                 
-                {/* 🟢 더보기 메뉴 (클릭해야 닫힘) */}
+                {/* 🟢 더보기 메뉴 */}
                 <div className="relative">
                    <button 
                      onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} 
@@ -133,7 +163,6 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                       <MoreHorizontal size={20}/>
                    </button>
                    
-                   {/* 메뉴 열렸을 때 오버레이 (바깥 클릭 시 닫기용) */}
                    {isMenuOpen && (
                      <>
                        <div className="fixed inset-0 z-30" onClick={() => setIsMenuOpen(false)}></div>
@@ -142,10 +171,9 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                           <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium">체험 다시 보기</button>
                           <div className="h-px bg-slate-100 my-1"></div>
                           
-                          {/* 취소 가능 상태일 때만 버튼 표시 */}
                           {(trip.status !== 'cancelled' && trip.status !== 'cancellation_requested') ? (
                             <button 
-                              onClick={() => { setIsMenuOpen(false); setShowCancelModal(true); }} 
+                              onClick={handleCancelClick} // 🟢 클릭 시 환불 계산 후 모달 오픈
                               className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 text-red-500 font-medium"
                             >
                               예약 취소 요청
@@ -186,7 +214,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                  <MessageSquare size={14}/> 메시지
               </button>
               <button 
-                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`, '_blank')}
+                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`, '_blank')} // 🟢 지도 링크 수정
                 className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
               >
                  <Map size={14}/> 지도
@@ -205,6 +233,8 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
         isOpen={showCancelModal}
         onClose={() => setShowCancelModal(false)}
         isProcessing={isProcessing}
+        // 🟢 [추가] 환불 정보 전달
+        refundInfo={refundInfo} 
         onConfirm={async (reason) => {
           const success = await onRequestCancel(trip.id, reason, trip.hostId); 
           if (success) setShowCancelModal(false);
