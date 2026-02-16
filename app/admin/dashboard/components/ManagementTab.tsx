@@ -3,6 +3,7 @@
 import React from 'react';
 import ListPanel from './ListPanel';
 import DetailsPanel from './DetailsPanel';
+import SettlementTab from './SettlementTab'; // 🟢 1. 추가
 
 export default function ManagementTab({ 
   activeTab, filter, setFilter, 
@@ -10,6 +11,10 @@ export default function ManagementTab({
   selectedItem, setSelectedItem, 
   updateStatus, deleteItem 
 }: any) {
+
+  if (activeTab === 'SETTLEMENT') {
+    return <SettlementTab />;
+  }
 
   // 현재 탭과 필터에 맞는 리스트 반환
   const getFilteredList = () => {

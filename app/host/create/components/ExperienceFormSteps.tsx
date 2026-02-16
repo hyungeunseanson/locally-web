@@ -24,6 +24,7 @@ export default function ExperienceFormSteps({
   tempInclusion,
   setTempInclusion,
   tempExclusion,
+  handleRemoveImage,
   setTempExclusion
 }: any) {
 
@@ -114,37 +115,38 @@ export default function ExperienceFormSteps({
       <div className="w-full space-y-12">
         <div className="space-y-2">
           <h1 className="text-3xl font-black text-slate-900">체험의 첫인상</h1>
-          <p className="text-slate-500 text-lg">매력적인 제목과 멋진 사진을 올려주세요. (최대 5장)</p>
+          <p className="text-slate-500 text-lg">매력적인 제목과 멋진 사진을 올려주세요.</p>
         </div>
         <div className="space-y-10">
           <input type="text" placeholder="체험 제목을 입력하세요" value={formData.title} onChange={(e) => updateData('title', e.target.value)} className="w-full py-4 text-3xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300"/>
           
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-            {/* 사진 추가 버튼 */}
             <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all">
               <Camera size={24} className="text-slate-400 mb-2"/>
               <span className="text-xs font-bold text-slate-500">사진 추가</span>
               <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload}/>
             </label>
 
-            {/* ✅ 사진 미리보기 리스트 + 삭제 기능 추가 */}
             {formData.photos.map((url: string, idx: number) => (
-              <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative shadow-sm group">
+              <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative shadow-sm group border border-slate-100">
                 <img src={url} className="w-full h-full object-cover" alt={`preview ${idx}`}/>
                 
-                {/* ❌ 삭제 버튼: 호버 시 나타남 */}
+                {/* 🟢 [수정] 삭제 버튼 로직 강화 */}
                 <button 
                   type="button"
                   onClick={() => {
-                    // photos URL 리스트에서 삭제
+                    // 1. Preview URL 삭제
                     const newPhotos = formData.photos.filter((_: any, i: number) => i !== idx);
                     updateData('photos', newPhotos);
-                    // 실제 파일 리스트(imageFiles)에서도 함께 삭제해야 함 (부모에서 관리 필요할 수 있음)
-                    // 지금은 편의상 URL이 사라지면 제출 시 걸러지도록 처리 가능
+                    
+                    // 2. 실제 File 객체 삭제 (부모 함수 호출)
+                    if (handleRemoveImage) {
+                      handleRemoveImage(idx);
+                    }
                   }}
-                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500"
+                  className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:scale-110"
                 >
-                  <X size={14} />
+                  <X size={14} strokeWidth={3} />
                 </button>
               </div>
             ))}

@@ -72,6 +72,10 @@ export default function CreateExperiencePage() {
     updateData('itinerary', newItinerary);
   };
 
+  const handleRemoveImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
 // 📸 사진 업로드 핸들러 수정
 const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
   if (e.target.files) {
@@ -192,6 +196,7 @@ const handleSubmit = async () => {
           handlePhotoUpload={handlePhotoUpload}
           addItem={addItem}
           removeItem={removeItem}
+          handleRemoveImage={handleRemoveImage}
           addItineraryItem={addItineraryItem}
           removeItineraryItem={removeItineraryItem}
           updateItineraryItem={updateItineraryItem}

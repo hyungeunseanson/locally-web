@@ -5,7 +5,6 @@ import { Search, Activity, Star, X } from 'lucide-react';
 import Skeleton from '@/app/components/ui/Skeleton';
 import { useToast } from '@/app/context/ToastContext';
 
-// 🟢 [핵심] Props 인터페이스 정의 (부모로부터 받을 데이터)
 interface AnalyticsTabProps {
   bookings: any[];
   users: any[];
@@ -20,35 +19,29 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   const [stats, setStats] = useState({
-    // KPI
     totalUsers: 0,
     activeExpsCount: 0,
     gmv: 0,
     netRevenue: 0,
-    hostPayout: 0, // 🟢 [수정] 초기값 추가 (타입 에러 해결)
+    hostPayout: 0,
     conversionRate: '0.0',
     retentionRate: '0.0',
     aov: 0,
     cancellationRate: 0,
-    
-    // Data
     topExperiences: [] as any[],
     superHostCandidates: [] as any[],
     funnel: { views: 0, clicks: 0, paymentInit: 0, completed: 0 },
     cancelBreakdown: { user: 0, host: 0 },
     priceDistribution: { low: 0, mid: 0, high: 0 },
-    
-    // Mock
     avgResponseTime: 28,
     responseRate: 96.5
   });
 
-  // 🟢 [수정] Props 데이터 변경 시 로직 실행 (내부 fetch 제거됨)
   useEffect(() => {
     if (bookings && users && exps && reviews) {
       processData();
     } else {
-      setLoading(false); // 데이터가 없어도 로딩 상태 해제
+      setLoading(false);
     }
   }, [bookings, users, exps, reviews]);
 
@@ -63,7 +56,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
       const hostStats: Record<string, any> = {};
       const priceDist = { low: 0, mid: 0, high: 0 };
 
-      // 1. Bookings 데이터 분석
       bookings?.forEach((b: any) => {
         const exp = exps?.find(e => e.id === b.experience_id);
         if (exp?.host_id) {
@@ -71,22 +63,29 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
            hostStats[exp.host_id].bookings += 1;
         }
 
+        // 🟢 [수정 포인트 1] totalPaid 선언 위치 및 로직 통합
         if (['confirmed', 'PAID', 'completed'].includes(b.status)) {
           completedCount++;
-          const totalPaid = b.amount || 0; 
+          const totalPaid = Number(b.amount || 0); 
           gmv += totalPaid;
-          netRevenue += (totalPaid - Math.floor((b.total_price || 0) * 0.8));
+          
+          // 순수익 계산 (DB 컬럼 우선, 없으면 20% 추정)
+          const revenue = b.platform_revenue ?? (totalPaid * 0.2); 
+          netRevenue += revenue; 
 
+          // 가격대별 분포 계산
           if (totalPaid < 30000) priceDist.low++;
           else if (totalPaid < 100000) priceDist.mid++;
           else priceDist.high++;
 
+          // 유저 재구매율 계산용
           if (b.user_id) userBookingCounts[b.user_id] = (userBookingCounts[b.user_id] || 0) + 1;
           
+          // 체험별 통계
           if (!expStats[b.experience_id]) expStats[b.experience_id] = { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
           expStats[b.experience_id].count++;
           expStats[b.experience_id].revenue += totalPaid;
-        }
+        } // <--- 여기가 아까 잘못 닫혔던 부분입니다.
 
         if (['cancelled', 'declined', 'cancellation_requested'].includes(b.status)) {
           cancelledCount++;
@@ -94,7 +93,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
         }
       });
 
-      // 2. Reviews 데이터 분석
+      // 2. Reviews 분석
       reviews?.forEach((r: any) => {
         if (expStats[r.experience_id]) {
           expStats[r.experience_id].ratingSum += r.rating;
@@ -136,7 +135,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
         activeExpsCount: exps?.length || 0,
         gmv,
         netRevenue,
-        hostPayout: 0, 
+        hostPayout: gmv - netRevenue, 
         conversionRate: userCount ? ((completedCount / userCount) * 100).toFixed(1) : '0.0',
         retentionRate: Object.values(userBookingCounts).filter(c => c > 1).length > 0 
           ? ((Object.values(userBookingCounts).filter(c => c > 1).length / Object.keys(userBookingCounts).length) * 100).toFixed(1) : '0.0',
@@ -165,11 +164,11 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
   if (loading) return <div className="p-8"><Skeleton className="w-full h-96"/></div>;
 
   return (
-    <div className="flex-1 p-8 space-y-12 animate-in fade-in duration-500 max-w-7xl mx-auto">
+    <div className="flex-1 p-8 space-y-12 animate-in fade-in duration-500 max-w-7xl mx-auto text-slate-900">
       
       {/* 1. 심플 KPI 그리드 */}
       <section>
-        <h2 className="text-xl font-bold text-black mb-6 tracking-tight">Overview</h2>
+        <h2 className="text-xl font-bold mb-6 tracking-tight">Overview</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           <SimpleKpi label="총 가입 유저" value={stats.totalUsers} unit="명" onClick={() => setSelectedMetric('users')} />
           <SimpleKpi label="활성 체험" value={stats.activeExpsCount} unit="개" onClick={() => setSelectedMetric('exps')} />
@@ -188,7 +187,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
       {/* 2. 인기 검색어 */}
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-black flex items-center gap-2">
+          <h2 className="text-lg font-bold flex items-center gap-2">
             <Search size={18} /> 인기 검색어 Top 5
           </h2>
           <span className="text-xs text-gray-400">Today Updates</span>
@@ -206,13 +205,11 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
         </div>
       </section>
 
-      <div className="border-t border-gray-100"></div>
-
       {/* 3. 분석 그리드 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-8">
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-black">예약 퍼널 (Funnel)</h3>
+            <h3 className="text-lg font-bold">예약 퍼널 (Funnel)</h3>
             <Activity size={18} className="text-gray-400"/>
           </div>
           <div className="space-y-2">
@@ -225,7 +222,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
 
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-black">인기 체험 Top 4</h3>
+            <h3 className="text-lg font-bold">인기 체험 Top 4</h3>
             <Star size={18} className="text-gray-400"/>
           </div>
           <div className="divide-y divide-gray-100">
@@ -241,52 +238,9 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
                   <div className="text-xs text-gray-400">⭐ {exp.rating}</div>
                 </div>
               </div>
-            )) : <div className="text-sm text-gray-400 py-4">데이터 없음</div>}
+            )) : <div className="text-sm text-gray-400 py-4 text-center">데이터 없음</div>}
           </div>
         </div>
-      </div>
-
-      <div className="border-t border-gray-100"></div>
-
-      {/* 4. 유저 통계 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-         <div>
-            <h3 className="text-lg font-bold text-black mb-6 flex items-center gap-2">슈퍼 호스트 후보</h3>
-            <div className="space-y-3">
-               {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((h, i) => (
-                  <div key={i} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-xs font-bold">H</div>
-                        <div>
-                           <div className="text-sm font-bold text-black">호스트 #{h.id.slice(0,5)}</div>
-                           <div className="text-xs text-gray-500">{h.bookings}건 예약</div>
-                        </div>
-                     </div>
-                     <span className="text-xs font-bold text-black">⭐ {h.rating}</span>
-                  </div>
-               )) : <div className="text-sm text-gray-400">조건 충족 호스트 없음</div>}
-            </div>
-         </div>
-
-         <div>
-            <h3 className="text-lg font-bold text-black mb-6">유저 분포 (KR / Global)</h3>
-            <div className="mb-8">
-               <div className="flex justify-between text-sm font-medium mb-2">
-                  <span>내국인</span> <span>65%</span>
-               </div>
-               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-black w-[65%]"></div>
-               </div>
-            </div>
-            <div>
-               <div className="flex justify-between text-sm font-medium mb-2">
-                  <span>외국인 (Global)</span> <span>35%</span>
-               </div>
-               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-gray-400 w-[35%]"></div>
-               </div>
-            </div>
-         </div>
       </div>
 
       {/* 상세 모달 */}
@@ -314,7 +268,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
   );
 }
 
-// --- UI Components ---
 function SimpleKpi({ label, value, unit, onClick }: any) {
   return (
     <div onClick={onClick} className="p-6 bg-white border border-gray-200 rounded-xl hover:border-black transition-colors cursor-pointer group">
