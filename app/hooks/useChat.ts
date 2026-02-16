@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { sendNotification } from '@/app/utils/notification'; // 🟢 알림 함수 임포트
-import { sanitizeText } from '@/app/utils/sanitize'; // 🟢 추가
+import { sendNotification } from '@/app/utils/notification';
+import { sanitizeText } from '@/app/utils/sanitize';
 
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -16,19 +16,23 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const supabase = createClient();
   const { showToast } = useToast();
 
+  // 🟢 [추가] 실시간 중복 처리 방지를 위한 Ref
+  const lastUpdateRef = useRef<number>(0);
+
   const secureUrl = (url: string | null) => {
     if (!url || url === '') return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
   };
 
-  const fetchInquiries = useCallback(async () => {
-    if (inquiries.length === 0) setIsLoading(true);
+  const fetchInquiries = useCallback(async (showLoading = true) => {
+    // 🟢 [수정] 불필요한 로딩 상태 변경 방지 (깜빡임 해결)
+    if (showLoading && inquiries.length === 0) setIsLoading(true);
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
-      setCurrentUser(user);
+      if (!currentUser) setCurrentUser(user); // 유저 정보 한 번만 세팅
 
       let query = supabase
         .from('inquiries')
@@ -102,7 +106,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
     } catch (err: any) { console.error(err); } 
     finally { setIsLoading(false); }
-  }, [supabase, role]);
+  }, [supabase, role, currentUser]); // 의존성 최적화
 
   const markAsRead = async (inquiryId: number) => {
     if (!currentUser) return;
@@ -163,12 +167,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   };
 
   const sendMessage = async (inquiryId: number, content: string) => {
-    // 🟢 [보안] 입력값 소독 (XSS 방지)
     const cleanContent = sanitizeText(content);
-
     if (!cleanContent.trim() || !currentUser) return;
     
-    // UI 즉시 업데이트 (소독된 내용으로 보여줌)
+    // UI 낙관적 업데이트
     setInquiries(prev => prev.map(inq => 
       inq.id === inquiryId 
         ? { ...inq, content: cleanContent, updated_at: new Date().toISOString() } 
@@ -176,25 +178,22 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
 
     try {
-      // 1. 메시지 저장 (소독된 내용만 저장)
       const { error } = await supabase.from('inquiry_messages').insert([{ 
         inquiry_id: inquiryId, 
         sender_id: currentUser.id, 
-        content: cleanContent // 🟢 안전한 데이터
+        content: cleanContent
       }]);
       
       if (error) throw error;
       
-      // 2. 채팅방 정보 업데이트
       await supabase.from('inquiries').update({ 
-        content: cleanContent, // 🟢 안전한 데이터
+        content: cleanContent, 
         updated_at: new Date().toISOString() 
       }).eq('id', inquiryId);
       
-      // 3. 메시지 목록 새로고침
       await loadMessages(inquiryId);
       
-      // 4. 알림 발송 (기존 로직 유지)
+      // 알림 발송
       const currentInquiry = inquiries.find(i => i.id === inquiryId);
       if (currentInquiry) {
         const recipientId = currentUser.id === currentInquiry.host_id 
@@ -212,7 +211,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           senderId: currentUser.id,
           type: 'new_message',
           title: `💬 ${senderName}님의 새 메시지`,
-          message: cleanContent, // 🟢 알림 내용도 안전하게
+          message: cleanContent,
           link: targetLink,
           inquiry_id: inquiryId
         });
@@ -247,29 +246,42 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
-  // 실시간 리스트 업데이트
+  // 🟢 [핵심 수정] 실시간 리스트 업데이트 강화 (채널 하나로 통합 관리)
   useEffect(() => {
+    if (!currentUser) return;
+
     const channel = supabase
-      .channel('chat-list-updates')
+      .channel('chat-realtime-updates')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
+        { event: '*', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
-          if (currentUser && payload.new.sender_id !== currentUser.id) {
-             fetchInquiries();
-          }
-          
-          if (selectedInquiry && payload.new.inquiry_id === selectedInquiry.id) {
-             loadMessages(selectedInquiry.id);
+          const now = Date.now();
+          // 0.5초 내 중복 이벤트 무시 (Supabase가 가끔 이벤트를 두 번 보냄)
+          if (now - lastUpdateRef.current < 500) return;
+          lastUpdateRef.current = now;
+
+          // 내가 보낸 게 아닐 때만 갱신 (나는 이미 낙관적 업데이트 함)
+          if (payload.new && payload.new.sender_id !== currentUser.id) {
+             fetchInquiries(false); // 로딩바 없이 조용히 갱신
+             
+             if (selectedInquiry && payload.new.inquiry_id === selectedInquiry.id) {
+               loadMessages(selectedInquiry.id);
+             }
           }
         }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'inquiries' }, // 🟢 추가: 채팅방 메타데이터 변경 감지
+        () => fetchInquiries(false) // 목록 순서 변경 등 반영
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, fetchInquiries, selectedInquiry, currentUser]);
+  }, [supabase, fetchInquiries, selectedInquiry, currentUser]); // loadMessages는 의존성에서 제외 (무한루프 방지)
 
   return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, refresh: fetchInquiries };
 }
