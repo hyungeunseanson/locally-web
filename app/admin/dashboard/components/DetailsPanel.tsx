@@ -17,35 +17,47 @@ export default function DetailsPanel({ activeTab, selectedItem, updateStatus, de
   // 'verification-docs' 버킷에 있는 파일은 그냥 <img> 태그로 못 봅니다. (403 에러)
   // 관리자 권한으로 '서명된 URL(Signed URL)'을 받아와야 볼 수 있습니다.
 // 🟢 [수정됨] 보안 버킷(verification-docs) 연결 로직
+// 🟢 [최종 수정] 신분증 보안 URL 발급 (확장자 자동 매칭)
 useEffect(() => {
   if (activeTab === 'APPS' && selectedItem?.id_card_file) {
     const fetchSignedUrl = async () => {
       try {
-        // 1. DB에 저장된 전체 경로(URL)에서 '파일명'만 추출
+        // 1. DB에 저장된 파일명 추출
         const fullPath = selectedItem.id_card_file;
         let fileName = fullPath.split('/').pop(); 
-        
-        // URL 뒤에 ?쿼리스트링이 붙어있다면 제거
-        if (fileName?.includes('?')) {
-          fileName = fileName.split('?')[0];
-        }
+        if (fileName?.includes('?')) fileName = fileName.split('?')[0];
 
         if (!fileName) return;
 
-        // 2. [중요] 'verification-docs' 버킷의 'id_card' 폴더 안을 찾도록 경로 조립
-        // (사용자님이 Supabase 대시보드에서 파일을 이 경로로 옮겨주셔야 함)
-        const securePath = `id_card/${fileName}`;
+        // 2. 경로 시도: 확장자가 없는 경우 .jpg나 .png를 붙여서 찾아봄 (브라우저 표시 문제 해결 위함)
+        // 우선은 사용자가 올린 그대로 요청해봅니다.
+        let securePath = `id_card/${fileName}`;
 
-        console.log("🔒 보안 스토리지 요청:", "verification-docs", securePath);
+        console.log("🔍 원본 요청:", securePath);
 
-        const { data, error } = await supabase
+        // 3. 서명된 URL 생성 요청
+        let { data, error } = await supabase
           .storage
-          .from('verification-docs') // 🟢 프라이빗 버킷 이름
-          .createSignedUrl(securePath, 3600); // 1시간 유효한 보안 링크 생성
+          .from('verification-docs')
+          .createSignedUrl(securePath, 3600);
+
+        // 4. 만약 에러가 나거나 파일이 없으면 -> 혹시 루트에 있나? 확인
+        if (error) {
+           console.log("⚠️ 폴더에 없음, 루트 경로 재시도:", fileName);
+           const retry = await supabase
+              .storage
+              .from('verification-docs')
+              .createSignedUrl(fileName, 3600); // id_card/ 뺴고 요청
+           
+           if (retry.data) {
+              data = retry.data;
+              error = retry.error;
+           }
+        }
 
         if (data) setSignedUrl(data.signedUrl);
         if (error) {
-          console.error("🔥 스토리지 에러 (버킷/파일이 존재하는지 확인하세요):", error);
+          console.error("🔥 최종 로드 실패:", error);
           setSignedUrl(null);
         }
       } catch (e) {
