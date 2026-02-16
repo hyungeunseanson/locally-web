@@ -4,11 +4,17 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-// 🟢 [수정] 상대 경로 (같은 폴더)
-import LoginModal from './LoginModal'; 
+
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
+
+import dynamic from 'next/dynamic';
+// 🟢 [추가] LoginModal을 동적으로 불러오기 (SSR false 옵션으로 빌드 에러 해결)
+const LoginModal = dynamic(() => import('./LoginModal'), { 
+  ssr: false, 
+  loading: () => null 
+});
 
 export default function SiteHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -127,10 +133,9 @@ export default function SiteHeader() {
 
   return (
     <>
-      {/* 🟢 [수정 2] Suspense로 감싸주기 (이게 없어서 빌드 에러가 났던 겁니다) */}
-      <Suspense fallback={null}>
-        <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
-      </Suspense>
+      {/* 🟢 [수정] dynamic import를 적용했으므로 Suspense 불필요 */}
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      
       <header className="sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex-1 flex items-center z-[101]">
