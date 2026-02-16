@@ -7,6 +7,7 @@ import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
 import Script from "next/script"; 
+import GoogleTranslate from '@/app/components/GoogleTranslate'; // 🟢 import
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -66,6 +67,7 @@ export default function RootLayout({
                 </main>
                 <SiteFooter />
               </div>
+              <GoogleTranslate />
             </LanguageProvider>
           </NotificationProvider>
         </ToastProvider>
