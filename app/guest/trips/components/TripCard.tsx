@@ -54,8 +54,9 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
     const hoursSincePayment = (now.getTime() - paymentDate.getTime()) / (1000 * 60 * 60);
 
-    const totalAmount = trip.totalPrice || trip.amount || 0;
-
+    // 🟢 [수정] 데이터 컬럼명 매핑 강화 (total_price가 Supabase 원본 컬럼)
+    const totalAmount = trip.total_price || trip.amount || trip.totalPrice || 0;
+    console.log('환불 계산 기준 금액:', totalAmount);
     // 1. 결제 후 24시간 이내 철회 (단, 투어일 1일 전까지만)
     if (hoursSincePayment <= 24 && diffDays > 1) {
       return { percent: 100, amount: totalAmount, reason: '결제 후 24시간 이내 철회 (전액 환불)' };
