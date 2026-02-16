@@ -129,7 +129,7 @@ export function useGuestTrips() {
     setIsProcessing(true);
     try {
       // API 호출
-      const res = await fetch('/api/payments/cancel', {
+      const res = await fetch('/api/payment/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
