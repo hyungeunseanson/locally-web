@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ReactNode, Suspense } from "react";
-import Sidebar from "@/app/admin/dashboard/components/Sidebar"; // 1. 사이드바 컴포넌트 불러오기 (useSearchParams 사용 → Suspense 필수)
+import Sidebar from "@/app/admin/dashboard/components/Sidebar";
 
 export default async function AdminLayout({
   children,
@@ -26,23 +26,23 @@ export default async function AdminLayout({
               cookieStore.set(name, value, options)
             );
           } catch {
-            // 서버 컴포넌트에서 쿠키 설정 무시 (미들웨어가 처리함)
+            // 서버 컴포넌트에서 쿠키 설정 무시
           }
         },
       },
     }
   );
 
-  // 2. 현재 로그인한 사용자 확인
+  // 현재 로그인한 사용자 확인
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login"); // 로그인 안 했으면 로그인 페이지로 보냄
+    redirect("/login");
   }
 
-  // 3. DB에서 진짜 관리자인지 확인 (보안 핵심)
+  // DB에서 진짜 관리자인지 확인 (보안 핵심)
   const { data: userProfile } = await supabase
     .from("users")
     .select("role")
@@ -54,19 +54,20 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  // 4. 레이아웃 구성 (사이드바 + 메인 콘텐츠). Sidebar는 useSearchParams 사용하므로 Suspense로 감쌈
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-slate-50">
       {/* 왼쪽: 고정된 관리자 사이드바 */}
-      <div className="w-64 flex-shrink-0">
-        <Suspense fallback={<div className="h-full w-64 bg-gray-200 animate-pulse rounded-r-lg" />}>
+      <div className="w-64 flex-shrink-0 bg-slate-900 min-h-screen sticky top-0">
+        <Suspense fallback={<div className="h-full w-full bg-slate-800 animate-pulse" />}>
           <Sidebar />
         </Suspense>
       </div>
 
-      {/* 오른쪽: 바뀌는 페이지 내용 (대시보드, 예약관리 등) */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        {children}
+      {/* 오른쪽: 바뀌는 페이지 내용 */}
+      <main className="flex-1 p-8 overflow-y-auto h-screen scrollbar-hide">
+        <div className="max-w-7xl mx-auto">
+          {children}
+        </div>
       </main>
     </div>
   );
