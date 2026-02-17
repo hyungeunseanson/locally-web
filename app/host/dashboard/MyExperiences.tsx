@@ -51,7 +51,7 @@ export default function MyExperiences() {
       
       {experiences.map((exp) => (
         <div key={exp.id} className="group flex flex-col gap-2">
-          {/* ✅ 디자인 추가: 보완 요청 또는 거절 시 관리자 코멘트 말풍선 표시 */}
+          {/* 관리자 코멘트 표시 */}
           {(exp.status === 'revision' || exp.status === 'rejected') && exp.admin_comment && (
             <div className={`p-4 rounded-2xl border flex items-start gap-3 text-sm animate-in fade-in slide-in-from-top-1 duration-300 ${
               exp.status === 'revision' ? 'bg-orange-50 border-orange-100 text-orange-800' : 'bg-red-50 border-red-100 text-red-800'
@@ -68,14 +68,14 @@ export default function MyExperiences() {
 
           <div className="bg-white border border-slate-100 rounded-2xl p-6 flex justify-between items-center shadow-sm hover:shadow-lg transition-all">
             <div className="flex gap-5 items-center">
-              {/* 썸네일 표시 */}
+              {/* 썸네일 */}
               <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative border border-slate-50">
                 {exp.photos && exp.photos.length > 0 ? (
                   <img src={exp.photos[0]} className="w-full h-full object-cover" alt={exp.title} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">No Img</div>
                 )}
-                {/* 상태 뱃지 업데이트 */}
+                {/* 상태 뱃지 */}
                 <div className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase text-white shadow-sm ${
                   exp.status === 'active' ? 'bg-green-500' : 
                   exp.status === 'revision' ? 'bg-orange-500' :

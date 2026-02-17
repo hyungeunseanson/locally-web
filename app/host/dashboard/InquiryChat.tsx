@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat'; 
-import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 [추가] 모달 불러오기
+import UserProfileModal from '@/app/components/UserProfileModal'; 
 import { Send, User, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -16,31 +16,24 @@ export default function InquiryChat() {
   const searchParams = useSearchParams();
   const guestIdFromUrl = searchParams.get('guestId');
 
-// ✅ [수정됨] URL에 guestId가 있으면 자동으로 해당 채팅방 열기
-useEffect(() => {
-  // inquiries(채팅방 목록)가 로드되었고, URL에 guestId가 있을 때 실행
-  if (guestIdFromUrl && inquiries.length > 0) {
-    
-    // 1. 문의 목록(inquiries) 중에서 해당 게스트(guestId)와 연결된 방 찾기
-    const targetInquiry = inquiries.find(inq => 
-      String(inq.user_id) === String(guestIdFromUrl) || 
-      String(inq.guest?.id) === String(guestIdFromUrl)
-    );
+  // 자동 채팅방 열기
+  useEffect(() => {
+    if (guestIdFromUrl && inquiries.length > 0) {
+      const targetInquiry = inquiries.find(inq => 
+        String(inq.user_id) === String(guestIdFromUrl) || 
+        String(inq.guest?.id) === String(guestIdFromUrl)
+      );
 
-    // 2. 찾았으면 해당 채팅방 메시지 불러오기 (loadMessages 사용)
-    if (targetInquiry) {
-      // 이미 선택된 방이 아닐 때만 로드 (중복 실행 방지)
-      if (selectedInquiry?.id !== targetInquiry.id) {
-        loadMessages(targetInquiry.id);
+      if (targetInquiry) {
+        if (selectedInquiry?.id !== targetInquiry.id) {
+          loadMessages(targetInquiry.id);
+        }
       }
     }
-  }
-}, [guestIdFromUrl, inquiries, loadMessages, selectedInquiry]);
+  }, [guestIdFromUrl, inquiries, loadMessages, selectedInquiry]);
 
-  // 🟢 [추가] 프로필 모달 상태 관리
   const [modalUserId, setModalUserId] = useState<string | null>(null);
 
-  // 🟢 [유지] HTTP 이미지를 HTTPS로 변환하는 헬퍼 함수
   const secureUrl = (url: string | null | undefined) => {
     if (!url) return "/default-avatar.png";
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
@@ -70,7 +63,6 @@ useEffect(() => {
 
   return (
     <div className="flex gap-6 h-full min-h-[600px] w-full">
-      {/* 🟢 [추가] 프로필 모달 컴포넌트 */}
       <UserProfileModal 
         userId={modalUserId || ''} 
         isOpen={!!modalUserId} 
@@ -78,7 +70,7 @@ useEffect(() => {
         role="guest" 
       />
 
-      {/* 좌측 리스트 영역 (기존 디자인 유지) */}
+      {/* 좌측 리스트 */}
       <div className="w-[300px] shrink-0 border-r border-slate-200 pr-4 overflow-y-auto max-h-[700px]">
         {inquiries.length === 0 && <div className="text-slate-400 text-sm text-center py-10">문의가 없습니다.</div>}
         
@@ -116,7 +108,6 @@ useEffect(() => {
             <div className="text-sm text-slate-600 line-clamp-2 bg-white/50 p-2 rounded-lg">
               {inq.content}
             </div>
-            {/* 🟢 [유지] 시간 표시 에러 방지 */}
             <div className="text-xs text-slate-400 mt-2 text-right" suppressHydrationWarning>
               {formatDate(inq.updated_at)}
             </div>
@@ -124,11 +115,11 @@ useEffect(() => {
         ))}
       </div>
 
-      {/* 우측 채팅방 영역 */}
+      {/* 우측 채팅방 */}
       <div className="flex-1 flex flex-col bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden h-[700px]">
         {selectedInquiry ? (
           <>
-            {/* 🟢 [수정] 헤더 클릭 시 프로필 모달 오픈 */}
+            {/* 헤더 */}
             <div 
               className="p-4 border-b border-slate-200 bg-white flex items-center gap-3 shadow-sm z-10 cursor-pointer hover:bg-slate-50 transition-colors"
               onClick={() => setModalUserId(selectedInquiry.user_id)}
@@ -147,6 +138,7 @@ useEffect(() => {
               </div>
             </div>
 
+            {/* 메시지 영역 */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
               {messages.map((msg) => {
                 const isMe = String(msg.sender_id) === String(currentUser?.id);
@@ -171,9 +163,9 @@ useEffect(() => {
                       {!isMe && (
                         <span 
                           className="text-[11px] text-slate-500 mb-1 ml-1 cursor-pointer hover:underline"
-                          onClick={() => setModalUserId(msg.sender_id)} // 🟢 [추가] 이름 클릭 시 프로필
+                          onClick={() => setModalUserId(msg.sender_id)} 
                         >
-{selectedInquiry.guest?.name || '게스트'}
+                          {selectedInquiry.guest?.name || '게스트'}
                         </span>
                       )}
 
@@ -210,7 +202,6 @@ useEffect(() => {
                 onChange={(e) => setReplyText(e.target.value)} 
                 placeholder="답장 입력..." 
                 disabled={isSending} 
-                // 🟢 [수정] 비활성화 시 스타일 강화 (텍스트 흐리게, 커서 금지)
                 className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 onKeyDown={(e) => {
                   if (e.nativeEvent.isComposing) return;
@@ -225,7 +216,6 @@ useEffect(() => {
                 disabled={!replyText.trim() || isSending} 
                 className="bg-black text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {/* 🟢 [유지] 로딩 스피너 및 아이콘 */}
                 {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
               </button>
             </div>

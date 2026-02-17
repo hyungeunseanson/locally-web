@@ -15,11 +15,11 @@ export default function Earnings() {
   const [showSettings, setShowSettings] = useState(false); 
   
   const [stats, setStats] = useState({
-    gross: 0,        // 총 매출 (게스트 결제금액)
+    gross: 0,        // 총 매출
     fee: 0,          // 플랫폼 수수료
     exchangeFee: 0,  // 결제망 수수료
     net: 0,          // 최종 정산금
-    count: 0
+    count: 0         // ✅ [복구] 예약 건수
   });
 
   const [chartData, setChartData] = useState<{
@@ -29,7 +29,6 @@ export default function Earnings() {
     isToday: boolean;
   }[]>([]);
 
-  // 설정 메뉴 외부 클릭 시 닫기
   useEffect(() => {
     const closeMenu = () => setShowSettings(false);
     if (showSettings) document.addEventListener('click', closeMenu);
@@ -42,7 +41,7 @@ export default function Earnings() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         
-        // 1. 예약 데이터 가져오기 (취소된 것 제외)
+        // 예약 데이터 가져오기
         const { data: bookings, error } = await supabase
           .from('bookings')
           .select(`
@@ -54,7 +53,7 @@ export default function Earnings() {
           .eq('experiences.host_id', user.id)
           .neq('status', 'cancelled') 
           .neq('status', 'declined')
-          .neq('status', 'cancellation_requested'); // 취소 요청 중인 것도 제외할지 결정 필요
+          .neq('status', 'cancellation_requested'); 
 
         if (error) throw error;
         
@@ -63,15 +62,13 @@ export default function Earnings() {
         const dailyIncome: Record<string, number> = {};
         
         bookings?.forEach((b: any) => {
-          // created_at 기준 (예약 발생일) 또는 date 기준 (체험일) 중 선택
-          // 여기서는 '예약 발생일(매출 발생일)' 기준으로 차트를 그립니다.
           const dateStr = b.created_at.split('T')[0]; 
           const price = b.total_price || 0; 
 
           grossRevenue += price;
           validCount++;
 
-          // 차트용: 순수익(약 77%) 기준으로 표시
+          // 차트용: 순수익(약 77%) 기준
           const netIncome = Math.floor(price * 0.77);
 
           if (dailyIncome[dateStr]) {
@@ -81,7 +78,7 @@ export default function Earnings() {
           }
         });
 
-        // 2. 최근 7일 ~ 미래 4일 (총 12일) 차트 데이터 생성
+        // 차트 데이터 생성
         const chart = [];
         const today = new Date();
         
@@ -89,7 +86,7 @@ export default function Earnings() {
           const d = new Date();
           d.setDate(today.getDate() + i);
           const dateStr = d.toISOString().split('T')[0];
-          const dayLabel = String(d.getDate()); // 일(Day)만 표시
+          const dayLabel = String(d.getDate());
           
           chart.push({
             date: dateStr,
@@ -99,9 +96,9 @@ export default function Earnings() {
           });
         }
 
-        // 3. 수수료 및 정산금 계산 (소수점 버림)
+        // 수수료 계산
         const fee = Math.floor(grossRevenue * 0.2); // 20%
-        const exchangeFee = Math.floor(grossRevenue * 0.03); // 3% (약 2.7~3.3%)
+        const exchangeFee = Math.floor(grossRevenue * 0.03); // 3%
         const net = grossRevenue - fee - exchangeFee; 
 
         setStats({
@@ -109,7 +106,7 @@ export default function Earnings() {
           fee,
           exchangeFee,
           net, 
-          count: validCount
+          count: validCount // ✅ [복구] 건수 저장
         });
 
         setChartData(chart);
@@ -121,11 +118,10 @@ export default function Earnings() {
       }
     };
     fetchData();
-  }, [supabase]); // 의존성 배열 수정
+  }, [supabase]);
 
   if (loading) return <Skeleton className="w-full h-[500px] rounded-3xl" />;
 
-  // 차트 높이 계산용 최대값 (최소 10,000원)
   const maxAmount = Math.max(...chartData.map(d => d.amount), 10000);
 
   return (
@@ -145,7 +141,6 @@ export default function Earnings() {
             <Settings size={20} />
           </button>
 
-          {/* 설정 드롭다운 메뉴 */}
           {showSettings && (
             <div className="absolute right-0 top-12 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <button 
@@ -155,7 +150,7 @@ export default function Earnings() {
                 <BookOpen size={16} className="text-slate-400"/> 호스트 가이드북
               </button>
               <button 
-                onClick={() => router.push('/host/dashboard?tab=profile')} // 프로필 탭으로 이동
+                onClick={() => router.push('/host/dashboard?tab=profile')}
                 className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-3"
               >
                 <CreditCard size={16} className="text-slate-400"/> 정산 계좌 관리
@@ -165,21 +160,24 @@ export default function Earnings() {
         </div>
       </div>
 
-      {/* 메인 카드 (수입 & 차트) */}
+      {/* 메인 카드 */}
       <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
         
         <div className="text-center mb-10 relative z-10">
           <p className="text-slate-400 font-bold text-xs mb-2 flex items-center justify-center gap-1 uppercase tracking-wider">
              정산 예정 금액 <Info size={12}/>
           </p>
-          <h1 className="text-5xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">
             ₩{stats.net.toLocaleString()}
           </h1>
+          
+          {/* ✅ [추가] 예약 건수 뱃지 (이게 빠져있었습니다!) */}
+          <div className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
+            총 {stats.count}건의 예약 완료
+          </div>
         </div>
 
-        {/* 차트 영역 */}
         <div className="h-48 flex items-end justify-between gap-2 md:gap-4 relative z-10">
-            {/* 배경 가이드 라인 (점선) */}
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 z-0">
                 <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
                 <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
@@ -188,18 +186,17 @@ export default function Earnings() {
 
             {chartData.map((d, i) => {
                const heightPercent = (d.amount / maxAmount) * 100;
-               // 최소 높이 4% 보장 (너무 작으면 안 보이므로)
                const barHeight = Math.max(heightPercent, 4); 
 
                return (
                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer relative z-10">
-                    {/* 툴팁 (금액 표시) */}
-                    <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-slate-900 text-white text-[10px] px-2 py-1 rounded transition-opacity whitespace-nowrap z-20 shadow-md">
-                        ₩{d.amount.toLocaleString()}
+                    {/* ✅ [수정] 툴팁에 날짜 표시 추가 */}
+                    <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-slate-900 text-white text-[10px] px-2 py-1.5 rounded transition-opacity whitespace-nowrap z-20 shadow-md text-center">
+                        <div className="font-bold mb-0.5 text-slate-300">{d.date}</div>
+                        <div className="font-bold">₩{d.amount.toLocaleString()}</div>
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
                     </div>
                     
-                    {/* 막대 그래프 */}
                     <div 
                       className={`w-full max-w-[20px] rounded-t-lg transition-all duration-500 ease-out relative 
                         ${d.isToday ? 'bg-slate-900' : 'bg-slate-200 group-hover:bg-slate-300'}`}
@@ -210,7 +207,6 @@ export default function Earnings() {
                         )}
                     </div>
                     
-                    {/* 날짜 라벨 */}
                     <span className={`text-[10px] font-bold ${d.isToday ? 'text-slate-900' : 'text-slate-400'}`}>
                         {d.label}
                     </span>
@@ -220,7 +216,7 @@ export default function Earnings() {
         </div>
       </div>
 
-      {/* 하단 요약 토글 섹션 */}
+      {/* 하단 요약 */}
       <div className="mt-6">
         <button 
           onClick={() => setShowSummary(!showSummary)}
@@ -240,6 +236,11 @@ export default function Earnings() {
              </div>
 
              <div className="space-y-4">
+                {/* ✅ [추가] 여기에도 건수 표시 */}
+                <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">총 예약 건수</span>
+                    <span className="font-bold text-slate-900">{stats.count}건</span>
+                </div>
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500">총 매출 (게스트 결제액)</span>
                     <span className="font-bold text-slate-900">₩{stats.gross.toLocaleString()}</span>
