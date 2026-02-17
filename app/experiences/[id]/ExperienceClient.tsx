@@ -35,7 +35,7 @@ export default function ExperienceClient({
   const router = useRouter();
   const params = useParams();
   const { createInquiry } = useChat(); 
-  const { language } = useLanguage(); // 🟢 현재 언어 가져오기
+  const { lang } = useLanguage(); // 🟢 현재 언어 (LanguageContext는 lang 제공)
   
   const experienceId = params?.id as string;
   const { isSaved, toggleWishlist, isLoading: isSaveLoading } = useWishlist(experienceId);
@@ -52,7 +52,7 @@ export default function ExperienceClient({
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   // 🟢 [핵심] 제목을 언어에 맞춰서 변환!
-  const translatedTitle = getContent(experience, 'title', language);
+  const translatedTitle = getContent(experience, 'title', lang);
   // 🟢 [핵심] 위치 정보는 아직 번역이 없으므로 한국어 사용 (나중에 location_en 추가 가능)
   const location = experience.location; 
 
