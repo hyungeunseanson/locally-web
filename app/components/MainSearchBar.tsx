@@ -46,11 +46,11 @@ export default function MainSearchBar({
   };
 
   const languages = [
-    { label: t('city_all'), value: 'all', icon: '🌐' }, // 🟢 수정됨
-    { label: '한국어', code: 'kr' },
-    { label: '영어', code: 'us' },
-    { label: '일본어', code: 'jp' },
-    { label: '중국어', code: 'cn' },
+    { label: t('city_all'), value: 'all', icon: '🌐' },
+    { label: t('lang_ko'), value: '한국어', code: 'kr' },
+    { label: t('lang_en'), value: '영어', code: 'us' },
+    { label: t('lang_ja'), value: '일본어', code: 'jp' },
+    { label: t('lang_zh'), value: '중국어', code: 'cn' },
   ];
 
   return (
@@ -107,7 +107,11 @@ export default function MainSearchBar({
 <input 
   type="text" 
   placeholder={t('add_language')}
-  value={selectedLanguage === 'all' ? t('city_all') : selectedLanguage} // 🟢 이렇게 바꾸세요!
+  // 🟢 선택된 언어에 따라 번역된 라벨 보여주기
+  value={
+    selectedLanguage === 'all' ? t('city_all') : 
+    languages.find(l => l.value === selectedLanguage)?.label || selectedLanguage
+  } 
   readOnly
               className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
             />
@@ -146,7 +150,7 @@ export default function MainSearchBar({
                 className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group"
               >
                 <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all"><MapPin size={20} /></div>
-                <span className="font-bold text-slate-700">{city.label}</span>
+                <span className="font-bold text-slate-700">{t(city.label)}</span>
               </button>
             ))}
           </div>
@@ -170,10 +174,10 @@ export default function MainSearchBar({
               key={lang.label} 
               onClick={(e) => { 
                 e.stopPropagation(); 
-                // 🟢 수정됨: 'all' 코드를 저장하도록 변경
+                // 🟢 값은 내부 코드(all)나 한국어로 저장하고, 보여주는 건 렌더링 때 처리
                 setSelectedLanguage(lang.value || lang.label); 
                 setActiveSearchField(null);
-              }} 
+              }}
                 className={`flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left w-full
                   ${selectedLanguage === lang.label ? 'bg-slate-100 ring-1 ring-slate-200' : ''}`}
               >

@@ -173,7 +173,16 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_destination: "여행지",
     label_date: "날짜",
     label_language: "언어", // 🟢 [수정] 인원 -> 언어
-    add_language: "언어 추가" // 🟢 [수정] 게스트 추가 -> 언어 추가
+    add_language: "언어 추가", // 🟢 [수정] 게스트 추가 -> 언어 추가
+    date_year: "년",
+    date_month: "월",
+    day_0: "일",
+    day_1: "월",
+    day_2: "화",
+    day_3: "수",
+    day_4: "목",
+    day_5: "금",
+    day_6: "토"
   },
   
   // 🟢 영어 (English)
@@ -323,7 +332,16 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_date: "When",
     label_guest: "Who",
     label_language: "Language", // 🟢 [수정] Guest -> Language
-    add_language: "Add language" // 🟢 [수정] Add guests -> Add language
+    add_language: "Add language", // 🟢 [수정] Add guests -> Add language
+    date_year: ".",
+    date_month: "",
+    day_0: "Sun",
+    day_1: "Mon",
+    day_2: "Tue",
+    day_3: "Wed",
+    day_4: "Thu",
+    day_5: "Fri",
+    day_6: "Sat"
   },
 
   // 🟢 일본어 (Japanese)
@@ -473,7 +491,16 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_date: "日付",
     label_language: "言語", // 🟢 [수정] Guest -> Language
     add_language: "言語を追加", // 🟢 [수정] Add guests -> Add language
-    label_guest: "人数"
+    label_guest: "人数",
+    date_year: "年",
+    date_month: "月",
+    day_0: "日",
+    day_1: "月",
+    day_2: "火",
+    day_3: "水",
+    day_4: "木",
+    day_5: "金",
+    day_6: "土"
   },
 
   // 🟢 중국어 (Chinese)
@@ -623,7 +650,16 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_date: "日期",
     label_language: "语言", // 🟢 [수정] Guest -> Language
     add_language: "添加语言", // 🟢 [수정] Add guests -> Add language
-    label_guest: "人数"
+    label_guest: "人数",
+    date_year: "年",
+    date_month: "月",
+    day_0: "日",
+    day_1: "一",
+    day_2: "二",
+    day_3: "三",
+    day_4: "四",
+    day_5: "五",
+    day_6: "六"
   }
 };
 
