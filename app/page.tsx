@@ -86,11 +86,11 @@ export default function HomePage() {
               <button 
                 onClick={() => { 
                     setLocationInput(''); 
-                    setSelectedLanguage('전체'); 
+                    setSelectedLanguage('all'); // 🟢 'all'로 바꿔야 번역기가 작동합니다.
                     setDateRange({ start: null, end: null });
                     setSelectedCategory('all');
                     setFilteredExperiences(allExperiences); 
-                }} 
+                }}
                 className="mt-6 px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors"
               >
                 전체 목록 보기
