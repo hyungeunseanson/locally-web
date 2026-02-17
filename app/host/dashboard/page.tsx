@@ -18,7 +18,7 @@ import Earnings from './Earnings';
 import HostReviews from './HostReviews';
 import ProfileEditor from './components/ProfileEditor';
 
-// ✅ [분리] 실제 대시보드 로직을 담은 컴포넌트
+// 실제 대시보드 로직
 function DashboardContent() {
   const [activeTab, setActiveTab] = useState('reservations'); 
   const [hostStatus, setHostStatus] = useState<any>(null); 
@@ -27,14 +27,12 @@ function DashboardContent() {
   
   const supabase = createClient();
   const router = useRouter();
-  const searchParams = useSearchParams(); // 여기서 사용
+  const searchParams = useSearchParams(); 
 
-  // ✅ [이 부분을 복사해서 넣으세요]
-const handleTabChange = (tab: string) => {
-  setActiveTab(tab);
-  // 주소창(URL)을 강제로 업데이트해서 자식 컴포넌트와 신호를 맞춥니다.
-  router.push(`/host/dashboard?tab=${tab}`, { scroll: false });
-};
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    router.push(`/host/dashboard?tab=${tab}`, { scroll: false });
+  };
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -64,35 +62,26 @@ const handleTabChange = (tab: string) => {
         .eq('id', user.id)
         .single();
 
-// 🟢 [수정됨] 모든 정보(비공개 포함) 병합하기
-const mergedProfile = {
-  ...profileData, // 기본 프로필 데이터
-  
-  // 1. 기본 정보 (프로필 우선 -> 지원서)
-  name: profileData?.name || hostData?.name,
-  // ✅ [수정] 호스트 지원서 사진을 최우선으로 (사용자 요청 반영)
-  avatar_url: hostData?.profile_photo || profileData?.avatar_url,
-  introduction: profileData?.introduction || profileData?.bio || hostData?.self_intro,
-  languages: (profileData?.languages && profileData.languages.length > 0) ? profileData.languages : (hostData?.languages || []),
-  
-  // 2. 비공개/개인 정보 (지원서 데이터 연결)
-  phone: profileData?.phone || hostData?.phone || '',
-  dob: profileData?.dob || hostData?.dob || '',
-  host_nationality: profileData?.host_nationality || hostData?.host_nationality || '',
-  
-  // 3. 정산 정보 (지원서 데이터 연결)
-  bank_name: profileData?.bank_name || hostData?.bank_name || '',
-  account_number: profileData?.account_number || hostData?.account_number || '',
-  account_holder: profileData?.account_holder || hostData?.account_holder || '',
-  
-  // 4. 기타
-  motivation: profileData?.motivation || hostData?.motivation || '',
-  job: profileData?.job || '',
-  dream_destination: profileData?.dream_destination || '',
-  favorite_song: profileData?.favorite_song || '',
-};
+      // 정보 병합 (프로필 > 지원서)
+      const mergedProfile = {
+        ...profileData,
+        name: profileData?.name || hostData?.name,
+        avatar_url: hostData?.profile_photo || profileData?.avatar_url,
+        introduction: profileData?.introduction || profileData?.bio || hostData?.self_intro,
+        languages: (profileData?.languages && profileData.languages.length > 0) ? profileData.languages : (hostData?.languages || []),
+        phone: profileData?.phone || hostData?.phone || '',
+        dob: profileData?.dob || hostData?.dob || '',
+        host_nationality: profileData?.host_nationality || hostData?.host_nationality || '',
+        bank_name: profileData?.bank_name || hostData?.bank_name || '',
+        account_number: profileData?.account_number || hostData?.account_number || '',
+        account_holder: profileData?.account_holder || hostData?.account_holder || '',
+        motivation: profileData?.motivation || hostData?.motivation || '',
+        job: profileData?.job || '',
+        dream_destination: profileData?.dream_destination || '',
+        favorite_song: profileData?.favorite_song || '',
+      };
 
-setProfile(mergedProfile);
+      setProfile(mergedProfile);
 
     } catch (error) {
       console.error(error);
@@ -112,11 +101,11 @@ setProfile(mergedProfile);
   // 1. 신청 내역 없음
   if (!hostStatus) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-20 text-center">
-        <h1 className="text-3xl font-black mb-4">아직 호스트가 아니시군요!</h1>
+      <div className="max-w-2xl mx-auto px-6 py-20 text-center animate-in fade-in slide-in-from-bottom-4">
+        <h1 className="text-3xl font-black mb-4 text-slate-900">아직 호스트가 아니시군요!</h1>
         <p className="text-slate-500 mb-8">나만의 특별한 투어를 만들고 수익을 창출해보세요.</p>
         <Link href="/host/register">
-          <button className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">호스트 지원하기</button>
+          <button className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">호스트 지원하기</button>
         </Link>
       </div>
     );
@@ -124,10 +113,10 @@ setProfile(mergedProfile);
 
   const status = hostStatus.status?.toLowerCase().trim();
 
-  // 2. 심사 중 / 보완 요청 / 거절 등 상태별 화면
+  // 2. 심사 중 / 보완 요청 / 거절
   if (['pending', 'revision', 'rejected'].includes(status)) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6">
+      <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6 animate-in fade-in">
         <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto ${
           status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
           status === 'revision' ? 'bg-orange-100 text-orange-600' :
@@ -138,7 +127,7 @@ setProfile(mergedProfile);
            <XCircle size={48} />}
         </div>
         <div>
-          <h1 className="text-3xl font-black mb-2">
+          <h1 className="text-3xl font-black mb-2 text-slate-900">
             {status === 'pending' ? '심사가 진행 중입니다' : 
              status === 'revision' ? '보완이 필요합니다' : 
              '승인이 거절되었습니다'}
@@ -160,7 +149,7 @@ setProfile(mergedProfile);
           
           {status === 'revision' && (
             <Link href="/host/register">
-              <button className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">신청서 수정하기</button>
+              <button className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">신청서 수정하기</button>
             </Link>
           )}
           {status === 'rejected' && (
@@ -179,32 +168,32 @@ setProfile(mergedProfile);
       <aside className="w-64 hidden md:block shrink-0">
           <div className="sticky top-24 space-y-2">
             <div className="px-4 py-2 mb-4">
-              <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold">HOST PARTNER</span>
+              <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold tracking-wide">HOST PARTNER</span>
               <p className="text-xs text-slate-400 mt-1">승인된 호스트입니다</p>
             </div>
             
-            <button onClick={() => handleTabChange('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-black text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-slate-900 text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
               <CalendarCheck size={20}/> 예약 관리
             </button>
             
-            <button onClick={() => handleTabChange('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
               <List size={20}/> 내 체험 관리
             </button>
 
-            <button onClick={() => handleTabChange('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
               <MessageSquare size={20}/> 문의함
             </button>
 
-            <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
               <DollarSign size={20}/> 수익 및 정산
             </button>
 
-            <button onClick={() => handleTabChange('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
               <Star size={20}/> 받은 후기
             </button>
             
             <div className="pt-4 mt-4 border-t border-slate-100">
-            <button onClick={() => handleTabChange('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-black'}`}>
+            <button onClick={() => handleTabChange('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
                 <UserCog size={20}/> 프로필 설정
               </button>
             </div>
@@ -214,7 +203,7 @@ setProfile(mergedProfile);
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-w-0">
         <div className="flex justify-between items-end mb-8">
-          <h1 className="text-3xl font-black">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
             {activeTab === 'reservations' && '예약 관리'}
             {activeTab === 'experiences' && '내 체험 관리'}
             {activeTab === 'inquiries' && '문의 메시지'}
@@ -231,7 +220,7 @@ setProfile(mergedProfile);
           )}
         </div>
 
-        {activeTab === 'reservations' && <div className="h-[700px]"><ReservationManager /></div>}
+        {activeTab === 'reservations' && <div className="h-[750px]"><ReservationManager /></div>}
         {activeTab === 'experiences' && <MyExperiences />}
         {activeTab === 'inquiries' && <InquiryChat />}
         {activeTab === 'earnings' && <Earnings />}
@@ -242,14 +231,14 @@ setProfile(mergedProfile);
   );
 }
 
-// ✅ [메인] Suspense로 감싼 페이지 컴포넌트
+// Suspense 적용
 export default function HostDashboardPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-slate-900"></div>
         </div>
       }>
         <DashboardContent />
