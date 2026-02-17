@@ -96,7 +96,7 @@ export default function GuestTripsPage() {
                   ))}
                 </div>
 ) : (
-  <div className="text-slate-400 text-sm py-4">{t('trip_past_empty')}</div> {/* 🟢 번역 */}
+  <div className="text-slate-400 text-sm py-4">{t('trip_past_empty')}</div>
 )}
             </div>
           </aside>
