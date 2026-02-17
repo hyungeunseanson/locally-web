@@ -180,19 +180,19 @@ const footerSections = [
   {t('footer_terms')}
 </button>
               
-              <span className="hidden md:inline mx-1">·</span>
+<span className="hidden md:inline mx-1">·</span>
               <button onClick={() => setActiveModal('travel')} className="hover:underline hover:text-black transition-colors">
-                여행약관
+                {t('footer_travel_terms')} {/* 🟢 교체 */}
               </button>
 
               <span className="hidden md:inline mx-1">·</span>
               <button onClick={() => setActiveModal('refund')} className="hover:underline hover:text-black transition-colors">
-                취소 및 환불 정책
+                {t('footer_refund')} {/* 🟢 교체 */}
               </button>
 
               <span className="hidden md:inline mx-1">·</span>
               <Link href="/site-map" className="hover:underline hover:text-black transition-colors">
-                사이트맵
+                {t('footer_sitemap')} {/* 🟢 교체 */}
               </Link>
             </div>
             

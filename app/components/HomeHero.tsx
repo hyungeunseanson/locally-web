@@ -5,6 +5,7 @@ import { Search } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import MainSearchBar from '@/app/components/MainSearchBar';
 import { CATEGORIES } from '@/app/constants';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 interface HomeHeroProps {
   activeTab: 'experience' | 'service';
@@ -30,6 +31,7 @@ interface HomeHeroProps {
 }
 
 export default function HomeHero({
+
   activeTab, setActiveTab,
   selectedCategory, setSelectedCategory,
   isScrolled,
@@ -43,7 +45,7 @@ export default function HomeHero({
   selectedLanguage, 
   setSelectedLanguage 
 }: HomeHeroProps) {
-
+  const { t } = useLanguage(); // 🟢 여기에 넣어야 합니다! (함수 내부 첫 줄)
   return (
     <>
       {/* 🟢 1. 상단 고정 헤더 & Sticky 캡슐 검색바 */}
@@ -61,9 +63,9 @@ export default function HomeHero({
           ].join(' ')}
           onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setActiveSearchField('location'); }}
         >
-          <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">어디든지</div>
-          <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">언제든지</div>
-          <div className="px-4 text-sm font-bold text-slate-500">검색</div>
+<div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">{t('anywhere')}</div>
+<div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">{t('anytime')}</div>
+<div className="px-4 text-sm font-bold text-slate-500">{t('search')}</div>
           <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
             <Search size={14} strokeWidth={3}/>
           </button>
@@ -86,13 +88,13 @@ export default function HomeHero({
               onClick={() => setActiveTab('experience')}
               className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'experience' ? 'text-black border-black' : 'text-slate-500 hover:text-slate-800 border-transparent'}`}
             >
-              <span className="text-xl">🎈</span> 체험
+<span className="text-xl">🎈</span> {t('cat_exp')}
             </button>
             <button
               onClick={() => setActiveTab('service')}
               className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'service' ? 'text-black border-black' : 'text-slate-500 hover:text-slate-800 border-transparent'}`}
             >
-              <span className="text-xl">🛎️</span> 서비스
+<span className="text-xl">🛎️</span> {t('cat_service')}
             </button>
           </div>
 
@@ -131,8 +133,9 @@ export default function HomeHero({
                   }
                 >
                   <span className="text-2xl transition-transform group-hover:scale-110">{cat.icon}</span>
-                  <span className={`text-xs font-bold whitespace-nowrap ${selectedCategory === cat.id ? 'text-black' : 'text-slate-600'}`}>{cat.label}</span>
-                </button>
+                  <span className={`text-xs font-bold whitespace-nowrap ${selectedCategory === cat.id ? 'text-black' : 'text-slate-600'}`}>
+  {t(cat.label)} {/* 🟢 t() 함수로 감싸주세요 */}
+</span>                </button>
               ))}
             </div>
           </div>
