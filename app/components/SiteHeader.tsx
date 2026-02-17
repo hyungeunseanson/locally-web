@@ -10,6 +10,7 @@ import { useNotification } from '@/app/context/NotificationContext';
 import dynamic from 'next/dynamic';
 import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만든 파일 불러오기
 
+
 // 🟢 LoginModal 동적 로딩 (SSR false)
 const LoginModal = dynamic(() => import('./LoginModal'), { 
   ssr: false, 
@@ -28,9 +29,8 @@ function SiteHeaderContent() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const menuRef = useRef<HTMLElement>(null);
-
+  const { t } = useLanguage();
   const languageContext = useLanguage();
-  const t = languageContext?.t || ((k: string) => k);
 
 
 

@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, MessageCircle } from 'lucide-react'; // MessageCircle 추가
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 번역 훅
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
+  const { t } = useLanguage(); // 🟢 번역 기능 사용
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   
   const [email, setEmail] = useState('');
@@ -96,7 +98,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         
         if (error) throw error;
 
-        // 이메일 인증이 꺼져있거나 완료된 경우
         if (data.user && data.session) {
           showToast('회원가입이 완료되었습니다!', 'success');
           await ensureProfileExists();
@@ -104,13 +105,11 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           if (onLoginSuccess) onLoginSuccess();
           router.refresh();
         } else {
-          // 이메일 인증이 켜져있는 경우
           showToast('가입 인증 메일을 보냈습니다! 이메일을 확인해주세요.', 'success');
           setMode('LOGIN'); 
         }
 
       } else {
-        // --- 로그인 ---
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         
         if (error) {
@@ -131,8 +130,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         router.refresh();
       }
     } catch (error: any) {
-      // 🟢 에러 핸들링 강화
-      // 브라우저 콘솔의 빨간 에러는 네트워크 실패라 막을 수 없지만, 사용자 경험은 여기서 처리합니다.
       if (error.message?.includes('rate limit') || error.status === 429) {
         showToast('너무 많은 가입 요청이 감지되었습니다. 잠시 후 다시 시도하거나 소셜 로그인을 이용해주세요.', 'error');
       } else {
@@ -164,7 +161,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <X size={18} className="text-gray-900" />
           </button>
           <span className="font-bold text-[15px] text-gray-900">
-            {mode === 'LOGIN' ? '로그인' : '회원가입'}
+            {mode === 'LOGIN' ? t('login') : t('signup')} {/* 🟢 번역 적용 */}
           </span>
           <div className="w-8"></div>
         </div>
@@ -173,10 +170,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           
           <div className="mb-6">
             <h3 className="text-xl font-bold text-gray-900 mb-1">
-              {mode === 'LOGIN' ? 'Locally에 오신 것을 환영합니다.' : '계정 생성하기'}
+              {mode === 'LOGIN' ? t('welcome_title') : '계정 생성하기'} {/* 🟢 번역 적용 */}
             </h3>
             <p className="text-sm text-gray-500 font-medium">
-              {mode === 'LOGIN' ? '현지인처럼 여행하는 가장 쉬운 방법' : '빠르고 간편하게 가입하세요.'}
+              {mode === 'LOGIN' ? t('welcome_subtitle') : '빠르고 간편하게 가입하세요.'} {/* 🟢 번역 적용 */}
             </p>
           </div>
 
@@ -184,13 +181,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <div className="border border-gray-300 rounded-xl overflow-hidden mb-6">
               
               <InputItem 
-                type="email" label="이메일" value={email} setValue={setEmail} 
+                type="email" label={t('email')} value={email} setValue={setEmail}  // 🟢 번역 적용
                 isFirst={true} focusKey="EMAIL" currentFocus={isFocused} setFocus={setIsFocused}
                 autoComplete="username"
               />
 
               <InputItem 
-                type="password" label="비밀번호" value={password} setValue={setPassword} 
+                type="password" label={t('password')} value={password} setValue={setPassword} // 🟢 번역 적용
                 isFirst={false} focusKey="PASSWORD" currentFocus={isFocused} setFocus={setIsFocused}
                 autoComplete={mode === 'LOGIN' ? "current-password" : "new-password"}
               />
@@ -253,7 +250,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             </div>
 
             <div className="text-[11px] text-gray-500 mb-6 leading-relaxed">
-              계속 진행하면 Locally의 <span className="font-bold underline cursor-pointer">서비스 약관</span> 및 <span className="font-bold underline cursor-pointer">개인정보 처리방침</span>에 동의하는 것으로 간주됩니다.
+              {t('agree_terms')} {/* 🟢 번역 적용 */}
             </div>
 
             <button 
@@ -261,19 +258,19 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               disabled={loading}
               className="w-full bg-[#111] hover:bg-black text-white font-bold h-12 rounded-xl text-[15px] transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed mb-6 shadow-md"
             >
-              {loading ? '처리 중...' : (mode === 'LOGIN' ? '로그인' : '가입하기')}
+              {loading ? t('loading') : (mode === 'LOGIN' ? t('login_button') : t('signup'))} {/* 🟢 번역 적용 */}
             </button>
           </form>
 
           <div className="flex items-center gap-3 mb-6">
             <div className="flex-1 h-px bg-gray-200"></div>
-            <span className="text-[11px] text-gray-400 font-bold">또는</span>
+            <span className="text-[11px] text-gray-400 font-bold">{t('or')}</span> {/* 🟢 번역 적용 */}
             <div className="flex-1 h-px bg-gray-200"></div>
           </div>
 
           <div className="space-y-3">
-            <SocialButton provider="kakao" onClick={() => handleSocialLogin('kakao')} />
-            <SocialButton provider="google" onClick={() => handleSocialLogin('google')} />
+            <SocialButton provider="kakao" label={t('continue_kakao')} onClick={() => handleSocialLogin('kakao')} /> {/* 🟢 번역 적용 */}
+            <SocialButton provider="google" label={t('continue_google')} onClick={() => handleSocialLogin('google')} /> {/* 🟢 번역 적용 */}
           </div>
 
           <div className="mt-6 text-center text-sm">
@@ -285,7 +282,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                 }} 
                 className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600 transition-colors"
              >
-               {mode === 'LOGIN' ? '계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인'}
+               {mode === 'LOGIN' ? `${t('no_account')} ${t('signup')}` : '이미 계정이 있으신가요? 로그인'} {/* 🟢 번역 적용 */}
              </button>
           </div>
 
@@ -317,7 +314,7 @@ function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFoc
   );
 }
 
-function SocialButton({ provider, onClick }: { provider: 'kakao' | 'google', onClick: () => void }) {
+function SocialButton({ provider, label, onClick }: { provider: 'kakao' | 'google', label: string, onClick: () => void }) {
   const isKakao = provider === 'kakao';
   return (
     <button 
@@ -335,7 +332,7 @@ function SocialButton({ provider, onClick }: { provider: 'kakao' | 'google', onC
         )}
       </div>
       <span className="w-full text-center text-sm font-bold text-gray-900">
-        {isKakao ? '카카오톡으로 계속하기' : '구글로 계속하기'}
+        {label}
       </span>
     </button>
   );

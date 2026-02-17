@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { Globe, Instagram, ChevronDown, ChevronUp, X } from 'lucide-react';
 // ❗ 아래 경로는 아까 만드신 파일 위치와 정확히 일치해야 합니다.
 import { TERMS_OF_USE, PRIVACY_POLICY, TRAVEL_TERMS, REFUND_POLICY } from '@/app/constants/legalText';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function SiteFooter() {
+  const { t } = useLanguage(); // 🟢 이 줄 추가 (맨 윗줄)
   const [instaOpen, setInstaOpen] = useState(false);
   
   // 모달 상태 관리 ('terms', 'privacy', 'travel', 'refund', null)
@@ -33,49 +35,83 @@ export default function SiteFooter() {
   };
 
   const modalData = getModalContent();
-
+// 🟢 [추가] 메뉴 데이터 번역 적용
+const footerSections = [
+  {
+    title: t('footer_support'),
+    links: [
+      { label: t('footer_intro'), href: '/about' },
+      { label: t('footer_notice'), href: '/company/notices' },
+      { label: t('footer_help'), href: '/help' },
+      { label: t('footer_admin'), href: '/admin/dashboard' },
+    ]
+  },
+  {
+    title: t('footer_hosting'),
+    links: [
+      { label: t('footer_become_host'), href: '/become-a-host' },
+      { label: t('footer_community'), href: '/company/community' },
+    ]
+  },
+  {
+    title: t('footer_locally'),
+    links: [
+      { label: t('footer_news'), href: '/company/news' },
+      { label: t('footer_careers'), href: '/company/careers' },
+      { label: t('footer_investors'), href: '/company/investors' },
+      { label: t('footer_partnership'), href: '/company/partnership' },
+    ]
+  },
+  {
+    title: t('footer_social'),
+    links: [
+      { label: 'Instagram', href: 'https://instagram.com' },
+      { label: 'Naver Blog', href: 'https://blog.naver.com' },
+    ]
+  }
+];
   return (
     <>
       <footer className="bg-white border-t border-[#DDDDDD] pt-12 pb-8 text-sm text-[#222222] font-sans">
         <div className="max-w-[1440px] mx-auto px-6">
           
-          {/* 상단 링크 모음 (4단 그리드) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+{/* 상단 링크 모음 (4단 그리드) */}
+<div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
             
             {/* 1. 로컬리 지원 */}
             <div className="space-y-4">
-              <h5 className="font-bold">로컬리 지원</h5>
+              <h5 className="font-bold">{t('footer_support')}</h5>
               <ul className="space-y-3 text-[#717171] font-light">
-                <li><Link href="/about" className="hover:underline">로컬리 소개</Link></li>
-                <li><Link href="/company/notices" className="hover:underline">공지사항</Link></li>
-                <li><Link href="/help" className="hover:underline">도움말 센터</Link></li>
-                <li><Link href="/admin/dashboard" className="hover:underline">Admin</Link></li>
+                <li><Link href="/about" className="hover:underline">{t('footer_intro')}</Link></li>
+                <li><Link href="/company/notices" className="hover:underline">{t('footer_notice')}</Link></li>
+                <li><Link href="/help" className="hover:underline">{t('footer_help')}</Link></li>
+                <li><Link href="/admin/dashboard" className="hover:underline">{t('footer_admin')}</Link></li>
               </ul>
             </div>
 
             {/* 2. 호스팅 */}
             <div className="space-y-4">
-              <h5 className="font-bold">호스팅</h5>
+              <h5 className="font-bold">{t('footer_hosting')}</h5>
               <ul className="space-y-3 text-[#717171] font-light">
-                <li><Link href="/become-a-host" className="hover:underline">호스트 되기</Link></li>
-                <li><Link href="/company/community" className="hover:underline">커뮤니티 포럼</Link></li>
+                <li><Link href="/become-a-host" className="hover:underline">{t('footer_become_host')}</Link></li>
+                <li><Link href="/company/community" className="hover:underline">{t('footer_community')}</Link></li>
               </ul>
             </div>
 
             {/* 3. 로컬리 */}
             <div className="space-y-4">
-              <h5 className="font-bold">로컬리</h5>
+              <h5 className="font-bold">{t('footer_locally')}</h5>
               <ul className="space-y-3 text-[#717171] font-light">
-                <li><Link href="/company/news" className="hover:underline">뉴스</Link></li>
-                <li><Link href="/company/careers" className="hover:underline">채용 정보</Link></li>
-                <li><Link href="/company/investors" className="hover:underline">투자자 정보</Link></li>
-                <li><Link href="/company/partnership" className="hover:underline">제휴 문의</Link></li>
+                <li><Link href="/company/news" className="hover:underline">{t('footer_news')}</Link></li>
+                <li><Link href="/company/careers" className="hover:underline">{t('footer_careers')}</Link></li>
+                <li><Link href="/company/investors" className="hover:underline">{t('footer_investors')}</Link></li>
+                <li><Link href="/company/partnership" className="hover:underline">{t('footer_partnership')}</Link></li>
               </ul>
             </div>
 
-            {/* 4. 소셜 미디어 */}
+            {/* 4. 소셜 미디어 (기존 기능 유지) */}
             <div className="space-y-4">
-              <h5 className="font-bold">소셜</h5>
+              <h5 className="font-bold">{t('footer_social')}</h5>
               <ul className="space-y-3 text-[#717171] font-light relative">
                 
                 {/* 인스타그램 (다중 계정 팝업) */}
@@ -108,7 +144,7 @@ export default function SiteFooter() {
                   )}
                 </li>
 
-                {/* 네이버 블로그 (커스텀 아이콘) */}
+                {/* 네이버 블로그 */}
                 <li>
                   <Link 
                     href="https://blog.naver.com/locally-travel" 
@@ -132,17 +168,17 @@ export default function SiteFooter() {
           {/* 하단: 저작권 및 약관 링크 (모달 트리거) */}
           <div className="flex flex-col xl:flex-row justify-between items-center gap-4 text-[#717171]">
             <div className="flex flex-wrap justify-center xl:justify-start items-center gap-x-1 gap-y-2 text-xs md:text-sm">
-              <span>© 2026 Locally, Inc.</span>
-              
-              <span className="hidden md:inline mx-1">·</span>
-              <button onClick={() => setActiveModal('privacy')} className="hover:underline hover:text-black transition-colors font-bold">
-                개인정보 처리방침
-              </button>
-              
-              <span className="hidden md:inline mx-1">·</span>
-              <button onClick={() => setActiveModal('terms')} className="hover:underline hover:text-black transition-colors">
-                이용약관
-              </button>
+            <span>{t('copyright')}</span>
+
+<span className="hidden md:inline mx-1">·</span>
+<button onClick={() => setActiveModal('privacy')} className="hover:underline hover:text-black transition-colors font-bold">
+  {t('footer_privacy')}
+</button>
+
+<span className="hidden md:inline mx-1">·</span>
+<button onClick={() => setActiveModal('terms')} className="hover:underline hover:text-black transition-colors">
+  {t('footer_terms')}
+</button>
               
               <span className="hidden md:inline mx-1">·</span>
               <button onClick={() => setActiveModal('travel')} className="hover:underline hover:text-black transition-colors">

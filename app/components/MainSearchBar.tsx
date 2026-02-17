@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Search, MapPin, Globe } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { CATEGORIES } from '@/app/constants';
 import DatePicker from './DatePicker';
 
@@ -27,6 +28,7 @@ export default function MainSearchBar({
   onCategorySelect, isVisible,
   onSearch
 }: MainSearchBarProps) {
+  const { t } = useLanguage(); // 🟢 추가
 
   const formatDateRange = () => {
     if (dateRange.start && dateRange.end) {
@@ -63,10 +65,10 @@ export default function MainSearchBar({
             ${activeSearchField === 'location' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} 
           onClick={() => setActiveSearchField('location')}
         >
-          <label className="text-[11px] font-bold text-slate-800">여행지</label>
-          <input 
-            type="text" 
-            placeholder="여행지 검색" 
+<label className="text-[11px] font-bold text-slate-800">{t('label_destination')}</label> {/* 🟢 교체 */}
+<input 
+  type="text" 
+  placeholder={t('search_placeholder')} // 🟢 교체
             value={locationInput} 
             onChange={(e) => setLocationInput(e.target.value)} 
             onKeyDown={handleKeyDown} 
@@ -82,10 +84,10 @@ export default function MainSearchBar({
             ${activeSearchField === 'date' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} 
           onClick={() => setActiveSearchField('date')}
         >
-          <label className="text-[11px] font-bold text-slate-800">날짜</label>
-          <input 
-            type="text" 
-            placeholder="날짜 선택" 
+<label className="text-[11px] font-bold text-slate-800">{t('label_date')}</label> {/* 🟢 교체 */}
+<input 
+  type="text" 
+  placeholder={t('add_dates')} // 🟢 교체
             value={formatDateRange()} 
             readOnly 
             className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
@@ -100,11 +102,11 @@ export default function MainSearchBar({
             ${activeSearchField === 'language' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} 
           onClick={() => setActiveSearchField('language')}
         >
-          <label className="text-[11px] font-bold text-slate-800">언어</label>
-          <div className="flex justify-between items-center w-full">
-            <input 
-              type="text" 
-              placeholder="언어 추가" 
+<label className="text-[11px] font-bold text-slate-800">{t('label_guest')}</label> {/* 🟢 교체 (일단 guest 키 사용) */}
+<div className="flex justify-between items-center w-full">
+  <input 
+    type="text" 
+    placeholder={t('add_guests')} // 🟢 교체
               value={selectedLanguage === 'all' ? '전체' : selectedLanguage} 
               readOnly 
               className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
