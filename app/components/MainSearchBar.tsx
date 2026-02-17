@@ -46,7 +46,7 @@ export default function MainSearchBar({
   };
 
   const languages = [
-    { label: '전체', icon: '🌐' },
+    { label: t('city_all'), value: 'all', icon: '🌐' }, // 🟢 수정됨
     { label: '한국어', code: 'kr' },
     { label: '영어', code: 'us' },
     { label: '일본어', code: 'jp' },
@@ -167,12 +167,13 @@ export default function MainSearchBar({
           <div className="grid grid-cols-1 gap-1">
             {languages.map((lang) => (
               <button 
-                key={lang.label} 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setSelectedLanguage(lang.label); 
-                  setActiveSearchField(null);
-                }} 
+              key={lang.label} 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                // 🟢 수정됨: 'all' 코드를 저장하도록 변경
+                setSelectedLanguage(lang.value || lang.label); 
+                setActiveSearchField(null);
+              }} 
                 className={`flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left w-full
                   ${selectedLanguage === lang.label ? 'bg-slate-100 ring-1 ring-slate-200' : ''}`}
               >

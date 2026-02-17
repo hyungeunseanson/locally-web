@@ -106,10 +106,9 @@ export default function HomeHero({
             dateRange={dateRange}
             setDateRange={setDateRange}
             
-            // ✅ [추가] 이 두 줄을 꼭 넣으세요!
-            selectedLanguage={selectedLanguage || '전체'} // 값이 없을 때 기본값 처리
-            setSelectedLanguage={setSelectedLanguage || (() => {})} // 함수 없을 때 빈 함수 처리
-            
+// ✅ [수정] '전체'를 'all'로 바꿔야 번역이 작동합니다!
+selectedLanguage={selectedLanguage || 'all'} 
+setSelectedLanguage={setSelectedLanguage || (() => {})}
             onCategorySelect={setSelectedCategory}
             isVisible={!isScrolled} 
             onSearch={onSearch} 
