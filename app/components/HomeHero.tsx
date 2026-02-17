@@ -45,7 +45,7 @@ export default function HomeHero({
   selectedLanguage, 
   setSelectedLanguage 
 }: HomeHeroProps) {
-  const { t } = useLanguage(); // 🟢 여기에 넣어야 합니다! (함수 내부 첫 줄)
+  const { t } = useLanguage(); // 🟢 추가
   return (
     <>
       {/* 🟢 1. 상단 고정 헤더 & Sticky 캡슐 검색바 */}
@@ -107,8 +107,8 @@ export default function HomeHero({
             setDateRange={setDateRange}
             
 // ✅ [수정] '전체'를 'all'로 바꿔야 번역이 작동합니다!
-            selectedLanguage={selectedLanguage || 'all'} 
-            setSelectedLanguage={setSelectedLanguage || (() => {})}
+selectedLanguage={selectedLanguage || 'all'} 
+  setSelectedLanguage={setSelectedLanguage || (() => {})}
             onCategorySelect={setSelectedCategory}
             isVisible={!isScrolled} 
             onSearch={onSearch} 

@@ -2,9 +2,11 @@
 
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
 export default function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange: (range: any) => void }) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const { t } = useLanguage(); // 🟢 추가
   
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
@@ -48,10 +50,17 @@ export default function DatePicker({ selectedRange, onChange }: { selectedRange:
     <div>
       <div className="flex justify-between items-center mb-4">
         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}><ChevronLeft size={20}/></button>
-        <span className="font-bold">{currentDate.getFullYear()}년 {currentDate.getMonth()+1}월</span>
+        <span className="font-bold">
+    {currentDate.getFullYear()}{t('date_year')} {currentDate.getMonth()+1}{t('date_month')}
+  </span>
         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}><ChevronRight size={20}/></button>
       </div>
-      <div className="grid grid-cols-7 text-center gap-y-1 text-xs font-bold text-slate-500 mb-2">{['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}</div>
+      <div className="grid grid-cols-7 ...">
+  {/* 🟢 번역 키 배열로 변경 */}
+  {['day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6'].map(key => (
+    <span key={key}>{t(key)}</span>
+  ))}
+</div>
       <div className="grid grid-cols-7 gap-y-1 justify-items-center">{renderDays()}</div>
     </div>
   );

@@ -330,9 +330,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     anytime: "Anytime",
     label_destination: "Where",
     label_date: "When",
-    label_guest: "Who",
-    label_language: "Language", // 🟢 [수정] Guest -> Language
-    add_language: "Add language", // 🟢 [수정] Add guests -> Add language
+    label_language: "Language",
+    add_language: "Add language",
     date_year: ".",
     date_month: "",
     day_0: "Sun",
@@ -491,7 +490,6 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_date: "日付",
     label_language: "言語", // 🟢 [수정] Guest -> Language
     add_language: "言語を追加", // 🟢 [수정] Add guests -> Add language
-    label_guest: "人数",
     date_year: "年",
     date_month: "月",
     day_0: "日",
@@ -650,7 +648,6 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_date: "日期",
     label_language: "语言", // 🟢 [수정] Guest -> Language
     add_language: "添加语言", // 🟢 [수정] Add guests -> Add language
-    label_guest: "人数",
     date_year: "年",
     date_month: "月",
     day_0: "日",
