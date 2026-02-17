@@ -8,6 +8,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
 import dynamic from 'next/dynamic';
+import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만든 파일 불러오기
 
 // 🟢 LoginModal 동적 로딩 (SSR false)
 const LoginModal = dynamic(() => import('./LoginModal'), { 
@@ -25,19 +26,13 @@ function SiteHeaderContent() {
   const { unreadCount } = useNotification();
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLangOpen, setIsLangOpen] = useState(false);
   
   const menuRef = useRef<HTMLElement>(null);
 
   const languageContext = useLanguage();
-  const setLang = languageContext?.setLang || (() => {});
-  const lang = languageContext?.lang || 'ko';
   const t = languageContext?.t || ((k: string) => k);
 
-  const languages = [
-    { label: '한국어', value: 'ko' }, { label: 'English', value: 'en' },
-    { label: '中文', value: 'zh' }, { label: '日本語', value: 'ja' }
-  ];
+
 
   const [supabase] = useState(() => createClient());
   const router = useRouter();
@@ -47,7 +42,6 @@ function SiteHeaderContent() {
     function handleClickOutside(event: any) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
-        setIsLangOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -142,21 +136,7 @@ function SiteHeaderContent() {
             >
                {getButtonLabel()}
             </button>
-
-            <div className="relative hidden sm:block">
-              <button onClick={() => setIsLangOpen(!isLangOpen)} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
-                <Globe size={18} />
-              </button>
-              {isLangOpen && (
-                <div className="absolute top-12 right-0 w-40 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200]">
-                  {languages.map((l) => (
-                    <button key={l.value} onClick={() => { setLang(l.value); setIsLangOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex justify-between">
-                      {l.label} {lang === l.value && <Check size={14}/>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <LanguageSelector />
 
             {user && (
               <Link 
