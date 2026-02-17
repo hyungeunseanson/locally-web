@@ -333,7 +333,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_language: "Language",
     add_language: "Add language",
     date_year: ".",
-    date_month: "Month",
+    date_month: ".",
     day_0: "Sun",
     day_1: "Mon",
     day_2: "Tue",
