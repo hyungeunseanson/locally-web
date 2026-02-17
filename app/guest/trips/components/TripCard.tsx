@@ -16,7 +16,7 @@ interface TripCardProps {
 }
 
 export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProcessing }: TripCardProps) {
-  const { t } = useLanguage(); // 🟢 추가
+  const { t, lang } = useLanguage(); // 🟢 lang 추가
   const router = useRouter();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); 
@@ -41,7 +41,9 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 
   const formatPaymentDate = (dateStr: string) => {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleString('ko-KR', {
+    // 🟢 언어별 시간 표기법 자동 적용 (AM/PM 등)
+    const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
+    return new Date(dateStr).toLocaleString(localeMap[lang] || 'en-US', {
       month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
     });
   };
