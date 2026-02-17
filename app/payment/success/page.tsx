@@ -5,6 +5,7 @@ import { CheckCircle, Home, FileText, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client'; // ✅ 핵심 수정: 올바른 클라이언트 사용
+import { useToast } from '@/app/context/ToastContext';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
@@ -12,6 +13,7 @@ function SuccessContent() {
   const amount = searchParams.get('amount');
   const [isSaving, setIsSaving] = useState(true);
   const supabase = createClient();
+  const { showToast } = useToast();
 
   useEffect(() => {
 // ... SuccessContent 내부 confirmBooking 함수 수정
@@ -46,9 +48,10 @@ if (data && data.experiences) {
   });
 }
 } catch (error) {
-console.error('확정 처리 중 오류:', error);
+  console.error('확정 처리 중 오류:', error);
+  showToast('예약 확정 처리 중 오류가 발생했어요. 나의 여행에서 확인해주세요.', 'error');
 } finally {
-setIsSaving(false);
+  setIsSaving(false);
 }
 };
     confirmBooking();

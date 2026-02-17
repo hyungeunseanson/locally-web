@@ -10,8 +10,10 @@ import {
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import Skeleton from '@/app/components/ui/Skeleton';
+import { useToast } from '@/app/context/ToastContext';
 
 export default function NotificationsPage() {
+  const { showToast } = useToast();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [localNotifications, setLocalNotifications] = useState<any[]>([]);
@@ -35,6 +37,8 @@ export default function NotificationsPage() {
       await supabase.from('notifications').delete().eq('id', id);
     } catch (error) {
       console.error('삭제 실패:', error);
+      showToast('알림 삭제에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
+      setLocalNotifications([...notifications]); // 삭제 실패 시 Context 기준으로 목록 다시 표시
     }
   };
 

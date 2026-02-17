@@ -1,8 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ReactNode } from "react";
-import Sidebar from "@/app/admin/dashboard/components/Sidebar"; // 1. 사이드바 컴포넌트 불러오기
+import { ReactNode, Suspense } from "react";
+import Sidebar from "@/app/admin/dashboard/components/Sidebar"; // 1. 사이드바 컴포넌트 불러오기 (useSearchParams 사용 → Suspense 필수)
 
 export default async function AdminLayout({
   children,
@@ -54,12 +54,14 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  // 4. 레이아웃 구성 (사이드바 + 메인 콘텐츠)
+  // 4. 레이아웃 구성 (사이드바 + 메인 콘텐츠). Sidebar는 useSearchParams 사용하므로 Suspense로 감쌈
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* 왼쪽: 고정된 관리자 사이드바 */}
       <div className="w-64 flex-shrink-0">
-        <Sidebar />
+        <Suspense fallback={<div className="h-full w-64 bg-gray-200 animate-pulse rounded-r-lg" />}>
+          <Sidebar />
+        </Suspense>
       </div>
 
       {/* 오른쪽: 바뀌는 페이지 내용 (대시보드, 예약관리 등) */}

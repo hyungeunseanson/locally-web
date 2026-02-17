@@ -7,10 +7,12 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useToast } from '@/app/context/ToastContext';
 
 export default function WishlistsPage() {
   const supabase = createClient();
   const router = useRouter();
+  const { showToast } = useToast();
   const [wishlists, setWishlists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +34,7 @@ export default function WishlistsPage() {
 
       if (error) {
         console.error('위시리스트 로딩 실패:', error);
+        showToast('위시리스트를 불러오는 중 오류가 발생했어요.', 'error');
       } else {
         // 체험 정보가 있는 것만 필터링
         setWishlists(data?.filter(item => item.experiences) || []);
@@ -53,7 +56,12 @@ export default function WishlistsPage() {
     const { error } = await supabase.from('wishlists').delete().eq('id', wishlistId);
     if (error) {
        console.error(error);
-       // 에러 시 복구 로직은 생략 (간단한 UX)
+       showToast('찜 해제에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
+       const { data: { user } } = await supabase.auth.getUser();
+       if (user) {
+         const { data: reData } = await supabase.from('wishlists').select('id, created_at, experiences (*)').eq('user_id', user.id).order('created_at', { ascending: false });
+         setWishlists(reData?.filter(item => item.experiences) || []);
+       }
     }
   };
 

@@ -238,7 +238,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews }: A
                   <div className="text-xs text-gray-400">⭐ {exp.rating}</div>
                 </div>
               </div>
-            )) : <div className="text-sm text-gray-400 py-4 text-center">데이터 없음</div>}
+            )) : <div className="text-sm text-gray-400 py-4 text-center">표시할 데이터가 없어요</div>}
           </div>
         </div>
       </div>

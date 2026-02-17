@@ -81,7 +81,8 @@ export default function HomePage() {
           ) : filteredExperiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-40 text-center">
               <Ghost size={48} className="text-slate-300 mb-4"/>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">검색 결과가 없습니다.</h3>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
+              <p className="text-slate-500 text-sm mb-2">날짜나 지역을 바꿔보거나, 아래 버튼으로 전체 목록을 둘러보세요.</p>
               <button 
                 onClick={() => { 
                     setLocationInput(''); 

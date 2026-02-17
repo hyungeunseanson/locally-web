@@ -34,7 +34,7 @@ function PaymentCompleteContent() {
 
       if (error || !data) {
         console.error('Booking fetch error:', error);
-        // showToast('예약 정보를 찾을 수 없습니다.', 'error');
+        showToast('예약 정보를 불러오지 못했어요. 주문 번호를 확인해주세요.', 'error');
       } else {
         setBooking(data);
         // 🎉 데이터 로드 성공 시 폭죽 발사!

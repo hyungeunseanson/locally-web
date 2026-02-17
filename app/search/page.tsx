@@ -8,11 +8,13 @@ import SiteFooter from '@/app/components/SiteFooter';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import SearchFilter from './components/SearchFilter';
 import { Map, List, Ghost } from 'lucide-react';
+import { useToast } from '@/app/context/ToastContext';
 
 // 🟢 검색 로직 컴포넌트
 function SearchResults() {
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const { showToast } = useToast();
   
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,7 @@ function SearchResults() {
         setExperiences(data || []);
       } catch (error) {
         console.error('Search error:', error);
+        showToast('검색 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.', 'error');
       } finally {
         setLoading(false);
       }
@@ -107,8 +110,8 @@ function SearchResults() {
           ) : experiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-20">
               <Ghost size={48} className="text-slate-300 mb-4"/>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">검색 결과가 없습니다.</h3>
-              <p className="text-slate-500 text-sm">다른 날짜나 키워드로 검색해보세요.</p>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
+              <p className="text-slate-500 text-sm">다른 날짜나 키워드로 검색해보시거나, 메인에서 전체 체험을 둘러보세요.</p>
             </div>
           ) : (
             <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>

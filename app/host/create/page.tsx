@@ -126,6 +126,7 @@ const handleSubmit = async () => {
       
       if (uploadError) {
         console.error('Upload error:', uploadError);
+        showToast('사진 업로드에 실패했어요. 용량·형식을 확인해주세요.', 'error');
         continue; 
       }
 

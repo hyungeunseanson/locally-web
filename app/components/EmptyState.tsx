@@ -12,8 +12,8 @@ interface EmptyStateProps {
 }
 
 export default function EmptyState({
-  title = "일치하는 데이터가 없습니다.",
-  subtitle = "조건을 변경하거나 필터를 초기화해보세요.",
+  title = "표시할 내용이 없어요",
+  subtitle = "조건을 바꿔보거나 다른 메뉴를 둘러보세요.",
   showReset,
   actionLabel,
   actionUrl

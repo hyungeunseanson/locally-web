@@ -5,10 +5,12 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/app/context/ToastContext';
 
 export default function AccountPage() {
   const supabase = createClient();
   const router = useRouter();
+  const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(true);
@@ -167,9 +169,9 @@ export default function AccountPage() {
 
     if (error) {
       console.error('Save error:', error);
-      alert(`저장에 실패했습니다. (${error.message})`);
+      showToast('저장에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
     } else {
-      alert('✅ 프로필이 성공적으로 업데이트되었습니다.');
+      showToast('프로필이 성공적으로 저장되었어요.', 'success');
       router.refresh(); 
     }
     setSaving(false);

@@ -10,11 +10,11 @@ import { getContent } from '@/app/utils/contentHelper';
 
 export default function ExperienceCard({ data }: { data: any }) {
   const { isSaved, toggleWishlist } = useWishlist(data.id);
-  const { language } = useLanguage();
+  const { lang } = useLanguage();
 
-  // 🟢 [기능 유지] 다국어 데이터 가져오기 (디자인에는 영향 없음)
-  const title = getContent(data, 'title', language);
-  const category = getContent(data, 'category', language);
+  // 🟢 [기능 유지] 다국어 데이터 가져오기 (LanguageContext의 lang 사용)
+  const title = getContent(data, 'title', lang);
+  const category = getContent(data, 'category', lang);
   
   // 이미지 주소 처리
   const imageUrl = (data.photos && data.photos.length > 0) 

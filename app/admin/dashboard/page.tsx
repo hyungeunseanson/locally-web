@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import UsersTab from './components/UsersTab';
 import BookingsTab from './components/BookingsTab';
@@ -11,7 +11,8 @@ import ChatMonitor from './components/ChatMonitor';
 import { useSearchParams } from 'next/navigation'; 
 import { useToast } from '@/app/context/ToastContext'; 
 
-export default function AdminDashboardPage() {
+// 🟢 useSearchParams 사용 로직은 이 컴포넌트에만 두고, default export에서 Suspense로 감싸서 정적 빌드 에러 방지
+function AdminDashboardContent() {
   const { showToast } = useToast(); 
   const [filter, setFilter] = useState('ALL'); 
   
@@ -75,15 +76,13 @@ export default function AdminDashboardPage() {
         .order('created_at', { ascending: false }) // 최신순 정렬
         .limit(1000); // 🟢 데이터 짤림 방지
 
-if (bookingData) {
-        console.log(`✅ 예약 데이터 ${bookingData.length}개 로드 완료`); // 디버깅용 로그
-        setBookings(bookingData);
-      }
+if (bookingData) setBookings(bookingData);
 
       const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id');
       if (reviewData) setReviews(reviewData);
     } catch (error) {
       console.error("Data Fetch Error:", error);
+      showToast('데이터를 불러오는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.', 'error');
     }
   };
 
@@ -177,5 +176,13 @@ const updateStatus = async (table: 'host_applications' | 'experiences', id: stri
         />
       )}
     </div>
+  );
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <Suspense fallback={<div className="bg-white p-6 rounded-lg shadow-sm flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black" /></div>}>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }
