@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ChevronRight, CheckCircle } from 'lucide-react'; // 체크 아이콘 추가
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
 interface PastTripCardProps {
   trip: any;
@@ -9,6 +10,7 @@ interface PastTripCardProps {
 }
 
 export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) {
+  const { t } = useLanguage(); // 🟢 추가
   return (
     <div className="flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors group cursor-default border border-transparent hover:border-slate-100">
       <div className="w-14 h-14 bg-slate-200 rounded-lg overflow-hidden shrink-0">
@@ -34,7 +36,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
               onClick={() => onOpenReview(trip)} 
               className="text-xs font-semibold text-blue-600 hover:underline mt-1.5"
             >
-              후기 작성하기
+{t('trip_review')} {/* 🟢 교체 (후기 작성하기) */}
             </button>
           )
         ) : (

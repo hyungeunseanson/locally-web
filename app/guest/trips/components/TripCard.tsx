@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, MessageSquare, Map, Receipt, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CancellationModal from './CancellationModal';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
 interface TripCardProps {
   trip: any;
@@ -15,6 +16,7 @@ interface TripCardProps {
 }
 
 export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProcessing }: TripCardProps) {
+  const { t } = useLanguage(); // 🟢 추가
   const router = useRouter();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); 
@@ -103,8 +105,9 @@ const calculateRefundFront = () => {
     const diffTime = tripDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return { label: '오늘 출발!', color: 'bg-rose-500 text-white', icon: <Clock size={12}/> };
-    if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays}일 후 출발`, color: 'bg-green-500 text-white', icon: <Calendar size={12}/> };
+// 🟢 [수정] D-Day 및 날짜 카운트 번역
+if (diffDays === 0) return { label: 'D-Day', color: 'bg-rose-500 text-white', icon: <Clock size={12}/> };
+if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_in')}`, color: 'bg-green-500 text-white', icon: <Calendar size={12}/> };
     
     return { label: '예약 확정', color: 'bg-white/90 text-slate-800', icon: <CheckCircle size={12}/> };
   };
@@ -160,8 +163,8 @@ const calculateRefundFront = () => {
              <div className="flex justify-between items-start mb-2">
                 <div className="flex flex-col gap-1">
                    <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                     <span className="font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">#{trip.orderId}</span>
-                     <span>결제: {formatPaymentDate(trip.paymentDate || trip.created_at)}</span>
+                   <span className="font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">#{trip.orderId}</span>
+                     <span>{t('paid_label')} {formatPaymentDate(trip.paymentDate || trip.created_at)}</span>
                    </div>
                    
                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mt-1">
@@ -182,8 +185,8 @@ const calculateRefundFront = () => {
                      <>
                        <div className="fixed inset-0 z-30" onClick={() => setIsMenuOpen(false)}></div>
                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
-                          <button onClick={addToCalendar} className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium">캘린더에 추가</button>
-                          <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium">체험 다시 보기</button>
+                          <button onClick={addToCalendar} className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_add_calendar')}</button> {/* 🟢 교체 */}
+                          <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_view_again')}</button>   {/* 🟢 교체 */}
                           <div className="h-px bg-slate-100 my-1"></div>
                           
                           {(trip.status !== 'cancelled' && trip.status !== 'cancellation_requested') ? (
@@ -191,8 +194,8 @@ const calculateRefundFront = () => {
                               onClick={handleCancelClick} // 🟢 클릭 시 환불 계산 후 모달 오픈
                               className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 text-red-500 font-medium"
                             >
-                              예약 취소 요청
-                            </button>
+{t('trip_cancel_req')} {/* 🟢 교체 */}
+</button>
                           ) : (
                             <button disabled className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed">
                               {trip.status === 'cancelled' ? '취소 완료됨' : '취소 요청중'}
@@ -226,20 +229,20 @@ const calculateRefundFront = () => {
                 onClick={() => router.push(`/guest/inbox?hostId=${trip.hostId}`)} 
                 className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
               >
-                 <MessageSquare size={14}/> 메시지
-              </button>
+<MessageSquare size={14}/> {t('messages')} {/* 🟢 교체 */}
+</button>
               <button 
                 onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`, '_blank')} // 🟢 지도 링크 수정
                 className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
               >
-                 <Map size={14}/> 지도
-              </button>
+<Map size={14}/> {t('trip_map')} {/* 🟢 교체 */}
+</button>
               <button 
                 onClick={() => onOpenReceipt(trip)}
                 className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
               >
-                 <Receipt size={14}/> 영수증
-              </button>
+<Receipt size={14}/> {t('receipt')} {/* 🟢 교체 */}
+</button>
            </div>
         </div>
       </div>
