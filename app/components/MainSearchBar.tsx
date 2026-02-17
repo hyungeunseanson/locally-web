@@ -107,8 +107,8 @@ export default function MainSearchBar({
 <input 
   type="text" 
   placeholder={t('add_language')}
-              value={selectedLanguage === 'all' ? '전체' : selectedLanguage} 
-              readOnly 
+  value={selectedLanguage === 'all' ? t('city_all') : selectedLanguage} // 🟢 이렇게 바꾸세요!
+  readOnly
               className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
             />
           </div>
