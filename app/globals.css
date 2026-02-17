@@ -1,15 +1,23 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Tailwind v4 방식의 테마 설정 */
+@theme {
+  /* 에어비앤비 스타일 포인트 컬러 */
+  --color-primary: #FF385C;
+  --color-primary-hover: #D90B3E;
+  
+  /* 고급스러운 카드 그림자 */
+  --shadow-card: 0 6px 16px rgba(0,0,0,0.12);
+  --shadow-floating: 0 8px 28px rgba(0,0,0,0.28);
+  
+  /* 부드러운 모서리 */
+  --radius-card: 12px;
+  --radius-button: 8px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --background: #ffffff;
+  --foreground: #222222; /* 완전 검정(#171717)보다 살짝 부드러운 차콜색 추천 */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +30,14 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Arial, Helvetica, sans-serif; /* 추후 폰트 변경 시 여기만 수정하면 됩니다 */
+  -webkit-font-smoothing: antialiased; /* 글씨를 더 선명하게 */
+}
+
+/* 유틸리티 클래스 (필요시 사용) */
+.text-primary {
+  color: var(--color-primary);
+}
+.bg-primary {
+  background-color: var(--color-primary);
 }
