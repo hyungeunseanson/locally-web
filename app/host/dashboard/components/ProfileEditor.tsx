@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText } from 'lucide-react';
+import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast 훅 임포트
+import { useToast } from '@/app/context/ToastContext'; 
 
 export default function ProfileEditor({ profile, onUpdate }: any) {
-  const { showToast } = useToast(); // 🟢 훅 사용
+  const { showToast } = useToast(); 
   const [activeTab, setActiveTab] = useState<'public' | 'private'>('public');
   
   const [formData, setFormData] = useState({
@@ -67,9 +67,9 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
       if (error) throw error;
       const { data } = supabase.storage.from('images').getPublicUrl(fileName);
       setAvatarUrl(data.publicUrl);
-      showToast('사진이 업로드되었습니다.', 'success'); // 🟢 추가된 피드백
+      showToast('사진이 업로드되었습니다.', 'success'); 
     } catch (err: any) {
-      showToast('사진 업로드 실패: ' + err.message, 'error'); // 🟢 alert -> showToast
+      showToast('사진 업로드 실패: ' + err.message, 'error'); 
     } finally {
       setUploading(false);
     }
@@ -82,6 +82,7 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
       const updates = {
         id: user.id,
         updated_at: new Date().toISOString(),
+        // 공개 정보만 업데이트 (비공개 정보는 UI에서 막힘 + 로직에서도 제외 가능하지만 안전하게 유지)
         name: formData.name,
         job: formData.job,
         dream_destination: formData.dream_destination,
@@ -90,21 +91,14 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
         introduction: formData.introduction,
         bio: formData.introduction,
         avatar_url: avatarUrl,
-        phone: formData.phone,
-        dob: formData.dob,
-        host_nationality: formData.host_nationality,
-        bank_name: formData.bank_name,
-        account_number: formData.account_number,
-        account_holder: formData.account_holder,
-        motivation: formData.motivation
       };
 
       const { error } = await supabase.from('profiles').upsert(updates);
       if (!error) {
-        showToast('정보가 성공적으로 저장되었습니다!', 'success'); // 🟢 alert -> showToast
+        showToast('정보가 성공적으로 저장되었습니다!', 'success'); 
         if(onUpdate) onUpdate();
       } else {
-        showToast('저장 중 오류가 발생했습니다.', 'error'); // 🟢 alert -> showToast
+        showToast('저장 중 오류가 발생했습니다.', 'error'); 
         console.error(error);
       }
     }
@@ -161,27 +155,32 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
 
         {activeTab === 'private' && (
           <div className="space-y-8 animate-in fade-in">
-            <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-xl flex gap-3 text-yellow-800 text-sm">
-               <Lock className="flex-shrink-0 mt-0.5" size={18}/>
+            {/* ✅ [수정] 통합된 안내 문구 (요청하신 내용 반영) */}
+            <div className="bg-yellow-50 border border-yellow-100 p-5 rounded-xl flex gap-3 text-yellow-800 text-sm leading-relaxed">
+               <AlertTriangle className="flex-shrink-0 mt-0.5" size={18}/>
                <div>
-                 <p className="font-bold mb-1">개인 정보 및 정산 정보는 수정할 수 없습니다.</p>
-                 <p className="opacity-80">정보 변경이 필요한 경우, 관리자에게 문의해 주세요. (보안 및 정산 오류 방지)</p>
+                 <p className="font-bold mb-1">개인 정보 및 정산 정보는 직접 수정할 수 없습니다.</p>
+                 <p className="opacity-90">
+                   이 정보는 게스트에게 공개되지 않으며, 정산 및 본인 확인 용도로만 사용됩니다. 정확하게 입력해 주세요.<br/>
+                   정보 변경이 필요한 경우, <span className="font-bold underline cursor-pointer">보안 및 정산 오류 방지</span>를 위해 관리자에게 문의해 주세요.
+                 </p>
                </div>
             </div>
 
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-80">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-90">
               <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><User size={18}/> 개인 신상 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ✅ [수정] 모든 필드 disabled 처리 */}
                 <InputGroup label="연락처" name="phone" value={formData.phone} disabled={true} />
                 <InputGroup label="생년월일" name="dob" value={formData.dob} disabled={true} />
                 <div className="col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">국적</label>
-                  <input value={formData.host_nationality} disabled className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-100 text-slate-500 text-sm cursor-not-allowed"/>
+                  {/* ✅ [수정] 국적 필드 InputGroup으로 원복 */}
+                  <InputGroup label="국적" name="host_nationality" value={formData.host_nationality} disabled={true} />
                 </div>
               </div>
             </div>
 
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-80">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-90">
               <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><CreditCard size={18}/> 정산 계좌 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <InputGroup label="은행명" name="bank_name" value={formData.bank_name} disabled={true} />
@@ -193,7 +192,7 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5"><FileText size={14}/> 지원 동기 (가입 시 작성)</label>
               <textarea 
-                value={formData.motivation} 
+                value={formData.motivation || '작성된 내용이 없습니다.'} 
                 disabled 
                 className="w-full h-32 p-4 border border-slate-200 rounded-xl resize-none text-sm bg-slate-100 text-slate-500 cursor-not-allowed" 
               />
@@ -201,6 +200,7 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
           </div>
         )}
 
+        {/* ✅ [수정] 저장 버튼은 Public 탭에서만 노출 */}
         {activeTab === 'public' && (
           <div className="flex justify-end pt-8 mt-4 border-t border-slate-100">
             <button onClick={handleSave} disabled={loading} className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50">
@@ -220,10 +220,12 @@ function InputGroup({ label, name, value, onChange, icon, placeholder, disabled 
       <input 
         type="text" 
         name={name} 
-        value={value} 
+        value={value || ''} 
         onChange={onChange} 
         disabled={disabled}
-        className={`w-full p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'}`} 
+        className={`w-full p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm ${
+          disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
+        }`} 
         placeholder={placeholder} 
       />
     </div>

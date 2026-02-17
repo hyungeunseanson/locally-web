@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Star, MessageCircle, Filter, CheckCircle, Reply, MoreHorizontal } from 'lucide-react';
+import { Star, MessageCircle, Filter, CheckCircle, Reply, MoreHorizontal, Edit2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
@@ -30,7 +30,6 @@ export default function HostReviews() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. 내 체험에 달린 리뷰 가져오기 (관계형 쿼리)
       const { data, error } = await supabase
         .from('reviews')
         .select(`
@@ -69,7 +68,6 @@ export default function HostReviews() {
 
       showToast('답글이 등록되었습니다!', 'success');
       
-      // 🟢 [핵심] UI 강제 업데이트 (서버 다시 부르지 않고 로컬 상태 즉시 변경)
       setReviews(prev => prev.map(r => 
         r.id === reviewId 
           ? { ...r, reply: replyText, reply_at: new Date().toISOString() } 
@@ -87,7 +85,6 @@ export default function HostReviews() {
     }
   };
 
-  // 📊 통계 계산
   const totalReviews = reviews.length;
   const averageRating = totalReviews > 0 
     ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1) 
@@ -101,7 +98,6 @@ export default function HostReviews() {
 
   const unrepliedCount = reviews.filter(r => !r.reply).length;
   
-  // 필터링
   const filteredReviews = filter === 'unreplied' 
     ? reviews.filter(r => !r.reply) 
     : reviews;
@@ -123,9 +119,7 @@ export default function HostReviews() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* 1. 상단 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* 평점 요약 */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
            <div>
              <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">평균 평점</div>
@@ -146,7 +140,6 @@ export default function HostReviews() {
            </div>
         </div>
 
-        {/* 미답변 현황 */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between cursor-pointer hover:border-rose-200 transition-colors" onClick={() => setFilter('unreplied')}>
            <div className="flex justify-between items-start">
              <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">미답변 후기</div>
@@ -158,7 +151,6 @@ export default function HostReviews() {
            </div>
         </div>
 
-        {/* 팁 카드 */}
         <div className="bg-slate-900 p-6 rounded-3xl text-white shadow-lg flex flex-col justify-center relative overflow-hidden">
            <div className="relative z-10">
              <h4 className="font-bold text-lg mb-2">답글의 힘! 💪</h4>
@@ -171,7 +163,6 @@ export default function HostReviews() {
         </div>
       </div>
 
-      {/* 2. 필터 및 리스트 */}
       <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex gap-2 bg-slate-50">
           <button 
@@ -198,7 +189,6 @@ export default function HostReviews() {
               <div key={review.id} className="p-6 md:p-8 hover:bg-slate-50 transition-colors">
                 <div className="flex gap-4">
                   
-                  {/* 게스트 프로필 */}
                   <div className="shrink-0">
                     <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden relative border border-slate-100">
                       <Image 
@@ -211,7 +201,6 @@ export default function HostReviews() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    {/* 헤더 */}
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm">{review.guest?.full_name || '익명 게스트'}</h4>
@@ -228,10 +217,8 @@ export default function HostReviews() {
                       </div>
                     </div>
 
-                    {/* 내용 */}
                     <p className="text-sm text-slate-700 leading-relaxed mb-4 whitespace-pre-wrap">{review.content}</p>
 
-                    {/* 사진 */}
                     {review.photos && review.photos.length > 0 && (
                       <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                         {review.photos.map((photo: string, idx: number) => (
@@ -242,9 +229,8 @@ export default function HostReviews() {
                       </div>
                     )}
 
-                    {/* 답글 영역 */}
-                    {review.reply ? (
-                      <div className="bg-slate-100 rounded-2xl p-4 mt-4 flex gap-3">
+                    {review.reply && replyingId !== review.id ? (
+                      <div className="bg-slate-100 rounded-2xl p-4 mt-4 flex gap-3 group relative">
                         <Reply size={16} className="text-slate-400 shrink-0 mt-1 rotate-180" />
                         <div className="flex-1">
                           <div className="flex justify-between items-center mb-1">
@@ -253,6 +239,14 @@ export default function HostReviews() {
                           </div>
                           <p className="text-xs text-slate-600 leading-relaxed">{review.reply}</p>
                         </div>
+                        {/* 🟢 [추가] 수정 버튼 (마우스 오버 시 표시) */}
+                        <button 
+                          onClick={() => { setReplyingId(review.id); setReplyText(review.reply); }}
+                          className="absolute top-2 right-2 p-1.5 bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-black"
+                          title="답글 수정"
+                        >
+                          <Edit2 size={12}/>
+                        </button>
                       </div>
                     ) : (
                       <div className="mt-4">
@@ -267,7 +261,7 @@ export default function HostReviews() {
                             />
                             <div className="flex justify-end gap-2 mt-2">
                               <button 
-                                onClick={() => setReplyingId(null)}
+                                onClick={() => { setReplyingId(null); setReplyText(''); }}
                                 className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                               >
                                 취소
