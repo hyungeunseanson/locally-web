@@ -46,7 +46,7 @@ export default function MainSearchBar({
   };
 
   const languages = [
-    { label: t('city_all'), value: 'all', icon: '🌐' },
+    { label: t('lang_all'), value: 'all', icon: '🌐' },
     { label: t('lang_ko'), value: '한국어', code: 'kr' },
     { label: t('lang_en'), value: '영어', code: 'us' },
     { label: t('lang_ja'), value: '일본어', code: 'jp' },

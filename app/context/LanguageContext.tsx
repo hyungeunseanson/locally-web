@@ -166,7 +166,12 @@ const dictionary: Record<Locale, Record<string, string>> = {
     continue_google: "구글로 계속하기",
     no_account: "계정이 없으신가요?",
     agree_terms: "계속 진행하면 Locally의 서비스 약관 및 개인정보 처리방침에 동의하는 것으로 간주됩니다.",
-
+// [언어 필터]
+lang_all: "전체",
+lang_ko: "한국어",
+lang_en: "영어",
+lang_ja: "일본어",
+lang_zh: "중국어",
     // [검색창 - 누락된 키 추가]
     anywhere: "어디든지",
     anytime: "언제든지",
@@ -331,6 +336,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_destination: "Where",
     label_date: "When",
     label_language: "Language",
+    lang_all: "All",
+    lang_ko: "Korean",
+    lang_en: "English",
+    lang_ja: "Japanese",
+    lang_zh: "Chinese",
     add_language: "Add language",
     date_year: ".",
     date_month: ".",
@@ -489,6 +499,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_destination: "ロケーション",
     label_date: "日付",
     label_language: "言語", // 🟢 [수정] Guest -> Language
+    lang_all: "すべて",
+    lang_ko: "韓国語",
+    lang_en: "英語",
+    lang_ja: "日本語",
+    lang_zh: "中国語",
     add_language: "言語を追加", // 🟢 [수정] Add guests -> Add language
     date_year: "年",
     date_month: "月",
@@ -647,6 +662,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     label_destination: "地点",
     label_date: "日期",
     label_language: "语言", // 🟢 [수정] Guest -> Language
+    lang_all: "全部",
+    lang_ko: "韩语",
+    lang_en: "英语",
+    lang_ja: "日语",
+    lang_zh: "中文",
     add_language: "添加语言", // 🟢 [수정] Add guests -> Add language
     date_year: "年",
     date_month: "月",
