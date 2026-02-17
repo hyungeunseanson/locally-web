@@ -1,14 +1,19 @@
 export const CATEGORIES = [
-    { id: 'all', label: '전체', icon: '🌏' },
-    { id: 'tokyo', label: '도쿄', icon: '🗼' },
-    { id: 'osaka', label: '오사카', icon: '🏯' },
-    { id: 'fukuoka', label: '후쿠오카', icon: '🍜' },
-    { id: 'sapporo', label: '삿포로', icon: '☃️' },
-    { id: 'nagoya', label: '나고야', icon: '🍣' },
-    { id: 'seoul', label: '서울', icon: '🏙️' },
-    { id: 'busan', label: '부산', icon: '🚢' },
-    { id: 'jeju', label: '제주', icon: '🏔️' },
-  ];
+  { id: 'all', label: 'city_all', icon: '🌏' },
+  { id: 'tokyo', label: 'city_tokyo', icon: '🗼' },
+  { id: 'osaka', label: 'city_osaka', icon: '🏯' },
+  { id: 'fukuoka', label: 'city_fukuoka', icon: '🍜' },
+  { id: 'sapporo', label: 'city_sapporo', icon: '☃️' },
+  { id: 'nagoya', label: 'city_nagoya', icon: '🍣' },
+  { id: 'seoul', label: 'city_seoul', icon: '🏙️' },
+  { id: 'busan', label: 'city_busan', icon: '🚢' },
+  { id: 'jeju', label: 'city_jeju', icon: '🏔️' },
+];
+
+export const SERVICE_TYPES = [
+  { id: 'experience', label: 'cat_exp', icon: '🎈' },
+  { id: 'service', label: 'cat_service', icon: '🛎️' },
+];
   
   export const LOCALLY_SERVICES = [
     { id: 1, title: '일본 식당 전화 예약 대행', price: 5000, image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b', desc: '한국어 대응 불가 식당, 대신 예약해드립니다.' },

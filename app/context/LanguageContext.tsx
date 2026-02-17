@@ -172,7 +172,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     anytime: "언제든지",
     label_destination: "여행지",
     label_date: "날짜",
-    label_guest: "인원"
+    label_language: "언어", // 🟢 [수정] 인원 -> 언어
+    add_language: "언어 추가" // 🟢 [수정] 게스트 추가 -> 언어 추가
   },
   
   // 🟢 영어 (English)
@@ -320,7 +321,9 @@ const dictionary: Record<Locale, Record<string, string>> = {
     anytime: "Anytime",
     label_destination: "Where",
     label_date: "When",
-    label_guest: "Who"
+    label_guest: "Who",
+    label_language: "Language", // 🟢 [수정] Guest -> Language
+    add_language: "Add language" // 🟢 [수정] Add guests -> Add language
   },
 
   // 🟢 일본어 (Japanese)
@@ -468,6 +471,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     anytime: "いつでも",
     label_destination: "ロケーション",
     label_date: "日付",
+    label_language: "言語", // 🟢 [수정] Guest -> Language
+    add_language: "言語を追加", // 🟢 [수정] Add guests -> Add language
     label_guest: "人数"
   },
 
@@ -616,6 +621,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     anytime: "任意时间",
     label_destination: "地点",
     label_date: "日期",
+    label_language: "语言", // 🟢 [수정] Guest -> Language
+    add_language: "添加语言", // 🟢 [수정] Add guests -> Add language
     label_guest: "人数"
   }
 };

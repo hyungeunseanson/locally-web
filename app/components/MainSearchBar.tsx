@@ -102,11 +102,11 @@ export default function MainSearchBar({
             ${activeSearchField === 'language' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`} 
           onClick={() => setActiveSearchField('language')}
         >
-<label className="text-[11px] font-bold text-slate-800">{t('label_guest')}</label> {/* 🟢 교체 (일단 guest 키 사용) */}
+<label className="text-[11px] font-bold text-slate-800">{t('label_language')}</label>
 <div className="flex justify-between items-center w-full">
-  <input 
-    type="text" 
-    placeholder={t('add_guests')} // 🟢 교체
+<input 
+  type="text" 
+  placeholder={t('add_language')}
               value={selectedLanguage === 'all' ? '전체' : selectedLanguage} 
               readOnly 
               className="w-full text-sm outline-none bg-transparent placeholder:text-slate-500 text-black font-semibold truncate cursor-pointer"
