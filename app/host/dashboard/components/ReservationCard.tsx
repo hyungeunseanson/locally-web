@@ -201,51 +201,38 @@ return (
           </div>
         </div>
 
-        {/* 액션 버튼 */}
-        <div className="flex flex-row md:flex-col gap-2 justify-end border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[100px]">
+{/* 액션 버튼 */}
+<div className="flex flex-row md:flex-col gap-2 justify-end border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[100px]">
           <button 
             onClick={(e) => { e.stopPropagation(); onMessage(); }}
             className="w-full h-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
-<MessageSquare size={16}/> {t('res_message_btn')} {/* 🟢 번역 */}
-</button>
+            <MessageSquare size={16}/> {t('res_message_btn')} {/* 🟢 번역 */}
+          </button>
 
-{/* 🟢 [추가] 이용 완료 상태일 때 후기 버튼 표시 */}
-{/* 🟢 [수정] 날짜가 지났으면(isPast) 후기 버튼 표시 */}
-{(() => {
-  const targetDate = new Date(res.date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isPast = targetDate < today;
-  const isValid = !['cancelled', 'cancellation_requested', 'declined'].includes(res.status);
+          {/* 🟢 [수정] 날짜가 지났고(isPast) 유효한 예약이면 후기 버튼 표시 */}
+          {(() => {
+            const targetDate = new Date(res.date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const isPast = targetDate < today;
+            const isValid = !['cancelled', 'cancellation_requested', 'declined'].includes(res.status);
 
-  return isPast && isValid && (
-    <button 
-      onClick={(e) => { e.stopPropagation(); if(!hasReview) onReview(); }}
-      disabled={hasReview}
-      className={`w-full h-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${
-        hasReview 
-          ? 'bg-slate-100 text-slate-400 cursor-default' 
-          : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
-      }`}
-    >
-      <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"}/> 
-      {hasReview ? '후기 작성됨' : '게스트 후기'}
-    </button>
-  );
-})()}
-              disabled={hasReview}
-              className={`w-full h-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${
-                hasReview 
-                  ? 'bg-slate-100 text-slate-400 cursor-default' 
-                  : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
-              }`}
-            >
-              <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"}/> 
-              {hasReview ? '후기 작성됨' : '게스트 후기'}
-            </button>
-          )}
-    
+            return isPast && isValid && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); if(!hasReview) onReview(); }}
+                disabled={hasReview}
+                className={`w-full h-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${
+                  hasReview 
+                    ? 'bg-slate-100 text-slate-400 cursor-default' 
+                    : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
+                }`}
+              >
+                <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"}/> 
+                {hasReview ? '후기 작성됨' : '게스트 후기'}
+              </button>
+            );
+          })()}
         </div>
       </div>
 
