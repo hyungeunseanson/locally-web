@@ -13,8 +13,56 @@ export async function POST(request: Request) {
     );
     
     const body = await request.json();
-    const { recipient_id, title, message, link, type } = body;
+    // 🟢 [수정] recipient_ids(배열) 추가로 받기
+    const { recipient_id, recipient_ids, title, message, link, type } = body;
+    // 🟢 [신규 추가] 다중 발송 처리 (관리자 공지용)
+    if (recipient_ids && Array.isArray(recipient_ids) && recipient_ids.length > 0) {
+      console.log(`🚀 [API] 다중 발송 시작: ${recipient_ids.length}명`);
 
+      // 1. DB 일괄 저장
+      const notificationsData = recipient_ids.map((id: string) => ({
+        user_id: id,
+        type: type || 'admin_alert',
+        title: title,
+        message: message,
+        link: link || '/notifications',
+        is_read: false
+      }));
+
+      const { error: dbError } = await supabase.from('notifications').insert(notificationsData);
+      
+      if (dbError) console.error('🔥 [API] DB 일괄 저장 실패:', dbError);
+      else console.log('✅ [API] DB 일괄 저장 성공');
+
+      // 2. 이메일 대상 조회 (한 번에 조회)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('email')
+        .in('id', recipient_ids);
+
+      const emails = profiles?.map((p: any) => p.email).filter(Boolean) || [];
+
+      // 3. 이메일 발송 (병렬 처리)
+      if (emails.length > 0) {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+        });
+
+        // 서버 부하 방지를 위해 Promise.all 사용 (비동기 병렬 발송)
+        await Promise.all(emails.map((email: string) => 
+          transporter.sendMail({
+            from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: `[Locally] ${title}`,
+            html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL}${link}">확인하기</a>`,
+          }).catch(e => console.error(`❌ 이메일 발송 실패 (${email}):`, e))
+        ));
+        console.log(`📨 [API] 이메일 ${emails.length}건 발송 시도 완료`);
+      }
+
+      return NextResponse.json({ success: true, count: recipient_ids.length });
+    }
     // 🟢 [추가됨] 2. DB 알림 테이블에 저장 (이게 없어서 알림창에 안 떴던 것!)
     if (recipient_id) {
         const { error: dbError } = await supabase
