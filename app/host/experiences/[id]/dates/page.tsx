@@ -7,12 +7,14 @@ import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Check, Clock, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 
 type TimeSlot = string; 
 type AvailabilityMap = Record<string, TimeSlot[]>;
 type BookingCountMap = Record<string, number>; 
 
 export default function ManageDatesPage() {
+  const { t, lang } = useLanguage(); // 🟢 2. Hook
   const supabase = createClient();
   const params = useParams();
   const { showToast } = useToast();
@@ -83,7 +85,7 @@ export default function ManageDatesPage() {
     
     const bookingKey = `${selectedDate}_${time}`;
     if (bookingCounts[bookingKey] > 0) {
-        alert(`⚠️ 해당 시간(${time})에는 확정된 예약이 ${bookingCounts[bookingKey]}건 있어 삭제할 수 없습니다.`);
+        alert(`${t('sched_delete_error')} (${bookingCounts[bookingKey]})`); // 🟢 번역
         return;
     }
 
@@ -97,7 +99,7 @@ export default function ManageDatesPage() {
 
   // 🟢 [핵심] 안전한 저장 로직 (Diff Algorithm)
   const handleSave = async () => {
-    if (!confirm('일정을 저장하시겠습니까?')) return;
+    if (!confirm(t('sched_save_confirm'))) return; // 🟢 번역
     setLoading(true);
 
     try {
@@ -157,12 +159,12 @@ export default function ManageDatesPage() {
         }
       }
 
-      showToast('일정이 성공적으로 업데이트되었습니다.', 'success');
+      showToast(t('sched_save_success'), 'success'); // 🟢 번역
       await fetchDates(); 
 
     } catch (e: any) {
       console.error(e);
-      alert('저장 중 오류가 발생했습니다: ' + e.message);
+      alert(t('sched_save_error') + e.message); // 🟢 번역
     } finally {
       setLoading(false);
     }
@@ -222,9 +224,9 @@ export default function ManageDatesPage() {
           {hasSlots && (
             <div className="mt-auto mb-1 flex flex-col items-center">
                 <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded-md group-hover:bg-white transition-colors">
-                {slotCount} 타임
+                {slotCount}{t('sched_slots')} {/* 🟢 번역 */}
                 </span>
-                {bookedCount > 0 && <span className="text-[8px] text-rose-500 font-bold mt-0.5">{bookedCount} 예약됨</span>}
+                {bookedCount > 0 && <span className="text-[8px] text-rose-500 font-bold mt-0.5">{bookedCount} {t('sched_booked')}</span>} {/* 🟢 번역 */}
             </div>
           )}
         </div>
@@ -237,28 +239,34 @@ export default function ManageDatesPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
       <main className="max-w-6xl mx-auto px-6 py-12">
-        <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-8">
           <Link href="/host/dashboard" className="flex items-center gap-2 text-slate-500 hover:text-black font-bold text-sm">
-            <ChevronLeft size={16} /> 대시보드
+            <ChevronLeft size={16} /> {t('nav_dashboard')} {/* 🟢 번역 */}
           </Link>
           <div className="flex gap-3">
-             <button onClick={() => { setAvailability(initialData); setSelectedDate(null); }} className="px-4 py-2 text-sm font-bold text-slate-400 hover:bg-slate-100 rounded-full">변경 취소</button>
+             <button onClick={() => { setAvailability(initialData); setSelectedDate(null); }} className="px-4 py-2 text-sm font-bold text-slate-400 hover:bg-slate-100 rounded-full">{t('btn_undo')}</button> {/* 🟢 번역 */}
              <button onClick={handleSave} disabled={loading} className="px-6 py-2 bg-black text-white rounded-full font-bold hover:scale-105 transition-transform flex items-center gap-2 shadow-lg disabled:opacity-50">
-               {loading ? '저장 중...' : <><Check size={16}/> 변경사항 저장</>}
+               {loading ? t('saving') : <><Check size={16}/> {t('btn_save_changes')}</>} {/* 🟢 기존 키 활용 */}
              </button>
           </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8 items-start">
-          <div className="flex-1 w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+        <div className="flex-1 w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-black">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</h2>
+              {/* 🟢 언어별 날짜 포맷 */}
+              <h2 className="text-2xl font-black">
+                {lang === 'ko' 
+                  ? `${currentDate.getFullYear()}년 ${currentDate.getMonth() + 1}월`
+                  : currentDate.toLocaleString(lang === 'en' ? 'en-US' : 'ja-JP', { month: 'long', year: 'numeric' })}
+              </h2>
               <div className="flex gap-2">
                 <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-2 border rounded-full hover:bg-slate-50"><ChevronLeft size={20}/></button>
                 <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} className="p-2 border rounded-full hover:bg-slate-50"><ChevronRight size={20}/></button>
               </div>
-            </div>
-            <div className="grid grid-cols-7 text-center mb-2">{['일','월','화','수','목','금','토'].map(d=><div key={d} className="text-xs font-bold text-slate-400 py-2">{d}</div>)}</div>
+              </div>
+            {/* 🟢 요일 번역 (LanguageContext의 day_0 ~ day_6 활용) */}
+            <div className="grid grid-cols-7 text-center mb-2">{[0,1,2,3,4,5,6].map(i=><div key={i} className="text-xs font-bold text-slate-400 py-2">{t(`day_${i}`)}</div>)}</div>
             <div className="grid grid-cols-7">{renderCalendar()}</div>
           </div>
 
@@ -266,8 +274,8 @@ export default function ManageDatesPage() {
             <div className="sticky top-24 bg-slate-50 border border-slate-200 rounded-3xl p-6 min-h-[500px]">
               {selectedDate ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                  <div className="flex justify-between items-start mb-6">
-                    <div><h3 className="text-xl font-black text-slate-900 mb-1">{selectedDate}</h3><p className="text-xs font-bold text-slate-500">시간 설정</p></div>
+<div className="flex justify-between items-start mb-6">
+                    <div><h3 className="text-xl font-black text-slate-900 mb-1">{selectedDate}</h3><p className="text-xs font-bold text-slate-500">{t('sched_time_setting')}</p></div> {/* 🟢 번역 */}
                     <button onClick={() => setSelectedDate(null)} className="p-1 hover:bg-slate-200 rounded-full text-slate-400"><X size={18}/></button>
                   </div>
                   <div className="space-y-2 mb-8">
@@ -279,7 +287,7 @@ export default function ManageDatesPage() {
                             <div className="flex items-center gap-3">
                                 <Clock size={16} className={isBooked ? "text-rose-400" : "text-slate-400"}/>
                                 <span className={`font-bold ${isBooked ? "text-rose-700" : "text-slate-800"}`}>{time}</span>
-                                {isBooked && <span className="text-[10px] font-bold bg-rose-200 text-rose-700 px-1.5 py-0.5 rounded">예약됨</span>}
+                                {isBooked && <span className="text-[10px] font-bold bg-rose-200 text-rose-700 px-1.5 py-0.5 rounded">{t('sched_booked')}</span>} {/* 🟢 번역 */}
                             </div>
                             <button 
                                 onClick={() => removeTimeSlot(time)} 
@@ -291,10 +299,10 @@ export default function ManageDatesPage() {
                             </div>
                         )
                       })
-                    ) : <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">시간을 추가해주세요.</div>}
+                    ) : <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">{t('sched_add_guide')}</div>} {/* 🟢 번역 */}
                   </div>
                   <div className="border-t border-slate-200 pt-6">
-                    <label className="text-xs font-bold text-slate-500 mb-3 block uppercase">시간 추가 (08:00 ~ 21:00)</label>
+                  <label className="text-xs font-bold text-slate-500 mb-3 block uppercase">{t('sched_add_label')} (08:00 ~ 21:00)</label> {/* 🟢 번역 */}
                     <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto custom-scrollbar">
                       {timeOptions.map(time => {
                         const isAdded = availability[selectedDate]?.includes(time);
@@ -314,12 +322,12 @@ export default function ManageDatesPage() {
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 py-32 opacity-60">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 border border-slate-100"><Clock size={32} /></div>
-                  <p className="font-bold text-slate-600">날짜를 선택해주세요</p>
-                </div>
-              )}
+) : (
+  <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 py-32 opacity-60">
+    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 border border-slate-100"><Clock size={32} /></div>
+    <p className="font-bold text-slate-600">{t('sched_select_date')}</p> {/* 🟢 번역 */}
+  </div>
+)}
             </div>
           </div>
         </div>
