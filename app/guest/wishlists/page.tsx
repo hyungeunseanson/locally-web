@@ -8,8 +8,10 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
 export default function WishlistsPage() {
+  const { t } = useLanguage(); // 🟢 추가
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast();
@@ -70,20 +72,19 @@ export default function WishlistsPage() {
       <SiteHeader />
       
       <main className="max-w-[1760px] mx-auto px-6 py-12">
-        <h1 className="text-3xl font-black mb-8">위시리스트</h1>
-
+      <h1 className="text-3xl font-black mb-8">{t('wishlist')}</h1> {/* 🟢 번역 */}
         {loading ? (
           <div className="flex justify-center py-40">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
           </div>
         ) : wishlists.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50">
+<div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50">
             <Heart size={48} className="text-slate-300 mb-4" />
-            <h3 className="text-lg font-bold text-slate-900 mb-2">아직 찜한 체험이 없어요</h3>
-            <p className="text-slate-500 mb-6">마음에 드는 체험을 찾아 하트를 눌러보세요!</p>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">{t('wishlist_empty')}</h3> {/* 🟢 번역 */}
+            <p className="text-slate-500 mb-6">{t('wishlist_desc')}</p> {/* 🟢 번역 */}
             <Link href="/">
               <button className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:scale-105 transition-transform flex items-center gap-2">
-                체험 둘러보기 <ArrowRight size={18}/>
+                {t('explore_exp')} <ArrowRight size={18}/> {/* 🟢 번역 */}
               </button>
             </Link>
           </div>
@@ -123,7 +124,7 @@ export default function WishlistsPage() {
                     <p className="text-[15px] text-slate-500 line-clamp-1">{exp.title}</p>
                     <div className="mt-1">
                       <span className="font-bold text-slate-900 text-[15px]">₩{Number(exp.price).toLocaleString()}</span>
-                      <span className="text-[15px] text-slate-900 font-normal"> / 인</span>
+                      <span className="text-[15px] text-slate-900 font-normal"> {t('per_person')}</span> {/* 🟢 번역 */}
                     </div>
                   </div>
                 </Link>
