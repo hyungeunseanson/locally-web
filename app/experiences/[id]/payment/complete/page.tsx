@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, Download, MessageCircle, Clock } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, Download, MessageCircle, Clock, CreditCard, AlertCircle } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 
@@ -98,13 +98,35 @@ function PaymentCompleteContent() {
       
       <main className="max-w-3xl mx-auto px-6 py-12 md:py-20 text-center">
         
-        {/* 1. 성공 메시지 */}
-        <div className="mb-10 animate-in zoom-in duration-500">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600 shadow-sm">
-            <CheckCircle size={40} strokeWidth={3} />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-3 tracking-tight">예약이 확정되었습니다!</h1>
-          <p className="text-slate-500 text-lg">설레는 여행 준비를 시작해보세요.</p>
+{/* 1. 성공 메시지 (상태별 분기) */}
+<div className="mb-10 animate-in zoom-in duration-500">
+          {booking.status === 'PENDING' ? (
+            <>
+              <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6 text-yellow-600 shadow-sm animate-pulse">
+                <AlertCircle size={40} strokeWidth={3} />
+              </div>
+              <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-3 tracking-tight">입금을 대기 중입니다!</h1>
+              <p className="text-slate-500 text-lg mb-6">아래 계좌로 입금해주시면 예약이 확정됩니다.</p>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 max-w-sm mx-auto">
+                 <p className="text-xs font-bold text-slate-400 mb-2 uppercase">입금 계좌 정보</p>
+                 <div className="flex items-center justify-center gap-2 mb-2">
+                    <span className="font-black text-2xl text-slate-900">3333-14-0254739</span>
+                    <Copy size={16} className="text-slate-400 cursor-pointer hover:text-black" onClick={() => { navigator.clipboard.writeText('3333140254739'); showToast('계좌번호 복사 완료!', 'success'); }}/>
+                 </div>
+                 <p className="font-bold text-slate-700">카카오뱅크 (예금주: 로컬리)</p>
+                 <p className="text-xs text-rose-500 mt-2 font-bold">* 1시간 내 미입금 시 자동 취소</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600 shadow-sm">
+                <CheckCircle size={40} strokeWidth={3} />
+              </div>
+              <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-3 tracking-tight">예약이 확정되었습니다!</h1>
+              <p className="text-slate-500 text-lg">설레는 여행 준비를 시작해보세요.</p>
+            </>
+          )}
         </div>
 
         {/* 2. 예약 정보 카드 */}

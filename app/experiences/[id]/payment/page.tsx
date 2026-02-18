@@ -24,6 +24,8 @@ function PaymentContent() {
   // 🟢 message state는 DB 저장을 위해 남겨두되, 입력란은 삭제했으므로 빈 값으로 유지
   const [message, setMessage] = useState(''); 
   const [agreed, setAgreed] = useState(false);
+  // 🟢 [추가] 결제 수단 상태 ('card' | 'bank')
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
 
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
@@ -138,8 +140,15 @@ function PaymentContent() {
         return;
       }
 
+      // 🟢 [수정] 무통장 입금이면 PG사 결제 없이 바로 완료 페이지로 이동
+      if (paymentMethod === 'bank') {
+        window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
+        return;
+      }
+
+      // 👇 카드 결제일 때만 실행
       const { IMP } = window as any;
-      IMP.init('imp44607000'); 
+      IMP.init('imp44607000');
 
       const data = {
         pg: 'nice_v2', 
@@ -231,9 +240,44 @@ function PaymentContent() {
                 <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors" placeholder="010-0000-0000"/>
             </div>
             {/* 🟢 [제거 완료] 메시지 입력란 삭제됨 */}
-          </div>
+            </div>
 
-          <div className="px-2 space-y-2 mb-8 text-sm">
+{/* 🟢 [추가] 결제 수단 선택 */}
+<div className="mb-8">
+  <h2 className="text-xl font-bold mb-4">결제 수단</h2>
+  <div className="grid grid-cols-2 gap-3 mb-4">
+    <button 
+      onClick={() => setPaymentMethod('card')}
+      className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'card' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+    >
+      <CreditCard size={24}/>
+      <span className="font-bold text-sm">카드 결제</span>
+    </button>
+    <button 
+      onClick={() => setPaymentMethod('bank')}
+      className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'bank' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+    >
+      <div className="flex items-center gap-1"><Users size={24}/><span className="text-[10px] font-bold bg-rose-100 text-rose-600 px-1 rounded">추천</span></div>
+      <span className="font-bold text-sm">무통장 입금</span>
+    </button>
+  </div>
+
+  {/* 무통장 선택 시 계좌 안내 */}
+  {paymentMethod === 'bank' && (
+    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
+      <p className="text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="font-black text-lg text-slate-900">3333-14-0254739</span>
+        <span className="text-xs font-bold bg-yellow-300 px-1.5 py-0.5 rounded text-black">카카오뱅크</span>
+      </div>
+      <p className="text-xs text-slate-400">
+        * 예약 후 <span className="text-rose-500 font-bold">1시간 이내</span>에 미입금 시 자동 취소됩니다.
+      </p>
+    </div>
+  )}
+</div>
+
+<div className="px-2 space-y-2 mb-8 text-sm">
             <div className="flex justify-between items-center text-slate-600"><span>체험 금액</span><span>₩{hostPrice.toLocaleString()}</span></div>
             <div className="flex justify-between items-center text-blue-600"><span className="flex items-center gap-1">서비스 수수료 (10%) <Info size={12}/></span><span>+ ₩{guestFee.toLocaleString()}</span></div>
             <div className="border-t border-slate-100 pt-4 mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
