@@ -58,11 +58,11 @@ export default function AccountPage() {
     { code: 'AU', name: '호주 (Australia)', phone: '+61' }
   ];
 
-  // 더미 후기
-  const reviews = [
-    { id: 1, host: 'Akiho', date: '2026년 1월', content: '정말 매너 좋고 시간 약속도 잘 지키시는 게스트였습니다! 대화도 즐거웠어요.' },
-    { id: 2, host: 'Minjun', date: '2025년 12월', content: '깔끔하게 이용해주셔서 감사합니다. 추천합니다!' }
-  ];
+// 더미 후기
+const reviews = [
+  { id: 1, host: 'Akiho', date: '2026.01', content: '정말 매너 좋고 시간 약속도 잘 지키시는 게스트였습니다! 대화도 즐거웠어요.' }, // 🟢 숫자 형식
+  { id: 2, host: 'Minjun', date: '2025.12', content: '깔끔하게 이용해주셔서 감사합니다. 추천합니다!' } // 🟢 숫자 형식
+];
 
   useEffect(() => {
     const getProfile = async () => {
@@ -243,10 +243,10 @@ export default function AccountPage() {
               
               <div className="text-left space-y-4 pt-6 border-t border-slate-100">
               <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> {t('review_from_host')} ({reviews.length})</h3> {/* 🟢 번역 */}
-                {reviews.map(review => (
+              {reviews.map(review => (
                   <div key={review.id} className="bg-slate-50 p-4 rounded-xl text-sm border border-slate-100">
                     <div className="flex justify-between mb-1.5">
-                      <span className="font-bold text-slate-900">{review.host} 호스트님</span>
+                      <span className="font-bold text-slate-900">{review.host}{t('host_honorific')}</span> {/* 🟢 번역 */}
                       <span className="text-slate-400 text-xs">{review.date}</span>
                     </div>
                     <p className="text-slate-600 leading-snug">"{review.content}"</p>
