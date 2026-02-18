@@ -56,9 +56,19 @@ export default function ReservationCard({
     if (status === 'cancelled') 
       return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_cancelled')}</span>;
     
-    // 🟢 PENDING, PAID, confirmed 모두 '확정' 또는 '완료'로 처리
-    if (['PAID', 'confirmed', 'PENDING', 'completed'].includes(status)) {
-      return isPast 
+    // 🟢 [수정] 입금 대기(PENDING) 상태 별도 처리 (반짝임 효과)
+    if (status === 'PENDING') {
+      return (
+        <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1 animate-pulse">
+          <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></div> 
+          입금 확인 중
+        </span>
+      );
+    }
+
+    // 🟢 [수정] PENDING 제거됨 (확정된 상태만 남김)
+    if (['PAID', 'confirmed', 'completed'].includes(status)) {
+      return isPast
         ? <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_completed')}</span> // 이용 완료
         : <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><CheckCircle2 size={10}/> {t('res_status_paid')}</span>; // 예약 확정
     }

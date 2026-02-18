@@ -44,10 +44,11 @@ function PaymentContent() {
       if (!experienceId) return;
       
       const { data: expData } = await supabase
-        .from('experiences')
-        .select('title, image_url, photos, location, price, private_price, max_guests')
-        .eq('id', experienceId)
-        .single();
+      .from('experiences')
+      // 🟢 [수정] host_id 추가 (알림 발송용)
+      .select('title, image_url, photos, location, price, private_price, max_guests, host_id') 
+      .eq('id', experienceId)
+      .single();
       if (expData) setExperience(expData);
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -140,6 +141,26 @@ function PaymentContent() {
         return;
       }
 
+      // 🟢 [추가] 호스트에게 "새 예약" 알림 발송 (비동기로 처리하여 흐름 방해 X)
+      if (experience?.host_id) {
+        const isPending = paymentMethod === 'bank';
+        const notiTitle = isPending ? '⏳ 새로운 예약 (입금 대기)' : '🎉 새로운 예약 확정!';
+        const notiMsg = isPending 
+          ? `'${experience.title}'에 새로운 예약이 들어왔습니다. (현재 입금 대기 중)`
+          : `'${experience.title}' 예약이 확정되었습니다. 게스트를 맞이할 준비를 해주세요!`;
+
+        supabase.from('notifications').insert({
+          user_id: experience.host_id,
+          type: 'new_booking',
+          title: notiTitle,
+          message: notiMsg,
+          link: '/host/dashboard',
+          is_read: false
+        }).then(({ error }) => {
+          if (error) console.error('알림 발송 실패:', error);
+        });
+      }
+      
       // 🟢 [수정] 무통장 입금이면 PG사 결제 없이 바로 완료 페이지로 이동
       if (paymentMethod === 'bank') {
         window.location.href = `/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`;
