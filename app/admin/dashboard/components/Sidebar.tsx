@@ -43,6 +43,7 @@ export default function Sidebar() {
     apps: 0,
     exps: 0,
     online: 0,
+    pendingBookings: 0, // 🟢 추가
   });
 
   useEffect(() => {
@@ -53,17 +54,24 @@ export default function Sidebar() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      // 체험 승인 대기 (pending)
-      const { count: expsCount } = await supabase
-        .from('experiences')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+// 체험 승인 대기
+const { count: expsCount } = await supabase
+.from('experiences')
+.select('*', { count: 'exact', head: true })
+.eq('status', 'pending');
 
-      setCounts(prev => ({
-        ...prev,
-        apps: appsCount || 0,
-        exps: expsCount || 0,
-      }));
+// 🟢 [추가] 입금 대기 예약 (PENDING)
+const { count: bookingCount } = await supabase
+.from('bookings')
+.select('*', { count: 'exact', head: true })
+.eq('status', 'PENDING');
+
+setCounts(prev => ({
+...prev,
+apps: appsCount || 0,
+exps: expsCount || 0,
+pendingBookings: bookingCount || 0, // 🟢 추가
+}));
     };
 
     fetchCounts();
@@ -132,11 +140,12 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Operation</h2>
           <div className="space-y-1">
-            <NavButton 
+          <NavButton 
               active={activeTab === 'BOOKINGS'} 
               onClick={() => handleTabChange('BOOKINGS')} 
               icon={<Calendar size={18}/>} 
               label="예약 현황" 
+              count={counts.pendingBookings} // 🟢 뱃지 표시
             />
             <NavButton 
               active={activeTab === 'CHATS'} 

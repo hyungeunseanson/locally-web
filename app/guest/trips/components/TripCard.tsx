@@ -97,12 +97,17 @@ const calculateRefundFront = () => {
     setShowCancelModal(true);
   };
 
-  // 상태 뱃지 로직
-  const getStatusInfo = () => {
-    if (trip.status === 'cancellation_requested') return { label: '취소 요청중', color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12}/> };
-    if (trip.status === 'cancelled') return { label: '취소됨', color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12}/> };
-    
-    const today = new Date();
+// 상태 뱃지 로직
+const getStatusInfo = () => {
+  // 🟢 [추가] 입금 대기 상태
+  if (trip.status === 'PENDING') {
+    return { label: '입금 확인 중', color: 'bg-yellow-100 text-yellow-700 animate-pulse', icon: <Receipt size={12}/> };
+  }
+
+  if (trip.status === 'cancellation_requested') return { label: '취소 요청중', color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12}/> };
+  if (trip.status === 'cancelled') return { label: '취소됨', color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12}/> };
+  
+  const today = new Date();
     const tripDate = new Date(trip.date);
     const diffTime = tripDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
