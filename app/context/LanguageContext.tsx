@@ -386,9 +386,21 @@ lang_zh: "중국어",
     exp_delete_confirm: "정말 이 체험을 삭제하시겠습니까?",
     exp_delete_warning: "삭제된 체험은 복구할 수 없습니다.",
     exp_toast_deleted: "체험이 삭제되었습니다.",
+    // [My Experiences - 추가]
+    exp_status_pending: "심사중",
+    exp_status_revision: "보완요청",
+    exp_status_rejected: "거절됨",
+    unit_hours: "시간",
+    btn_first_exp: "첫 체험 등록하기",
+    admin_req_revision: "⚠️ 관리자 보완 요청:",
+    admin_req_rejected: "❌ 관리자 거절 사유:",
   },
   
-  // 🟢 영어 (English)
+
+
+
+
+  // 🟢 영어 (English) 🇬🇧
   en: {
     host_mode: "Switch to Host",
     guest_mode: "Switch to Guest",
@@ -734,11 +746,18 @@ lang_zh: "중국어",
     exp_delete_confirm: "Are you sure you want to delete this experience?",
     exp_delete_warning: "Deleted experiences cannot be recovered.",
     exp_toast_deleted: "Experience deleted.",
-
+// [My Experiences - Add]
+exp_status_pending: "Pending",
+exp_status_revision: "Revision",
+exp_status_rejected: "Rejected",
+unit_hours: " hours",
+btn_first_exp: "Register First Experience",
+admin_req_revision: "⚠️ Revision Request:",
+admin_req_rejected: "❌ Rejection Reason:",
     
   },
 
-  // 🟢 일본어 (Japanese)
+  // 🟢 일본어 (Japanese) 🇯🇵
   ja: {
     host_mode: "ホストモード",
     guest_mode: "ゲストモード",
@@ -1091,9 +1110,17 @@ exp_empty_desc: "あなただけの特別な体験を登録して、ゲストを
 exp_delete_confirm: "本当にこの体験を削除しますか？",
 exp_delete_warning: "削除された体験は復元できません。",
 exp_toast_deleted: "体験が削除されました。",
+// [My Experiences - Add]
+exp_status_pending: "審査中",
+exp_status_revision: "補完要請",
+exp_status_rejected: "拒否",
+unit_hours: "時間",
+btn_first_exp: "最初の体験を登録",
+admin_req_revision: "⚠️ 管理者からの修正要請:",
+admin_req_rejected: "❌ 管理者による拒否:",
   },
 
-  // 🟢 중국어 (Chinese)
+  // 🟢 중국어 (Chinese)🇨🇳
   zh: {
     host_mode: "切换房东模式",
     guest_mode: "切换游客模式",
@@ -1445,6 +1472,14 @@ exp_toast_deleted: "体験が削除されました。",
     exp_delete_confirm: "确定要删除此体验吗？",
     exp_delete_warning: "删除的体验无法恢复。",
     exp_toast_deleted: "体验已删除。",
+    // [My Experiences - Add]
+    exp_status_pending: "审核中",
+    exp_status_revision: "需补充",
+    exp_status_rejected: "被拒绝",
+    unit_hours: "小时",
+    btn_first_exp: "发布首个体验",
+    admin_req_revision: "⚠️ 管理员补充要求:",
+    admin_req_rejected: "❌ 管理员拒绝理由:",
   }
 };
 
