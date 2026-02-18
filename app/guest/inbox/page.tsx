@@ -7,8 +7,10 @@ import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
 import { Send, ShieldCheck, User, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 
 function InboxContent() {
+  const { t } = useLanguage(); // 🟢 2. t 함수 가져오기
   const { 
     inquiries, 
     selectedInquiry, 
@@ -141,15 +143,15 @@ function InboxContent() {
         role="host" 
       />
 
-      <main className="max-w-[1280px] mx-auto px-6 py-8 h-[calc(100vh-80px)] flex flex-col">
-        <h1 className="text-2xl font-bold mb-6">메시지</h1>
+<main className="max-w-[1280px] mx-auto px-6 py-8 h-[calc(100vh-80px)] flex flex-col">
+        <h1 className="text-2xl font-bold mb-6">{t('messages')}</h1> {/* 🟢 번역 */}
         
         <div className="flex-1 flex border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
           {/* 좌측: 목록 */}
           <div className={`w-full md:w-[320px] lg:w-[400px] border-r border-slate-200 flex flex-col ${selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
-            <div className="p-4 border-b border-slate-100 font-bold bg-white">대화 목록</div>
+            <div className="p-4 border-b border-slate-100 font-bold bg-white">{t('msg_list')}</div> {/* 🟢 번역 */}
             <div className="flex-1 overflow-y-auto">
-              {inquiries.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">대화가 없습니다.</div>}
+              {inquiries.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">{t('msg_empty')}</div>} {/* 🟢 번역 */}
               {inquiries.map((inq) => {
                 const display = getDisplayHost(inq); 
                 return (
@@ -170,7 +172,7 @@ function InboxContent() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <div className="font-bold text-sm truncate">{inq.type === 'admin' ? '로컬리 고객센터' : display.name}</div>
+                    <div className="font-bold text-sm truncate">{inq.type === 'admin' ? t('admin_name') : display.name}</div> {/* 🟢 번역 */}
                       <div className="text-xs text-slate-500 truncate flex items-center gap-1">
                         <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600 font-medium truncate max-w-[120px]">{inq.experiences?.title}</span>
                         <span className="truncate">{inq.content}</span>
@@ -191,7 +193,7 @@ function InboxContent() {
                       <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill className="object-cover" />
                    </div>
                    <div>
-                      <div className="font-bold text-base leading-tight">{selectedInquiry.type === 'admin' ? '1:1 문의 (고객센터)' : currentHostDisplay.name}</div>
+                   <div className="font-bold text-base leading-tight">{selectedInquiry.type === 'admin' ? t('admin_chat_title') : currentHostDisplay.name}</div> {/* 🟢 번역 */}
                       <div className="text-xs text-slate-500 font-normal">{selectedInquiry.experiences?.title}</div>
                    </div>
                 </div>
@@ -243,8 +245,8 @@ function InboxContent() {
 
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
                   <input 
-className="flex-1 border border-slate-300 rounded-xl px-4 py-2 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-placeholder="메시지 입력..." 
+                    className="..."
+                    placeholder={t('msg_placeholder')} // 🟢 번역
 value={inputText} 
 onChange={(e) => setInputText(e.target.value)} 
 disabled={isSending} 
@@ -266,9 +268,9 @@ onKeyDown={(e) => {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-2">
+<div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-2">
                 <div className="p-4 bg-slate-50 rounded-full"><User size={32} className="text-slate-300"/></div>
-                <p>대화를 선택하세요.</p>
+                <p>{t('msg_select_chat')}</p> {/* 🟢 번역 */}
               </div>
             )}
           </div>
