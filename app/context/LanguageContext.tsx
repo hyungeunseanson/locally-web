@@ -360,6 +360,32 @@ lang_zh: "중국어",
     guest_contact_info: "연락처 정보",
     guest_kakao_none: "등록되지 않음",
     guest_phone_private: "비공개",
+
+    // [Host Status - 대시보드 메인 심사 상태]
+    status_pending_title: "심사가 진행 중입니다",
+    status_pending_desc: "제출해주신 신청서를 꼼꼼히 확인하고 있습니다.",
+    status_revision_title: "보완이 필요합니다",
+    status_revision_desc: "관리자 코멘트를 확인하고 내용을 보완해 주세요.",
+    status_rejected_title: "승인이 거절되었습니다",
+    status_rejected_desc: "아쉽게도 이번에는 모시지 못하게 되었습니다.",
+    admin_comment_title: "관리자 코멘트",
+    btn_edit_app: "신청서 수정하기",
+    btn_go_home: "홈으로 돌아가기",
+    
+    // [No Host - 호스트 미등록 상태]
+    no_host_title: "아직 호스트가 아니시군요!",
+    no_host_desc: "나만의 특별한 투어를 만들고 수익을 창출해보세요.",
+    btn_apply_host: "호스트 지원하기",
+
+    // [My Experiences - 내 체험 관리 추가]
+    exp_no_img: "No Img",
+    exp_booking_count: "예약",
+    exp_count_unit: "건",
+    exp_empty_title: "등록된 체험이 없습니다.",
+    exp_empty_desc: "나만의 특별한 체험을 등록하고 게스트를 맞이해보세요!",
+    exp_delete_confirm: "정말 이 체험을 삭제하시겠습니까?",
+    exp_delete_warning: "삭제된 체험은 복구할 수 없습니다.",
+    exp_toast_deleted: "체험이 삭제되었습니다.",
   },
   
   // 🟢 영어 (English)
@@ -683,6 +709,33 @@ lang_zh: "중국어",
     guest_contact_info: "Contact Info",
     guest_kakao_none: "Not registered",
     guest_phone_private: "Private",
+    // [Host Status]
+    status_pending_title: "Application Pending",
+    status_pending_desc: "We are reviewing your application carefully.",
+    status_revision_title: "Revision Required",
+    status_revision_desc: "Please check the admin comments and revise your application.",
+    status_rejected_title: "Application Rejected",
+    status_rejected_desc: "Unfortunately, we cannot approve your application at this time.",
+    admin_comment_title: "Admin Comment",
+    btn_edit_app: "Edit Application",
+    btn_go_home: "Go to Home",
+
+    // [No Host]
+    no_host_title: "Not a host yet?",
+    no_host_desc: "Create your own unique tour and start earning.",
+    btn_apply_host: "Apply to be a Host",
+
+    // [My Experiences - Add]
+    exp_no_img: "No Img",
+    exp_booking_count: "Bookings",
+    exp_count_unit: "",
+    exp_empty_title: "No experiences found.",
+    exp_empty_desc: "Create a unique experience and welcome guests!",
+    exp_delete_confirm: "Are you sure you want to delete this experience?",
+    exp_delete_warning: "Deleted experiences cannot be recovered.",
+    exp_toast_deleted: "Experience deleted.",
+
+    
   },
 
   // 🟢 일본어 (Japanese)
@@ -1011,7 +1064,33 @@ lang_zh: "중국어",
     guest_intro_none: "自己紹介がまだありません。",
     guest_contact_info: "連絡先情報",
     guest_kakao_none: "未登録",
-    guest_phone_private: "非公開"
+    guest_phone_private: "非公開",
+
+// [Host Status]
+status_pending_title: "審査中です",
+status_pending_desc: "提出された申請書を確認しております。",
+status_revision_title: "修正が必要です",
+status_revision_desc: "管理者コメントを確認して内容を修正してください。",
+status_rejected_title: "承認が見送られました",
+status_rejected_desc: "残念ながら今回は承認を見送らせていただきます。",
+admin_comment_title: "管理者コメント",
+btn_edit_app: "申請書を修正",
+btn_go_home: "ホームへ戻る",
+
+// [No Host]
+no_host_title: "まだホストではありませんか？",
+no_host_desc: "あなただけの特別なツアーを作って収益を上げましょう。",
+btn_apply_host: "ホストに申し込む",
+
+// [My Experiences - Add]
+exp_no_img: "No Img",
+exp_booking_count: "予約",
+exp_count_unit: "件",
+exp_empty_title: "登録された体験がありません。",
+exp_empty_desc: "あなただけの特別な体験を登録して、ゲストを迎えましょう！",
+exp_delete_confirm: "本当にこの体験を削除しますか？",
+exp_delete_warning: "削除された体験は復元できません。",
+exp_toast_deleted: "体験が削除されました。",
   },
 
   // 🟢 중국어 (Chinese)
@@ -1339,7 +1418,33 @@ lang_zh: "중국어",
     guest_intro_none: "暂无自我介绍。",
     guest_contact_info: "联系方式",
     guest_kakao_none: "未注册",
-    guest_phone_private: "不公开"
+    guest_phone_private: "不公开",
+
+    // [Host Status]
+    status_pending_title: "正在审核中",
+    status_pending_desc: "我们正在仔细审核您的申请书。",
+    status_revision_title: "需要补充信息",
+    status_revision_desc: "请确认管理员留言并补充相关内容。",
+    status_rejected_title: "申请被拒绝",
+    status_rejected_desc: "很遗憾，这次未能通过审核。",
+    admin_comment_title: "管理员留言",
+    btn_edit_app: "修改申请书",
+    btn_go_home: "返回首页",
+
+    // [No Host]
+    no_host_title: "还不是房东？",
+    no_host_desc: "打造您独有的特别之旅并创造收益吧。",
+    btn_apply_host: "申请成为房东",
+
+    // [My Experiences - Add]
+    exp_no_img: "无图片",
+    exp_booking_count: "预订",
+    exp_count_unit: "笔",
+    exp_empty_title: "暂无已发布的体验。",
+    exp_empty_desc: "发布独一无二的体验，迎接房客吧！",
+    exp_delete_confirm: "确定要删除此体验吗？",
+    exp_delete_warning: "删除的体验无法恢复。",
+    exp_toast_deleted: "体验已删除。",
   }
 };
 

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import 추가
 
 // 컴포넌트 임포트
 import ReservationManager from './components/ReservationManager';
@@ -20,7 +21,8 @@ import ProfileEditor from './components/ProfileEditor';
 
 // 실제 대시보드 로직
 function DashboardContent() {
-  const [activeTab, setActiveTab] = useState('reservations'); 
+  const { t } = useLanguage(); // 🟢 2. t 함수 추가
+  const [activeTab, setActiveTab] = useState('reservations');
   const [hostStatus, setHostStatus] = useState<any>(null); 
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -98,18 +100,18 @@ function DashboardContent() {
     );
   }
 
-  // 1. 신청 내역 없음
-  if (!hostStatus) {
-    return (
-      <div className="max-w-2xl mx-auto px-6 py-20 text-center animate-in fade-in slide-in-from-bottom-4">
-        <h1 className="text-3xl font-black mb-4 text-slate-900">아직 호스트가 아니시군요!</h1>
-        <p className="text-slate-500 mb-8">나만의 특별한 투어를 만들고 수익을 창출해보세요.</p>
-        <Link href="/host/register">
-          <button className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">호스트 지원하기</button>
-        </Link>
-      </div>
-    );
-  }
+// 1. 신청 내역 없음
+if (!hostStatus) {
+  return (
+    <div className="max-w-2xl mx-auto px-6 py-20 text-center animate-in fade-in slide-in-from-bottom-4">
+      <h1 className="text-3xl font-black mb-4 text-slate-900">{t('no_host_title')}</h1> {/* 🟢 번역 */}
+      <p className="text-slate-500 mb-8">{t('no_host_desc')}</p> {/* 🟢 번역 */}
+      <Link href="/host/register">
+        <button className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">{t('btn_apply_host')}</button> {/* 🟢 번역 */}
+      </Link>
+    </div>
+  );
+}
 
   const status = hostStatus.status?.toLowerCase().trim();
 
@@ -128,97 +130,100 @@ function DashboardContent() {
         </div>
         <div>
           <h1 className="text-3xl font-black mb-2 text-slate-900">
-            {status === 'pending' ? '심사가 진행 중입니다' : 
-             status === 'revision' ? '보완이 필요합니다' : 
-             '승인이 거절되었습니다'}
+            {status === 'pending' ? t('status_pending_title') : 
+             status === 'revision' ? t('status_revision_title') : 
+             t('status_rejected_title')} {/* 🟢 번역 */}
           </h1>
           <p className="text-slate-500 mb-6">
-            {status === 'pending' ? '제출해주신 신청서를 꼼꼼히 확인하고 있습니다.' : 
-             status === 'revision' ? '관리자 코멘트를 확인하고 내용을 보완해 주세요.' : 
-             '아쉽게도 이번에는 모시지 못하게 되었습니다.'}
+            {status === 'pending' ? t('status_pending_desc') : 
+             status === 'revision' ? t('status_revision_desc') : 
+             t('status_rejected_desc')} {/* 🟢 번역 */}
           </p>
           
           {(status === 'revision' || status === 'rejected') && hostStatus.admin_comment && (
             <div className={`bg-slate-50 border p-6 rounded-2xl text-left mb-8 shadow-sm ${
               status === 'revision' ? 'border-orange-100 bg-orange-50 text-orange-800' : 'border-red-100 bg-red-50 text-red-800'
             }`}>
-              <h4 className="font-bold mb-2 flex items-center gap-2"><MessageSquare size={16}/> 관리자 코멘트</h4>
+              <h4 className="font-bold mb-2 flex items-center gap-2"><MessageSquare size={16}/> {t('admin_comment_title')}</h4> {/* 🟢 번역 */}
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{hostStatus.admin_comment}</p>
             </div>
           )}
           
           {status === 'revision' && (
             <Link href="/host/register">
-              <button className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">신청서 수정하기</button>
+              <button className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg">{t('btn_edit_app')}</button> {/* 🟢 번역 */}
             </Link>
           )}
           {status === 'rejected' && (
-            <Link href="/"><button className="text-slate-400 underline hover:text-slate-600 text-sm">홈으로 돌아가기</button></Link>
+            <Link href="/"><button className="text-slate-400 underline hover:text-slate-600 text-sm">{t('btn_go_home')}</button></Link> 
           )}
         </div>
       </div>
     );
   }
 
-  // 3. 승인된 호스트 대시보드
-  return (
-    <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
-      
-      {/* 사이드바 */}
-      <aside className="w-64 hidden md:block shrink-0">
-          <div className="sticky top-24 space-y-2">
-            <div className="px-4 py-2 mb-4">
-              <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold tracking-wide">HOST PARTNER</span>
-              <p className="text-xs text-slate-400 mt-1">승인된 호스트입니다</p>
-            </div>
-            
-            <button onClick={() => handleTabChange('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-slate-900 text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-              <CalendarCheck size={20}/> 예약 관리
-            </button>
-            
-            <button onClick={() => handleTabChange('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-              <List size={20}/> 내 체험 관리
-            </button>
-
-            <button onClick={() => handleTabChange('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-              <MessageSquare size={20}/> 문의함
-            </button>
-
-            <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-              <DollarSign size={20}/> 수익 및 정산
-            </button>
-
-            <button onClick={() => handleTabChange('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-              <Star size={20}/> 받은 후기
-            </button>
-            
-            <div className="pt-4 mt-4 border-t border-slate-100">
-            <button onClick={() => handleTabChange('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-                <UserCog size={20}/> 프로필 설정
-              </button>
-            </div>
+// 3. 승인된 호스트 대시보드
+return (
+  <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
+    
+    {/* 사이드바 */}
+    <aside className="w-64 hidden md:block shrink-0">
+        <div className="sticky top-24 space-y-2">
+          <div className="px-4 py-2 mb-4">
+            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold tracking-wide">{t('host_partner')}</span> {/* 🟢 번역 */}
+            <p className="text-xs text-slate-400 mt-1">{t('host_approved_msg')}</p> {/* 🟢 번역 */}
           </div>
-      </aside>
+          
+          <button onClick={() => handleTabChange('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-slate-900 text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+            <CalendarCheck size={20}/> {t('menu_reservation')} {/* 🟢 번역 */}
+          </button>
+          
+          <button onClick={() => handleTabChange('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+            <List size={20}/> {t('menu_my_exp')} {/* 🟢 번역 */}
+          </button>
 
-      {/* 메인 콘텐츠 */}
-      <main className="flex-1 min-w-0">
-        <div className="flex justify-between items-end mb-8">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            {activeTab === 'reservations' && '예약 관리'}
-            {activeTab === 'experiences' && '내 체험 관리'}
-            {activeTab === 'inquiries' && '문의 메시지'}
-            {activeTab === 'earnings' && '수익 및 정산'}
-            {activeTab === 'reviews' && '게스트 후기'}
-            {activeTab === 'profile' && '프로필 설정'}
-          </h1>
-          {activeTab === 'experiences' && (
-            <Link href="/host/create">
-              <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md">
-                <Plus size={18} /> 새 체험 등록
-              </button>
-            </Link>
-          )}
+          <button onClick={() => handleTabChange('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+            <MessageSquare size={20}/> {t('menu_inquiry')} {/* 🟢 번역 */}
+          </button>
+
+          <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+            <DollarSign size={20}/> {t('menu_earnings')} {/* 🟢 번역 */}
+          </button>
+
+          <button onClick={() => handleTabChange('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+            <Star size={20}/> {t('menu_reviews')} {/* 🟢 번역 */}
+          </button>
+          
+          <div className="pt-4 mt-4 border-t border-slate-100">
+          <button onClick={() => handleTabChange('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+              <UserCog size={20}/> {t('menu_profile')} {/* 🟢 번역 */}
+            </button>
+          </div>
         </div>
+    </aside>
+
+    {/* 메인 콘텐츠 */}
+    <main className="flex-1 min-w-0">
+      <div className="flex justify-between items-end mb-8">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+          {activeTab === 'reservations' && t('menu_reservation')} {/* 🟢 번역 */}
+          {activeTab === 'experiences' && t('menu_my_exp')}       {/* 🟢 번역 */}
+          {activeTab === 'inquiries' && t('menu_inquiry')}        {/* 🟢 번역 */}
+          {activeTab === 'earnings' && t('menu_earnings')}        {/* 🟢 번역 */}
+          {activeTab === 'reviews' && t('menu_reviews')}          {/* 🟢 번역 */}
+          {activeTab === 'profile' && t('menu_profile')}          {/* 🟢 번역 */}
+        </h1>
+        {activeTab === 'experiences' && (
+          <Link href="/host/create">
+            <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md">
+              <Plus size={18} /> {t('btn_new_exp')} {/* 🟢 번역 */}
+            </button>
+          </Link>
+        )}
+      </div>
+
+
+
 
         {activeTab === 'reservations' && <div className="h-[750px]"><ReservationManager /></div>}
         {activeTab === 'experiences' && <MyExperiences />}
