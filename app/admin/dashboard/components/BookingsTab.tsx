@@ -68,14 +68,36 @@ export default function BookingsTab({ bookings, onRefresh }: { bookings: any[], 
     showToast('예약 내역이 다운로드되었습니다.', 'success');
   };
 
-  // 4. 복사 기능
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showToast('클립보드에 복사되었습니다.', 'success');
-  };
+// 4. 복사 기능
+const handleCopy = (text: string) => {
+  navigator.clipboard.writeText(text);
+  showToast('클립보드에 복사되었습니다.', 'success');
+};
 
-  // 5. 관리자 강제 취소 (핵심 기능)
-  const handleForceCancel = async () => {
+// 🟢 [추가] 입금 확인 처리 함수 (방금 만든 API 호출)
+const handleConfirmPayment = async (bookingId: number) => {
+  setIsProcessing(true);
+  try {
+    const res = await fetch('/api/bookings/confirm-payment', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId }),
+    });
+    
+    if (!res.ok) throw new Error('입금 확인 처리에 실패했습니다.');
+    
+    showToast('💰 입금 확인 완료! 예약이 확정되었습니다.', 'success');
+    if (onRefresh) onRefresh(); // 목록 새로고침
+    
+  } catch (e: any) {
+    showToast(e.message, 'error');
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+// 5. 관리자 강제 취소 (핵심 기능)
+const handleForceCancel = async () => {
     if (!selectedBooking) return;
     if (!confirm('⚠️ 경고: 관리자 권한으로 강제 취소(전액 환불)를 진행하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
     
@@ -183,8 +205,23 @@ export default function BookingsTab({ bookings, onRefresh }: { bookings: any[], 
                        <div className="font-medium text-slate-700 text-sm">{bk.contact_name}</div>
                        <div className="text-[10px] text-slate-400 font-mono">{bk.profiles?.email}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 flex items-center gap-2">
                        <StatusBadge status={bk.status} />
+                       
+{/* 🟢 [추가] 입금 확인 버튼 (PENDING 상태일 때만 노출) */}
+{bk.status === 'PENDING' && (
+                         <button
+                           onClick={(e) => {
+                             e.stopPropagation(); // 행 클릭 방지 (상세 패널 열림 방지)
+                             if(confirm('입금이 확인되었습니까? 예약을 확정합니다.')) {
+                               handleConfirmPayment(bk.id); 
+                             }
+                           }}
+                           className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-700 transition-colors shadow-sm animate-pulse z-10 relative"
+                         >
+                           입금 확인
+                         </button>
+                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
                         <div className="font-mono font-bold text-slate-900 text-sm">₩{Number(bk.amount).toLocaleString()}</div>

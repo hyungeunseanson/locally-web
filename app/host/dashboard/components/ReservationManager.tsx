@@ -206,10 +206,15 @@ guest:profiles!bookings_user_id_fkey (
     const today = new Date(); 
     today.setHours(0,0,0,0);
 
+    const isPending = r.status === 'PENDING'; // 🟢 추가
+
     if (activeTab === 'cancelled') return isCancelled || isRequesting;
     if (isCancelled) return false;
-    if (activeTab === 'upcoming') return tripDate >= today || isRequesting; 
-    if (activeTab === 'completed') return tripDate < today && !isRequesting;
+    
+    // 🟢 [수정] PENDING 상태도 '예정된 예약'으로 취급
+    if (activeTab === 'upcoming') return tripDate >= today || isRequesting || isPending; 
+    
+    if (activeTab === 'completed') return tripDate < today && !isRequesting && !isPending;
     return true;
   }).sort((a, b) => {
     // ✅ [복구] 정렬 로직 (신규 예약 최상단)
