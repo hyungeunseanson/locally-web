@@ -66,6 +66,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     trip_view_again: "체험 다시 보기",
     trip_cancel_req: "예약 취소 요청",
     trip_start_in: "일 후 출발",
+// [달력 - 기존 키 활용 및 월 추가]
+month_1: "1월", month_2: "2월", month_3: "3월", month_4: "4월", month_5: "5월", month_6: "6월",
+month_7: "7월", month_8: "8월", month_9: "9월", month_10: "10월", month_11: "11월", month_12: "12월",
+select_year: "연도 선택",
+confirm_date: "적용",
     per_person: "/ 인",
     receipt: "영수증",
     paid_label: "결제:",
@@ -275,6 +280,11 @@ lang_zh: "중국어",
     trip_view_again: "View Experience",
     trip_cancel_req: "Request Cancellation",
     trip_start_in: "days to go",
+    month_1: "January", month_2: "February", month_3: "March", month_4: "April", month_5: "May", month_6: "June",
+    month_7: "July", month_8: "August", month_9: "September", month_10: "October", month_11: "November", month_12: "December",
+    day_0: "Sun", day_1: "Mon", day_2: "Tue", day_3: "Wed", day_4: "Thu", day_5: "Fri", day_6: "Sat",
+    select_year: "Select Year",
+    confirm_date: "Confirm",
     per_person: "/ person",
     // 👇 여기 추가
     error_prefix: "Error:",
@@ -400,14 +410,7 @@ lang_zh: "중국어",
     lang_zh: "Chinese",
     add_language: "Add language",
     date_year: ".",
-    date_month: ".",
-    day_0: "Sun",
-    day_1: "Mon",
-    day_2: "Tue",
-    day_3: "Wed",
-    day_4: "Thu",
-    day_5: "Fri",
-    day_6: "Sat"
+    date_month: "."
   },
 
   // 🟢 일본어 (Japanese)
@@ -467,6 +470,11 @@ lang_zh: "중국어",
     trip_view_again: "体験を見る",
     trip_cancel_req: "キャンセルリクエスト",
     trip_start_in: "日後に出発",
+    month_1: "1月", month_2: "2月", month_3: "3月", month_4: "4月", month_5: "5月", month_6: "6月",
+    month_7: "7月", month_8: "8月", month_9: "9月", month_10: "10月", month_11: "11月", month_12: "12月",
+    day_0: "日", day_1: "月", day_2: "火", day_3: "水", day_4: "木", day_5: "金", day_6: "土",
+    select_year: "年を選択",
+    confirm_date: "適用",
     per_person: "/ 人",
     // 👇 여기 추가
     error_prefix: "エラー:",
@@ -592,14 +600,7 @@ lang_zh: "중국어",
     lang_zh: "中国語",
     add_language: "言語を追加", // 🟢 [수정] Add guests -> Add language
     date_year: "年",
-    date_month: "月",
-    day_0: "日",
-    day_1: "月",
-    day_2: "火",
-    day_3: "水",
-    day_4: "木",
-    day_5: "金",
-    day_6: "土"
+    date_month: "月"
   },
 
   // 🟢 중국어 (Chinese)
@@ -659,6 +660,11 @@ lang_zh: "중국어",
     trip_view_again: "查看体验",
     trip_cancel_req: "申请取消",
     trip_start_in: "天后出发",
+    month_1: "1月", month_2: "2月", month_3: "3月", month_4: "4月", month_5: "5月", month_6: "6月",
+    month_7: "7月", month_8: "8月", month_9: "9月", month_10: "10月", month_11: "11月", month_12: "12月",
+    day_0: "日", day_1: "一", day_2: "二", day_3: "三", day_4: "四", day_5: "五", day_6: "六",
+    select_year: "选择年份",
+    confirm_date: "确认",
     per_person: "/ 人",
     // 👇 여기 추가
     error_prefix: "错误:",
@@ -783,14 +789,7 @@ lang_zh: "중국어",
     lang_zh: "中文",
     add_language: "添加语言", // 🟢 [수정] Add guests -> Add language
     date_year: "年",
-    date_month: "月",
-    day_0: "日",
-    day_1: "一",
-    day_2: "二",
-    day_3: "三",
-    day_4: "四",
-    day_5: "五",
-    day_6: "六"
+    date_month: "月"
   }
 };
 

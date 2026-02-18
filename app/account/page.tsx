@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar } from 'lucide-react';
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'; // 🟢 아이콘 추가
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
@@ -11,6 +11,21 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (imp
 export default function AccountPage() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const supabase = createClient();
+  // 🟢 [추가] 커스텀 달력 상태
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date()); // 달력에서 보고 있는 날짜
+
+  // 달력 생성 헬퍼 함수
+  const generateCalendar = (year: number, month: number) => {
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    // 빈 칸 채우기
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    // 날짜 채우기
+    for (let i = 1; i <= lastDate; i++) days.push(new Date(year, month, i));
+    return days;
+  };
   const router = useRouter();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -286,14 +301,89 @@ const reviews = [
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                <label className="block text-sm font-bold mb-2">{t('label_birth')}</label> {/* 🟢 번역 */}
-                  <input 
-                    type="date" 
-                    value={profile.birth_date}
-                    onChange={e => setProfile({...profile, birth_date: e.target.value})}
-                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
-                  />
+              <div className="relative">
+                  <label className="block text-sm font-bold mb-2">{t('label_birth')}</label>
+                  
+                  {/* 🟢 기존 input 대신 예쁜 버튼형 input 사용 */}
+                  <div 
+                    onClick={() => {
+                      // 이미 값이 있으면 그 날짜를 기준으로 달력을 켬
+                      if(profile.birth_date) setViewDate(new Date(profile.birth_date));
+                      else setViewDate(new Date(1990, 0, 1)); // 기본값 1990년
+                      setIsCalendarOpen(true);
+                    }}
+                    className="w-full p-3 border border-slate-300 rounded-xl flex items-center justify-between cursor-pointer hover:border-black transition-colors bg-white group"
+                  >
+                    <span className={profile.birth_date ? "text-slate-900" : "text-transparent"}>
+                      {profile.birth_date || "YYYY-MM-DD"}
+                    </span>
+                    <Calendar size={18} className="text-slate-400 group-hover:text-black"/>
+                  </div>
+
+                  {/* 🟢 커스텀 달력 모달 (팝업) */}
+                  {isCalendarOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsCalendarOpen(false)}></div>
+                      <div className="absolute top-full left-0 mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-slate-100 z-50 p-4 animate-in fade-in zoom-in-95">
+                        
+                        {/* 헤더: 연도/월 이동 */}
+                        <div className="flex justify-between items-center mb-4">
+                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-1 hover:bg-slate-100 rounded-full"><ChevronLeft size={20}/></button>
+                          <div className="flex items-center gap-2 font-bold text-slate-800">
+                             {/* 연도 선택 (간편하게 셀렉트 박스) */}
+                             <select 
+                                value={viewDate.getFullYear()} 
+                                onChange={(e) => setViewDate(new Date(viewDate.setFullYear(Number(e.target.value))))}
+                                className="bg-transparent text-sm focus:outline-none cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                             >
+                               {Array.from({length: 100}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                 <option key={year} value={year}>{year}</option>
+                               ))}
+                             </select>
+                             <span>{t(`month_${viewDate.getMonth() + 1}`)}</span>
+                          </div>
+                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-1 hover:bg-slate-100 rounded-full"><ChevronRight size={20}/></button>
+                        </div>
+
+                        {/* 요일 헤더 */}
+                        <div className="grid grid-cols-7 text-center mb-2">
+                          {t('weekdays_short')?.map((day: string) => (
+                            <div key={day} className="text-xs text-slate-400 font-medium">{day}</div>
+                          ))}
+                        </div>
+
+                        {/* 날짜 그리드 */}
+                        <div className="grid grid-cols-7 gap-1">
+                          {generateCalendar(viewDate.getFullYear(), viewDate.getMonth()).map((date, idx) => {
+                            if (!date) return <div key={idx}></div>;
+                            
+                            // 날짜 비교용 문자열 (YYYY-MM-DD)
+                            const dateStr = date.toLocaleDateString('en-CA'); 
+                            const isSelected = profile.birth_date === dateStr;
+                            const isToday = new Date().toDateString() === date.toDateString();
+
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setProfile({...profile, birth_date: dateStr});
+                                  setIsCalendarOpen(false);
+                                }}
+                                className={`
+                                  h-9 w-9 rounded-full text-sm flex items-center justify-center transition-all
+                                  ${isSelected ? 'bg-black text-white font-bold' : 'hover:bg-slate-100 text-slate-700'}
+                                  ${isToday && !isSelected ? 'ring-1 ring-black text-black font-bold' : ''}
+                                `}
+                              >
+                                {date.getDate()}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div>
                 <label className="block text-sm font-bold mb-2">{t('label_gender')}</label> {/* 🟢 번역 */}
