@@ -87,11 +87,16 @@ function SiteHeaderContent() {
   };
 
   const handleLogout = async () => {
+    // 1. Supabase 서버 세션 종료
     await supabase.auth.signOut();
-    router.refresh(); // 서버 컴포넌트 데이터 갱신
-    router.push('/'); // 메인으로 이동
+    
+    // 2. 로컬 스토리지에 남아있을 수 있는 잔여 데이터 삭제 (선택사항이지만 안전함)
+    localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL + '-auth-token');
+    
+    // 3. 브라우저 강제 이동 (페이지를 새로고침하며 캐시를 날림)
+    window.location.href = '/'; 
   };
-  
+
   const handleMainHeaderButtonClick = () => {
     if (pathname?.startsWith('/host')) { 
       router.push('/'); 

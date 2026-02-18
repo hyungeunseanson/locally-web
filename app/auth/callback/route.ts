@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@/app/utils/supabase/server'; // 🟢 만들어둔 유틸리티 사용
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -9,23 +8,8 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/';
 
   if (code) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll() },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              )
-            } catch { }
-          },
-        },
-      }
-    );
+    // 🟢 [수정됨] 복잡한 설정 코드 삭제 -> 유틸리티 함수 한 줄로 대체
+    const supabase = await createClient();
     
     // 인증 코드 교환 (세션 생성)
     const { error } = await supabase.auth.exchangeCodeForSession(code);
