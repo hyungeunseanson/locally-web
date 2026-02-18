@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Clock, MapPin, MessageCircle, Smile, Trash2, Star } from 'lucide-react';
+// 🟢 [수정] 아이콘 추가 및 유틸리티 import
+import { 
+  Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Clock, MapPin, 
+  MessageCircle, Smile, Trash2, Star, Bell, Send, CheckSquare, Square, CheckCircle 
+} from 'lucide-react';
+import { sendNotification } from '@/app/utils/notification';
+import { useToast } from '@/app/context/ToastContext';
 
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
 function timeAgo(dateString: string | null) {
@@ -19,9 +25,16 @@ function timeAgo(dateString: string | null) {
 }
 
 export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
+  const { showToast } = useToast(); // 🟢 추가
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
+  // 🟢 [추가] 다중 선택 및 알림 모달 상태
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [isNotiModalOpen, setIsNotiModalOpen] = useState(false);
+  const [notiTitle, setNotiTitle] = useState('');
+  const [notiMessage, setNotiMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
   // 1분마다 화면을 갱신해서 "몇 분 전" 시간을 최신화하는 코드
   const [tick, setTick] = useState(0); 
 
@@ -38,10 +51,43 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
     u.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
-  const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
+// 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
+const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
 
-  return (
+// 🟢 [추가] 전체 선택/해제
+const toggleSelectAll = () => {
+  if (selectedUserIds.length === filteredUsers.length) setSelectedUserIds([]);
+  else setSelectedUserIds(filteredUsers.map((u: any) => u.id));
+};
+
+// 🟢 [추가] 개별 선택/해제
+const toggleSelectUser = (id: string) => {
+  setSelectedUserIds(prev => prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]);
+};
+
+// 🟢 [추가] 알림 발송 로직
+const handleSendNotification = async () => {
+  if (!notiTitle.trim() || !notiMessage.trim()) {
+    showToast('제목과 내용을 입력해주세요.', 'error');
+    return;
+  }
+  setIsSending(true);
+  try {
+    await sendNotification({
+      recipient_ids: selectedUserIds,
+      type: 'admin_alert',
+      title: notiTitle,
+      message: notiMessage,
+      link: '/notifications'
+    });
+    showToast(`${selectedUserIds.length}명에게 전송 완료!`, 'success');
+    setIsNotiModalOpen(false);
+    setNotiTitle(''); setNotiMessage(''); setSelectedUserIds([]);
+  } catch (e) { console.error(e); showToast('전송 실패', 'error'); } 
+  finally { setIsSending(false); }
+};
+
+return (
     <div className="flex-1 h-full flex overflow-hidden relative">
       
       {/* 🟢 메인 콘텐츠 (리스트 영역) */}
@@ -72,11 +118,24 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
           )}
         </section>
 
-        {/* 2. 전체 유저 목록 섹션 */}
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
+{/* 2. 전체 유저 목록 섹션 */}
+<section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
             <h3 className="font-bold text-lg">전체 회원 ({users.length})</h3>
-            <div className="relative w-64">
+            
+            <div className="flex items-center gap-3">
+              {/* 🟢 [추가] 선택된 유저가 있을 때 버튼 표시 */}
+              {selectedUserIds.length > 0 && (
+                <button 
+                  onClick={() => setIsNotiModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors animate-in fade-in"
+                >
+                  <Bell size={16}/> {selectedUserIds.length}명에게 알림 발송
+                </button>
+              )}
+
+              <div className="relative w-64">
+              
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
               <input 
                 type="text" 
@@ -87,11 +146,19 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               />
             </div>
           </div>
-
+        </div>
           <div className="overflow-y-auto flex-1">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
+                  {/* 🟢 [추가] 전체 선택 체크박스 */}
+                  <th className="px-6 py-3 w-10">
+                    <button onClick={toggleSelectAll}>
+                      {filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length 
+                        ? <CheckSquare size={18} className="text-slate-900"/> 
+                        : <Square size={18} className="text-slate-300"/>}
+                    </button>
+                  </th>
                   <th className="px-6 py-3">유저 정보</th>
                   <th className="px-6 py-3">연락처</th>
                   <th className="px-6 py-3">최근 접속</th> {/* 🟢 추가됨 */}
@@ -100,14 +167,23 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredUsers.map((user: any) => {
+              {filteredUsers.map((user: any) => {
                   const isOnline = onlineUserIds.has(user.id);
+                  const isSelected = selectedUserIds.includes(user.id); // 🟢 추가
+
                   return (
                     <tr 
                       key={user.id} 
                       onClick={() => setSelectedUser(user)} 
-                      className={`cursor-pointer transition-colors ${selectedUser?.id === user.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                      className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50' : ''} ${selectedUser?.id === user.id ? 'bg-blue-100' : 'hover:bg-slate-50'}`}
                     >
+                      {/* 🟢 [추가] 개별 선택 체크박스 */}
+                      <td className="px-6 py-4" onClick={(e) => { e.stopPropagation(); toggleSelectUser(user.id); }}>
+                         {isSelected 
+                           ? <CheckSquare size={18} className="text-slate-900"/> 
+                           : <Square size={18} className="text-slate-300 hover:text-slate-400"/>}
+                      </td>
+
                       <td className="px-6 py-4 flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden border border-slate-100 relative">
                           {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={16}/>}
@@ -273,8 +349,16 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
             </div>
           </div>
 
-          {/* 하단 버튼 */}
-          <div className="p-5 border-t border-slate-100 bg-white sticky bottom-0">
+{/* 하단 버튼 */}
+<div className="p-5 border-t border-slate-100 bg-white sticky bottom-0">
+            {/* 🟢 [추가] 개별 알림 버튼 */}
+            <button 
+              onClick={() => { setSelectedUserIds([selectedUser.id]); setIsNotiModalOpen(true); }}
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mb-2"
+            >
+              <Bell size={16}/> 이 유저에게 알림 보내기
+            </button>
+
             <button 
               onClick={() => { if(confirm('정말 계정을 영구 삭제하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
               className="w-full bg-slate-900 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -283,9 +367,32 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
             </button>
           </div>
         </div>
-      )}
+)}
+
+{/* 🟢 [추가] 알림 발송 모달 */}
+{isNotiModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+    <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+      <button onClick={() => setIsNotiModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X size={20}/></button>
+      
+      <div className="mb-6 text-center">
+        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 mx-auto"><Send size={24}/></div>
+        <h3 className="text-xl font-black">알림 보내기</h3>
+        <p className="text-sm text-slate-500">선택된 <span className="font-bold text-slate-900">{selectedUserIds.length}명</span>에게 메시지를 보냅니다.</p>
+      </div>
+
+      <div className="space-y-4">
+        <input type="text" value={notiTitle} onChange={(e) => setNotiTitle(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-sm" placeholder="제목" autoFocus />
+        <textarea value={notiMessage} onChange={(e) => setNotiMessage(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl text-sm h-32 resize-none" placeholder="내용" />
+        <button onClick={handleSendNotification} disabled={isSending} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black">
+          {isSending ? '발송 중...' : <><CheckCircle size={18}/> 발송하기</>}
+        </button>
+      </div>
     </div>
-  );
+  </div>
+)}
+</div>
+);
 }
 
 // 헬퍼 컴포넌트 (아이콘 + 라벨 + 값)
