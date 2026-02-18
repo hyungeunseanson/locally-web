@@ -73,11 +73,9 @@ export default function AccountPage() {
     { code: 'AU', name: '호주 (Australia)', phone: '+61' }
   ];
 
-// 더미 후기
-const reviews = [
-  { id: 1, host: 'Akiho', date: '2026.01', content: '정말 매너 좋고 시간 약속도 잘 지키시는 게스트였습니다! 대화도 즐거웠어요.' }, // 🟢 숫자 형식
-  { id: 2, host: 'Minjun', date: '2025.12', content: '깔끔하게 이용해주셔서 감사합니다. 추천합니다!' } // 🟢 숫자 형식
-];
+// 🟢 [수정] 진짜 리뷰 데이터 및 모달 상태
+const [guestReviews, setGuestReviews] = useState<any[]>([]);
+const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 선택된 리뷰
 
   useEffect(() => {
     const getProfile = async () => {
@@ -108,6 +106,19 @@ const reviews = [
           avatar_url: user.user_metadata?.avatar_url || ''
         }));
       }
+
+      // 🟢 [추가] 게스트 리뷰 불러오기
+      const { data: reviewData } = await supabase
+        .from('guest_reviews')
+        .select(`
+          *,
+          host:profiles!guest_reviews_host_id_fkey ( full_name, avatar_url )
+        `)
+        .eq('guest_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (reviewData) setGuestReviews(reviewData);
+
       setLoading(false);
     };
     getProfile();
@@ -257,16 +268,43 @@ const reviews = [
               {/* 카카오톡 ID 제거됨 (여기서는 안 보이게) */}
               
               <div className="text-left space-y-4 pt-6 border-t border-slate-100">
-              <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> {t('review_from_host')} ({reviews.length})</h3> {/* 🟢 번역 */}
-              {reviews.map(review => (
-                  <div key={review.id} className="bg-slate-50 p-4 rounded-xl text-sm border border-slate-100">
-                    <div className="flex justify-between mb-1.5">
-                      <span className="font-bold text-slate-900">{review.host}{t('host_honorific')}</span> {/* 🟢 번역 */}
-                      <span className="text-slate-400 text-xs">{review.date}</span>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Star size={18} fill="black"/> {t('review_from_host')} ({guestReviews.length})
+                </h3>
+                
+                {guestReviews.length === 0 ? (
+                  <p className="text-slate-400 text-sm py-4 text-center">아직 받은 후기가 없습니다.</p>
+                ) : (
+                  guestReviews.map(review => (
+                    <div 
+                      key={review.id} 
+                      onClick={() => setSelectedReview(review)} // 🟢 클릭 시 모달 열기
+                      className="bg-slate-50 p-4 rounded-xl text-sm border border-slate-100 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-all group"
+                    >
+                      <div className="flex justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {/* 호스트 아바타 (있으면 표시) */}
+                          <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden relative">
+                             {review.host?.avatar_url ? (
+                               <img src={review.host.avatar_url} className="w-full h-full object-cover" />
+                             ) : <User size={14} className="text-slate-400 m-auto mt-1"/>}
+                          </div>
+                          <span className="font-bold text-slate-900 group-hover:underline">
+                            {review.host?.full_name || 'Host'}{t('host_honorific')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                           <Star size={12} className="text-amber-400" fill="currentColor"/>
+                           <span className="font-bold">{review.rating}</span>
+                        </div>
+                      </div>
+                      <p className="text-slate-600 leading-snug line-clamp-2">"{review.content}"</p>
+                      <p className="text-slate-400 text-xs mt-2 text-right">
+                        {new Date(review.created_at).toLocaleDateString()}
+                      </p>
                     </div>
-                    <p className="text-slate-600 leading-snug">"{review.content}"</p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -504,7 +542,47 @@ const reviews = [
             </div>
           </div>
         </div>
-      </main>
+        </main>
+
+{/* 🟢 [추가] 리뷰 상세 모달 */}
+{selectedReview && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedReview(null)}>
+    <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative p-6" onClick={e => e.stopPropagation()}>
+      <div className="flex justify-between items-start mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative">
+            {selectedReview.host?.avatar_url ? (
+              <img src={selectedReview.host.avatar_url} className="w-full h-full object-cover" />
+            ) : <User size={24} className="text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/>}
+          </div>
+          <div>
+            <h3 className="font-bold text-lg text-slate-900">
+              {selectedReview.host?.full_name || 'Host'}
+              <span className="text-sm font-normal text-slate-500 ml-1">{t('host_honorific')}</span>
+            </h3>
+            <p className="text-xs text-slate-400">{new Date(selectedReview.created_at).toLocaleDateString()}</p>
+          </div>
+        </div>
+        <button onClick={() => setSelectedReview(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+          <X size={20}/>
+        </button>
+      </div>
+
+      <div className="flex gap-1 mb-4">
+        {[...Array(5)].map((_, i) => (
+          <Star key={i} size={20} className={i < selectedReview.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"} />
+        ))}
+      </div>
+
+      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+        <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+          {selectedReview.content}
+        </p>
+      </div>
     </div>
-  );
+  </div>
+)}
+
+</div>
+);
 }
