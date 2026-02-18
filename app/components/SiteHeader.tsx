@@ -88,9 +88,10 @@ function SiteHeaderContent() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.reload();
+    router.refresh(); // 서버 컴포넌트 데이터 갱신
+    router.push('/'); // 메인으로 이동
   };
-
+  
   const handleMainHeaderButtonClick = () => {
     if (pathname?.startsWith('/host')) { 
       router.push('/'); 

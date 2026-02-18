@@ -27,10 +27,17 @@ function LoginPageContent() {
   useEffect(() => {
     if (!mounted) return;
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setChecking(false);
-      if (user) router.replace(returnUrl || '/');
-    });
+    
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.replace(returnUrl); 
+      } else {
+        setChecking(false);
+      }
+    };
+    
+    checkSession();
   }, [mounted, returnUrl, router]);
 
   const handleClose = () => {
