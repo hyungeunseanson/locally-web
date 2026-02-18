@@ -304,59 +304,66 @@ const reviews = [
               <div className="relative">
                   <label className="block text-sm font-bold mb-2">{t('label_birth')}</label>
                   
-                  {/* 🟢 기존 input 대신 예쁜 버튼형 input 사용 */}
+                  {/* 🟢 입력창 (Placeholder 추가) */}
                   <div 
                     onClick={() => {
-                      // 이미 값이 있으면 그 날짜를 기준으로 달력을 켬
+                      // 🟢 [수정] 기본값 2000년으로 변경
                       if(profile.birth_date) setViewDate(new Date(profile.birth_date));
-                      else setViewDate(new Date(1990, 0, 1)); // 기본값 1990년
+                      else setViewDate(new Date(2000, 0, 1)); 
                       setIsCalendarOpen(true);
                     }}
                     className="w-full p-3 border border-slate-300 rounded-xl flex items-center justify-between cursor-pointer hover:border-black transition-colors bg-white group"
                   >
-                    <span className={profile.birth_date ? "text-slate-900" : "text-transparent"}>
-                      {profile.birth_date || "YYYY-MM-DD"}
+                    <span className={profile.birth_date ? "text-slate-900 font-medium" : "text-slate-400"}>
+                      {/* 🟢 값이 없으면 YYYY. MM. DD 표시 */}
+                      {profile.birth_date ? profile.birth_date.replace(/-/g, '. ') : "YYYY. MM. DD"}
                     </span>
                     <Calendar size={18} className="text-slate-400 group-hover:text-black"/>
                   </div>
 
-                  {/* 🟢 커스텀 달력 모달 (팝업) */}
+                  {/* 🟢 커스텀 달력 모달 */}
                   {isCalendarOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsCalendarOpen(false)}></div>
-                      <div className="absolute top-full left-0 mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-slate-100 z-50 p-4 animate-in fade-in zoom-in-95">
+                      <div className="absolute top-full left-0 mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-slate-100 z-50 p-5 animate-in fade-in zoom-in-95">
                         
-                        {/* 헤더: 연도/월 이동 */}
-                        <div className="flex justify-between items-center mb-4">
-                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-1 hover:bg-slate-100 rounded-full"><ChevronLeft size={20}/></button>
-                          <div className="flex items-center gap-2 font-bold text-slate-800">
-                             {/* 연도 선택 (간편하게 셀렉트 박스) */}
-                             <select 
-                                value={viewDate.getFullYear()} 
-                                onChange={(e) => setViewDate(new Date(viewDate.setFullYear(Number(e.target.value))))}
-                                className="bg-transparent text-sm focus:outline-none cursor-pointer"
-                                onClick={(e) => e.stopPropagation()}
-                             >
-                               {Array.from({length: 100}, (_, i) => new Date().getFullYear() - i).map(year => (
-                                 <option key={year} value={year}>{year}</option>
-                               ))}
-                             </select>
-                             <span>{t(`month_${viewDate.getMonth() + 1}`)}</span>
+                        {/* 헤더: 연도/월 이동 (디자인 통일) */}
+                        <div className="flex justify-between items-center mb-5">
+                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><ChevronLeft size={20}/></button>
+                          
+                          <div className="flex items-center justify-center gap-1 font-bold text-lg text-slate-900">
+                             {/* 연도 */}
+                             <div className="relative group cursor-pointer">
+                               <span>{viewDate.getFullYear()}.</span>
+                               <select 
+                                  value={viewDate.getFullYear()} 
+                                  onChange={(e) => setViewDate(new Date(viewDate.setFullYear(Number(e.target.value))))}
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                  onClick={(e) => e.stopPropagation()}
+                               >
+                                 {Array.from({length: 100}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                   <option key={year} value={year}>{year}</option>
+                                 ))}
+                               </select>
+                             </div>
+                             {/* 월 (숫자로만 표기: 1) */}
+                             <span className="w-6 text-center">{viewDate.getMonth() + 1}</span>
                           </div>
-                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-1 hover:bg-slate-100 rounded-full"><ChevronRight size={20}/></button>
+
+                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><ChevronRight size={20}/></button>
                         </div>
 
-{/* 요일 헤더 */}
-<div className="grid grid-cols-7 text-center mb-2">
-                          {[0, 1, 2, 3, 4, 5, 6].map(i => ( // 🟢 숫자 배열로 반복
-                            <div key={i} className="text-xs text-slate-400 font-medium">{t(`day_${i}`)}</div>
+                        {/* 요일 헤더 */}
+                        <div className="grid grid-cols-7 text-center mb-3">
+                          {[0, 1, 2, 3, 4, 5, 6].map(i => (
+                            <div key={i} className="text-xs text-slate-400 font-bold uppercase tracking-wide">{t(`day_${i}`)}</div>
                           ))}
                         </div>
 
                         {/* 날짜 그리드 */}
-                        <div className="grid grid-cols-7 gap-1">
+                        <div className="grid grid-cols-7 gap-1 place-items-center">
                           {generateCalendar(viewDate.getFullYear(), viewDate.getMonth()).map((date, idx) => {
-                            if (!date) return <div key={idx}></div>;
+                            if (!date) return <div key={idx} className="w-9 h-9"></div>;
                             
                             // 날짜 비교용 문자열 (YYYY-MM-DD)
                             const dateStr = date.toLocaleDateString('en-CA'); 
@@ -371,9 +378,9 @@ const reviews = [
                                   setIsCalendarOpen(false);
                                 }}
                                 className={`
-                                  h-9 w-9 rounded-full text-sm flex items-center justify-center transition-all
-                                  ${isSelected ? 'bg-black text-white font-bold' : 'hover:bg-slate-100 text-slate-700'}
-                                  ${isToday && !isSelected ? 'ring-1 ring-black text-black font-bold' : ''}
+                                  w-9 h-9 rounded-full text-sm font-medium flex items-center justify-center transition-all
+                                  ${isSelected ? 'bg-black text-white shadow-md scale-105' : 'hover:bg-slate-100 text-slate-700 hover:text-black'}
+                                  ${isToday && !isSelected ? 'text-blue-600 font-bold bg-blue-50' : ''}
                                 `}
                               >
                                 {date.getDate()}
@@ -385,6 +392,9 @@ const reviews = [
                     </>
                   )}
                 </div>
+
+
+
                 <div>
                 <label className="block text-sm font-bold mb-2">{t('label_gender')}</label> {/* 🟢 번역 */}
                   <select 
