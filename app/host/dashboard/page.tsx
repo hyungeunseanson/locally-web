@@ -171,7 +171,7 @@ return (
         <div className="sticky top-24 space-y-2">
           <div className="px-4 py-2 mb-4">
             <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold tracking-wide">{t('host_partner')}</span> {/* 🟢 번역 */}
-            <p className="text-xs text-slate-400 mt-1">{t('host_approved_msg')}</p> {/* 🟢 번역 */}
+            <p className="text-xs text-slate-400 mt-1">{t('host_approved')}</p>
           </div>
           
           <button onClick={() => handleTabChange('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab==='reservations' ? 'bg-slate-900 text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
@@ -215,9 +215,9 @@ return (
         </h1>
         {activeTab === 'experiences' && (
           <Link href="/host/create">
-            <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md">
-              <Plus size={18} /> {t('btn_new_exp')} {/* 🟢 번역 */}
-            </button>
+<button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md">
+  <Plus size={18} /> {t('exp_new')}
+</button>
           </Link>
         )}
       </div>
