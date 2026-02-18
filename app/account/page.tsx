@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'; // 🟢 아이콘 추가
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown } from 'lucide-react'; // 🟢 아이콘 추가
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
@@ -327,30 +327,52 @@ const reviews = [
                       <div className="fixed inset-0 z-40" onClick={() => setIsCalendarOpen(false)}></div>
                       <div className="absolute top-full left-0 mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-slate-100 z-50 p-5 animate-in fade-in zoom-in-95">
                         
-                        {/* 헤더: 연도/월 이동 (디자인 통일) */}
-                        <div className="flex justify-between items-center mb-5">
-                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)))} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><ChevronLeft size={20}/></button>
+{/* 🟢 [수정] 헤더: 연도 선택 강조 디자인 */}
+<div className="flex justify-between items-center mb-4 px-1">
+                          {/* 이전 달 버튼 */}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)));
+                            }} 
+                            className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors"
+                          >
+                            <ChevronLeft size={20}/>
+                          </button>
                           
-                          <div className="flex items-center justify-center gap-1 font-bold text-lg text-slate-900">
-                             {/* 연도 */}
-                             <div className="relative group cursor-pointer">
-                               <span>{viewDate.getFullYear()}.</span>
+                          <div className="flex items-center gap-2">
+                             {/* 🟢 연도 선택 (버튼처럼 보이게 수정) */}
+                             <div className="relative flex items-center gap-1 cursor-pointer hover:bg-slate-100 px-2 py-1 rounded-lg transition-colors group">
+                               <span className="text-lg font-bold text-slate-900">{viewDate.getFullYear()}</span>
+                               <ChevronDown size={14} className="text-slate-400 group-hover:text-black mt-0.5"/>
+                               
+                               {/* 투명 select 박스로 기능 유지 */}
                                <select 
                                   value={viewDate.getFullYear()} 
                                   onChange={(e) => setViewDate(new Date(viewDate.setFullYear(Number(e.target.value))))}
                                   className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                                   onClick={(e) => e.stopPropagation()}
                                >
-                                 {Array.from({length: 100}, (_, i) => new Date().getFullYear() - i).map(year => (
+                                 {Array.from({length: 100}, (_, i) => new Date().getFullYear() - i + 5).map(year => (
                                    <option key={year} value={year}>{year}</option>
                                  ))}
                                </select>
                              </div>
-                             {/* 월 (숫자로만 표기: 1) */}
-                             <span className="w-6 text-center">{viewDate.getMonth() + 1}</span>
+
+                             {/* 월 표시 (점 찍어서 구분) */}
+                             <span className="text-lg font-bold text-slate-900">. {viewDate.getMonth() + 1}</span>
                           </div>
 
-                          <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><ChevronRight size={20}/></button>
+                          {/* 다음 달 버튼 */}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)));
+                            }} 
+                            className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors"
+                          >
+                            <ChevronRight size={20}/>
+                          </button>
                         </div>
 
                         {/* 요일 헤더 */}
