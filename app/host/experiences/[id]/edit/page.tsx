@@ -246,8 +246,8 @@ export default function EditExperiencePage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-2">국가</label>
+            <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-2">{t('label_country')}</label>
                     <select className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold focus:border-black outline-none appearance-none" value={formData.country} onChange={(e) => setFormData({...formData, country: e.target.value})}>
                     <option value="Korea">{t('select_country_kr')}</option> {/* 🟢 번역 */}
                         <option value="Japan">{t('select_country_jp')}</option> {/* 🟢 번역 */}
@@ -277,7 +277,7 @@ export default function EditExperiencePage() {
                 <div className="flex flex-wrap gap-2 mb-4">
                     {CATEGORIES.map((cat) => (
                         <button key={cat} onClick={() => setFormData({...formData, category: cat})} className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${formData.category === cat ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-600 hover:border-black'}`}>
-                            {cat}
+ {t(cat)} {/* 🟢 번역 적용 */}
                         </button>
                     ))}
                 </div>
