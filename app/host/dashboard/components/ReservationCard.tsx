@@ -44,17 +44,25 @@ export default function ReservationCard({
   };
 
   const renderStatusBadge = (status: string, date: string) => {
-    const isPast = new Date(date) < new Date();
+    // 🟢 날짜 비교 (오늘 자정 기준)
+    const targetDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isPast = targetDate < today;
     
     if (status === 'cancellation_requested') 
-      return <span className="bg-orange-100 text-orange-700 text-[10px] px-2 py-1 rounded-full font-bold animate-pulse flex items-center gap-1"><AlertTriangle size={10}/> {t('res_status_req')}</span>; // 🟢 번역
+      return <span className="bg-orange-100 text-orange-700 text-[10px] px-2 py-1 rounded-full font-bold animate-pulse flex items-center gap-1"><AlertTriangle size={10}/> {t('res_status_req')}</span>;
+    
     if (status === 'cancelled') 
-      return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_cancelled')}</span>; // 🟢 번역
-    if (status === 'PAID' || status === 'confirmed') {
+      return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_cancelled')}</span>;
+    
+    // 🟢 PENDING, PAID, confirmed 모두 '확정' 또는 '완료'로 처리
+    if (['PAID', 'confirmed', 'PENDING', 'completed'].includes(status)) {
       return isPast 
-        ? <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_completed')}</span> // 🟢 번역
-        : <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><CheckCircle2 size={10}/> {t('res_status_paid')}</span>; // 🟢 번역
+        ? <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_completed')}</span> // 이용 완료
+        : <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><CheckCircle2 size={10}/> {t('res_status_paid')}</span>; // 예약 확정
     }
+    
     return <span className="bg-slate-100 text-slate-500 text-[10px] px-2 py-1 rounded-full">{status}</span>;
   };
 
@@ -203,9 +211,29 @@ return (
 </button>
 
 {/* 🟢 [추가] 이용 완료 상태일 때 후기 버튼 표시 */}
-{res.status === 'completed' && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); if(!hasReview) onReview(); }}
+{/* 🟢 [수정] 날짜가 지났으면(isPast) 후기 버튼 표시 */}
+{(() => {
+  const targetDate = new Date(res.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isPast = targetDate < today;
+  const isValid = !['cancelled', 'cancellation_requested', 'declined'].includes(res.status);
+
+  return isPast && isValid && (
+    <button 
+      onClick={(e) => { e.stopPropagation(); if(!hasReview) onReview(); }}
+      disabled={hasReview}
+      className={`w-full h-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${
+        hasReview 
+          ? 'bg-slate-100 text-slate-400 cursor-default' 
+          : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
+      }`}
+    >
+      <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"}/> 
+      {hasReview ? '후기 작성됨' : '게스트 후기'}
+    </button>
+  );
+})()}
               disabled={hasReview}
               className={`w-full h-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${
                 hasReview 
