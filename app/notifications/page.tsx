@@ -20,6 +20,8 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [localNotifications, setLocalNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // 🟢 [추가] 펼쳐진 알림 ID 목록 (아코디언 기능용)
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
   
   const router = useRouter();
   const supabase = createClient();
@@ -45,12 +47,25 @@ export default function NotificationsPage() {
   };
 
   const handleNotificationClick = async (noti: any) => {
+    // 1. 읽음 처리 (화면 즉시 반영)
     if (!noti.is_read) {
       await markAsRead(noti.id);
+      setLocalNotifications(prev => prev.map(n => n.id === noti.id ? { ...n, is_read: true } : n));
     }
-    if (noti.link) {
+
+    // 2. 링크가 있고, 그 링크가 '현재 페이지(/notifications)'가 아니면 이동
+    // (예약, 메시지 등은 여기 걸려서 이동됨)
+    if (noti.link && noti.link !== '/notifications') {
       router.push(noti.link);
+      return;
     }
+
+    // 3. 링크가 없거나 현재 페이지면 내용 펼치기/접기 (관리자 공지 등)
+    setExpandedIds(prev => 
+      prev.includes(noti.id) 
+        ? prev.filter(id => id !== noti.id) // 닫기
+        : [...prev, noti.id] // 펼치기
+    );
   };
 
   const filteredList = localNotifications.filter(n => {
@@ -147,14 +162,22 @@ export default function NotificationsPage() {
                       <span className="text-xs text-slate-400 shrink-0 ml-2">
                         {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')} {/* 🟢 다국어 날짜 */}
                       </span>
-                    </div>
-                    <p className={`text-sm leading-relaxed line-clamp-2 ${!noti.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
+                      </div>
+                    {/* 🟢 [수정] 펼쳐졌으면 전체 보이기, 아니면 2줄만 보이기 */}
+                    <p className={`text-sm leading-relaxed whitespace-pre-wrap transition-all duration-300 ${
+                      expandedIds.includes(noti.id) ? '' : 'line-clamp-2'
+                    } ${!noti.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
                       {noti.message}
                     </p>
                   </div>
 
-                  <div className="hidden md:flex items-center text-slate-300 group-hover:text-slate-400 group-hover:translate-x-1 transition-all">
-                    <ChevronRight size={20}/>
+                  {/* 🟢 [수정] 화살표 아이콘: 이동 가능한 링크면 오른쪽 화살표, 펼치기면 아래쪽 화살표 */}
+                  <div className="hidden md:flex items-center text-slate-300 group-hover:text-slate-500 transition-all">
+                    {noti.link && noti.link !== '/notifications' ? (
+                       <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform"/>
+                    ) : (
+                       <ChevronRight size={20} className={`transition-transform duration-300 ${expandedIds.includes(noti.id) ? 'rotate-90' : ''}`}/>
+                    )}
                   </div>
                 </div>
 
