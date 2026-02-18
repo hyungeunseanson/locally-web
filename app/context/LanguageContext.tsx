@@ -740,7 +740,7 @@ lang_zh: "중국어",
     // [My Experiences - Add]
     exp_no_img: "No Img",
     exp_booking_count: "Bookings",
-    exp_count_unit: "",
+    exp_count_unit: " ",
     exp_empty_title: "No experiences found.",
     exp_empty_desc: "Create a unique experience and welcome guests!",
     exp_delete_confirm: "Are you sure you want to delete this experience?",

@@ -9,6 +9,14 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 export default function MyExperiences() {
   const { t } = useLanguage(); // 🟢 2. Hook
   const supabase = createClient();
+
+  // 🟢 도시 이름 매핑 (DB 데이터 -> 번역 키)
+  const cityMap: Record<string, string> = {
+    '서울': 'seoul', '부산': 'busan', '제주': 'jeju',
+    '도쿄': 'tokyo', '오사카': 'osaka', '후쿠오카': 'fukuoka', 
+    '삿포로': 'sapporo', '나고야': 'nagoya'
+  };
+
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -94,9 +102,15 @@ export default function MyExperiences() {
 
               <div>
                 <h2 className="font-bold text-xl mb-1">{exp.title}</h2>
-                <div className="flex items-center gap-3 text-sm text-slate-500">
-                  <span className="flex items-center gap-1"><MapPin size={14}/> {t(`city_${exp.city?.toLowerCase()}`) || exp.city}</span> {/* 🟢 도시 번역 */}
-                  <span className="flex items-center gap-1"><Clock size={14}/> {exp.duration}{t('unit_hours')}</span> {/* 🟢 번역 */}
+<div className="flex items-center gap-3 text-sm text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <MapPin size={14}/> 
+                    {/* 🟢 도시 번역: 매핑된 키가 있으면 번역, 없으면 원본 표시 */}
+                    {t(`city_${cityMap[exp.city] || exp.city?.toLowerCase()}`) !== `city_${cityMap[exp.city] || exp.city?.toLowerCase()}` 
+                      ? t(`city_${cityMap[exp.city] || exp.city?.toLowerCase()}`) 
+                      : exp.city}
+                  </span>
+                  <span className="flex items-center gap-1"><Clock size={14}/> {exp.duration}{t('unit_hours')}</span>
                 </div>
                 <p className="text-sm font-bold text-slate-900 mt-2">
                   ₩{Number(exp.price).toLocaleString()} 
