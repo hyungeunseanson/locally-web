@@ -17,11 +17,14 @@ interface ReservationCardProps {
   onMessage: () => void;
   onCalendar: () => void;
   onCancelQuery: () => void;
+  hasReview: boolean; // 🟢 추가
+  onReview: () => void; // 🟢 추가
 }
 
 export default function ReservationCard({ 
   res, isNew, isProcessing, 
-  onApproveCancel, onShowProfile, onCheck, onMessage, onCalendar, onCancelQuery 
+  onApproveCancel, onShowProfile, onCheck, onMessage, onCalendar, onCancelQuery,
+  hasReview, onReview // 🟢 추가
 }: ReservationCardProps) {
   const { t, lang } = useLanguage(); // 🟢 2. 훅 사용
   const secureUrl = (url: string | null) => {
@@ -198,6 +201,23 @@ return (
           >
 <MessageSquare size={16}/> {t('res_message_btn')} {/* 🟢 번역 */}
 </button>
+
+{/* 🟢 [추가] 이용 완료 상태일 때 후기 버튼 표시 */}
+{res.status === 'completed' && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); if(!hasReview) onReview(); }}
+              disabled={hasReview}
+              className={`w-full h-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${
+                hasReview 
+                  ? 'bg-slate-100 text-slate-400 cursor-default' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
+              }`}
+            >
+              <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"}/> 
+              {hasReview ? '후기 작성됨' : '게스트 후기'}
+            </button>
+          )}
+    
         </div>
       </div>
 

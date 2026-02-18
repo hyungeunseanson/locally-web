@@ -9,6 +9,8 @@ import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState'; 
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. import 추가
+import { MessageCircle } from 'lucide-react'; // 아이콘 추가
+import GuestReviewModal from './GuestReviewModal'; // 모달 추가
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -19,6 +21,9 @@ export default function ReservationManager() {
   const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<any>(null);
+  const [reviewedBookingIds, setReviewedBookingIds] = useState<number[]>([]); // 작성 완료된 예약 ID 목록
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<any[]>([]);
@@ -85,6 +90,15 @@ export default function ReservationManager() {
 
       if (error) throw error;
       setReservations(data || []);
+      // 🟢 [추가] 이미 후기를 작성한 예약 ID 조회
+      const { data: reviews } = await supabase
+        .from('guest_reviews')
+        .select('booking_id')
+        .eq('host_id', user.id);
+      
+      if (reviews) {
+        setReviewedBookingIds(reviews.map(r => r.booking_id));
+      }
 
     } catch (error) {
       console.error(error);
@@ -317,6 +331,13 @@ export default function ReservationManager() {
                 onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
                 onCalendar={() => addToGoogleCalendar(res)}
                 onCancelQuery={() => handleRequestUserCancel(res)}
+                // 🟢 [추가] 후기 관련 Props
+                hasReview={reviewedBookingIds.includes(res.id)} 
+                onReview={() => {
+                  setSelectedBookingForReview(res);
+                  setReviewModalOpen(true);
+                }}
+                
               />
             ))}
           </div>
@@ -325,6 +346,13 @@ export default function ReservationManager() {
 
       {selectedGuest && (
         <GuestProfileModal guest={selectedGuest} onClose={() => setSelectedGuest(null)} />
+      )}
+      {reviewModalOpen && selectedBookingForReview && (
+        <GuestReviewModal 
+          booking={selectedBookingForReview}
+          onClose={() => setReviewModalOpen(false)}
+          onSuccess={() => fetchReservations(true)} // 목록 갱신
+        />
       )}
     </div>
   );
