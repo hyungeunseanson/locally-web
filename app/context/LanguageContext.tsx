@@ -319,7 +319,20 @@ lang_zh: "중국어",
     q_h_oper_4: "노쇼(No-Show)가 발생하면요?",
     a_h_oper_4: "걱정 마세요. 예약 확정 시 결제가 완료되므로, 게스트가 나타나지 않더라도 규정에 따라 정산금을 지급받으실 수 있습니다.",
     q_h_oper_5: "진상 게스트는 어떻게 대처하나요?",
-    a_h_oper_5: "투어 진행 중 무례하거나 안전을 위협하는 행동을 하는 게스트가 있다면 즉시 로컬리 고객센터로 신고해 주세요. 사실 확인 후 해당 게스트의 이용 제한 조치를 취하며, 호스트님을 보호하기 위해 최선을 다하겠습니다."
+    a_h_oper_5: "투어 진행 중 무례하거나 안전을 위협하는 행동을 하는 게스트가 있다면 즉시 로컬리 고객센터로 신고해 주세요. 사실 확인 후 해당 게스트의 이용 제한 조치를 취하며, 호스트님을 보호하기 위해 최선을 다하겠습니다.",
+    // [예약 관리 - 추가]
+    res_empty_title: "예약 내역이 없습니다.",
+    res_empty_upcoming: "매력적인 체험을 등록하고 첫 손님을 맞이해보세요!",
+    res_empty_cancelled: "취소된 예약이 없습니다. (좋은 소식이네요!)",
+    res_empty_date: "해당 기간의 예약 내역이 없습니다.",
+    res_toast_new: "🎉 새로운 예약이 도착했습니다!",
+    res_toast_cancel: "🚨 예약 취소 요청이 접수되었습니다.",
+    res_error_load: "예약 정보를 불러오는데 실패했습니다.",
+    res_cancel_confirm_msg: "'확인'을 누르면 채팅방으로 이동합니다.",
+    res_cancel_ask: "게스트에게 직접 취소를 요청하시겠습니까?",
+    res_refund_confirm_prefix: "'",
+    res_refund_confirm_suffix: "' 님의 취소를 승인하고 환불하시겠습니까?",
+    res_toast_approved: "취소가 승인되었습니다."
   },
   
   // 🟢 영어 (English)
@@ -602,7 +615,20 @@ lang_zh: "중국어",
     q_h_oper_4: "What if a guest is a No-Show?",
     a_h_oper_4: "Don't worry. You will still receive the payout according to the policy since payment is completed upon booking.",
     q_h_oper_5: "How to handle rude guests?",
-    a_h_oper_5: "Report them immediately to support. We will verify facts and restrict their usage to protect you."
+    a_h_oper_5: "Report them immediately to support. We will verify facts and restrict their usage to protect you.",
+    // [Reservation - Add]
+    res_empty_title: "No reservations found.",
+    res_empty_upcoming: "Register an experience and welcome your first guest!",
+    res_empty_cancelled: "No canceled reservations. (That's good news!)",
+    res_empty_date: "No reservations found for this period.",
+    res_toast_new: "🎉 New booking arrived!",
+    res_toast_cancel: "🚨 Cancellation request received.",
+    res_error_load: "Failed to load reservations.",
+    res_cancel_confirm_msg: "Press 'OK' to go to the chat room.",
+    res_cancel_ask: "Ask the guest to cancel directly?",
+    res_refund_confirm_prefix: "Approve cancellation and refund for '",
+    res_refund_confirm_suffix: "'?",
+    res_toast_approved: "Cancellation approved."
   },
 
   // 🟢 일본어 (Japanese)
@@ -891,7 +917,20 @@ lang_zh: "중국어",
     q_h_oper_4: "ノーショー(No-Show)が発生したら？",
     a_h_oper_4: "心配しないでください。予約確定時に決済が完了しているため、ゲストが現れなくても規定に従って精算金を受け取ることができます。",
     q_h_oper_5: "迷惑なゲストにはどう対処しますか？",
-    a_h_oper_5: "ツアー進行中に無礼な態度や安全を脅かす行動をするゲストがいれば、直ちにLocallyカスタマーセンターに通報してください。事実確認後、該当ゲストの利用制限措置を取り、ホスト様を保護するために最善を尽くします。"
+    a_h_oper_5: "ツアー進行中に無礼な態度や安全を脅かす行動をするゲストがいれば、直ちにLocallyカスタマーセンターに通報してください。事実確認後、該当ゲストの利用制限措置を取り、ホスト様を保護するために最善を尽くします。",
+    // [Reservation - Add]
+    res_empty_title: "予約履歴がありません。",
+    res_empty_upcoming: "体験を登録して、最初のゲストを迎えましょう！",
+    res_empty_cancelled: "キャンセルされた予約はありません。（良い知らせですね！）",
+    res_empty_date: "この期間の予約履歴はありません。",
+    res_toast_new: "🎉 新しい予約が入りました！",
+    res_toast_cancel: "🚨 予約キャンセルリクエストが届きました。",
+    res_error_load: "予約情報の読み込みに失敗しました。",
+    res_cancel_confirm_msg: "「OK」を押すとチャットルームに移動します。",
+    res_cancel_ask: "ゲストに直接キャンセルを依頼しますか？",
+    res_refund_confirm_prefix: "'",
+    res_refund_confirm_suffix: "' 様のキャンセルを承認して返金しますか？",
+    res_toast_approved: "キャンセルが承認されました。"
   },
 
   // 🟢 중국어 (Chinese)
@@ -1180,6 +1219,19 @@ lang_zh: "중국어",
     a_h_oper_4: "别担心。预订确认时已完成支付，即使游客未出现，也会按照规定向您支付结算金。",
     q_h_oper_5: "如何应对无理取闹的游客？",
     a_h_oper_5: "如果行程中遇到无礼或威胁安全的游客，请立即向 Locally 客服中心举报。确认事实后，我们将采取限制该游客使用的措施，尽全力保护房东。",
+    // [Reservation - Add]
+    res_empty_title: "暂无预订记录。",
+    res_empty_upcoming: "发布体验，迎接您的第一位房客吧！",
+    res_empty_cancelled: "没有取消的预订。（这是个好消息！）",
+    res_empty_date: "该期间无预订记录。",
+    res_toast_new: "🎉 收到新的预订！",
+    res_toast_cancel: "🚨 收到取消预订请求。",
+    res_error_load: "加载预订信息失败。",
+    res_cancel_confirm_msg: "点击“确定”进入聊天室。",
+    res_cancel_ask: "要求房客直接取消吗？",
+    res_refund_confirm_prefix: "批准 '",
+    res_refund_confirm_suffix: "' 的取消并退款吗？",
+    res_toast_approved: "取消已批准。"
   }
 };
 

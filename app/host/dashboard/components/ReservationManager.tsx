@@ -8,12 +8,14 @@ import { sendNotification } from '@/app/utils/notification';
 import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState'; 
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. import 추가
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
 import GuestProfileModal from './GuestProfileModal';
 
 export default function ReservationManager() {
+  const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
@@ -87,7 +89,7 @@ export default function ReservationManager() {
     } catch (error) {
       console.error(error);
       // ✅ [복구] 에러 메시지 설정
-      setErrorMsg('예약 정보를 불러오는데 실패했습니다. 잠시 후 다시 시도해주세요.'); 
+      setErrorMsg(t('res_error_load')); // 🟢 번역
       if (!isBackground) showToast('예약 정보를 불러오는데 실패했습니다.', 'error');
     } finally {
       if (!isBackground) setLoading(false);
@@ -107,7 +109,7 @@ export default function ReservationManager() {
           if (!user) return;
 
           if (payload.eventType === 'INSERT') {
-             showToast('🎉 새로운 예약이 도착했습니다!', 'success');
+            showToast(t('res_toast_new'), 'success'); // 🟢 번역
              await sendNotification({
                recipient_id: user.id,
                type: 'new_booking',
@@ -117,7 +119,7 @@ export default function ReservationManager() {
              });
           } 
           else if (payload.eventType === 'UPDATE' && payload.new.status === 'cancellation_requested') {
-            showToast('🚨 예약 취소 요청이 접수되었습니다.', 'error');
+            showToast(t('res_toast_cancel'), 'error'); // 🟢 번역
              await sendNotification({
                 recipient_id: user.id,
                 type: 'booking_cancel_request', 
@@ -146,13 +148,13 @@ export default function ReservationManager() {
   };
 
   const handleRequestUserCancel = (res: any) => {
-    if (confirm(`게스트에게 직접 취소를 요청하시겠습니까?\n'확인'을 누르면 채팅방으로 이동합니다.`)) {
+    if (confirm(`${t('res_cancel_ask')}\n${t('res_cancel_confirm_msg')}`)) { // 🟢 번역
       router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`);
     }
   };
 
   const handleApproveCancel = async (booking: any) => {
-    if (!confirm(`'${booking.guest?.full_name}' 님의 취소를 승인하고 환불하시겠습니까?`)) return;
+    if (!confirm(`${t('res_refund_confirm_prefix')}${booking.guest?.full_name}${t('res_refund_confirm_suffix')}`)) return; // 🟢 번역
     setProcessingId(booking.id);
     
     try {
@@ -171,7 +173,7 @@ export default function ReservationManager() {
         link_url: '/guest/trips'
       });
 
-      showToast('취소가 승인되었습니다.', 'success');
+      showToast(t('res_toast_approved'), 'success'); // 🟢 번역
       fetchReservations(true);
     } catch (err: any) {
       showToast(err.message, 'error');
@@ -215,7 +217,7 @@ export default function ReservationManager() {
       <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white sticky top-0 z-10">
         <div>
           <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-            예약 현황
+          {t('res_status')} {/* 🟢 기존 키 사용 */}
             <button 
               onClick={() => fetchReservations()} 
               className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
@@ -224,14 +226,14 @@ export default function ReservationManager() {
               <RefreshCw size={16} className={loading ? "animate-spin text-blue-500" : ""} />
             </button>
           </h3>
-          <p className="text-sm text-slate-500 mt-1">게스트의 예약을 관리하고 준비하세요.</p>
+          <p className="text-sm text-slate-500 mt-1">{t('res_desc')}</p> {/* 🟢 기존 키 사용 */}
         </div>
         
         <div className="flex bg-slate-100 p-1.5 rounded-xl">
-          {[
-            { id: 'upcoming', label: '다가오는 일정' },
-            { id: 'completed', label: '지난 일정' },
-            { id: 'cancelled', label: '취소/환불' }
+        {[
+            { id: 'upcoming', label: 'tab_upcoming' }, // 🟢 기존 키
+            { id: 'completed', label: 'tab_past' },     // 🟢 completed -> tab_past 매핑
+            { id: 'cancelled', label: 'tab_cancel' }    // 🟢 cancelled -> tab_cancel 매핑
           ].map(tab => {
              // ✅ [복구] 취소 요청 카운트 계산
              const cancelCount = (tab.id === 'cancelled' || tab.id === 'upcoming') 
@@ -254,7 +256,7 @@ export default function ReservationManager() {
                    activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
                  }`}
                >
-                 {tab.label}
+{t(tab.label)} {/* 🟢 2. 여기서 t() 함수로 감싸서 번역 출력 */}
                  {/* ✅ [복구] 취소 카운트 뱃지 */}
                  {cancelCount > 0 && <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{cancelCount}</span>}
                  
@@ -292,13 +294,13 @@ export default function ReservationManager() {
           </div>
         ) : filteredList.length === 0 ? (
           // ✅ [복구] 탭별 상황에 맞는 Empty State 문구
-          <EmptyState 
-            title="예약 내역이 없습니다."
+<EmptyState 
+            title={t('res_empty_title')} 
             subtitle={activeTab === 'upcoming' 
-              ? "매력적인 체험을 등록하고 첫 손님을 맞이해보세요!" 
+              ? t('res_empty_upcoming') 
               : activeTab === 'cancelled' 
-              ? "취소된 예약이 없습니다. (좋은 소식이네요!)"
-              : "해당 기간의 예약 내역이 없습니다."}
+              ? t('res_empty_cancelled')
+              : t('res_empty_date')}
           />
         ) : (
           <div className="space-y-4">
