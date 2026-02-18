@@ -360,7 +360,7 @@ const reviews = [
                              </div>
 
                              {/* 월 표시 (점 찍어서 구분) */}
-                             <span className="text-lg font-bold text-slate-900">. {viewDate.getMonth() + 1}</span>
+                             <span className="text-lg font-bold text-slate-900">  {viewDate.getMonth() + 1}</span>
                           </div>
 
                           {/* 다음 달 버튼 */}
