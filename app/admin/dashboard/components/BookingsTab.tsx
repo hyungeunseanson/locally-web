@@ -178,10 +178,11 @@ const handleForceCancel = async () => {
         <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
           <div className="overflow-y-auto flex-1">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
+            <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
                 <tr>
                   <th className="px-6 py-3">체험 정보 / 일시</th>
                   <th className="px-6 py-3">게스트</th>
+                  <th className="px-6 py-3">예약 요청일</th> {/* 🟢 추가됨 */}
                   <th className="px-6 py-3">상태</th>
                   <th className="px-6 py-3 text-right">결제 금액</th>
                 </tr>
@@ -205,6 +206,17 @@ const handleForceCancel = async () => {
                        <div className="font-medium text-slate-700 text-sm">{bk.contact_name}</div>
                        <div className="text-[10px] text-slate-400 font-mono">{bk.profiles?.email}</div>
                     </td>
+                    
+                    {/* 🟢 [추가] 예약 생성일 (created_at) 표시 */}
+                    <td className="px-6 py-4">
+                      <div className="text-xs font-bold text-slate-700">
+                        {new Date(bk.created_at).toLocaleDateString()}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {new Date(bk.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </td>
+
                     <td className="px-6 py-4 flex items-center gap-2">
                        <StatusBadge status={bk.status} />
                        
@@ -299,13 +311,16 @@ const handleForceCancel = async () => {
                           <span className="text-lg font-black text-slate-900">₩{Number(selectedBooking.amount).toLocaleString()}</span>
                       </div>
                       <div className="p-4 bg-white space-y-2 text-xs">
-                          <div className="flex justify-between text-slate-500">
+                      <div className="flex justify-between text-slate-500">
                               <span>결제 상태</span>
                               <span className="font-bold text-slate-700">{selectedBooking.status}</span>
                           </div>
                           <div className="flex justify-between text-slate-500">
                               <span>결제 수단</span>
-                              <span className="font-mono">{selectedBooking.payment_method || 'CARD'}</span>
+                              {/* 🟢 [수정] 무통장 입금 / 카드 결제 구분 표시 */}
+                              <span className={`font-bold ${selectedBooking.payment_method === 'bank' ? 'text-blue-600' : 'text-slate-700'}`}>
+                                {selectedBooking.payment_method === 'bank' ? '무통장 입금 (계좌)' : '카드 결제'}
+                              </span>
                           </div>
                           <div className="flex justify-between text-slate-500">
                               <span>주문 번호</span>
