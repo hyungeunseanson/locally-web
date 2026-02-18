@@ -346,10 +346,10 @@ const reviews = [
                           <button onClick={() => setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)))} className="p-1 hover:bg-slate-100 rounded-full"><ChevronRight size={20}/></button>
                         </div>
 
-                        {/* 요일 헤더 */}
-                        <div className="grid grid-cols-7 text-center mb-2">
-                          {t('weekdays_short')?.map((day: string) => (
-                            <div key={day} className="text-xs text-slate-400 font-medium">{day}</div>
+{/* 요일 헤더 */}
+<div className="grid grid-cols-7 text-center mb-2">
+                          {[0, 1, 2, 3, 4, 5, 6].map(i => ( // 🟢 숫자 배열로 반복
+                            <div key={i} className="text-xs text-slate-400 font-medium">{t(`day_${i}`)}</div>
                           ))}
                         </div>
 
