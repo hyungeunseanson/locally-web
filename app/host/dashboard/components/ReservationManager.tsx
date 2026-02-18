@@ -81,9 +81,10 @@ export default function ReservationManager() {
         .select(`
           *,
           experiences!inner ( id, title, photos ), 
-          guest:profiles!bookings_user_id_fkey ( 
+guest:profiles!bookings_user_id_fkey ( 
             id, full_name, avatar_url, email, phone, 
-            kakao_id, introduction, job, languages, host_nationality 
+            kakao_id, introduction, job, languages, host_nationality,
+            gender, mbti 
           )
         `)
         .eq('experiences.host_id', user.id);

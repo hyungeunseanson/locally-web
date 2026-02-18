@@ -46,7 +46,8 @@ export default function AccountPage() {
     phone: '',
     mbti: '',
     kakao_id: '',
-    avatar_url: '' 
+    avatar_url: '',
+    languages: [] as string[] // 🟢 [추가] 언어 배열 초기화
   });
 
   // 국가 리스트 & 국가번호 매핑
@@ -96,7 +97,8 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
           phone: data.phone || '',
           mbti: data.mbti || '',
           kakao_id: data.kakao_id || '',
-          avatar_url: data.avatar_url || user.user_metadata?.avatar_url || ''
+          avatar_url: data.avatar_url || user.user_metadata?.avatar_url || '',
+          languages: data.languages || [] // 🟢 [추가] DB에서 언어 가져오기
         });
       } else {
         setProfile(prev => ({ 
@@ -190,6 +192,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
       kakao_id: profile.kakao_id,
       email: profile.email, // 수정된 이메일 저장
       avatar_url: profile.avatar_url, 
+      languages: profile.languages, // 🟢 [추가] 저장 시 포함
       updated_at: new Date().toISOString(), 
     };
 
@@ -505,6 +508,33 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                     maxLength={4}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors uppercase"
                   />
+                </div>
+
+                {/* 🟢 [추가] 구사 가능한 언어 선택 */}
+                <div className="col-span-1 md:col-span-2">
+                  <label className="block text-sm font-bold mb-2">{t('label_languages_spoken')}</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {['English', 'Korean', 'Japanese', 'Chinese', 'Spanish', 'French'].map(lang => (
+                      <button
+                        key={lang}
+                        onClick={() => {
+                          const current = profile.languages || [];
+                          const newLangs = current.includes(lang)
+                            ? current.filter(l => l !== lang)
+                            : [...current, lang];
+                          setProfile({ ...profile, languages: newLangs });
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                          profile.languages?.includes(lang)
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                        }`}
+                      >
+                        {t(`lang_${lang}`) || lang}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400">호스트에게 내가 할 수 있는 언어를 알려주세요.</p>
                 </div>
                 <div>
                 <label className="block text-sm font-bold mb-2">{t('label_email')}</label> {/* 🟢 번역 */}
