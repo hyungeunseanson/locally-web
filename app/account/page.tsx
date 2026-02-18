@@ -6,8 +6,10 @@ import { createClient } from '@/app/utils/supabase/client';
 import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 
 export default function AccountPage() {
+  const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast();
@@ -140,9 +142,9 @@ export default function AccountPage() {
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
       setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
-      alert('프로필 사진이 변경되었습니다.');
+      alert(t('profile_photo_change_done')); // 🟢 번역
     } catch (error: any) {
-      alert('사진 업로드 실패: ' + error.message);
+      alert(t('profile_photo_fail') + ' ' + error.message); // 🟢 번역
     } finally {
       setUploading(false);
     }
@@ -169,9 +171,9 @@ export default function AccountPage() {
 
     if (error) {
       console.error('Save error:', error);
-      showToast('저장에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
+      showToast(t('profile_save_fail'), 'error'); // 🟢 번역
     } else {
-      showToast('프로필이 성공적으로 저장되었어요.', 'success');
+      showToast(t('profile_save_success'), 'success'); // 🟢 번역
       router.refresh(); 
     }
     setSaving(false);
@@ -184,8 +186,8 @@ export default function AccountPage() {
       <SiteHeader />
       
       <main className="max-w-6xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-black mb-2">계정 및 프로필</h1>
-        <p className="text-slate-500 mb-10">본인 정보를 관리하고 호스트에게 보여질 프로필을 설정하세요.</p>
+      <h1 className="text-3xl font-black mb-2">{t('account_title')}</h1> {/* 🟢 번역 */}
+      <p className="text-slate-500 mb-10">{t('account_desc')}</p> {/* 🟢 번역 */}
 
         <div className="flex flex-col lg:flex-row gap-16">
           
@@ -209,19 +211,19 @@ export default function AccountPage() {
                 <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden"/>
               </div>
 
-              <h2 className="text-2xl font-black mb-1">{profile.full_name || '이름 없음'}</h2>
+              <h2 className="text-2xl font-black mb-1">{profile.full_name || t('label_no_name')}</h2> {/* 🟢 번역 */}
               <p className="text-slate-500 text-sm mb-4">
-                {countries.find(c => c.code === profile.nationality)?.name || profile.nationality || '국적 미설정'}
+                {countries.find(c => c.code === profile.nationality)?.name || profile.nationality || t('label_no_nationality')} {/* 🟢 번역 */}
               </p>
               
               <div className="flex flex-wrap justify-center gap-2 mb-6">
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
-                  <ShieldCheck size={14}/> 신원 인증됨
+                <ShieldCheck size={14}/> {t('identity_verified')} {/* 🟢 번역 */}
                 </div>
                 {/* 🌈 성별 이모지 표시 */}
                 {profile.gender && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-100">
-                    {profile.gender === 'Male' ? '🙋‍♂️ 남성' : profile.gender === 'Female' ? '🙋‍♀️ 여성' : '🙋 기타'}
+{profile.gender === 'Male' ? `🙋‍♂️ ${t('gender_male')}` : profile.gender === 'Female' ? `🙋‍♀️ ${t('gender_female')}` : `🙋 ${t('gender_other')}`} {/* 🟢 번역 */}
                   </div>
                 )}
                 {profile.mbti && (
@@ -240,7 +242,7 @@ export default function AccountPage() {
               {/* 카카오톡 ID 제거됨 (여기서는 안 보이게) */}
               
               <div className="text-left space-y-4 pt-6 border-t border-slate-100">
-                <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> 호스트에게 받은 후기 ({reviews.length})</h3>
+              <h3 className="font-bold text-lg flex items-center gap-2"><Star size={18} fill="black"/> {t('review_from_host')} ({reviews.length})</h3> {/* 🟢 번역 */}
                 {reviews.map(review => (
                   <div key={review.id} className="bg-slate-50 p-4 rounded-xl text-sm border border-slate-100">
                     <div className="flex justify-between mb-1.5">
@@ -260,7 +262,7 @@ export default function AccountPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold mb-2">이름 (실명)</label>
+                <label className="block text-sm font-bold mb-2">{t('label_name')}</label> {/* 🟢 번역 */}
                   <input 
                     type="text" 
                     value={profile.full_name}
@@ -269,13 +271,13 @@ export default function AccountPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2">국적</label>
+                <label className="block text-sm font-bold mb-2">{t('label_nationality')}</label> {/* 🟢 번역 */}
                   <select 
                     value={profile.nationality}
                     onChange={handleNationalityChange}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
                   >
-                    <option value="">국적을 선택하세요</option>
+<option value="">{t('select_nationality')}</option> {/* 🟢 번역 */}
                     {countries.map(country => (
                       <option key={country.code} value={country.code}>{country.name}</option>
                     ))}
@@ -285,7 +287,7 @@ export default function AccountPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold mb-2">생년월일</label>
+                <label className="block text-sm font-bold mb-2">{t('label_birth')}</label> {/* 🟢 번역 */}
                   <input 
                     type="date" 
                     value={profile.birth_date}
@@ -294,39 +296,39 @@ export default function AccountPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2">성별</label>
+                <label className="block text-sm font-bold mb-2">{t('label_gender')}</label> {/* 🟢 번역 */}
                   <select 
                     value={profile.gender}
                     onChange={e => setProfile({...profile, gender: e.target.value})}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
                   >
-                    <option value="">선택하세요</option>
-                    <option value="Male">🙋‍♂️ 남성 (Male)</option>
-                    <option value="Female">🙋‍♀️ 여성 (Female)</option>
-                    <option value="Other">🙋 기타 (Other)</option>
+<option value="">{t('gender_select')}</option> {/* 🟢 번역 */}
+                    <option value="Male">🙋‍♂️ {t('gender_male')} (Male)</option>
+                    <option value="Female">🙋‍♀️ {t('gender_female')} (Female)</option>
+                    <option value="Other">🙋 {t('gender_other')} (Other)</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold mb-2">전화번호</label>
+                <label className="block text-sm font-bold mb-2">{t('label_phone')}</label> {/* 🟢 번역 */}
                   <input 
                     type="tel" 
                     value={profile.phone}
                     onChange={handlePhoneChange}
-                    placeholder="+82 10-1234-5678"
+                    placeholder={t('ph_phone')}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
-                  <p className="text-xs text-slate-400 mt-1">* 국적 선택 시 국가번호가 자동 입력됩니다.</p>
+<p className="text-xs text-slate-400 mt-1">{t('help_phone')}</p> {/* 🟢 번역 */}
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2">카카오톡 ID (선택)</label>
+                <label className="block text-sm font-bold mb-2">{t('label_kakao')}</label> {/* 🟢 번역 */}
                   <input 
                     type="text" 
                     value={profile.kakao_id}
                     onChange={e => setProfile({...profile, kakao_id: e.target.value})}
-                    placeholder="연락용 카카오톡 ID"
+                    placeholder={t('ph_kakao')}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
                 </div>
@@ -334,35 +336,35 @@ export default function AccountPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold mb-2">MBTI</label>
+                <label className="block text-sm font-bold mb-2">{t('label_mbti')}</label> {/* 🟢 번역 */}
                   <input 
                     type="text" 
                     value={profile.mbti}
                     onChange={e => setProfile({...profile, mbti: e.target.value.toUpperCase()})}
-                    placeholder="ex. ENFP"
+                    placeholder={t('ph_mbti')}
                     maxLength={4}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors uppercase"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2">이메일 주소</label>
+                <label className="block text-sm font-bold mb-2">{t('label_email')}</label> {/* 🟢 번역 */}
                   <input 
                     type="email" 
                     value={profile.email}
                     onChange={e => setProfile({...profile, email: e.target.value})}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
-                  <p className="text-xs text-slate-400 mt-1">* 로그인 시 사용하는 ID가 변경됩니다.</p>
+<p className="text-xs text-slate-400 mt-1">{t('help_email')}</p> {/* 🟢 번역 */}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold mb-2">자기소개</label>
+              <label className="block text-sm font-bold mb-2">{t('label_bio')}</label> {/* 🟢 번역 */}
                 <textarea 
                   rows={5}
                   value={profile.bio}
                   onChange={e => setProfile({...profile, bio: e.target.value})}
-                  placeholder="호스트에게 자신을 간단히 소개해주세요. (취미, 여행 스타일 등)"
+                  placeholder={t('ph_bio')}
                   className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors resize-none"
                 />
               </div>
@@ -373,7 +375,7 @@ export default function AccountPage() {
                   disabled={saving}
                   className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:scale-105 transition-transform flex items-center gap-2 disabled:opacity-50"
                 >
-                  <Save size={18}/> {saving ? '저장 중...' : '변경사항 저장'}
+<Save size={18}/> {saving ? t('saving') : t('btn_save_changes')} {/* 🟢 번역 */}
                 </button>
               </div>
 
