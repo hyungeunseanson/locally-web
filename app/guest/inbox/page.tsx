@@ -10,7 +10,7 @@ import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 
 function InboxContent() {
-  const { t } = useLanguage(); // 🟢 2. t 함수 가져오기
+  const { t, lang } = useLanguage(); // 🟢 lang 추가 필수!
   const { 
     inquiries, 
     selectedInquiry, 
@@ -50,7 +50,9 @@ function InboxContent() {
   };
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    // 🟢 언어별 시간 포맷 적용
+    const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
+    return new Date(dateString).toLocaleTimeString(localeMap[lang] || 'ko-KR', { hour: '2-digit', minute: '2-digit' });
   };
 
   useEffect(() => {
@@ -243,25 +245,25 @@ function InboxContent() {
                   })}
                 </div>
 
-                <div className="p-4 bg-white border-t border-slate-100 flex gap-2">
+                <div className="p-4 bg-white border-t border-slate-100 flex items-center gap-2"> {/* 🟢 items-center 추가 */}
                   <input 
-                    className="..."
-                    placeholder={t('msg_placeholder')} // 🟢 번역
-value={inputText} 
-onChange={(e) => setInputText(e.target.value)} 
-disabled={isSending} 
-onKeyDown={(e) => { 
-  if (e.nativeEvent.isComposing) return; 
-  if (e.key === 'Enter') { 
-    e.preventDefault(); 
-    handleSend(); 
-  }
+                    className="flex-1 h-12 border border-slate-300 rounded-xl px-4 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    placeholder={t('msg_placeholder')} 
+                    value={inputText} 
+                    onChange={(e) => setInputText(e.target.value)} 
+                    disabled={isSending} 
+                    onKeyDown={(e) => { 
+                      if (e.nativeEvent.isComposing) return; 
+                      if (e.key === 'Enter') { 
+                        e.preventDefault(); 
+                        handleSend(); 
+                      }
                     }} 
                   />
                   <button 
                     onClick={handleSend} 
                     disabled={!inputText.trim() || isSending} 
-                    className="p-3 bg-black text-white rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+                    className="h-12 w-12 flex items-center justify-center bg-black text-white rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed shrink-0" 
                   >
                     {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
                   </button>
