@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
-import { Send, ShieldCheck, User, Loader2 } from 'lucide-react';
+import { Send, ShieldCheck, User, Loader2, ImagePlus } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 
@@ -26,6 +26,7 @@ function InboxContent() {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 🟢 프로필 모달 상태
   const [modalUserId, setModalUserId] = useState<string | null>(null);
@@ -91,21 +92,31 @@ function InboxContent() {
     if (hostId || expId) router.replace('/guest/inbox');
   };
 
-  const handleSend = async () => {
-    if (selectedInquiry && inputText.trim() && !isSending) {
-      setIsSending(true); 
-      try {
-        if (selectedInquiry.id === 'new') {
-          await createInquiry(selectedInquiry.host_id, selectedInquiry.experience_id, inputText);
-        } else {
-          await sendMessage(selectedInquiry.id, inputText);
-        }
-        setInputText('');
-      } catch (error) {
-        console.error("Failed to send message", error);
-      } finally {
-        setIsSending(false);
+  const handleSend = async (file?: File) => {
+    if (!selectedInquiry || isSending) return;
+    if (!inputText.trim() && !file) return;
+
+    setIsSending(true); 
+    try {
+      if (selectedInquiry.id === 'new') {
+        // 첫 문의 시 텍스트 필수 (이미지는 첫 문의 후 가능하도록 로직 유지 혹은 확장 가능)
+        await createInquiry(selectedInquiry.host_id, selectedInquiry.experience_id, inputText);
+      } else {
+        await sendMessage(selectedInquiry.id, inputText, file);
       }
+      setInputText('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (error) {
+      console.error("Failed to send message", error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleSend(file);
     }
   };
 
@@ -230,9 +241,24 @@ function InboxContent() {
                             )}
                             
                             <div className="flex items-end gap-2">
-                            {isMe && <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1" suppressHydrationWarning>{formatTime(msg.created_at)}</span>}
+                            {isMe && (
+                              <div className="flex flex-col items-end">
+                                <span className="text-[9px] font-bold text-blue-500 mb-0.5">
+                                  {msg.is_read ? '' : '1'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 min-w-[50px] text-right" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
+                              </div>
+                            )}
                                
                                <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm break-words ${isMe ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none'}`}>
+                                 {/* 📸 이미지 렌더링 추가 */}
+                                 {msg.type === 'image' && msg.image_url && (
+                                   <div className="mb-2 rounded-lg overflow-hidden border border-slate-100 bg-slate-50">
+                                      <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
+                                        <Image src={msg.image_url} alt="chat-img" width={300} height={300} className="w-full h-auto object-cover hover:opacity-90 transition-opacity" />
+                                      </a>
+                                   </div>
+                                 )}
                                  {msg.content}
                                </div>
 
@@ -245,7 +271,16 @@ function InboxContent() {
                   })}
                 </div>
 
-                <div className="p-4 bg-white border-t border-slate-100 flex items-center gap-2"> {/* 🟢 items-center 추가 */}
+                <div className="p-4 bg-white border-t border-slate-100 flex items-center gap-2"> 
+                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isSending || selectedInquiry.id === 'new'} 
+                    className="h-12 w-12 flex items-center justify-center bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors shrink-0 disabled:opacity-30"
+                  >
+                    <ImagePlus size={20}/>
+                  </button>
+
                   <input 
                     className="flex-1 h-12 border border-slate-300 rounded-xl px-4 focus:outline-none focus:border-black transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                     placeholder={t('msg_placeholder')} 
@@ -261,8 +296,8 @@ function InboxContent() {
                     }} 
                   />
                   <button 
-                    onClick={handleSend} 
-                    disabled={!inputText.trim() || isSending} 
+                    onClick={() => handleSend()} 
+                    disabled={(!inputText.trim()) || isSending} 
                     className="h-12 w-12 flex items-center justify-center bg-black text-white rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed shrink-0" 
                   >
                     {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}

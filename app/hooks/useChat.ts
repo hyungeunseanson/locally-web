@@ -5,6 +5,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { sendNotification } from '@/app/utils/notification';
 import { sanitizeText } from '@/app/utils/sanitize';
+import { compressImage, sanitizeFileName } from '@/app/utils/image';
 
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -166,14 +167,40 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     } catch (err: any) { console.error(err); }
   };
 
-  const sendMessage = async (inquiryId: number, content: string) => {
+  const sendMessage = async (inquiryId: number, content: string, file?: File) => {
     const cleanContent = sanitizeText(content);
-    if (!cleanContent.trim() || !currentUser) return;
+    if (!cleanContent.trim() && !file) return;
+    if (!currentUser) return;
     
+    let imageUrl = null;
+    let type = 'text';
+
+    // 📸 이미지 업로드 처리
+    if (file) {
+      try {
+        const compressed = await compressImage(file);
+        const fileName = `${inquiryId}/${Date.now()}_${sanitizeFileName(file.name)}`;
+        const { error: uploadError } = await supabase.storage
+          .from('chat-images')
+          .upload(fileName, compressed);
+
+        if (uploadError) throw uploadError;
+        const { data } = supabase.storage.from('chat-images').getPublicUrl(fileName);
+        imageUrl = data.publicUrl;
+        type = 'image';
+      } catch (err) {
+        console.error('Image upload failed:', err);
+        showToast('이미지 전송 실패', 'error');
+        return;
+      }
+    }
+
+    const displayContent = cleanContent || (type === 'image' ? '📷 사진을 보냈습니다.' : '');
+
     // UI 낙관적 업데이트
     setInquiries(prev => prev.map(inq => 
       inq.id === inquiryId 
-        ? { ...inq, content: cleanContent, updated_at: new Date().toISOString() } 
+        ? { ...inq, content: displayContent, updated_at: new Date().toISOString() } 
         : inq
     ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
 
@@ -181,13 +208,16 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       const { error } = await supabase.from('inquiry_messages').insert([{ 
         inquiry_id: inquiryId, 
         sender_id: currentUser.id, 
-        content: cleanContent
+        content: cleanContent,
+        image_url: imageUrl,
+        type: type,
+        is_read: false
       }]);
       
       if (error) throw error;
       
       await supabase.from('inquiries').update({ 
-        content: cleanContent, 
+        content: displayContent, 
         updated_at: new Date().toISOString() 
       }).eq('id', inquiryId);
       
@@ -211,7 +241,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           senderId: currentUser.id,
           type: 'new_message',
           title: `💬 ${senderName}님의 새 메시지`,
-          message: cleanContent,
+          message: displayContent,
           link: targetLink,
           inquiry_id: inquiryId
         });

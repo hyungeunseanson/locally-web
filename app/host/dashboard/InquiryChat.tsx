@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat'; 
 import UserProfileModal from '@/app/components/UserProfileModal'; 
-import { Send, User, Loader2 } from 'lucide-react';
+import { Send, User, Loader2, ImagePlus } from 'lucide-react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 
@@ -12,6 +12,7 @@ export default function InquiryChat() {
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const searchParams = useSearchParams();
   const guestIdFromUrl = searchParams.get('guestId');
@@ -44,13 +45,25 @@ export default function InquiryChat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const handleSend = async () => {
-    if (selectedInquiry && replyText.trim() && !isSending) {
-      setIsSending(true);
-      await sendMessage(selectedInquiry.id, replyText);
+  const handleSend = async (file?: File) => {
+    if (!selectedInquiry || isSending) return;
+    if (!replyText.trim() && !file) return;
+
+    setIsSending(true);
+    try {
+      await sendMessage(selectedInquiry.id, replyText, file);
       setReplyText('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (error) {
+      console.error("Failed to send", error);
+    } finally {
       setIsSending(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleSend(file);
   };
 
   const formatTime = (dateString: string) => {
@@ -171,9 +184,14 @@ export default function InquiryChat() {
 
                       <div className="flex items-end gap-2">
                         {isMe && (
-                          <span className="text-[10px] text-slate-400 min-w-[50px] text-right mb-1" suppressHydrationWarning>
-                            {formatTime(msg.created_at)}
-                          </span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-bold text-blue-500 mb-0.5">
+                              {msg.is_read ? '' : '1'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 min-w-[50px] text-right" suppressHydrationWarning>
+                              {formatTime(msg.created_at)}
+                            </span>
+                          </div>
                         )}
 
                         <div className={`p-3 rounded-2xl text-sm leading-relaxed shadow-sm break-words ${
@@ -181,6 +199,14 @@ export default function InquiryChat() {
                             ? 'bg-black text-white rounded-tr-none' 
                             : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
                         }`}>
+                          {/* 📸 이미지 렌더링 추가 */}
+                          {msg.type === 'image' && msg.image_url && (
+                            <div className="mb-2 rounded-lg overflow-hidden border border-slate-100 bg-slate-50">
+                               <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
+                                 <Image src={msg.image_url} alt="chat-img" width={300} height={300} className="w-full h-auto object-cover hover:opacity-90 transition-opacity" />
+                               </a>
+                            </div>
+                          )}
                           {msg.content}
                         </div>
 
@@ -196,7 +222,16 @@ export default function InquiryChat() {
               })}
             </div>
 
-            <div className="p-4 bg-white border-t border-slate-200 flex gap-2">
+            <div className="p-4 bg-white border-t border-slate-200 flex gap-2 items-center">
+              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending} 
+                className="h-10 w-10 flex items-center justify-center bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors shrink-0 disabled:opacity-30"
+              >
+                <ImagePlus size={20}/>
+              </button>
+
               <input 
                 value={replyText} 
                 onChange={(e) => setReplyText(e.target.value)} 
@@ -212,9 +247,9 @@ export default function InquiryChat() {
                 }}
               />
               <button 
-                onClick={handleSend} 
-                disabled={!replyText.trim() || isSending} 
-                className="bg-black text-white p-2.5 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => handleSend()} 
+                disabled={(!replyText.trim()) || isSending} 
+                className="bg-black text-white h-10 w-10 flex items-center justify-center rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
               >
                 {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
               </button>
