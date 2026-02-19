@@ -47,97 +47,81 @@ setSelectedLanguage
 }: HomeHeroProps) {
 const { t } = useLanguage(); // 🟢 추가
 
-// 🟢 [추가] 밋밋한 이모지 대신 들어갈 "고화질 커스텀 도시 아이콘" 생성기
-const getCategorySvg = (id: string) => {
-  const baseClass = "w-[32px] h-[32px] transition-transform duration-300 group-hover:scale-110 drop-shadow-sm";
-  switch (id) {
-    case 'seoul': // 🇰🇷 서울: 남산타워
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M6 40 Q20 20 34 40 Z" fill="#81C784"/> {/* 남산 */}
-          <path d="M18 40 L19 20 L21 20 L22 40 Z" fill="#B0BEC5"/> {/* 기둥 */}
-          <path d="M19.5 20 L19.5 4 L20.5 4 L20.5 20 Z" fill="#CFD8DC"/> {/* 안테나 */}
-          <path d="M20 1 L19.5 4 L20.5 4 Z" fill="#F44336"/> {/* 빨간 송신탑 끝 */}
-          <ellipse cx="20" cy="18" rx="6" ry="3.5" fill="#0288D1"/> {/* 파란 전망대 */}
-        </svg>
-      );
-    case 'busan': // 🇰🇷 부산: 광안대교
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0 28 Q10 24 20 28 T40 28 L40 40 L0 40 Z" fill="#4FC3F7"/> {/* 바다 */}
-          <rect x="8" y="8" width="5" height="24" fill="#90A4AE" rx="1"/> {/* 주탑 1 */}
-          <rect x="27" y="8" width="5" height="24" fill="#90A4AE" rx="1"/> {/* 주탑 2 */}
-          <path d="M0 20 Q10 32 20 20 T40 20" stroke="#CFD8DC" strokeWidth="2.5" fill="none"/> {/* 현수 케이블 */}
-          <path d="M0 25 L40 25" stroke="#607D8B" strokeWidth="2.5"/> {/* 다리 상판 */}
-        </svg>
-      );
-    case 'jeju': // 🇰🇷 제주: 돌하르방과 감귤
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="8" y="8" width="18" height="28" rx="9" fill="#78909C"/> {/* 하르방 몸통 */}
-          <circle cx="13" cy="16" r="2.5" fill="#37474F"/> {/* 눈 */}
-          <circle cx="21" cy="16" r="2.5" fill="#37474F"/> {/* 눈 */}
-          <rect x="11" y="22" width="12" height="4" rx="2" fill="#546E7A"/> {/* 팔 */}
-          <path d="M14 29 L20 29" stroke="#546E7A" strokeWidth="2.5" strokeLinecap="round"/> {/* 입 */}
-          <circle cx="32" cy="30" r="6" fill="#FFA000"/> {/* 한라봉/귤 */}
-          <path d="M32 24 Q34 20 36 23" stroke="#4CAF50" strokeWidth="2.5" fill="none" strokeLinecap="round"/> {/* 잎사귀 */}
-        </svg>
-      );
-    case 'tokyo': // 🇯🇵 도쿄: 도쿄타워
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M14 40 L18 10 L22 10 L26 40 Z" fill="#E53935"/>
-          <path d="M19 10 L20 2 L21 10 Z" fill="#BDBDBD"/>
-          <rect x="15" y="25" width="10" height="3" fill="#FFFFFF"/>
-          <rect x="16.5" y="15" width="7" height="2" fill="#FFFFFF"/>
-        </svg>
-      );
-    case 'osaka': // 🇯🇵 오사카: 오사카성
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="6" y="26" width="28" height="14" fill="#CFD8DC"/>
-          <path d="M2 26 L20 12 L38 26 Z" fill="#4DB6AC"/>
-          <path d="M8 14 L20 4 L32 14 Z" fill="#4DB6AC"/>
-          <rect x="16" y="30" width="8" height="10" fill="#8D6E63"/>
-          <path d="M20 0 L20 5" stroke="#FFCA28" strokeWidth="2.5" strokeLinecap="round"/>
-        </svg>
-      );
-    case 'fukuoka': // 🇯🇵 후쿠오카: 돈코츠 라멘
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M2 20 L38 20 C38 32 28 38 20 38 C12 38 2 32 2 20 Z" fill="#E53935"/>
-          <path d="M2 20 L38 20" stroke="#FFCA28" strokeWidth="2"/>
-          <circle cx="12" cy="17" r="4.5" fill="#8D6E63"/> {/* 차슈 */}
-          <circle cx="20" cy="17" r="4.5" fill="#8D6E63"/>
-          <rect x="25" y="13" width="7" height="6" fill="#FFF59D" rx="1"/> {/* 계란/어묵 */}
-          <path d="M8 10 Q20 22 32 10" stroke="#FFCA28" strokeWidth="2" fill="none"/> {/* 젓가락 */}
-        </svg>
-      );
-    case 'sapporo': // 🇯🇵 삿포로: 눈꽃
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="20" cy="20" r="18" fill="#E1F5FE"/>
-          <path d="M20 6 L20 34 M6 20 L34 20 M10 10 L30 30 M10 30 L30 10" stroke="#4FC3F7" strokeWidth="3.5" strokeLinecap="round"/>
-          <circle cx="20" cy="20" r="5" fill="#81D4FA"/>
-        </svg>
-      );
-    case 'nagoya': // 🇯🇵 나고야: 초밥
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="6" y="22" width="28" height="12" rx="6" fill="#FAFAFA"/> {/* 밥 */}
-          <path d="M4 24 C 4 14, 20 14, 36 24 L 34 28 C 20 20, 10 24, 6 28 Z" fill="#FF7043"/> {/* 연어/새우 */}
-          <rect x="17" y="17" width="6" height="18" fill="#212121"/> {/* 김 띠 */}
-        </svg>
-      );
-    case 'all': // 🌏 전체: 맑은 지구
-    default:
-      return (
-        <svg viewBox="0 0 40 40" className={baseClass} fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="20" cy="20" r="18" fill="#BBDEFB"/>
-          <path d="M8 12 C16 2, 28 12, 24 22 C18 32, 30 38, 16 38 C4 32, 2 18, 8 12 Z" fill="#66BB6A"/>
-        </svg>
-      );
+// 🟢 [추가] "진짜 이모지처럼 감쪽같이 만든" 커스텀 SVG 이모지 렌더러
+const renderKoreanEmoji = (id: string) => {
+  // text-2xl(24px) 크기에 딱 맞는 28px 사이즈 지정
+  const size = "28"; 
+  const style = { display: 'inline-block', verticalAlign: 'middle', filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.1))' };
+
+  if (id === 'seoul') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={style}>
+        {/* 🇰🇷 서울: 남산타워 (애플 이모지 스타일) */}
+        <path d="M4 30 C 4 22, 12 18, 16 18 C 20 18, 28 22, 28 30 Z" fill="url(#seoul-mt)" />
+        <defs>
+          <linearGradient id="seoul-mt" x1="16" y1="18" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#66BB6A"/><stop offset="1" stopColor="#388E3C"/>
+          </linearGradient>
+          <linearGradient id="seoul-deck" x1="10" y1="10" x2="22" y2="17" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#29B6F6"/><stop offset="1" stopColor="#0277BD"/>
+          </linearGradient>
+        </defs>
+        <path d="M13 22 L19 22 L17 14 L15 14 Z" fill="#E0E0E0"/>
+        <path d="M15 14 L17 14 L17 22 L15 22 Z" fill="#FFFFFF"/>
+        <path d="M10 14 C 10 11.5, 12 10, 16 10 C 20 10, 22 11.5, 22 14 C 22 16, 19 17, 16 17 C 13 17, 10 16, 10 14 Z" fill="url(#seoul-deck)"/>
+        <path d="M11 14 C 11 12.5, 13 11.5, 16 11.5 C 19 11.5, 21 12.5, 21 14 C 21 15, 19 15.5, 16 15.5 C 13 15.5, 11 15, 11 14 Z" fill="#E1F5FE" opacity="0.6"/>
+        <rect x="15.5" y="4" width="1" height="6" fill="#F44336"/>
+        <circle cx="16" cy="3" r="1.5" fill="#EF5350"/>
+        <rect x="14" y="6" width="4" height="1" fill="#E53935" rx="0.5"/>
+      </svg>
+    );
   }
+  if (id === 'busan') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={style}>
+        {/* 🇰🇷 부산: 광안대교 야경 (🌉 이모지 느낌) */}
+        <rect x="2" y="4" width="28" height="26" rx="6" fill="url(#busan-sky)"/>
+        <defs>
+          <linearGradient id="busan-sky" x1="16" y1="4" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#1A237E"/><stop offset="1" stopColor="#3949AB"/>
+          </linearGradient>
+          <linearGradient id="busan-water" x1="16" y1="25" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#0288D1"/><stop offset="1" stopColor="#01579B"/>
+          </linearGradient>
+        </defs>
+        <circle cx="24" cy="10" r="3" fill="#FFF59D"/>
+        <path d="M10 12 L12 12 L13 24 L9 24 Z" fill="#CFD8DC"/>
+        <path d="M20 12 L22 12 L23 24 L19 24 Z" fill="#CFD8DC"/>
+        <path d="M2 18 Q 11 26 16 18 T 30 18" stroke="#FFFFFF" strokeWidth="1" fill="none" opacity="0.8"/>
+        <rect x="2" y="22" width="28" height="2" fill="#FF5252"/>
+        <path d="M2 25 L30 25 L30 28 C 30 29.1 29.1 30 28 30 L4 30 C 2.9 30 2 29.1 2 28 Z" fill="url(#busan-water)"/>
+      </svg>
+    );
+  }
+  if (id === 'jeju') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={style}>
+        {/* 🇰🇷 제주: 돌하르방과 귤 (🗿 이모지 스타일) */}
+        <path d="M10 12 C 10 5, 22 5, 22 12 L 24 30 L 8 30 Z" fill="url(#jeju-stone)"/>
+        <defs>
+          <linearGradient id="jeju-stone" x1="10" y1="5" x2="24" y2="30" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#BDBDBD"/><stop offset="1" stopColor="#616161"/>
+          </linearGradient>
+        </defs>
+        <path d="M8 12 Q 16 15 24 12" stroke="#757575" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+        <circle cx="13" cy="16" r="2" fill="#424242"/>
+        <circle cx="19" cy="16" r="2" fill="#424242"/>
+        <path d="M15 18 L17 18 L18 21 L14 21 Z" fill="#757575"/>
+        <path d="M14 24 Q 16 25 18 24" stroke="#424242" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+        <path d="M10 26 C 12 25, 14 25, 16 27" stroke="#757575" strokeWidth="2" fill="none" strokeLinecap="round"/>
+        <path d="M22 23 C 20 22, 18 22, 16 24" stroke="#757575" strokeWidth="2" fill="none" strokeLinecap="round"/>
+        <circle cx="26" cy="26" r="4.5" fill="#FFB300"/>
+        <circle cx="25.5" cy="25.5" r="3.5" fill="#FFCA28"/>
+        <path d="M26 21.5 Q 28 19.5 29 20.5" stroke="#4CAF50" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+  return null;
 };
 
 return (
@@ -269,14 +253,14 @@ return (
                   className={
                     selectedCategory === cat.id
                       ? 'flex flex-col items-center gap-2 min-w-fit pb-2 transition-all border-b-2 cursor-pointer group border-black opacity-100'
-                      : 'flex flex-col items-center gap-2 min-w-fit pb-2 transition-all border-b-2 cursor-pointer group border-transparent opacity-50 hover:opacity-100 hover:border-slate-200'
+                      : 'flex flex-col items-center gap-2 min-w-fit pb-2 transition-all border-b-2 cursor-pointer group border-transparent opacity-60 hover:opacity-100 hover:border-slate-200'
                   }
                 >
-                  {/* 🟢 기존 이모지 대신 고해상도 SVG 벡터 아이콘 렌더링 */}
-                  <div className="flex items-center justify-center h-8 w-8">
-                    {getCategorySvg(cat.id)}
-                  </div>
-                  <span className={`text-[13px] font-bold whitespace-nowrap ${selectedCategory === cat.id ? 'text-slate-900' : 'text-slate-500'}`}>
+                  {/* 🟢 서울, 부산, 제주일 때만 가짜 이모지를 렌더링하고, 나머지는 원래 이모지 유지 */}
+                  <span className="text-2xl transition-transform group-hover:scale-110 flex items-center justify-center h-[32px]">
+                    {['seoul', 'busan', 'jeju'].includes(cat.id) ? renderKoreanEmoji(cat.id) : cat.icon}
+                  </span>
+                  <span className={`text-xs font-bold whitespace-nowrap ${selectedCategory === cat.id ? 'text-black' : 'text-slate-600'}`}>
                     {t(cat.label)}
                   </span>                
                 </button>
