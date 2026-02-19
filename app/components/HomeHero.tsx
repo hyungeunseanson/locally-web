@@ -47,54 +47,66 @@ setSelectedLanguage
 }: HomeHeroProps) {
 const { t } = useLanguage(); // 🟢 추가
 
-// 🟢 [추가] 애플 이모지 스타일(2.5D, 광택, 그라데이션) 완벽 재현 렌더러
+// 🟢 [추가] 애플 2.5D 이모지 완벽 재현 (남대문, 샌프란시스코형 다리, 모아이형 돌하르방)
 const renderKoreanEmoji = (id: string) => {
-  // text-2xl 사이즈에 자연스럽게 어울리도록 28px, 고화질용 viewBox 64x64 사용
+  // text-[14~17px] 크기에 맞춰 시각적으로 가장 자연스러운 28px 세팅
   const size = "28"; 
   const style = { 
     display: 'inline-block', 
     verticalAlign: 'middle', 
-    filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.15))' // 이모지 특유의 입체 그림자
+    filter: 'drop-shadow(0px 3px 4px rgba(0,0,0,0.2))' // 리얼 이모지 특유의 입체 그림자
   };
 
   if (id === 'seoul') {
     return (
       <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={style}>
-        {/* 🇰🇷 서울: 경복궁 (🏯 오사카성 이모지와 완벽한 통일감) */}
+        {/* 🇰🇷 서울: 숭례문/남대문 (한국 전통 성문 스타일, 2.5D 입체감) */}
         <defs>
-          <linearGradient id="roofGrad" x1="32" y1="6" x2="32" y2="28" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#00838F"/><stop offset="1" stopColor="#004D40"/>
-          </linearGradient>
-          <linearGradient id="woodGrad" x1="32" y1="20" x2="32" y2="52" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#D32F2F"/><stop offset="1" stopColor="#880E4F"/>
-          </linearGradient>
-          <linearGradient id="stoneGrad" x1="32" y1="50" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+          <linearGradient id="stoneBase" x1="32" y1="42" x2="32" y2="62" gradientUnits="userSpaceOnUse">
             <stop stopColor="#CFD8DC"/><stop offset="1" stopColor="#78909C"/>
+          </linearGradient>
+          <linearGradient id="woodPillar" x1="32" y1="20" x2="32" y2="42" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#C62828"/><stop offset="1" stopColor="#880E4F"/>
+          </linearGradient>
+          <linearGradient id="roofTile" x1="32" y1="6" x2="32" y2="30" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#37474F"/><stop offset="1" stopColor="#1C313A"/>
+          </linearGradient>
+          <linearGradient id="dancheong" x1="32" y1="34" x2="32" y2="38" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#2E7D32"/><stop offset="1" stopColor="#1B5E20"/>
           </linearGradient>
         </defs>
         
-        {/* 기단 (돌) */}
-        <path d="M6 50 L58 50 L62 60 L2 60 Z" fill="url(#stoneGrad)"/>
-        <path d="M6 50 L58 50 L58 52 L6 52 Z" fill="#FFFFFF" opacity="0.3"/> {/* 하이라이트 */}
+        {/* 돌기단 (육축) */}
+        <path d="M4 42 Q 8 42, 10 60 L 54 60 Q 56 42, 60 42 Z" fill="url(#stoneBase)"/>
+        <path d="M6 42 L58 42 L58 44 L6 44 Z" fill="#FFFFFF" opacity="0.4"/> {/* 기단 모서리 하이라이트 */}
         
-        {/* 1층 기둥 & 벽 (붉은색) */}
-        <rect x="12" y="34" width="40" height="16" fill="url(#woodGrad)"/>
-        <rect x="26" y="38" width="12" height="12" fill="#3E2723" rx="1"/> {/* 문 */}
+        {/* 아치형 홍예문 */}
+        <path d="M22 60 L 22 50 A 10 10 0 0 1 42 50 L 42 60 Z" fill="#111111"/>
+        <path d="M22 50 A 10 10 0 0 1 42 50" stroke="#455A64" strokeWidth="2" fill="none"/> {/* 아치 입체감 */}
         
-        {/* 1층 지붕 (청기와) */}
-        <path d="M2 34 Q 16 26 32 30 Q 48 26 62 34 L 56 26 Q 32 18 8 26 Z" fill="url(#roofGrad)"/>
-        <path d="M2 34 Q 16 26 32 30 Q 48 26 62 34" stroke="#4DD0E1" strokeWidth="1.5" fill="none"/> {/* 기와 빛 반사 */}
+        {/* 1층 붉은 기둥 (목조건물) */}
+        <rect x="14" y="28" width="36" height="14" fill="url(#woodPillar)"/>
+        <rect x="18" y="32" width="6" height="10" fill="#3E2723" rx="1"/> {/* 문짝 */}
+        <rect x="40" y="32" width="6" height="10" fill="#3E2723" rx="1"/>
         
-        {/* 2층 기둥 & 벽 */}
-        <rect x="18" y="20" width="28" height="10" fill="url(#woodGrad)"/>
-        <rect x="28" y="22" width="8" height="3" fill="#388E3C" rx="0.5"/> {/* 단청/현판 느낌 */}
+        {/* 1층 단청 (녹색 처마밑 장식) */}
+        <rect x="12" y="26" width="40" height="4" fill="url(#dancheong)" rx="1"/>
+        <rect x="12" y="26" width="40" height="1" fill="#81C784"/> {/* 단청 하이라이트 */}
         
-        {/* 2층 지붕 (메인) */}
-        <path d="M8 22 Q 20 12 32 16 Q 44 12 56 22 L 48 10 Q 32 4 16 10 Z" fill="url(#roofGrad)"/>
-        <path d="M8 22 Q 20 12 32 16 Q 44 12 56 22" stroke="#4DD0E1" strokeWidth="2" fill="none"/> {/* 기와 빛 반사 */}
+        {/* 1층 지붕 (우아한 처마 곡선) */}
+        <path d="M 4 28 C 16 18, 48 18, 60 28 C 50 24, 14 24, 4 28 Z" fill="url(#roofTile)"/>
+        <path d="M 4 28 C 16 18, 48 18, 60 28" stroke="#78909C" strokeWidth="1.5" fill="none"/> {/* 지붕 빛반사 */}
         
-        {/* 용마루 (지붕 꼭대기 장식) */}
-        <path d="M16 10 Q 32 4 48 10" stroke="#FFCA28" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+        {/* 2층 누각 */}
+        <rect x="20" y="14" width="24" height="10" fill="url(#woodPillar)"/>
+        <rect x="26" y="16" width="12" height="4" fill="#1B5E20" rx="0.5"/> {/* 현판 부위 */}
+        
+        {/* 2층 지붕 (팔작지붕 느낌) */}
+        <path d="M 8 16 C 20 6, 44 6, 56 16 C 44 10, 20 10, 8 16 Z" fill="url(#roofTile)"/>
+        <path d="M 8 16 C 20 6, 44 6, 56 16" stroke="#78909C" strokeWidth="2" fill="none"/> 
+        
+        {/* 용마루 (지붕 꼭대기 하얀 선) */}
+        <path d="M 22 6 Q 32 8 42 6" stroke="#CFD8DC" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
       </svg>
     );
   }
@@ -102,46 +114,51 @@ const renderKoreanEmoji = (id: string) => {
   if (id === 'busan') {
     return (
       <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={style}>
-        {/* 🇰🇷 부산: 광안대교 야경 (🌉 2.5D 샌프란시스코/야경 이모지 스타일) */}
+        {/* 🇰🇷 부산: 광안대교 샌프란시스코 야경 스타일 (🌉 애플 이모지 완벽 오마주) */}
         <defs>
-          <linearGradient id="skyGrad" x1="32" y1="4" x2="32" y2="44" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#1A237E"/><stop offset="1" stopColor="#6A1B9A"/>
+          <linearGradient id="nightSky" x1="32" y1="4" x2="32" y2="40" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#0D47A1"/><stop offset="1" stopColor="#4A148C"/>
           </linearGradient>
-          <linearGradient id="seaGrad" x1="32" y1="44" x2="32" y2="60" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#0277BD"/><stop offset="1" stopColor="#01579B"/>
+          <linearGradient id="bridgeRed" x1="32" y1="12" x2="32" y2="44" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#F44336"/><stop offset="1" stopColor="#B71C1C"/>
           </linearGradient>
-          <linearGradient id="bridgeGrad" x1="32" y1="12" x2="32" y2="44" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#B0BEC5"/><stop offset="1" stopColor="#455A64"/>
+          <linearGradient id="deepWater" x1="32" y1="46" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#01579B"/><stop offset="1" stopColor="#000000"/>
           </linearGradient>
         </defs>
         
-        {/* 둥근 사각형 배경 (이모지 특유의 풍경 뱃지 형태) */}
-        <rect x="2" y="4" width="60" height="56" rx="12" fill="url(#skyGrad)"/>
+        {/* 둥근 풍경 뱃지 */}
+        <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#nightSky)"/>
         
         {/* 별 & 달 */}
-        <circle cx="50" cy="16" r="4" fill="#FFF59D"/>
-        <circle cx="14" cy="12" r="1.5" fill="#FFFFFF" opacity="0.8"/>
-        <circle cx="24" cy="20" r="1" fill="#FFFFFF" opacity="0.6"/>
+        <circle cx="48" cy="18" r="5" fill="#FFF59D"/>
+        <circle cx="16" cy="14" r="1.5" fill="#FFFFFF" opacity="0.9"/>
+        <circle cx="28" cy="10" r="1" fill="#FFFFFF" opacity="0.6"/>
         
-        {/* 주탑 2개 (3D 효과를 위해 밝은 면/어두운 면 구분) */}
-        <path d="M18 16 L22 16 L24 44 L16 44 Z" fill="url(#bridgeGrad)"/>
-        <path d="M22 16 L24 16 L26 44 L24 44 Z" fill="#37474F"/> {/* 주탑 측면 그림자 */}
+        {/* 현수교 주탑 2개 (빨간색) */}
+        <rect x="18" y="16" width="6" height="28" fill="url(#bridgeRed)" rx="1"/>
+        <rect x="22" y="16" width="2" height="28" fill="#FFFFFF" opacity="0.2"/> {/* 기둥 하이라이트 */}
+        <rect x="40" y="16" width="6" height="28" fill="url(#bridgeRed)" rx="1"/>
+        <rect x="44" y="16" width="2" height="28" fill="#FFFFFF" opacity="0.2"/>
         
-        <path d="M42 16 L46 16 L48 44 L40 44 Z" fill="url(#bridgeGrad)"/>
-        <path d="M46 16 L48 16 L50 44 L48 44 Z" fill="#37474F"/>
+        {/* 현수교 꼭대기 가로보 */}
+        <rect x="16" y="22" width="10" height="3" fill="#D32F2F" rx="1"/>
+        <rect x="38" y="22" width="10" height="3" fill="#D32F2F" rx="1"/>
         
-        {/* 빛나는 현수교 케이블 (글로우 효과) */}
-        <path d="M2 34 Q 20 44 32 34 T 62 34" stroke="#FFCA28" strokeWidth="2.5" fill="none" opacity="0.9"/>
-        <path d="M2 34 Q 20 44 32 34 T 62 34" stroke="#FFE082" strokeWidth="1" fill="none"/>
+        {/* 케이블 (스우시 곡선) */}
+        <path d="M 4 28 Q 32 50 60 28" stroke="#EF5350" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+        <path d="M 4 28 Q 32 50 60 28" stroke="#FFFFFF" strokeWidth="1" fill="none" opacity="0.4"/> {/* 케이블 광택 */}
         
-        {/* 바다 & 물결 반사 */}
-        <path d="M2 44 L62 44 L62 48 C 62 54.6 56.6 60 50 60 L14 60 C 7.4 60 2 54.6 2 48 Z" fill="url(#seaGrad)"/>
-        <rect x="20" y="48" width="24" height="2" fill="#81D4FA" rx="1" opacity="0.6"/>
-        <rect x="28" y="52" width="16" height="2" fill="#81D4FA" rx="1" opacity="0.4"/>
+        {/* 다리 상판 */}
+        <rect x="4" y="42" width="56" height="4" fill="#C62828"/>
+        <rect x="4" y="42" width="56" height="1.5" fill="#FF8A80"/> {/* 상판 빛반사 */}
         
-        {/* 다리 상판 (두께감) */}
-        <rect x="2" y="40" width="60" height="4" fill="#F44336"/>
-        <rect x="2" y="40" width="60" height="1.5" fill="#FF8A80"/> {/* 상판 하이라이트 */}
+        {/* 하단 바다 영역 */}
+        <path d="M 4 46 L 60 46 L 60 46 C 60 53.7 53.7 60 46 60 L 18 60 C 10.3 60 4 53.7 4 46 Z" fill="url(#deepWater)"/>
+        
+        {/* 바다 물결 반사광 */}
+        <rect x="22" y="50" width="20" height="1.5" fill="#4FC3F7" rx="0.5" opacity="0.8"/>
+        <rect x="30" y="54" width="12" height="1.5" fill="#4FC3F7" rx="0.5" opacity="0.5"/>
       </svg>
     );
   }
@@ -149,42 +166,46 @@ const renderKoreanEmoji = (id: string) => {
   if (id === 'jeju') {
     return (
       <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={style}>
-        {/* 🇰🇷 제주: 돌하르방 + 귤 (🗿🍊 2.5D 볼륨감 극대화) */}
+        {/* 🇰🇷 제주: 한라산 + 모아이 스타일 리얼 돌하르방 (🏔️ + 🗿 조합) */}
         <defs>
-          <radialGradient id="stoneGrad" cx="30%" cy="30%" r="70%">
-            <stop stopColor="#9E9E9E"/><stop offset="1" stopColor="#424242"/>
-          </radialGradient>
-          <radialGradient id="tangerineGrad" cx="35%" cy="35%" r="65%">
-            <stop stopColor="#FFD54F"/><stop offset="0.6" stopColor="#FF9800"/><stop offset="1" stopColor="#E65100"/>
+          <linearGradient id="daySky" x1="32" y1="4" x2="32" y2="40" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#4FC3F7"/><stop offset="1" stopColor="#E1F5FE"/>
+          </linearGradient>
+          <linearGradient id="hallasan" x1="32" y1="20" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#66BB6A"/><stop offset="1" stopColor="#2E7D32"/>
+          </linearGradient>
+          <radialGradient id="moaiStone" cx="35%" cy="30%" r="70%">
+            <stop stopColor="#B0BEC5"/><stop offset="0.7" stopColor="#546E7A"/><stop offset="1" stopColor="#263238"/>
           </radialGradient>
         </defs>
         
-        {/* 돌하르방 몸통 (모아이 🗿 느낌의 질감과 볼륨) */}
-        <path d="M16 20 C 16 6, 40 6, 40 20 L 44 54 L 12 54 Z" fill="url(#stoneGrad)"/>
+        {/* 둥근 풍경 뱃지 배경 */}
+        <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#daySky)"/>
         
-        {/* 모자 챙 부분 그림자 */}
-        <path d="M14 20 Q 28 26 42 20" stroke="#212121" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.6"/>
+        {/* 구름 */}
+        <path d="M 12 20 Q 16 16 20 20 Q 24 18 28 22 L 12 22 Z" fill="#FFFFFF" opacity="0.9"/>
         
-        {/* 움푹 패인 눈 */}
-        <circle cx="22" cy="28" r="4" fill="#212121"/>
-        <circle cx="34" cy="28" r="4" fill="#212121"/>
-        <circle cx="23" cy="27" r="1.5" fill="#FFFFFF" opacity="0.2"/> {/* 눈빛 반사 */}
+        {/* 배경 한라산 (완만한 화산 지형) */}
+        <path d="M 4 60 L 22 30 L 32 30 L 52 60 Z" fill="url(#hallasan)"/>
+        <path d="M 22 30 L 32 30 L 34 34 L 20 34 Z" fill="#A5D6A7"/> {/* 분화구 부근 하이라이트 */}
         
-        {/* 뭉툭한 코 & 입 */}
-        <path d="M28 30 L 28 36" stroke="#616161" strokeWidth="6" strokeLinecap="round"/>
-        <path d="M28 36" stroke="#212121" strokeWidth="6" strokeLinecap="round" opacity="0.5" transform="translate(0, 2)"/> {/* 코 그림자 */}
-        <path d="M24 42 Q 28 44 32 42" stroke="#212121" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.7"/>
+        {/* 전경: 거대하고 무거운 모아이 스타일 돌하르방 (우측 배치) */}
+        <path d="M 36 18 C 36 10, 56 10, 56 18 L 60 60 L 32 60 Z" fill="url(#moaiStone)"/>
         
-        {/* 귤 (앞쪽에 겹치게 배치하여 3D 원근감 부여) */}
-        <circle cx="46" cy="46" r="14" fill="url(#tangerineGrad)"/>
+        {/* 돌하르방 이목구비 (깊고 입체적인 그림자) */}
+        <path d="M 38 28 Q 46 32 54 28" stroke="#37474F" strokeWidth="3" fill="none" strokeLinecap="round"/> {/* 무거운 눈썹뼈 */}
+        <path d="M 38 29 Q 46 33 54 29" stroke="#CFD8DC" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.4"/> {/* 눈썹뼈 빛반사 */}
         
-        {/* 귤 하이라이트 (광택) */}
-        <ellipse cx="40" cy="40" rx="4" ry="2" fill="#FFFFFF" opacity="0.6" transform="rotate(-30 40 40)"/>
+        <circle cx="42" cy="34" r="3" fill="#111111"/> {/* 푹 패인 눈 */}
+        <circle cx="50" cy="34" r="3" fill="#111111"/>
         
-        {/* 귤 꼭지와 잎사귀 */}
-        <circle cx="45" cy="34" r="1.5" fill="#33691E"/>
-        <path d="M46 34 Q 52 28 56 32 Q 52 38 46 34 Z" fill="#4CAF50"/>
-        <path d="M46 34 Q 52 28 56 32 Q 52 38 46 34 Z" stroke="#2E7D32" strokeWidth="1" fill="none"/>
+        <rect x="44" y="34" width="4" height="10" rx="2" fill="#455A64"/> {/* 뭉툭한 코 */}
+        <path d="M 48 34 L 48 44" stroke="#263238" strokeWidth="1" opacity="0.6"/> {/* 코 측면 그림자 */}
+        
+        <path d="M 42 48 Q 46 50 50 48" stroke="#263238" strokeWidth="2.5" fill="none" strokeLinecap="round"/> {/* 굳게 다문 입 */}
+        
+        {/* 돌하르방 몸통/팔 디테일 */}
+        <path d="M 34 54 C 40 54, 46 52, 46 52" stroke="#455A64" strokeWidth="4" fill="none" strokeLinecap="round"/> {/* 얹은 팔 */}
       </svg>
     );
   }
