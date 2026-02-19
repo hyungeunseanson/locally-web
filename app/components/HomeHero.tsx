@@ -76,32 +76,31 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-{/* 🟢 탭 버튼 (3D SVG 디자인 적용) */}
-
-          <div
+{/* 🟢 탭 버튼 (미니멀하고 귀여운 사이즈로 재조정) */}
+<div
             className={
               isScrolled
                 ? 'flex gap-8 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
-                : 'flex gap-12 mb-6 transition-all duration-300 opacity-100 translate-y-0 h-auto'
+                : 'flex gap-10 mb-4 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
             {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`flex flex-col items-center transition-all duration-300 outline-none ${
+              className={`relative flex flex-col items-center transition-all duration-300 outline-none pt-2 ${
                 activeTab === 'experience' 
                   ? 'opacity-100 scale-105' 
-                  : 'opacity-40 hover:opacity-80 grayscale-[30%] hover:grayscale-0 scale-100'
+                  : 'opacity-40 hover:opacity-80 grayscale-[50%] hover:grayscale-0 scale-100'
               }`}
             >
-              {/* NEW 라벨 */}
-              <div className="bg-[#0066CC] text-white text-[11px] font-bold px-3 py-0.5 rounded-full mb-2 tracking-wide shadow-sm">
+              {/* 아주 작고 앙증맞은 NEW 라벨 (아이콘 위로 살짝 겹침) */}
+              <div className="absolute -top-1 bg-[#0066CC] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-wider shadow-sm z-10">
                 NEW
               </div>
               
-              {/* 아이콘 (높이를 60px로 고정하여 두 아이콘의 하단 라인을 맞춤) */}
-              <div className="h-[60px] flex items-end justify-center mb-2">
-                <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+              {/* 아이콘 (높이 32px 수준으로 대폭 축소) */}
+              <div className="h-[32px] flex items-end justify-center mb-1.5">
+                <svg width="26" height="32" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm">
                   <defs>
                     <linearGradient id="balloonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                       <stop offset="0%" stopColor="#FFCC00" />
@@ -110,7 +109,7 @@ export default function HomeHero({
                     </linearGradient>
                   </defs>
                   <path d="M25 0 C10 20, 10 40, 25 60 C40 40, 40 20, 25 0" fill="url(#balloonGrad)" />
-                  <path d="M15 10 C20 15, 20 25, 15 30" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeOpacity="0.2" />
+                  <path d="M15 10 C20 15, 20 25, 15 30" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeOpacity="0.3" />
                   <path d="M35 10 C30 15, 30 25, 35 30" fill="none" stroke="#000000" strokeWidth="2" strokeOpacity="0.1" />
                   <line x1="20" y1="50" x2="20" y2="55" stroke="#663300" strokeWidth="1" />
                   <line x1="25" y1="50" x2="25" y2="55" stroke="#663300" strokeWidth="1" />
@@ -122,7 +121,7 @@ export default function HomeHero({
               </div>
               
               {/* 텍스트 및 에어비앤비 스타일 하단 라인 */}
-              <span className={`text-[15px] font-bold pb-1 border-b-[3px] transition-all ${
+              <span className={`text-[15px] font-bold pb-2 border-b-[3px] transition-all ${
                 activeTab === 'experience' ? 'text-black border-black' : 'text-[#333333] border-transparent'
               }`}>
                 {t('cat_exp')}
@@ -132,20 +131,20 @@ export default function HomeHero({
             {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`flex flex-col items-center transition-all duration-300 outline-none ${
+              className={`relative flex flex-col items-center transition-all duration-300 outline-none pt-2 ${
                 activeTab === 'service' 
                   ? 'opacity-100 scale-105' 
-                  : 'opacity-40 hover:opacity-80 grayscale-[30%] hover:grayscale-0 scale-100'
+                  : 'opacity-40 hover:opacity-80 grayscale-[50%] hover:grayscale-0 scale-100'
               }`}
             >
               {/* NEW 라벨 */}
-              <div className="bg-[#0066CC] text-white text-[11px] font-bold px-3 py-0.5 rounded-full mb-2 tracking-wide shadow-sm">
+              <div className="absolute -top-1 bg-[#0066CC] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-wider shadow-sm z-10">
                 NEW
               </div>
               
-              {/* 아이콘 (체험 탭과 높이를 맞추기 위해 h-[60px] 유지) */}
-              <div className="h-[60px] flex items-end justify-center mb-2">
-                <svg width="50" height="50" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+              {/* 아이콘 (종 크기를 열기구와 밸런스 맞춤) */}
+              <div className="h-[32px] flex items-end justify-center mb-1.5">
+                <svg width="26" height="26" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm">
                   <defs>
                     <linearGradient id="bellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                       <stop offset="0%" stopColor="#CCCCCC" />
@@ -162,7 +161,7 @@ export default function HomeHero({
               </div>
               
               {/* 텍스트 및 에어비앤비 스타일 하단 라인 */}
-              <span className={`text-[15px] font-bold pb-1 border-b-[3px] transition-all ${
+              <span className={`text-[15px] font-bold pb-2 border-b-[3px] transition-all ${
                 activeTab === 'service' ? 'text-black border-black' : 'text-[#333333] border-transparent'
               }`}>
                 {t('cat_service')}
