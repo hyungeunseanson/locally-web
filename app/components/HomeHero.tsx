@@ -92,7 +92,7 @@ export default function HomeHero({
               }`}
             >
               {/* 아이콘 영역 (54px - 텍스트 대비 약 2.5배 체감 크기) */}
-              <div className="relative w-[54px] h-[54px] flex items-center justify-center shrink-0">
+              <div className="relative w-[90px] h-[90px] flex items-center justify-center shrink-0">
                 {/* NEW 배지 (좌측 상단에 딱 맞게) */}
                 <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[10px] font-bold px-1.5 py-[2px] rounded-full shadow-sm z-10 tracking-wide border border-white transform -translate-x-1 translate-y-1">
                   NEW
@@ -121,7 +121,7 @@ export default function HomeHero({
               }`}
             >
               {/* 아이콘 영역 (54px) */}
-              <div className="relative w-[54px] h-[54px] flex items-center justify-center shrink-0">
+              <div className="relative w-[90px] h-[90px] flex items-center justify-center shrink-0">
                 {/* NEW 배지 */}
                 <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[10px] font-bold px-1.5 py-[2px] rounded-full shadow-sm z-10 tracking-wide border border-white transform -translate-x-1 translate-y-1">
                   NEW
