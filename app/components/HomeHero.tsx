@@ -76,7 +76,7 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-{/* 🟢 탭 버튼 (고화질 3D 벡터 아이콘 + CSS 애니메이션) */}
+{/* 🟢 탭 버튼 (비율 완벽 수정: 동글동글한 3D 아이콘) */}
 <div
             className={
               isScrolled
@@ -84,7 +84,7 @@ export default function HomeHero({
                 : 'flex gap-12 mb-6 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
-            {/* 🎈 체험 탭 (High-Quality 3D Balloon) */}
+            {/* 🎈 체험 탭 (둥근 열기구 형태) */}
             <button
               onClick={() => setActiveTab('experience')}
               className={`relative flex flex-col items-center group transition-all duration-300 outline-none ${
@@ -98,32 +98,33 @@ export default function HomeHero({
                 NEW
               </div>
               
-              {/* 아이콘: 고화질 SVG (크기 44px로 시원하게 키움) */}
+              {/* 아이콘: 44px (동그란 비율) */}
               <div className="h-[48px] flex items-end justify-center mb-1">
-                <svg width="44" height="48" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg" className={`drop-shadow-sm transition-transform duration-500 ${activeTab === 'experience' ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'}`}>
+                <svg width="44" height="44" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" className={`drop-shadow-sm transition-transform duration-500 ${activeTab === 'experience' ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'}`}>
                   <defs>
                     <linearGradient id="balloonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="#FFCC00" />
-                      <stop offset="50%" stopColor="#FF6600" />
-                      <stop offset="100%" stopColor="#CC0000" />
+                      <stop offset="0%" stopColor="#FFC107" /> {/* 밝은 노랑 */}
+                      <stop offset="50%" stopColor="#FF5722" /> {/* 주황 */}
+                      <stop offset="100%" stopColor="#D84315" /> {/* 진한 주황 */}
                     </linearGradient>
-                    <radialGradient id="balloonShine" cx="30%" cy="30%" r="50%">
-                      <stop offset="0%" stopColor="white" stopOpacity="0.4"/>
+                    <radialGradient id="balloonShine" cx="30%" cy="30%" r="60%">
+                      <stop offset="0%" stopColor="white" stopOpacity="0.5"/>
                       <stop offset="100%" stopColor="white" stopOpacity="0"/>
                     </radialGradient>
                   </defs>
-                  {/* 풍선 본체 */}
-                  <path d="M25 0 C10 20, 10 40, 25 60 C40 40, 40 20, 25 0" fill="url(#balloonGrad)" />
-                  {/* 입체광 (하이라이트) */}
-                  <ellipse cx="18" cy="15" rx="8" ry="12" fill="url(#balloonShine)" transform="rotate(-15 18 15)" />
                   
-                  {/* 줄 & 바구니 */}
+                  {/* 풍선 본체 (훨씬 둥글게 수정됨) */}
+                  <path d="M25 2 C 11 2, 2 16, 25 40 C 48 16, 39 2, 25 2" fill="url(#balloonGrad)" />
+                  {/* 하이라이트 (광택) */}
+                  <ellipse cx="16" cy="14" rx="8" ry="6" fill="url(#balloonShine)" transform="rotate(-20 16 14)" />
+                  
+                  {/* 줄 & 바구니 (위치 조정) */}
                   <g stroke="#5D4037" strokeWidth="1.2">
-                    <line x1="20" y1="50" x2="20" y2="55" />
-                    <line x1="25" y1="50" x2="25" y2="55" />
-                    <line x1="30" y1="50" x2="30" y2="55" />
+                    <line x1="20" y1="40" x2="19" y2="45" />
+                    <line x1="25" y1="40" x2="25" y2="45" />
+                    <line x1="30" y1="40" x2="31" y2="45" />
                   </g>
-                  <rect x="18" y="55" width="14" height="5" fill="#795548" rx="1" />
+                  <rect x="18" y="45" width="14" height="4" fill="#795548" rx="1" />
                 </svg>
               </div>
               
@@ -135,7 +136,7 @@ export default function HomeHero({
               </span>
             </button>
 
-            {/* 🛎️ 서비스 탭 (High-Quality 3D Bell) */}
+            {/* 🛎️ 서비스 탭 (납작하고 귀여운 종) */}
             <button
               onClick={() => setActiveTab('service')}
               className={`relative flex flex-col items-center group transition-all duration-300 outline-none ${
@@ -149,29 +150,30 @@ export default function HomeHero({
                 NEW
               </div>
               
-              {/* 아이콘: 고화질 SVG (크기 44px) */}
+              {/* 아이콘: 44px */}
               <div className="h-[48px] flex items-end justify-center mb-1">
                 <svg width="44" height="44" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" className={`drop-shadow-sm transition-transform duration-500 origin-top ${activeTab === 'service' ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-6'}`}>
                   <defs>
                     <linearGradient id="bellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                       <stop offset="0%" stopColor="#F5F5F5" />
-                      <stop offset="100%" stopColor="#BDBDBD" />
-                    </linearGradient>
-                    <linearGradient id="bellMetal" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#E0E0E0" />
-                      <stop offset="50%" stopColor="#FFFFFF" />
-                      <stop offset="100%" stopColor="#9E9E9E" />
+                      <stop offset="100%" stopColor="#B0BEC5" />
                     </linearGradient>
                   </defs>
-                  {/* 종 본체 */}
-                  <path d="M10 40 C10 18, 40 18, 40 40 L25 48 L10 40" fill="url(#bellGrad)" />
-                  {/* 금속 광택 효과 */}
-                  <path d="M15 25 C15 20, 20 20, 20 25" fill="none" stroke="white" strokeWidth="2" strokeOpacity="0.6" />
                   
-                  {/* 손잡이 & 받침 */}
-                  <circle cx="25" cy="12" r="4" fill="#333333" />
-                  <rect x="10" y="38" width="30" height="3" fill="#D32F2F" rx="1" />
-                  <ellipse cx="25" cy="46" rx="12" ry="2" fill="#333333" fillOpacity="0.2" />
+                  {/* 손잡이 (검정 구슬) */}
+                  <circle cx="25" cy="10" r="4" fill="#37474F" />
+                  
+                  {/* 종 본체 (납작하게 조정) */}
+                  <path d="M12 40 C 12 20, 38 20, 38 40 L 25 40 Z" fill="url(#bellGrad)" stroke="#90A4AE" strokeWidth="0.5"/> 
+                  {/* 실제 종 모양 Path 수정 */}
+                  <path d="M10 40 C 10 22, 40 22, 40 40 L 25 48 L 10 40" fill="url(#bellGrad)" />
+                  
+                  {/* 광택 라인 */}
+                  <path d="M16 26 C 16 22, 22 22, 20 28" fill="none" stroke="white" strokeWidth="2.5" strokeOpacity="0.7" strokeLinecap="round" />
+
+                  {/* 받침대 & 타격점 */}
+                  <rect x="10" y="38" width="30" height="3" fill="#E53935" rx="1.5" />
+                  <circle cx="25" cy="46" r="3" fill="#37474F" opacity="0.3" />
                 </svg>
               </div>
               
