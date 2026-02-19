@@ -76,70 +76,66 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-{/* 🟢 탭 버튼 (이미지 100% 동일 디자인 적용) */}
+{/* 🟢 탭 버튼 (가로 배치, 사이즈 확대, 고화질 이미지 적용) */}
 <div
             className={
               isScrolled
                 ? 'flex gap-8 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
-                : 'flex gap-12 mb-6 transition-all duration-300 opacity-100 translate-y-0 h-auto'
+                : 'flex gap-8 mb-8 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
-            {/* 🎈 체험 탭 (열기구 이미지 적용) */}
+            {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`flex flex-col items-center group transition-all duration-300 outline-none ${
-                activeTab === 'experience' 
-                  ? 'opacity-100 scale-105' 
-                  : 'opacity-50 hover:opacity-100 grayscale-[40%] hover:grayscale-0 scale-100'
+              className={`group flex items-center gap-3 px-6 py-3 rounded-full transition-all duration-300 outline-none hover:bg-slate-50 ${
+                activeTab === 'experience' ? 'opacity-100' : 'opacity-60 hover:opacity-100 grayscale-[40%] hover:grayscale-0'
               }`}
             >
-              {/* NEW 배지 (파란색 알약 모양) */}
-              <div className="bg-[#0066CC] text-white text-[10px] font-bold px-2 py-[2px] rounded-full shadow-sm mb-1 tracking-wide">
-                NEW
-              </div>
-              
-              {/* 아이콘: 고품질 3D 이미지 에셋 사용 */}
-              <div className="h-[48px] flex items-end justify-center mb-2">
+              {/* 아이콘 영역 */}
+              <div className="relative w-14 h-14 flex items-center justify-center">
+                {/* NEW 배지 (이미지 좌측 상단에 살짝 걸치게) */}
+                <div className="absolute -top-1 -left-1 bg-[#0066CC] text-white text-[10px] font-black px-2 py-[2px] rounded-full shadow-sm z-10 tracking-wide">
+                  NEW
+                </div>
+                {/* 고화질 이미지 */}
                 <img 
                   src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240" 
                   alt="체험" 
-                  className="w-11 h-11 object-contain drop-shadow-sm transition-transform group-hover:scale-110"
+                  className="w-full h-full object-contain drop-shadow-sm transition-transform group-hover:scale-110"
                 />
               </div>
               
-              {/* 텍스트 (밑줄 제거됨) */}
-              <span className={`text-[15px] font-bold transition-all ${
+              {/* 텍스트 (우측 배치, 크기 확대) */}
+              <span className={`text-lg font-bold ${
                 activeTab === 'experience' ? 'text-black' : 'text-[#717171]'
               }`}>
                 {t('cat_exp')}
               </span>
             </button>
 
-            {/* 🛎️ 서비스 탭 (서빙 종 이미지 적용) */}
+            {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`flex flex-col items-center group transition-all duration-300 outline-none ${
-                activeTab === 'service' 
-                  ? 'opacity-100 scale-105' 
-                  : 'opacity-50 hover:opacity-100 grayscale-[40%] hover:grayscale-0 scale-100'
+              className={`group flex items-center gap-3 px-6 py-3 rounded-full transition-all duration-300 outline-none hover:bg-slate-50 ${
+                activeTab === 'service' ? 'opacity-100' : 'opacity-60 hover:opacity-100 grayscale-[40%] hover:grayscale-0'
               }`}
             >
-              {/* NEW 배지 (파란색 알약 모양) */}
-              <div className="bg-[#0066CC] text-white text-[10px] font-bold px-2 py-[2px] rounded-full shadow-sm mb-1 tracking-wide">
-                NEW
-              </div>
-              
-              {/* 아이콘: 고품질 3D 이미지 에셋 사용 */}
-              <div className="h-[48px] flex items-end justify-center mb-2">
+              {/* 아이콘 영역 */}
+              <div className="relative w-14 h-14 flex items-center justify-center">
+                {/* NEW 배지 */}
+                <div className="absolute -top-1 -left-1 bg-[#0066CC] text-white text-[10px] font-black px-2 py-[2px] rounded-full shadow-sm z-10 tracking-wide">
+                  NEW
+                </div>
+                {/* 고화질 이미지 */}
                 <img 
                   src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240" 
                   alt="서비스" 
-                  className="w-11 h-11 object-contain drop-shadow-sm transition-transform group-hover:scale-110"
+                  className="w-full h-full object-contain drop-shadow-sm transition-transform group-hover:scale-110"
                 />
               </div>
               
-              {/* 텍스트 (밑줄 제거됨) */}
-              <span className={`text-[15px] font-bold transition-all ${
+              {/* 텍스트 (우측 배치, 크기 확대) */}
+              <span className={`text-lg font-bold ${
                 activeTab === 'service' ? 'text-black' : 'text-[#717171]'
               }`}>
                 {t('cat_service')}
