@@ -77,7 +77,7 @@ export default function HomeHero({
         <div className="flex flex-col items-center relative">
           
 {/* 🟢 탭 버튼 (3D SVG 디자인 적용) */}
-<d{/* 🟢 탭 버튼 (대표님 원본 HTML 스타일 100% 반영) */}
+
           <div
             className={
               isScrolled
