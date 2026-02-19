@@ -81,13 +81,13 @@ export default function HomeHero({
             className={
               isScrolled
                 ? 'flex gap-6 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
-                : 'flex gap-8 mb-8 transition-all duration-300 opacity-100 translate-y-0 h-auto'
+                : 'flex gap-8 mb-4 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
             {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`group flex items-center gap-4 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${
+              className={`group flex items-center gap-2 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${
                 activeTab === 'experience' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
               }`}
             >
@@ -116,7 +116,7 @@ export default function HomeHero({
             {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`group flex items-center gap-4 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${
+              className={`group flex items-center gap-2 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${
                 activeTab === 'service' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
               }`}
             >
