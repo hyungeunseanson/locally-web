@@ -76,25 +76,27 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-{/* 🟢 탭 버튼 (아이콘 확대, 텍스트 축소, 비율 최적화) */}
+{/* 🟢 탭 버튼 (Airbnb 스타일 완벽 비율 & 미세 조정 적용) */}
 <div
             className={
               isScrolled
-                ? 'flex gap-8 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
+                ? 'flex gap-4 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
                 : 'flex gap-6 mb-8 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
             {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`group flex items-center gap-2 pr-6 pl-2 py-2 rounded-full transition-all duration-300 outline-none hover:bg-slate-50/80 ${
-                activeTab === 'experience' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+              className={`group flex items-center gap-3 pl-1 pr-5 py-2 rounded-full transition-all duration-200 outline-none ${
+                activeTab === 'experience' 
+                  ? 'opacity-100 hover:bg-slate-50' 
+                  : 'opacity-60 hover:opacity-100 hover:bg-slate-50'
               }`}
             >
-              {/* 아이콘 영역 (64px로 확대) */}
-              <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
-                {/* NEW 배지 (좌측 상단, 아이콘에 살짝 걸치게) */}
-                <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[9px] font-black px-1.5 py-[1px] rounded-full shadow-sm z-10 tracking-wide transform -translate-x-1 translate-y-1">
+              {/* 아이콘 영역 (44px - 최적의 고급스러운 크기) */}
+              <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
+                {/* NEW 배지 (아이콘 우측 상단에 정밀 배치) */}
+                <div className="absolute -top-0.5 -right-1 bg-[#0066CC] text-white text-[9px] font-bold px-1.5 py-[1px] rounded-full shadow-sm z-10 tracking-wide border border-white">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
@@ -105,9 +107,9 @@ export default function HomeHero({
                 />
               </div>
               
-              {/* 텍스트 (크기 줄임: 14px) */}
-              <span className={`text-[14px] font-bold whitespace-nowrap ${
-                activeTab === 'experience' ? 'text-black' : 'text-[#717171]'
+              {/* 텍스트 (15px, SemiBold, #222222 색상 적용) */}
+              <span className={`text-[15px] font-semibold whitespace-nowrap tracking-tight ${
+                activeTab === 'experience' ? 'text-[#222222]' : 'text-[#717171]'
               }`}>
                 {t('cat_exp')}
               </span>
@@ -116,14 +118,16 @@ export default function HomeHero({
             {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`group flex items-center gap-2 pr-6 pl-2 py-2 rounded-full transition-all duration-300 outline-none hover:bg-slate-50/80 ${
-                activeTab === 'service' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+              className={`group flex items-center gap-3 pl-1 pr-5 py-2 rounded-full transition-all duration-200 outline-none ${
+                activeTab === 'service' 
+                  ? 'opacity-100 hover:bg-slate-50' 
+                  : 'opacity-60 hover:opacity-100 hover:bg-slate-50'
               }`}
             >
-              {/* 아이콘 영역 (64px로 확대) */}
-              <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+              {/* 아이콘 영역 (44px) */}
+              <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
                 {/* NEW 배지 */}
-                <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[9px] font-black px-1.5 py-[1px] rounded-full shadow-sm z-10 tracking-wide transform -translate-x-1 translate-y-1">
+                <div className="absolute -top-0.5 -right-1 bg-[#0066CC] text-white text-[9px] font-bold px-1.5 py-[1px] rounded-full shadow-sm z-10 tracking-wide border border-white">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
@@ -134,9 +138,9 @@ export default function HomeHero({
                 />
               </div>
               
-              {/* 텍스트 (크기 줄임: 14px) */}
-              <span className={`text-[14px] font-bold whitespace-nowrap ${
-                activeTab === 'service' ? 'text-black' : 'text-[#717171]'
+              {/* 텍스트 (15px, SemiBold) */}
+              <span className={`text-[15px] font-semibold whitespace-nowrap tracking-tight ${
+                activeTab === 'service' ? 'text-[#222222]' : 'text-[#717171]'
               }`}>
                 {t('cat_service')}
               </span>
