@@ -288,8 +288,8 @@ function PaymentContent() {
     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
       <p className="text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
       <div className="flex items-center gap-2 mb-2">
-        <span className="font-black text-lg text-slate-900">3333-14-0254739</span>
-        <span className="text-xs font-bold bg-yellow-300 px-1.5 py-0.5 rounded text-black">카카오뱅크</span>
+        <span className="font-black text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
+        <span className="text-xs font-bold bg-yellow-300 px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
       </div>
       <p className="text-xs text-slate-400">
         * 예약 후 <span className="text-rose-500 font-bold">1시간 이내</span>에 미입금 시 자동 취소됩니다.

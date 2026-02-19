@@ -1,41 +1,66 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
+
+function verifySignature(signData: string, ediDate: string, amount: string, mid: string, key: string): boolean {
+  try {
+    const data = ediDate + mid + amount + key;
+    const hash = crypto.createHash('sha256').update(data).digest('hex');
+    return hash === signData;
+  } catch (error) {
+    console.error('Signature verification failed:', error);
+    return false;
+  }
+}
 
 export async function POST(request: Request) {
-  console.log('🚨 [DEBUG] 결제 콜백 시작 (금액 검증 제외 버전)');
+  // [L-1] Removed debug log with sensitive info
+  console.log('🔒 [SECURE] Payment Callback Received');
 
   try {
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
+    const MID = process.env.NICEPAY_MID;
 
-    if (!SUPABASE_URL || !SERVICE_KEY) {
+    if (!SUPABASE_URL || !SERVICE_KEY || !MER_KEY || !MID) {
+      console.error('Missing Server Configuration');
       return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
     }
 
-    let resCode: any = '';
-    let amount: any = 0;
-    let orderId: any = '';
-    let tid: any = '';
+    let resCode: string = '';
+    let amount: string = '';
+    let orderId: string = '';
+    let tid: string = '';
+    let signData: string = '';
+    let ediDate: string = '';
 
     const contentType = request.headers.get('content-type') || '';
     
     if (contentType.includes('application/json')) {
       const json = await request.json();
-      const isSuccess = json.success === true || json.code === '0' || json.status === 'paid' || (json.imp_uid && !json.error_msg);
-      resCode = isSuccess ? '0000' : '9999';
-      amount = json.paid_amount || json.amount;
-      orderId = json.merchant_uid || json.orderId;
-      tid = json.pg_tid || json.imp_uid;
+      resCode = json.resCode || json.resultCode || '';
+      amount = (json.paid_amount || json.amount || '').toString();
+      orderId = json.merchant_uid || json.orderId || '';
+      tid = json.pg_tid || json.imp_uid || '';
+      signData = json.signData || '';
+      ediDate = json.ediDate || '';
     } else {
       const formData = await request.formData();
-      resCode = formData.get('resCode') || '0000'; 
-      amount = formData.get('amt');
-      orderId = formData.get('moid');
-      tid = formData.get('tid');
+      resCode = formData.get('resCode')?.toString() || '';
+      amount = formData.get('amt')?.toString() || '';
+      orderId = formData.get('moid')?.toString() || '';
+      tid = formData.get('tid')?.toString() || '';
+      signData = formData.get('signData')?.toString() || '';
+      ediDate = formData.get('ediDate')?.toString() || '';
     }
 
-    console.log(`🔍 [DEBUG] 주문ID: ${orderId}, 결제금액: ${amount}, 코드: ${resCode}`);
+    // [C-2] Security: Verify Signature
+    if (!verifySignature(signData, ediDate, amount, MID, MER_KEY)) {
+      console.error(`🚨 [SECURITY] Signature Mismatch! Order: ${orderId}`);
+      throw new Error('Invalid Signature');
+    }
 
     if (resCode === '0000') { 
       const supabase = createClient(SUPABASE_URL, SERVICE_KEY);

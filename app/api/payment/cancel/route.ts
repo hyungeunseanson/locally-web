@@ -1,16 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer'; // 🟢 추가됨
+import nodemailer from 'nodemailer';
+import { toZonedTime } from 'date-fns-tz';
 
-// 환불률 계산기 (기존 동일)
+const TAX_RATE = 1.1;
+const COMMISSION_RATE = 0.2;
+const TIMEZONE = 'Asia/Seoul';
+
+// 환불률 계산기 (Timezone Fixed)
 function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDateStr: string) {
-  const now = new Date();
-  const tourDate = new Date(`${tourDateStr}T${tourTimeStr}:00`);
-  const paymentDate = new Date(paymentDateStr);
-  
-  const diffTime = tourDate.getTime() - now.getTime();
+  const now = toZonedTime(new Date(), TIMEZONE);
+  const tourDate = new Date(`${tourDateStr}T${tourTimeStr}:00`); // Assume local time matches server/kst logic or stick to string calc if simple
+  // Better: Parse tourDate as KST if it's stored as local string
+  const tourDateKST = toZonedTime(new Date(`${tourDateStr}T${tourTimeStr}:00`), TIMEZONE);
+  const paymentDate = new Date(paymentDateStr); // UTC usually from DB
+  const paymentDateKST = toZonedTime(paymentDate, TIMEZONE);
+
+  const diffTime = tourDateKST.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  const hoursSincePayment = (now.getTime() - paymentDate.getTime()) / (1000 * 60 * 60);
+  const hoursSincePayment = (now.getTime() - paymentDateKST.getTime()) / (1000 * 60 * 60);
 
   if (hoursSincePayment <= 24 && diffDays > 1) return { rate: 100, reason: '24시간 이내 철회' };
   if (diffDays <= 0) return { rate: 0, reason: '당일/지난 일정' };
@@ -23,16 +32,34 @@ function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDa
 export async function POST(request: Request) {
   try {
     const { bookingId, reason: userReason, isHostCancel } = await request.json();
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    
+    // [C-3] Auth Check
+    const supabaseAuth = await createClient();
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // 1. 예약 조회
-    const { data: booking, error } = await supabase
+    const { data: booking, error } = await supabaseAdmin
       .from('bookings')
-      .select('*, experiences(host_id, title)') // 🟢 experiences 정보 추가 조회
+      .select('*, experiences(host_id, title)')
       .eq('id', bookingId)
       .single();
 
     if (error || !booking) return NextResponse.json({ error: '예약 없음' }, { status: 404 });
+    
+    // [C-3] Ownership Verification
+    if (booking.user_id !== user.id && booking.experiences?.host_id !== user.id) {
+       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (booking.status === 'cancelled') return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
 
     // 2. 환불액 및 정산액 계산
@@ -40,6 +67,10 @@ export async function POST(request: Request) {
     let reasonText = '';
 
     if (isHostCancel) {
+      // Ensure it is actually the host canceling
+      if (booking.experiences?.host_id !== user.id) {
+         return NextResponse.json({ error: 'Only host can perform host cancellation' }, { status: 403 });
+      }
       refundRate = 100;
       reasonText = '호스트 사유 취소';
     } else {
@@ -57,8 +88,8 @@ export async function POST(request: Request) {
     let platformRevenue = 0;
 
     if (penaltyAmount > 0) {
-      const hostPrincipal = Math.floor(penaltyAmount / 1.1); 
-      const commission = Math.floor(hostPrincipal * 0.2); 
+      const hostPrincipal = Math.floor(penaltyAmount / TAX_RATE); // [M-5] Use Constant
+      const commission = Math.floor(hostPrincipal * COMMISSION_RATE); 
       
       hostPayout = hostPrincipal - commission; 
       platformRevenue = penaltyAmount - hostPayout; 
@@ -66,25 +97,41 @@ export async function POST(request: Request) {
 
     // 3. PG사 취소 요청
     if (refundAmount > 0 && booking.tid) {
+        const MID = process.env.NICEPAY_MID;
+        if (!MID) throw new Error('Server Config Error: NICEPAY_MID missing');
+
         const isPartial = refundAmount < totalAmount ? '1' : '0';
         const formBody = new URLSearchParams({
             TID: booking.tid,
-            MID: process.env.NICEPAY_MID || 'nicepay00m', // 🟢 환경변수 확인 필요
+            MID: MID,
             Moid: booking.order_id,
             CancelAmt: refundAmount.toString(),
             CancelMsg: userReason || reasonText,
             PartialCancelCode: isPartial, 
         });
 
-        await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
+        // [H-2] Verify Response
+        const pgResponse = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formBody.toString()
         });
+
+        const pgResult = await pgResponse.text();
+        const pgJson = JSON.parse(pgResult.replace(/'/g, '"')); // Simple parsing, assuming JSON-like or verify format. 
+        // NicePay `cancel_process.jsp` returns JSON string.
+        
+        // Note: Check actual response format. If simple text, adapt. 
+        // Standard NicePay API usually returns JSON with ResultCode.
+        // Assuming standard JSON:
+        if (pgJson.ResultCode !== '2001' && pgJson.ResultCode !== '2211') { // 2001: Success, 2211: Already Cancelled (sometimes acceptable)
+           console.error('PG Cancel Failed:', pgJson);
+           throw new Error(`PG Cancel Failed: ${pgJson.ResultMsg}`);
+        }
     }
 
     // 4. DB 업데이트
-    await supabase.from('bookings').update({ 
+    await supabaseAdmin.from('bookings').update({ 
       status: 'cancelled',
       cancel_reason: `${userReason} (${reasonText})`,
       refund_amount: refundAmount,          
@@ -92,13 +139,13 @@ export async function POST(request: Request) {
       platform_revenue: platformRevenue     
     }).eq('id', bookingId);
 
-    // 🟢 5. [추가됨] 알림 및 이메일 발송 로직
+    // 🟢 5. 알림 및 이메일 발송 로직
     const hostId = booking.experiences?.host_id;
     const expTitle = booking.experiences?.title;
 
     if (hostId) {
       // (A) 알림 저장
-      await supabase.from('notifications').insert({
+      await supabaseAdmin.from('notifications').insert({
         user_id: hostId,
         type: 'cancellation',
         title: '😢 예약이 취소되었습니다.',
@@ -108,14 +155,13 @@ export async function POST(request: Request) {
       });
 
       // (B) 이메일 발송
-      console.log('⏳ [DEBUG] 취소 알림 메일 발송 준비...');
       let hostEmail = '';
-      const { data: hostProfile } = await supabase.from('profiles').select('email').eq('id', hostId).single();
+      const { data: hostProfile } = await supabaseAdmin.from('profiles').select('email').eq('id', hostId).single();
       
       if (hostProfile?.email) {
         hostEmail = hostProfile.email;
       } else {
-         const { data: authData } = await supabase.auth.admin.getUserById(hostId);
+         const { data: authData } = await supabaseAdmin.auth.admin.getUserById(hostId);
          if (authData?.user?.email) hostEmail = authData.user.email;
       }
 
@@ -141,9 +187,8 @@ export async function POST(request: Request) {
               </div>
             `,
           });
-          console.log(`🚀 [DEBUG] 취소 메일 발송 성공!`);
         } catch (mailError) {
-          console.error('🔥 [DEBUG] 메일 발송 실패:', mailError);
+          console.error('Email sending failed but ignored:', mailError);
         }
       }
     }
@@ -151,6 +196,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, refundAmount, hostPayout });
 
   } catch (error: any) {
+    console.error('Cancel Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -48,33 +48,59 @@ export default function Earnings() {
             total_price,
             created_at,
             status,
+            host_payout_amount,
             experiences!inner ( host_id )
           `)
           .eq('experiences.host_id', user.id)
-          .neq('status', 'cancelled') 
           .neq('status', 'declined')
           .neq('status', 'cancellation_requested'); 
 
         if (error) throw error;
         
-        let grossRevenue = 0;
+        let totalGross = 0;
+        let totalFee = 0;
+        let totalExchange = 0;
+        let totalNet = 0;
         let validCount = 0;
+        
         const dailyIncome: Record<string, number> = {};
         
         bookings?.forEach((b: any) => {
-          const dateStr = b.created_at.split('T')[0]; 
-          const price = b.total_price || 0; 
+          // [H-1] Skip cancelled bookings with no payout
+          if (b.status === 'cancelled' && (!b.host_payout_amount || b.host_payout_amount <= 0)) {
+            return;
+          }
 
-          grossRevenue += price;
+          const dateStr = b.created_at.split('T')[0];
+          let itemGross = 0;
+          let itemFee = 0;
+          let itemExchange = 0;
+          let itemNet = 0;
+
+          if (b.status === 'cancelled') {
+             // For cancelled bookings with payout, the payout is the final net amount.
+             // We treat it as 0 fees for display since they were deducted at source (backend).
+             itemNet = b.host_payout_amount;
+             itemGross = b.host_payout_amount; // Effective gross for host
+             itemFee = 0;
+             itemExchange = 0;
+          } else {
+             itemGross = b.total_price || 0;
+             itemFee = Math.floor(itemGross * 0.2);
+             itemExchange = Math.floor(itemGross * 0.03);
+             itemNet = itemGross - itemFee - itemExchange;
+          }
+
+          totalGross += itemGross;
+          totalFee += itemFee;
+          totalExchange += itemExchange;
+          totalNet += itemNet;
           validCount++;
 
-          // 차트용: 순수익(약 77%) 기준
-          const netIncome = Math.floor(price * 0.77);
-
           if (dailyIncome[dateStr]) {
-            dailyIncome[dateStr] += netIncome; 
+            dailyIncome[dateStr] += itemNet; 
           } else {
-            dailyIncome[dateStr] = netIncome;
+            dailyIncome[dateStr] = itemNet;
           }
         });
 
@@ -96,16 +122,11 @@ export default function Earnings() {
           });
         }
 
-        // 수수료 계산
-        const fee = Math.floor(grossRevenue * 0.2); // 20%
-        const exchangeFee = Math.floor(grossRevenue * 0.03); // 3%
-        const net = grossRevenue - fee - exchangeFee; 
-
         setStats({
-          gross: grossRevenue,
-          fee,
-          exchangeFee,
-          net, 
+          gross: totalGross,
+          fee: totalFee,
+          exchangeFee: totalExchange,
+          net: totalNet, 
           count: validCount // ✅ [복구] 건수 저장
         });
 

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 알림 기능 사용
 import { TOTAL_STEPS, INITIAL_FORM_DATA } from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps'; 
-import { validateImage, sanitizeFileName } from '@/app/utils/image';
+import { validateImage, sanitizeFileName, compressImage } from '@/app/utils/image';
 
 export default function CreateExperiencePage() {
   const supabase = createClient();
@@ -74,33 +74,42 @@ export default function CreateExperiencePage() {
 
   const handleRemoveImage = (index: number) => {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
+    const newPhotos = formData.photos.filter((_, i) => i !== index);
+    updateData('photos', newPhotos);
   };
 
 // 📸 사진 업로드 핸들러 수정
-const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   if (e.target.files) {
     const files = Array.from(e.target.files);
-    const newUrls: string[] = [];
-    const newFiles: File[] = [];
-
-    // 최대 장수 제한 (예: 5장)
-    if (formData.photos.length + files.length > 5) {
-      showToast('사진은 최대 5장까지 업로드 가능합니다.', 'error');
+    
+    // 최대 장수 제한 (10장으로 상향)
+    if (formData.photos.length + files.length > 10) {
+      showToast('사진은 최대 10장까지 업로드 가능합니다.', 'error');
       return;
     }
 
-    files.forEach(file => {
-      // ✅ [추가] 이미지 검증 로직
+    const newUrls: string[] = [];
+    const newFiles: File[] = [];
+
+    for (const file of files) {
       const validation = validateImage(file);
       if (!validation.valid) {
         showToast(validation.message || '이미지 형식이 올바르지 않습니다.', 'error');
-        return;
+        continue;
       }
 
-      const url = URL.createObjectURL(file);
-      newUrls.push(url);
-      newFiles.push(file);
-    });
+      try {
+        // ✅ 이미지 압축 및 리사이징 적용 (최대 1MB, 1280px)
+        const compressedFile = await compressImage(file);
+        const url = URL.createObjectURL(compressedFile);
+        newUrls.push(url);
+        newFiles.push(compressedFile);
+      } catch (err) {
+        console.error('Compression error:', err);
+        showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
+      }
+    }
 
     if (newUrls.length > 0) {
       updateData('photos', [...formData.photos, ...newUrls]);
