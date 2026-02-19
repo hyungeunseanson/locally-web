@@ -76,37 +76,37 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-{/* 🟢 탭 버튼 (가로 배치, 사이즈 확대, 고화질 이미지 적용) */}
+{/* 🟢 탭 버튼 (아이콘 확대, 텍스트 축소, 비율 최적화) */}
 <div
             className={
               isScrolled
                 ? 'flex gap-8 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
-                : 'flex gap-8 mb-8 transition-all duration-300 opacity-100 translate-y-0 h-auto'
+                : 'flex gap-6 mb-8 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
             {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`group flex items-center gap-3 px-6 py-3 rounded-full transition-all duration-300 outline-none hover:bg-slate-50 ${
-                activeTab === 'experience' ? 'opacity-100' : 'opacity-60 hover:opacity-100 grayscale-[40%] hover:grayscale-0'
+              className={`group flex items-center gap-2 pr-6 pl-2 py-2 rounded-full transition-all duration-300 outline-none hover:bg-slate-50/80 ${
+                activeTab === 'experience' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
               }`}
             >
-              {/* 아이콘 영역 */}
-              <div className="relative w-14 h-14 flex items-center justify-center">
-                {/* NEW 배지 (이미지 좌측 상단에 살짝 걸치게) */}
-                <div className="absolute -top-1 -left-1 bg-[#0066CC] text-white text-[10px] font-black px-2 py-[2px] rounded-full shadow-sm z-10 tracking-wide">
+              {/* 아이콘 영역 (64px로 확대) */}
+              <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+                {/* NEW 배지 (좌측 상단, 아이콘에 살짝 걸치게) */}
+                <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[9px] font-black px-1.5 py-[1px] rounded-full shadow-sm z-10 tracking-wide transform -translate-x-1 translate-y-1">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
                 <img 
                   src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240" 
                   alt="체험" 
-                  className="w-full h-full object-contain drop-shadow-sm transition-transform group-hover:scale-110"
+                  className="w-full h-full object-contain drop-shadow-sm transition-transform group-hover:scale-105"
                 />
               </div>
               
-              {/* 텍스트 (우측 배치, 크기 확대) */}
-              <span className={`text-lg font-bold ${
+              {/* 텍스트 (크기 줄임: 14px) */}
+              <span className={`text-[14px] font-bold whitespace-nowrap ${
                 activeTab === 'experience' ? 'text-black' : 'text-[#717171]'
               }`}>
                 {t('cat_exp')}
@@ -116,26 +116,26 @@ export default function HomeHero({
             {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`group flex items-center gap-3 px-6 py-3 rounded-full transition-all duration-300 outline-none hover:bg-slate-50 ${
-                activeTab === 'service' ? 'opacity-100' : 'opacity-60 hover:opacity-100 grayscale-[40%] hover:grayscale-0'
+              className={`group flex items-center gap-2 pr-6 pl-2 py-2 rounded-full transition-all duration-300 outline-none hover:bg-slate-50/80 ${
+                activeTab === 'service' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
               }`}
             >
-              {/* 아이콘 영역 */}
-              <div className="relative w-14 h-14 flex items-center justify-center">
+              {/* 아이콘 영역 (64px로 확대) */}
+              <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
                 {/* NEW 배지 */}
-                <div className="absolute -top-1 -left-1 bg-[#0066CC] text-white text-[10px] font-black px-2 py-[2px] rounded-full shadow-sm z-10 tracking-wide">
+                <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[9px] font-black px-1.5 py-[1px] rounded-full shadow-sm z-10 tracking-wide transform -translate-x-1 translate-y-1">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
                 <img 
                   src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240" 
                   alt="서비스" 
-                  className="w-full h-full object-contain drop-shadow-sm transition-transform group-hover:scale-110"
+                  className="w-full h-full object-contain drop-shadow-sm transition-transform group-hover:scale-105"
                 />
               </div>
               
-              {/* 텍스트 (우측 배치, 크기 확대) */}
-              <span className={`text-lg font-bold ${
+              {/* 텍스트 (크기 줄임: 14px) */}
+              <span className={`text-[14px] font-bold whitespace-nowrap ${
                 activeTab === 'service' ? 'text-black' : 'text-[#717171]'
               }`}>
                 {t('cat_service')}
