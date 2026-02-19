@@ -10,16 +10,35 @@ export async function POST(request: Request) {
     
     const { bookingId } = await request.json();
     
-    // 1. 예약 정보 조회 (알림 대상을 찾기 위해)
-    const { data: booking, error: fetchError } = await supabase
-      .from('bookings')
-      .select(`*, experiences ( title, host_id )`)
-      .eq('id', bookingId)
-      .single();
+// 1. 예약 정보 및 연결된 체험 정원 정보 함께 조회
+const { data: booking, error: fetchError } = await supabase
+.from('bookings')
+.select(`*, experiences ( title, host_id, max_guests )`)
+.eq('id', bookingId)
+.single();
 
-    if (fetchError || !booking) throw new Error('예약 정보를 찾을 수 없습니다.');
+if (fetchError || !booking) throw new Error('예약 정보를 찾을 수 없습니다.');
 
-    // 2. 상태를 'confirmed'로 변경
+// 🚨 [핵심 보안] 입금 확인(승인) 버튼을 누른 '이 순간'에 잔여 좌석 더블 체크
+const { data: existingBookings } = await supabase
+.from('bookings')
+.select('guests, type')
+.eq('experience_id', booking.experience_id)
+.eq('date', booking.date)
+.eq('time', booking.time)
+.in('status', ['PAID', 'confirmed']);
+
+const currentBookedCount = existingBookings?.reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
+const hasPrivateBooking = existingBookings?.some(b => b.type === 'private');
+const maxGuests = booking.experiences?.max_guests || 10;
+
+if (hasPrivateBooking || 
+  (booking.type === 'private' && currentBookedCount > 0) || 
+  (booking.type !== 'private' && (currentBookedCount + booking.guests > maxGuests))) {
+throw new Error('해당 시간대의 정원이 이미 초과되어 입금을 승인할 수 없습니다.');
+}
+
+// 2. 상태를 'confirmed'로 변경
     const { error: updateError } = await supabase
       .from('bookings')
       .update({ status: 'confirmed' })

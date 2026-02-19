@@ -40,23 +40,57 @@ export async function POST(request: Request) {
     if (resCode === '0000') { 
       const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
       
-      // 1. DB 예약 정보 조회
-      const { data: originalBooking } = await supabase
-        .from('bookings')
-        .select('amount, status')
-        .eq('id', orderId)
-        .single();
+// 1. DB 예약 정보 및 연결된 체험 정보(정원/가격) 조회
+const { data: originalBooking } = await supabase
+.from('bookings')
+.select('*, experiences (price, private_price, max_guests)')
+.eq('id', orderId)
+.single();
 
-      if (!originalBooking) throw new Error('예약 정보를 찾을 수 없습니다.');
+if (!originalBooking) throw new Error('예약 정보를 찾을 수 없습니다.');
 
-      // 2. 이미 처리된 건인지 확인 (중복 방지)
-      if (['PAID', 'confirmed'].includes(originalBooking.status)) {
-        return NextResponse.json({ success: true, message: 'Already processed' });
-      }
+// 2. 이미 처리된 건인지 확인 (중복 방지)
+if (['PAID', 'confirmed'].includes(originalBooking.status)) {
+return NextResponse.json({ success: true, message: 'Already processed' });
+}
 
-      // 🔴 [삭제됨] 금액 검증 로직 제거 (Payment amount mismatch 에러 원천 차단)
-      // 금액이 달라도 일단 넘어갑니다. (로그만 남김)
-      console.log(`ℹ️ [INFO] 금액 확인 - DB: ${originalBooking.amount}, PG: ${amount}`);
+// 🚨 [핵심 보안 1] 금액 검증 (1원 결제 위변조 원천 차단)
+// 클라이언트가 보낸 값이 아니라, DB에 저장된 '진짜 체험 가격'을 기준으로 서버가 다시 계산합니다.
+const expPrice = originalBooking.experiences?.price || 50000;
+const hostPrice = originalBooking.type === 'private' 
+? (originalBooking.experiences?.private_price || 300000) 
+: expPrice * originalBooking.guests;
+const guestFee = Math.floor(hostPrice * 0.1);
+const expectedAmount = hostPrice + guestFee;
+
+// PG사 승인 금액(amount)과 서버 찐 금액(expectedAmount) 비교
+if (Number(amount) !== expectedAmount) {
+console.error(`🚨 [보안 경고] 결제 금액 조작 시도! (주문: ${orderId}, 기대금액: ${expectedAmount}, 실제결제: ${amount})`);
+throw new Error('결제 금액이 위변조되었습니다.');
+}
+
+// 🚨 [핵심 보안 2] 잔여 좌석 트랜잭션 체크 (초과 예약 / Race Condition 차단)
+// 결제를 승인하는 바로 이 순간(0.1초 차이)에 좌석이 남아있는지 최종 확인합니다.
+const { data: existingBookings } = await supabase
+.from('bookings')
+.select('guests, type')
+.eq('experience_id', originalBooking.experience_id)
+.eq('date', originalBooking.date)
+.eq('time', originalBooking.time)
+.in('status', ['PAID', 'confirmed']);
+
+const currentBookedCount = existingBookings?.reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
+const hasPrivateBooking = existingBookings?.some(b => b.type === 'private');
+const maxGuests = originalBooking.experiences?.max_guests || 10;
+
+if (hasPrivateBooking || 
+  (originalBooking.type === 'private' && currentBookedCount > 0) || 
+  (originalBooking.type !== 'private' && (currentBookedCount + originalBooking.guests > maxGuests))) {
+console.error(`🚨 [보안 경고] 초과 예약(Overbooking) 발생! (주문: ${orderId})`);
+throw new Error('잔여 좌석이 부족하여 예약을 확정할 수 없습니다. (결제 자동 취소 대상)');
+}
+
+console.log(`✅ [INFO] 금액 및 좌석 검증 완벽 통과 (DB: ${expectedAmount} == PG: ${amount})`);
 
       // 3. 예약 상태 무조건 업데이트 (PAID)
       const { data: bookingData, error: dbError } = await supabase
