@@ -76,93 +76,97 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-{/* 🟢 탭 버튼 (미니멀하고 귀여운 사이즈로 재조정) */}
+{/* 🟢 탭 버튼 (귀엽고 예쁜 3D 아이콘 적용) */}
 <div
             className={
               isScrolled
                 ? 'flex gap-8 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
-                : 'flex gap-10 mb-4 transition-all duration-300 opacity-100 translate-y-0 h-auto'
+                : 'flex gap-12 mb-6 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
-            {/* 🎈 체험 탭 */}
+            {/* 📷 체험 탭 (3D 핑크 카메라) */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`relative flex flex-col items-center transition-all duration-300 outline-none pt-2 ${
+              className={`relative flex flex-col items-center group transition-all duration-300 outline-none ${
                 activeTab === 'experience' 
                   ? 'opacity-100 scale-105' 
-                  : 'opacity-40 hover:opacity-80 grayscale-[50%] hover:grayscale-0 scale-100'
+                  : 'opacity-50 hover:opacity-100 grayscale-[40%] hover:grayscale-0 scale-100'
               }`}
             >
-              {/* 아주 작고 앙증맞은 NEW 라벨 (아이콘 위로 살짝 겹침) */}
-              <div className="absolute -top-1 bg-[#0066CC] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-wider shadow-sm z-10">
+              {/* NEW 라벨 (아이콘 우측 상단에 앙증맞게 배치) */}
+              <div className="absolute -top-1.5 -right-3 bg-[#FF385C] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce-slow">
                 NEW
               </div>
               
-              {/* 아이콘 (높이 32px 수준으로 대폭 축소) */}
-              <div className="h-[32px] flex items-end justify-center mb-1.5">
-                <svg width="26" height="32" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm">
+              {/* 아이콘: 귀여운 3D 카메라 */}
+              <div className="h-[42px] flex items-end justify-center mb-2">
+                <svg width="42" height="42" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm transition-transform group-hover:-rotate-3">
                   <defs>
-                    <linearGradient id="balloonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="#FFCC00" />
-                      <stop offset="50%" stopColor="#FF6600" />
-                      <stop offset="100%" stopColor="#CC0000" />
+                    <linearGradient id="camGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#FF9A9E" />
+                      <stop offset="100%" stopColor="#FECFEF" />
+                    </linearGradient>
+                    <linearGradient id="lensGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#434343" />
+                      <stop offset="100%" stopColor="#000000" />
                     </linearGradient>
                   </defs>
-                  <path d="M25 0 C10 20, 10 40, 25 60 C40 40, 40 20, 25 0" fill="url(#balloonGrad)" />
-                  <path d="M15 10 C20 15, 20 25, 15 30" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeOpacity="0.3" />
-                  <path d="M35 10 C30 15, 30 25, 35 30" fill="none" stroke="#000000" strokeWidth="2" strokeOpacity="0.1" />
-                  <line x1="20" y1="50" x2="20" y2="55" stroke="#663300" strokeWidth="1" />
-                  <line x1="25" y1="50" x2="25" y2="55" stroke="#663300" strokeWidth="1" />
-                  <line x1="30" y1="50" x2="30" y2="55" stroke="#663300" strokeWidth="1" />
-                  <rect x="18" y="55" width="14" height="5" fill="#996633" />
-                  <line x1="18" y1="56" x2="32" y2="56" stroke="#663300" strokeWidth="0.5" />
-                  <line x1="18" y1="58" x2="32" y2="58" stroke="#663300" strokeWidth="0.5" />
+                  {/* 카메라 바디 */}
+                  <rect x="4" y="10" width="32" height="22" rx="6" fill="url(#camGrad)" />
+                  <path d="M4 16 Q4 10 10 10 L30 10 Q36 10 36 16" fill="none" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.4" />
+                  {/* 셔터 버튼 */}
+                  <rect x="26" y="6" width="6" height="4" rx="1.5" fill="#FF758C" />
+                  {/* 렌즈 */}
+                  <circle cx="20" cy="21" r="8" fill="#F0F0F0" stroke="#E0E0E0" strokeWidth="1" />
+                  <circle cx="20" cy="21" r="6" fill="url(#lensGrad)" />
+                  <circle cx="21.5" cy="19.5" r="1.5" fill="#FFFFFF" fillOpacity="0.8" />
                 </svg>
               </div>
               
-              {/* 텍스트 및 에어비앤비 스타일 하단 라인 */}
-              <span className={`text-[15px] font-bold pb-2 border-b-[3px] transition-all ${
-                activeTab === 'experience' ? 'text-black border-black' : 'text-[#333333] border-transparent'
+              {/* 텍스트 */}
+              <span className={`text-[15px] font-bold pb-1.5 border-b-[3px] transition-all ${
+                activeTab === 'experience' ? 'text-slate-900 border-slate-900' : 'text-slate-500 border-transparent'
               }`}>
                 {t('cat_exp')}
               </span>
             </button>
 
-            {/* 🛎️ 서비스 탭 */}
+            {/* ✨ 서비스 탭 (3D 블루 스파클) */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`relative flex flex-col items-center transition-all duration-300 outline-none pt-2 ${
+              className={`relative flex flex-col items-center group transition-all duration-300 outline-none ${
                 activeTab === 'service' 
                   ? 'opacity-100 scale-105' 
-                  : 'opacity-40 hover:opacity-80 grayscale-[50%] hover:grayscale-0 scale-100'
+                  : 'opacity-50 hover:opacity-100 grayscale-[40%] hover:grayscale-0 scale-100'
               }`}
             >
               {/* NEW 라벨 */}
-              <div className="absolute -top-1 bg-[#0066CC] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-wider shadow-sm z-10">
+              <div className="absolute -top-1.5 -right-3 bg-[#0066CC] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce-slow">
                 NEW
               </div>
               
-              {/* 아이콘 (종 크기를 열기구와 밸런스 맞춤) */}
-              <div className="h-[32px] flex items-end justify-center mb-1.5">
-                <svg width="26" height="26" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm">
+              {/* 아이콘: 귀여운 3D 스파클/다이아몬드 */}
+              <div className="h-[42px] flex items-end justify-center mb-2">
+                <svg width="42" height="42" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm transition-transform group-hover:rotate-6">
                   <defs>
-                    <linearGradient id="bellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="#CCCCCC" />
-                      <stop offset="100%" stopColor="#999999" />
+                    <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#4facfe" />
+                      <stop offset="100%" stopColor="#00f2fe" />
                     </linearGradient>
                   </defs>
-                  <path d="M10 40 C10 20, 40 20, 40 40 L25 50 L10 40" fill="url(#bellGrad)" />
-                  <circle cx="25" cy="10" r="5" fill="#000000" />
-                  <rect x="10" y="38" width="30" height="2" fill="#FF0000" />
-                  <path d="M15 20 C20 25, 20 30, 25 35" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeOpacity="0.3" />
-                  <path d="M35 20 C30 25, 30 30, 25 35" fill="none" stroke="#000000" strokeWidth="3" strokeOpacity="0.15" />
-                  <ellipse cx="25" cy="48" rx="15" ry="2" fill="#000000" fillOpacity="0.1" />
+                  {/* 중앙 큰 별 */}
+                  <path d="M20 4 L23 14 L33 17 L23 20 L20 30 L17 20 L7 17 L17 14 Z" fill="url(#sparkleGrad)" />
+                  <path d="M20 4 L23 14 L33 17 L23 20" fill="none" stroke="#FFFFFF" strokeWidth="1" strokeOpacity="0.4" />
+                  
+                  {/* 주변 작은 별들 (장식) */}
+                  <path d="M32 6 L33 9 L36 10 L33 11 L32 14 L31 11 L28 10 L31 9 Z" fill="#FFD700" />
+                  <path d="M8 26 L9 29 L12 30 L9 31 L8 34 L7 31 L4 30 L7 29 Z" fill="#FFD700" />
                 </svg>
               </div>
               
-              {/* 텍스트 및 에어비앤비 스타일 하단 라인 */}
-              <span className={`text-[15px] font-bold pb-2 border-b-[3px] transition-all ${
-                activeTab === 'service' ? 'text-black border-black' : 'text-[#333333] border-transparent'
+              {/* 텍스트 */}
+              <span className={`text-[15px] font-bold pb-1.5 border-b-[3px] transition-all ${
+                activeTab === 'service' ? 'text-slate-900 border-slate-900' : 'text-slate-500 border-transparent'
               }`}>
                 {t('cat_service')}
               </span>
