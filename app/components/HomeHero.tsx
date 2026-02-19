@@ -76,97 +76,73 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-{/* 🟢 탭 버튼 (귀엽고 예쁜 3D 아이콘 적용) */}
+{/* 🟢 탭 버튼 (에어비앤비 스타일 3D 영상 아이콘 적용) */}
 <div
             className={
               isScrolled
                 ? 'flex gap-8 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
-                : 'flex gap-12 mb-6 transition-all duration-300 opacity-100 translate-y-0 h-auto'
+                : 'flex gap-8 mb-4 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
-            {/* 📷 체험 탭 (3D 핑크 카메라) */}
+            {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`relative flex flex-col items-center group transition-all duration-300 outline-none ${
-                activeTab === 'experience' 
-                  ? 'opacity-100 scale-105' 
-                  : 'opacity-50 hover:opacity-100 grayscale-[40%] hover:grayscale-0 scale-100'
+              className={`group flex flex-col items-center gap-2 min-w-[64px] cursor-pointer outline-none transition-all duration-200 ${
+                activeTab === 'experience' ? 'opacity-100' : 'opacity-60 hover:opacity-80 hover:bg-slate-50/50 rounded-xl pt-1'
               }`}
             >
-              {/* NEW 라벨 (아이콘 우측 상단에 앙증맞게 배치) */}
-              <div className="absolute -top-1.5 -right-3 bg-[#FF385C] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce-slow">
-                NEW
+              <div className="relative w-7 h-7 md:w-8 md:h-8">
+                {/* NEW 라벨 */}
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF385C] text-white text-[9px] font-bold px-1.5 py-[1px] rounded-full shadow-sm z-10 whitespace-nowrap">
+                  NEW
+                </div>
+                {/* 3D 영상 아이콘 */}
+                <video 
+                  className="w-full h-full object-cover"
+                  autoPlay 
+                  loop={activeTab === 'experience'} // 활성화되면 반복 재생
+                  muted 
+                  playsInline
+                  src={activeTab === 'experience' 
+                    ? "https://a0.muscache.com/videos/search-bar-icons/webm/balloon-selected.webm"
+                    : "https://a0.muscache.com/videos/search-bar-icons/webm/balloon-twirl.webm"}
+                  poster="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
+                />
               </div>
-              
-              {/* 아이콘: 귀여운 3D 카메라 */}
-              <div className="h-[42px] flex items-end justify-center mb-2">
-                <svg width="42" height="42" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm transition-transform group-hover:-rotate-3">
-                  <defs>
-                    <linearGradient id="camGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#FF9A9E" />
-                      <stop offset="100%" stopColor="#FECFEF" />
-                    </linearGradient>
-                    <linearGradient id="lensGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#434343" />
-                      <stop offset="100%" stopColor="#000000" />
-                    </linearGradient>
-                  </defs>
-                  {/* 카메라 바디 */}
-                  <rect x="4" y="10" width="32" height="22" rx="6" fill="url(#camGrad)" />
-                  <path d="M4 16 Q4 10 10 10 L30 10 Q36 10 36 16" fill="none" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.4" />
-                  {/* 셔터 버튼 */}
-                  <rect x="26" y="6" width="6" height="4" rx="1.5" fill="#FF758C" />
-                  {/* 렌즈 */}
-                  <circle cx="20" cy="21" r="8" fill="#F0F0F0" stroke="#E0E0E0" strokeWidth="1" />
-                  <circle cx="20" cy="21" r="6" fill="url(#lensGrad)" />
-                  <circle cx="21.5" cy="19.5" r="1.5" fill="#FFFFFF" fillOpacity="0.8" />
-                </svg>
-              </div>
-              
-              {/* 텍스트 */}
-              <span className={`text-[15px] font-bold pb-1.5 border-b-[3px] transition-all ${
-                activeTab === 'experience' ? 'text-slate-900 border-slate-900' : 'text-slate-500 border-transparent'
+              <span className={`text-xs md:text-sm font-bold pb-2 border-b-2 transition-all ${
+                activeTab === 'experience' ? 'text-black border-black' : 'text-slate-600 border-transparent'
               }`}>
                 {t('cat_exp')}
               </span>
             </button>
 
-            {/* ✨ 서비스 탭 (3D 블루 스파클) */}
+            {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`relative flex flex-col items-center group transition-all duration-300 outline-none ${
-                activeTab === 'service' 
-                  ? 'opacity-100 scale-105' 
-                  : 'opacity-50 hover:opacity-100 grayscale-[40%] hover:grayscale-0 scale-100'
+              className={`group flex flex-col items-center gap-2 min-w-[64px] cursor-pointer outline-none transition-all duration-200 ${
+                activeTab === 'service' ? 'opacity-100' : 'opacity-60 hover:opacity-80 hover:bg-slate-50/50 rounded-xl pt-1'
               }`}
             >
-              {/* NEW 라벨 */}
-              <div className="absolute -top-1.5 -right-3 bg-[#0066CC] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce-slow">
-                NEW
+              <div className="relative w-7 h-7 md:w-8 md:h-8">
+                {/* NEW 라벨 */}
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FF385C] text-white text-[9px] font-bold px-1.5 py-[1px] rounded-full shadow-sm z-10 whitespace-nowrap">
+                  NEW
+                </div>
+                {/* 3D 영상 아이콘 */}
+                <video 
+                  className="w-full h-full object-cover"
+                  autoPlay 
+                  loop={activeTab === 'service'} // 활성화되면 반복 재생
+                  muted 
+                  playsInline
+                  src={activeTab === 'service' 
+                    ? "https://a0.muscache.com/videos/search-bar-icons/webm/consierge-selected.webm"
+                    : "https://a0.muscache.com/videos/search-bar-icons/webm/consierge-twirl.webm"}
+                  poster="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
+                />
               </div>
-              
-              {/* 아이콘: 귀여운 3D 스파클/다이아몬드 */}
-              <div className="h-[42px] flex items-end justify-center mb-2">
-                <svg width="42" height="42" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm transition-transform group-hover:rotate-6">
-                  <defs>
-                    <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#4facfe" />
-                      <stop offset="100%" stopColor="#00f2fe" />
-                    </linearGradient>
-                  </defs>
-                  {/* 중앙 큰 별 */}
-                  <path d="M20 4 L23 14 L33 17 L23 20 L20 30 L17 20 L7 17 L17 14 Z" fill="url(#sparkleGrad)" />
-                  <path d="M20 4 L23 14 L33 17 L23 20" fill="none" stroke="#FFFFFF" strokeWidth="1" strokeOpacity="0.4" />
-                  
-                  {/* 주변 작은 별들 (장식) */}
-                  <path d="M32 6 L33 9 L36 10 L33 11 L32 14 L31 11 L28 10 L31 9 Z" fill="#FFD700" />
-                  <path d="M8 26 L9 29 L12 30 L9 31 L8 34 L7 31 L4 30 L7 29 Z" fill="#FFD700" />
-                </svg>
-              </div>
-              
-              {/* 텍스트 */}
-              <span className={`text-[15px] font-bold pb-1.5 border-b-[3px] transition-all ${
-                activeTab === 'service' ? 'text-slate-900 border-slate-900' : 'text-slate-500 border-transparent'
+              <span className={`text-xs md:text-sm font-bold pb-2 border-b-2 transition-all ${
+                activeTab === 'service' ? 'text-black border-black' : 'text-slate-600 border-transparent'
               }`}>
                 {t('cat_service')}
               </span>
