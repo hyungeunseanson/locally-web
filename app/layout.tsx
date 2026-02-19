@@ -10,6 +10,7 @@ import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
 import Script from "next/script";
 import GoogleTranslate from '@/app/components/GoogleTranslate';
+import QueryProvider from '@/app/providers/QueryProvider'; // 🟢 추가
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -58,8 +59,9 @@ export default function RootLayout({
             strategy="beforeInteractive" 
           />
         )}
-
-        <ToastProvider>
+{/* 🟢 React Query Provider로 앱 전체 감싸기 */}
+<QueryProvider>
+          <ToastProvider>
           <NotificationProvider>
             <LanguageProvider>
               
@@ -82,7 +84,8 @@ export default function RootLayout({
 
             </LanguageProvider>
           </NotificationProvider>
-        </ToastProvider>
+          </ToastProvider>
+          </QueryProvider> {/* 🟢 추가 */}
       </body>
     </html>
   );

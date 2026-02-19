@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '../utils/supabase/client';
-import { CATEGORIES } from '../constants';
+import { useQuery } from '@tanstack/react-query';
+import { fetchActiveExperiences } from '../utils/api/experiences';
 import { Experience } from '../types';
 
-// 🟢 [추가] 통역기: 영어 ID가 들어오면 한글 DB 이름으로 바꿔주는 역할
+// 🟢 통역기: 영어 ID가 들어오면 한글 DB 이름으로 바꿔주는 역할 (유지)
 const cityMap: Record<string, string> = {
   tokyo: '도쿄',
   osaka: '오사카',
@@ -16,60 +16,37 @@ const cityMap: Record<string, string> = {
 };
 
 export function useExperienceFilter() {
-  const [allExperiences, setAllExperiences] = useState<Experience[]>([]);
-  const [filteredExperiences, setFilteredExperiences] = useState<Experience[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 🟢 1. React Query를 이용한 데이터 패칭 및 캐싱 (로딩 상태 자동 관리)
+  const { 
+    data: allExperiences = [], // 기본값 빈 배열
+    isLoading: loading,
+    isSuccess
+  } = useQuery({
+    queryKey: ['experiences', 'active'], // 캐시 키
+    queryFn: fetchActiveExperiences,     // API 호출 함수
+  });
 
-  // 필터 상태
+  // 필터링된 결과 상태
+  const [filteredExperiences, setFilteredExperiences] = useState<Experience[]>([]);
+
+  // 필터 컨트롤 상태 (유지)
   const [locationInput, setLocationInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  // 🟢 [수정] '전체' -> 'all'로 변경해야 번역 작동함
   const [selectedLanguage, setSelectedLanguage] = useState('all');
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
 
-  const supabase = createClient();
-
+  // 🟢 2. React Query로 데이터를 성공적으로 불러오면 초기 필터링 결과에 세팅
   useEffect(() => {
-    const fetchExperiences = async () => {
-      setLoading(true);
-      try {
-        let { data: expData, error } = await supabase
-          .from('experiences')
-          .select('*')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
+    if (isSuccess) {
+      setFilteredExperiences(allExperiences);
+    }
+  }, [allExperiences, isSuccess]);
 
-        if (error) throw error;
-
-        if (expData && expData.length > 0) {
-          const expIds = expData.map((e: any) => e.id);
-          const { data: dateData } = await supabase
-            .from('experience_availability')
-            .select('experience_id, date')
-            .in('experience_id', expIds);
-
-          const mergedData = expData.map((exp: any) => ({
-            ...exp,
-            available_dates: dateData
-              ?.filter((d: any) => d.experience_id === exp.id)
-              .map((d: any) => d.date) || [],
-          }));
-
-          setAllExperiences(mergedData);
-          setFilteredExperiences(mergedData);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchExperiences();
-  }, []);
-
+  // 🟢 3. 필터 적용 로직 (기존 로직 100% 유지)
   const applyFilters = () => {
     let result = allExperiences;
 
+    // 검색어 필터
     if (locationInput.trim()) {
       const searchTerms = locationInput.replace(/[·,.]/g, ' ').toLowerCase().split(/\s+/).filter(t => t.length > 0);
       result = result.filter(item => {
@@ -78,11 +55,12 @@ export function useExperienceFilter() {
       });
     }
 
-// 🟢 [수정] 언어 필터: 'all'이 아닐 때 작동하도록 변경
-if (selectedLanguage !== 'all' && selectedLanguage !== '전체') {
-  result = result.filter(item => item.languages?.includes(selectedLanguage));
-}
+    // 언어 필터
+    if (selectedLanguage !== 'all' && selectedLanguage !== '전체') {
+      result = result.filter(item => item.languages?.includes(selectedLanguage));
+    }
 
+    // 날짜 필터
     if (dateRange.start) {
       const start = new Date(dateRange.start); start.setHours(0,0,0,0);
       const end = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start); end.setHours(23,59,59,999);
@@ -95,27 +73,30 @@ if (selectedLanguage !== 'all' && selectedLanguage !== '전체') {
       );
     }
 
-// 🟢 [수정] 카테고리 필터: cityMap(통역기)를 사용해 영어ID를 한글로 변환
-if (selectedCategory !== 'all') {
-  const targetCity = cityMap[selectedCategory] || selectedCategory;
-  // 검색어 입력 여부와 상관없이 카테고리 누르면 필터링 되도록 변경
-  result = result.filter(item => item.city === targetCity);
-}
-    
+    // 카테고리(도시) 필터
+    if (selectedCategory !== 'all') {
+      const targetCity = cityMap[selectedCategory] || selectedCategory;
+      result = result.filter(item => item.city === targetCity);
+    }
 
     setFilteredExperiences(result);
   };
 
+  // 🟢 4. 카테고리, 언어, 날짜 변경 시 자동 필터 적용 (유지)
   useEffect(() => {
+    // 검색어가 비어있을 때만 자동 필터 적용 (검색 버튼 클릭 시나리오 유지)
     if (!locationInput) applyFilters();
-  }, [selectedCategory, selectedLanguage, dateRange]);
+  }, [selectedCategory, selectedLanguage, dateRange, allExperiences]); // allExperiences 변경 시 재실행 추가
 
   return {
-    loading, filteredExperiences, allExperiences,
+    loading, 
+    filteredExperiences, 
+    allExperiences,
     locationInput, setLocationInput,
     selectedCategory, setSelectedCategory,
     selectedLanguage, setSelectedLanguage,
     dateRange, setDateRange,
-    setFilteredExperiences, applyFilters
+    setFilteredExperiences, 
+    applyFilters
   };
 }
