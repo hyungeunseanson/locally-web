@@ -1,67 +1,55 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/context/ToastContext';
+import { fetchGuestTrips, cancelGuestTrip } from '@/app/utils/api/trips';
 
 export function useGuestTrips() {
   const { showToast } = useToast();
-  const [trips, setTrips] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false); // 취소 처리 중 상태
+  const queryClient = useQueryClient();
 
-  const fetchTrips = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch('/api/guest/trips');
-      const data = await res.json();
+  // 🟢 1. React Query를 이용한 예약 내역 패칭 및 캐싱
+  const { 
+    data: trips = [], 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
+    queryKey: ['guestTrips'], // 캐시 키
+    queryFn: fetchGuestTrips, // 분리한 API 함수 호출
+  });
 
-      if (!res.ok) throw new Error(data.error);
-      setTrips(data.trips || []);
-    } catch (err: any) {
-      setErrorMsg(err.message);
-    } finally {
-      setIsLoading(false);
+  // 🟢 2. React Query Mutation을 이용한 취소 로직 처리
+  const cancelMutation = useMutation({
+    mutationFn: cancelGuestTrip,
+    onSuccess: () => {
+      showToast('취소 요청이 접수되었습니다.', 'success');
+      // 취소 성공 시 캐시를 무효화하여 목록을 즉시(자동으로) 새로고침
+      queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
+    },
+    onError: (err: any) => {
+      showToast(`취소 실패: ${err.message}`, 'error');
     }
-  }, []);
+  });
 
-  useEffect(() => {
-    fetchTrips();
-  }, [fetchTrips]);
-
-  // 🟢 취소 요청 함수
+  // 🟢 3. 기존 UI 컴포넌트와 연결되는 함수 (기존 구조 100% 유지)
   const requestCancel = async (bookingId: number, reason: string, hostId: string) => {
     if (!confirm('정말로 예약을 취소하시겠습니까?')) return false;
     
-    setIsProcessing(true);
     try {
-      const res = await fetch('/api/payment/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, reason, isHostCancel: false }), // 게스트 취소
-      });
-      const result = await res.json();
-
-      if (!res.ok) throw new Error(result.error);
-
-      showToast('취소 요청이 접수되었습니다.', 'success');
-      fetchTrips(); // 목록 새로고침
+      await cancelMutation.mutateAsync({ bookingId, reason });
       return true;
-    } catch (err: any) {
-      showToast(`취소 실패: ${err.message}`, 'error');
-      return false;
-    } finally {
-      setIsProcessing(false);
+    } catch (err) {
+      return false; // 에러 토스트는 onError에서 처리됨
     }
   };
 
-  // 🟢 데이터 분류 (현재 시간 기준이 아니라, API가 준 'status' 기준으로 분류)
-  // completed 또는 cancelled는 '지난 여행'으로 간주
-  const upcomingTrips = trips.filter(t => 
+  // 🟢 4. 데이터 분류 (기존 로직 유지)
+  const upcomingTrips = trips.filter((t: any) => 
     t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'cancellation_requested'
   );
   
-  const pastTrips = trips.filter(t => 
+  const pastTrips = trips.filter((t: any) => 
     t.status === 'completed' || t.status === 'cancelled' || t.status === 'cancellation_requested'
   );
 
@@ -69,9 +57,9 @@ export function useGuestTrips() {
     upcomingTrips,
     pastTrips,
     isLoading,
-    errorMsg,
+    errorMsg: error ? error.message : '',
     requestCancel,
-    isProcessing,
-    refreshTrips: fetchTrips // 모달 닫힐 때 등 재호출용
+    isProcessing: cancelMutation.isPending, // 취소 버튼 로딩 상태 자동 연동
+    refreshTrips: refetch // 모달 등에서 명시적 새로고침 필요 시 사용
   };
 }
