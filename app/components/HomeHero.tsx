@@ -76,25 +76,76 @@ export default function HomeHero({
       <div className="pt-24 pb-6 px-6 relative z-40 bg-white" ref={searchRef}>
         <div className="flex flex-col items-center relative">
           
-          {/* 탭 버튼 */}
-          <div
+{/* 🟢 탭 버튼 (3D SVG 디자인 적용) */}
+<div
             className={
               isScrolled
-                ? 'flex gap-8 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
-                : 'flex gap-8 mb-4 transition-all duration-300 opacity-100 translate-y-0 h-auto'
+                ? 'flex gap-6 mb-4 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none h-0 mb-0 overflow-hidden'
+                : 'flex gap-8 mb-8 transition-all duration-300 opacity-100 translate-y-0 h-auto'
             }
           >
+            {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'experience' ? 'text-black border-black' : 'text-slate-500 hover:text-slate-800 border-transparent'}`}
+              className={`relative flex flex-col items-center justify-center p-3 w-28 rounded-2xl transition-all duration-300 group ${
+                activeTab === 'experience' 
+                  ? 'text-slate-900 bg-slate-50/80 shadow-sm border border-slate-200' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 border border-transparent opacity-60 hover:opacity-100'
+              }`}
             >
-<span className="text-xl">🎈</span> {t('cat_exp')}
+              <span className="absolute -top-3 bg-[#0066CC] text-white text-[10px] font-black px-3 py-1 rounded-full shadow-md z-10 transition-transform group-hover:scale-105">NEW</span>
+              <div className={`transition-transform duration-300 mb-1 ${activeTab === 'experience' ? 'scale-110 grayscale-0' : 'scale-100 grayscale-[40%]'}`}>
+                <svg width="40" height="48" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+                  <defs>
+                    <linearGradient id="balloonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" style={{ stopColor: '#FFCC00', stopOpacity: 1 }} />
+                      <stop offset="50%" style={{ stopColor: '#FF6600', stopOpacity: 1 }} />
+                      <stop offset="100%" style={{ stopColor: '#CC0000', stopOpacity: 1 }} />
+                    </linearGradient>
+                  </defs>
+                  <path d="M25 0 C10 20, 10 40, 25 60 C40 40, 40 20, 25 0" fill="url(#balloonGrad)" />
+                  <path d="M15 10 C20 15, 20 25, 15 30" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeOpacity="0.2" />
+                  <path d="M35 10 C30 15, 30 25, 35 30" fill="none" stroke="#000000" strokeWidth="2" strokeOpacity="0.1" />
+                  <line x1="20" y1="50" x2="20" y2="55" stroke="#663300" strokeWidth="1.5" />
+                  <line x1="25" y1="50" x2="25" y2="55" stroke="#663300" strokeWidth="1.5" />
+                  <line x1="30" y1="50" x2="30" y2="55" stroke="#663300" strokeWidth="1.5" />
+                  <rect x="18" y="55" width="14" height="6" fill="#996633" rx="1" />
+                  <line x1="18" y1="57" x2="32" y2="57" stroke="#663300" strokeWidth="0.5" />
+                  <line x1="18" y1="59" x2="32" y2="59" stroke="#663300" strokeWidth="0.5" />
+                </svg>
+              </div>
+              <span className="font-bold text-sm">{t('cat_exp')}</span>
+              {activeTab === 'experience' && <div className="absolute -bottom-4 w-[80%] h-[3px] bg-black rounded-full" />}
             </button>
+
+            {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`pb-2 text-base font-bold flex items-center gap-2 transition-all border-b-[3px] ${activeTab === 'service' ? 'text-black border-black' : 'text-slate-500 hover:text-slate-800 border-transparent'}`}
+              className={`relative flex flex-col items-center justify-center p-3 w-28 rounded-2xl transition-all duration-300 group ${
+                activeTab === 'service' 
+                  ? 'text-slate-900 bg-slate-50/80 shadow-sm border border-slate-200' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 border border-transparent opacity-60 hover:opacity-100'
+              }`}
             >
-<span className="text-xl">🛎️</span> {t('cat_service')}
+              <span className="absolute -top-3 bg-[#0066CC] text-white text-[10px] font-black px-3 py-1 rounded-full shadow-md z-10 transition-transform group-hover:scale-105">NEW</span>
+              <div className={`transition-transform duration-300 mb-1 flex items-end h-[48px] pb-1 ${activeTab === 'service' ? 'scale-110 grayscale-0' : 'scale-100 grayscale-[40%]'}`}>
+                <svg width="40" height="40" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+                  <defs>
+                    <linearGradient id="bellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" style={{ stopColor: '#EEEEEE', stopOpacity: 1 }} />
+                      <stop offset="100%" style={{ stopColor: '#999999', stopOpacity: 1 }} />
+                    </linearGradient>
+                  </defs>
+                  <path d="M10 40 C10 20, 40 20, 40 40 L25 50 L10 40" fill="url(#bellGrad)" />
+                  <circle cx="25" cy="10" r="5" fill="#333333" />
+                  <rect x="10" y="38" width="30" height="2.5" fill="#FF0000" />
+                  <path d="M15 20 C20 25, 20 30, 25 35" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeOpacity="0.5" />
+                  <path d="M35 20 C30 25, 30 30, 25 35" fill="none" stroke="#000000" strokeWidth="3" strokeOpacity="0.15" />
+                  <ellipse cx="25" cy="48" rx="15" ry="2" fill="#000000" fillOpacity="0.1" />
+                </svg>
+              </div>
+              <span className="font-bold text-sm">{t('cat_service')}</span>
+              {activeTab === 'service' && <div className="absolute -bottom-4 w-[80%] h-[3px] bg-black rounded-full" />}
             </button>
           </div>
 
@@ -107,8 +158,8 @@ export default function HomeHero({
             setDateRange={setDateRange}
             
 // ✅ [수정] '전체'를 'all'로 바꿔야 번역이 작동합니다!
-selectedLanguage={selectedLanguage || 'all'} 
-  setSelectedLanguage={setSelectedLanguage || (() => {})}
+            selectedLanguage={selectedLanguage || 'all'} 
+            setSelectedLanguage={setSelectedLanguage || (() => {})}
             onCategorySelect={setSelectedCategory}
             isVisible={!isScrolled} 
             onSearch={onSearch} 
