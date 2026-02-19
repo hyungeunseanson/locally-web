@@ -8,7 +8,7 @@ import { TERMS_OF_USE, PRIVACY_POLICY, TRAVEL_TERMS, REFUND_POLICY } from '@/app
 import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function SiteFooter() {
-  const { t } = useLanguage(); // 🟢 이 줄 추가 (맨 윗줄)
+  const { t, lang } = useLanguage();
   const [instaOpen, setInstaOpen] = useState(false);
   
   // 모달 상태 관리 ('terms', 'privacy', 'travel', 'refund', null)
@@ -35,6 +35,16 @@ export default function SiteFooter() {
   };
 
   const modalData = getModalContent();
+  // 🟢 [추가] 현재 언어 코드(lang)를 화면에 표시할 텍스트로 변환
+  const getLanguageLabel = () => {
+    switch (lang) {
+      case 'en': return 'English (US)';
+      case 'ja': return '日本語 (JP)';
+      case 'zh': return '中文 (CN)';
+      case 'ko': 
+      default: return '한국어 (KR)';
+    }
+  };
 // 🟢 [추가] 메뉴 데이터 번역 적용
 const footerSections = [
   {
@@ -196,14 +206,13 @@ const footerSections = [
               </Link>
             </div>
             
-            <div className="flex items-center gap-6 font-bold text-[#222222]">
+{/* 🟢 수정됨: KRW 삭제 및 언어 동적 표시 */}
+<div className="flex items-center gap-6 font-bold text-[#222222]">
               <button className="flex items-center gap-2 hover:underline">
                 <Globe size={16} />
-                한국어 (KR)
+                {getLanguageLabel()} {/* 🟢 한국어 (KR) 대신 함수 호출 */}
               </button>
-              <button className="hover:underline">
-                ₩ KRW
-              </button>
+              {/* 🔴 [삭제] ₩ KRW 버튼 제거됨 */}
             </div>
           </div>
         </div>
