@@ -94,8 +94,9 @@ function AdminDashboardContent() {
         // 3. 유저(게스트+호스트) 정보 조회
         let userMap = new Map();
         if (userIds.length > 0) {
-          // 🟢 [수정] full_name 컬럼 제거 (스키마 불일치 방지)
-          const { data: profiles } = await supabase.from('profiles').select('id, email, name').in('id', userIds);
+          // 🟢 [수정] 특정 컬럼 지정 대신 전체 조회 (*). 
+          // DB 스키마가 불확실할 때 400 에러를 피하는 가장 확실한 방법입니다.
+          const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);
           if (profiles) {
             userMap = new Map(profiles.map((p: any) => [p.id, p]));
           }

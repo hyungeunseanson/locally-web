@@ -63,6 +63,11 @@ export default function AuditLogTab() {
         color: 'bg-emerald-50 text-emerald-700 border-emerald-100',
         description: '체험 상품 승인 상태 변경'
       },
+      'CONFIRM_PAYMENT': { 
+        label: '입금 확인', 
+        color: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+        description: '관리자 권한으로 무통장 입금 확정 처리'
+      },
     };
     return map[type] || { label: type, color: 'bg-slate-50 text-slate-700 border-slate-100', description: '기타 관리 작업' };
   };
