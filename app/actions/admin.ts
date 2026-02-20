@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 
-// 🔒 관리자 권한 확인 (재사용 함수)
+// 🔒 관리자 권한 확인
 async function getAdminClient() {
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -45,6 +45,18 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   const { data: { user: adminUser } } = await supabase.auth.getUser();
   const supabaseAdmin = createAdminClient();
 
+  // 🟢 [추가] 기록 전 대상 이름(제목/호스트명) 가져오기
+  let targetTitle = id;
+  try {
+    if (table === 'experiences') {
+      const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).single();
+      if (data) targetTitle = data.title;
+    } else if (table === 'host_applications') {
+      const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).single();
+      if (data) targetTitle = data.name;
+    }
+  } catch (e) {}
+
   const updateData: any = { status };
   if (comment) updateData.admin_comment = comment;
 
@@ -58,37 +70,49 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
     }
   }
 
-  // 🟢 로그 기록
+  // 🟢 로그 기록 (상세 정보 보강)
   await recordAuditLog({
     admin_id: adminUser?.id,
     admin_email: adminUser?.email,
     action_type: `UPDATE_${table.toUpperCase()}_STATUS`,
     target_type: table,
     target_id: id,
-    details: { new_status: status, comment }
+    details: { 
+      target_info: targetTitle,
+      new_status: status, 
+      comment 
+    }
   });
 
   return { success: true };
 }
 
-// 🗑️ 데이터 삭제 (Server Action)
+// 🗑️ 데이터 삭제 (Server Action 사용 시 대비 - 로직 일치화)
 export async function deleteAdminItem(table: string, id: string) {
   const supabase = await getAdminClient();
   const { data: { user: adminUser } } = await supabase.auth.getUser();
   const supabaseAdmin = createAdminClient();
 
-  if (table === 'profiles' || table === 'users') {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
-    if (error) {
-      console.warn('Auth user deletion warning:', error.message);
+  let targetInfo = id;
+  try {
+    if (table === 'profiles') {
+      const { data } = await supabaseAdmin.from('profiles').select('email').eq('id', id).single();
+      if (data) targetInfo = data.email;
+    } else if (table === 'experiences') {
+      const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).single();
+      if (data) targetInfo = data.title;
     }
-    
+  } catch (e) {}
+
+  if (table === 'profiles' || table === 'users') {
+    await supabaseAdmin.auth.admin.deleteUser(id);
     await recordAuditLog({
       admin_id: adminUser?.id,
       admin_email: adminUser?.email,
       action_type: 'DELETE_USER_FULL',
       target_type: table,
-      target_id: id
+      target_id: id,
+      details: { target_info: targetInfo }
     });
     return { success: true };
   }
@@ -101,7 +125,8 @@ export async function deleteAdminItem(table: string, id: string) {
     admin_email: adminUser?.email,
     action_type: 'DELETE_ITEM',
     target_type: table,
-    target_id: id
+    target_id: id,
+    details: { target_info: targetInfo }
   });
 
   return { success: true };
