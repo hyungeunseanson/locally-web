@@ -55,6 +55,15 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
 // 🗑️ 데이터 삭제
 export async function deleteAdminItem(table: string, id: string) {
   const supabase = await getAdminClient();
+
+  // 유저 프로필 삭제 시, Auth 계정도 함께 삭제 (완전 삭제)
+  if (table === 'profiles' || table === 'users') {
+    const { error } = await supabase.auth.admin.deleteUser(id);
+    if (error) throw new Error(`Auth 삭제 실패: ${error.message}`);
+    return { success: true };
+  }
+
+  // 일반 테이블 삭제
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
