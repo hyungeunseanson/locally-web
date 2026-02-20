@@ -63,9 +63,9 @@ export default function ExperienceCard({ data }: { data: any }) {
             {location} · {category}
           </h3>
           <div className="flex items-center gap-1 text-sm shrink-0">
-            <Star size={14} fill="black" />
-            <span>4.95</span>
-            <span className="text-slate-400 font-normal">(32)</span>
+            <Star size={14} fill={data.rating > 0 ? "black" : "none"} className={data.rating > 0 ? "" : "text-slate-300"} />
+            <span>{data.rating > 0 ? data.rating.toFixed(2) : "New"}</span>
+            {data.review_count > 0 && <span className="text-slate-400 font-normal">({data.review_count})</span>}
           </div>
         </div>
         
