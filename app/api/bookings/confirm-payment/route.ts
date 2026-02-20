@@ -1,71 +1,67 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { recordAuditLog } from '@/app/utils/supabase/admin'; // 🟢 Import
+
+// 🔒 API Route 내부에서 직접 관리자 클라이언트 생성 (의존성 제거)
+const createAdminClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('🔥 [Server Error] Missing Env Vars:', { 
+      url: !!supabaseUrl, 
+      key: !!serviceRoleKey 
+    });
+    throw new Error('Server Configuration Error: Missing Supabase Keys');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+};
 
 export async function POST(request: Request) {
+  console.log('💰 [API] Confirm Payment Started');
+
   try {
-    // ... (중략)
-
-    // 3. 상태를 'confirmed'로 변경 및 정산 데이터 확정 기록
-    // ... (업데이트 로직 동일)
-
-    if (updateError) throw updateError;
-
-    // 🟢 [추가] 활동 로그 기록 (입금 확인)
-    // 로그 실패가 전체 트랜잭션을 망치지 않도록 안전하게 처리
-    try {
-      await recordAuditLog({
-        action_type: 'CONFIRM_PAYMENT',
-        target_type: 'bookings',
-        target_id: bookingId,
-        details: {
-          target_info: `${experience.title} (게스트: ${booking.contact_name})`,
-          amount: booking.amount
-        }
-      });
-    } catch (logError) {
-      console.error('Audit Log Failed (Non-fatal):', logError);
-    }
-
-    // 4. 호스트에게 알림 발송
-    // ... (동일)
-    
+    const supabase = createAdminClient(); // 🟢 직접 생성
     const { bookingId } = await request.json();
-    
-    // 1. 예약 정보 조회 (조인 제거)
+
+    if (!bookingId) throw new Error('Missing bookingId');
+
+    // 1. 예약 정보 조회
     const { data: booking, error: fetchError } = await supabase
       .from('bookings')
       .select('*')
       .eq('id', bookingId)
       .single();
 
-    if (fetchError || !booking) throw new Error('예약 정보를 찾을 수 없습니다.');
+    if (fetchError || !booking) {
+      console.error('Fetch Booking Error:', fetchError);
+      throw new Error('예약 정보를 찾을 수 없습니다.');
+    }
 
-    // 2. 체험 정보 별도 조회 (안전한 방식)
+    // 2. 체험 정보 조회
     const { data: experience, error: expError } = await supabase
       .from('experiences')
       .select('title, host_id, max_guests, price')
       .eq('id', booking.experience_id)
       .single();
     
-    if (expError) {
-      console.error('Experience fetch error:', expError);
-      throw new Error(`체험 정보를 불러오는데 실패했습니다: ${expError.message}`);
+    if (expError || !experience) {
+      console.error('Fetch Experience Error:', expError);
+      throw new Error('체험 정보를 찾을 수 없습니다.');
     }
-    if (!experience) throw new Error('연결된 체험 정보가 없습니다.');
 
-    console.log(`[ConfirmPayment] Booking: ${bookingId}, Exp: ${experience.title}, Price: ${experience.price}`);
-
-    // ... (중간 로직 동일)
-
-    // 3. 상태를 'confirmed'로 변경 및 정산 데이터 확정 기록
+    // 3. 정산 데이터 계산
     const basePrice = Number(experience.price || 0);
     const totalExpPrice = basePrice * (Number(booking.guests) || 1);
     const payoutAmount = totalExpPrice * 0.8;
     const platformRev = Number(booking.amount || 0) - payoutAmount;
 
-    console.log(`[ConfirmPayment] Settling: Base=${basePrice}, Total=${totalExpPrice}, Payout=${payoutAmount}`);
-
+    // 4. 업데이트 (확정)
     const { error: updateError } = await supabase
       .from('bookings')
       .update({ 
@@ -80,35 +76,58 @@ export async function POST(request: Request) {
 
     if (updateError) {
       console.error('Update Booking Error:', updateError);
-      throw new Error(`예약 업데이트 실패: ${updateError.message}`);
+      throw new Error(updateError.message);
     }
 
-    // 4. 호스트에게 알림 발송
-    if (experience.host_id) {
-      await supabase.from('notifications').insert({
-        user_id: experience.host_id,
-        type: 'booking_confirmed',
-        title: '💰 입금 확인 완료!',
-        message: `'${experience.title}' 예약의 입금 확인이 완료되었습니다.`,
-        link: '/host/dashboard',
-        is_read: false
+    // 5. 활동 로그 기록 (안전하게 내부 처리)
+    try {
+      await supabase.from('admin_audit_logs').insert({
+        action_type: 'CONFIRM_PAYMENT',
+        target_type: 'bookings',
+        target_id: bookingId,
+        details: {
+          target_info: `${experience.title} (게스트: ${booking.contact_name})`,
+          amount: booking.amount
+        }
       });
+    } catch (logError) {
+      console.error('Log Insert Failed (Ignored):', logError);
     }
 
-    // 5. 게스트에게 알림 발송
-    if (booking.user_id) {
-      await supabase.from('notifications').insert({
-        user_id: booking.user_id,
-        type: 'booking_confirmed',
-        title: '✅ 예약 확정 알림',
-        message: `'${experience.title}' 입금이 확인되어 예약이 확정되었습니다. 즐거운 여행 되세요!`,
-        link: '/guest/trips',
-        is_read: false
-      });
+    // 6. 알림 발송 (호스트/게스트)
+    try {
+      const notifications = [];
+      if (experience.host_id) {
+        notifications.push({
+          user_id: experience.host_id,
+          type: 'booking_confirmed',
+          title: '💰 입금 확인 완료!',
+          message: `'${experience.title}' 예약의 입금 확인이 완료되었습니다.`,
+          link: '/host/dashboard',
+          is_read: false
+        });
+      }
+      if (booking.user_id) {
+        notifications.push({
+          user_id: booking.user_id,
+          type: 'booking_confirmed',
+          title: '✅ 예약 확정 알림',
+          message: `'${experience.title}' 입금이 확인되어 예약이 확정되었습니다.`,
+          link: '/guest/trips',
+          is_read: false
+        });
+      }
+      if (notifications.length > 0) {
+        await supabase.from('notifications').insert(notifications);
+      }
+    } catch (notiError) {
+      console.error('Notification Failed (Ignored):', notiError);
     }
 
     return NextResponse.json({ success: true });
+
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('🔥 [API Error]', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
