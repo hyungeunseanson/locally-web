@@ -52,19 +52,30 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   return { success: true };
 }
 
+import { createClient } from '@supabase/supabase-js';
+
+// ... (getAdminClient 유지)
+
 // 🗑️ 데이터 삭제
 export async function deleteAdminItem(table: string, id: string) {
-  const supabase = await getAdminClient();
+  // 1. 관리자 권한 체크 (기존 로직 사용)
+  await getAdminClient();
+
+  // 2. 실제 삭제를 위한 Admin 클라이언트 생성 (Service Role Key 필요)
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   // 유저 프로필 삭제 시, Auth 계정도 함께 삭제 (완전 삭제)
   if (table === 'profiles' || table === 'users') {
-    const { error } = await supabase.auth.admin.deleteUser(id);
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
     if (error) throw new Error(`Auth 삭제 실패: ${error.message}`);
     return { success: true };
   }
 
-  // 일반 테이블 삭제
-  const { error } = await supabase.from(table).delete().eq('id', id);
+  // 일반 테이블 삭제 (RLS 우회를 위해 Admin 클라이언트 사용 권장)
+  const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
   if (error) throw new Error(error.message);
   return { success: true };
 }
