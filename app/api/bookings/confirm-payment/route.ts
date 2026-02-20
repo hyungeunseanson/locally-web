@@ -38,10 +38,22 @@ if (hasPrivateBooking ||
 throw new Error('해당 시간대의 정원이 이미 초과되어 입금을 승인할 수 없습니다.');
 }
 
-// 2. 상태를 'confirmed'로 변경
+// 2. 상태를 'confirmed'로 변경 및 정산 데이터 확정 기록
+    const basePrice = Number(booking.experiences?.price || 0);
+    const totalExpPrice = basePrice * (booking.guests || 1);
+    const payoutAmount = totalExpPrice * 0.8;
+    const platformRev = Number(booking.amount || 0) - payoutAmount;
+
     const { error: updateError } = await supabase
       .from('bookings')
-      .update({ status: 'confirmed' })
+      .update({ 
+        status: 'confirmed',
+        price_at_booking: basePrice,
+        total_experience_price: totalExpPrice,
+        host_payout_amount: payoutAmount,
+        platform_revenue: platformRev,
+        payout_status: 'pending'
+      })
       .eq('id', bookingId);
 
     if (updateError) throw updateError;

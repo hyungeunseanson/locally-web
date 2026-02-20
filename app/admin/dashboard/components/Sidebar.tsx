@@ -156,29 +156,15 @@ pendingBookings: bookingCount || 0, // 🟢 추가
           </div>
         </div>
 
-        <div>
-          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Finance</h2>
-          <div className="space-y-1">
-            <NavButton 
-              active={activeTab === 'SALES'} 
-              onClick={() => handleTabChange('SALES')} 
-              icon={<CreditCard size={18}/>} 
-              label="매출 및 정산" 
-            />
-            <NavButton 
-              active={activeTab === 'ANALYTICS'} 
-              onClick={() => handleTabChange('ANALYTICS')} 
-              icon={<BarChart2 size={18}/>} 
-              label="데이터 통계" 
-            />
-            <NavButton 
-              active={activeTab === 'LOGS'} 
-              onClick={() => handleTabChange('LOGS')} 
-              icon={<ShieldCheck size={18}/>} 
-              label="활동 로그" 
-            />
-          </div>
-        </div>
+                <div>
+                  <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Finance</h2>
+                  <div className="space-y-1">
+                    <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={18}/>} label="통합 마스터 장부" />
+                    <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={18}/>} label="매출 및 정산" />
+                    <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={18}/>} label="데이터 통계" />
+                    <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={18}/>} label="활동 로그" />
+                  </div>
+                </div>
       </div>
       
       {/* 하단 프로필 (선택사항) */}

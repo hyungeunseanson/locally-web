@@ -113,10 +113,24 @@ throw new Error('잔여 좌석이 부족하여 예약을 확정할 수 없습니
 
 console.log(`✅ [INFO] 금액 및 좌석 검증 완벽 통과 (DB: ${expectedAmount} == PG: ${amount})`);
 
-      // 3. 예약 상태 무조건 업데이트 (PAID)
+      // 3. 예약 상태 및 정산 데이터 업데이트 (PAID)
+      // 💰 [정산 데이터 박제] 호스트 원가와 수수료 수익을 이 시점에 확정 기록합니다.
+      const basePrice = Number(originalBooking.experiences?.price || 0);
+      const totalExpPrice = basePrice * (originalBooking.guests || 1);
+      const payoutAmount = totalExpPrice * 0.8; // 호스트 정산금 (원가의 80%)
+      const platformRev = Number(amount) - payoutAmount; // 플랫폼 순수익 (실결제액 - 지급액)
+
       const { data: bookingData, error: dbError } = await supabase
         .from('bookings')
-        .update({ status: 'PAID', tid: tid })
+        .update({ 
+          status: 'PAID', 
+          tid: tid,
+          price_at_booking: basePrice,
+          total_experience_price: totalExpPrice,
+          host_payout_amount: payoutAmount,
+          platform_revenue: platformRev,
+          payout_status: 'pending'
+        })
         .eq('id', orderId)
         .select(`*, experiences (host_id, title)`)
         .single();
