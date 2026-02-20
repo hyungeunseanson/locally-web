@@ -12,7 +12,7 @@ import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
 import ChatMonitor from './components/ChatMonitor'; 
-import { updateAdminStatus, deleteAdminItem } from '@/app/actions/admin';
+import { updateAdminStatus } from '@/app/actions/admin';
 
 function AdminDashboardContent() {
   const { showToast } = useToast(); 
@@ -120,7 +120,16 @@ function AdminDashboardContent() {
     if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
     
     try {
-      await deleteAdminItem(table, id);
+      const res = await fetch('/api/admin/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table, id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || '삭제 요청 실패');
+
       showToast('삭제되었습니다.', 'success'); 
       fetchData(); 
       setSelectedItem(null); 
