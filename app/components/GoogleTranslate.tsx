@@ -23,7 +23,6 @@ const GoogleTranslate = () => {
           layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
           autoDisplay: false
         }, 'google_translate_element');
-        console.log('Google Translate Initialized');
       }
     };
   }, []);
@@ -39,33 +38,47 @@ const GoogleTranslate = () => {
       
       <div className="fixed bottom-10 right-10 z-[9999]">
         <div className="relative group">
-          {/* 디자인은 그대로 유지하되 클릭 방해 요소 제거 */}
-          <div className="flex items-center gap-3 px-6 py-3.5 bg-white border border-gray-200 rounded-full shadow-xl cursor-pointer">
-            <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded">
-              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 11.37 9.188 16.544 5 20" />
+          {/* 1. 프리미엄 배경 글로우 (Pulse 애니메이션) */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 animate-pulse-slow"></div>
+          
+          {/* 2. 시각적 버튼 디자인 (Glassmorphism) */}
+          <div className="relative flex items-center gap-3 px-6 py-3.5 bg-white/80 backdrop-blur-xl border border-white/40 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] transition-all duration-500 group-hover:-translate-y-1">
+            
+            {/* 그라데이션 아이콘 박스 */}
+            <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-sm transform group-hover:rotate-12 transition-transform duration-500">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 11.37 9.188 16.544 5 20" />
               </svg>
             </div>
-            <span className="text-sm font-bold text-gray-900 uppercase tracking-tight">Translate</span>
-          </div>
+            
+            <span className="text-sm font-bold tracking-tight text-gray-900 uppercase select-none">
+              Translate
+            </span>
 
-          {/* 실제 구글 요소 - 1차 성공 버전의 구조로 복원 */}
-          <div 
-            id="google_translate_element" 
-            className="absolute inset-0 w-full h-full z-20 cursor-pointer overflow-hidden"
-            style={{ opacity: 0 }}
-          />
+            {/* 3. 실제 구글 클릭 영역 (최상단 투명 레이어) */}
+            <div 
+              id="google_translate_element" 
+              className="absolute inset-0 w-full h-full z-20 cursor-pointer rounded-full overflow-hidden"
+              style={{ opacity: 0 }}
+            />
+          </div>
         </div>
       </div>
       
       <style jsx global>{`
-        /* 구글 상단 바와 불필요한 텍스트만 숨김 (기능 필수 요소는 건드리지 않음) */
+        /* 버튼 애니메이션 */
+        @keyframes pulse-slow {
+          0%, 100% { transform: scale(1); opacity: 0.2; }
+          50% { transform: scale(1.1); opacity: 0.4; }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* 구글 필수 기능만 유지 (모달 스타일 절대 금지) */
         .goog-te-banner-frame { display: none !important; }
         body { top: 0px !important; }
         
-        /* 모달 관련 모든 커스텀 스타일 삭제 (순정 상태 유지) */
-        
-        /* 클릭 영역 확보를 위한 최소 스타일 */
         #google_translate_element .goog-te-gadget-simple {
           width: 100% !important;
           height: 100% !important;
@@ -74,7 +87,9 @@ const GoogleTranslate = () => {
           padding: 0 !important;
           margin: 0 !important;
           cursor: pointer !important;
+          display: block !important;
         }
+        .goog-te-gadget-icon, .goog-te-gadget span, .goog-logo-link { display: none !important; }
       `}</style>
     </>
   );
