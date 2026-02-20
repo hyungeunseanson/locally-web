@@ -12,21 +12,20 @@ export async function POST(request: Request) {
     if (updateError) throw updateError;
 
     // 🟢 [추가] 활동 로그 기록 (입금 확인)
-    // 관리자 정보를 알기 위해 헤더에서 토큰을 확인하거나, 
-    // 여기서는 시스템이 처리한 것으로 간주할 수도 있지만, 보안상 관리자 토큰 검증이 좋음.
-    // 하지만 현재 클라이언트에서 토큰을 안 보내고 있을 수 있으므로, 일단 'System' 또는 'Admin'으로 기록.
-    // (완벽하게 하려면 클라이언트에서 Authorization 헤더를 보내줘야 함)
-    
-    // 임시로 '관리자(Admin)'로 기록
-    await recordAuditLog({
-      action_type: 'CONFIRM_PAYMENT',
-      target_type: 'bookings',
-      target_id: bookingId,
-      details: {
-        target_info: `${experience.title} (게스트: ${booking.contact_name})`,
-        amount: booking.amount
-      }
-    });
+    // 로그 실패가 전체 트랜잭션을 망치지 않도록 안전하게 처리
+    try {
+      await recordAuditLog({
+        action_type: 'CONFIRM_PAYMENT',
+        target_type: 'bookings',
+        target_id: bookingId,
+        details: {
+          target_info: `${experience.title} (게스트: ${booking.contact_name})`,
+          amount: booking.amount
+        }
+      });
+    } catch (logError) {
+      console.error('Audit Log Failed (Non-fatal):', logError);
+    }
 
     // 4. 호스트에게 알림 발송
     // ... (동일)
