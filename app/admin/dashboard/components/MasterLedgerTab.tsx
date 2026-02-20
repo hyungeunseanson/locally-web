@@ -12,32 +12,41 @@ import Image from 'next/image';
 export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any[], onRefresh: () => void }) {
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [monthFilter, setMonthFilter] = useState(''); // 초기값 비움 = 전체 기간
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'PENDING' | 'CANCELLED'>('ALL');
-  const [selectedBooking, setSelectedBooking] = useState<any>(null); // 상세 보기용
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 1. 장부 데이터 필터링 로직 강화
+  // 1. 장부 데이터 필터링
   const ledgerData = bookings.filter(b => {
-    // 날짜 매칭 (월별 필터)
-    const dateMatch = b.date?.startsWith(monthFilter);
+    // 날짜 필터 (값이 있을 때만 적용)
+    const dateMatch = !monthFilter || b.date?.startsWith(monthFilter);
     
     // 검색어 매칭
     const searchString = `${b.experiences?.profiles?.name} ${b.experiences?.title} ${b.contact_name} ${b.id} ${b.profiles?.email}`.toLowerCase();
     const searchMatch = searchString.includes(searchTerm.toLowerCase());
 
     // 상태 필터링
-    let statusMatch = true;
-    if (statusFilter === 'PAID') statusMatch = ['PAID', 'confirmed', 'completed'].includes(b.status);
-    if (statusFilter === 'PENDING') statusMatch = b.status === 'PENDING'; // 입금 대기
-    if (statusFilter === 'CANCELLED') statusMatch = ['cancelled', 'declined', 'cancellation_requested'].includes(b.status);
+    const status = b.status;
+    let statusMatch = false;
+
+    if (statusFilter === 'ALL') {
+      // 전체 보기: 입금대기, 결제완료, 취소됨 모두 포함
+      statusMatch = ['PENDING', 'PAID', 'confirmed', 'completed', 'cancelled', 'declined', 'cancellation_requested'].includes(status);
+    } else if (statusFilter === 'PAID') {
+      statusMatch = ['PAID', 'confirmed', 'completed'].includes(status);
+    } else if (statusFilter === 'PENDING') {
+      statusMatch = status === 'PENDING';
+    } else if (statusFilter === 'CANCELLED') {
+      statusMatch = ['cancelled', 'declined', 'cancellation_requested'].includes(status);
+    }
 
     return dateMatch && searchMatch && statusMatch;
   });
 
-  // 2. 통합 합계 계산 (KPI) - 취소된 건은 제외하거나 별도 처리 가능하지만, 여기선 '매출' 관점에서 실결제액 기준
+  // 2. 통합 합계 계산 (KPI) - 취소된 건은 제외
   const totals = ledgerData.reduce((acc, curr) => {
-    if (curr.status === 'cancelled') return acc; // 취소 건은 합계 제외 (선택 사항)
+    if (['cancelled', 'declined', 'cancellation_requested'].includes(curr.status)) return acc;
     
     acc.totalSales += Number(curr.amount || 0); 
     acc.totalBasePrice += Number(curr.total_experience_price || 0); 
@@ -67,12 +76,11 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `locally_ledger_${monthFilter}.csv`;
+    link.download = `locally_ledger_${monthFilter || 'ALL'}.csv`;
     link.click();
     showToast('장부가 CSV로 다운로드되었습니다.', 'success');
   };
 
-  // 4. 관리자 액션: 입금 확인
   const handleConfirmPayment = async (bookingId: number) => {
     if (!confirm('입금이 확인되었습니까? 예약을 확정합니다.')) return;
     setIsProcessing(true);
@@ -91,7 +99,6 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     } finally { setIsProcessing(false); }
   };
 
-  // 5. 관리자 액션: 강제 취소
   const handleForceCancel = async (bookingId: string) => {
     if (!confirm('⚠️ 정말로 강제 취소(전액 환불)하시겠습니까?')) return;
     setIsProcessing(true);
@@ -110,27 +117,23 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     } finally { setIsProcessing(false); }
   };
 
-  // 복사 유틸
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     showToast('복사되었습니다.', 'success');
   };
 
-  // 상태 배지 렌더러
   const renderStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
     if (['paid', 'confirmed', 'completed'].includes(s)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">확정</span>;
     if (s === 'pending') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 animate-pulse">입금 대기</span>;
-    if (['cancelled', 'declined'].includes(s)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">취소됨</span>;
+    if (['cancelled', 'declined', 'cancellation_requested'].includes(s)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">취소됨</span>;
     return <span className="text-xs text-slate-500">{status}</span>;
   };
 
   return (
     <div className="flex h-full gap-6 relative">
-      {/* 왼쪽 메인 장부 영역 */}
       <div className={`flex-1 flex flex-col space-y-6 transition-all duration-300 ${selectedBooking ? 'w-2/3' : 'w-full'}`}>
         
-        {/* KPI 대시보드 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
           <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-lg shadow-slate-200">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sales</div>
@@ -148,13 +151,12 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <div className="text-[10px] text-slate-400 mt-1">순수익</div>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Count</div>
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bookings</div>
             <div className="text-2xl font-black text-slate-900">{ledgerData.length}건</div>
-            <div className="text-[10px] text-slate-400 mt-1">{monthFilter} 기준</div>
+            <div className="text-[10px] text-slate-400 mt-1">{monthFilter || '전체 기간'}</div>
           </div>
         </div>
 
-        {/* 컨트롤 바 */}
         <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0">
           <div className="flex gap-4 items-center">
             <input 
@@ -163,7 +165,6 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
               onChange={(e) => setMonthFilter(e.target.value)}
               className="p-2 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 ring-rose-500/20"
             />
-            {/* 상태 필터 버튼 */}
             <div className="flex bg-slate-100 p-1 rounded-xl">
               {[
                 { id: 'ALL', label: '전체' },
@@ -201,7 +202,6 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
           </div>
         </div>
 
-        {/* 마스터 장부 테이블 */}
         <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
           <div className="overflow-y-auto flex-1 scrollbar-hide">
             <table className="w-full text-[13px] text-left border-collapse">
@@ -260,10 +260,8 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
         </div>
       </div>
 
-      {/* 🟢 우측 상세 패널 (BookingsTab 기능 이식 완료) */}
       {selectedBooking && (
         <div className="w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 absolute right-0 top-0 bottom-0 z-20">
-           {/* 패널 헤더 */}
            <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
               <div>
                   <div className="text-xs font-bold text-slate-400 uppercase mb-1">Booking Detail</div>
@@ -275,10 +273,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
               <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-900"><X size={20}/></button>
            </div>
 
-           {/* 패널 바디 */}
            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-              
-              {/* 게스트 정보 */}
               <div>
                   <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
                       <User size={16}/> 게스트 정보
@@ -308,7 +303,6 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   </div>
               </div>
 
-              {/* 결제 정보 */}
               <div>
                   <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
                       <CreditCard size={16}/> 결제 및 정산
@@ -333,13 +327,11 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   </div>
               </div>
 
-              {/* 관리자 액션 */}
               <div className="pt-4 border-t border-slate-100 space-y-3">
                   <h4 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
                       <AlertTriangle size={16} className="text-orange-500"/> 관리자 액션
                   </h4>
                   
-                  {/* 입금 확인 버튼 */}
                   {selectedBooking.status === 'PENDING' && (
                     <button 
                       onClick={() => handleConfirmPayment(selectedBooking.id)}
@@ -350,7 +342,6 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                     </button>
                   )}
 
-                  {/* 강제 취소 버튼 */}
                   {['confirmed', 'paid', 'completed'].includes(selectedBooking.status.toLowerCase()) && (
                     <button 
                       onClick={() => handleForceCancel(selectedBooking.id)}

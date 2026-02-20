@@ -8,7 +8,6 @@ import {
   Calendar, BarChart2, CreditCard, LayoutDashboard, ShieldCheck
 } from 'lucide-react';
 
-// NavButton 컴포넌트 내부 정의 (별도 파일 의존성 제거)
 const NavButton = ({ active, onClick, icon, label, count }: any) => (
   <button
     onClick={onClick}
@@ -43,53 +42,34 @@ export default function Sidebar() {
     apps: 0,
     exps: 0,
     online: 0,
-    pendingBookings: 0, // 🟢 추가
+    pendingBookings: 0,
   });
 
   useEffect(() => {
     const fetchCounts = async () => {
-      // 호스트 지원서 대기 (pending)
-      const { count: appsCount } = await supabase
-        .from('host_applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+      const { count: appsCount } = await supabase.from('host_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+      const { count: expsCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+      const { count: bookingCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING');
 
-// 체험 승인 대기
-const { count: expsCount } = await supabase
-.from('experiences')
-.select('*', { count: 'exact', head: true })
-.eq('status', 'pending');
-
-// 🟢 [추가] 입금 대기 예약 (PENDING)
-const { count: bookingCount } = await supabase
-.from('bookings')
-.select('*', { count: 'exact', head: true })
-.eq('status', 'PENDING');
-
-setCounts(prev => ({
-...prev,
-apps: appsCount || 0,
-exps: expsCount || 0,
-pendingBookings: bookingCount || 0, // 🟢 추가
-}));
+      setCounts(prev => ({
+        ...prev,
+        apps: appsCount || 0,
+        exps: expsCount || 0,
+        pendingBookings: bookingCount || 0,
+      }));
     };
 
     fetchCounts();
 
-    // 실시간 접속자 수 체크
     const channel = supabase.channel('online_users_sidebar')
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
-        const uniqueUsers = new Set(
-          Object.values(state).flat().map((u: any) => u.user_id)
-        );
+        const uniqueUsers = new Set(Object.values(state).flat().map((u: any) => u.user_id));
         setCounts(prev => ({ ...prev, online: uniqueUsers.size }));
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const handleTabChange = (tab: string) => {
@@ -98,7 +78,6 @@ pendingBookings: bookingCount || 0, // 🟢 추가
 
   return (
     <aside className="w-64 bg-[#111827] text-white flex flex-col p-4 shadow-xl h-screen sticky top-0 border-r border-slate-800">
-      {/* 로고 */}
       <div className="mb-10 px-2 mt-4 flex items-center gap-2">
         <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center">
           <LayoutDashboard size={18} className="text-white" />
@@ -113,54 +92,31 @@ pendingBookings: bookingCount || 0, // 🟢 추가
         <div>
           <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Management</h2>
           <div className="space-y-1">
-            <NavButton 
-              active={activeTab === 'APPS'} 
-              onClick={() => handleTabChange('APPS')} 
-              icon={<Users size={18}/>} 
-              label="호스트 지원서" 
-              count={counts.apps} 
-            />
-            <NavButton 
-              active={activeTab === 'EXPS'} 
-              onClick={() => handleTabChange('EXPS')} 
-              icon={<MapPin size={18}/>} 
-              label="체험 승인 관리" 
-              count={counts.exps} 
-            />
-            <NavButton 
-              active={activeTab === 'USERS'} 
-              onClick={() => handleTabChange('USERS')} 
-              icon={<CheckCircle2 size={18}/>} 
-              label="회원 관리" 
-              count={counts.online > 0 ? `${counts.online} 접속` : undefined} 
-            />
+            <NavButton active={activeTab === 'APPS'} onClick={() => handleTabChange('APPS')} icon={<Users size={18}/>} label="호스트 지원서" count={counts.apps} />
+            <NavButton active={activeTab === 'EXPS'} onClick={() => handleTabChange('EXPS')} icon={<MapPin size={18}/>} label="체험 승인 관리" count={counts.exps} />
+            <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<CheckCircle2 size={18}/>} label="회원 관리" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
           </div>
         </div>
         
         <div>
           <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Operation</h2>
           <div className="space-y-1">
-            <NavButton 
-              active={activeTab === 'CHATS'} 
-              onClick={() => handleTabChange('CHATS')} 
-              icon={<MessageSquare size={18}/>} 
-              label="메시지 모니터링" 
-            />
+            {/* BOOKINGS 제거됨 */}
+            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={18}/>} label="메시지 모니터링" />
           </div>
         </div>
 
-                <div>
-                  <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Finance</h2>
-                  <div className="space-y-1">
-                    <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={18}/>} label="통합 마스터 장부" />
-                    <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={18}/>} label="매출 및 정산" />
-                    <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={18}/>} label="데이터 통계" />
-                    <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={18}/>} label="활동 로그" />
-                  </div>
-                </div>
+        <div>
+          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Finance</h2>
+          <div className="space-y-1">
+            <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={18}/>} label="통합 마스터 장부" count={counts.pendingBookings} />
+            <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={18}/>} label="매출 및 정산" />
+            <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={18}/>} label="데이터 통계" />
+            <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={18}/>} label="활동 로그" />
+          </div>
+        </div>
       </div>
       
-      {/* 하단 프로필 (선택사항) */}
       <div className="mt-auto pt-6 border-t border-slate-800 px-2">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">AD</div>
