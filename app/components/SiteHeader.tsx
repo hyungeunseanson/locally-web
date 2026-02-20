@@ -51,15 +51,44 @@ function SiteHeaderContent() {
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-      if (session?.user) checkHostStatus(session.user.id);
+      if (session?.user) {
+        // 🟢 Auth 세션 정보뿐만 아니라, DB의 최신 프로필 정보(사진)를 가져와 병합합니다.
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', session.user.id)
+          .single();
+        
+        const updatedUser = {
+          ...session.user,
+          user_metadata: {
+            ...session.user.user_metadata,
+            avatar_url: profile?.avatar_url || session.user.user_metadata.avatar_url
+          }
+        };
+        setUser(updatedUser);
+        checkHostStatus(session.user.id);
+      } else {
+        setUser(null);
+      }
     };
     checkUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-      if (session?.user) checkHostStatus(session.user.id);
-      else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        // 🟢 Auth 상태 변경 시에도 DB 최신 정보 반영
+        const { data: profile } = await supabase.from('profiles').select('avatar_url').eq('id', session.user.id).single();
+        const updatedUser = {
+          ...session.user,
+          user_metadata: {
+            ...session.user.user_metadata,
+            avatar_url: profile?.avatar_url || session.user.user_metadata.avatar_url
+          }
+        };
+        setUser(updatedUser);
+        checkHostStatus(session.user.id);
+      } else {
+        setUser(null);
         setIsHost(false);
         setApplicationStatus(null);
       }
