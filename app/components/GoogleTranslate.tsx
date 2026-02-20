@@ -14,8 +14,9 @@ const GoogleTranslate = () => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
+    // 전역 초기화 함수 등록
     window.googleTranslateElementInit = () => {
-      if (window.google && window.google.translate && !isLoaded) {
+      if (window.google && window.google.translate) {
         new window.google.translate.TranslateElement({
           pageLanguage: 'ko', 
           includedLanguages: 'ko,en,ja,zh-CN,vi,th',
@@ -25,7 +26,12 @@ const GoogleTranslate = () => {
         setIsLoaded(true);
       }
     };
-  }, [isLoaded]);
+
+    // 이미 스크립트가 로드된 경우 대응
+    if (window.google && window.google.translate) {
+      window.googleTranslateElementInit();
+    }
+  }, []);
 
   return (
     <>
@@ -34,14 +40,14 @@ const GoogleTranslate = () => {
         strategy="afterInteractive"
       />
       
-      {/* 프리미엄 모던 번역 버튼 */}
       <div className="fixed bottom-10 right-10 z-[9999]">
         <div className="relative group">
-          {/* 배경 애니메이션 (은은하게 커졌다 작아졌다 하는 효과) */}
+          {/* 배경 애니메이션 */}
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-teal-400 rounded-full blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200 animate-pulse-slow"></div>
           
-          <button className="relative flex items-center gap-2.5 px-5 py-3 bg-white/80 backdrop-blur-md border border-white/20 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.15)] transition-all duration-500 ease-out active:scale-90 group">
-            {/* 세련된 번역 아이콘 */}
+          {/* 버튼 컨테이너 (div로 변경하여 이벤트 간섭 최소화) */}
+          <div className="relative flex items-center gap-2.5 px-5 py-3 bg-white/90 backdrop-blur-md border border-white/20 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.15)] transition-all duration-500 ease-out active:scale-90 cursor-pointer">
+            
             <svg 
               className="w-5 h-5 text-gray-800 transition-transform duration-500 group-hover:rotate-12" 
               fill="none" 
@@ -55,17 +61,17 @@ const GoogleTranslate = () => {
               {isLoaded ? 'Translate' : 'Loading...'}
             </span>
 
-            {/* 실제 구글 클릭 영역 - 버튼 전체를 덮으면서 투명함 */}
+            {/* 실제 구글 클릭 영역 - opacity를 0이 아닌 최소값으로 설정 */}
             <div 
               id="google_translate_element" 
-              className="absolute inset-0 w-full h-full z-20 opacity-0 cursor-pointer overflow-hidden rounded-full"
+              className="absolute inset-0 w-full h-full z-20 cursor-pointer rounded-full"
+              style={{ opacity: 0.02 }}
             />
-          </button>
+          </div>
         </div>
       </div>
       
       <style jsx global>{`
-        /* 은은한 숨쉬기 애니메이션 */
         @keyframes pulse-slow {
           0%, 100% { transform: scale(1); opacity: 0.2; }
           50% { transform: scale(1.1); opacity: 0.35; }
@@ -74,12 +80,10 @@ const GoogleTranslate = () => {
           animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
-        /* 구글 번역기 UI 강제 제거 */
         .goog-te-banner-frame { display: none !important; }
         body { top: 0px !important; }
         .goog-logo-link, .goog-te-gadget span, .goog-te-gadget-icon { display: none !important; }
         
-        /* 위젯 내부 요소를 버튼 크기에 맞춤 */
         #google_translate_element .goog-te-gadget-simple {
           width: 100% !important;
           height: 100% !important;
@@ -88,25 +92,23 @@ const GoogleTranslate = () => {
           padding: 0 !important;
           margin: 0 !important;
           cursor: pointer !important;
-          display: block !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
         }
 
-        /* 90년대 스타일 메뉴창을 최대한 현대적으로 수정 */
-        .goog-te-menu-frame {
-          box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
-          border-radius: 16px !important;
-          border: 1px solid rgba(255, 255, 255, 0.2) !important;
-          overflow: hidden !important;
-          margin-top: 10px !important;
-        }
-
-        /* 메뉴 내부 스타일 (일부 브라우저 허용 범위 내) */
-        .goog-te-menu2 {
+        /* 메뉴 창 스타일 보강 */
+        iframe.goog-te-menu-frame {
+          box-shadow: 0 24px 48px rgba(0,0,0,0.18) !important;
+          border-radius: 20px !important;
           border: none !important;
-          border-radius: 16px !important;
-          padding: 8px !important;
-          background-color: rgba(255, 255, 255, 0.95) !important;
-          backdrop-filter: blur(10px) !important;
+          margin-top: 12px !important;
+          animation: menu-appear 0.3s ease-out !important;
+        }
+
+        @keyframes menu-appear {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </>
