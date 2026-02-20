@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { 
   Users, MapPin, CheckCircle2, MessageSquare, 
-  Calendar, BarChart2, CreditCard, LayoutDashboard
+  Calendar, BarChart2, CreditCard, LayoutDashboard, ShieldCheck
 } from 'lucide-react';
 
 // NavButton 컴포넌트 내부 정의 (별도 파일 의존성 제거)
@@ -170,6 +170,12 @@ pendingBookings: bookingCount || 0, // 🟢 추가
               onClick={() => handleTabChange('ANALYTICS')} 
               icon={<BarChart2 size={18}/>} 
               label="데이터 통계" 
+            />
+            <NavButton 
+              active={activeTab === 'LOGS'} 
+              onClick={() => handleTabChange('LOGS')} 
+              icon={<ShieldCheck size={18}/>} 
+              label="활동 로그" 
             />
           </div>
         </div>

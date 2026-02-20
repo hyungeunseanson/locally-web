@@ -2,7 +2,7 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 
 // 🔒 관리자 권한 확인 (재사용 함수)
 async function getAdminClient() {
@@ -25,9 +25,7 @@ async function getAdminClient() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  // 관리자 권한 체크: profiles 테이블 우선 확인 후 users 테이블 확인
   let isAdmin = false;
-  
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
   if (profile?.role === 'admin') isAdmin = true;
   
@@ -43,7 +41,8 @@ async function getAdminClient() {
 
 // ✅ 상태 변경 (승인/거절)
 export async function updateAdminStatus(table: 'host_applications' | 'experiences', id: string, status: string, comment?: string) {
-  await getAdminClient(); // 권한 체크
+  const supabase = await getAdminClient();
+  const { data: { user: adminUser } } = await supabase.auth.getUser();
   const supabaseAdmin = createAdminClient();
 
   const updateData: any = { status };
@@ -59,48 +58,51 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
     }
   }
 
+  // 🟢 로그 기록
+  await recordAuditLog({
+    admin_id: adminUser?.id,
+    admin_email: adminUser?.email,
+    action_type: `UPDATE_${table.toUpperCase()}_STATUS`,
+    target_type: table,
+    target_id: id,
+    details: { new_status: status, comment }
+  });
+
   return { success: true };
 }
 
-// 🗑️ 데이터 삭제
+// 🗑️ 데이터 삭제 (Server Action)
 export async function deleteAdminItem(table: string, id: string) {
-  console.log(`[AdminAction] deleteAdminItem called for table: ${table}, id: ${id}`);
+  const supabase = await getAdminClient();
+  const { data: { user: adminUser } } = await supabase.auth.getUser();
+  const supabaseAdmin = createAdminClient();
 
-  try {
-    // ⚠️ 디버깅을 위해 권한 체크를 잠시 건너뛰거나 단순화합니다.
-    // 실무에서는 여기서 cookies() 호출이 문제일 확률이 99%입니다.
-    // console.log('[AdminAction] Verifying admin permissions...');
-    // await getAdminClient(); 
-    
-    // 2. Admin 클라이언트 생성
-    console.log('[AdminAction] Creating admin client...');
-    const supabaseAdmin = createAdminClient();
-    console.log('[AdminAction] Admin client created successfully.');
-
-    // 유저 프로필 삭제 시, Auth 계정도 함께 삭제 (완전 삭제)
-    if (table === 'profiles' || table === 'users') {
-      console.log('[AdminAction] Attempting to delete Auth user...');
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
-      if (error) {
-        console.error('[AdminAction] Auth delete failed:', error);
-        throw new Error(`Auth 삭제 실패: ${error.message}`);
-      }
-      console.log('[AdminAction] Auth user deleted successfully.');
-      return { success: true };
-    }
-
-    // 일반 테이블 삭제
-    console.log('[AdminAction] Deleting from table...');
-    const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
+  if (table === 'profiles' || table === 'users') {
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
     if (error) {
-      console.error('[AdminAction] Table delete failed:', error);
-      throw new Error(error.message);
+      console.warn('Auth user deletion warning:', error.message);
     }
-    console.log('[AdminAction] Item deleted successfully.');
+    
+    await recordAuditLog({
+      admin_id: adminUser?.id,
+      admin_email: adminUser?.email,
+      action_type: 'DELETE_USER_FULL',
+      target_type: table,
+      target_id: id
+    });
     return { success: true };
-
-  } catch (error: any) {
-    console.error('[AdminAction] Critical Error:', error);
-    throw new Error(`Server Error: ${error.message}`);
   }
+
+  const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
+  if (error) throw new Error(error.message);
+
+  await recordAuditLog({
+    admin_id: adminUser?.id,
+    admin_email: adminUser?.email,
+    action_type: 'DELETE_ITEM',
+    target_type: table,
+    target_id: id
+  });
+
+  return { success: true };
 }

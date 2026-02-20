@@ -12,6 +12,7 @@ import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
 import ChatMonitor from './components/ChatMonitor'; 
+import AuditLogTab from './components/AuditLogTab';
 import { updateAdminStatus } from '@/app/actions/admin';
 
 function AdminDashboardContent() {
@@ -148,9 +149,9 @@ function AdminDashboardContent() {
         <SalesTab bookings={bookings} apps={apps} />
       ) : activeTab === 'ANALYTICS' ? (
         <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} />
-      ) : activeTab === 'CHATS' ? (
-        <ChatMonitor />
-      ) : (
+            ) : activeTab === 'CHATS' ? ( <ChatMonitor />
+            ) : activeTab === 'LOGS' ? ( <AuditLogTab />
+            ) : (
         <ManagementTab 
           activeTab={activeTab as any}
           filter={filter} setFilter={setFilter}
