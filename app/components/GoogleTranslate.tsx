@@ -37,45 +37,46 @@ const GoogleTranslate = () => {
       />
       
       <div className="fixed bottom-10 right-10 z-[9999]">
-        <div className="relative group">
-          {/* 1. 프리미엄 배경 글로우 (Pulse 애니메이션) */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 animate-pulse-slow"></div>
+        <div className="relative group w-[140px] h-[52px]"> {/* 고정 크기로 안정성 확보 */}
           
-          {/* 2. 시각적 버튼 디자인 (Glassmorphism) */}
-          <div className="relative flex items-center gap-3 px-6 py-3.5 bg-white/80 backdrop-blur-xl border border-white/40 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] transition-all duration-500 group-hover:-translate-y-1">
+          {/* 1. 디자인 레이어 (이벤트 차단: pointer-events-none) */}
+          <div className="pointer-events-none select-none">
+            {/* 배경 글로우 */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 animate-pulse-slow"></div>
             
-            {/* 그라데이션 아이콘 박스 */}
-            <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-sm transform group-hover:rotate-12 transition-transform duration-500">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 11.37 9.188 16.544 5 20" />
-              </svg>
+            {/* 글래스모피즘 버튼 디자인 */}
+            <div className="absolute inset-0 flex items-center gap-3 px-6 py-3.5 bg-white/80 backdrop-blur-xl border border-white/40 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] transition-all duration-300">
+              {/* 아이콘 */}
+              <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-sm transform group-hover:rotate-12 transition-transform duration-500">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 11.37 9.188 16.544 5 20" />
+                </svg>
+              </div>
+              <span className="text-sm font-bold tracking-tight text-gray-900 uppercase">
+                Translate
+              </span>
             </div>
-            
-            <span className="text-sm font-bold tracking-tight text-gray-900 uppercase select-none">
-              Translate
-            </span>
-
-            {/* 3. 실제 구글 클릭 영역 (최상단 투명 레이어) */}
-            <div 
-              id="google_translate_element" 
-              className="absolute inset-0 w-full h-full z-20 cursor-pointer rounded-full overflow-hidden"
-              style={{ opacity: 0 }}
-            />
           </div>
+
+          {/* 2. 실제 구글 클릭 영역 (최상단 레이어, 투명) */}
+          <div 
+            id="google_translate_element" 
+            className="absolute inset-0 w-full h-full z-20 cursor-pointer overflow-hidden rounded-full"
+            style={{ opacity: 0 }}
+          />
         </div>
       </div>
       
       <style jsx global>{`
-        /* 버튼 애니메이션 */
         @keyframes pulse-slow {
           0%, 100% { transform: scale(1); opacity: 0.2; }
-          50% { transform: scale(1.1); opacity: 0.4; }
+          50% { transform: scale(1.05); opacity: 0.35; }
         }
         .animate-pulse-slow {
           animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
 
-        /* 구글 필수 기능만 유지 (모달 스타일 절대 금지) */
+        /* 구글 필수 설정 (모달 간섭 절대 없음) */
         .goog-te-banner-frame { display: none !important; }
         body { top: 0px !important; }
         
