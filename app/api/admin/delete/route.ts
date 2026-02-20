@@ -64,10 +64,10 @@ export async function POST(request: Request) {
         // 4. Auth 계정 삭제
         const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
         if (authError) {
-          console.error('Auth delete error:', authError);
-          // Auth 삭제 실패해도 프로필은 지워졌으니 성공으로 간주할지, 에러로 볼지 결정 필요
-          // 여기서는 에러로 반환하되 상세 메시지 포함
-          throw new Error(`Auth 삭제 실패: ${authError.message}`);
+          // ⚠️ Auth 삭제가 실패하더라도, 이미 프로필과 모든 데이터가 삭제되었으므로
+          // 서비스 레벨에서는 '삭제된 유저'로 간주하고 성공으로 처리합니다.
+          // (단, 로그는 남겨서 추후 확인 가능하게 함)
+          console.warn('Auth user deletion warning (Zombie account):', authError.message);
         }
         
         return NextResponse.json({ success: true });
