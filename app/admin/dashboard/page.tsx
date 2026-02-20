@@ -94,7 +94,8 @@ function AdminDashboardContent() {
         // 3. 유저(게스트+호스트) 정보 조회
         let userMap = new Map();
         if (userIds.length > 0) {
-          const { data: profiles } = await supabase.from('profiles').select('id, email, name, full_name').in('id', userIds);
+          // 🟢 [수정] full_name 컬럼 제거 (스키마 불일치 방지)
+          const { data: profiles } = await supabase.from('profiles').select('id, email, name').in('id', userIds);
           if (profiles) {
             userMap = new Map(profiles.map((p: any) => [p.id, p]));
           }
@@ -111,12 +112,12 @@ function AdminDashboardContent() {
             experiences: {
               title: exp?.title || 'Unknown Experience',
               host_id: exp?.host_id,
-              profiles: { name: host?.name || 'Unknown Host' } // MasterLedgerTab에서 참조하는 구조
+              profiles: { name: host?.name || 'Unknown Host' }
             },
             profiles: {
               email: guest?.email || 'No Email',
-              name: guest?.name || 'No Name',
-              full_name: guest?.full_name // 상세 패널용
+              name: guest?.name || 'No Name'
+              // full_name 제거됨
             }
           };
         });
