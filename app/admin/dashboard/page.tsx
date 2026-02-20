@@ -69,8 +69,8 @@ function AdminDashboardContent() {
       const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
       if (expData) setExps(expData);
       
-      // 3. 유저 목록
-      const { data: userData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+      // 3. 유저 목록 (profiles 테이블 조회로 변경하여 avatar_url 확보)
+      const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (userData) setUsers(userData);
       
       // 4. 예약 데이터 (상세 정보 포함)
