@@ -12,6 +12,7 @@ import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
 import ChatMonitor from './components/ChatMonitor'; 
+import { updateAdminStatus, deleteAdminItem } from '@/app/actions/admin';
 
 function AdminDashboardContent() {
   const { showToast } = useToast(); 
@@ -89,10 +90,6 @@ function AdminDashboardContent() {
       showToast('데이터를 불러오는 중 오류가 발생했습니다.', 'error');
     }
   };
-
-import { updateAdminStatus, deleteAdminItem } from '@/app/actions/admin';
-
-// ... (fetchData 유지)
 
   // 상태 업데이트 (승인/거절)
   const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
