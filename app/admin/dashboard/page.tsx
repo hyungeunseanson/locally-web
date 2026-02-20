@@ -65,37 +65,65 @@ function AdminDashboardContent() {
       const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (userData) setUsers(userData);
       
-      // 🟢 [수정] 예약 데이터 조회 쿼리 단순화 (500 에러 방지)
+      // 🟢 [최종 수정] 조인 쿼리 완전 제거 (안전한 개별 조회 방식)
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          experiences ( title, host_id ),
-          profiles:user_id ( email, name, full_name )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(1000);
 
-      if (bookingData) {
-        // 호스트 이름 매핑 (별도 조회로 안전하게 처리)
-        const hostIds = Array.from(new Set(bookingData.map((b: any) => b.experiences?.host_id).filter(Boolean)));
-        let hostMap = new Map();
-        
-        if (hostIds.length > 0) {
-          const { data: hosts } = await supabase.from('profiles').select('id, name').in('id', hostIds);
-          if (hosts) {
-            hostMap = new Map(hosts.map((h: any) => [h.id, h.name]));
+      if (bookingError) throw bookingError;
+
+      if (bookingData && bookingData.length > 0) {
+        // 1. 필요한 ID 수집
+        const expIds = Array.from(new Set(bookingData.map((b: any) => b.experience_id).filter(Boolean)));
+        const userIds = Array.from(new Set(bookingData.map((b: any) => b.user_id).filter(Boolean)));
+
+        // 2. 체험 정보 조회
+        let expMap = new Map();
+        if (expIds.length > 0) {
+          const { data: exps } = await supabase.from('experiences').select('id, title, host_id').in('id', expIds);
+          if (exps) {
+            // 호스트 ID도 수집
+            const hostIds = exps.map((e: any) => e.host_id).filter(Boolean);
+            userIds.push(...hostIds); // 유저 목록에 호스트도 추가
+            expMap = new Map(exps.map((e: any) => [e.id, e]));
           }
         }
 
-        const enrichedBookings = bookingData.map((b: any) => ({
-          ...b,
-          experiences: {
-            ...b.experiences,
-            profiles: { name: hostMap.get(b.experiences?.host_id) || 'Unknown' }
+        // 3. 유저(게스트+호스트) 정보 조회
+        let userMap = new Map();
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase.from('profiles').select('id, email, name, full_name').in('id', userIds);
+          if (profiles) {
+            userMap = new Map(profiles.map((p: any) => [p.id, p]));
           }
-        }));
+        }
+
+        // 4. 데이터 조립 (Merge)
+        const enrichedBookings = bookingData.map((b: any) => {
+          const exp = expMap.get(b.experience_id);
+          const guest = userMap.get(b.user_id);
+          const host = exp ? userMap.get(exp.host_id) : null;
+
+          return {
+            ...b,
+            experiences: {
+              title: exp?.title || 'Unknown Experience',
+              host_id: exp?.host_id,
+              profiles: { name: host?.name || 'Unknown Host' } // MasterLedgerTab에서 참조하는 구조
+            },
+            profiles: {
+              email: guest?.email || 'No Email',
+              name: guest?.name || 'No Name',
+              full_name: guest?.full_name // 상세 패널용
+            }
+          };
+        });
+        
         setBookings(enrichedBookings);
+      } else {
+        setBookings([]);
       }
 
       const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id, created_at');
