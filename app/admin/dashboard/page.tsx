@@ -90,52 +90,29 @@ function AdminDashboardContent() {
     }
   };
 
+import { updateAdminStatus, deleteAdminItem } from '@/app/actions/admin';
+
+// ... (fetchData 유지)
+
   // 상태 업데이트 (승인/거절)
   const updateStatus = async (table: 'host_applications' | 'experiences', id: string, status: string) => {
     let comment = '';
     let dbStatus = status; 
 
-    // 거절/보완요청 시 사유 입력
     if (status === 'rejected' || status === 'revision') {
       const input = prompt(`[${status === 'revision' ? '보완요청' : '거절'}] 사유를 입력해주세요:`);
-      if (input === null) return; // 취소
+      if (input === null) return;
       comment = input;
-    } 
-    // 승인 시 확인
-    else if (status === 'approved') {
+    } else if (status === 'approved') {
       if (!confirm('승인 처리하시겠습니까?')) return;
-      if (table === 'experiences') {
-        dbStatus = 'active'; // 체험은 승인되면 'active' 상태가 됨
-      }
+      if (table === 'experiences') dbStatus = 'active';
     }
 
     try {
-      let updateData: any = { status: dbStatus };
-
-      if (comment) {
-          updateData.admin_comment = comment;
-      }
-
-      const { data, error } = await supabase
-        .from(table)
-        .update(updateData)
-        .eq('id', id)
-        .select();
-
-      if (error) throw error;
-
-      // 호스트 지원서가 승인되면 유저 권한도 'host'로 변경
-      if (table === 'host_applications' && status === 'approved') {
-        const app = apps.find(a => a.id === id);
-        if (app) {
-          await supabase.from('users').update({ role: 'host' }).eq('id', app.user_id);
-        }
-      }
-
+      await updateAdminStatus(table, id, dbStatus, comment);
       showToast(`성공적으로 처리되었습니다. (${dbStatus})`, 'success'); 
-      await fetchData(); // 데이터 새로고침
+      await fetchData(); 
       setSelectedItem(null); 
-
     } catch (err: any) {
       console.error(err);
       showToast('처리 중 오류 발생: ' + err.message, 'error'); 
@@ -145,13 +122,13 @@ function AdminDashboardContent() {
   const deleteItem = async (table: string, id: string) => {
     if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
     
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) {
-      showToast('삭제 실패: ' + error.message, 'error');
-    } else { 
+    try {
+      await deleteAdminItem(table, id);
       showToast('삭제되었습니다.', 'success'); 
       fetchData(); 
       setSelectedItem(null); 
+    } catch (err: any) {
+      showToast('삭제 실패: ' + err.message, 'error');
     }
   };
 

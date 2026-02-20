@@ -80,13 +80,9 @@ return NextResponse.json({ success: true, message: 'Already processed' });
 }
 
 // 🚨 [핵심 보안 1] 금액 검증 (1원 결제 위변조 원천 차단)
-// 클라이언트가 보낸 값이 아니라, DB에 저장된 '진짜 체험 가격'을 기준으로 서버가 다시 계산합니다.
-const expPrice = originalBooking.experiences?.price || 50000;
-const hostPrice = originalBooking.type === 'private' 
-? (originalBooking.experiences?.private_price || 300000) 
-: expPrice * originalBooking.guests;
-const guestFee = Math.floor(hostPrice * 0.1);
-const expectedAmount = hostPrice + guestFee;
+// 클라이언트가 보낸 값이 아니라, 예약 시점에 DB에 확정 저장된 금액(bookings.amount)을 기준으로 검증합니다.
+// (호스트가 가격을 변경하더라도, 이미 예약된 건은 예약 당시 가격을 따라야 하기 때문입니다.)
+const expectedAmount = Number(originalBooking.amount);
 
 // PG사 승인 금액(amount)과 서버 찐 금액(expectedAmount) 비교
 if (Number(amount) !== expectedAmount) {
