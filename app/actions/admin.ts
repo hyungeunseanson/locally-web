@@ -58,13 +58,18 @@ import { createClient } from '@supabase/supabase-js';
 
 // 🗑️ 데이터 삭제
 export async function deleteAdminItem(table: string, id: string) {
-  // 1. 관리자 권한 체크 (기존 로직 사용)
+  // 1. 관리자 권한 체크
   await getAdminClient();
 
-  // 2. 실제 삭제를 위한 Admin 클라이언트 생성 (Service Role Key 필요)
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+    throw new Error('Server Error: Missing Service Role Key');
+  }
+
+  // 2. 실제 삭제를 위한 Admin 클라이언트 생성
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    serviceRoleKey
   );
 
   // 유저 프로필 삭제 시, Auth 계정도 함께 삭제 (완전 삭제)
