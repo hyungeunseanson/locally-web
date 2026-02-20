@@ -116,14 +116,25 @@ function SiteHeaderContent() {
   };
 
   const handleLogout = async () => {
-    // 1. Supabase 서버 세션 종료
-    await supabase.auth.signOut();
-    
-    // 2. 로컬 스토리지에 남아있을 수 있는 잔여 데이터 삭제 (선택사항이지만 안전함)
-    localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL + '-auth-token');
-    
-    // 3. 브라우저 강제 이동 (페이지를 새로고침하며 캐시를 날림)
-    window.location.href = '/'; 
+    try {
+      // 1. UI 즉시 초기화 (사용자 경험 향상)
+      setUser(null);
+      setIsHost(false);
+      setApplicationStatus(null);
+
+      // 2. Supabase 서버 세션 종료 (완료될 때까지 대기)
+      await supabase.auth.signOut();
+      
+      // 3. 로컬 스토리지 및 쿠키 잔여 데이터 강제 삭제
+      localStorage.clear(); // 모든 로컬 데이터 초기화 (가장 확실함)
+      
+      // 4. 강제 새로고침으로 클라이언트 상태 완전 초기화
+      window.location.href = '/'; 
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // 에러가 나더라도 강제로 홈으로 이동시켜 갇히는 현상 방지
+      window.location.href = '/';
+    }
   };
 
   const handleMainHeaderButtonClick = () => {
