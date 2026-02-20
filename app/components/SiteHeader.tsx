@@ -17,26 +17,27 @@ const LoginModal = dynamic(() => import('./LoginModal'), {
   loading: () => null 
 });
 
-// 🟢 [핵심] 실제 헤더의 모든 로직은 여기에 다 넣습니다. (이름이 Content임에 주의!)
+import { useAuth } from '@/app/context/AuthContext'; // 🟢 Auth 훅 사용
+
+// ...
+
 function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [isHost, setIsHost] = useState(false);
-  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
-  
-  const { unreadCount } = useNotification();
-  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
+  // 🟢 [핵심] 로컬 상태 대신 전역 AuthContext 사용 (깜빡임 해결)
+  const { user, isHost, applicationStatus, isLoading, signOut } = useAuth();
+  
+  const { unreadCount } = useNotification();
   const menuRef = useRef<HTMLElement>(null);
   const { t } = useLanguage();
-  const languageContext = useLanguage();
-
-
-
-  const [supabase] = useState(() => createClient());
   const router = useRouter();
   const pathname = usePathname();
+
+  // 🟢 [수정] 로그아웃은 AuthContext의 signOut 호출
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   useEffect(() => {
     function handleClickOutside(event: any) {
@@ -47,95 +48,6 @@ function SiteHeaderContent() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // 🟢 Auth 세션 정보뿐만 아니라, DB의 최신 프로필 정보(사진)를 가져와 병합합니다.
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('avatar_url')
-          .eq('id', session.user.id)
-          .single();
-        
-        const updatedUser = {
-          ...session.user,
-          user_metadata: {
-            ...session.user.user_metadata,
-            avatar_url: profile?.avatar_url || session.user.user_metadata.avatar_url
-          }
-        };
-        setUser(updatedUser);
-        checkHostStatus(session.user.id);
-      } else {
-        setUser(null);
-      }
-    };
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        // 🟢 Auth 상태 변경 시에도 DB 최신 정보 반영
-        const { data: profile } = await supabase.from('profiles').select('avatar_url').eq('id', session.user.id).single();
-        const updatedUser = {
-          ...session.user,
-          user_metadata: {
-            ...session.user.user_metadata,
-            avatar_url: profile?.avatar_url || session.user.user_metadata.avatar_url
-          }
-        };
-        setUser(updatedUser);
-        checkHostStatus(session.user.id);
-      } else {
-        setUser(null);
-        setIsHost(false);
-        setApplicationStatus(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
-  const checkHostStatus = async (userId: string) => {
-    const { data: app } = await supabase
-      .from('host_applications')
-      .select('status')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (app) setApplicationStatus(app.status);
-
-    const { count } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('host_id', userId);
-    
-    if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
-      setIsHost(true);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      // 1. UI 즉시 초기화 (사용자 경험 향상)
-      setUser(null);
-      setIsHost(false);
-      setApplicationStatus(null);
-
-      // 2. Supabase 서버 세션 종료 (완료될 때까지 대기)
-      await supabase.auth.signOut();
-      
-      // 3. 로컬 스토리지 및 쿠키 잔여 데이터 강제 삭제
-      localStorage.clear(); // 모든 로컬 데이터 초기화 (가장 확실함)
-      
-      // 4. 강제 새로고침으로 클라이언트 상태 완전 초기화
-      window.location.href = '/'; 
-    } catch (error) {
-      console.error('Logout failed:', error);
-      // 에러가 나더라도 강제로 홈으로 이동시켜 갇히는 현상 방지
-      window.location.href = '/';
-    }
-  };
 
   const handleMainHeaderButtonClick = () => {
     if (pathname?.startsWith('/host')) { 
@@ -163,6 +75,7 @@ function SiteHeaderContent() {
     return t('become_host');
   };
 
+  // 🟢 로딩 중이거나 유저가 없으면 기본값 처리 (깜빡임 방지용 스피너는 헤더에서 안 보여주는 게 나음)
   const getAvatarUrl = () => user?.user_metadata?.avatar_url || null;
 
   return (
@@ -184,7 +97,8 @@ function SiteHeaderContent() {
             </button>
             <LanguageSelector />
 
-            {user && (
+            {/* 🟢 로딩이 끝난 후에만 알림/유저 아이콘 표시 (깜빡임 최소화) */}
+            {!isLoading && user ? (
               <Link 
                 href="/notifications" 
                 className="relative mx-1 p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors inline-block"
@@ -194,16 +108,17 @@ function SiteHeaderContent() {
                   <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full animate-bounce"></span>
                 )}
               </Link>
-            )}
+            ) : null}
 
             <div className="relative ml-1">
               <div 
-                onClick={() => user ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
+                onClick={() => (!isLoading && user) ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
                 className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white select-none"
               >
                 <Menu size={18} className="ml-2"/>
                 <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-200 flex items-center justify-center text-slate-500">
-                  {user && getAvatarUrl() ? (
+                  {/* 🟢 로딩 중일 땐 기본 아이콘 유지 */}
+                  {!isLoading && user && getAvatarUrl() ? (
                     <img src={getAvatarUrl()} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="profile" />
                   ) : (
                     <User size={18} fill="currentColor" />
@@ -211,7 +126,7 @@ function SiteHeaderContent() {
                 </div>
               </div>
 
-              {user && isMenuOpen && (
+              {!isLoading && user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">

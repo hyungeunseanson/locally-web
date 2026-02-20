@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// 🟢 [필수] Suspense 추가
 import { Suspense } from "react"; 
 import { LanguageProvider } from '@/app/context/LanguageContext';
 import UserPresenceTracker from '@/app/components/UserPresenceTracker';
@@ -10,7 +9,8 @@ import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
 import Script from "next/script";
 import GoogleTranslate from '@/app/components/GoogleTranslate';
-import QueryProvider from '@/app/providers/QueryProvider'; // 🟢 추가
+import QueryProvider from '@/app/providers/QueryProvider';
+import { AuthProvider } from '@/app/context/AuthContext'; // 🟢 올바른 위치
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -59,33 +59,32 @@ export default function RootLayout({
             strategy="beforeInteractive" 
           />
         )}
-{/* 🟢 React Query Provider로 앱 전체 감싸기 */}
-<QueryProvider>
-          <ToastProvider>
-          <NotificationProvider>
-            <LanguageProvider>
-              
-              {/* 🟢 [핵심] URL을 감시하는 추적기는 반드시 Suspense로 감싸야 빌드 에러가 안 납니다! */}
-              <Suspense fallback={null}>
-                <UserPresenceTracker />
-              </Suspense>
+        <QueryProvider>
+          <AuthProvider> {/* 🟢 AuthProvider 적용 */}
+            <ToastProvider>
+              <NotificationProvider>
+                <LanguageProvider>
+                  
+                  <Suspense fallback={null}>
+                    <UserPresenceTracker />
+                  </Suspense>
 
-              <div className="flex flex-col min-h-screen">
-                <main className="flex-1">
-                  {children}
-                </main>
-                <SiteFooter />
-              </div>
+                  <div className="flex flex-col min-h-screen">
+                    <main className="flex-1">
+                      {children}
+                    </main>
+                    <SiteFooter />
+                  </div>
 
-              {/* 🟢 [핵심] 구글 번역기도 Suspense로 감싸는 게 안전합니다. */}
-              <Suspense fallback={null}>
-                <GoogleTranslate />
-              </Suspense>
+                  <Suspense fallback={null}>
+                    <GoogleTranslate />
+                  </Suspense>
 
-            </LanguageProvider>
-          </NotificationProvider>
-          </ToastProvider>
-          </QueryProvider> {/* 🟢 추가 */}
+                </LanguageProvider>
+              </NotificationProvider>
+            </ToastProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

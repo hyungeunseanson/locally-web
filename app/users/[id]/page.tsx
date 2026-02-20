@@ -98,7 +98,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
                 <h2 className="text-2xl font-bold mb-6">{profile?.full_name}님의 체험</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {hostExperiences.map(exp => (
-                    <ExperienceCard key={exp.id} item={exp} />
+                    <ExperienceCard key={exp.id} data={exp} />
                   ))}
                 </div>
               </section>

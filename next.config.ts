@@ -1,11 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // eslint 설정은 삭제하셔도 됩니다.
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
   // ✅ 이미지 최적화를 위한 도메인 허용 설정 (필수!//필수 
   images: {
     remotePatterns: [

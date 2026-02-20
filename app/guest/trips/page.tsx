@@ -61,7 +61,7 @@ export default function GuestTripsPage() {
             
             <div className="flex flex-col gap-8">
               {upcomingTrips.length > 0 ? (
-                upcomingTrips.map(trip => (
+                upcomingTrips.map((trip: any) => (
                   <TripCard 
                     key={trip.id} 
                     trip={trip} 
@@ -91,7 +91,7 @@ export default function GuestTripsPage() {
               
               {pastTrips.length > 0 ? (
                 <div className="space-y-4">
-                  {pastTrips.map(trip => (
+                  {pastTrips.map((trip: any) => (
                     <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
                   ))}
                 </div>
