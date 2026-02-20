@@ -49,12 +49,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         id: user.id,
         email: user.email,
         full_name: meta.full_name || 'User',
+        avatar_url: meta.avatar_url || meta.picture || null, // 🟢 프로필 사진 URL 저장
         phone: meta.phone,
         birth_date: meta.birth_date,
         gender: meta.gender
       });
     } else {
       const updates: any = {};
+      if (!existingProfile.avatar_url && (meta.avatar_url || meta.picture)) {
+        updates.avatar_url = meta.avatar_url || meta.picture; // 🟢 기존 유저도 사진 없으면 업데이트
+      }
       if (!existingProfile.gender && meta.gender) updates.gender = meta.gender;
       if (!existingProfile.birth_date && meta.birth_date) updates.birth_date = meta.birth_date;
       if (!existingProfile.phone && meta.phone) updates.phone = meta.phone;
