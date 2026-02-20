@@ -30,22 +30,34 @@ export async function POST(request: Request) {
     if (table === 'profiles' || table === 'users') {
       console.log(`[AdminDelete] Starting cascade delete for user: ${id}`);
       
-      // 1. 참조하는 테이블들 데이터 먼저 삭제
-      // (순서 중요: 자식 테이블 -> 부모 테이블)
+      // 1. 호스트일 경우: 내가 만든 체험에 연결된 데이터 먼저 삭제
+      const { data: myExperiences } = await supabaseAdmin.from('experiences').select('id').eq('host_id', id);
+      if (myExperiences && myExperiences.length > 0) {
+        const expIds = myExperiences.map(e => e.id);
+        await supabaseAdmin.from('bookings').delete().in('experience_id', expIds);
+        await supabaseAdmin.from('reviews').delete().in('experience_id', expIds);
+        await supabaseAdmin.from('inquiries').delete().in('experience_id', expIds);
+        await supabaseAdmin.from('wishlists').delete().in('experience_id', expIds);
+        await supabaseAdmin.from('experience_availability').delete().in('experience_id', expIds);
+        
+        // 이제 체험 삭제 가능
+        await supabaseAdmin.from('experiences').delete().in('id', expIds);
+      }
+
+      // 2. 게스트일 경우: 내가 남긴 데이터 삭제
       await supabaseAdmin.from('inquiry_messages').delete().eq('sender_id', id);
       await supabaseAdmin.from('inquiries').delete().or(`user_id.eq.${id},host_id.eq.${id}`);
       await supabaseAdmin.from('guest_reviews').delete().or(`guest_id.eq.${id},host_id.eq.${id}`);
       await supabaseAdmin.from('reviews').delete().eq('user_id', id);
       await supabaseAdmin.from('bookings').delete().eq('user_id', id);
       await supabaseAdmin.from('host_applications').delete().eq('user_id', id);
-      await supabaseAdmin.from('experiences').delete().eq('host_id', id);
       await supabaseAdmin.from('wishlists').delete().eq('user_id', id);
       await supabaseAdmin.from('notifications').delete().eq('user_id', id);
       
-      // 2. 프로필 삭제
+      // 3. 프로필 삭제
       await supabaseAdmin.from('profiles').delete().eq('id', id);
 
-      // 3. Auth 계정 삭제
+      // 4. Auth 계정 삭제
       const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
       if (authError) {
         console.error('Auth delete error:', authError);
