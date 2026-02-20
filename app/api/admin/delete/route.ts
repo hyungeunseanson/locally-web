@@ -26,14 +26,33 @@ export async function POST(request: Request) {
       },
     });
 
-    // 유저 프로필 삭제 시, Auth 계정도 함께 삭제 (완전 삭제)
+    // 유저 프로필 삭제 시, 연관된 모든 데이터를 먼저 삭제 (FK 제약 조건 해결)
     if (table === 'profiles' || table === 'users') {
+      console.log(`[AdminDelete] Starting cascade delete for user: ${id}`);
+      
+      // 1. 참조하는 테이블들 데이터 먼저 삭제
+      // (순서 중요: 자식 테이블 -> 부모 테이블)
+      await supabaseAdmin.from('inquiry_messages').delete().eq('sender_id', id);
+      await supabaseAdmin.from('inquiries').delete().or(`user_id.eq.${id},host_id.eq.${id}`);
+      await supabaseAdmin.from('guest_reviews').delete().or(`guest_id.eq.${id},host_id.eq.${id}`);
+      await supabaseAdmin.from('reviews').delete().eq('user_id', id);
+      await supabaseAdmin.from('bookings').delete().eq('user_id', id);
+      await supabaseAdmin.from('host_applications').delete().eq('user_id', id);
+      await supabaseAdmin.from('experiences').delete().eq('host_id', id);
+      await supabaseAdmin.from('wishlists').delete().eq('user_id', id);
+      await supabaseAdmin.from('notifications').delete().eq('user_id', id);
+      
+      // 2. 프로필 삭제
+      await supabaseAdmin.from('profiles').delete().eq('id', id);
+
+      // 3. Auth 계정 삭제
       const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
       if (authError) {
         console.error('Auth delete error:', authError);
-        // 프로필만 있고 Auth가 없는 경우도 있으므로 에러 무시하고 진행할 수도 있으나, 일단 에러 반환
         return NextResponse.json({ error: `Auth 삭제 실패: ${authError.message}` }, { status: 500 });
       }
+      
+      return NextResponse.json({ success: true });
     }
 
     // 일반 테이블 데이터 삭제
