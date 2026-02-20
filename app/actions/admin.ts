@@ -64,18 +64,43 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
 
 // 🗑️ 데이터 삭제
 export async function deleteAdminItem(table: string, id: string) {
-  await getAdminClient(); // 권한 체크
-  const supabaseAdmin = createAdminClient();
+  console.log(`[AdminAction] deleteAdminItem called for table: ${table}, id: ${id}`);
 
-  // 유저 프로필 삭제 시, Auth 계정도 함께 삭제 (완전 삭제)
-  if (table === 'profiles' || table === 'users') {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
-    if (error) throw new Error(`Auth 삭제 실패: ${error.message}`);
+  try {
+    // 1. 관리자 권한 체크
+    console.log('[AdminAction] Verifying admin permissions...');
+    await getAdminClient();
+    console.log('[AdminAction] Permission verified.');
+
+    // 2. Admin 클라이언트 생성
+    console.log('[AdminAction] Creating admin client...');
+    const supabaseAdmin = createAdminClient();
+    console.log('[AdminAction] Admin client created successfully.');
+
+    // 유저 프로필 삭제 시, Auth 계정도 함께 삭제 (완전 삭제)
+    if (table === 'profiles' || table === 'users') {
+      console.log('[AdminAction] Attempting to delete Auth user...');
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+      if (error) {
+        console.error('[AdminAction] Auth delete failed:', error);
+        throw new Error(`Auth 삭제 실패: ${error.message}`);
+      }
+      console.log('[AdminAction] Auth user deleted successfully.');
+      return { success: true };
+    }
+
+    // 일반 테이블 삭제
+    console.log('[AdminAction] Deleting from table...');
+    const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
+    if (error) {
+      console.error('[AdminAction] Table delete failed:', error);
+      throw new Error(error.message);
+    }
+    console.log('[AdminAction] Item deleted successfully.');
     return { success: true };
-  }
 
-  // 일반 테이블 삭제
-  const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
-  if (error) throw new Error(error.message);
-  return { success: true };
+  } catch (error: any) {
+    console.error('[AdminAction] Critical Error:', error);
+    throw new Error(`Server Error: ${error.message}`);
+  }
 }
