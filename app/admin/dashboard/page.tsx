@@ -104,7 +104,6 @@ function AdminDashboardContent() {
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[80vh]">
       {activeTab === 'USERS' ? ( <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />
-      ) : activeTab === 'BOOKINGS' ? ( <BookingsTab bookings={bookings} />
       ) : activeTab === 'LEDGER' ? ( <MasterLedgerTab bookings={bookings} onRefresh={fetchData} />
       ) : activeTab === 'SALES' ? ( <SalesTab bookings={bookings} apps={apps} />
       ) : activeTab === 'ANALYTICS' ? ( <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} />

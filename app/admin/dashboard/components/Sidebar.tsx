@@ -140,13 +140,6 @@ pendingBookings: bookingCount || 0, // 🟢 추가
         <div>
           <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Operation</h2>
           <div className="space-y-1">
-          <NavButton 
-              active={activeTab === 'BOOKINGS'} 
-              onClick={() => handleTabChange('BOOKINGS')} 
-              icon={<Calendar size={18}/>} 
-              label="예약 현황" 
-              count={counts.pendingBookings} // 🟢 뱃지 표시
-            />
             <NavButton 
               active={activeTab === 'CHATS'} 
               onClick={() => handleTabChange('CHATS')} 
