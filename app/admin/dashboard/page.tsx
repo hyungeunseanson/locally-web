@@ -7,7 +7,6 @@ import { useToast } from '@/app/context/ToastContext';
 
 // 컴포넌트 import
 import UsersTab from './components/UsersTab';
-import BookingsTab from './components/BookingsTab';
 import SalesTab from './components/SalesTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import ManagementTab from './components/ManagementTab';
@@ -59,15 +58,50 @@ function AdminDashboardContent() {
     try {
       const { data: appData } = await supabase.from('host_applications').select('*').order('created_at', { ascending: false });
       if (appData) setApps(appData);
+      
       const { data: expData } = await supabase.from('experiences').select('*').order('created_at', { ascending: false });
       if (expData) setExps(expData);
+      
       const { data: userData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (userData) setUsers(userData);
-      const { data: bookingData } = await supabase.from('bookings').select('*, experiences (title, host_id, profiles:host_id(name)), profiles:user_id (email, name, full_name)').order('created_at', { ascending: false }).limit(1000);
-      if (bookingData) setBookings(bookingData);
+      
+      // 🟢 [수정] 예약 데이터 조회 쿼리 단순화 (500 에러 방지)
+      const { data: bookingData, error: bookingError } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          experiences ( title, host_id ),
+          profiles:user_id ( email, name, full_name )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
+      if (bookingData) {
+        // 호스트 이름 매핑 (별도 조회로 안전하게 처리)
+        const hostIds = Array.from(new Set(bookingData.map((b: any) => b.experiences?.host_id).filter(Boolean)));
+        let hostMap = new Map();
+        
+        if (hostIds.length > 0) {
+          const { data: hosts } = await supabase.from('profiles').select('id, name').in('id', hostIds);
+          if (hosts) {
+            hostMap = new Map(hosts.map((h: any) => [h.id, h.name]));
+          }
+        }
+
+        const enrichedBookings = bookingData.map((b: any) => ({
+          ...b,
+          experiences: {
+            ...b.experiences,
+            profiles: { name: hostMap.get(b.experiences?.host_id) || 'Unknown' }
+          }
+        }));
+        setBookings(enrichedBookings);
+      }
+
       const { data: reviewData } = await supabase.from('reviews').select('rating, experience_id, created_at');
       if (reviewData) setReviews(reviewData);
     } catch (error) {
+      console.error(error);
       showToast('Error loading data.', 'error');
     }
   };
