@@ -1,8 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+export async function updateSession(request: NextRequest, response?: NextResponse) {
+  // 인자로 받은 response가 있으면 사용, 없으면 새로 생성
+  const supabaseResponse = response || NextResponse.next({
     request,
   })
 
@@ -20,10 +21,7 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value)
           )
           
-          // 2. 응답(Response) 객체 새로 생성 후 쿠키 설정
-          supabaseResponse = NextResponse.next({
-            request,
-          })
+          // 2. 응답(Response) 객체에 쿠키 설정
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -32,8 +30,7 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // 중요: getUser로 세션 검증 (단순 getSession보다 보안상 안전)
-  // 토큰이 만료되었다면 여기서 자동으로 갱신됩니다.
+  // 토큰 갱신
   await supabase.auth.getUser()
 
   return supabaseResponse

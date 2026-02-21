@@ -1,4 +1,4 @@
-import { Profile, Experience } from './index';
+import { Profile } from './index';
 
 export type AdminTaskType = 'DAILY_LOG' | 'TODO' | 'MEMO';
 export type AdminTaskStatus = 'Done' | 'Progress';

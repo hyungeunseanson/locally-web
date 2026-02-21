@@ -1,22 +1,26 @@
 import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
 import ExperienceClient from './ExperienceClient';
-import { notFound } from 'next/navigation'; // 🟢 [필수] 이거 없어서 에러 났던 겁니다!
+import { notFound } from 'next/navigation';
+import { getCurrentLocale } from '@/app/utils/locale';
+import { getContent } from '@/app/utils/contentHelper';
 
 type Props = {
   params: Promise<{ id: string }>;
 }
 
-// 🟢 메타데이터 생성 (SEO)
+// 🟢 메타데이터 생성 (SEO & 다국어)
 export async function generateMetadata(
   { params }: Props
 ): Promise<Metadata> {
   const { id } = await params;
+  const locale = await getCurrentLocale(); // 현재 언어 감지
   const supabase = await createClient();
 
+  // 모든 다국어 컬럼 조회
   const { data: experience } = await supabase
     .from('experiences')
-    .select('title, description, image_url, photos')
+    .select('*')
     .eq('id', id)
     .single();
 
@@ -26,20 +30,25 @@ export async function generateMetadata(
     }
   }
 
+  // 언어에 맞는 제목과 설명 가져오기
+  const title = getContent(experience, 'title', locale);
+  const description = getContent(experience, 'description', locale);
   const imageUrl = experience.photos?.[0] || experience.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
 
   return {
-    title: `${experience.title} - Locally`,
-    description: experience.description?.slice(0, 100) || '현지인과 함께하는 특별한 여행',
+    title: `${title} - Locally`,
+    description: description?.slice(0, 150) || '현지인과 함께하는 특별한 여행',
     openGraph: {
-      title: experience.title,
-      description: experience.description?.slice(0, 100),
+      title: title,
+      description: description?.slice(0, 150),
       images: [imageUrl],
+      locale: locale,
+      siteName: 'Locally',
     },
     twitter: {
       card: 'summary_large_image',
-      title: experience.title,
-      description: experience.description?.slice(0, 100),
+      title: title,
+      description: description?.slice(0, 150),
       images: [imageUrl],
     }
   }
