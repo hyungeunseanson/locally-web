@@ -47,16 +47,27 @@ export default function Sidebar() {
     teamNewCount: 0,
   });
 
-  useEffect(() => {
-    const fetchCounts = async () => {
-      const { count: appsCount } = await supabase.from('host_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-      const { count: expsCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-      const { count: bookingCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING');
+  const fetchCounts = async () => {
+    try {
+      const [
+        { count: appsCount },
+        { count: expsCount },
+        { count: bookingCount }
+      ] = await Promise.all([
+        supabase.from('host_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING')
+      ]);
 
       // 신규 투두 및 댓글 수 합산
       const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
-      const { count: newTasksCount } = await supabase.from('admin_tasks').select('*', { count: 'exact', head: true }).eq('type', 'TODO').gt('created_at', lastViewed);
-      const { count: newCommentsCount } = await supabase.from('admin_task_comments').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed);
+      const [
+        { count: newTasksCount },
+        { count: newCommentsCount }
+      ] = await Promise.all([
+        supabase.from('admin_tasks').select('*', { count: 'exact', head: true }).eq('type', 'TODO').gt('created_at', lastViewed),
+        supabase.from('admin_task_comments').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed)
+      ]);
 
       setCounts(prev => ({
         ...prev,
@@ -65,8 +76,12 @@ export default function Sidebar() {
         pendingBookings: bookingCount || 0,
         teamNewCount: (newTasksCount || 0) + (newCommentsCount || 0)
       }));
-    };
+    } catch (e) {
+      console.error('Sidebar counts fetch error:', e);
+    }
+  };
 
+  useEffect(() => {
     fetchCounts();
 
     const channel = supabase.channel('online_users_sidebar')

@@ -8,32 +8,11 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-
-interface Task {
-  id: string;
-  created_at: string;
-  type: 'DAILY_LOG' | 'TODO' | 'MEMO';
-  content: string;
-  is_completed: boolean;
-  author_id: string;
-  author_name: string;
-  metadata: {
-    note?: string;
-    status_text?: 'Done' | 'Progress';
-  };
-}
-
-interface Comment {
-  id: string;
-  task_id: string;
-  content: string;
-  author_name: string;
-  created_at: string;
-}
+import { AdminTask, AdminComment } from '@/app/types/admin';
 
 export default function TeamTab() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [tasks, setTasks] = useState<AdminTask[]>([]);
+  const [comments, setComments] = useState<AdminComment[]>([]);
   const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
   const [newMemo, setNewMemo] = useState('');
