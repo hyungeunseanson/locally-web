@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { 
   ClipboardList, CheckSquare, FileText, Plus, Trash2, 
-  Clock, CheckCircle2, Circle, X, NotebookPen, ChevronDown
+  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -23,50 +23,65 @@ interface Task {
   };
 }
 
+interface Comment {
+  id: string;
+  task_id: string;
+  content: string;
+  author_name: string;
+  created_at: string;
+}
+
 export default function TeamTab() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [newLog, setNewLog] = useState({ task: '', note: '', status: 'Done' as 'Done' | 'Progress' });
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
   const [newMemo, setNewMemo] = useState('');
   const [showMemos, setShowMemos] = useState(false);
+  const [expandedTodo, setExpandedTodo] = useState<string | null>(null);
+  const [newComment, setNewComment] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
+  const [lastViewed, setLastViewed] = useState<string>(new Date(0).toISOString());
   
   const supabase = createClient();
 
   useEffect(() => {
     setIsClient(true);
+    const viewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
+    setLastViewed(viewed);
+    
+    // 방문 시간 업데이트 (사이드바 N 배지 제거 목적)
+    localStorage.setItem('last_viewed_team', new Date().toISOString());
+
     fetchTasks();
+    fetchComments();
     getCurrentUser();
 
-    // 실시간 구독 설정
-    const channel = supabase
-      .channel('admin_tasks_realtime_v2')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => {
-        fetchTasks();
-      })
+    const channel = supabase.channel('team_workspace_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => { fetchTasks(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_task_comments' }, () => { fetchComments(); })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const getCurrentUser = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        setCurrentUser({ id: user.id, name: profile?.name || profile?.full_name || user.email?.split('@')[0] });
-      }
-    } catch (err) {
-      console.error(err);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      setCurrentUser({ id: user.id, name: profile?.name || profile?.full_name || user.email?.split('@')[0] });
     }
   };
 
   const fetchTasks = async () => {
     const { data } = await supabase.from('admin_tasks').select('*').order('created_at', { ascending: false });
     if (data) setTasks(data);
+  };
+
+  const fetchComments = async () => {
+    const { data } = await supabase.from('admin_task_comments').select('*').order('created_at', { ascending: true });
+    if (data) setComments(data);
   };
 
   const addDailyLog = async () => {
@@ -76,10 +91,21 @@ export default function TeamTab() {
       content: newLog.task,
       author_id: currentUser.id,
       author_name: currentUser.name,
-      is_completed: newLog.status === 'Done',
-      metadata: { note: newLog.note, status_text: newLog.status }
+      is_completed: false, // 무조건 Progress 시작
+      metadata: { note: newLog.note, status_text: 'Progress' }
     });
-    setNewLog({ task: '', note: '', status: 'Done' });
+    setNewLog({ task: '', note: '' });
+  };
+
+  const addComment = async (taskId: string) => {
+    if (!newComment.trim() || !currentUser) return;
+    await supabase.from('admin_task_comments').insert({
+      task_id: taskId,
+      content: newComment,
+      author_id: currentUser.id,
+      author_name: currentUser.name
+    });
+    setNewComment('');
   };
 
   const toggleStatus = async (id: string, currentStatus: boolean) => {
@@ -90,33 +116,18 @@ export default function TeamTab() {
     }).eq('id', id);
   };
 
-  const addTodo = async () => {
-    if (!newTodo.trim() || !currentUser) return;
-    await supabase.from('admin_tasks').insert({
-      type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false
-    });
-    setNewTodo('');
-  };
-
-  const addMemo = async () => {
-    if (!newMemo.trim() || !currentUser) return;
-    await supabase.from('admin_tasks').insert({
-      type: 'MEMO', content: newMemo, author_id: currentUser.id, author_name: currentUser.name
-    });
-    setNewMemo('');
-  };
-
-  const deleteTask = async (id: string) => {
+  const deleteTask = async (table: string, id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    await supabase.from('admin_tasks').delete().eq('id', id);
+    await supabase.from(table).delete().eq('id', id);
   };
 
-  // 클라이언트 사이드 렌더링 보장 (Hydration 500 에러 방지)
   if (!isClient) return null;
 
   const dailyLogs = tasks.filter(t => t.type === 'DAILY_LOG');
   const todos = tasks.filter(t => t.type === 'TODO');
   const memos = tasks.filter(t => t.type === 'MEMO');
+
+  const isNew = (createdAt: string) => new Date(createdAt) > new Date(lastViewed);
 
   return (
     <div className="flex flex-col h-full gap-6 relative">
@@ -131,27 +142,20 @@ export default function TeamTab() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
-        {/* Left: Daily Logs Table */}
+        {/* Left: Daily Logs */}
         <div className="flex-[2.5] flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock size={18} className="text-blue-500" /> Daily Logs</h3>
           </div>
 
-          {/* Log Input Row */}
           <div className="p-3 bg-blue-50/30 border-b border-slate-100 flex items-center gap-2">
-            <div className="flex-[3]">
-              <input type="text" placeholder="Current Task" value={newLog.task} onChange={e => setNewLog({...newLog, task: e.target.value})} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-            </div>
-            <div className="flex-[1] min-w-[100px]">
-              <select value={newLog.status} onChange={e => setNewLog({...newLog, status: e.target.value as any})} className="w-full text-sm px-2 py-2 rounded-lg border border-slate-200 outline-none bg-white">
-                <option value="Done">Done</option>
-                <option value="Progress">Progress</option>
-              </select>
+            <div className="flex-[4]">
+              <input type="text" placeholder="Current Task (New logs start as Progress)" value={newLog.task} onChange={e => setNewLog({...newLog, task: e.target.value})} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
             </div>
             <div className="flex-[3]">
               <input type="text" placeholder="Issue / Note" value={newLog.note} onChange={e => setNewLog({...newLog, note: e.target.value})} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
             </div>
-            <button onClick={addDailyLog} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors whitespace-nowrap">기록</button>
+            <button onClick={addDailyLog} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors">기록</button>
           </div>
 
           <div className="flex-1 overflow-auto">
@@ -169,7 +173,10 @@ export default function TeamTab() {
               <tbody className="divide-y divide-slate-50">
                 {dailyLogs.map(log => (
                   <tr key={log.id} className="hover:bg-slate-50/50 group">
-                    <td className="px-4 py-3 text-[11px] text-slate-500 font-medium whitespace-nowrap">{format(new Date(log.created_at), 'yyyy-MM-dd')}</td>
+                    <td className="px-4 py-3 text-[11px] text-slate-500 font-medium whitespace-nowrap flex items-center gap-2">
+                      {isNew(log.created_at) && <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
+                      {format(new Date(log.created_at), 'yyyy-MM-dd')}
+                    </td>
                     <td className="px-4 py-3"><span className="text-xs font-bold text-rose-500 whitespace-nowrap">{log.author_name}</span></td>
                     <td className="px-4 py-3"><p className="text-sm text-slate-700 font-medium">{log.content}</p></td>
                     <td className="px-4 py-3 text-center">
@@ -185,7 +192,7 @@ export default function TeamTab() {
                     <td className="px-4 py-3"><p className="text-xs text-slate-500 italic">{log.metadata?.note || '-'}</p></td>
                     <td className="px-4 py-3 text-right">
                       {log.author_id === currentUser?.id && (
-                        <button onClick={() => deleteTask(log.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={14} /></button>
+                        <button onClick={() => deleteTask('admin_tasks', log.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
                       )}
                     </td>
                   </tr>
@@ -195,26 +202,69 @@ export default function TeamTab() {
           </div>
         </div>
 
-        {/* Right: Todo List */}
+        {/* Right: Todo List with Threads */}
         <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 overflow-hidden shadow-sm">
           <div className="flex items-center gap-2 mb-4"><CheckSquare size={18} className="text-green-500" /><h3 className="font-bold text-slate-800">To-do List</h3></div>
           <div className="flex gap-2 mb-4">
-            <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none" />
-            <button onClick={addTodo} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800"><Plus size={18} /></button>
+            <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && (async () => {
+              if (!newTodo.trim() || !currentUser) return;
+              await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
+              setNewTodo('');
+            })()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-green-500/20" />
+            <button onClick={async () => {
+              if (!newTodo.trim() || !currentUser) return;
+              await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
+              setNewTodo('');
+            }} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800"><Plus size={18} /></button>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {todos.map(todo => (
-              <div key={todo.id} className={`flex items-center gap-3 p-3 rounded-xl border group transition-all ${todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm'}`}>
-                <button onClick={() => toggleStatus(todo.id, todo.is_completed)} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>{todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}</button>
-                <div className="flex-1"><p className={`text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p><span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span></div>
-                <button onClick={() => deleteTask(todo.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
-              </div>
-            ))}
+          <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+            {todos.map(todo => {
+              const taskComments = comments.filter(c => c.task_id === todo.id);
+              const hasNewComment = taskComments.some(c => isNew(c.created_at));
+              return (
+                <div key={todo.id} className="flex flex-col gap-2">
+                  <div className={`flex items-center gap-3 p-3 rounded-xl border group transition-all ${todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm'}`}>
+                    <button onClick={() => toggleStatus(todo.id, todo.is_completed)} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>{todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}</button>
+                    <div className="flex-1 relative">
+                      <p className={`text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
+                        {(isNew(todo.created_at) || hasNewComment) && <span className="text-[9px] bg-rose-500 text-white px-1 rounded font-bold">N</span>}
+                        <button onClick={() => setExpandedTodo(expandedTodo === todo.id ? null : todo.id)} className="flex items-center gap-1 text-[10px] text-blue-500 font-bold hover:underline">
+                          <MessageCircle size={12} /> {taskComments.length}
+                        </button>
+                      </div>
+                    </div>
+                    <button onClick={() => deleteTask('admin_tasks', todo.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                  </div>
+                  
+                  {expandedTodo === todo.id && (
+                    <div className="ml-8 p-3 bg-white rounded-xl border border-slate-100 shadow-inner space-y-2 animate-in slide-in-from-top-2 duration-200">
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        {taskComments.map(comment => (
+                          <div key={comment.id} className="text-[12px] bg-slate-50 p-2 rounded-lg relative">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-bold text-slate-700">{comment.author_name}</span>
+                              <span className="text-[9px] text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
+                            </div>
+                            <p className="text-slate-600">{comment.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t border-slate-50">
+                        <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[11px] px-2 py-1 rounded border border-slate-100 outline-none focus:ring-1 focus:ring-blue-500/20" />
+                        <button onClick={() => addComment(todo.id)} className="text-blue-500 hover:text-blue-600"><Send size={16} /></button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Memo Panel */}
+      {/* Floating Memo Panel */}
       {showMemos && (
         <div className="absolute top-0 right-0 w-80 h-full bg-amber-50 border-l border-amber-200 shadow-2xl z-20 flex flex-col animate-in slide-in-from-right duration-300">
           <div className="p-4 border-b border-amber-200 flex items-center justify-between bg-amber-100/50">
@@ -223,13 +273,20 @@ export default function TeamTab() {
           </div>
           <div className="p-4 bg-amber-100/30">
             <textarea placeholder="메모 입력..." value={newMemo} onChange={e => setNewMemo(e.target.value)} className="w-full text-sm p-3 rounded-lg border border-amber-200 outline-none min-h-[80px] resize-none" />
-            <button onClick={addMemo} className="w-full mt-2 bg-amber-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-amber-700">추가</button>
+            <button onClick={async () => {
+              if (!newMemo.trim() || !currentUser) return;
+              await supabase.from('admin_tasks').insert({ type: 'MEMO', content: newMemo, author_id: currentUser.id, author_name: currentUser.name });
+              setNewMemo('');
+            }} className="w-full mt-2 bg-amber-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-amber-700">추가</button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {memos.map(memo => (
               <div key={memo.id} className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm group">
                 <p className="text-sm text-slate-700 whitespace-pre-wrap">{memo.content}</p>
-                <div className="mt-2 pt-2 border-t border-slate-50 flex justify-between items-center"><span className="text-[10px] font-bold text-amber-700 uppercase">{memo.author_name}</span><button onClick={() => deleteTask(memo.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button></div>
+                <div className="mt-2 pt-2 border-t border-slate-50 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-amber-700 uppercase">{memo.author_name}</span>
+                  <button onClick={() => deleteTask('admin_tasks', memo.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+                </div>
               </div>
             ))}
           </div>

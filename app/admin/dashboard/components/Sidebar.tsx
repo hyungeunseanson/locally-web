@@ -44,6 +44,7 @@ export default function Sidebar() {
     exps: 0,
     online: 0,
     pendingBookings: 0,
+    hasNewTeam: false,
   });
 
   useEffect(() => {
@@ -52,11 +53,17 @@ export default function Sidebar() {
       const { count: expsCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending');
       const { count: bookingCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING');
 
+      // N 배지 체크 로직
+      const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
+      const { data: newTasks } = await supabase.from('admin_tasks').select('id').gt('created_at', lastViewed).limit(1);
+      const { data: newComments } = await supabase.from('admin_task_comments').select('id').gt('created_at', lastViewed).limit(1);
+
       setCounts(prev => ({
         ...prev,
         apps: appsCount || 0,
         exps: expsCount || 0,
         pendingBookings: bookingCount || 0,
+        hasNewTeam: (newTasks?.length || 0) > 0 || (newComments?.length || 0) > 0
       }));
     };
 
@@ -70,7 +77,15 @@ export default function Sidebar() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    const teamChannel = supabase.channel('team_notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_tasks' }, () => { fetchCounts(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { fetchCounts(); })
+      .subscribe();
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      supabase.removeChannel(teamChannel);
+    };
   }, []);
 
   const handleTabChange = (tab: string) => {
@@ -109,7 +124,14 @@ export default function Sidebar() {
           <div className="space-y-1">
             {/* BOOKINGS 제거됨 */}
             <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={18}/>} label="메시지 모니터링" />
-            <NavButton active={activeTab === 'TEAM'} onClick={() => handleTabChange('TEAM')} icon={<Briefcase size={18}/>} label="팀 협업 (Team)" />
+            <div className="relative">
+              <NavButton active={activeTab === 'TEAM'} onClick={() => handleTabChange('TEAM')} icon={<Briefcase size={18}/>} label="팀 협업 (Team)" />
+              {counts.hasNewTeam && activeTab !== 'TEAM' && (
+                <div className="absolute top-3 right-3 w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center animate-pulse border-2 border-[#111827]">
+                  <span className="text-[9px] font-bold text-white">N</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
