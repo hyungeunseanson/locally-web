@@ -9,23 +9,29 @@ const intlMiddleware = createMiddleware({
 });
 
 export async function middleware(request: NextRequest) {
-  // API 및 정적 파일 제외
-  if (request.nextUrl.pathname.startsWith('/api') || request.nextUrl.pathname.startsWith('/_next')) {
+  // 1. API 및 내부 경로 제외 (가장 먼저 체크)
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname.startsWith('/api') || 
+    pathname.startsWith('/_next') || 
+    pathname.includes('.') // 파일 확장자가 있는 경우 (이미지, 파비콘 등)
+  ) {
     return await updateSession(request);
   }
 
-  // 1. next-intl 미들웨어 실행 (Response 생성)
+  // 2. next-intl 미들웨어 실행 (Response 생성 - Rewrite/Redirect 담당)
   const intlResponse = intlMiddleware(request);
 
-  // 2. 생성된 Response를 Supabase 미들웨어에 전달하여 세션 처리 및 쿠키 병합
-  // 이렇게 하면 next-intl의 rewrite 헤더와 Supabase의 auth 쿠키가 하나의 Response에 담김
+  // 3. 생성된 Response를 Supabase 미들웨어에 전달
+  // next-intl이 Redirect를 시키는 경우(예: / -> /ko)에는 세션 업데이트 불필요할 수 있으나,
+  // 안전하게 모든 경우에 세션을 유지하도록 함.
   const finalResponse = await updateSession(request, intlResponse);
 
   return finalResponse;
 }
 
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  // Matcher를 더 단순하고 강력하게 설정
+  // 모든 경로를 잡되, 내부 로직에서 api 등을 제외하는 방식이 더 안전함
+  matcher: ['/((?!_next|.*\\..*).*)']
 };

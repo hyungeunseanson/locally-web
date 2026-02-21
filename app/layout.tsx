@@ -10,7 +10,8 @@ import SiteFooter from "@/app/components/SiteFooter";
 import Script from "next/script";
 import GoogleTranslate from '@/app/components/GoogleTranslate';
 import QueryProvider from '@/app/providers/QueryProvider';
-import { AuthProvider } from '@/app/context/AuthContext'; // 🟢 올바른 위치
+import { AuthProvider } from '@/app/context/AuthContext';
+import { getCurrentLocale } from '@/app/utils/locale'; // 🟢 locale 유틸리티 추가
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,13 +46,16 @@ export const metadata: Metadata = {
   keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', 'Locally'],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 🟢 서버 사이드에서 현재 언어 감지
+  const locale = await getCurrentLocale();
+
   return (
-    <html lang="ko" suppressHydrationWarning={true}>
+    <html lang={locale} suppressHydrationWarning={true}>
       <body className={inter.className}>
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script 
@@ -60,7 +64,7 @@ export default function RootLayout({
           />
         )}
         <QueryProvider>
-          <AuthProvider> {/* 🟢 AuthProvider 적용 */}
+          <AuthProvider>
             <ToastProvider>
               <NotificationProvider>
                 <LanguageProvider>
