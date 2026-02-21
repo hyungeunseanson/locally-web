@@ -95,9 +95,25 @@ export default function TeamTab() {
 
   const addWhitelistEmail = async () => {
     if (!newWhitemail.trim()) return;
-    const { error } = await supabase.from('admin_whitelist').insert({ email: newWhitemail.trim().toLowerCase() });
-    if (error) alert('Error: ' + error.message);
-    else setNewWhitemail('');
+    const email = newWhitemail.trim().toLowerCase();
+    
+    // 이미 로컬 리스트에 있는지 먼저 확인 (네트워크 요청 절약)
+    if (whitelist.some(item => item.email === email)) {
+      alert('이미 등록된 이메일입니다.');
+      return;
+    }
+
+    const { error } = await supabase.from('admin_whitelist').insert({ email });
+    
+    if (error) {
+      if (error.code === '23505') {
+        alert('이미 화이트리스트에 존재하는 이메일입니다.');
+      } else {
+        alert('Error: ' + error.message);
+      }
+    } else {
+      setNewWhitemail('');
+    }
   };
 
   const addDailyLog = async () => {

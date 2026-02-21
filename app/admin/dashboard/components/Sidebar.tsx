@@ -52,12 +52,16 @@ export default function Sidebar() {
       const [
         { count: appsCount },
         { count: expsCount },
-        { count: bookingCount }
+        { data: pendingBookingsData }
       ] = await Promise.all([
         supabase.from('host_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING')
+        supabase.from('bookings').select('id').eq('status', 'PENDING')
       ]);
+
+      // 미열람 예약 필터링
+      const viewedIds = JSON.parse(localStorage.getItem('viewed_booking_ids') || '[]');
+      const unviewedCount = (pendingBookingsData || []).filter((b: any) => !viewedIds.includes(b.id)).length;
 
       // 신규 투두 및 댓글 수 합산
       const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
@@ -73,7 +77,7 @@ export default function Sidebar() {
         ...prev,
         apps: appsCount || 0,
         exps: expsCount || 0,
-        pendingBookings: bookingCount || 0,
+        pendingBookings: unviewedCount,
         teamNewCount: (newTasksCount || 0) + (newCommentsCount || 0)
       }));
     } catch (e) {
@@ -83,6 +87,9 @@ export default function Sidebar() {
 
   useEffect(() => {
     fetchCounts();
+
+    // 열람 상태 변경 감지를 위한 이벤트 리스너
+    window.addEventListener('booking-viewed', fetchCounts);
 
     const channel = supabase.channel('online_users_sidebar')
       .on('presence', { event: 'sync' }, () => {
@@ -100,6 +107,7 @@ export default function Sidebar() {
     return () => { 
       supabase.removeChannel(channel); 
       supabase.removeChannel(teamChannel);
+      window.removeEventListener('booking-viewed', fetchCounts);
     };
   }, []);
 
