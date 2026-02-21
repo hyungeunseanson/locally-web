@@ -253,34 +253,102 @@ export default function TeamTab() {
         </div>
       </div>
 
-      {/* Memo Panel */}
-      {showMemos && (
-        <div className="absolute top-0 right-0 w-80 h-full bg-amber-50 border-l border-amber-200 shadow-2xl z-20 flex flex-col animate-in slide-in-from-right duration-300">
-          <div className="p-4 border-b border-amber-200 flex items-center justify-between bg-amber-100/50">
-            <h3 className="font-bold text-amber-900 flex items-center gap-2"><FileText size={18} /> 공유 메모장</h3>
-            <button onClick={() => setShowMemos(false)} className="text-amber-700 hover:bg-amber-200 p-1 rounded-md"><X size={20} /></button>
-          </div>
-          <div className="p-4 bg-amber-100/30">
-            <textarea placeholder="메모 입력..." value={newMemo} onChange={e => setNewMemo(e.target.value)} className="w-full text-sm p-3 rounded-lg border border-amber-200 outline-none min-h-[80px] resize-none" />
-            <button onClick={async () => {
-              if (!newMemo.trim() || !currentUser) return;
-              await supabase.from('admin_tasks').insert({ type: 'MEMO', content: newMemo, author_id: currentUser.id, author_name: currentUser.name });
-              setNewMemo('');
-            }} className="w-full mt-2 bg-amber-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-amber-700">추가</button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {memos.map(memo => (
-              <div key={memo.id} className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm group">
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{memo.content}</p>
-                <div className="mt-2 pt-2 border-t border-slate-50 flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-amber-700 uppercase">{memo.author_name}</span>
-                  <button onClick={() => deleteTask('admin_tasks', memo.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+            {/* Floating Memo Panel (Modernized & Larger) */}
+            {showMemos && (
+              <>
+                {/* Backdrop for focus */}
+                <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[1px] z-20" onClick={() => setShowMemos(false)} />
+                
+                <div className="absolute top-0 right-0 w-[500px] h-full bg-white border-l border-slate-200 shadow-2xl z-30 flex flex-col animate-in slide-in-from-right duration-300">
+                  {/* Memo Header */}
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+                        <FileText size={22} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-lg">공유 메모 보드</h3>
+                        <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Team Shared Knowledge</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setShowMemos(false)} 
+                      className="text-slate-400 hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+                  
+                  {/* New Memo Input Section */}
+                  <div className="p-6 border-b border-slate-50 bg-white">
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 focus-within:border-amber-300 focus-within:ring-4 focus-within:ring-amber-500/5 transition-all">
+                      <textarea 
+                        placeholder="팀원들과 공유할 중요한 정보, 공지사항, 혹은 업무 가이드를 자유롭게 기록하세요..."
+                        value={newMemo}
+                        onChange={e => setNewMemo(e.target.value)}
+                        className="w-full text-sm p-0 bg-transparent outline-none min-h-[120px] resize-none text-slate-700 placeholder:text-slate-400 leading-relaxed"
+                      />
+                      <div className="mt-4 flex justify-between items-center">
+                        <span className="text-[11px] text-slate-400 font-medium italic">Shift + Enter for new line</span>
+                        <button 
+                          onClick={async () => {
+                            if (!newMemo.trim() || !currentUser) return;
+                            await supabase.from('admin_tasks').insert({ type: 'MEMO', content: newMemo, author_id: currentUser.id, author_name: currentUser.name });
+                            setNewMemo('');
+                          }} 
+                          className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2"
+                        >
+                          <Plus size={18} /> 메모 등록
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+      
+                  {/* Memo List Area */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30 scrollbar-thin">
+                    {memos.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20">
+                        <NotebookPen size={48} className="opacity-20 mb-4" />
+                        <p className="text-sm">저장된 메모가 없습니다.</p>
+                      </div>
+                    ) : (
+                      memos.map(memo => (
+                        <div key={memo.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md hover:border-amber-200 transition-all relative">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                {memo.author_name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-900">{memo.author_name}</p>
+                                <p className="text-[10px] text-slate-400 font-medium">
+                                  {format(new Date(memo.created_at), 'yyyy.MM.dd HH:mm', { locale: ko })}
+                                </p>
+                              </div>
+                            </div>
+                            {memo.author_id === currentUser?.id && (
+                              <button 
+                                onClick={() => deleteTask('admin_tasks', memo.id)} 
+                                className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                            {memo.content}
+                          </div>
+      
+                          {/* Subtle marker */}
+                          <div className="absolute top-0 left-0 w-1 h-full bg-amber-400/0 group-hover:bg-amber-400 transition-all rounded-l-2xl" />
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              </>
+            )}
     </div>
   );
 }
