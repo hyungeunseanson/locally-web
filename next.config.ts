@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from 'next-intl/plugin';
+
+// next-intl 플러그인 생성 (명시적 경로 설정)
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
-  // ✅ 이미지 최적화를 위한 도메인 허용 설정 (필수!//필수 
+  // ✅ 이미지 최적화를 위한 도메인 허용 설정 (필수!)
   images: {
     remotePatterns: [
       {
@@ -48,4 +52,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// next-intl 플러그인으로 nextConfig 감싸기
+export default withNextIntl(nextConfig);
