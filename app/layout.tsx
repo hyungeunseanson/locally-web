@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Noto_Sans_KR } from "next/font/google"; // 🟢 폰트 변경
 import "./globals.css";
 import { Suspense } from "react"; 
 import { LanguageProvider } from '@/app/context/LanguageContext';
@@ -11,9 +11,12 @@ import Script from "next/script";
 import GoogleTranslate from '@/app/components/GoogleTranslate';
 import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
-import { getCurrentLocale } from '@/app/utils/locale'; // 🟢 locale 유틸리티 추가
+import { getCurrentLocale } from '@/app/utils/locale';
 
-const inter = Inter({ subsets: ["latin"] });
+const notoSansKr = Noto_Sans_KR({ 
+  subsets: ["latin"],
+  weight: ['100', '300', '400', '500', '700', '900'], // 다양한 굵기 지원
+});
 
 export const metadata: Metadata = {
   title: {
@@ -51,12 +54,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 🟢 서버 사이드에서 현재 언어 감지
   const locale = await getCurrentLocale();
 
   return (
     <html lang={locale} suppressHydrationWarning={true}>
-      <body className={inter.className}>
+      <body className={notoSansKr.className}>
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script 
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}

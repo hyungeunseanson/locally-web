@@ -50,6 +50,15 @@ export async function generateMetadata(
       title: title,
       description: description?.slice(0, 150),
       images: [imageUrl],
+    },
+    alternates: {
+      canonical: `https://locally.vercel.app/experiences/${id}`,
+      languages: {
+        'ko': `https://locally.vercel.app/experiences/${id}`,
+        'en': `https://locally.vercel.app/en/experiences/${id}`,
+        'ja': `https://locally.vercel.app/ja/experiences/${id}`,
+        'zh': `https://locally.vercel.app/zh/experiences/${id}`,
+      },
     }
   }
 }

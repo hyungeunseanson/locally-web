@@ -27,6 +27,15 @@ export async function generateMetadata(): Promise<Metadata> {
       title: titles[locale] || titles.ko,
       description: descriptions[locale] || descriptions.ko,
       type: 'website',
+    },
+    alternates: {
+      canonical: 'https://locally.vercel.app',
+      languages: {
+        'ko': 'https://locally.vercel.app',
+        'en': 'https://locally.vercel.app/en',
+        'ja': 'https://locally.vercel.app/ja',
+        'zh': 'https://locally.vercel.app/zh',
+      },
     }
   };
 }
