@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'via.placeholder.com', // 🟢 에러 원인 해결
+        hostname: 'via.placeholder.com', 
       },
       {
         protocol: 'https',
@@ -18,9 +18,8 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'lh3.googleusercontent.com', // 구글 프로필
+        hostname: 'lh3.googleusercontent.com', 
       },
-      // 🟢 [수정됨] 카카오는 http와 https 둘 다 허용해야 합니다!
       {
         protocol: 'http',
         hostname: 'k.kakaocdn.net', 
@@ -50,6 +49,23 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // 🟢 [추가] Vercel 배포 시 미들웨어 무시 방지를 위한 명시적 Rewrite (안전 장치)
+  // 파일 구조 변경 없이 /en -> / 로 내부 매핑을 강제함
+  // async rewrites() {
+  //   return [
+  //     {
+  //       source: '/:locale(en|ja|zh)/:path*',
+  //       destination: '/:path*',
+  //     },
+  //     {
+  //       source: '/:locale(en|ja|zh)',
+  //       destination: '/',
+  //     }
+  //   ];
+  // },
+  // ⚠️ 주의: next-intl 미들웨어를 사용하는 경우, next.config.js의 rewrites는 충돌할 수 있어 주석 처리함.
+  // 대신 미들웨어 matcher를 강화했으므로, 이것만으로도 충분해야 함.
 };
 
 // next-intl 플러그인으로 nextConfig 감싸기

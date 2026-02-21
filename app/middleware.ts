@@ -9,8 +9,12 @@ const intlMiddleware = createMiddleware({
 });
 
 export async function middleware(request: NextRequest) {
-  // 1. API 및 내부 경로 제외 (가장 먼저 체크)
+  // 1. API 및 정적 파일 제외 (가장 먼저 체크)
   const pathname = request.nextUrl.pathname;
+  
+  // 디버깅용 헤더 설정 (배포 후 확인용)
+  request.headers.set('x-middleware-path', pathname);
+
   if (
     pathname.startsWith('/api') || 
     pathname.startsWith('/_next') || 
@@ -23,15 +27,12 @@ export async function middleware(request: NextRequest) {
   const intlResponse = intlMiddleware(request);
 
   // 3. 생성된 Response를 Supabase 미들웨어에 전달
-  // next-intl이 Redirect를 시키는 경우(예: / -> /ko)에는 세션 업데이트 불필요할 수 있으나,
-  // 안전하게 모든 경우에 세션을 유지하도록 함.
   const finalResponse = await updateSession(request, intlResponse);
 
   return finalResponse;
 }
 
 export const config = {
-  // Matcher를 더 단순하고 강력하게 설정
-  // 모든 경로를 잡되, 내부 로직에서 api 등을 제외하는 방식이 더 안전함
-  matcher: ['/((?!_next|.*\\..*).*)']
+  // Matcher: 루트(/)와 모든 경로를 포함하되, 내부 경로 제외
+  matcher: ['/', '/(ko|en|ja|zh)/:path*', '/((?!_next|_vercel|.*\\..*).*)']
 };
