@@ -1,23 +1,22 @@
 @import "tailwindcss";
 
-/* Tailwind v4 방식의 테마 설정 */
 @theme {
-  /* 에어비앤비 스타일 포인트 컬러 */
+  /* 🟢 Tailwind의 font-sans를 Noto Sans KR 변수로 매핑 */
+  --font-sans: var(--font-noto-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
   --color-primary: #FF385C;
   --color-primary-hover: #D90B3E;
   
-  /* 고급스러운 카드 그림자 */
   --shadow-card: 0 6px 16px rgba(0,0,0,0.12);
   --shadow-floating: 0 8px 28px rgba(0,0,0,0.28);
   
-  /* 부드러운 모서리 */
   --radius-card: 12px;
   --radius-button: 8px;
 }
 
 :root {
   --background: #ffffff;
-  --foreground: #222222; /* 완전 검정(#171717)보다 살짝 부드러운 차콜색 추천 ㅏㄴㅁㅇㄴㅏㅏ*/
+  --foreground: #222222; 
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,11 +29,10 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  /* font-family: Arial, Helvetica, sans-serif;  <- 🔴 삭제됨: Next.js Font 클래스와 충돌 방지 */
-  -webkit-font-smoothing: antialiased; /* 글씨를 더 선명하게 */
+  /* font-family: Arial, Helvetica, sans-serif; */
+  -webkit-font-smoothing: antialiased; 
 }
 
-/* 유틸리티 클래스 (필요시 사용) */
 .text-primary {
   color: var(--color-primary);
 }

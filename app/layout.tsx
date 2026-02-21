@@ -15,7 +15,8 @@ import { getCurrentLocale } from '@/app/utils/locale';
 
 const notoSansKr = Noto_Sans_KR({ 
   subsets: ["latin"],
-  weight: ['100', '300', '400', '500', '700', '900'], // 다양한 굵기 지원
+  weight: ['100', '300', '400', '500', '700', '900'],
+  variable: '--font-noto-sans',
 });
 
 export const metadata: Metadata = {
@@ -58,7 +59,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning={true}>
-      <body className={notoSansKr.className}>
+      <body className={`${notoSansKr.className} ${notoSansKr.variable} font-sans`}>
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script 
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
