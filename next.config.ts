@@ -52,11 +52,11 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/:locale(en|ja|zh)/:path*',
+        source: '/:locale(ko|en|ja|zh)/:path*',
         destination: '/:path*',
       },
       {
-        source: '/:locale(en|ja|zh)',
+        source: '/:locale(ko|en|ja|zh)',
         destination: '/',
       }
     ];
