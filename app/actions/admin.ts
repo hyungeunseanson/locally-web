@@ -34,6 +34,12 @@ async function getAdminClient() {
      if (userView?.role === 'admin') isAdmin = true;
   }
 
+  // 🟢 [추가] 화이트리스트 이메일 확인
+  if (!isAdmin) {
+    const { data: whitelist } = await supabase.from('admin_whitelist').select('id').eq('email', user.email).single();
+    if (whitelist) isAdmin = true;
+  }
+
   if (!isAdmin) throw new Error('Forbidden: Admin access required');
 
   return supabase;

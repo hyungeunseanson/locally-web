@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { 
   ClipboardList, CheckSquare, FileText, Plus, Trash2, 
-  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send
+  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -13,6 +13,9 @@ import { AdminTask, AdminComment } from '@/app/types/admin';
 export default function TeamTab() {
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
+  const [whitelist, setWhitelist] = useState<any[]>([]);
+  const [newWhitemail, setNewWhitemail] = useState('');
+  const [showWhitelist, setShowWhitelist] = useState(false);
   const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
   const [newMemo, setNewMemo] = useState('');
@@ -44,11 +47,13 @@ export default function TeamTab() {
 
     fetchTasks();
     fetchComments();
+    fetchWhitelist();
     getCurrentUser();
 
     const channel = supabase.channel('team_workspace_realtime_final')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => { fetchTasks(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_task_comments' }, () => { fetchComments(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_whitelist' }, () => { fetchWhitelist(); })
       .subscribe();
 
     // 외부 클릭 시 댓글 창 닫기
@@ -81,6 +86,18 @@ export default function TeamTab() {
   const fetchComments = async () => {
     const { data } = await supabase.from('admin_task_comments').select('*').order('created_at', { ascending: true });
     if (data) setComments(data);
+  };
+
+  const fetchWhitelist = async () => {
+    const { data } = await supabase.from('admin_whitelist').select('*').order('created_at', { ascending: false });
+    if (data) setWhitelist(data);
+  };
+
+  const addWhitelistEmail = async () => {
+    if (!newWhitemail.trim()) return;
+    const { error } = await supabase.from('admin_whitelist').insert({ email: newWhitemail.trim().toLowerCase() });
+    if (error) alert('Error: ' + error.message);
+    else setNewWhitemail('');
   };
 
   const addDailyLog = async () => {
@@ -383,9 +400,54 @@ export default function TeamTab() {
                                     );
                                   })
                                 )}
-                              </div>                </div>
-              </>
-            )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+      {/* Discrete Admin Whitelist Manager */}
+      <div className="mt-auto pt-10 pb-2 flex flex-col items-center">
+        {!showWhitelist ? (
+          <button 
+            onClick={() => setShowWhitelist(true)} 
+            className="text-[10px] text-slate-300 hover:text-slate-500 transition-colors flex items-center gap-1"
+          >
+            <Settings size={10} /> Admin Whitelist
+          </button>
+        ) : (
+          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xl animate-in fade-in zoom-in duration-200 max-w-sm w-full">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-xs font-bold text-slate-800">Admin Whitelist</h4>
+              <button onClick={() => setShowWhitelist(false)} className="text-slate-400 hover:text-slate-900"><X size={14}/></button>
+            </div>
+            <div className="flex gap-2 mb-3">
+              <input 
+                type="email" 
+                placeholder="New admin email" 
+                value={newWhitemail}
+                onChange={e => setNewWhitemail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addWhitelistEmail()}
+                className="flex-1 text-[11px] px-2 py-1 rounded border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20"
+              />
+              <button onClick={addWhitelistEmail} className="bg-slate-900 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-slate-800 transition-colors">Add</button>
+            </div>
+            <div className="max-h-32 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+              {whitelist.length === 0 ? (
+                <p className="text-[9px] text-slate-400 text-center py-2">No extra admins whitelisted.</p>
+              ) : (
+                whitelist.map(item => (
+                  <div key={item.id} className="flex justify-between items-center text-[10px] bg-slate-50 px-2 py-1 rounded group">
+                    <span className="text-slate-600 truncate mr-2 font-medium">{item.email}</span>
+                    <button onClick={() => deleteTask('admin_whitelist', item.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
+                      <Trash2 size={10}/>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

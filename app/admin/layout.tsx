@@ -42,15 +42,16 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
-  // DB에서 진짜 관리자인지 확인 (보안 핵심)
-  const { data: userProfile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  // DB에서 진짜 관리자인지 확인 (보안 핵심: role 또는 whitelist 체크)
+  const [userProfile, whitelistEntry] = await Promise.all([
+    supabase.from("users").select("role").eq("id", user.id).single(),
+    supabase.from("admin_whitelist").select("id").eq("email", user.email).single()
+  ]);
+
+  const isAdmin = (userProfile.data?.role === "admin") || !!whitelistEntry.data;
 
   // 관리자가 아니면 메인 홈페이지로 쫓아냄
-  if (!userProfile || userProfile.role !== "admin") {
+  if (!isAdmin) {
     redirect("/");
   }
 
