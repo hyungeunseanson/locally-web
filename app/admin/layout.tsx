@@ -44,8 +44,8 @@ export default async function AdminLayout({
 
   // DB에서 진짜 관리자인지 확인 (보안 핵심: role 또는 whitelist 체크)
   const [userProfile, whitelistEntry] = await Promise.all([
-    supabase.from("users").select("role").eq("id", user.id).single(),
-    supabase.from("admin_whitelist").select("id").eq("email", user.email).single()
+    supabase.from("users").select("role").eq("id", user.id).maybeSingle(),
+    supabase.from("admin_whitelist").select("id").eq("email", user.email).maybeSingle()
   ]);
 
   const isAdmin = (userProfile.data?.role === "admin") || !!whitelistEntry.data;

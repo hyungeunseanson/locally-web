@@ -26,17 +26,17 @@ async function getAdminClient() {
   if (!user) throw new Error('Unauthorized');
 
   let isAdmin = false;
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
   if (profile?.role === 'admin') isAdmin = true;
   
   if (!isAdmin) {
-     const { data: userView } = await supabase.from('users').select('role').eq('id', user.id).single();
+     const { data: userView } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
      if (userView?.role === 'admin') isAdmin = true;
   }
 
   // 🟢 [추가] 화이트리스트 이메일 확인
   if (!isAdmin) {
-    const { data: whitelist } = await supabase.from('admin_whitelist').select('id').eq('email', user.email).single();
+    const { data: whitelist } = await supabase.from('admin_whitelist').select('id').eq('email', user.email).maybeSingle();
     if (whitelist) isAdmin = true;
   }
 
