@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronDown, Star, Search, CheckCircle2, MessageCircle, Calendar, ShieldCheck, Heart, Globe, Users, MapPin, ArrowRight } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 
-// --- [Components] ---
+// --- [Components] ---dd
 
 function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
