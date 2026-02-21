@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { 
   ClipboardList, CheckSquare, FileText, Plus, Trash2, 
@@ -44,6 +44,7 @@ export default function TeamTab() {
   const [isClient, setIsClient] = useState(false);
   const [lastViewed, setLastViewed] = useState<string>(new Date(0).toISOString());
   
+  const threadRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -51,19 +52,30 @@ export default function TeamTab() {
     const viewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
     setLastViewed(viewed);
     
-    // 방문 시간 업데이트 (사이드바 N 배지 제거 목적)
+    // 방문 시간 업데이트
     localStorage.setItem('last_viewed_team', new Date().toISOString());
 
     fetchTasks();
     fetchComments();
     getCurrentUser();
 
-    const channel = supabase.channel('team_workspace_realtime')
+    const channel = supabase.channel('team_workspace_realtime_final')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => { fetchTasks(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_task_comments' }, () => { fetchComments(); })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // 외부 클릭 시 댓글 창 닫기
+    const handleClickOutside = (event: MouseEvent) => {
+      if (threadRef.current && !threadRef.current.contains(event.target as Node)) {
+        setExpandedTodo(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const getCurrentUser = async () => {
@@ -91,7 +103,7 @@ export default function TeamTab() {
       content: newLog.task,
       author_id: currentUser.id,
       author_name: currentUser.name,
-      is_completed: false, // 무조건 Progress 시작
+      is_completed: false,
       metadata: { note: newLog.note, status_text: 'Progress' }
     });
     setNewLog({ task: '', note: '' });
@@ -131,7 +143,6 @@ export default function TeamTab() {
 
   return (
     <div className="flex flex-col h-full gap-6 relative">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
           <ClipboardList className="text-rose-500" /> 팀 협업 보드
@@ -142,7 +153,7 @@ export default function TeamTab() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
-        {/* Left: Daily Logs */}
+        {/* Left: Daily Logs (N 제거됨) */}
         <div className="flex-[2.5] flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock size={18} className="text-blue-500" /> Daily Logs</h3>
@@ -150,7 +161,7 @@ export default function TeamTab() {
 
           <div className="p-3 bg-blue-50/30 border-b border-slate-100 flex items-center gap-2">
             <div className="flex-[4]">
-              <input type="text" placeholder="Current Task (New logs start as Progress)" value={newLog.task} onChange={e => setNewLog({...newLog, task: e.target.value})} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+              <input type="text" placeholder="Current Task" value={newLog.task} onChange={e => setNewLog({...newLog, task: e.target.value})} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
             </div>
             <div className="flex-[3]">
               <input type="text" placeholder="Issue / Note" value={newLog.note} onChange={e => setNewLog({...newLog, note: e.target.value})} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
@@ -173,26 +184,16 @@ export default function TeamTab() {
               <tbody className="divide-y divide-slate-50">
                 {dailyLogs.map(log => (
                   <tr key={log.id} className="hover:bg-slate-50/50 group">
-                    <td className="px-4 py-3 text-[11px] text-slate-500 font-medium whitespace-nowrap flex items-center gap-2">
-                      {isNew(log.created_at) && <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
-                      {format(new Date(log.created_at), 'yyyy-MM-dd')}
-                    </td>
+                    <td className="px-4 py-3 text-[11px] text-slate-500 font-medium whitespace-nowrap">{format(new Date(log.created_at), 'yyyy-MM-dd')}</td>
                     <td className="px-4 py-3"><span className="text-xs font-bold text-rose-500 whitespace-nowrap">{log.author_name}</span></td>
                     <td className="px-4 py-3"><p className="text-sm text-slate-700 font-medium">{log.content}</p></td>
                     <td className="px-4 py-3 text-center">
-                      <button 
-                        onClick={() => toggleStatus(log.id, log.is_completed)}
-                        className={`text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap min-w-[65px] transition-colors ${
-                          log.is_completed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {log.is_completed ? 'Done' : 'Progress'}
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); toggleStatus(log.id, log.is_completed); }} className={`text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap min-w-[65px] transition-colors ${log.is_completed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{log.is_completed ? 'Done' : 'Progress'}</button>
                     </td>
                     <td className="px-4 py-3"><p className="text-xs text-slate-500 italic">{log.metadata?.note || '-'}</p></td>
                     <td className="px-4 py-3 text-right">
                       {log.author_id === currentUser?.id && (
-                        <button onClick={() => deleteTask('admin_tasks', log.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', log.id); }} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={14} /></button>
                       )}
                     </td>
                   </tr>
@@ -202,57 +203,66 @@ export default function TeamTab() {
           </div>
         </div>
 
-        {/* Right: Todo List with Threads */}
-        <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 overflow-hidden shadow-sm">
+        {/* Right: Todo List (Container Click To Expand) */}
+        <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 overflow-hidden shadow-sm" ref={threadRef}>
           <div className="flex items-center gap-2 mb-4"><CheckSquare size={18} className="text-green-500" /><h3 className="font-bold text-slate-800">To-do List</h3></div>
           <div className="flex gap-2 mb-4">
             <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && (async () => {
               if (!newTodo.trim() || !currentUser) return;
               await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
               setNewTodo('');
-            })()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-green-500/20" />
+            })()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none" />
             <button onClick={async () => {
               if (!newTodo.trim() || !currentUser) return;
               await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
               setNewTodo('');
-            }} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800"><Plus size={18} /></button>
+            }} className="bg-slate-900 text-white p-2 rounded-lg"><Plus size={18} /></button>
           </div>
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {todos.map(todo => {
               const taskComments = comments.filter(c => c.task_id === todo.id);
               const hasNewComment = taskComments.some(c => isNew(c.created_at));
+              const isTodoNew = isNew(todo.created_at);
+              
               return (
                 <div key={todo.id} className="flex flex-col gap-2">
-                  <div className={`flex items-center gap-3 p-3 rounded-xl border group transition-all ${todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm'}`}>
-                    <button onClick={() => toggleStatus(todo.id, todo.is_completed)} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>{todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}</button>
+                  <div 
+                    onClick={() => setExpandedTodo(expandedTodo === todo.id ? null : todo.id)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border group transition-all cursor-pointer ${expandedTodo === todo.id ? 'border-blue-300 ring-2 ring-blue-500/10' : ''} ${todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm hover:border-slate-300'}`}
+                  >
+                    <button onClick={(e) => { e.stopPropagation(); toggleStatus(todo.id, todo.is_completed); }} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>{todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}</button>
                     <div className="flex-1 relative">
                       <p className={`text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
-                        {(isNew(todo.created_at) || hasNewComment) && <span className="text-[9px] bg-rose-500 text-white px-1 rounded font-bold">N</span>}
-                        <button onClick={() => setExpandedTodo(expandedTodo === todo.id ? null : todo.id)} className="flex items-center gap-1 text-[10px] text-blue-500 font-bold hover:underline">
+                        {(isTodoNew || hasNewComment) && <span className="text-[9px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold animate-pulse">N</span>}
+                        <div className="flex items-center gap-1 text-[10px] text-blue-500 font-bold">
                           <MessageCircle size={12} /> {taskComments.length}
-                        </button>
+                        </div>
                       </div>
                     </div>
-                    <button onClick={() => deleteTask('admin_tasks', todo.id)} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', todo.id); }} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
                   </div>
                   
                   {expandedTodo === todo.id && (
                     <div className="ml-8 p-3 bg-white rounded-xl border border-slate-100 shadow-inner space-y-2 animate-in slide-in-from-top-2 duration-200">
                       <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                        {taskComments.map(comment => (
-                          <div key={comment.id} className="text-[12px] bg-slate-50 p-2 rounded-lg relative">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-slate-700">{comment.author_name}</span>
-                              <span className="text-[9px] text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
+                        {taskComments.length === 0 ? (
+                          <p className="text-[11px] text-slate-400 text-center py-2">댓글이 없습니다.</p>
+                        ) : (
+                          taskComments.map(comment => (
+                            <div key={comment.id} className="text-[12px] bg-slate-50 p-2 rounded-lg">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-bold text-slate-700">{comment.author_name}</span>
+                                <span className="text-[9px] text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
+                              </div>
+                              <p className="text-slate-600">{comment.content}</p>
                             </div>
-                            <p className="text-slate-600">{comment.content}</p>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
-                      <div className="flex gap-2 pt-2 border-t border-slate-50">
-                        <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[11px] px-2 py-1 rounded border border-slate-100 outline-none focus:ring-1 focus:ring-blue-500/20" />
+                      <div className="flex gap-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
+                        <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[11px] px-2 py-1.5 rounded border border-slate-100 outline-none focus:ring-1 focus:ring-blue-500/20" />
                         <button onClick={() => addComment(todo.id)} className="text-blue-500 hover:text-blue-600"><Send size={16} /></button>
                       </div>
                     </div>
@@ -264,7 +274,7 @@ export default function TeamTab() {
         </div>
       </div>
 
-      {/* Floating Memo Panel */}
+      {/* Memo Panel */}
       {showMemos && (
         <div className="absolute top-0 right-0 w-80 h-full bg-amber-50 border-l border-amber-200 shadow-2xl z-20 flex flex-col animate-in slide-in-from-right duration-300">
           <div className="p-4 border-b border-amber-200 flex items-center justify-between bg-amber-100/50">

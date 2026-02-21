@@ -44,7 +44,7 @@ export default function Sidebar() {
     exps: 0,
     online: 0,
     pendingBookings: 0,
-    hasNewTeam: false,
+    teamNewCount: 0,
   });
 
   useEffect(() => {
@@ -53,17 +53,17 @@ export default function Sidebar() {
       const { count: expsCount } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending');
       const { count: bookingCount } = await supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING');
 
-      // N 배지 체크 로직
+      // 신규 투두 및 댓글 수 합산
       const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
-      const { data: newTasks } = await supabase.from('admin_tasks').select('id').gt('created_at', lastViewed).limit(1);
-      const { data: newComments } = await supabase.from('admin_task_comments').select('id').gt('created_at', lastViewed).limit(1);
+      const { count: newTasksCount } = await supabase.from('admin_tasks').select('*', { count: 'exact', head: true }).eq('type', 'TODO').gt('created_at', lastViewed);
+      const { count: newCommentsCount } = await supabase.from('admin_task_comments').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed);
 
       setCounts(prev => ({
         ...prev,
         apps: appsCount || 0,
         exps: expsCount || 0,
         pendingBookings: bookingCount || 0,
-        hasNewTeam: (newTasks?.length || 0) > 0 || (newComments?.length || 0) > 0
+        teamNewCount: (newTasksCount || 0) + (newCommentsCount || 0)
       }));
     };
 
@@ -124,14 +124,13 @@ export default function Sidebar() {
           <div className="space-y-1">
             {/* BOOKINGS 제거됨 */}
             <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={18}/>} label="메시지 모니터링" />
-            <div className="relative">
-              <NavButton active={activeTab === 'TEAM'} onClick={() => handleTabChange('TEAM')} icon={<Briefcase size={18}/>} label="팀 협업 (Team)" />
-              {counts.hasNewTeam && activeTab !== 'TEAM' && (
-                <div className="absolute top-3 right-3 w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center animate-pulse border-2 border-[#111827]">
-                  <span className="text-[9px] font-bold text-white">N</span>
-                </div>
-              )}
-            </div>
+            <NavButton 
+              active={activeTab === 'TEAM'} 
+              onClick={() => handleTabChange('TEAM')} 
+              icon={<Briefcase size={18}/>} 
+              label="팀 협업 (Team)" 
+              count={activeTab !== 'TEAM' ? counts.teamNewCount : undefined} 
+            />
           </div>
         </div>
 
