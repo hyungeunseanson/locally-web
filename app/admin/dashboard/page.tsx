@@ -23,9 +23,22 @@ function AdminDashboardContent() {
   const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPROVALS';
 
   const { 
-    apps, exps, users, bookings, reviews, onlineUsers, 
+    apps, exps, users, bookings, reviews, onlineUsers, isLoading,
     updateStatus, deleteItem, refresh 
   } = useAdminData();
+
+  if (isLoading) {
+    return (
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] animate-pulse">
+        <div className="h-8 bg-slate-100 rounded w-1/4 mb-6"></div>
+        <div className="space-y-4">
+          <div className="h-12 bg-slate-100 rounded"></div>
+          <div className="h-12 bg-slate-100 rounded"></div>
+          <div className="h-12 bg-slate-100 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[80vh]">

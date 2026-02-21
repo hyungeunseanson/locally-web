@@ -7,22 +7,19 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 const nextConfig: NextConfig = {
   // ✅ 이미지 최적화 설정
   images: {
+    formats: ['image/avif', 'image/webp'], // 🟢 차세대 이미지 포맷 강제
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com', 
-      },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com', 
       },
       {
         protocol: 'https',
-        hostname: 'lh3.googleusercontent.com', 
+        hostname: 'lh3.googleusercontent.com', // Google Auth Profile
       },
       {
         protocol: 'http',
-        hostname: 'k.kakaocdn.net', 
+        hostname: 'k.kakaocdn.net', // Kakao Auth Profile
       },
       {
         protocol: 'https',
@@ -38,7 +35,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'uhinvcydgzqlpnvieyal.supabase.co', 
+        hostname: 'uhinvcydgzqlpnvieyal.supabase.co', // Supabase Storage
       }
     ],
     dangerouslyAllowSVG: true,

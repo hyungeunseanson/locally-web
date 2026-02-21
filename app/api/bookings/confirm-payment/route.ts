@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 // 🔒 API Route 내부에서 직접 관리자 클라이언트 생성 (의존성 제거)
 const createAdminClient = () => {
@@ -26,7 +27,28 @@ export async function POST(request: Request) {
   console.log('💰 [API] Confirm Payment Started');
 
   try {
-    const supabase = createAdminClient(); // 🟢 직접 생성
+    // 🚨 [보안 패치] 권한 검증 추가 (Phase 5 긴급 수정)
+    const supabaseAuth = await createServerClient();
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 관리자 권한 확인 (Role or Whitelist)
+    const [userProfile, whitelistEntry] = await Promise.all([
+      supabaseAuth.from('profiles').select('role').eq('id', user.id).single(),
+      supabaseAuth.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
+    ]);
+
+    const isAdmin = (userProfile.data?.role === 'admin') || !!whitelistEntry.data;
+
+    if (!isAdmin) {
+      console.error(`🚨 [Security Warning] Unauthorized Access Attempt by ${user.email}`);
+      return NextResponse.json({ error: 'Forbidden: Admin Access Required' }, { status: 403 });
+    }
+
+    const supabase = createAdminClient(); // 🟢 검증 후 관리자 클라이언트 생성
     const { bookingId } = await request.json();
 
     if (!bookingId) throw new Error('Missing bookingId');
