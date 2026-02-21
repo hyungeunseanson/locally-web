@@ -90,11 +90,16 @@ export default function Sidebar() {
 
       <div className="space-y-8 flex-1 overflow-y-auto scrollbar-hide">
         <div>
-          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Management</h2>
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Management</h2>
           <div className="space-y-1">
-            <NavButton active={activeTab === 'APPS'} onClick={() => handleTabChange('APPS')} icon={<Users size={18}/>} label="호스트 지원서" count={counts.apps} />
-            <NavButton active={activeTab === 'EXPS'} onClick={() => handleTabChange('EXPS')} icon={<MapPin size={18}/>} label="체험 승인 관리" count={counts.exps} />
-            <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<CheckCircle2 size={18}/>} label="회원 관리" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
+            <NavButton 
+              active={activeTab === 'APPROVALS' || activeTab === 'APPS' || activeTab === 'EXPS'} 
+              onClick={() => handleTabChange('APPROVALS')} 
+              icon={<CheckCircle2 size={18}/>} 
+              label="승인 관리 (Approvals)" 
+              count={counts.apps + counts.exps} 
+            />
+            <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={18}/>} label="회원 관리" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
           </div>
         </div>
         

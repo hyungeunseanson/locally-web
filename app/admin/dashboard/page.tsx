@@ -20,7 +20,7 @@ function AdminDashboardContent() {
   const [filter, setFilter] = useState('ALL'); 
   
   const searchParams = useSearchParams();
-  const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPS';
+  const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPROVALS';
 
   const [apps, setApps] = useState<any[]>([]);
   const [exps, setExps] = useState<any[]>([]);
