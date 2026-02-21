@@ -30,7 +30,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif; /* 추후 폰트 변경 시 여기만 수정하면 됩니다 */
+  /* font-family: Arial, Helvetica, sans-serif;  <- 🔴 삭제됨: Next.js Font 클래스와 충돌 방지 */
   -webkit-font-smoothing: antialiased; /* 글씨를 더 선명하게 */
 }
 
