@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { CheckCircle2, PenTool } from 'lucide-react';
 
 interface TripCardProps {
@@ -17,10 +18,12 @@ export default function TripCard({ id, image, title, date, host, isReviewed, onR
   return (
     <div className="border border-slate-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full bg-white">
       <div className="aspect-[4/3] bg-slate-100 relative group">
-        <img 
+        <Image 
           src={image} 
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
       </div>
       <div className="p-5 flex-1 flex flex-col">
