@@ -277,10 +277,11 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       </div>
 
       {selectedBooking && (
-        <div className="w-[450px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 absolute right-0 top-0 bottom-0 z-20">
-           <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
-              <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+        <div className="w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 absolute right-0 top-0 bottom-0 z-20">
+           {/* Header */}
+           <div className="p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+              <div className="flex-1 pr-2">
+                  <div className="flex items-center gap-2 mb-1.5">
                     <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
                       selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
                       ['paid', 'confirmed', 'completed'].includes(selectedBooking.status.toLowerCase()) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
@@ -289,134 +290,102 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                     </div>
                     <span className="text-[10px] text-slate-400 font-bold">#{selectedBooking.id.slice(0,8)}</span>
                   </div>
-                  <h3 className="text-lg font-black text-slate-900 leading-tight mb-2">{selectedBooking.experiences?.title}</h3>
-                  <div className="flex flex-wrap gap-y-1 gap-x-4 items-center text-xs text-slate-600 font-medium">
-                      <div className="flex items-center gap-1.5"><Calendar size={14} className="text-rose-500"/> {selectedBooking.date}</div>
-                      <div className="flex items-center gap-1.5"><Clock size={14} className="text-rose-500"/> {selectedBooking.time}</div>
-                      <div className="flex items-center gap-1.5"><User size={14} className="text-rose-500"/> 게스트 {selectedBooking.guests}인</div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight mb-2 line-clamp-2">{selectedBooking.experiences?.title}</h3>
+                  <div className="flex items-center gap-3 text-xs text-slate-600 font-medium">
+                      <span>{selectedBooking.date} {selectedBooking.time}</span>
+                      <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                      <span>게스트 {selectedBooking.guests}명</span>
                   </div>
               </div>
-              <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-900 bg-white p-1.5 rounded-full border border-slate-100 shadow-sm transition-all"><X size={20}/></button>
+              <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-900 p-1 bg-white rounded-full border border-slate-100 shadow-sm"><X size={16}/></button>
            </div>
 
-           <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide">
+           <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide bg-white">
               {/* 예약/결제 시점 */}
-              <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
-                    <Clock size={18}/>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-tight">예약 접수 일시</p>
-                    <p className="text-sm font-black text-blue-900">
-                      {format(new Date(selectedBooking.created_at), 'yyyy년 MM월 dd일 HH:mm:ss', { locale: ko })}
-                    </p>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <Clock size={12} className="text-slate-400"/>
+                <span>접수: <span className="font-bold text-slate-700">{format(new Date(selectedBooking.created_at), 'yyyy.MM.dd HH:mm:ss', { locale: ko })}</span></span>
               </div>
 
-              {/* 게스트 정보 */}
+              {/* 게스트 정보 (Compact) */}
               <div>
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <User size={14}/> Guest Information
-                  </h4>
-                  <div className="bg-white rounded-xl space-y-4 text-sm">
-                      <div className="flex justify-between items-center group">
-                          <span className="text-slate-500 font-medium">예약자 성함</span>
-                          <span className="font-black text-slate-900 flex items-center gap-2">
-                              {selectedBooking.contact_name}
-                              <Copy size={12} className="text-slate-300 cursor-pointer hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleCopy(selectedBooking.contact_name)}/>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><User size={10}/> Guest Info</h4>
+                  <div className="grid grid-cols-1 gap-0 text-sm border border-slate-100 rounded-xl overflow-hidden">
+                      <div className="flex justify-between items-center px-3 py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                          <span className="text-slate-500 text-xs">Name</span>
+                          <span className="font-bold text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_name)}>
+                              {selectedBooking.contact_name} <Copy size={10} className="text-slate-300"/>
                           </span>
                       </div>
-                      <div className="flex justify-between items-center group">
-                          <span className="text-slate-500 font-medium">연락처</span>
-                          <span className="font-black text-slate-900 flex items-center gap-2">
-                              {selectedBooking.contact_phone}
-                              <Phone size={12} className="text-slate-300 cursor-pointer hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleCopy(selectedBooking.contact_phone)}/>
+                      <div className="flex justify-between items-center px-3 py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                          <span className="text-slate-500 text-xs">Phone</span>
+                          <span className="font-bold text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_phone)}>
+                              {selectedBooking.contact_phone} <Copy size={10} className="text-slate-300"/>
                           </span>
                       </div>
-                      <div className="flex justify-between items-center group">
-                          <span className="text-slate-500 font-medium">이메일</span>
-                          <span className="font-black text-slate-900 flex items-center gap-2">
-                              {selectedBooking.profiles?.email}
-                              <Mail size={12} className="text-slate-300 cursor-pointer hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all" onClick={() => handleCopy(selectedBooking.profiles?.email)}/>
+                      <div className="flex justify-between items-center px-3 py-2.5 hover:bg-slate-50 transition-colors">
+                          <span className="text-slate-500 text-xs">Email</span>
+                          <span className="font-bold text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600 truncate max-w-[200px]" onClick={() => handleCopy(selectedBooking.profiles?.email)}>
+                              {selectedBooking.profiles?.email} <Copy size={10} className="text-slate-300"/>
                           </span>
                       </div>
                   </div>
               </div>
 
-              {/* 결제 및 정산 */}
+              {/* 결제 및 정산 (Compact List) */}
               <div>
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <CreditCard size={14}/> Payment & Settlement
-                  </h4>
-                  <div className="bg-slate-900 rounded-2xl p-5 text-white shadow-xl shadow-slate-200">
-                      <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-4">
-                          <span className="text-xs text-white/60 font-medium">실결제 금액 (매출)</span>
-                          <span className="text-2xl font-black text-white">₩{Number(selectedBooking.amount).toLocaleString()}</span>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><CreditCard size={10}/> Payment Breakdown</h4>
+                  <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100">
+                      <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">결제 수단</span>
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            {/* 결제수단 로직 개선: payment_method 필드 자체를 확인 */}
+                            {selectedBooking.payment_method === 'bank' || (selectedBooking.payment_method && selectedBooking.payment_method.includes('bank')) ? '🏛️ 무통장 입금' : '💳 카드 결제'}
+                          </span>
                       </div>
-                      <div className="space-y-3">
-                          <div className="flex justify-between text-xs">
-                              <span className="text-white/50">결제 수단</span>
-                              <span className="font-bold flex items-center gap-1">
-                                {selectedBooking.payment_method?.includes('bank') ? (
-                                  <>🏛️ 무통장 입금</>
-                                ) : (
-                                  <>💳 카드 결제</>
-                                )}
-                              </span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                              <span className="text-white/50">정산 대상 (호스트)</span>
-                              <span className="font-bold text-rose-400">{selectedBooking.experiences?.profiles?.name}</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                              <span className="text-white/50">호스트 지급액 (80%)</span>
-                              <span className="font-black text-rose-400">₩{Number(selectedBooking.host_payout_amount || (selectedBooking.total_experience_price * 0.8)).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-xs pt-3 border-t border-white/10">
-                              <span className="text-white/50">플랫폼 수익 (Net)</span>
-                              <span className="font-black text-blue-400">₩{Number(selectedBooking.platform_revenue || (selectedBooking.amount - (selectedBooking.total_experience_price * 0.8))).toLocaleString()}</span>
-                          </div>
+                      <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">결제 금액</span>
+                          <span className="text-sm font-black text-slate-900">₩{Number(selectedBooking.amount).toLocaleString()}</span>
+                      </div>
+                      <div className="h-px bg-slate-200 my-1"></div>
+                      <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">호스트 정산 (80%)</span>
+                          <span className="text-xs font-bold text-rose-500">₩{Number(selectedBooking.host_payout_amount || (selectedBooking.total_experience_price * 0.8)).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">플랫폼 수익 (Net)</span>
+                          <span className="text-xs font-bold text-blue-600">₩{Number(selectedBooking.platform_revenue || (selectedBooking.amount - (selectedBooking.total_experience_price * 0.8))).toLocaleString()}</span>
                       </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-3 flex items-center gap-1">
-                    <Info size={10}/> 주문번호: {selectedBooking.order_id || selectedBooking.id}
-                  </p>
+                  <p className="text-[9px] text-slate-400 mt-2 text-right flex justify-end gap-1 items-center"><Info size={10}/> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
               </div>
 
               {/* 관리자 액션 */}
-              <div className="pt-4 border-t border-slate-100">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <AlertTriangle size={14} className="text-orange-500"/> Admin Control
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 gap-3">
-                    {selectedBooking.status === 'PENDING' && (
-                      <button 
-                        onClick={() => handleConfirmPayment(selectedBooking.id)}
-                        disabled={isProcessing}
-                        className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-black transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
-                      >
-                        {isProcessing ? '처리 중...' : (
-                          <>
-                            <span>💰 입금 확인 (예약 확정)</span>
-                            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform"/>
-                          </>
-                        )}
-                      </button>
-                    )}
+              <div className="pt-2">
+                  {selectedBooking.status === 'PENDING' && (
+                    <button 
+                      onClick={() => handleConfirmPayment(selectedBooking.id)}
+                      disabled={isProcessing}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
+                    >
+                      {isProcessing ? '처리 중...' : (
+                        <>
+                          <span>💰 입금 확인 (예약 확정)</span>
+                          <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
+                        </>
+                      )}
+                    </button>
+                  )}
 
-                    {['confirmed', 'paid', 'completed'].includes(selectedBooking.status.toLowerCase()) && (
-                      <button 
-                        onClick={() => handleForceCancel(selectedBooking.id)}
-                        disabled={isProcessing}
-                        className="w-full py-4 bg-white hover:bg-red-50 text-red-600 rounded-xl text-sm font-black transition-all border border-red-100 flex items-center justify-center gap-2"
-                      >
-                        {isProcessing ? '처리 중...' : '⚠️ 예약 강제 취소 (전액 환불)'}
-                      </button>
-                    )}
-                  </div>
+                  {['confirmed', 'paid', 'completed'].includes(selectedBooking.status.toLowerCase()) && (
+                    <button 
+                      onClick={() => handleForceCancel(selectedBooking.id)}
+                      disabled={isProcessing}
+                      className="w-full py-3 bg-white hover:bg-red-50 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 flex items-center justify-center gap-2"
+                    >
+                      {isProcessing ? '처리 중...' : '⚠️ 예약 강제 취소 (전액 환불)'}
+                    </button>
+                  )}
               </div>
            </div>
         </div>
