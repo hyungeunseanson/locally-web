@@ -22,9 +22,17 @@ export default function TeamTab() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
   const [lastViewed, setLastViewed] = useState<string>(new Date(0).toISOString());
+  const [expandedMemos, setExpandedMemos] = useState<Set<string>>(new Set());
   
   const threadRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  const toggleMemoExpand = (id: string) => {
+    const newSet = new Set(expandedMemos);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedMemos(newSet);
+  };
 
   useEffect(() => {
     setIsClient(true);
@@ -304,49 +312,78 @@ export default function TeamTab() {
                     </div>
                   </div>
       
-                  {/* Memo List Area */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30 scrollbar-thin">
-                    {memos.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20">
-                        <NotebookPen size={48} className="opacity-20 mb-4" />
-                        <p className="text-sm">저장된 메모가 없습니다.</p>
-                      </div>
-                    ) : (
-                      memos.map(memo => (
-                        <div key={memo.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md hover:border-amber-200 transition-all relative">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                                {memo.author_name.slice(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-slate-900">{memo.author_name}</p>
-                                <p className="text-[10px] text-slate-400 font-medium">
-                                  {format(new Date(memo.created_at), 'yyyy.MM.dd HH:mm', { locale: ko })}
-                                </p>
-                              </div>
-                            </div>
-                            {memo.author_id === currentUser?.id && (
-                              <button 
-                                onClick={() => deleteTask('admin_tasks', memo.id)} 
-                                className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )}
-                          </div>
-                          
-                          <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-                            {memo.content}
-                          </div>
-      
-                          {/* Subtle marker */}
-                          <div className="absolute top-0 left-0 w-1 h-full bg-amber-400/0 group-hover:bg-amber-400 transition-all rounded-l-2xl" />
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                              {/* Memo List Area */}
+                              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30 scrollbar-thin">
+                                {memos.length === 0 ? (
+                                  <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20">
+                                    <NotebookPen size={48} className="opacity-20 mb-4" />
+                                    <p className="text-sm">저장된 메모가 없습니다.</p>
+                                  </div>
+                                ) : (
+                                  memos.map(memo => {
+                                    const isExpanded = expandedMemos.has(memo.id);
+                                    const lineCount = memo.content.split('\n').length;
+                                    const isLong = lineCount > 15 || memo.content.length > 800;
+                  
+                                    return (
+                                      <div key={memo.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative">
+                                        <div className="flex justify-between items-start mb-4">
+                                          <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 border border-slate-200">
+                                              {memo.author_name.slice(0, 2).toUpperCase()}
+                                            </div>
+                                            <div>
+                                              <p className="text-sm font-bold text-slate-900">{memo.author_name}</p>
+                                              <p className="text-[10px] text-slate-400 font-medium">
+                                                {format(new Date(memo.created_at), 'yyyy.MM.dd HH:mm', { locale: ko })}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          {memo.author_id === currentUser?.id && (
+                                            <button 
+                                              onClick={() => deleteTask('admin_tasks', memo.id)} 
+                                              className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                                            >
+                                              <Trash2 size={16} />
+                                            </button>
+                                          )}
+                                        </div>
+                                        
+                                        <div className={`relative ${!isExpanded && isLong ? 'max-h-[350px] overflow-hidden' : ''}`}>
+                                          <div className="text-[14px] text-slate-700 whitespace-pre-wrap leading-relaxed tracking-tight">
+                                            {memo.content}
+                                          </div>
+                                          
+                                          {!isExpanded && isLong && (
+                                            <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-2">
+                                              <button 
+                                                onClick={() => toggleMemoExpand(memo.id)}
+                                                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-800 transition-all mb-2"
+                                              >
+                                                전체 내용 보기 (더보기)
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                  
+                                        {isExpanded && isLong && (
+                                          <div className="mt-6 flex justify-center border-t border-slate-50 pt-4">
+                                            <button 
+                                              onClick={() => toggleMemoExpand(memo.id)}
+                                              className="text-slate-400 hover:text-slate-900 text-xs font-bold flex items-center gap-1"
+                                            >
+                                              내용 접기 <X size={12} />
+                                            </button>
+                                          </div>
+                                        )}
+                  
+                                        {/* Side marker */}
+                                        <div className={`absolute top-0 left-0 w-1 h-full transition-all rounded-l-2xl ${isLong ? 'bg-amber-400/50' : 'bg-amber-400/0 group-hover:bg-amber-400'}`} />
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>                </div>
               </>
             )}
     </div>
