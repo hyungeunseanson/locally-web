@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { 
   ClipboardList, CheckSquare, FileText, Plus, Trash2, 
-  User, Clock, CheckCircle2, Circle, AlertCircle
+  Clock, CheckCircle2, Circle, X, NotebookPen
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -15,17 +15,23 @@ interface Task {
   type: 'DAILY_LOG' | 'TODO' | 'MEMO';
   content: string;
   is_completed: boolean;
-  assignee: string | null;
   author_id: string;
   author_name: string;
+  metadata: {
+    note?: string;
+    status_text?: string;
+  };
 }
 
 export default function TeamTab() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [newLog, setNewLog] = useState('');
+  const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
   const [newMemo, setNewMemo] = useState('');
+  const [showMemos, setShowMemos] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
   const supabase = createClient();
 
   useEffect(() => {
@@ -33,7 +39,7 @@ export default function TeamTab() {
     getCurrentUser();
 
     const channel = supabase
-      .channel('admin_tasks_changes')
+      .channel('admin_tasks_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => {
         fetchTasks();
       })
@@ -45,14 +51,25 @@ export default function TeamTab() {
   }, []);
 
   const getCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('name')
-        .eq('id', user.id)
-        .single();
-      setCurrentUser({ ...user, name: profile?.name || user.email?.split('@')[0] });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // 400 에러 방지를 위해 '*' 조회 후 안전하게 접근
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        setCurrentUser({ 
+          id: user.id, 
+          name: profile?.name || profile?.full_name || user.email?.split('@')[0] 
+        });
+      }
+    } catch (err) {
+      console.error('Error getting user:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -66,31 +83,46 @@ export default function TeamTab() {
     if (error) console.error('Error fetching tasks:', error);
   };
 
-  const addTask = async (type: 'DAILY_LOG' | 'TODO' | 'MEMO', content: string) => {
-    if (!content.trim() || !currentUser) return;
+  const addDailyLog = async () => {
+    if (!newLog.task.trim() || !currentUser) return;
 
     const { error } = await supabase.from('admin_tasks').insert({
-      type,
-      content,
+      type: 'DAILY_LOG',
+      content: newLog.task,
+      author_id: currentUser.id,
+      author_name: currentUser.name,
+      is_completed: true, // Daily Log는 기본적으로 완료(Done) 상태로 기록
+      metadata: { note: newLog.note, status_text: 'Done' }
+    });
+
+    if (!error) setNewLog({ task: '', note: '' });
+  };
+
+  const addTodo = async () => {
+    if (!newTodo.trim() || !currentUser) return;
+    await supabase.from('admin_tasks').insert({
+      type: 'TODO',
+      content: newTodo,
       author_id: currentUser.id,
       author_name: currentUser.name,
       is_completed: false
     });
+    setNewTodo('');
+  };
 
-    if (error) {
-      alert('저장에 실패했습니다.');
-    } else {
-      if (type === 'DAILY_LOG') setNewLog('');
-      if (type === 'TODO') setNewTodo('');
-      if (type === 'MEMO') setNewMemo('');
-    }
+  const addMemo = async () => {
+    if (!newMemo.trim() || !currentUser) return;
+    await supabase.from('admin_tasks').insert({
+      type: 'MEMO',
+      content: newMemo,
+      author_id: currentUser.id,
+      author_name: currentUser.name
+    });
+    setNewMemo('');
   };
 
   const toggleTodo = async (id: string, isCompleted: boolean) => {
-    await supabase
-      .from('admin_tasks')
-      .update({ is_completed: !isCompleted })
-      .eq('id', id);
+    await supabase.from('admin_tasks').update({ is_completed: !isCompleted }).eq('id', id);
   };
 
   const deleteTask = async (id: string) => {
@@ -102,181 +134,209 @@ export default function TeamTab() {
   const todos = tasks.filter(t => t.type === 'TODO');
   const memos = tasks.filter(t => t.type === 'MEMO');
 
+  if (loading) return <div className="p-8 text-center text-slate-500">Loading Team Workspace...</div>;
+
   return (
-    <div className="flex flex-col h-full gap-6">
+    <div className="flex flex-col h-full gap-6 relative">
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <ClipboardList className="text-rose-500" />
-            팀 협업 보드 (Team Workspace)
+            팀 협업 보드
           </h2>
-          <p className="text-sm text-slate-500 mt-1">팀원들과 업무 진행 상황을 공유하고 할 일을 관리하세요.</p>
         </div>
+        <button 
+          onClick={() => setShowMemos(!showMemos)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            showMemos ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <NotebookPen size={18} />
+          공유 메모장 {memos.length > 0 && `(${memos.length})`}
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
         
-        {/* Daily Logs Section */}
-        <div className="flex flex-col bg-slate-50/50 rounded-2xl border border-slate-100 p-4 overflow-hidden">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock size={18} className="text-blue-500" />
-            <h3 className="font-bold text-slate-800">Daily Logs</h3>
-            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{dailyLogs.length}</span>
-          </div>
-          
-          <div className="flex gap-2 mb-4">
-            <input 
-              type="text" 
-              value={newLog}
-              onChange={(e) => setNewLog(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addTask('DAILY_LOG', newLog)}
-              placeholder="오늘의 업무 진행 상황..."
-              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-            />
-            <button 
-              onClick={() => addTask('DAILY_LOG', newLog)}
-              className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
-            >
-              <Plus size={18} />
-            </button>
+        {/* Left: Daily Logs Table */}
+        <div className="flex-[2] flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <Clock size={18} className="text-blue-500" />
+              Daily Logs
+            </h3>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-            {dailyLogs.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 text-sm">기록된 업무 일지가 없습니다.</div>
-            ) : (
-              dailyLogs.map(log => (
-                <div key={log.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm group">
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="text-[10px] font-bold text-rose-500 uppercase tracking-tight">{log.author_name}</span>
-                    <span className="text-[10px] text-slate-400">{format(new Date(log.created_at), 'HH:mm', { locale: ko })}</span>
-                  </div>
-                  <p className="text-sm text-slate-700 leading-relaxed">{log.content}</p>
-                  {log.author_id === currentUser?.id && (
-                    <button 
-                      onClick={() => deleteTask(log.id)}
-                      className="mt-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
+          {/* Log Input Row */}
+          <div className="p-4 bg-blue-50/30 border-b border-slate-100 grid grid-cols-12 gap-3">
+            <div className="col-span-5">
+              <input 
+                type="text" 
+                placeholder="Current Task (무엇을 했나요?)" 
+                value={newLog.task}
+                onChange={e => setNewLog({...newLog, task: e.target.value})}
+                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none"
+              />
+            </div>
+            <div className="col-span-5">
+              <input 
+                type="text" 
+                placeholder="Issue / Note (특이사항)" 
+                value={newLog.note}
+                onChange={e => setNewLog({...newLog, note: e.target.value})}
+                onKeyDown={e => e.key === 'Enter' && addDailyLog()}
+                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none"
+              />
+            </div>
+            <div className="col-span-2">
+              <button 
+                onClick={addDailyLog}
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors"
+              >
+                기록하기
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-white shadow-sm z-10">
+                <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                  <th className="px-4 py-3 w-32">Date</th>
+                  <th className="px-4 py-3 w-24">Name</th>
+                  <th className="px-4 py-3">Current Task</th>
+                  <th className="px-4 py-3 w-24 text-center">Done?</th>
+                  <th className="px-4 py-3">Issue / Note</th>
+                  <th className="px-4 py-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {dailyLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-20 text-center text-slate-400 text-sm">기록된 데일리 로그가 없습니다.</td>
+                  </tr>
+                ) : (
+                  dailyLogs.map(log => (
+                    <tr key={log.id} className="hover:bg-slate-50/50 group transition-colors">
+                      <td className="px-4 py-3 text-xs text-slate-500 font-medium">
+                        {format(new Date(log.created_at), 'yyyy-MM-dd')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-bold text-rose-500">{log.author_name}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-slate-700 font-medium">{log.content}</p>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                          log.is_completed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {log.metadata?.status_text || (log.is_completed ? 'Done' : 'In Progress')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-xs text-slate-500 italic">{log.metadata?.note || '-'}</p>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {log.author_id === currentUser?.id && (
+                          <button onClick={() => deleteTask(log.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Todo List Section */}
-        <div className="flex flex-col bg-slate-50/50 rounded-2xl border border-slate-100 p-4 overflow-hidden">
+        {/* Right: Todo List Section */}
+        <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 overflow-hidden shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <CheckSquare size={18} className="text-green-500" />
             <h3 className="font-bold text-slate-800">To-do List</h3>
-            <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
-              {todos.filter(t => !t.is_completed).length} remaining
-            </span>
           </div>
 
           <div className="flex gap-2 mb-4">
             <input 
               type="text" 
               value={newTodo}
-              onChange={(e) => setNewTodo(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addTask('TODO', newTodo)}
-              placeholder="새로운 할 일 추가..."
-              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+              onChange={e => setNewTodo(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addTodo()}
+              placeholder="새로운 할 일..."
+              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-green-500/20"
             />
-            <button 
-              onClick={() => addTask('TODO', newTodo)}
-              className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
-            >
+            <button onClick={addTodo} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800">
               <Plus size={18} />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin">
-            {todos.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 text-sm">등록된 할 일이 없습니다.</div>
-            ) : (
-              todos.map(todo => (
-                <div 
-                  key={todo.id} 
-                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                    todo.is_completed ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-100 shadow-sm'
-                  }`}
-                >
-                  <button 
-                    onClick={() => toggleTodo(todo.id, todo.is_completed)}
-                    className={todo.is_completed ? 'text-green-500' : 'text-slate-300 hover:text-slate-400'}
-                  >
-                    {todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                  </button>
-                  <div className="flex-1">
-                    <p className={`text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                      {todo.content}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => deleteTask(todo.id)}
-                    className="text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+            {todos.map(todo => (
+              <div key={todo.id} className={`flex items-center gap-3 p-3 rounded-xl border group transition-all ${
+                todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <button onClick={() => toggleTodo(todo.id, todo.is_completed)} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>
+                  {todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                </button>
+                <div className="flex-1">
+                  <p className={`text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
+                  <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
                 </div>
-              ))
-            )}
+                <button onClick={() => deleteTask(todo.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Shared Memos Section */}
-        <div className="flex flex-col bg-slate-50/50 rounded-2xl border border-slate-100 p-4 overflow-hidden">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText size={18} className="text-amber-500" />
-            <h3 className="font-bold text-slate-800">Shared Memos</h3>
-          </div>
-
-          <div className="flex gap-2 mb-4">
-            <input 
-              type="text" 
-              value={newMemo}
-              onChange={(e) => setNewMemo(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addTask('MEMO', newMemo)}
-              placeholder="공유가 필요한 중요한 메모..."
-              className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-            />
-            <button 
-              onClick={() => addTask('MEMO', newMemo)}
-              className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
-            >
-              <Plus size={18} />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-            {memos.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 text-sm">저장된 메모가 없습니다.</div>
-            ) : (
-              memos.map(memo => (
-                <div key={memo.id} className="bg-amber-50 p-4 rounded-xl border border-amber-100 shadow-sm relative group">
-                  <p className="text-sm text-amber-900 leading-relaxed mb-2">{memo.content}</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-amber-700 font-bold uppercase">{memo.author_name}</span>
-                    <button 
-                      onClick={() => deleteTask(memo.id)}
-                      className="text-amber-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
       </div>
+
+      {/* Floating Memo Panel */}
+      {showMemos && (
+        <div className="absolute top-0 right-0 w-80 h-full bg-amber-50 border-l border-amber-200 shadow-2xl z-20 flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="p-4 border-b border-amber-200 flex items-center justify-between bg-amber-100/50">
+            <h3 className="font-bold text-amber-900 flex items-center gap-2">
+              <FileText size={18} /> 공유 메모장
+            </h3>
+            <button onClick={() => setShowMemos(false)} className="text-amber-700 hover:bg-amber-200 p-1 rounded-md">
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="p-4 bg-amber-100/30">
+            <textarea 
+              placeholder="중요한 내용을 기록하세요..."
+              value={newMemo}
+              onChange={e => setNewMemo(e.target.value)}
+              className="w-full text-sm p-3 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-500/20 outline-none min-h-[100px] resize-none"
+            />
+            <button 
+              onClick={addMemo}
+              className="w-full mt-2 bg-amber-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-amber-700"
+            >
+              메모 추가
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {memos.map(memo => (
+              <div key={memo.id} className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm group">
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">{memo.content}</p>
+                <div className="mt-2 pt-2 border-t border-slate-50 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-amber-700 uppercase">{memo.author_name}</span>
+                  <button onClick={() => deleteTask(memo.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
