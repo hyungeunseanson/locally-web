@@ -1754,8 +1754,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Locale>('ko');
 
   useEffect(() => {
-    const saved = localStorage.getItem('app_lang') as Locale;
-    if (saved && dictionary[saved]) setLang(saved);
+    // 1. URL 기반 언어 감지 (최우선)
+    const path = window.location.pathname;
+    const pathLang = path.split('/')[1] as Locale; // /en/..., /ja/...
+    if (['ko', 'en', 'ja', 'zh'].includes(pathLang)) {
+      setLang(pathLang);
+      localStorage.setItem('app_lang', pathLang);
+    } else {
+      // 2. URL에 언어 정보가 없으면 localStorage 확인 (기존 로직)
+      const saved = localStorage.getItem('app_lang') as Locale;
+      if (saved && dictionary[saved]) setLang(saved);
+    }
   }, []);
 
   const changeLang = (newLang: Locale) => {
