@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { 
   Users, MapPin, CheckCircle2, MessageSquare, 
-  Calendar, BarChart2, CreditCard, LayoutDashboard, ShieldCheck
+  Calendar, BarChart2, CreditCard, LayoutDashboard, ShieldCheck,
+  Briefcase
 } from 'lucide-react';
 
 const NavButton = ({ active, onClick, icon, label, count }: any) => (
@@ -108,6 +109,7 @@ export default function Sidebar() {
           <div className="space-y-1">
             {/* BOOKINGS 제거됨 */}
             <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={18}/>} label="메시지 모니터링" />
+            <NavButton active={activeTab === 'TEAM'} onClick={() => handleTabChange('TEAM')} icon={<Briefcase size={18}/>} label="팀 협업 (Team)" />
           </div>
         </div>
 
@@ -123,6 +125,12 @@ export default function Sidebar() {
       </div>
       
       <div className="mt-auto pt-6 border-t border-slate-800 px-2">
+        <div className="flex items-center gap-2 mb-4 px-1">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            {counts.online} Online Now
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">AD</div>
           <div className="flex-1 overflow-hidden">

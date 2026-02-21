@@ -13,6 +13,7 @@ import ManagementTab from './components/ManagementTab';
 import ChatMonitor from './components/ChatMonitor'; 
 import AuditLogTab from './components/AuditLogTab';
 import MasterLedgerTab from './components/MasterLedgerTab';
+import TeamTab from './components/TeamTab';
 import { updateAdminStatus, deleteAdminItem } from '@/app/actions/admin';
 
 function AdminDashboardContent() {
@@ -173,6 +174,7 @@ function AdminDashboardContent() {
       ) : activeTab === 'ANALYTICS' ? ( <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} />
       ) : activeTab === 'CHATS' ? ( <ChatMonitor />
       ) : activeTab === 'LOGS' ? ( <AuditLogTab />
+      ) : activeTab === 'TEAM' ? ( <TeamTab />
       ) : (
         <ManagementTab activeTab={activeTab as any} filter={filter} setFilter={setFilter} apps={apps} exps={exps} users={users} messages={[]} selectedItem={selectedItem} setSelectedItem={setSelectedItem} updateStatus={updateStatus} deleteItem={deleteItem} />
       )}
