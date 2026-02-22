@@ -25,7 +25,7 @@ export default function HostExperienceDetailPage() {
         .select('*')
         .eq('id', params.id)
         .eq('host_id', user.id) // 내 것만 조회 가능
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error(error);

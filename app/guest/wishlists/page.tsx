@@ -49,42 +49,42 @@ export default function WishlistsPage() {
 
   // 🟢 [추가] 찜 해제 기능 (화면에서 바로 사라지게)
   const handleRemove = async (e: React.MouseEvent, wishlistId: number, expId: number) => {
-    e.preventDefault(); 
+    e.preventDefault();
     e.stopPropagation();
-    
+
     // 낙관적 업데이트 (UI 먼저 삭제)
     setWishlists(prev => prev.filter(item => item.id !== wishlistId));
 
     const { error } = await supabase.from('wishlists').delete().eq('id', wishlistId);
     if (error) {
-       console.error(error);
-       showToast('찜 해제에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
-       const { data: { user } } = await supabase.auth.getUser();
-       if (user) {
-         const { data: reData } = await supabase.from('wishlists').select('id, created_at, experiences (*)').eq('user_id', user.id).order('created_at', { ascending: false });
-         setWishlists(reData?.filter(item => item.experiences) || []);
-       }
+      console.error(error);
+      showToast('찜 해제에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: reData } = await supabase.from('wishlists').select('id, created_at, experiences (*)').eq('user_id', user.id).order('created_at', { ascending: false });
+        setWishlists(reData?.filter(item => item.experiences) || []);
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      
+
       <main className="max-w-[1760px] mx-auto px-6 py-12">
-      <h1 className="text-3xl font-black mb-8">{t('wishlist')}</h1> {/* 🟢 번역 */}
+        <h1 className="text-3xl font-black mb-8">{t('wishlist')}</h1> {/* 🟢 번역 */}
         {loading ? (
           <div className="flex justify-center py-40">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
           </div>
         ) : wishlists.length === 0 ? (
-<div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50">
+          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50">
             <Heart size={48} className="text-slate-300 mb-4" />
             <h3 className="text-lg font-bold text-slate-900 mb-2">{t('wishlist_empty')}</h3> {/* 🟢 번역 */}
             <p className="text-slate-500 mb-6">{t('wishlist_desc')}</p> {/* 🟢 번역 */}
             <Link href="/">
               <button className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:scale-105 transition-transform flex items-center gap-2">
-                {t('explore_exp')} <ArrowRight size={18}/> {/* 🟢 번역 */}
+                {t('explore_exp')} <ArrowRight size={18} /> {/* 🟢 번역 */}
               </button>
             </Link>
           </div>
@@ -98,14 +98,14 @@ export default function WishlistsPage() {
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
                   <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
-                    <Image 
-                      src={imageUrl} 
-                      alt={exp.title} 
+                    <Image
+                      src={imageUrl}
+                      alt={exp.title}
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     {/* 찜 해제 버튼 */}
-                    <button 
+                    <button
                       onClick={(e) => handleRemove(e, item.id, exp.id)}
                       className="absolute top-3 right-3 text-rose-500 hover:scale-110 transition-all z-10"
                     >
@@ -117,8 +117,8 @@ export default function WishlistsPage() {
                     <div className="flex justify-between items-start">
                       <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">{exp.city || exp.location || '서울'} · {exp.category}</h3>
                       <div className="flex items-center gap-1 text-sm shrink-0">
-                        <Star size={14} fill="black" />
-                        <span>4.98</span> {/* 평점은 DB에 없으면 고정값 사용 */}
+                        <Star size={14} fill={exp.rating > 0 ? "black" : "none"} className={exp.rating > 0 ? "" : "text-slate-300"} />
+                        <span>{exp.rating > 0 ? exp.rating.toFixed(2) : "New"}</span>
                       </div>
                     </div>
                     <p className="text-[15px] text-slate-500 line-clamp-1">{exp.title}</p>

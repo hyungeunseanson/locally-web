@@ -30,12 +30,11 @@ export async function GET() {
       const expDate = new Date(`${booking.date}T${booking.time}`);
       let status = booking.status;
 
-      // 🟢 [핵심] 날짜가 지났고, 상태가 'PAID'나 'confirmed'라면 -> 'completed'로 자동 업데이트
-      // (DB 업데이트는 비동기로 던져두고, 사용자에게는 바로 보여줌)
+      // 🟢 [M-2] 클라이언트 측 조회 API에서는 무거운 DB 덮어쓰기(Side-effect)를 제거합니다.
+      // 단순히 날짜가 지났으면 클라이언트 화면에만 'completed'로 가공해서 내려주고,
+      // 실제 DB 업데이트는 매 시간 도는 Cron Job 서버가 전담하여 서버 부하와 Vercel 타임아웃을 방지합니다.
       if (expDate < now && (status === 'PAID' || status === 'confirmed')) {
         status = 'completed';
-        // 서버단에서 조용히 업데이트 실행 (await 안 함)
-        supabase.from('bookings').update({ status: 'completed' }).eq('id', booking.id).then();
       }
 
       updatedTrips.push({

@@ -31,7 +31,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (!baseProfile) {
         setLoading(false);
@@ -47,7 +47,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
         .from('host_applications')
         .select('*') // 모든 컬럼을 가져와서 확인 (컬럼명 실수 방지)
         .eq('user_id', userId)
-        .maybeSingle(); // .single() 대신 사용 (에러 방지)
+        .maybeSingle(); // .maybeSingle() 대신 사용 (에러 방지)
       
       // 🟢 콘솔에서 이 로그를 꼭 확인해보세요!
       console.log('🔍 호스트 데이터 조회 결과:', { hostData, error });

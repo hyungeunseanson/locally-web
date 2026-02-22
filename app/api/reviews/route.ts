@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { experienceId, bookingId, rating, content } = body;
+    const { experienceId, bookingId, rating, content, photos } = body;
 
     // 2. 필수 값 체크
     if (!experienceId || !bookingId || !rating) {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       .from('bookings')
       .select('status, user_id')
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
 
     if (!booking) {
       return NextResponse.json({ error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       booking_id: bookingId,
       rating,
       content,
+      photos: photos || [], // 🟢 누락되었던 photos 필드 추가
       created_at: new Date().toISOString()
     });
 
@@ -73,9 +74,9 @@ export async function POST(request: Request) {
       // (2) experiences 테이블 업데이트 (컬럼이 없다면 추가 필요: rating, review_count)
       await supabase
         .from('experiences')
-        .update({ 
+        .update({
           rating: newAverage,
-          review_count: newCount 
+          review_count: newCount
         })
         .eq('id', experienceId);
     }

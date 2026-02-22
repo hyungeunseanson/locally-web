@@ -84,7 +84,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
       if (!user) { router.push('/'); return; }
       setUser(user);
 
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       
       if (data) {
         setProfile({

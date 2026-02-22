@@ -1,8 +1,4 @@
 import type { NextConfig } from "next";
-import createNextIntlPlugin from 'next-intl/plugin';
-
-// next-intl 플러그인 생성
-const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
   // ✅ 이미지 최적화 설정
@@ -11,7 +7,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com', 
+        hostname: 'images.unsplash.com',
       },
       {
         protocol: 'https',
@@ -23,15 +19,15 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'k.kakaocdn.net', 
+        hostname: 'k.kakaocdn.net',
       },
       {
         protocol: 'http',
-        hostname: 't1.kakaocdn.net', 
+        hostname: 't1.kakaocdn.net',
       },
       {
         protocol: 'https',
-        hostname: 't1.kakaocdn.net', 
+        hostname: 't1.kakaocdn.net',
       },
       {
         protocol: 'https',
@@ -40,7 +36,7 @@ const nextConfig: NextConfig = {
     ],
     dangerouslyAllowSVG: true,
   },
-  
+
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -60,4 +56,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+export default nextConfig;

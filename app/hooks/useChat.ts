@@ -252,7 +252,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   const createInquiry = async (hostId: string, experienceId: string, content: string) => {
     if (!currentUser) throw new Error('로그인 필요');
-    const { data, error } = await supabase.from('inquiries').insert([{ user_id: currentUser.id, host_id: hostId, experience_id: experienceId, content, type: 'general' }]).select().single();
+    const { data, error } = await supabase.from('inquiries').insert([{ user_id: currentUser.id, host_id: hostId, experience_id: experienceId, content, type: 'general' }]).select().maybeSingle();
     if (error) throw error;
     await sendMessage(data.id, content);
     return data;

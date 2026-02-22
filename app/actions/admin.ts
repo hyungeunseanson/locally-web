@@ -55,10 +55,10 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   let targetTitle = id;
   try {
     if (table === 'experiences') {
-      const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).single();
+      const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).maybeSingle();
       if (data) targetTitle = data.title;
     } else if (table === 'host_applications') {
-      const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).single();
+      const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).maybeSingle();
       if (data) targetTitle = data.name;
     }
   } catch (e) {}
@@ -70,7 +70,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   if (error) throw new Error(error.message);
 
   if (table === 'host_applications' && status === 'approved') {
-    const { data: app } = await supabaseAdmin.from('host_applications').select('user_id').eq('id', id).single();
+    const { data: app } = await supabaseAdmin.from('host_applications').select('user_id').eq('id', id).maybeSingle();
     if (app) {
       await supabaseAdmin.from('profiles').update({ role: 'host' }).eq('id', app.user_id);
     }
@@ -102,10 +102,10 @@ export async function deleteAdminItem(table: string, id: string) {
   let targetInfo = id;
   try {
     if (table === 'profiles') {
-      const { data } = await supabaseAdmin.from('profiles').select('email').eq('id', id).single();
+      const { data } = await supabaseAdmin.from('profiles').select('email').eq('id', id).maybeSingle();
       if (data) targetInfo = data.email;
     } else if (table === 'experiences') {
-      const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).single();
+      const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).maybeSingle();
       if (data) targetInfo = data.title;
     }
   } catch (e) {}

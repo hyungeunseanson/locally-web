@@ -30,7 +30,7 @@ function PaymentCompleteContent() {
         .from('bookings')
         .select('*, experiences(*)')
         .eq('order_id', orderId)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         console.error('Booking fetch error:', error);

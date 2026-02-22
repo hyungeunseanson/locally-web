@@ -70,7 +70,7 @@ const { data: originalBooking } = await supabase
 .from('bookings')
 .select('*, experiences (price, private_price, max_guests)')
 .eq('id', orderId)
-.single();
+.maybeSingle();
 
 if (!originalBooking) throw new Error('예약 정보를 찾을 수 없습니다.');
 
@@ -133,7 +133,7 @@ console.log(`✅ [INFO] 금액 및 좌석 검증 완벽 통과 (DB: ${expectedAm
         })
         .eq('id', orderId)
         .select(`*, experiences (host_id, title)`)
-        .single();
+        .maybeSingle();
 
       if (dbError) throw new Error(`DB Error: ${dbError.message}`);
       
@@ -156,7 +156,7 @@ console.log(`✅ [INFO] 금액 및 좌석 검증 완벽 통과 (DB: ${expectedAm
           
           // (B) 이메일 발송 (이전과 동일 로직 복구)
           let hostEmail = '';
-          const { data: hostProfile } = await supabase.from('profiles').select('email').eq('id', hostId).single();
+          const { data: hostProfile } = await supabase.from('profiles').select('email').eq('id', hostId).maybeSingle();
           if (hostProfile?.email) {
             hostEmail = hostProfile.email;
           } else {

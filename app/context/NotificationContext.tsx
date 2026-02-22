@@ -96,7 +96,7 @@ useEffect(() => {
             .from('inquiries')
             .select('user_id, host_id')
             .eq('id', newMsg.inquiry_id)
-            .single();
+            .maybeSingle();
 
           if (inquiry && (inquiry.user_id === user.id || inquiry.host_id === user.id)) {
               const link = inquiry.host_id === user.id ? '/host/dashboard?tab=chat' : '/guest/inbox';

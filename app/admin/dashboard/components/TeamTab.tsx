@@ -3,16 +3,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { 
-  ClipboardList, CheckSquare, FileText, Plus, Trash2, 
+import {
+  ClipboardList, CheckSquare, FileText, Plus, Trash2,
   Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AdminTask, AdminComment } from '@/app/types/admin';
+import { useToast } from '@/app/context/ToastContext';
 
 export default function TeamTab() {
   const { t } = useLanguage();
+  const { showToast } = useToast();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
   const [whitelist, setWhitelist] = useState<any[]>([]);
@@ -29,7 +31,7 @@ export default function TeamTab() {
   const [lastViewed, setLastViewed] = useState<string>(new Date(0).toISOString());
   const [expandedMemos, setExpandedMemos] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const threadRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
@@ -89,8 +91,8 @@ export default function TeamTab() {
     };
     document.addEventListener('mousedown', handleClickOutside);
 
-    return () => { 
-      supabase.removeChannel(channel); 
+    return () => {
+      supabase.removeChannel(channel);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
@@ -102,50 +104,101 @@ export default function TeamTab() {
       alert('이미 등록된 이메일입니다.');
       return;
     }
-    const { error } = await supabase.from('admin_whitelist').insert({ email });
-    if (error) {
-      if (error.code === '23505') alert('이미 화이트리스트에 존재하는 이메일입니다.');
-      else alert('Error: ' + error.message);
-    } else {
-      setNewWhitemail('');
+    try {
+      const { error } = await supabase.from('admin_whitelist').insert({ email });
+      if (error) {
+        if (error.code === '23505') showToast('이미 화이트리스트에 존재하는 이메일입니다.', 'error');
+        else throw error;
+      } else {
+        setNewWhitemail('');
+        showToast('화이트리스트 추가 완료', 'success');
+      }
+    } catch (error: any) {
+      showToast('오류 발생: ' + error.message, 'error');
     }
   };
 
   const addDailyLog = async () => {
     if (!newLog.task.trim() || !currentUser) return;
-    await supabase.from('admin_tasks').insert({
-      type: 'DAILY_LOG',
-      content: newLog.task,
-      author_id: currentUser.id,
-      author_name: currentUser.name,
-      is_completed: false,
-      metadata: { note: newLog.note, status_text: 'Progress' }
-    });
-    setNewLog({ task: '', note: '' });
+    try {
+      const { error } = await supabase.from('admin_tasks').insert({
+        type: 'DAILY_LOG',
+        content: newLog.task,
+        author_id: currentUser.id,
+        author_name: currentUser.name,
+        is_completed: false,
+        metadata: { note: newLog.note, status_text: 'Progress' }
+      });
+      if (error) throw error;
+      setNewLog({ task: '', note: '' });
+      showToast('Daily Log 기록 성공', 'success');
+    } catch (error: any) {
+      showToast('저장 중 오류가 발생했습니다: ' + error.message, 'error');
+    }
   };
 
   const addComment = async (taskId: string) => {
     if (!newComment.trim() || !currentUser) return;
-    await supabase.from('admin_task_comments').insert({
-      task_id: taskId,
-      content: newComment,
-      author_id: currentUser.id,
-      author_name: currentUser.name
-    });
-    setNewComment('');
+    try {
+      const { error } = await supabase.from('admin_task_comments').insert({
+        task_id: taskId,
+        content: newComment,
+        author_id: currentUser.id,
+        author_name: currentUser.name
+      });
+      if (error) throw error;
+      setNewComment('');
+    } catch (error: any) {
+      showToast('댓글 작성 실패: ' + error.message, 'error');
+    }
   };
 
   const toggleStatus = async (id: string, currentStatus: boolean) => {
-    const nextStatus = !currentStatus;
-    await supabase.from('admin_tasks').update({ 
-      is_completed: nextStatus,
-      metadata: { status_text: nextStatus ? 'Done' : 'Progress' }
-    }).eq('id', id);
+    try {
+      const nextStatus = !currentStatus;
+      const { error } = await supabase.from('admin_tasks').update({
+        is_completed: nextStatus,
+        metadata: { status_text: nextStatus ? 'Done' : 'Progress' }
+      }).eq('id', id);
+      if (error) throw error;
+    } catch (error: any) {
+      showToast('상태 업데이트 실패: ' + error.message, 'error');
+    }
   };
 
   const deleteTask = async (table: string, id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    await supabase.from(table).delete().eq('id', id);
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+      showToast('삭제 완료', 'success');
+    } catch (error: any) {
+      showToast('삭제 실패: ' + error.message, 'error');
+    }
+  };
+
+  const addTodo = async () => {
+    if (!newTodo.trim() || !currentUser) return;
+    try {
+      const { error } = await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
+      if (error) throw error;
+      setNewTodo('');
+      showToast('할 일이 추가되었습니다.', 'success');
+    } catch (error: any) {
+      showToast('오류: ' + error.message, 'error');
+    }
+  };
+
+  const addMemo = async () => {
+    if (!newMemo.trim() || !currentUser) return;
+    try {
+      const { error } = await supabase.from('admin_tasks').insert({ type: 'MEMO', content: newMemo, author_id: currentUser.id, author_name: currentUser.name });
+      if (error) throw error;
+      setNewMemo('');
+      showToast('메모가 저장되었습니다.', 'success');
+    } catch (error: any) {
+      showToast('오류: ' + error.message, 'error');
+    }
   };
 
   if (!isClient) return null;
@@ -196,10 +249,10 @@ export default function TeamTab() {
 
           <div className="p-3 bg-blue-50/30 border-b border-slate-100 flex items-center gap-2">
             <div className="flex-[4]">
-              <input type="text" placeholder={t('team_input_task')} value={newLog.task} onChange={e => setNewLog({...newLog, task: e.target.value})} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+              <input type="text" placeholder={t('team_input_task')} value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
             </div>
             <div className="flex-[3]">
-              <input type="text" placeholder={t('team_input_note')} value={newLog.note} onChange={e => setNewLog({...newLog, note: e.target.value})} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+              <input type="text" placeholder={t('team_input_note')} value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
             </div>
             <button onClick={addDailyLog} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors">{t('team_btn_record')}</button>
           </div>
@@ -245,26 +298,18 @@ export default function TeamTab() {
         <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 overflow-hidden shadow-sm" ref={threadRef}>
           <div className="flex items-center gap-2 mb-4"><CheckSquare size={18} className="text-green-500" /><h3 className="font-bold text-slate-800">{t('team_todo_list')}</h3></div>
           <div className="flex gap-2 mb-4">
-            <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && (async () => {
-              if (!newTodo.trim() || !currentUser) return;
-              await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
-              setNewTodo('');
-            })()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none" />
-            <button onClick={async () => {
-              if (!newTodo.trim() || !currentUser) return;
-              await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
-              setNewTodo('');
-            }} className="bg-slate-900 text-white p-2 rounded-lg"><Plus size={18} /></button>
+            <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none" />
+            <button onClick={addTodo} className="bg-slate-900 text-white p-2 rounded-lg"><Plus size={18} /></button>
           </div>
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {todos.map(todo => {
               const taskComments = comments.filter(c => c.task_id === todo.id);
               const hasNewComment = taskComments.some(c => isNew(c.created_at));
               const isTodoNew = isNew(todo.created_at);
-              
+
               return (
                 <div key={todo.id} className="flex flex-col gap-2">
-                  <div 
+                  <div
                     onClick={() => setExpandedTodo(expandedTodo === todo.id ? null : todo.id)}
                     className={`flex items-center gap-3 p-3 rounded-xl border group transition-all cursor-pointer ${expandedTodo === todo.id ? 'border-blue-300 ring-2 ring-blue-500/10' : ''} ${todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm hover:border-slate-300'}`}
                   >
@@ -281,7 +326,7 @@ export default function TeamTab() {
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', todo.id); }} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
                   </div>
-                  
+
                   {expandedTodo === todo.id && (
                     <div className="ml-8 p-3 bg-white rounded-xl border border-slate-100 shadow-inner space-y-2 animate-in slide-in-from-top-2 duration-200">
                       <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
@@ -329,10 +374,10 @@ export default function TeamTab() {
               </div>
               <button onClick={() => setShowMemos(false)} className="text-slate-400 hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all"><X size={24} /></button>
             </div>
-            
+
             <div className="p-6 border-b border-slate-50 bg-white">
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 focus-within:border-amber-300 focus-within:ring-4 focus-within:ring-amber-500/5 transition-all">
-                <textarea 
+                <textarea
                   placeholder={t('team_memo_placeholder')}
                   value={newMemo}
                   onChange={e => setNewMemo(e.target.value)}
@@ -340,12 +385,8 @@ export default function TeamTab() {
                 />
                 <div className="mt-4 flex justify-between items-center">
                   <span className="text-[11px] text-slate-400 font-medium italic">Shift + Enter for new line</span>
-                  <button 
-                    onClick={async () => {
-                      if (!newMemo.trim() || !currentUser) return;
-                      await supabase.from('admin_tasks').insert({ type: 'MEMO', content: newMemo, author_id: currentUser.id, author_name: currentUser.name });
-                      setNewMemo('');
-                    }} 
+                  <button
+                    onClick={addMemo}
                     className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2"
                   >
                     <Plus size={18} /> {t('team_btn_add_memo')}
@@ -381,23 +422,23 @@ export default function TeamTab() {
                           </div>
                         </div>
                         {memo.author_id === currentUser?.id && (
-                          <button 
-                            onClick={() => deleteTask('admin_tasks', memo.id)} 
+                          <button
+                            onClick={() => deleteTask('admin_tasks', memo.id)}
                             className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1"
                           >
                             <Trash2 size={16} />
                           </button>
                         )}
                       </div>
-                      
+
                       <div className={`relative ${!isExpanded && isLong ? 'max-h-[350px] overflow-hidden' : ''}`}>
                         <div className="text-[14px] text-slate-700 whitespace-pre-wrap leading-relaxed tracking-tight">
                           {memo.content}
                         </div>
-                        
+
                         {!isExpanded && isLong && (
                           <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-2">
-                            <button 
+                            <button
                               onClick={() => toggleMemoExpand(memo.id)}
                               className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-800 transition-all mb-2"
                             >
@@ -409,7 +450,7 @@ export default function TeamTab() {
 
                       {isExpanded && isLong && (
                         <div className="mt-6 flex justify-center border-t border-slate-50 pt-4">
-                          <button 
+                          <button
                             onClick={() => toggleMemoExpand(memo.id)}
                             className="text-slate-400 hover:text-slate-900 text-xs font-bold flex items-center gap-1"
                           >
@@ -431,8 +472,8 @@ export default function TeamTab() {
       {/* Discrete Admin Whitelist Manager */}
       <div className="mt-auto pt-10 pb-2 flex flex-col items-center">
         {!showWhitelist ? (
-          <button 
-            onClick={() => setShowWhitelist(true)} 
+          <button
+            onClick={() => setShowWhitelist(true)}
             className="text-[10px] text-slate-300 hover:text-slate-500 transition-colors flex items-center gap-1"
           >
             <Settings size={10} /> Admin Whitelist
@@ -441,12 +482,12 @@ export default function TeamTab() {
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xl animate-in fade-in zoom-in duration-200 max-w-sm w-full">
             <div className="flex justify-between items-center mb-3">
               <h4 className="text-xs font-bold text-slate-800">Admin Whitelist</h4>
-              <button onClick={() => setShowWhitelist(false)} className="text-slate-400 hover:text-slate-900"><X size={14}/></button>
+              <button onClick={() => setShowWhitelist(false)} className="text-slate-400 hover:text-slate-900"><X size={14} /></button>
             </div>
             <div className="flex gap-2 mb-3">
-              <input 
-                type="email" 
-                placeholder="New admin email" 
+              <input
+                type="email"
+                placeholder="New admin email"
                 value={newWhitemail}
                 onChange={e => setNewWhitemail(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addWhitelistEmail()}
@@ -462,7 +503,7 @@ export default function TeamTab() {
                   <div key={item.id} className="flex justify-between items-center text-[10px] bg-slate-50 px-2 py-1 rounded group">
                     <span className="text-slate-600 truncate mr-2 font-medium">{item.email}</span>
                     <button onClick={() => deleteTask('admin_whitelist', item.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
-                      <Trash2 size={10}/>
+                      <Trash2 size={10} />
                     </button>
                   </div>
                 ))

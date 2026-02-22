@@ -22,7 +22,7 @@ export async function generateMetadata(
     .from('experiences')
     .select('*')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (!experience) {
     return {
@@ -70,7 +70,7 @@ export default async function Page({ params }: Props) {
 
   // 1. 병렬 데이터 페칭 (속도 최적화)
   const [expResult, datesResult, bookingsResult, userResult] = await Promise.all([
-    supabase.from('experiences').select('*').eq('id', id).single(),
+    supabase.from('experiences').select('*').eq('id', id).maybeSingle(),
     supabase.from('experience_availability').select('date, start_time').eq('experience_id', id).eq('is_booked', false),
     supabase.from('bookings').select('date, time, guests').eq('experience_id', id).in('status', ['PAID', 'confirmed']),
     supabase.auth.getUser()
@@ -85,7 +85,7 @@ export default async function Page({ params }: Props) {
   // 2. 호스트 프로필 데이터 가져오기
   let hostProfile = null;
   if (experience.host_id) {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', experience.host_id).single();
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', experience.host_id).maybeSingle();
     const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle();
     
     hostProfile = {

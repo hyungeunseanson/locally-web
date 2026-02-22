@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     // 관리자 권한 확인 (Role or Whitelist)
     const [userProfile, whitelistEntry] = await Promise.all([
-      supabaseAuth.from('profiles').select('role').eq('id', user.id).single(),
+      supabaseAuth.from('profiles').select('role').eq('id', user.id).maybeSingle(),
       supabaseAuth.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
     ]);
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       .from('bookings')
       .select('*')
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !booking) {
       console.error('Fetch Booking Error:', fetchError);
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       .from('experiences')
       .select('title, host_id, max_guests, price')
       .eq('id', booking.experience_id)
-      .single();
+      .maybeSingle();
     
     if (expError || !experience) {
       console.error('Fetch Experience Error:', expError);

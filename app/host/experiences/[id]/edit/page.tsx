@@ -26,7 +26,7 @@ export default function EditExperiencePage() {
   // 데이터 불러오기
   useEffect(() => {
     const fetchExp = async () => {
-      const { data, error } = await supabase.from('experiences').select('*').eq('id', params.id).single();
+      const { data, error } = await supabase.from('experiences').select('*').eq('id', params.id).maybeSingle();
       if (error) {
         showToast(t('msg_load_fail'), 'error'); // 🟢 번역
         return;

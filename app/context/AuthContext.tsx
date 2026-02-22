@@ -15,11 +15,17 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+export function AuthProvider({
+  children,
+  initialUser = null
+}: {
+  children: React.ReactNode;
+  initialUser?: User | null;
+}) {
+  const [user, setUser] = useState<User | null>(initialUser);
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialUser); // 🟢 만약 initialUser가 있으면 로딩 없이 즉시 렌더링
   const supabase = createClient();
 
   const loadUser = async () => {
@@ -30,8 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from('profiles')
           .select('avatar_url')
           .eq('id', session.user.id)
-          .single();
-        
+          .maybeSingle();
+
         const updatedUser = {
           ...session.user,
           user_metadata: {
@@ -61,11 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    
+
     if (app) setApplicationStatus(app.status);
 
     const { count } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('host_id', userId);
-    
+
     if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
       setIsHost(true);
     } else {
@@ -87,7 +93,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    loadUser();
+    if (initialUser) {
+      checkHostStatus(initialUser.id);
+    } else {
+      loadUser();
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {

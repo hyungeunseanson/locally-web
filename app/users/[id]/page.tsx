@@ -19,7 +19,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
         .from('profiles')
         .select('*')
         .eq('id', params.id)
-        .single();
+        .maybeSingle();
       
       setProfile(profileData);
 

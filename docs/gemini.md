@@ -126,6 +126,28 @@
   - 다국어 메타데이터 (`alternates`, `hreflang`) 적용.
   - 전역 폰트 시스템(Tailwind CSS Variable) 통합.
 
+### Phase 4.1: 데이터 무결성 및 아키텍처 개선 (Data Integrity & Architecture) - ✅ 완료
+- [x] **보안 및 권한 API 패치:**
+  - `admin/delete`, `payment/cancel`, `notifications/email` API 등의 무단 호출 방지 및 관리자 예외 처리 로직 추가.
+- [x] **정산 로직 및 데이터 정합성 보장:**
+  - 결제 취소 시 PG사 결제망 상태 이중 검증(결제 실패 시 DB 저장 방어 로직).
+  - 위약금 기반 호스트 정산액(80%) 공식 통일 및 `Earnings.tsx` 수익금 불일치 버그 해결.
+- [x] **아키텍처 및 렌더링 최적화:**
+  - Server Side Prefetching(`layout.tsx`)을 도입하여 진행 상황의 깜빡임(FOUC) 원천 차단.
+  - `LoginModal` 프로필 강제 인서트(유령 계정 방지) 로직을 보안 서버 액션(`syncProfile`)으로 완전 이관.
+- [x] **API 우회 차단 및 데이터 라이브 연동:**
+  - 클라이언트 DB 접근을 차단하고 `Review` API의 평균 별점 집계 트리거 정상 복구.
+  - `ExperienceClient`, `WishlistsPage` 등 프론트엔드 곳곳의 더미 데이터(하드코딩된 별점) 파기 및 실제 DB 데이터 연동.
+
+### Phase 4.2: 백엔드 보안 아키텍처 완성 (V3 Security Patch) - ✅ 완료
+- [x] **클라이언트 위변조 원천 차단 (Price Tampering):**
+  - 프론트엔드(`payment/page.tsx`)의 결제 대금 계산 및 예약 DB Insert 로직 파기.
+  - 철저하게 서버 기반의 권한 통제를 받는 `/api/bookings` 신규 생성 및 적용.
+- [x] **알림 스팸 인젝션 (Notification Defacement) 방어:**
+  - 프론트엔드 사이드에서의 무분별한 알림(`notifications`) Insert 로직 제거 및 백엔드 은닉.
+- [x] **관리자 대시보드 강건성 확보 (Error Handling):**
+  - `TeamTab.tsx` 내 모든 비동기 쓰기 함수에 `try-catch` 및 Toast 에러 피드백을 추가하여 침묵 실패(Silent Failure) 현상 영구 해결.
+
 ---
 
 ## 5. 🚧 핵심 개발 규칙 (Development Rules)

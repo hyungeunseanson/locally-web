@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR } from "next/font/google"; // 🟢 폰트 변경
 import "./globals.css";
-import { Suspense } from "react"; 
+import { Suspense } from "react";
 import { LanguageProvider } from '@/app/context/LanguageContext';
 import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
@@ -12,8 +12,9 @@ import GoogleTranslate from '@/app/components/GoogleTranslate';
 import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { getCurrentLocale } from '@/app/utils/locale';
+import { createClient } from '@/app/utils/supabase/server';
 
-const notoSansKr = Noto_Sans_KR({ 
+const notoSansKr = Noto_Sans_KR({
   subsets: ["latin"],
   weight: ['100', '300', '400', '500', '700', '900'],
   variable: '--font-noto-sans',
@@ -57,21 +58,44 @@ export default async function RootLayout({
 }>) {
   const locale = await getCurrentLocale();
 
+  // 🟢 [M-3] 서버 사이드에서 세션 가져오기 (FOUC 방지)
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // 프로필 이미지까지 가져와서 주입하면 완벽합니다.
+  let initialUser = session?.user || null;
+  if (initialUser) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', initialUser.id)
+      .maybeSingle();
+    if (profile?.avatar_url) {
+      initialUser = {
+        ...initialUser,
+        user_metadata: {
+          ...initialUser.user_metadata,
+          avatar_url: profile.avatar_url
+        }
+      } as any;
+    }
+  }
+
   return (
     <html lang={locale} suppressHydrationWarning={true}>
       <body className={`${notoSansKr.className} ${notoSansKr.variable} font-sans`}>
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
-          <Script 
+          <Script
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
-            strategy="beforeInteractive" 
+            strategy="beforeInteractive"
           />
         )}
         <QueryProvider>
-          <AuthProvider>
+          <AuthProvider initialUser={initialUser}>
             <ToastProvider>
               <NotificationProvider>
                 <LanguageProvider>
-                  
+
                   <Suspense fallback={null}>
                     <UserPresenceTracker />
                   </Suspense>

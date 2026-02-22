@@ -22,15 +22,31 @@ export async function POST(request: Request) {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const authHeader = request.headers.get('Authorization');
-    const { data: { user: adminUser } } = await supabaseAdmin.auth.getUser(authHeader?.split('Bearer ')[1]);
+    const { data: { user: adminUser }, error: authError } = await supabaseAdmin.auth.getUser(authHeader?.split('Bearer ')[1]);
 
+    if (authError || !adminUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 🚨 [보안 패치] 관리자 권한 확인 (Role or Whitelist)
+    const [userProfile, whitelistEntry] = await Promise.all([
+      supabaseAdmin.from('profiles').select('role').eq('id', adminUser.id).maybeSingle(),
+      supabaseAdmin.from('admin_whitelist').select('id').eq('email', adminUser.email || '').maybeSingle()
+    ]);
+
+    const isAdmin = (userProfile.data?.role === 'admin') || !!whitelistEntry.data;
+
+    if (!isAdmin) {
+      console.error(`🚨 [Security Warning] Unauthorized Delete Attempt by ${adminUser.email}`);
+      return NextResponse.json({ error: 'Forbidden: Admin Access Required' }, { status: 403 });
+    }
     // 유저 프로필 삭제 시, 연관된 모든 데이터를 먼저 삭제 (FK 제약 조건 해결)
     if (table === 'profiles' || table === 'users') {
       try {
         console.log(`[AdminDelete] Starting cascade delete for user: ${id}`);
         
         // 🟢 삭제 전 유저 정보(이메일) 미리 확보 (로그용)
-        const { data: targetProfile } = await supabaseAdmin.from('profiles').select('email, full_name').eq('id', id).single();
+        const { data: targetProfile } = await supabaseAdmin.from('profiles').select('email, full_name').eq('id', id).maybeSingle();
         const targetInfo = targetProfile ? `${targetProfile.email} (${targetProfile.full_name})` : '알 수 없는 유저';
 
         // 1. 호스트일 경우: 내가 만든 체험에 연결된 데이터 먼저 삭제
@@ -89,7 +105,7 @@ export async function POST(request: Request) {
     // 일반 테이블 데이터 삭제 (체험 등) - 삭제 전 제목 확보 시도
     let targetName = id;
     if (table === 'experiences') {
-        const { data: exp } = await supabaseAdmin.from('experiences').select('title').eq('id', id).single();
+        const { data: exp } = await supabaseAdmin.from('experiences').select('title').eq('id', id).maybeSingle();
         if (exp) targetName = exp.title;
     }
 

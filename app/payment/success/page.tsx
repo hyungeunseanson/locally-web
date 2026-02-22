@@ -34,7 +34,7 @@ const confirmBooking = async () => {
           host_id
         )
       `)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 // 2. 업데이트 성공 시 호스트에게 실시간 알림 전송

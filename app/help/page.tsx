@@ -146,7 +146,7 @@ export default function HelpCenterPage() {
           type: 'admin_support' 
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (roomError) throw roomError;
 
