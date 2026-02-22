@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
-**Last Updated:** 2026-02-21
-**Version:** 2.2.0 (Admin 2.0 Refactoring & Whitelist & Ledger v2 Complete)
+**Last Updated:** 2026-02-22
+**Version:** 2.3.0 (Security Patch & Performance Optimization Complete)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -92,7 +92,7 @@
 
 ## 4. ✅ 개발 현황 및 완료된 기능 (Development Status)
 
-**전체 진행률: 약 70%** (관리자 시스템 고도화 완료)
+**전체 진행률: 약 85%** (시스템 안정화 및 최적화 완료)
 
 ### Phase 1: 기반 구축 (Foundation) - ✅ 완료
 - [x] Supabase Auth & Profile 시스템
@@ -114,6 +114,17 @@
   - **상세 모달:** 결제 수단(무통장/카드) 구분, 정산액(80%) 및 플랫폼 수익 자동 계산.
 - [x] **관리자 화이트리스트:** 대시보드 내에서 즉시 관리자 권한 부여/삭제 가능.
 - [x] **구조적 리팩토링:** `useAdminData` 훅 분리 및 `maybeSingle()` 도입으로 500/400 에러 차단.
+
+### Phase 4: 시스템 안정화 및 보안 (Stabilization) - ✅ 완료
+- [x] **보안 강화 (Security):**
+  - NicePay 콜백 위변조 방지 (HMAC 서명 검증).
+  - 결제 확정/취소 API 권한 제어 (Admin/Owner Check).
+- [x] **성능 최적화 (Performance):**
+  - Admin 예약 데이터 페이지네이션 (Lazy Loading) 구현.
+  - 이미지 최적화 (AVIF/WebP) 및 폰트 경량화 (Noto Sans KR).
+- [x] **SEO & UX:**
+  - 다국어 메타데이터 (`alternates`, `hreflang`) 적용.
+  - 전역 폰트 시스템(Tailwind CSS Variable) 통합.
 
 ---
 
@@ -148,12 +159,12 @@
 
 ## 6. 🚀 향후 로드맵 (Future Roadmap)
 
-### Phase 4: 글로벌 및 확장 (Next Steps)
+### Phase 5: 글로벌 및 확장 (Next Steps)
 - [ ] **SEO & i18n:** 다국어 지원 아키텍처 개편 (`next-intl` 도입 검토).
 - [ ] **지도 서비스:** 국내(카카오맵) 및 해외(구글맵) 분기 처리 및 지도 기반 검색 구현.
 - [ ] **메시징 고도화:** 현재의 단순 채팅을 넘어선 미디어 전송, 읽음 확인 등이 포함된 실시간 채팅 시스템.
 
-### Phase 5: 운영 효율화 (Enterprise Admin)
+### Phase 6: 운영 효율화 (Enterprise Admin)
 - [ ] **RBAC 심화:** 슈퍼 관리자, 일반 관리자, 재무 담당자 등으로 권한 세분화.
 - [ ] **데이터 분석:** 매출 추이, 인기 상품 등을 시각화하는 차트 대시보드 구현.
 - [ ] **정산 자동화:** 정산 내역 엑셀 다운로드를 넘어선 자동 정산 스케줄러 구현.
