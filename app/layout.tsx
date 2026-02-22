@@ -7,8 +7,8 @@ import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
+import BottomTabNavigation from "@/app/components/mobile/BottomTabNavigation";
 import Script from "next/script";
-import GoogleTranslate from '@/app/components/GoogleTranslate';
 import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { getCurrentLocale } from '@/app/utils/locale';
@@ -101,15 +101,12 @@ export default async function RootLayout({
                   </Suspense>
 
                   <div className="flex flex-col min-h-screen">
-                    <main className="flex-1">
+                    <main className="flex-1 pb-20 md:pb-0">
                       {children}
                     </main>
                     <SiteFooter />
+                    <BottomTabNavigation />
                   </div>
-
-                  <Suspense fallback={null}>
-                    <GoogleTranslate />
-                  </Suspense>
 
                 </LanguageProvider>
               </NotificationProvider>

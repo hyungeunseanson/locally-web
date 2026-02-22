@@ -82,7 +82,7 @@ function SiteHeaderContent() {
     <>
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
-      <header className="sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
+      <header className="hidden md:block sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex-1 flex items-center gap-[2px] z-[101] group h-full">
             <img

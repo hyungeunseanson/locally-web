@@ -34,7 +34,7 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<any>(null);
-  
+
   // 프로필 상태
   const [profile, setProfile] = useState({
     full_name: '',
@@ -74,9 +74,9 @@ export default function AccountPage() {
     { code: 'AU', name: '호주 (Australia)', phone: '+61' }
   ];
 
-// 🟢 [수정] 진짜 리뷰 데이터 및 모달 상태
-const [guestReviews, setGuestReviews] = useState<any[]>([]);
-const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 선택된 리뷰
+  // 🟢 [수정] 진짜 리뷰 데이터 및 모달 상태
+  const [guestReviews, setGuestReviews] = useState<any[]>([]);
+  const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 선택된 리뷰
 
   useEffect(() => {
     const getProfile = async () => {
@@ -85,7 +85,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
       setUser(user);
 
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      
+
       if (data) {
         setProfile({
           full_name: data.full_name || '',
@@ -101,9 +101,9 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
           languages: data.languages || [] // 🟢 [추가] DB에서 언어 가져오기
         });
       } else {
-        setProfile(prev => ({ 
-          ...prev, 
-          email: user.email || '', 
+        setProfile(prev => ({
+          ...prev,
+          email: user.email || '',
           full_name: user.user_metadata?.full_name || '',
           avatar_url: user.user_metadata?.avatar_url || ''
         }));
@@ -148,7 +148,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
     const code = e.target.value;
     const country = countries.find(c => c.code === code);
     let newPhone = profile.phone;
-    
+
     // 기존 번호가 없거나 국가번호가 없으면 자동 추가
     if (country && (!profile.phone || !profile.phone.startsWith('+'))) {
       newPhone = `${country.phone} `;
@@ -181,7 +181,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
   const handleSave = async () => {
     setSaving(true);
     const updates = {
-      id: user.id, 
+      id: user.id,
       full_name: profile.full_name,
       nationality: profile.nationality,
       birth_date: profile.birth_date || null,
@@ -191,9 +191,9 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
       mbti: profile.mbti,
       kakao_id: profile.kakao_id,
       email: profile.email, // 수정된 이메일 저장
-      avatar_url: profile.avatar_url, 
+      avatar_url: profile.avatar_url,
       languages: profile.languages, // 🟢 [추가] 저장 시 포함
-      updated_at: new Date().toISOString(), 
+      updated_at: new Date().toISOString(),
     };
 
     let { error } = await supabase.from('profiles').upsert(updates);
@@ -203,7 +203,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
       showToast(t('profile_save_fail'), 'error'); // 🟢 번역
     } else {
       showToast(t('profile_save_success'), 'success'); // 🟢 번역
-      router.refresh(); 
+      router.refresh();
     }
     setSaving(false);
   };
@@ -213,51 +213,51 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      
+
       <main className="max-w-6xl mx-auto px-6 py-12">
-      <h1 className="text-3xl font-black mb-2">{t('account_title')}</h1> {/* 🟢 번역 */}
-      <p className="text-slate-500 mb-10">{t('account_desc')}</p> {/* 🟢 번역 */}
+        <h1 className="text-[32px] tracking-tight md:text-3xl font-black mb-2 md:mb-2 mt-4 md:mt-0 leading-tight">{t('account_title')}</h1>
+        <p className="text-slate-500 mb-8 md:mb-10 text-sm md:text-base">{t('account_desc')}</p>
 
         <div className="flex flex-col lg:flex-row gap-16">
-          
+
           {/* 왼쪽: 프로필 카드 */}
           <div className="w-full lg:w-[360px] flex-shrink-0">
-            <div className="border border-slate-200 rounded-3xl p-8 shadow-sm text-center sticky top-28 bg-white">
-              
+            <div className="md:border border-slate-200 md:rounded-3xl py-4 md:p-8 md:shadow-sm text-center sticky top-28 bg-white border-b md:border-b-0">
+
               {/* 📸 프로필 사진 */}
               <div className="relative w-32 h-32 mx-auto mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                 <div className="w-32 h-32 bg-slate-200 rounded-full overflow-hidden border border-slate-100 shadow-inner relative">
-                   {profile.avatar_url ? (
-                     <img src={profile.avatar_url} className="w-full h-full object-cover"/>
-                   ) : (
-                     <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={48}/></div>
-                   )}
-                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                     <Camera size={24} className="text-white"/>
-                   </div>
-                   {uploading && <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10"><Loader2 size={24} className="text-white animate-spin"/></div>}
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={48} /></div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera size={24} className="text-white" />
+                  </div>
+                  {uploading && <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10"><Loader2 size={24} className="text-white animate-spin" /></div>}
                 </div>
-                <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden"/>
+                <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
               </div>
 
               <h2 className="text-2xl font-black mb-1">{profile.full_name || t('label_no_name')}</h2> {/* 🟢 번역 */}
               <p className="text-slate-500 text-sm mb-4">
                 {countries.find(c => c.code === profile.nationality)?.name || profile.nationality || t('label_no_nationality')} {/* 🟢 번역 */}
               </p>
-              
+
               <div className="flex flex-wrap justify-center gap-2 mb-6">
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
-                <ShieldCheck size={14}/> {t('identity_verified')} {/* 🟢 번역 */}
+                  <ShieldCheck size={14} /> {t('identity_verified')} {/* 🟢 번역 */}
                 </div>
                 {/* 🌈 성별 이모지 표시 */}
                 {profile.gender && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-100">
-{profile.gender === 'Male' ? `🙋‍♂️ ${t('gender_male')}` : profile.gender === 'Female' ? `🙋‍♀️ ${t('gender_female')}` : `🙋 ${t('gender_other')}`} {/* 🟢 번역 */}
+                    {profile.gender === 'Male' ? `🙋‍♂️ ${t('gender_male')}` : profile.gender === 'Female' ? `🙋‍♀️ ${t('gender_female')}` : `🙋 ${t('gender_other')}`} {/* 🟢 번역 */}
                   </div>
                 )}
                 {profile.mbti && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-xs font-bold border border-rose-100">
-                    <Smile size={14}/> {profile.mbti}
+                    <Smile size={14} /> {profile.mbti}
                   </div>
                 )}
               </div>
@@ -267,20 +267,20 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                   "{profile.bio}"
                 </div>
               )}
-              
+
               {/* 카카오톡 ID 제거됨 (여기서는 안 보이게) */}
-              
+
               <div className="text-left space-y-4 pt-6 border-t border-slate-100">
                 <h3 className="font-bold text-lg flex items-center gap-2">
-                  <Star size={18} fill="black"/> {t('review_from_host')} ({guestReviews.length})
+                  <Star size={18} fill="black" /> {t('review_from_host')} ({guestReviews.length})
                 </h3>
-                
+
                 {guestReviews.length === 0 ? (
                   <p className="text-slate-400 text-sm py-4 text-center">아직 받은 후기가 없습니다.</p>
                 ) : (
                   guestReviews.map(review => (
-                    <div 
-                      key={review.id} 
+                    <div
+                      key={review.id}
                       onClick={() => setSelectedReview(review)} // 🟢 클릭 시 모달 열기
                       className="bg-slate-50 p-4 rounded-xl text-sm border border-slate-100 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-all group"
                     >
@@ -288,17 +288,17 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                         <div className="flex items-center gap-2">
                           {/* 호스트 아바타 (있으면 표시) */}
                           <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden relative">
-                             {review.host?.avatar_url ? (
-                               <img src={review.host.avatar_url} className="w-full h-full object-cover" />
-                             ) : <User size={14} className="text-slate-400 m-auto mt-1"/>}
+                            {review.host?.avatar_url ? (
+                              <img src={review.host.avatar_url} className="w-full h-full object-cover" />
+                            ) : <User size={14} className="text-slate-400 m-auto mt-1" />}
                           </div>
                           <span className="font-bold text-slate-900 group-hover:underline">
                             {review.host?.full_name || 'Host'}{t('host_honorific')}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
-                           <Star size={12} className="text-amber-400" fill="currentColor"/>
-                           <span className="font-bold">{review.rating}</span>
+                          <Star size={12} className="text-amber-400" fill="currentColor" />
+                          <span className="font-bold">{review.rating}</span>
                         </div>
                       </div>
                       <p className="text-slate-600 leading-snug line-clamp-2">"{review.content}"</p>
@@ -315,25 +315,25 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
           {/* 오른쪽: 정보 수정 폼 */}
           <div className="flex-1 max-w-2xl">
             <div className="space-y-8 bg-white">
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                <label className="block text-sm font-bold mb-2">{t('label_name')}</label> {/* 🟢 번역 */}
-                  <input 
-                    type="text" 
+                  <label className="block text-sm font-bold mb-2">{t('label_name')}</label> {/* 🟢 번역 */}
+                  <input
+                    type="text"
                     value={profile.full_name}
-                    onChange={e => setProfile({...profile, full_name: e.target.value})}
+                    onChange={e => setProfile({ ...profile, full_name: e.target.value })}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
                 </div>
                 <div>
-                <label className="block text-sm font-bold mb-2">{t('label_nationality')}</label> {/* 🟢 번역 */}
-                  <select 
+                  <label className="block text-sm font-bold mb-2">{t('label_nationality')}</label> {/* 🟢 번역 */}
+                  <select
                     value={profile.nationality}
                     onChange={handleNationalityChange}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
                   >
-<option value="">{t('select_nationality')}</option> {/* 🟢 번역 */}
+                    <option value="">{t('select_nationality')}</option> {/* 🟢 번역 */}
                     {countries.map(country => (
                       <option key={country.code} value={country.code}>{country.name}</option>
                     ))}
@@ -342,15 +342,15 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="relative">
+                <div className="relative">
                   <label className="block text-sm font-bold mb-2">{t('label_birth')}</label>
-                  
+
                   {/* 🟢 입력창 (Placeholder 추가) */}
-                  <div 
+                  <div
                     onClick={() => {
                       // 🟢 [수정] 기본값 2000년으로 변경
-                      if(profile.birth_date) setViewDate(new Date(profile.birth_date));
-                      else setViewDate(new Date(2000, 0, 1)); 
+                      if (profile.birth_date) setViewDate(new Date(profile.birth_date));
+                      else setViewDate(new Date(2000, 0, 1));
                       setIsCalendarOpen(true);
                     }}
                     className="w-full p-3 border border-slate-300 rounded-xl flex items-center justify-between cursor-pointer hover:border-black transition-colors bg-white group"
@@ -359,7 +359,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                       {/* 🟢 값이 없으면 YYYY. MM. DD 표시 */}
                       {profile.birth_date ? profile.birth_date.replace(/-/g, '. ') : "YYYY. MM. DD"}
                     </span>
-                    <Calendar size={18} className="text-slate-400 group-hover:text-black"/>
+                    <Calendar size={18} className="text-slate-400 group-hover:text-black" />
                   </div>
 
                   {/* 🟢 커스텀 달력 모달 */}
@@ -367,52 +367,52 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsCalendarOpen(false)}></div>
                       <div className="absolute top-full left-0 mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-slate-100 z-50 p-5 animate-in fade-in zoom-in-95">
-                        
-{/* 🟢 [수정] 헤더: 연도 선택 강조 디자인 */}
-<div className="flex justify-between items-center mb-4 px-1">
+
+                        {/* 🟢 [수정] 헤더: 연도 선택 강조 디자인 */}
+                        <div className="flex justify-between items-center mb-4 px-1">
                           {/* 이전 달 버튼 */}
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() - 1)));
-                            }} 
+                            }}
                             className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors"
                           >
-                            <ChevronLeft size={20}/>
+                            <ChevronLeft size={20} />
                           </button>
-                          
-                          <div className="flex items-center gap-2">
-                             {/* 🟢 연도 선택 (버튼처럼 보이게 수정) */}
-                             <div className="relative flex items-center gap-1 cursor-pointer hover:bg-slate-100 px-2 py-1 rounded-lg transition-colors group">
-                               <span className="text-lg font-bold text-slate-900">{viewDate.getFullYear()}</span>
-                               <ChevronDown size={14} className="text-slate-400 group-hover:text-black mt-0.5"/>
-                               
-                               {/* 투명 select 박스로 기능 유지 */}
-                               <select 
-                                  value={viewDate.getFullYear()} 
-                                  onChange={(e) => setViewDate(new Date(viewDate.setFullYear(Number(e.target.value))))}
-                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                  onClick={(e) => e.stopPropagation()}
-                               >
-                                 {Array.from({length: 100}, (_, i) => new Date().getFullYear() - i + 5).map(year => (
-                                   <option key={year} value={year}>{year}</option>
-                                 ))}
-                               </select>
-                             </div>
 
-                             {/* 월 표시 (점 찍어서 구분) */}
-                             <span className="text-lg font-bold text-slate-900">  {viewDate.getMonth() + 1}</span>
+                          <div className="flex items-center gap-2">
+                            {/* 🟢 연도 선택 (버튼처럼 보이게 수정) */}
+                            <div className="relative flex items-center gap-1 cursor-pointer hover:bg-slate-100 px-2 py-1 rounded-lg transition-colors group">
+                              <span className="text-lg font-bold text-slate-900">{viewDate.getFullYear()}</span>
+                              <ChevronDown size={14} className="text-slate-400 group-hover:text-black mt-0.5" />
+
+                              {/* 투명 select 박스로 기능 유지 */}
+                              <select
+                                value={viewDate.getFullYear()}
+                                onChange={(e) => setViewDate(new Date(viewDate.setFullYear(Number(e.target.value))))}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i + 5).map(year => (
+                                  <option key={year} value={year}>{year}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* 월 표시 (점 찍어서 구분) */}
+                            <span className="text-lg font-bold text-slate-900">  {viewDate.getMonth() + 1}</span>
                           </div>
 
                           {/* 다음 달 버튼 */}
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setViewDate(new Date(viewDate.setMonth(viewDate.getMonth() + 1)));
-                            }} 
+                            }}
                             className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors"
                           >
-                            <ChevronRight size={20}/>
+                            <ChevronRight size={20} />
                           </button>
                         </div>
 
@@ -427,9 +427,9 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                         <div className="grid grid-cols-7 gap-1 place-items-center">
                           {generateCalendar(viewDate.getFullYear(), viewDate.getMonth()).map((date, idx) => {
                             if (!date) return <div key={idx} className="w-9 h-9"></div>;
-                            
+
                             // 날짜 비교용 문자열 (YYYY-MM-DD)
-                            const dateStr = date.toLocaleDateString('en-CA'); 
+                            const dateStr = date.toLocaleDateString('en-CA');
                             const isSelected = profile.birth_date === dateStr;
                             const isToday = new Date().toDateString() === date.toDateString();
 
@@ -437,7 +437,7 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                               <button
                                 key={idx}
                                 onClick={() => {
-                                  setProfile({...profile, birth_date: dateStr});
+                                  setProfile({ ...profile, birth_date: dateStr });
                                   setIsCalendarOpen(false);
                                 }}
                                 className={`
@@ -459,13 +459,13 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
 
 
                 <div>
-                <label className="block text-sm font-bold mb-2">{t('label_gender')}</label> {/* 🟢 번역 */}
-                  <select 
+                  <label className="block text-sm font-bold mb-2">{t('label_gender')}</label> {/* 🟢 번역 */}
+                  <select
                     value={profile.gender}
-                    onChange={e => setProfile({...profile, gender: e.target.value})}
+                    onChange={e => setProfile({ ...profile, gender: e.target.value })}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors bg-white"
                   >
-<option value="">{t('gender_select')}</option> {/* 🟢 번역 */}
+                    <option value="">{t('gender_select')}</option> {/* 🟢 번역 */}
                     <option value="Male">🙋‍♂️ {t('gender_male')} (Male)</option>
                     <option value="Female">🙋‍♀️ {t('gender_female')} (Female)</option>
                     <option value="Other">🙋 {t('gender_other')} (Other)</option>
@@ -475,22 +475,22 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                <label className="block text-sm font-bold mb-2">{t('label_phone')}</label> {/* 🟢 번역 */}
-                  <input 
-                    type="tel" 
+                  <label className="block text-sm font-bold mb-2">{t('label_phone')}</label> {/* 🟢 번역 */}
+                  <input
+                    type="tel"
                     value={profile.phone}
                     onChange={handlePhoneChange}
                     placeholder={t('ph_phone')}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
-<p className="text-xs text-slate-400 mt-1">{t('help_phone')}</p> {/* 🟢 번역 */}
+                  <p className="text-xs text-slate-400 mt-1">{t('help_phone')}</p> {/* 🟢 번역 */}
                 </div>
                 <div>
-                <label className="block text-sm font-bold mb-2">{t('label_kakao')}</label> {/* 🟢 번역 */}
-                  <input 
-                    type="text" 
+                  <label className="block text-sm font-bold mb-2">{t('label_kakao')}</label> {/* 🟢 번역 */}
+                  <input
+                    type="text"
                     value={profile.kakao_id}
-                    onChange={e => setProfile({...profile, kakao_id: e.target.value})}
+                    onChange={e => setProfile({ ...profile, kakao_id: e.target.value })}
                     placeholder={t('ph_kakao')}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
@@ -499,11 +499,11 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                <label className="block text-sm font-bold mb-2">{t('label_mbti')}</label> {/* 🟢 번역 */}
-                  <input 
-                    type="text" 
+                  <label className="block text-sm font-bold mb-2">{t('label_mbti')}</label> {/* 🟢 번역 */}
+                  <input
+                    type="text"
                     value={profile.mbti}
-                    onChange={e => setProfile({...profile, mbti: e.target.value.toUpperCase()})}
+                    onChange={e => setProfile({ ...profile, mbti: e.target.value.toUpperCase() })}
                     placeholder={t('ph_mbti')}
                     maxLength={4}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors uppercase"
@@ -524,11 +524,10 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                             : [...current, lang];
                           setProfile({ ...profile, languages: newLangs });
                         }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                          profile.languages?.includes(lang)
-                            ? 'bg-slate-900 text-white border-slate-900'
-                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-                        }`}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${profile.languages?.includes(lang)
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                          }`}
                       >
                         {t(`lang_${lang}`) || lang}
                       </button>
@@ -537,82 +536,82 @@ const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 �
                   <p className="text-xs text-slate-400">호스트에게 내가 할 수 있는 언어를 알려주세요.</p>
                 </div>
                 <div>
-                <label className="block text-sm font-bold mb-2">{t('label_email')}</label> {/* 🟢 번역 */}
-                  <input 
-                    type="email" 
+                  <label className="block text-sm font-bold mb-2">{t('label_email')}</label> {/* 🟢 번역 */}
+                  <input
+                    type="email"
                     value={profile.email}
-                    onChange={e => setProfile({...profile, email: e.target.value})}
+                    onChange={e => setProfile({ ...profile, email: e.target.value })}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
-<p className="text-xs text-slate-400 mt-1">{t('help_email')}</p> {/* 🟢 번역 */}
+                  <p className="text-xs text-slate-400 mt-1">{t('help_email')}</p> {/* 🟢 번역 */}
                 </div>
               </div>
 
               <div>
-              <label className="block text-sm font-bold mb-2">{t('label_bio')}</label> {/* 🟢 번역 */}
-                <textarea 
+                <label className="block text-sm font-bold mb-2">{t('label_bio')}</label> {/* 🟢 번역 */}
+                <textarea
                   rows={5}
                   value={profile.bio}
-                  onChange={e => setProfile({...profile, bio: e.target.value})}
+                  onChange={e => setProfile({ ...profile, bio: e.target.value })}
                   placeholder={t('ph_bio')}
                   className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors resize-none"
                 />
               </div>
 
               <div className="pt-6 border-t border-slate-100 flex justify-end">
-                <button 
+                <button
                   onClick={handleSave}
                   disabled={saving}
                   className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:scale-105 transition-transform flex items-center gap-2 disabled:opacity-50"
                 >
-<Save size={18}/> {saving ? t('saving') : t('btn_save_changes')} {/* 🟢 번역 */}
+                  <Save size={18} /> {saving ? t('saving') : t('btn_save_changes')} {/* 🟢 번역 */}
                 </button>
               </div>
 
             </div>
           </div>
         </div>
-        </main>
+      </main>
 
-{/* 🟢 [추가] 리뷰 상세 모달 */}
-{selectedReview && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedReview(null)}>
-    <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative p-6" onClick={e => e.stopPropagation()}>
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative">
-            {selectedReview.host?.avatar_url ? (
-              <img src={selectedReview.host.avatar_url} className="w-full h-full object-cover" />
-            ) : <User size={24} className="text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/>}
-          </div>
-          <div>
-            <h3 className="font-bold text-lg text-slate-900">
-              {selectedReview.host?.full_name || 'Host'}
-              <span className="text-sm font-normal text-slate-500 ml-1">{t('host_honorific')}</span>
-            </h3>
-            <p className="text-xs text-slate-400">{new Date(selectedReview.created_at).toLocaleDateString()}</p>
+      {/* 🟢 [추가] 리뷰 상세 모달 */}
+      {selectedReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedReview(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative">
+                  {selectedReview.host?.avatar_url ? (
+                    <img src={selectedReview.host.avatar_url} className="w-full h-full object-cover" />
+                  ) : <User size={24} className="text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-slate-900">
+                    {selectedReview.host?.full_name || 'Host'}
+                    <span className="text-sm font-normal text-slate-500 ml-1">{t('host_honorific')}</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">{new Date(selectedReview.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedReview(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex gap-1 mb-4">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} size={20} className={i < selectedReview.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"} />
+              ))}
+            </div>
+
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {selectedReview.content}
+              </p>
+            </div>
           </div>
         </div>
-        <button onClick={() => setSelectedReview(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
-          <X size={20}/>
-        </button>
-      </div>
+      )}
 
-      <div className="flex gap-1 mb-4">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} size={20} className={i < selectedReview.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"} />
-        ))}
-      </div>
-
-      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-        <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-          {selectedReview.content}
-        </p>
-      </div>
     </div>
-  </div>
-)}
-
-</div>
-);
+  );
 }

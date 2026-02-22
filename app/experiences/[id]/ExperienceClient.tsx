@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share, Heart, MapPin, Check, X, Grid } from 'lucide-react';
+import { Share, Heart, MapPin, Check, X, Grid, Copy } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import { useWishlist } from '@/app/hooks/useWishlist';
 import ExpMainContent from './components/ExpMainContent';
 import ExpSidebar from './components/ExpSidebar';
+import StickyActionSheet from './components/StickyActionSheet';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
@@ -125,8 +126,8 @@ export default function ExperienceClient({
           </div>
         </section>
 
-        {/* 사진 그리드 */}
-        <section className="relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
+        {/* 데스크탑 사진 그리드 */}
+        <section className="hidden md:block relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
           {photos.length === 1 && (
             <div className="w-full h-full relative cursor-pointer" onClick={() => setIsGalleryOpen(true)}>
               <Image src={photos[0]} alt="Background" fill className="object-cover blur-xl opacity-50 scale-110" />
@@ -157,6 +158,27 @@ export default function ExperienceClient({
           </button>
         </section>
 
+        {/* 모바일 벤토 그리드 사진 (md:hidden) */}
+        <section className="md:hidden relative w-full aspect-square mb-8 overflow-hidden rounded-[24px] cursor-pointer shadow-sm border border-slate-100" onClick={() => setIsGalleryOpen(true)}>
+          <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1.5 bg-slate-100">
+            <div className="relative overflow-hidden w-full h-full">
+              <Image src={photos[0]} alt="Main" fill className="object-cover" />
+            </div>
+            <div className="relative overflow-hidden w-full h-full">
+              <Image src={photos[1] || photos[0]} alt="Sub 1" fill className="object-cover" />
+            </div>
+            <div className="relative overflow-hidden w-full h-full">
+              <Image src={photos[2] || photos[0]} alt="Sub 2" fill className="object-cover" />
+            </div>
+            <div className="relative overflow-hidden w-full h-full">
+              <Image src={photos[3] || photos[0]} alt="Sub 3" fill className="object-cover" />
+              <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm p-2 rounded-full shadow border border-slate-100 z-10 text-slate-800">
+                <Copy size={16} className="rotate-90" />
+              </div>
+            </div>
+          </div>
+        </section>
+
         <div className="flex flex-col md:flex-row gap-16 relative">
           <ExpMainContent
             experience={experience}
@@ -174,6 +196,8 @@ export default function ExperienceClient({
           />
         </div>
       </main>
+
+      <StickyActionSheet experience={experience} />
 
       {isGalleryOpen && (
         <div className="fixed inset-0 z-[100] bg-white animate-in fade-in duration-200 flex flex-col">
