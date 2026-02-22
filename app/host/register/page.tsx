@@ -10,26 +10,26 @@ export default function HostRegisterPage() {
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast(); // 🟢 훅 사용
-  
+
   const [step, setStep] = useState(1);
-  const totalSteps = 8; 
+  const totalSteps = 8;
   const [loading, setLoading] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    targetLanguages: [] as string[], 
-    languageLevel: 3, 
+    targetLanguages: [] as string[],
+    languageLevel: 3,
     languageCert: '',
     name: '', phone: '', dob: '', email: '', instagram: '', source: '',
     profilePhoto: null as string | null,
     selfIntro: '',
-    idCardType: '', 
+    idCardType: '',
     idCardFile: null as string | null,
     hostNationality: '',
     bankName: '', accountNumber: '', accountHolder: '',
     motivation: '', agreeTerms: false
   });
-  
+
   const [files, setFiles] = useState<{ profile?: File, idCard?: File }>({});
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function HostRegisterPage() {
           accountNumber: data.account_number || '',
           accountHolder: data.account_holder || '',
           motivation: data.motivation || '',
-          agreeTerms: true 
+          agreeTerms: true
         }));
       }
     };
@@ -107,8 +107,8 @@ export default function HostRegisterPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요합니다.');
 
-      let profileUrl = formData.profilePhoto; 
-      let idCardUrl = formData.idCardFile;    
+      let profileUrl = formData.profilePhoto;
+      let idCardUrl = formData.idCardFile;
 
       if (files.profile) {
         const fileName = `profile/${user.id}_${Date.now()}`;
@@ -159,7 +159,10 @@ export default function HostRegisterPage() {
         error = res.error;
       }
 
-      await supabase.from('profiles').update({ 
+      if (error) throw error; // If host application fails, stop immediately
+
+      // Only update profile if application submission succeeded
+      const { error: profileError } = await supabase.from('profiles').update({
         languages: formData.targetLanguages,
         bio: formData.selfIntro,
         name: formData.name,
@@ -167,8 +170,8 @@ export default function HostRegisterPage() {
         avatar_url: profileUrl
       }).eq('id', user.id);
 
-      if (error) throw error;
-      
+      if (profileError) throw profileError;
+
       // 🟢 alert -> showToast (성공)
       showToast('신청이 완료되었습니다! 관리자 승인을 기다려주세요.', 'success');
       router.push('/host/dashboard');
@@ -183,7 +186,7 @@ export default function HostRegisterPage() {
   };
 
   return (
-    <HostRegisterForm 
+    <HostRegisterForm
       step={step}
       totalSteps={totalSteps}
       formData={formData}

@@ -57,12 +57,12 @@ export default function MainSearchBar({
     <div
       className={`relative w-full max-w-[850px] h-[66px] transition-all duration-300 ease-in-out ${isVisible ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 -translate-y-4 scale-95 pointer-events-none'}`}
     >
-      <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100' : 'border-slate-200'} rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.08)] transition-all`}>
+      <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100/50' : 'border-slate-200'} rounded-full shadow-[var(--shadow-card)] transition-all duration-500`}>
 
         {/* 1. 여행지 입력 */}
         <div
-          className={`flex-1 relative h-full flex flex-col justify-center px-8 rounded-full cursor-pointer transition-all z-10 group
-            ${activeSearchField === 'location' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
+          className={`flex-1 relative h-full flex flex-col justify-center px-8 rounded-full cursor-pointer transition-all duration-300 z-10 group
+            ${activeSearchField === 'location' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
           onClick={() => setActiveSearchField('location')}
         >
           <label className="text-[11px] font-bold text-slate-800">{t('label_destination')}</label> {/* 🟢 교체 */}
@@ -80,8 +80,8 @@ export default function MainSearchBar({
 
         {/* 2. 날짜 입력 */}
         <div
-          className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all z-10 group
-            ${activeSearchField === 'date' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
+          className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all duration-300 z-10 group
+            ${activeSearchField === 'date' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
           onClick={() => setActiveSearchField('date')}
         >
           <label className="text-[11px] font-bold text-slate-800">{t('label_date')}</label> {/* 🟢 교체 */}
@@ -98,8 +98,8 @@ export default function MainSearchBar({
 
         {/* 3. 언어 선택 */}
         <div
-          className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all z-10 group
-            ${activeSearchField === 'language' ? 'bg-white shadow-lg' : 'hover:bg-slate-100'}`}
+          className={`flex-1 relative h-full flex flex-col justify-center px-6 rounded-full cursor-pointer transition-all duration-300 z-10 group
+            ${activeSearchField === 'language' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
           onClick={() => setActiveSearchField('language')}
         >
           <label className="text-[11px] font-bold text-slate-800">{t('label_language')}</label>

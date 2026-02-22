@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-22
-**Version:** 2.3.0 (Security Patch & Performance Optimization Complete)
+**Version:** 2.4.1 (Complete Refactoring & Translation System Fix)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -148,6 +148,27 @@
 - [x] **관리자 대시보드 강건성 확보 (Error Handling):**
   - `TeamTab.tsx` 내 모든 비동기 쓰기 함수에 `try-catch` 및 Toast 에러 피드백을 추가하여 침묵 실패(Silent Failure) 현상 영구 해결.
 
+### Phase 4.3: 전역 리팩토링 및 다국어 시스템 안정화 (Global Cleanup) - ✅ 완료
+- [x] **잠재적 500 에러 폭탄 제거 (Database Querying):**
+  - 백엔드 및 컴포넌트 전반에 존재하던 약 40여 개의 `.single()` 코드를 전부 안전한 `.maybeSingle()` 로 일괄 치환하여 데이터 부재 시의 치명적 크래시를 방지함.
+- [x] **잉여 패키지 및 충돌 로직 제거 (Dependency Cleanup):**
+  - 빌드 용량을 낭비하고 사설 언어 시스템(`LanguageContext`)과 혼선을 유발하던 `next-intl` 관련 패키지 및 찌꺼기 파일(middleware.ts, locale.ts 등)을 완벽 제초.
+- [x] **번역 시스템 무결성 수복 (Localization Fix):**
+  - 검색바(`MainSearchBar.tsx`)에서 도시 키값(`city_tokyo`)이 날것으로 들어가는 하드코딩 오류를 번역 함수 `t()`로 감싸어 UI와 DB 연결 정합성을 100% 회복함.
+
+### Phase 4.4: 프리미엄 브랜드 아이덴티티 및 UI 고도화 (Premium Identity & UI Polish) - ✅ 완료
+- [x] **고품격 UI/UX 디자인 시스템 결속 (High-End Visual V4):**
+  - **토큰 기반 그림자 시스템:** Airbnb 스타일의 다층적이고 부드러운 커스텀 그림자(`shadow-elevation-low`, `medium`, `high`)를 `globals.css` 전역에 구축.
+  - **체험 카드(ExperienceCard) 럭셔리 튜닝:** 카드 Hover 시 자연스럽게 떠오르는 Lift 섀도우 컴포넌트 트랜지션 및 썸네일 미세 줌인(`scale-105`) 에셋 추가. 폰트 자간(`tracking-tight`) 최적화.
+  - **메인 검색바(MainSearchBar) 인터랙션:** 마우스 오버 시 부드럽게 발광하는 심층 오버레이 섀도우 적용으로 고급스러운 반응성 부여.
+- [x] **신규 로고 디자인 및 파비콘 배포:**
+  - 기존의 텍스트 로고를 대체하는 "The Local Thread" (호스트와 게스트의 연결을 상징하는 끊어지지 않는 유려한 선) 심볼 로고 도입.
+  - 브라우저 탭 및 앱 아이콘(`app/icon.png`) 동기화 완료.
+- [x] **정밀한 시각적 비율 보정 (Airbnb Layout Proportions):**
+  - 목업 기반(Base 100 계산식)의 로고 심볼과 "Locally" 텍스트 간격, 글씨체 두께 비율(1:1), 텍스트 대비 심볼 크기 우위 비율을 픽셀 단위로 구현.
+  - 원본 AI 이미지의 투명 패딩(Padding)을 시각적으로 상쇄하기 위해 컨테이너 크기를 확장하고 텍스트를 축소하는 트릭(`w-[52px] h-[52px]`)으로 에어비앤비 프론트엔드와 완벽하게 동일한 황금 비율 및 시각적 무게 균형 완성.
+  - 투명 배경 PNG(블랙/화이트) 알파 브렌딩 에셋 자체 추출 및 배포.
+
 ---
 
 ## 5. 🚧 핵심 개발 규칙 (Development Rules)
@@ -190,3 +211,8 @@
 - [ ] **RBAC 심화:** 슈퍼 관리자, 일반 관리자, 재무 담당자 등으로 권한 세분화.
 - [ ] **데이터 분석:** 매출 추이, 인기 상품 등을 시각화하는 차트 대시보드 구현.
 - [ ] **정산 자동화:** 정산 내역 엑셀 다운로드를 넘어선 자동 정산 스케줄러 구현.
+
+### Phase 7: 모바일 웹 네이티브 UX 최적화 (Mobile Web Native UX Optimization)
+- [ ] **모바일 네비게이션:** 상단 헤더 축소 및 최하단 5탭 네비게이션(Bottom Tab Navigation) 고정.
+- [ ] **에어비앤비 스타일 UI:** 압도적인 대형 폰트, 알약(Pill)형 가로 스크롤 필터, 자석처럼 붙는 가로 스와이프 리스트(Snap-scroll) 구현.
+- [ ] **결제 UX 향상:** 상세 및 결제 페이지 하단에 가격, 예약하기 버튼이 포함된 고정 플로팅 바(Sticky Action Sheet) 배치.

@@ -12,9 +12,9 @@ import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만�
 
 
 // 🟢 LoginModal 동적 로딩 (SSR false)
-const LoginModal = dynamic(() => import('./LoginModal'), { 
-  ssr: false, 
-  loading: () => null 
+const LoginModal = dynamic(() => import('./LoginModal'), {
+  ssr: false,
+  loading: () => null
 });
 
 import { useAuth } from '@/app/context/AuthContext'; // 🟢 Auth 훅 사용
@@ -24,10 +24,10 @@ import { useAuth } from '@/app/context/AuthContext'; // 🟢 Auth 훅 사용
 function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
+
   // 🟢 [핵심] 로컬 상태 대신 전역 AuthContext 사용 (깜빡임 해결)
   const { user, isHost, applicationStatus, isLoading, signOut } = useAuth();
-  
+
   const { unreadCount } = useNotification();
   const menuRef = useRef<HTMLElement>(null);
   const { t } = useLanguage();
@@ -50,23 +50,23 @@ function SiteHeaderContent() {
   }, []);
 
   const handleMainHeaderButtonClick = () => {
-    if (pathname?.startsWith('/host')) { 
-      router.push('/'); 
+    if (pathname?.startsWith('/host')) {
+      router.push('/');
     } else {
       router.push('/become-a-host');
     }
   };
 
   const handleDropdownMenuClick = () => {
-    if (pathname?.startsWith('/host')) { 
-      router.push('/'); 
+    if (pathname?.startsWith('/host')) {
+      router.push('/');
       return;
     }
 
     if (applicationStatus || isHost) {
-      router.push('/host/dashboard'); 
+      router.push('/host/dashboard');
     } else {
-      router.push('/become-a-host'); 
+      router.push('/become-a-host');
     }
   };
 
@@ -81,26 +81,31 @@ function SiteHeaderContent() {
   return (
     <>
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
-      
+
       <header className="sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
-          <Link href="/" className="flex-1 flex items-center z-[101]">
-            <h1 className="text-2xl font-black tracking-tighter cursor-pointer text-slate-900">Locally</h1>
+          <Link href="/" className="flex-1 flex items-center gap-[2px] z-[101] group h-full">
+            <img
+              src="/images/logo.png"
+              alt="Locally Logo"
+              className="w-[52px] h-[52px] object-contain mix-blend-multiply grayscale contrast-200 group-hover:scale-105 transition-transform duration-300"
+            />
+            <h1 className="text-[18px] font-bold tracking-tight cursor-pointer text-[#111827] leading-none mb-[1.5px]">Locally</h1>
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            <button 
-              onClick={handleMainHeaderButtonClick} 
+            <button
+              onClick={handleMainHeaderButtonClick}
               className="hidden md:block text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 cursor-pointer"
             >
-               {getButtonLabel()}
+              {getButtonLabel()}
             </button>
             <LanguageSelector />
 
             {/* 🟢 로딩이 끝난 후에만 알림/유저 아이콘 표시 (깜빡임 최소화) */}
             {!isLoading && user ? (
-              <Link 
-                href="/notifications" 
+              <Link
+                href="/notifications"
                 className="relative mx-1 p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors inline-block"
               >
                 <Bell size={20} />
@@ -111,11 +116,11 @@ function SiteHeaderContent() {
             ) : null}
 
             <div className="relative ml-1">
-              <div 
+              <div
                 onClick={() => (!isLoading && user) ? setIsMenuOpen(!isMenuOpen) : setIsLoginModalOpen(true)}
                 className="flex items-center gap-2 border border-slate-300 rounded-full p-1 pl-2 hover:shadow-md transition-shadow cursor-pointer ml-1 bg-white select-none"
               >
-                <Menu size={18} className="ml-2"/>
+                <Menu size={18} className="ml-2" />
                 <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-200 flex items-center justify-center text-slate-500">
                   {/* 🟢 로딩 중일 땐 기본 아이콘 유지 */}
                   {!isLoading && user && getAvatarUrl() ? (
@@ -130,31 +135,31 @@ function SiteHeaderContent() {
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
-                       <span className="flex items-center gap-3"><MessageSquare size={18}/> {t('messages')}</span>
+                      <span className="flex items-center gap-3"><MessageSquare size={18} /> {t('messages')}</span>
                     </Link>
                     <Link href="/guest/trips" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                       <Briefcase size={18}/> {t('my_trips')}
+                      <Briefcase size={18} /> {t('my_trips')}
                     </Link>
                     <Link href="/guest/wishlists" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                       <Heart size={18}/> {t('wishlist')}
+                      <Heart size={18} /> {t('wishlist')}
                     </Link>
                   </div>
 
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                       <User size={18}/> {t('account')}
+                      <User size={18} /> {t('account')}
                     </Link>
                     <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                       <Settings size={18}/> {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
+                      <Settings size={18} /> {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
                     </button>
                   </div>
 
                   <div className="py-2">
                     <Link href="/help" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                       <HelpCircle size={18}/> {t('help')}
+                      <HelpCircle size={18} /> {t('help')}
                     </Link>
                     <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                      <LogOut size={18}/> {t('logout')}
+                      <LogOut size={18} /> {t('logout')}
                     </button>
                   </div>
                 </div>

@@ -15,10 +15,10 @@ export default function ExperienceCard({ data }: { data: any }) {
   // 🟢 [기능 유지] 다국어 데이터 가져오기 (LanguageContext의 lang 사용)
   const title = getContent(data, 'title', lang);
   const category = getContent(data, 'category', lang);
-  
+
   // 이미지 주소 처리
-  const imageUrl = (data.photos && data.photos.length > 0) 
-    ? data.photos[0] 
+  const imageUrl = (data.photos && data.photos.length > 0)
+    ? data.photos[0]
     : (data.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
 
   // 지역 정보 (없으면 기본값)
@@ -26,40 +26,40 @@ export default function ExperienceCard({ data }: { data: any }) {
 
   return (
     <Link href={`/experiences/${data.id}`} className="block group">
-      {/* 🖼️ 이미지 영역 (4:5 비율 원본 복구) */}
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
-        <Image 
-          src={imageUrl} 
-          alt={title} 
-          fill 
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+      {/* 🖼️ 이미지 영역 (프리미엄 쉐도우 및 Lift 애니메이션 적용) */}
+      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent [box-shadow:var(--shadow-card)] group-hover:[box-shadow:var(--shadow-card-hover)] group-hover:-translate-y-1 transition-all duration-500 ease-out">
+        <Image
+          src={imageUrl}
+          alt={title}
+          fill
+          className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
         />
 
         {/* ❤️ 하트 버튼 (우측 상단 고정 원본 복구) */}
-        <button 
-          onClick={(e) => { 
-            e.preventDefault(); 
-            e.stopPropagation(); 
-            toggleWishlist(); 
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist();
           }}
           className="absolute top-3 right-3 text-white/70 hover:text-white hover:scale-110 transition-all z-10"
         >
-          <Heart 
-            size={24} 
-            fill={isSaved ? "#F43F5E" : "rgba(0,0,0,0.5)"} 
-            strokeWidth={2} 
+          <Heart
+            size={24}
+            fill={isSaved ? "#F43F5E" : "rgba(0,0,0,0.5)"}
+            strokeWidth={2}
             className={isSaved ? "text-rose-500" : ""}
           />
         </button>
       </div>
-      
+
       {/* 📝 텍스트 영역 (원본 레이아웃 복구) */}
       <div className="space-y-1 px-1">
-        
+
         {/* 1열: [지역 · 카테고리] --------- [별점] */}
         <div className="flex justify-between items-start">
-          <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">
+          <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2 tracking-tight">
             {location} · {category}
           </h3>
           <div className="flex items-center gap-1 text-sm shrink-0">
@@ -68,18 +68,18 @@ export default function ExperienceCard({ data }: { data: any }) {
             {data.review_count > 0 && <span className="text-slate-400 font-normal">({data.review_count})</span>}
           </div>
         </div>
-        
+
         {/* 2열: 제목 */}
-        <p className="text-[15px] text-slate-500 line-clamp-1">
+        <p className="text-[15px] text-slate-500 line-clamp-1 leading-snug tracking-tight">
           {title}
         </p>
 
         {/* 3열: 가격 */}
         <div className="mt-1">
-          <span className="font-bold text-slate-900 text-[15px]">
+          <span className="font-black text-slate-900 text-[15px] tracking-tight">
             ₩{Number(data.price).toLocaleString()}
           </span>
-          <span className="text-[15px] text-slate-900 font-normal"> / 인</span>
+          <span className="text-[14px] text-slate-500 font-normal ml-0.5">/ 인</span>
         </div>
       </div>
     </Link>
