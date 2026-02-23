@@ -34,10 +34,11 @@ export function useAdminData() {
     const userIds = Array.from(new Set(rawBookings.map((b: any) => b.user_id).filter(Boolean)));
 
     let expMap = new Map();
+    let hostIds: string[] = [];
     if (expIds.length > 0) {
       const { data: exps } = await supabase.from('experiences').select('id, title, host_id').in('id', expIds);
       if (exps) {
-        const hostIds = exps.map((e: any) => e.host_id).filter(Boolean);
+        hostIds = exps.map((e: any) => e.host_id).filter(Boolean);
         userIds.push(...hostIds); // 호스트 ID도 유저 목록에 추가
         expMap = new Map(exps.map((e: any) => [e.id, e]));
       }
@@ -51,17 +52,31 @@ export function useAdminData() {
       }
     }
 
+    let hostAppMap = new Map();
+    if (hostIds.length > 0) {
+      const { data: apps } = await supabase.from('host_applications').select('user_id, name').in('user_id', hostIds).order('created_at', { ascending: false });
+      if (apps) {
+        // user_id별 가장 최근 신청서의 name을 사용
+        for (const app of apps) {
+          if (!hostAppMap.has(app.user_id)) {
+            hostAppMap.set(app.user_id, app.name);
+          }
+        }
+      }
+    }
+
     return rawBookings.map((b: any) => {
       const exp = expMap.get(b.experience_id);
       const guest = userMap.get(b.user_id);
       const host = exp ? userMap.get(exp.host_id) : null;
+      const hostAppName = exp ? hostAppMap.get(exp.host_id) : null;
 
       return {
         ...b,
         experiences: {
           title: exp?.title || 'Unknown Experience',
           host_id: exp?.host_id,
-          profiles: { name: host?.full_name || 'Unknown Host' }
+          profiles: { name: hostAppName || host?.full_name || 'Unknown Host' }
         },
         profiles: {
           email: guest?.email || 'No Email',
