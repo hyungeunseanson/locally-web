@@ -102,7 +102,9 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       funnel: { applied: 0, approved: 0, active: 0, booked: 0 }
     },
     avgResponseTime: 0,
-    responseRate: 0
+    responseRate: 0,
+    topRespHosts: [] as any[],
+    bottomRespHosts: [] as any[]
   });
 
   useEffect(() => {
@@ -321,6 +323,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       });
 
       // 🟢 호스트 응답률 및 응답 시간 계산
+      const hostCommStats: Record<string, { total: number, answered: number, timeMs: number }> = {};
       let totalHostInquiries = 0;
       let answeredHostInquiries = 0;
       let totalResponseTimeMs = 0;
@@ -337,21 +340,46 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       inquiries?.forEach(inq => {
         if (!inq.host_id || !isWithinDateRange(inq.created_at)) return;
         totalHostInquiries++;
+        if (!hostCommStats[inq.host_id]) hostCommStats[inq.host_id] = { total: 0, answered: 0, timeMs: 0 };
+        hostCommStats[inq.host_id].total++;
+
         const msgs = messagesByInquiry[inq.id] || [];
 
         // 첫 호스트 응답 탐색
         const firstHostMsg = msgs.find(m => m.sender_id === inq.host_id);
         if (firstHostMsg) {
           answeredHostInquiries++;
+          hostCommStats[inq.host_id].answered++;
+
           const guestMsg = msgs.find(m => m.sender_id !== inq.host_id);
           const startTime = guestMsg ? new Date(guestMsg.created_at).getTime() : new Date(inq.created_at).getTime();
           const responseTimeMs = new Date(firstHostMsg.created_at).getTime() - startTime;
-          if (responseTimeMs > 0) totalResponseTimeMs += responseTimeMs;
+          if (responseTimeMs > 0) {
+            totalResponseTimeMs += responseTimeMs;
+            hostCommStats[inq.host_id].timeMs += responseTimeMs;
+          }
         }
       });
 
       const avgRespMins = answeredHostInquiries > 0 ? (totalResponseTimeMs / answeredHostInquiries) / (1000 * 60) : 0;
       const respRatePct = totalHostInquiries > 0 ? (answeredHostInquiries / totalHostInquiries) * 100 : 0;
+
+      // 호스트 개별 순위 계산
+      const hostRespArr = Object.entries(hostCommStats).map(([id, s]) => {
+        const hostInfo = users?.find(u => u.id === id);
+        const rate = s.total > 0 ? (s.answered / s.total) * 100 : 0;
+        const timeMins = s.answered > 0 ? (s.timeMs / s.answered) / (1000 * 60) : 0;
+        return {
+          id,
+          name: hostInfo?.name || hostInfo?.full_name || 'Unknown',
+          rate,
+          timeMins: Math.round(timeMins),
+          total: s.total
+        };
+      }).filter(h => h.total >= 1);
+
+      const topRespHosts = [...hostRespArr].sort((a, b) => b.rate - a.rate || a.timeMins - b.timeMins).slice(0, 10);
+      const bottomRespHosts = [...hostRespArr].sort((a, b) => a.rate - b.rate || b.timeMins - a.timeMins).slice(0, 10);
 
       // 등록된 Active 체험을 보유한 호스트 수 계산
       exps?.forEach((e: any) => {
@@ -403,7 +431,9 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           funnel: { applied, approved, active: activeHosts.size, booked: bookedHosts.size }
         },
         avgResponseTime: avgRespMins > 0 ? Math.round(avgRespMins) : 0, // 🟢 리얼 응답 시간(분)
-        responseRate: respRatePct > 0 ? Number(respRatePct.toFixed(1)) : 0 // 🟢 리얼 응답률(%)
+        responseRate: respRatePct > 0 ? Number(respRatePct.toFixed(1)) : 0, // 🟢 리얼 응답률(%)
+        topRespHosts,
+        bottomRespHosts
       });
 
     } catch (err) {
@@ -688,80 +718,42 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           </div>
 
 
-          {/* 🟢 복구 & 신설: 호스트 리스크 모니터링 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-            {/* 우수 호스트 후보 리스트 */}
+          {/* 3. 매출 견인 Top 5 인기 체험 */}
+          <section className="pt-4">
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  ⭐ 슈퍼 호스트 유망주 <span className="text-xs font-normal text-slate-400">평점 4.0 이상 & 취소 0</span>
+                  🏆 매출 견인 Top 5 인기 체험 <span className="text-xs font-normal text-slate-400">결제 완료 건수 기준</span>
                 </h3>
-                <UserCheck size={18} className="text-emerald-500" />
+                <Star size={18} className="text-yellow-500" />
               </div>
               <div className="space-y-4">
-                {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((host: any, idx: number) => (
-                  <div key={host.id} className="flex items-center gap-4 p-3 hover:bg-emerald-50/50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-emerald-100">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-                      {host.name[0]}
+                {stats.topExperiences.length > 0 ? stats.topExperiences.map((exp: any, idx: number) => (
+                  <div key={exp.id} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 border border-slate-200">
+                      {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-slate-900 truncate">{host.name}</div>
-                      <div className="text-xs text-slate-500">예약 {host.bookings}건 • 취소율 0%</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-emerald-600 px-2 py-1 bg-emerald-100 rounded-lg">
-                        평점 {host.rating}
+                      <div className="text-sm font-bold text-slate-900 truncate">{exp.title}</div>
+                      <div className="text-xs font-medium text-slate-500 flex gap-2">
+                        <span>예약 {exp.bookingCount}건</span>
+                        <span>매출 ₩{exp.totalRevenue.toLocaleString()}</span>
                       </div>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="h-40 flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
-                    <UserCheck size={24} className="text-slate-300" />
-                    <p> 조건에 맞는 유망주가 아직 없습니다.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 🟢 신설: 집중 관리 호스트 리스트 */}
-            <div className="bg-white p-6 rounded-2xl border border-rose-200 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-full translate-x-16 -translate-y-16 blur-2xl"></div>
-              <div className="flex items-center justify-between mb-6 relative z-10">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  🚨 집중 관리 호스트 (Risk) <span className="text-xs font-normal text-rose-400">잦은 취소 또는 평점 저하</span>
-                </h3>
-                <AlertTriangle size={18} className="text-rose-500 animate-pulse" />
-              </div>
-              <div className="space-y-4 relative z-10">
-                {stats.riskHosts.length > 0 ? stats.riskHosts.map((host: any, idx: number) => (
-                  <div key={host.id} className="flex items-center gap-4 p-3 bg-white hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-slate-100 hover:border-rose-200">
-                    <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
-                      {host.name[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-slate-900 truncate">{host.name}</div>
-                      <div className="text-xs font-medium text-rose-500">주의: 취소 {host.cancelCount}건 • 예약 {host.bookings}건</div>
                     </div>
                     <div className="text-right flex flex-col items-end">
-                      {host.rating !== 'New' && Number(host.rating) < 3.5 && (
-                        <div className="text-[10px] font-bold text-white px-1.5 py-0.5 bg-rose-500 rounded flex items-center gap-1 mb-1">
-                          <AlertTriangle size={10} /> 저평점
-                        </div>
-                      )}
-                      <div className="text-xs font-bold text-slate-700">
-                        평점 {host.rating}
+                      <div className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
+                        평점 {exp.rating} ({exp.reviewCount})
                       </div>
                     </div>
                   </div>
                 )) : (
-                  <div className="h-40 flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
-                    <CheckCircle size={24} className="text-emerald-300" />
-                    <p>현재 감지된 불량 평점 호스트가 없습니다.</p>
+                  <div className="h-40 flex flex-col items-center justify-center text-slate-400 text-sm">
+                    기간 내 결제된 인기 체험이 없습니다.
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          </section>
         </>
       ) : (
         <div className="space-y-12 animate-in slide-in-from-bottom-[50px] duration-500">
@@ -804,13 +796,90 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
             </div>
           </section>
 
+          {/* 🟢 이동 배치됨: 호스트 리스크 모니터링 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 mt-8">
+            {/* 우수 호스트 후보 리스트 */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  ⭐ 슈퍼 호스트 유망주 <span className="text-xs font-normal text-slate-400">평점 4.0 이상 & 취소 0</span>
+                </h3>
+                <UserCheck size={18} className="text-emerald-500" />
+              </div>
+              <div className="space-y-4">
+                {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((host: any, idx: number) => (
+                  <div key={host.id} className="flex items-center gap-4 p-3 hover:bg-emerald-50/50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-emerald-100">
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                      {host.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-slate-900 truncate">{host.name}</div>
+                      <div className="text-xs text-slate-500">예약 {host.bookings}건 • 취소율 0%</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-bold text-emerald-600 px-2 py-1 bg-emerald-100 rounded-lg">
+                        평점 {host.rating}
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="h-40 flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+                    <UserCheck size={24} className="text-slate-300" />
+                    <p> 조건에 맞는 유망주가 아직 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 집중 관리 호스트 리스트 */}
+            <div className="bg-white p-6 rounded-2xl border border-rose-200 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-full translate-x-16 -translate-y-16 blur-2xl"></div>
+              <div className="flex items-center justify-between mb-6 relative z-10">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  🚨 집중 관리 호스트 (Risk) <span className="text-xs font-normal text-rose-400">잦은 취소 또는 평점 저하</span>
+                </h3>
+                <AlertTriangle size={18} className="text-rose-500 animate-pulse" />
+              </div>
+              <div className="space-y-4 relative z-10">
+                {stats.riskHosts.length > 0 ? stats.riskHosts.map((host: any, idx: number) => (
+                  <div key={host.id} className="flex items-center gap-4 p-3 bg-white hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-slate-100 hover:border-rose-200">
+                    <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                      {host.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-slate-900 truncate">{host.name}</div>
+                      <div className="text-xs font-medium text-rose-500">주의: 취소 {host.cancelCount}건 • 예약 {host.bookings}건</div>
+                    </div>
+                    <div className="text-right flex flex-col items-end">
+                      {host.rating !== 'New' && Number(host.rating) < 3.5 && (
+                        <div className="text-[10px] font-bold text-white px-1.5 py-0.5 bg-rose-500 rounded flex items-center gap-1 mb-1">
+                          <AlertTriangle size={10} /> 저평점
+                        </div>
+                      )}
+                      <div className="text-xs font-bold text-slate-700">
+                        평점 {host.rating}
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="h-40 flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+                    <CheckCircle size={24} className="text-emerald-300" />
+                    <p>현재 감지된 불량 평점 호스트가 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* 1.5. 호스트 활동 및 응답 (Host Activity) */}
           <section>
             <div className="flex items-center justify-between mb-4 mt-8">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 💬 커뮤니케이션 현황 <span className="text-xs font-normal text-slate-400">게스트 문의 대비 응답 속도</span>
               </h2>
-              <Activity size={20} className="text-blue-500" />
+              <div onClick={() => setSelectedMetric('response')} className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                상세 랭킹 보기
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <SimpleKpi
@@ -819,6 +888,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                 unit="분"
                 sub="문의 접수 후"
                 className={stats.avgResponseTime < 60 ? "text-emerald-500" : "text-rose-500"}
+                onClick={() => setSelectedMetric('response')}
               />
               <SimpleKpi
                 label="호스트 응답률 (Response Rate)"
@@ -826,6 +896,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                 unit="%"
                 sub="전체 문의 대비"
                 className={stats.responseRate >= 90 ? "text-emerald-500" : "text-amber-500"}
+                onClick={() => setSelectedMetric('response')}
               />
             </div>
           </section>
@@ -961,16 +1032,55 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                 </div>
               )}
 
-              {!['aov', 'cancel'].includes(selectedMetric) && (
+              {selectedMetric === 'response' && (
+                <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    🏆 응답시간 상위 10명 <span className="text-xs font-normal text-emerald-500">최단 시간 기준</span>
+                  </h3>
+                  <div className="space-y-3 mb-6">
+                    {stats.topRespHosts.length > 0 ? stats.topRespHosts.map((h: any, idx: number) => (
+                      <div key={h.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-black">{idx + 1}</div>
+                          <div className="text-sm font-bold text-slate-800">{h.name}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-emerald-600">{h.timeMins}분</div>
+                          <div className="text-[10px] text-slate-400">응답률 {h.rate.toFixed(0)}%</div>
+                        </div>
+                      </div>
+                    )) : <div className="text-sm text-slate-400">데이터 없음</div>}
+                  </div>
+
+                  <h3 className="text-xl font-bold flex items-center gap-2 pt-4 border-t border-slate-100">
+                    🐢 응답시간 하위 10명 <span className="text-xs font-normal text-rose-500">최장 시간 기준</span>
+                  </h3>
+                  <div className="space-y-3">
+                    {stats.bottomRespHosts.length > 0 ? stats.bottomRespHosts.map((h: any, idx: number) => (
+                      <div key={h.id} className="flex justify-between items-center bg-rose-50/30 p-3 rounded-lg border border-rose-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs font-black">{idx + 1}</div>
+                          <div className="text-sm font-bold text-slate-800">{h.name}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-rose-600">{h.timeMins}분</div>
+                          <div className="text-[10px] text-slate-400">응답률 {h.rate.toFixed(0)}%</div>
+                        </div>
+                      </div>
+                    )) : <div className="text-sm text-slate-400">데이터 없음</div>}
+                  </div>
+                </div>
+              )}
+
+              {!['aov', 'cancel', 'users', 'gmv', 'response'].includes(selectedMetric) && (
                 <div className="text-center py-8 text-slate-500">
                   상세 분석 데이터를 준비 중입니다.
                 </div>
               )}
             </div>
           </div>
-        )
-      }
-    </div >
+        )}
+    </div>
   );
 }
 
