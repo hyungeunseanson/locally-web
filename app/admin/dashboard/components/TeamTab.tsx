@@ -267,7 +267,7 @@ export default function TeamTab() {
     <div className="flex flex-col h-full gap-6 relative">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <ClipboardList className="text-rose-500" /> 팀 관리 시스템
+          <ClipboardList className="text-rose-500" /> Team Sync HQ
         </h2>
 
         {/* 🟢 구조 개편: Inner Tab Navigation */}
@@ -276,7 +276,7 @@ export default function TeamTab() {
             onClick={() => setInnerTab('todo')}
             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${innerTab === 'todo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            업무 일지 & To-Do
+            Daily Log & Tasks
           </button>
           <button
             onClick={() => setInnerTab('memo')}
@@ -426,8 +426,8 @@ export default function TeamTab() {
                       <FileText size={22} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900 text-lg">팀 마크다운 메모장</h3>
-                      <p className="text-xs text-slate-500 font-medium tracking-wider">노출 제한 없는 자유로운 지식 보관소</p>
+                      <h3 className="font-bold text-slate-900 text-lg">Team Knowledge Docs</h3>
+                      <p className="text-xs text-slate-500 font-medium tracking-wider">아이디어부터 정책까지, 자유롭게 쌓아가는 우리 팀의 아카이브</p>
                     </div>
                   </div>
                   <button onClick={() => { setEditingMemo(null); setIsComposingMemo(true); }} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all">
