@@ -41,15 +41,15 @@ export default function GlobalTeamChat() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const [profileData, whitelistData] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+            const [userData, whitelistData] = await Promise.all([
+                supabase.from('users').select('*').eq('id', user.id).maybeSingle(),
                 supabase.from('admin_whitelist').select('*').eq('email', user.email!).maybeSingle()
             ]);
 
-            if (profileData.data?.role === 'admin' || whitelistData.data) {
+            if (userData.data?.role === 'admin' || whitelistData.data) {
                 setCurrentUser({
                     id: user.id,
-                    name: profileData.data?.name || profileData.data?.full_name || user.email?.split('@')[0]
+                    name: user.email?.split('@')[0] || 'Admin'
                 });
             }
         };
@@ -218,12 +218,12 @@ export default function GlobalTeamChat() {
                 <>
                     <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
                         {messages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                            <div className="h-full flex flex-col items-center justify-center text-slate-500">
                                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-                                    <MessageSquare size={24} className="text-slate-300" />
+                                    <MessageSquare size={24} className="text-slate-400" />
                                 </div>
-                                <p className="text-sm font-bold text-slate-600">첫 메시지를 남겨보세요.</p>
-                                <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">여기에 작성한 메시지와 사진은<br />페이지 이동 후에도 실시간 유지됩니다.</p>
+                                <p className="text-sm font-bold text-slate-700">첫 메시지를 남겨보세요.</p>
+                                <p className="text-xs text-slate-500 mt-2 text-center leading-relaxed">여기에 작성한 메시지와 사진은<br />페이지 이동 후에도 실시간 유지됩니다.</p>
                             </div>
                         ) : (
                             messages.map((msg, idx) => {
@@ -312,7 +312,7 @@ export default function GlobalTeamChat() {
                                 value={newMessage}
                                 onChange={e => setNewMessage(e.target.value)}
                                 placeholder="메시지를 입력하세요..."
-                                className="flex-1 text-sm bg-slate-100 border-transparent focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded-xl px-4 py-3 outline-none transition-all"
+                                className="flex-1 text-sm bg-slate-100 border-transparent focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-500"
                                 disabled={isUploading}
                             />
                             <button

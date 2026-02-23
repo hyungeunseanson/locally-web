@@ -41,6 +41,17 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
         }, 0);
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+            e.preventDefault();
+            insertSyntax('**', '**');
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
+            e.preventDefault();
+            insertSyntax('*', '*');
+        }
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -110,15 +121,16 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                         ref={textareaRef}
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         placeholder="마크다운(Markdown) 포맷으로 자유롭게 메모를 작성하세요..."
-                        className="w-full min-h-[300px] h-full resize-none outline-none bg-transparent text-sm leading-loose text-slate-700 placeholder:text-slate-300 font-mono"
+                        className="w-full min-h-[300px] h-full resize-none outline-none bg-transparent text-sm leading-loose text-slate-800 placeholder:text-slate-500 font-mono"
                     />
                 ) : (
                     <div className="prose prose-sm md:prose-base max-w-none prose-slate prose-img:rounded-xl prose-img:shadow-sm prose-headings:font-bold prose-a:text-blue-500">
                         {content ? (
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                         ) : (
-                            <p className="text-slate-400 italic">내용이 없습니다.</p>
+                            <p className="text-slate-500 italic">내용이 없습니다.</p>
                         )}
                     </div>
                 )}

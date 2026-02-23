@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   ClipboardList, CheckSquare, FileText, Plus, Trash2,
-  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings
+  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings, Edit2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -25,6 +25,8 @@ export default function TeamTab() {
   const [newTodo, setNewTodo] = useState('');
   const [innerTab, setInnerTab] = useState<'todo' | 'memo'>('todo'); // 🟢 새로운 서브 탭
   const [isComposingMemo, setIsComposingMemo] = useState(false);
+  const [editingMemo, setEditingMemo] = useState<any>(null); // ⭐ 수정 모드용 상태
+  const [memoCommentInputs, setMemoCommentInputs] = useState<Record<string, string>>({}); // ⭐ 메모별 댓글 입력 상태
   const [expandedTodo, setExpandedTodo] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -192,18 +194,40 @@ export default function TeamTab() {
     }
   };
 
-  const addMemo = async (markdownContent: string) => {
-    if (!currentUser) return;
+  const addMemoComment = async (taskId: string) => {
+    const text = memoCommentInputs[taskId];
+    if (!text?.trim() || !currentUser) return;
     try {
-      const { error } = await supabase.from('admin_tasks').insert({
-        type: 'MEMO',
-        content: markdownContent,
-        author_id: currentUser.id,
-        author_name: currentUser.name
+      const { error } = await supabase.from('admin_task_comments').insert({
+        task_id: taskId, content: text, author_id: currentUser.id, author_name: currentUser.name
       });
       if (error) throw error;
+      setMemoCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+      showToast('답글을 남겼습니다.', 'success');
+    } catch (error: any) {
+      showToast('오류: ' + error.message, 'error');
+    }
+  };
+
+  const saveMemo = async (markdownContent: string) => {
+    if (!currentUser) return;
+    try {
+      if (editingMemo) {
+        const { error } = await supabase.from('admin_tasks').update({ content: markdownContent }).eq('id', editingMemo.id);
+        if (error) throw error;
+        showToast('마크다운 메모가 수정되었습니다.', 'success');
+      } else {
+        const { error } = await supabase.from('admin_tasks').insert({
+          type: 'MEMO',
+          content: markdownContent,
+          author_id: currentUser.id,
+          author_name: currentUser.name
+        });
+        if (error) throw error;
+        showToast('마크다운 메모가 저장되었습니다.', 'success');
+      }
       setIsComposingMemo(false);
-      showToast('마크다운 메모가 저장되었습니다.', 'success');
+      setEditingMemo(null);
     } catch (error: any) {
       showToast('오류: ' + error.message, 'error');
     }
@@ -384,10 +408,11 @@ export default function TeamTab() {
           /* 🟢 Right: Notion-style Memos Tab */
           <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
             {isComposingMemo ? (
-              // 새 메모 작성 에디터
+              // 새 메모 작성/수정 에디터
               <MarkdownMemoEditor
-                onSave={addMemo}
-                onCancel={() => setIsComposingMemo(false)}
+                initialValue={editingMemo?.content || ''}
+                onSave={saveMemo}
+                onCancel={() => { setIsComposingMemo(false); setEditingMemo(null); }}
                 isSaving={false}
               />
             ) : (
@@ -403,54 +428,100 @@ export default function TeamTab() {
                       <p className="text-xs text-slate-500 font-medium tracking-wider">노출 제한 없는 자유로운 지식 보관소</p>
                     </div>
                   </div>
-                  <button onClick={() => setIsComposingMemo(true)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all">
+                  <button onClick={() => { setEditingMemo(null); setIsComposingMemo(true); }} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all">
                     <Plus size={18} /> 새 메모 작성
                   </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-6 pr-2 scrollbar-thin">
                   {memos.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20">
+                    <div className="h-full flex flex-col items-center justify-center text-slate-500 py-20">
                       <NotebookPen size={48} className="opacity-20 mb-4" />
                       <p className="text-sm border bg-white px-4 py-2 rounded-full shadow-sm">등록된 메모가 없습니다. 노션처럼 마크다운으로 작성해보세요!</p>
                     </div>
                   ) : (
-                    memos.map(memo => (
-                      <div key={memo.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative">
-                        <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex flex-col items-center justify-center text-[11px] font-bold text-slate-500 border border-slate-200 uppercase">
-                              {memo.author_name.slice(0, 2)}
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pb-6">
+                      {memos.map(memo => {
+                        const memoComments = comments.filter(c => c.task_id === memo.id);
+                        return (
+                          <div key={memo.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-[500px]">
+                            <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100 shrink-0">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-slate-100 flex flex-col items-center justify-center text-[11px] font-bold text-slate-600 border border-slate-200 uppercase">
+                                  {memo.author_name.slice(0, 2)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    {memo.author_name}
+                                    {isNew(memo.created_at) && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">NEW</span>}
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 font-medium">
+                                    {format(new Date(memo.created_at), 'yyyy.MM.dd HH:mm', { locale: ko })}
+                                  </p>
+                                </div>
+                              </div>
+                              {memo.author_id === currentUser?.id && (
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                  <button
+                                    onClick={() => { setEditingMemo(memo); setIsComposingMemo(true); }}
+                                    className="text-slate-400 hover:text-blue-500 bg-white p-2 rounded-full hover:bg-blue-50 shadow-sm border border-transparent hover:border-blue-100"
+                                    title="메모 수정"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteTask('admin_tasks', memo.id)}
+                                    className="text-slate-400 hover:text-rose-500 bg-white p-2 rounded-full hover:bg-rose-50 shadow-sm border border-transparent hover:border-rose-100"
+                                    title="메모 삭제"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                {memo.author_name}
-                                {isNew(memo.created_at) && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">NEW</span>}
-                              </p>
-                              <p className="text-[11px] text-slate-400 font-medium">
-                                {format(new Date(memo.created_at), 'yyyy.MM.dd HH:mm', { locale: ko })}
-                              </p>
+
+                            {/* 리치 텍스트 렌더러 기반 뷰어 */}
+                            <div className="flex-1 overflow-y-auto prose prose-sm max-w-none prose-slate prose-img:rounded-xl prose-img:shadow-sm prose-headings:font-bold prose-headings:text-slate-800 prose-a:text-blue-500 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {memo.content}
+                              </ReactMarkdown>
+                            </div>
+
+                            {/* 댓글 구역 */}
+                            <div className="mt-4 pt-4 border-t border-slate-100 shrink-0 space-y-2 bg-slate-50/50 -mx-6 -mb-6 p-4 rounded-b-2xl">
+                              <div className="max-h-28 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                                {memoComments.length === 0 ? (
+                                  <p className="text-[11px] text-slate-400/80 text-center py-2 font-medium">작성된 답글이 없습니다.</p>
+                                ) : (
+                                  memoComments.map(c => (
+                                    <div key={c.id} className="text-[12px] bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                      <div className="flex justify-between items-center mb-1">
+                                        <span className="font-bold text-slate-700">{c.author_name}</span>
+                                        <span className="text-[9px] text-slate-400">{format(new Date(c.created_at), 'MM.dd HH:mm')}</span>
+                                      </div>
+                                      <p className="text-slate-600 leading-relaxed">{c.content}</p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                              <div className="flex gap-2 pt-2">
+                                <input
+                                  type="text"
+                                  placeholder="답글 달기..."
+                                  value={memoCommentInputs[memo.id] || ''}
+                                  onChange={e => setMemoCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
+                                  onKeyDown={e => e.key === 'Enter' && addMemoComment(memo.id)}
+                                  className="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 bg-white placeholder:text-slate-400"
+                                />
+                                <button onClick={() => addMemoComment(memo.id)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
+                                  <Send size={16} />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                          {memo.author_id === currentUser?.id && (
-                            <button
-                              onClick={() => deleteTask('admin_tasks', memo.id)}
-                              className="text-slate-300 hover:text-rose-500 transition-all bg-white p-2 rounded-full hover:bg-rose-50 shadow-sm border border-transparent hover:border-rose-100"
-                              title="메모 삭제"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-
-                        {/* 리치 텍스트 렌더러 기반 뷰어 */}
-                        <div className="prose prose-sm md:prose-base max-w-none prose-slate prose-img:rounded-xl prose-img:shadow-sm prose-headings:font-bold prose-headings:text-slate-800 prose-a:text-blue-500 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {memo.content}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                    ))
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
