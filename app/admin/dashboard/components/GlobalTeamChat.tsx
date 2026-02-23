@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Paperclip, X, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
@@ -331,10 +332,10 @@ export default function GlobalTeamChat() {
                 </>
             )}
 
-            {/* Image Zoom Modal */}
-            {zoomImage && (
+            {/* Image Zoom Modal using React Portal to escape fixed container */}
+            {zoomImage && createPortal(
                 <div
-                    className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
+                    className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
                     onClick={() => setZoomImage(null)}
                 >
                     <button
@@ -349,7 +350,8 @@ export default function GlobalTeamChat() {
                         className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
                         onClick={e => e.stopPropagation()} // Prevent close when clicking the image itself
                     />
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
