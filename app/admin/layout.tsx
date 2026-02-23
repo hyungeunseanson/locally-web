@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ReactNode, Suspense } from "react";
 import Sidebar from "@/app/admin/dashboard/components/Sidebar";
+import GlobalTeamChat from "@/app/admin/dashboard/components/GlobalTeamChat";
 
 export default async function AdminLayout({
   children,
@@ -86,6 +87,9 @@ export default async function AdminLayout({
           {children}
         </div>
       </main>
+
+      {/* 🟢 전역 팀 채팅창 마운트 */}
+      <GlobalTeamChat />
     </div>
   );
 }

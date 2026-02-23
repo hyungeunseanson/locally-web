@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-23
-**Version:** 2.4.3 (Safety Policies & Host Education System)
+**Version:** 2.4.4 (Team Collaboration Overhaul: Global Chat & Markdown Memo)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
