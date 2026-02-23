@@ -105,8 +105,10 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
         settlementMap.set(hostId, {
           id: hostId,
           hostName: hostInfo?.name || '알 수 없음',
-          bank: hostInfo?.bank_name ? `${hostInfo.bank_name} ${hostInfo.account_number}` : '계좌 미등록',
+          bank: hostInfo?.bank_name ? `${hostInfo.bank_name}` : '계좌 미등록',
+          accountNumber: hostInfo?.account_number || '',
           accountHolder: hostInfo?.account_holder || '-',
+          hostNationality: hostInfo?.host_nationality || '-',
           totalAmount: 0,
           count: 0,
           status: booking.payout_status || 'pending',
@@ -164,31 +166,75 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
 
   const handleDownloadCSV = (item: any) => {
     try {
-      const headers = ['결제일', '예약ID', '게스트', '진행상태', '결제금액', '정산대상액(\u20A9)'];
-      const rows = item.bookings.map((b: any) => [
-        format(new Date(b.created_at), 'yyyy-MM-dd HH:mm'),
-        b.id.split('-').pop(), // short id
-        b.profiles?.name || 'Unknown',
-        b.status === 'completed' ? '완료됨' : '취소/위약금',
-        b.amount || 0,
-        b.calculatedPayout
-      ]);
+      // 국세청 해외송금 증빙용 포맷 (수기 입력란 포함)
+      const headers = [
+        '결제일시',
+        '예약번호(ID)',
+        '예금주(실명)',
+        '호스트국적',
+        '수취은행명',
+        '계좌번호',
+        '용역제공내역',
+        '게스트명',
+        '거래총액(Gross)',
+        '위약금반환액',
+        '플랫폼수수료(Fee)',
+        '실지급정산액(Net)',
+        '비고(외국인신분증등_수기입력)'
+      ];
+
+      const rows = item.bookings.map((b: any) => {
+        // 취소된 경우와 완료된 경우의 매출/위약금 계산
+        const gross = b.amount || 0;
+        let refundPenaltyAmount = 0; // 취소 위약금 발생액
+        let fee = 0; // 플랫폼 수수료
+        let net = b.calculatedPayout || 0; // 호스트 지급액
+
+        if (b.status === 'cancelled') {
+          refundPenaltyAmount = gross; // 취소되었는데 리스트에 들어왔다면 전액 위약금이거나 부분 위약금. 
+          fee = gross - net;
+        } else {
+          fee = gross - net;
+        }
+
+        const expTitle = b.experiences?.title || '로컬 가이드 서비스';
+        // 따옴표나 쉼표가 있을 수 있으므로 필드 보호 (CSV 이스케이프)
+        const escapeCSV = (str: any) => `"${String(str).replace(/"/g, '""')}"`;
+
+        return [
+          escapeCSV(format(new Date(b.created_at), 'yyyy-MM-dd HH:mm')),
+          escapeCSV(b.id),
+          escapeCSV(item.accountHolder),
+          escapeCSV(item.hostNationality),
+          escapeCSV(item.bank),
+          escapeCSV(item.accountNumber),
+          escapeCSV(`플랫폼 로컬 체험/가이드 용역 (${expTitle})`),
+          escapeCSV(b.profiles?.name || 'Unknown User'),
+          gross,
+          refundPenaltyAmount,
+          fee,
+          net,
+          '""' // 수기입력란 (빈칸)
+        ];
+      });
 
       const csvContent = [
         headers.join(','),
         ...rows.map((row: any[]) => row.join(','))
       ].join('\n');
 
+      // Excel에서 한글 깨짐을 방지하기 위해 UTF-8 BOM(Byte Order Mark) 추가
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `정산명세서_${item.hostName}_${format(new Date(), 'yyyyMMdd')}.csv`);
+      link.setAttribute('download', `세무증빙_정산명세서_${item.hostName}_${format(new Date(), 'yyyyMMdd')}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showToast('명세서(CSV) 다운로드가 시작되었습니다.', 'success');
+      showToast('국세청 소명용 명세서(CSV) 다운로드가 시작되었습니다.', 'success');
     } catch (err) {
+      console.error('CSV Gen Error:', err);
       showToast('CSV 생성 중 오류가 발생했습니다.', 'error');
     }
   };
@@ -309,7 +355,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
                   <td className="px-6 py-4 font-mono font-bold text-purple-600">₩{item.totalAmount.toLocaleString()}</td>
                   <td className="px-6 py-4 text-slate-500 flex items-center gap-1">
                     {item.bank === '계좌 미등록' ? <AlertTriangle size={14} className="text-red-500" /> : <CreditCard size={14} />}
-                    {item.bank}
+                    {item.bank} {item.accountNumber}
                   </td>
                   <td className="px-6 py-4 text-slate-500">{item.count}건</td>
                   <td className="px-6 py-4 text-right">
