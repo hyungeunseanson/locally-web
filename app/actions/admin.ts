@@ -16,7 +16,7 @@ async function getAdminClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-          } catch {}
+          } catch { }
         },
       },
     }
@@ -28,10 +28,10 @@ async function getAdminClient() {
   let isAdmin = false;
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
   if (profile?.role === 'admin') isAdmin = true;
-  
+
   if (!isAdmin) {
-     const { data: userView } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-     if (userView?.role === 'admin') isAdmin = true;
+    const { data: userView } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+    if (userView?.role === 'admin') isAdmin = true;
   }
 
   // 🟢 [추가] 화이트리스트 이메일 확인
@@ -61,7 +61,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
       const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).maybeSingle();
       if (data) targetTitle = data.name;
     }
-  } catch (e) {}
+  } catch (e) { }
 
   const updateData: any = { status };
   if (comment) updateData.admin_comment = comment;
@@ -83,10 +83,10 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
     action_type: `UPDATE_${table.toUpperCase()}_STATUS`,
     target_type: table,
     target_id: id,
-    details: { 
+    details: {
       target_info: targetTitle,
-      new_status: status, 
-      comment 
+      new_status: status,
+      comment
     }
   });
 
@@ -108,7 +108,7 @@ export async function deleteAdminItem(table: string, id: string) {
       const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).maybeSingle();
       if (data) targetInfo = data.title;
     }
-  } catch (e) {}
+  } catch (e) { }
 
   if (table === 'profiles' || table === 'users') {
     await supabaseAdmin.auth.admin.deleteUser(id);
@@ -133,6 +133,33 @@ export async function deleteAdminItem(table: string, id: string) {
     target_type: table,
     target_id: id,
     details: { target_info: targetInfo }
+  });
+
+  return { success: true };
+}
+
+// 💰 정산 완료 처리 (다중 Bookings 업데이트)
+export async function settleHostPayout(bookingIds: string[]) {
+  const supabase = await getAdminClient();
+  const { data: { user: adminUser } } = await supabase.auth.getUser();
+  const supabaseAdmin = createAdminClient();
+
+  if (!bookingIds || bookingIds.length === 0) return { success: false, error: 'No bookings provided' };
+
+  const { error } = await supabaseAdmin
+    .from('bookings')
+    .update({ payout_status: 'paid' })
+    .in('id', bookingIds);
+
+  if (error) throw new Error(error.message);
+
+  await recordAuditLog({
+    admin_id: adminUser?.id,
+    admin_email: adminUser?.email,
+    action_type: 'SETTLE_HOST_PAYOUT',
+    target_type: 'bookings',
+    target_id: bookingIds.length > 1 ? 'MULTIPLE' : bookingIds[0],
+    details: { booking_ids: bookingIds }
   });
 
   return { success: true };
