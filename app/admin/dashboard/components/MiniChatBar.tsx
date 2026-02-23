@@ -24,7 +24,7 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
     const [hasUnread, setHasUnread] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const supabase = createClient();
-    const CHAT_ROOM_ID = 'MINI_CHAT_ROOM_A1'; // Using a fixed task_id for general chat
+    const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000'; // Using a fixed task_id for general chat
 
     const fetchMessages = async () => {
         const { data } = await supabase
@@ -182,8 +182,8 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
                                                 </span>
                                             )}
                                             <div className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-sm ${isMe
-                                                    ? 'bg-slate-900 border border-slate-800 text-white rounded-br-sm'
-                                                    : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
+                                                ? 'bg-slate-900 border border-slate-800 text-white rounded-br-sm'
+                                                : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                                                 }`}>
                                                 {msg.content}
                                             </div>
@@ -213,8 +213,8 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
                                 type="submit"
                                 disabled={!newMessage.trim()}
                                 className={`p-2 rounded-lg transition-all ${newMessage.trim()
-                                        ? 'bg-slate-900 text-white shadow-md hover:bg-slate-800 scale-100'
-                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed scale-95'
+                                    ? 'bg-slate-900 text-white shadow-md hover:bg-slate-800 scale-100'
+                                    : 'bg-slate-100 text-slate-300 cursor-not-allowed scale-95'
                                     }`}
                             >
                                 <Send size={14} className={newMessage.trim() ? "ml-0.5" : ""} />
