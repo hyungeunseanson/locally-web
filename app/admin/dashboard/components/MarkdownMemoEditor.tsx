@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Bold, Italic, Code, Quote, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Bold, Italic, Code, Quote, Image as ImageIcon, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 
 interface MarkdownMemoEditorProps {
@@ -15,6 +16,7 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
     const [content, setContent] = useState(initialValue);
     const [isPreview, setIsPreview] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [zoomImage, setZoomImage] = useState<string | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
@@ -126,9 +128,24 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                         className="w-full min-h-[300px] h-full resize-none outline-none bg-transparent text-sm leading-loose text-slate-800 placeholder:text-slate-500 font-mono"
                     />
                 ) : (
-                    <div className="prose prose-slate max-w-none !text-[13px] [&_p]:!text-[13px] [&_p]:!text-slate-700 [&_p]:!leading-relaxed [&_li]:!text-[13px] [&_li]:!text-slate-700 [&_img]:!max-w-[50%] [&_img]:!h-auto [&_img]:!object-contain [&_img]:!rounded-xl [&_img]:!shadow-sm [&_img]:!my-2 [&_a]:!text-blue-600 prose-headings:font-bold prose-headings:text-slate-800">
+                    <div className="prose prose-slate max-w-none !text-[13px] [&_p]:!text-[13px] [&_p]:!text-slate-700 [&_p]:!leading-relaxed [&_li]:!text-[13px] [&_li]:!text-slate-700 [&_img]:!max-w-[50%] [&_img]:!h-auto [&_img]:!object-contain [&_img]:!rounded-xl [&_img]:!shadow-sm [&_img]:!cursor-pointer hover:[&_img]:!opacity-90 [&_img]:!transition-opacity [&_img]:!my-2 [&_a]:!text-blue-600 prose-headings:font-bold prose-headings:text-slate-800">
                         {content ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                    img: ({ node, ...props }) => (
+                                        <img
+                                            {...props}
+                                            onClick={() => {
+                                                if (props.src) setZoomImage(props.src as string);
+                                            }}
+                                            alt={props.alt || "markdown image"}
+                                        />
+                                    )
+                                }}
+                            >
+                                {content}
+                            </ReactMarkdown>
                         ) : (
                             <p className="text-slate-500 italic">내용이 없습니다.</p>
                         )}
@@ -143,6 +160,27 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                     {isSaving ? '저장 중...' : <><CheckCircle2 size={16} /> 작성 완료</>}
                 </button>
             </div>
+
+            {zoomImage && createPortal(
+                <div
+                    className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
+                    onClick={() => setZoomImage(null)}
+                >
+                    <button
+                        onClick={() => setZoomImage(null)}
+                        className="absolute top-6 right-6 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-colors"
+                    >
+                        <X size={24} />
+                    </button>
+                    <img
+                        src={zoomImage}
+                        alt="Zoomed"
+                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+                        onClick={e => e.stopPropagation()}
+                    />
+                </div>,
+                document.body
+            )}
         </div>
     );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import MarkdownMemoEditor from './MarkdownMemoEditor';
 import ReactMarkdown from 'react-markdown';
@@ -33,6 +34,7 @@ export default function TeamTab() {
   const [isClient, setIsClient] = useState(false);
   const [lastViewed, setLastViewed] = useState<string>(new Date(0).toISOString());
   const [expandedMemos, setExpandedMemos] = useState<Set<string>>(new Set());
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const threadRef = useRef<HTMLDivElement>(null);
@@ -481,39 +483,52 @@ export default function TeamTab() {
                             </div>
 
                             {/* 리치 텍스트 렌더러 기반 뷰어 */}
-                            <div className="flex-1 overflow-y-auto prose prose-slate max-w-none !text-[13px] [&_p]:!text-[13px] [&_p]:!text-slate-700 [&_p]:!leading-relaxed [&_li]:!text-[13px] [&_li]:!text-slate-700 [&_img]:!max-w-[50%] [&_img]:!h-auto [&_img]:!object-contain [&_img]:!rounded-xl [&_img]:!shadow-sm [&_img]:!my-2 [&_a]:!text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            <div className="flex-1 overflow-y-auto prose prose-slate max-w-none !text-[13px] [&_p]:!text-[13px] [&_p]:!text-slate-700 [&_p]:!leading-relaxed [&_li]:!text-[13px] [&_li]:!text-slate-700 [&_img]:!max-w-[50%] [&_img]:!h-auto [&_img]:!object-contain [&_img]:!rounded-xl [&_img]:!shadow-sm [&_img]:!cursor-pointer hover:[&_img]:!opacity-90 [&_img]:!transition-opacity [&_img]:!my-2 [&_a]:!text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  img: ({ node, ...props }) => (
+                                    <img
+                                      {...props}
+                                      onClick={() => {
+                                        if (props.src) setZoomImage(props.src as string);
+                                      }}
+                                      alt={props.alt || "markdown image"}
+                                    />
+                                  )
+                                }}
+                              >
                                 {memo.content}
                               </ReactMarkdown>
                             </div>
 
                             {/* 댓글 구역 */}
-                            <div className="mt-4 pt-4 border-t border-slate-100 shrink-0 space-y-2 bg-slate-50/50 -mx-6 -mb-6 p-4 rounded-b-2xl">
-                              <div className="max-h-28 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                            <div className="mt-4 pt-5 border-t-2 border-slate-100 shrink-0 space-y-3 bg-slate-50/80 -mx-6 -mb-6 p-5 rounded-b-2xl shadow-inner">
+                              <div className="max-h-32 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
                                 {memoComments.length === 0 ? (
-                                  <p className="text-[11px] text-slate-400/80 text-center py-2 font-medium">작성된 답글이 없습니다.</p>
+                                  <p className="text-[11px] text-slate-400/80 text-center py-3 font-medium">작성된 답글이 없습니다.</p>
                                 ) : (
                                   memoComments.map(c => (
-                                    <div key={c.id} className="text-[12px] bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
-                                      <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-slate-700">{c.author_name}</span>
-                                        <span className="text-[9px] text-slate-400">{format(new Date(c.created_at), 'MM.dd HH:mm')}</span>
+                                    <div key={c.id} className="text-[12px] bg-white p-3 rounded-xl border border-slate-200 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.05)]">
+                                      <div className="flex justify-between items-center mb-1.5">
+                                        <span className="font-bold text-slate-800">{c.author_name}</span>
+                                        <span className="text-[10px] text-slate-400 font-medium">{format(new Date(c.created_at), 'MM.dd HH:mm')}</span>
                                       </div>
                                       <p className="text-slate-600 leading-relaxed">{c.content}</p>
                                     </div>
                                   ))
                                 )}
                               </div>
-                              <div className="flex gap-2 pt-2">
+                              <div className="flex gap-2 pt-2 border-t border-slate-200/50 mt-1">
                                 <input
                                   type="text"
-                                  placeholder="답글 달기..."
+                                  placeholder="진행 상황이나 의견을 남겨주세요..."
                                   value={memoCommentInputs[memo.id] || ''}
                                   onChange={e => setMemoCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
                                   onKeyDown={e => e.key === 'Enter' && addMemoComment(memo.id)}
-                                  className="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 bg-white placeholder:text-slate-400"
+                                  className="flex-1 text-xs px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all"
                                 />
-                                <button onClick={() => addMemoComment(memo.id)} className="bg-slate-900 text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
+                                <button onClick={() => addMemoComment(memo.id)} className="bg-slate-900 text-white px-3.5 rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center">
                                   <Send size={16} />
                                 </button>
                               </div>
@@ -573,6 +588,27 @@ export default function TeamTab() {
           </div>
         )}
       </div>
+
+      {zoomImage && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setZoomImage(null)}
+        >
+          <button
+            onClick={() => setZoomImage(null)}
+            className="absolute top-6 right-6 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-colors"
+          >
+            <X size={24} />
+          </button>
+          <img
+            src={zoomImage}
+            alt="Zoomed"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
