@@ -55,6 +55,22 @@ export default async function AdminLayout({
     redirect("/");
   }
 
+  // 화이트리스트에 있으나 권한이 admin이 아닌 경우 자동 승급 (DB RLS 우회 목적)
+  if (whitelistEntry.data && userProfile.data?.role !== "admin") {
+    // Service Role을 사용하여 RLS 제약을 무시하고 profiles 업데이트
+    const adminSupabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        cookies: {
+          getAll() { return []; },
+          setAll() { }
+        }
+      }
+    );
+    await adminSupabase.from("profiles").update({ role: "admin" }).eq("id", user.id);
+  }
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* 왼쪽: 고정된 관리자 사이드바 */}
