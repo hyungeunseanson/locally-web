@@ -10,9 +10,13 @@ import { useToast } from '@/app/context/ToastContext';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { DateRange, Range } from 'react-date-range';
+import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css'; // main style file
 import 'react-date-range/dist/theme/default.css'; // theme css file
+import { Range } from 'react-date-range';
+
+// SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
+const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
 export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any[], onRefresh: () => void }) {
   const { showToast } = useToast();
