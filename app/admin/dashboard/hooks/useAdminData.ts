@@ -61,11 +61,11 @@ export function useAdminData() {
         experiences: {
           title: exp?.title || 'Unknown Experience',
           host_id: exp?.host_id,
-          profiles: { name: host?.name || 'Unknown Host' }
+          profiles: { name: host?.full_name || 'Unknown Host' }
         },
         profiles: {
           email: guest?.email || 'No Email',
-          name: guest?.name || 'No Name'
+          name: guest?.full_name || 'No Name'
         }
       };
     });
@@ -118,7 +118,7 @@ export function useAdminData() {
   // 🟢 더보기 (Load More) 기능 구현
   const loadMoreBookings = async () => {
     if (isBookingLoading || !hasMoreBookings) return;
-    
+
     setIsBookingLoading(true);
     const nextPage = bookingPage + 1;
     const from = nextPage * ITEMS_PER_PAGE;
@@ -170,7 +170,7 @@ export function useAdminData() {
         // 🟢 새 예약이 오면 맨 앞에 추가 (전체 리로드 방지)
         const newBookingRaw = payload.new;
         const enriched = await enrichBookings([newBookingRaw]);
-        
+
         setState(prev => ({
           ...prev,
           bookings: [...enriched, ...prev.bookings]
@@ -217,10 +217,10 @@ export function useAdminData() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '삭제 요청 실패');
       showToast('삭제되었습니다.', 'success');
-      
+
       // 로컬 상태에서 즉시 제거 (리로드 없이)
       if (table === 'users') {
-        setState(prev => ({ ...prev, users: prev.users.filter((u:any) => u.id !== id) }));
+        setState(prev => ({ ...prev, users: prev.users.filter((u: any) => u.id !== id) }));
       } else {
         fetchInitialData();
       }
