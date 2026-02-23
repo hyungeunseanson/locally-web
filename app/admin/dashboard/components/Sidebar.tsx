@@ -114,7 +114,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-black text-white flex flex-col p-4 shadow-xl h-screen sticky top-0 border-r border-slate-900">
+    <aside className="w-64 bg-slate-900 text-white flex flex-col p-4 shadow-xl h-screen sticky top-0 border-r border-slate-900">
       <div className="mb-10 px-2 mt-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden">
           <img src="/images/logo-new-white.png" alt="Locally Logo" className="w-8 h-8 object-contain" />

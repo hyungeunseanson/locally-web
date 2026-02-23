@@ -219,7 +219,7 @@ export default function HomeHero({
           <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">{t('anywhere')}</div>
           <div className="px-4 text-sm font-bold text-slate-900 border-r border-slate-300">{t('anytime')}</div>
           <div className="px-4 text-sm font-bold text-slate-500">{t('search')}</div>
-          <button className="w-8 h-8 bg-[#FF385C] rounded-full flex items-center justify-center text-white ml-2">
+          <button className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-white ml-2">
             <Search size={14} strokeWidth={3} />
           </button>
         </div>

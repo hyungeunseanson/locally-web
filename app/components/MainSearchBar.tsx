@@ -126,7 +126,7 @@ export default function MainSearchBar({
               onSearch();
               setActiveSearchField(null);
             }}
-            className="w-12 h-12 bg-[#FF385C] hover:bg-[#E00B41] rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"
+            className="w-12 h-12 bg-slate-900 hover:bg-slate-800 rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"
           >
             <Search size={20} strokeWidth={2.5} />
           </button>
