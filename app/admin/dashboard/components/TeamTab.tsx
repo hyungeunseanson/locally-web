@@ -224,7 +224,7 @@ export default function TeamTab() {
 
   const dailyLogs = tasks.filter(t => t.type === 'DAILY_LOG');
   const todos = tasks.filter(t => t.type === 'TODO');
-  const memos = tasks.filter(t => t.type === 'MEMO');
+  const memos = tasks.filter(t => t.type === 'MEMO' && t.id !== '00000000-0000-0000-0000-000000000000');
 
   const isNew = (createdAt: string) => new Date(createdAt) > new Date(lastViewed);
 
