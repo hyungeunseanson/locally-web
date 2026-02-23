@@ -26,6 +26,7 @@ export default function GlobalTeamChat() {
     const [hasUnread, setHasUnread] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<{ file: File, url: string } | null>(null);
+    const [zoomImage, setZoomImage] = useState<string | null>(null);
     const [isClient, setIsClient] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -250,7 +251,10 @@ export default function GlobalTeamChat() {
                                             <div className={`flex flex-col gap-1 rounded-2xl shadow-sm overflow-hidden ${isMe ? 'items-end' : 'items-start'}`}>
                                                 {/* Image Attachment */}
                                                 {msg.metadata?.image_url && (
-                                                    <div className={`p-1 bg-white border border-slate-200 max-w-[240px] ${isMe ? 'rounded-2xl rounded-br-sm bg-indigo-50 border-indigo-100' : 'rounded-2xl rounded-bl-sm'}`}>
+                                                    <div
+                                                        onClick={() => setZoomImage(msg.metadata!.image_url!)}
+                                                        className={`p-1 bg-white border border-slate-200 max-w-[240px] cursor-pointer hover:opacity-90 transition-opacity ${isMe ? 'rounded-2xl rounded-br-sm bg-indigo-50 border-indigo-100' : 'rounded-2xl rounded-bl-sm'}`}
+                                                    >
                                                         <img src={msg.metadata.image_url} alt="attached" className="rounded-xl w-full object-cover max-h-48" loading="lazy" />
                                                     </div>
                                                 )}
@@ -325,6 +329,27 @@ export default function GlobalTeamChat() {
                         </form>
                     </div>
                 </>
+            )}
+
+            {/* Image Zoom Modal */}
+            {zoomImage && (
+                <div
+                    className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
+                    onClick={() => setZoomImage(null)}
+                >
+                    <button
+                        onClick={() => setZoomImage(null)}
+                        className="absolute top-6 right-6 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-colors"
+                    >
+                        <X size={24} />
+                    </button>
+                    <img
+                        src={zoomImage}
+                        alt="Zoomed"
+                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+                        onClick={e => e.stopPropagation()} // Prevent close when clicking the image itself
+                    />
+                </div>
             )}
         </div>
     );
