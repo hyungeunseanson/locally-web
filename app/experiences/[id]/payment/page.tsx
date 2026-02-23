@@ -58,6 +58,17 @@ function PaymentContent() {
           setCustomerName(profile.full_name || '');
           setCustomerPhone(profile.phone || '');
         }
+
+        // 🟢 결제 페이지 진입 기록 (퍼널 3단계: 결제 시도)
+        if (experienceId) {
+          supabase.from('analytics_events').insert([{
+            event_type: 'payment_init',
+            target_id: experienceId,
+            user_id: user.id
+          }]).then(({ error }) => {
+            if (error) console.error('Payment Init Log Error:', error);
+          });
+        }
       }
     };
     fetchExp();

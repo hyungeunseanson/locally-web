@@ -18,6 +18,8 @@ export function useAdminData() {
     users: [],
     bookings: [],
     reviews: [],
+    searchLogs: [], // 🟢 추가
+    analyticsEvents: [], // 🟢 추가
     onlineUsers: [],
     isLoading: true,
   });
@@ -97,12 +99,16 @@ export function useAdminData() {
         { data: expData },
         { data: userData },
         { data: reviewData },
+        { data: searchLogsData },
+        { data: analyticsEventsData },
         { data: bookingRawData, error: bookingError }
       ] = await Promise.all([
         supabase.from('host_applications').select('*').order('created_at', { ascending: false }),
         supabase.from('experiences').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('reviews').select('rating, experience_id, created_at'),
+        supabase.from('search_logs').select('*').order('created_at', { ascending: false }).limit(2000), // 🟢 최근 검색 로그
+        supabase.from('analytics_events').select('*').order('created_at', { ascending: false }).limit(10000), // 🟢 이벤트 로그 (퍼널용)
         supabase.from('bookings')
           .select('*')
           .order('created_at', { ascending: false })
@@ -120,6 +126,8 @@ export function useAdminData() {
         users: userData || [],
         bookings: enrichedBookings,
         reviews: reviewData || [],
+        searchLogs: searchLogsData || [], // 🟢 저장
+        analyticsEvents: analyticsEventsData || [], // 🟢 저장
         isLoading: false
       }));
 

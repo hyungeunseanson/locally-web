@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchActiveExperiences } from '../utils/api/experiences';
 import { Experience } from '../types';
+import { supabase } from '../lib/supabase';
 
 // 🟢 통역기: 영어 ID가 들어오면 한글 DB 이름으로 바꿔주는 역할 (유지)
 const cityMap: Record<string, string> = {
@@ -17,7 +18,7 @@ const cityMap: Record<string, string> = {
 
 export function useExperienceFilter() {
   // 🟢 1. React Query를 이용한 데이터 패칭 및 캐싱 (로딩 상태 자동 관리)
-  const { 
+  const {
     data: allExperiences = [], // 기본값 빈 배열
     isLoading: loading,
     isSuccess
@@ -48,6 +49,14 @@ export function useExperienceFilter() {
 
     // 검색어 필터
     if (locationInput.trim()) {
+      // 🟢 검색 로그 기록 (Supabase, 비동기로 백그라운드에서 실행)
+      supabase.from('search_logs').insert([{
+        keyword: locationInput.trim(),
+        route: 'main'
+      }]).then(({ error }) => {
+        if (error) console.error('Search Log Insert Error:', error);
+      });
+
       const searchTerms = locationInput.replace(/[·,.]/g, ' ').toLowerCase().split(/\s+/).filter(t => t.length > 0);
       result = result.filter(item => {
         const targetString = `${item.title} ${item.city} ${item.description} ${item.category} ${item.tags?.join(' ')}`.toLowerCase();
@@ -62,10 +71,10 @@ export function useExperienceFilter() {
 
     // 날짜 필터
     if (dateRange.start) {
-      const start = new Date(dateRange.start); start.setHours(0,0,0,0);
-      const end = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start); end.setHours(23,59,59,999);
-      
-      result = result.filter(item => 
+      const start = new Date(dateRange.start); start.setHours(0, 0, 0, 0);
+      const end = dateRange.end ? new Date(dateRange.end) : new Date(dateRange.start); end.setHours(23, 59, 59, 999);
+
+      result = result.filter(item =>
         item.available_dates?.some(d => {
           const t = new Date(d).getTime();
           return t >= start.getTime() && t <= end.getTime();
@@ -89,14 +98,14 @@ export function useExperienceFilter() {
   }, [selectedCategory, selectedLanguage, dateRange, allExperiences]); // allExperiences 변경 시 재실행 추가
 
   return {
-    loading, 
-    filteredExperiences, 
+    loading,
+    filteredExperiences,
     allExperiences,
     locationInput, setLocationInput,
     selectedCategory, setSelectedCategory,
     selectedLanguage, setSelectedLanguage,
     dateRange, setDateRange,
-    setFilteredExperiences, 
+    setFilteredExperiences,
     applyFilters
   };
 }

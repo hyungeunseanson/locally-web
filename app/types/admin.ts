@@ -68,4 +68,6 @@ export interface AdminDashboardState {
   reviews: any[];
   onlineUsers: any[];
   isLoading: boolean;
+  searchLogs?: any[]; // 🟢 추가: 검색 트렌드 분석용
+  analyticsEvents?: any[]; // 🟢 추가: 퍼널 분석용
 }

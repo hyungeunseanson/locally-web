@@ -23,7 +23,7 @@ function AdminDashboardContent() {
   const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPROVALS';
 
   const {
-    apps, exps, users, bookings, reviews, onlineUsers, isLoading,
+    apps, exps, users, bookings, reviews, searchLogs, analyticsEvents, onlineUsers, isLoading,
     updateStatus, deleteItem, refresh
   } = useAdminData();
 
@@ -49,7 +49,7 @@ function AdminDashboardContent() {
       ) : activeTab === 'SALES' ? (
         <SalesTab bookings={bookings} apps={apps} onRefresh={refresh} />
       ) : activeTab === 'ANALYTICS' ? (
-        <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} />
+        <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} searchLogs={searchLogs} analyticsEvents={analyticsEvents} />
       ) : activeTab === 'CHATS' ? (
         <ChatMonitor />
       ) : activeTab === 'LOGS' ? (

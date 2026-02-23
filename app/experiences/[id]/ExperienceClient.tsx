@@ -13,6 +13,7 @@ import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
+import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
 
 type Props = {
   initialUser: any;
@@ -57,6 +58,19 @@ export default function ExperienceClient({
   // 🟢 [핵심] 위치 정보는 아직 번역이 없으므로 한국어 사용 (나중에 location_en 추가 가능)
   const location = experience.location;
 
+  // 🟢 체험 상세페이지 진입 시 조회(view) 이벤트 기록
+  React.useEffect(() => {
+    if (experience?.id) {
+      supabase.from('analytics_events').insert([{
+        event_type: 'view',
+        target_id: String(experience.id),
+        user_id: user?.id || null
+      }]).then(({ error }) => {
+        if (error) console.error('View Event Log Error:', error);
+      });
+    }
+  }, [experience?.id, user?.id]);
+
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -88,6 +102,16 @@ export default function ExperienceClient({
     if (!user) return showToast("로그인이 필요합니다.", 'error');
     if (!date) return showToast("날짜를 선택해주세요.", 'error');
     if (!time) return showToast("시간을 선택해주세요.", 'error');
+
+    // 🟢 결제하기 버튼 클릭 기록 (퍼널 2단계: 클릭)
+    supabase.from('analytics_events').insert([{
+      event_type: 'click',
+      target_id: String(experience.id),
+      user_id: user.id
+    }]).then(({ error }) => {
+      if (error) console.error('Click Event Log Error:', error);
+    });
+
     const typeParam = isPrivate ? '&type=private' : '';
     router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
