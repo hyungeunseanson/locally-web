@@ -481,7 +481,7 @@ export default function TeamTab() {
                             </div>
 
                             {/* 리치 텍스트 렌더러 기반 뷰어 */}
-                            <div className="flex-1 overflow-y-auto prose prose-sm text-[13px] max-w-none prose-slate text-slate-800 prose-p:text-slate-800 prose-p:text-[13px] prose-li:text-slate-800 prose-li:text-[13px] prose-img:rounded-xl prose-img:shadow-sm prose-img:max-h-[140px] prose-img:w-auto prose-img:object-contain prose-img:my-2 prose-headings:font-bold prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-blue-600 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
+                            <div className="flex-1 overflow-y-auto prose prose-sm text-[13px] max-w-none prose-slate text-slate-800 prose-p:text-slate-800 prose-p:text-[13px] prose-li:text-slate-800 prose-li:text-[13px] prose-img:rounded-xl prose-img:shadow-sm prose-img:max-w-[50%] prose-img:h-auto prose-img:object-contain prose-img:my-2 prose-headings:font-bold prose-headings:text-slate-900 prose-strong:text-slate-900 prose-a:text-blue-600 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                 {memo.content}
                               </ReactMarkdown>
