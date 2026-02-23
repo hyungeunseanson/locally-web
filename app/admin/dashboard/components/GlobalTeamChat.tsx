@@ -186,6 +186,17 @@ export default function GlobalTeamChat() {
                 metadata: imageUrl ? { image_url: imageUrl } : null
             });
 
+            // 알림 발송 (비동기 처리)
+            fetch('/api/admin/notify-team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: `Team Chat에 새로운 메시지가 도착했습니다.`,
+                    message: `${currentUser.name}: ${messageText || '(사진)'}`,
+                    link: '/admin/dashboard?tab=TEAM'
+                })
+            }).catch(e => console.error('Notify error:', e));
+
         } catch (error) {
             console.error('Failed to send message:', error);
             setMessages(prev => prev.filter(m => m.id !== tempId));
@@ -209,7 +220,7 @@ export default function GlobalTeamChat() {
                     <MessageSquare size={18} />
                     <span className="font-bold tracking-tight">Team Chat</span>
                     {hasUnread && !isOpen && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse ml-2 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></span>
+                        <span className="w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center ml-2 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">N</span>
                     )}
                 </div>
                 {isOpen ? <ChevronDown size={20} className="text-slate-300" /> : <ChevronUp size={20} className="text-slate-300" />}

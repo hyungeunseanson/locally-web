@@ -67,7 +67,7 @@ export default function Sidebar() {
         { count: newTasksCount },
         { count: newCommentsCount }
       ] = await Promise.all([
-        supabase.from('admin_tasks').select('*', { count: 'exact', head: true }).eq('type', 'TODO').gt('created_at', lastViewed),
+        supabase.from('admin_tasks').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed),
         supabase.from('admin_task_comments').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed)
       ]);
 

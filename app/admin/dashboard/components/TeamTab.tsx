@@ -154,6 +154,18 @@ export default function TeamTab() {
         author_name: currentUser.name
       });
       if (error) throw error;
+
+      // 알림 발송 (비동기 처리)
+      fetch('/api/admin/notify-team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `할 일에 새로운 댓글이 등록되었습니다.`,
+          message: `${currentUser.name}: ${newComment}`,
+          link: '/admin/dashboard?tab=TEAM'
+        })
+      }).catch(e => console.error('Notify error:', e));
+
       setNewComment('');
     } catch (error: any) {
       showToast('댓글 작성 실패: ' + error.message, 'error');
@@ -189,6 +201,17 @@ export default function TeamTab() {
     try {
       const { error } = await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
       if (error) throw error;
+
+      fetch('/api/admin/notify-team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `새로운 할 일이 등록되었습니다.`,
+          message: `${currentUser.name}님이 할 일을 추가했습니다:\n${newTodo}`,
+          link: '/admin/dashboard?tab=TEAM'
+        })
+      }).catch(e => console.error('Notify error:', e));
+
       setNewTodo('');
       showToast('할 일이 추가되었습니다.', 'success');
     } catch (error: any) {
@@ -204,6 +227,17 @@ export default function TeamTab() {
         task_id: taskId, content: text, author_id: currentUser.id, author_name: currentUser.name
       });
       if (error) throw error;
+
+      fetch('/api/admin/notify-team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `메모에 새로운 답글이 등록되었습니다.`,
+          message: `${currentUser.name}: ${text}`,
+          link: '/admin/dashboard?tab=TEAM'
+        })
+      }).catch(e => console.error('Notify error:', e));
+
       setMemoCommentInputs(prev => ({ ...prev, [taskId]: '' }));
       showToast('답글을 남겼습니다.', 'success');
     } catch (error: any) {
@@ -226,6 +260,17 @@ export default function TeamTab() {
           author_name: currentUser.name
         });
         if (error) throw error;
+
+        fetch('/api/admin/notify-team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `새로운 팀 메모가 등록되었습니다.`,
+            message: `${currentUser.name}님이 메모를 작성했습니다.\n대시보드에서 내용을 확인해보세요.`,
+            link: '/admin/dashboard?tab=TEAM'
+          })
+        }).catch(e => console.error('Notify error:', e));
+
         showToast('마크다운 메모가 저장되었습니다.', 'success');
       }
       setIsComposingMemo(false);
@@ -323,7 +368,7 @@ export default function TeamTab() {
                     {dailyLogs.map(log => (
                       <tr key={log.id} className="hover:bg-slate-50/50 group">
                         <td className="px-4 py-3 text-[11px] text-slate-500 font-medium whitespace-nowrap flex items-center gap-2">
-                          {isNew(log.created_at) && <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
+                          {isNew(log.created_at) && <span className="w-4 h-4 bg-rose-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
                           {format(new Date(log.created_at), 'yyyy-MM-dd')}
                         </td>
                         <td className="px-4 py-3"><span className="text-xs font-bold text-rose-500 whitespace-nowrap">{log.author_name}</span></td>
@@ -368,7 +413,7 @@ export default function TeamTab() {
                           <p className={`text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
-                            {(isTodoNew || hasNewComment) && <span className="text-[9px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold animate-pulse">N</span>}
+                            {(isTodoNew || hasNewComment) && <span className="w-4 h-4 bg-rose-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
                             <div className="flex items-center gap-1 text-[10px] text-blue-500 font-bold">
                               <MessageCircle size={12} /> {taskComments.length}
                             </div>
@@ -455,7 +500,7 @@ export default function TeamTab() {
                                 <div>
                                   <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
                                     {memo.author_name}
-                                    {isNew(memo.created_at) && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">NEW</span>}
+                                    {isNew(memo.created_at) && <span className="w-4 h-4 bg-rose-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
                                   </p>
                                   <p className="text-[11px] text-slate-500 font-medium">
                                     {format(new Date(memo.created_at), 'yyyy.MM.dd HH:mm', { locale: ko })}
