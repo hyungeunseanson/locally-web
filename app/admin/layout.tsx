@@ -44,7 +44,7 @@ export default async function AdminLayout({
 
   // DB에서 진짜 관리자인지 확인 (보안 핵심: role 또는 whitelist 체크)
   const [userProfile, whitelistEntry] = await Promise.all([
-    supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+    supabase.from("users").select("role").eq("id", user.id).maybeSingle(),
     supabase.from("admin_whitelist").select("id").eq("email", user.email || "").maybeSingle()
   ]);
 
@@ -57,7 +57,7 @@ export default async function AdminLayout({
 
   // 화이트리스트에 있으나 권한이 admin이 아닌 경우 자동 승급 (DB RLS 우회 목적)
   if (whitelistEntry.data && userProfile.data?.role !== "admin") {
-    // Service Role을 사용하여 RLS 제약을 무시하고 profiles 업데이트
+    // Service Role을 사용하여 RLS 제약을 무시하고 users 업데이트
     const adminSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -68,7 +68,7 @@ export default async function AdminLayout({
         }
       }
     );
-    await adminSupabase.from("profiles").update({ role: "admin" }).eq("id", user.id);
+    await adminSupabase.from("users").update({ role: "admin" }).eq("id", user.id);
   }
 
   return (
