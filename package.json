@@ -23,6 +23,7 @@
     "nodemailer": "^8.0.1",
     "react": "19.2.3",
     "react-confetti": "^6.4.0",
+    "react-date-range": "^2.0.1",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
@@ -31,6 +32,7 @@
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.9",
     "@types/react": "^19",
+    "@types/react-date-range": "^1.4.10",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",

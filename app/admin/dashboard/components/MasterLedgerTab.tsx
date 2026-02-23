@@ -10,12 +10,19 @@ import { useToast } from '@/app/context/ToastContext';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { DateRange, Range } from 'react-date-range';
+import 'react-date-range/dist/styles.css'; // main style file
+import 'react-date-range/dist/theme/default.css'; // theme css file
 
 export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any[], onRefresh: () => void }) {
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [dateRange, setDateRange] = useState<Range[]>([{
+    startDate: undefined,
+    endDate: undefined,
+    key: 'selection'
+  }]);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'PENDING' | 'CANCELLED'>('ALL');
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,9 +43,30 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
   // 1. 장부 데이터 필터링
   const ledgerData = bookings.filter(b => {
-    // 날짜 범위 필터 (startDate, endDate)
-    const startMatch = !startDate || (b.date && b.date >= startDate);
-    const endMatch = !endDate || (b.date && b.date <= endDate);
+    // 날짜 범위 필터
+    const sd = dateRange[0].startDate;
+    const ed = dateRange[0].endDate;
+
+    let startMatch = true;
+    let endMatch = true;
+
+    if (b.date) {
+      if (sd) {
+        // 예약 날짜(YYYY-MM-DD)와 필터 Date 비교
+        const bDate = new Date(b.date);
+        bDate.setHours(0, 0, 0, 0);
+        const filterSd = new Date(sd);
+        filterSd.setHours(0, 0, 0, 0);
+        startMatch = bDate >= filterSd;
+      }
+      if (ed) {
+        const bDate = new Date(b.date);
+        bDate.setHours(0, 0, 0, 0);
+        const filterEd = new Date(ed);
+        filterEd.setHours(23, 59, 59, 999);
+        endMatch = bDate <= filterEd;
+      }
+    }
 
     // 검색어 매칭
     const searchString = `${b.experiences?.profiles?.name} ${b.experiences?.title} ${b.contact_name} ${b.id} ${b.profiles?.email}`.toLowerCase();
@@ -92,9 +120,11 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
     const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const sdStr = dateRange[0].startDate ? format(dateRange[0].startDate, 'yyyyMMdd') : 'ALL';
+    const edStr = dateRange[0].endDate ? format(dateRange[0].endDate, 'yyyyMMdd') : 'ALL';
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `locally_ledger_${startDate || 'ALL'}_to_${endDate || 'ALL'}.csv`;
+    link.download = `locally_ledger_${sdStr}_to_${edStr}.csv`;
     link.click();
     showToast('장부가 CSV로 다운로드되었습니다.', 'success');
   };
@@ -172,28 +202,59 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bookings</div>
             <div className="text-2xl font-black text-slate-900">{ledgerData.length}건</div>
             <div className="text-[10px] text-slate-400 mt-1">
-              {startDate && endDate ? `${startDate} ~ ${endDate}` : startDate ? `${startDate} 이후` : endDate ? `${endDate} 이전` : '전체 기간'}
+              {dateRange[0].startDate && dateRange[0].endDate ?
+                `${format(dateRange[0].startDate, 'yy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yy.MM.dd')}`
+                : '전체 기간'
+              }
             </div>
           </div>
         </div>
 
         <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0">
           <div className="flex gap-4 items-center">
-            <div className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-1">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-2 py-1 bg-transparent outline-none focus:ring-2 ring-blue-500/20 rounded"
-              />
-              <span className="text-slate-300">~</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-2 py-1 bg-transparent outline-none focus:ring-2 ring-blue-500/20 rounded"
-              />
+
+            {/* 🗓️ 통합 달력(DateRangePicker) UI */}
+            <div className="relative">
+              <button
+                onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <Calendar size={16} className="text-blue-600" />
+                {dateRange[0].startDate && dateRange[0].endDate
+                  ? `${format(dateRange[0].startDate, 'yyyy.MM.dd')} - ${format(dateRange[0].endDate, 'yyyy.MM.dd')}`
+                  : '전체 기간 선택'}
+              </button>
+
+              {isCalendarOpen && (
+                <div className="absolute top-12 left-0 z-50 bg-white border border-slate-200 shadow-2xl rounded-2xl p-2 animate-in fade-in zoom-in-95">
+                  <DateRange
+                    editableDateInputs={true}
+                    onChange={item => setDateRange([item.selection])}
+                    moveRangeOnFirstSelection={false}
+                    ranges={dateRange}
+                    months={2} // 두 달 연속 표시
+                    direction="horizontal"
+                    locale={ko}
+                    rangeColors={['#2563eb']} // Tailwind Blue-600
+                  />
+                  <div className="flex justify-between items-center p-2 border-t border-slate-100 mt-2">
+                    <button
+                      onClick={() => setDateRange([{ startDate: undefined, endDate: undefined, key: 'selection' }])}
+                      className="text-xs text-slate-400 hover:text-slate-700 underline"
+                    >
+                      초기화
+                    </button>
+                    <button
+                      onClick={() => setIsCalendarOpen(false)}
+                      className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-xs font-bold"
+                    >
+                      적용
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="flex bg-slate-100 p-1 rounded-xl">
               {[
                 { id: 'ALL', label: '전체' },
@@ -296,7 +357,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <div className="flex-1 pr-2">
               <div className="flex items-center gap-2 mb-1.5">
                 <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
-                    ['paid', 'confirmed', 'completed'].includes(selectedBooking.status.toLowerCase()) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                  ['paid', 'confirmed', 'completed'].includes(selectedBooking.status.toLowerCase()) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                   }`}>
                   {selectedBooking.status}
                 </div>
