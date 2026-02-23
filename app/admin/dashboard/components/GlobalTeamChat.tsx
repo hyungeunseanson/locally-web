@@ -203,16 +203,16 @@ export default function GlobalTeamChat() {
             {/* Header (Toggle) */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full h-12 px-5 flex items-center justify-between border-b border-indigo-900 bg-indigo-950 text-white rounded-t-2xl hover:bg-indigo-900 transition-colors shrink-0"
+                className="w-full h-12 px-5 flex items-center justify-between border-b border-slate-800 bg-black text-white rounded-t-2xl hover:bg-slate-900 transition-colors shrink-0"
             >
-                <div className="flex items-center gap-3">
-                    <MessageSquare size={18} className="text-blue-400" />
-                    <span className="font-bold tracking-tight">전역 팀 채팅 (Global)</span>
+                <div className="flex items-center gap-2">
+                    <MessageSquare size={18} />
+                    <span className="font-bold tracking-tight">Team Chat</span>
                     {hasUnread && !isOpen && (
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse ml-2 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></span>
                     )}
                 </div>
-                {isOpen ? <ChevronDown size={20} className="text-indigo-300" /> : <ChevronUp size={20} className="text-indigo-300" />}
+                {isOpen ? <ChevronDown size={20} className="text-slate-300" /> : <ChevronUp size={20} className="text-slate-300" />}
             </button>
 
             {/* Chat Area */}
@@ -254,7 +254,7 @@ export default function GlobalTeamChat() {
                                                 {msg.metadata?.image_url && (
                                                     <div
                                                         onClick={() => setZoomImage(msg.metadata!.image_url!)}
-                                                        className={`p-1 bg-white border border-slate-200 max-w-[240px] cursor-pointer hover:opacity-90 transition-opacity ${isMe ? 'rounded-2xl rounded-br-sm bg-indigo-50 border-indigo-100' : 'rounded-2xl rounded-bl-sm'}`}
+                                                        className={`p-1 bg-white border border-slate-200 max-w-[240px] cursor-pointer hover:opacity-90 transition-opacity ${isMe ? 'rounded-2xl rounded-br-sm bg-slate-50 border-slate-100' : 'rounded-2xl rounded-bl-sm'}`}
                                                     >
                                                         <img src={msg.metadata.image_url} alt="attached" className="rounded-xl w-full object-cover max-h-48" loading="lazy" />
                                                     </div>
@@ -262,17 +262,21 @@ export default function GlobalTeamChat() {
 
                                                 {/* Text Content */}
                                                 {msg.content && msg.content !== '사진 전송 중...' && msg.content !== '사진을 1장 보냈습니다.' && (
-                                                    <div className={`px-4 py-3 text-sm leading-relaxed ${isMe
-                                                        ? 'bg-indigo-600 border border-indigo-500 text-white rounded-2xl rounded-tr-sm rounded-br-sm'
-                                                        : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm rounded-bl-sm'
-                                                        }`}>
+                                                    <div
+                                                        className={`px-4 py-2.5 shadow-sm text-[13px] leading-relaxed break-words whitespace-pre-wrap max-w-[240px] ${isMe
+                                                            ? 'bg-black border border-slate-800 text-white rounded-2xl rounded-tr-sm rounded-br-sm'
+                                                            : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm rounded-bl-sm'
+                                                            }`}
+                                                    >
                                                         {msg.content}
                                                     </div>
                                                 )}
                                                 {/* Optimistic Uploading Text */}
                                                 {(msg.content === '사진 전송 중...') && (
-                                                    <div className="px-4 py-2 text-xs bg-indigo-50 text-indigo-500 rounded-2xl animate-pulse font-medium border border-indigo-100">
-                                                        Uploading media...
+                                                    <div className="flex justify-end mt-1">
+                                                        <div className="px-4 py-2 text-xs bg-slate-100 text-slate-500 rounded-2xl animate-pulse font-medium border border-slate-200">
+                                                            사진 전송 중...
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
@@ -308,7 +312,7 @@ export default function GlobalTeamChat() {
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                                className="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
                             >
                                 <Paperclip size={20} />
                             </button>
@@ -317,13 +321,13 @@ export default function GlobalTeamChat() {
                                 value={newMessage}
                                 onChange={e => setNewMessage(e.target.value)}
                                 placeholder="메시지를 입력하세요..."
-                                className="flex-1 text-sm bg-slate-100 border-transparent focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-500"
+                                className="flex-1 text-sm bg-slate-100 border-transparent focus:bg-white focus:border-slate-300 focus:ring-2 focus:ring-slate-200 rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-500"
                                 disabled={isUploading}
                             />
                             <button
                                 type="submit"
                                 disabled={(!newMessage.trim() && !selectedImage) || isUploading}
-                                className="bg-indigo-600 text-white p-3 flex items-center justify-center rounded-xl shadow-md hover:bg-indigo-700 disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none transition-all"
+                                className="bg-black text-white p-3 flex items-center justify-center rounded-xl shadow-md hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none transition-all"
                             >
                                 <Send size={18} className={isUploading ? 'animate-pulse' : ''} />
                             </button>
