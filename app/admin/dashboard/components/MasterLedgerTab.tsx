@@ -77,18 +77,18 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     const searchMatch = searchString.includes(searchTerm.toLowerCase());
 
     // 상태 필터링
-    const status = b.status;
+    const status = (b.status || '').toUpperCase();
     let statusMatch = false;
 
     if (statusFilter === 'ALL') {
       // 전체 보기: 입금대기, 결제완료, 취소됨 모두 포함
-      statusMatch = ['PENDING', 'PAID', 'confirmed', 'completed', 'cancelled', 'declined', 'cancellation_requested'].includes(status);
+      statusMatch = ['PENDING', 'PAID', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'DECLINED', 'CANCELLATION_REQUESTED'].includes(status);
     } else if (statusFilter === 'PAID') {
-      statusMatch = ['PAID', 'confirmed', 'completed'].includes(status);
+      statusMatch = ['PAID', 'CONFIRMED', 'COMPLETED'].includes(status);
     } else if (statusFilter === 'PENDING') {
       statusMatch = status === 'PENDING';
     } else if (statusFilter === 'CANCELLED') {
-      statusMatch = ['cancelled', 'declined', 'cancellation_requested'].includes(status);
+      statusMatch = ['CANCELLED', 'DECLINED', 'CANCELLATION_REQUESTED'].includes(status);
     }
 
     return startMatch && endMatch && searchMatch && statusMatch;
