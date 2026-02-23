@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { useLanguage } from '@/app/context/LanguageContext';
+import MiniChatBar from './MiniChatBar';
 import {
   ClipboardList, CheckSquare, FileText, Plus, Trash2,
   Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings
@@ -13,7 +13,6 @@ import { AdminTask, AdminComment } from '@/app/types/admin';
 import { useToast } from '@/app/context/ToastContext';
 
 export default function TeamTab() {
-  const { t } = useLanguage();
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
@@ -233,10 +232,10 @@ export default function TeamTab() {
     <div className="flex flex-col h-full gap-6 relative">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <ClipboardList className="text-rose-500" /> {t('team_board_title')}
+          <ClipboardList className="text-rose-500" /> 팀 관리 보드
         </h2>
         <button onClick={() => setShowMemos(!showMemos)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${showMemos ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-          <NotebookPen size={18} /> {t('team_memo_board')} {memos.length > 0 && `(${memos.length})`}
+          <NotebookPen size={18} /> 팀 메모장 {memos.length > 0 && `(${memos.length})`}
         </button>
       </div>
 
@@ -244,17 +243,17 @@ export default function TeamTab() {
         {/* Left: Daily Logs */}
         <div className="flex-[2.5] flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock size={18} className="text-blue-500" /> {t('team_daily_log')}</h3>
+            <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock size={18} className="text-blue-500" /> 업무 일지</h3>
           </div>
 
           <div className="p-3 bg-blue-50/30 border-b border-slate-100 flex items-center gap-2">
             <div className="flex-[4]">
-              <input type="text" placeholder={t('team_input_task')} value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+              <input type="text" placeholder="오늘의 주요 업무를 입력하세요" value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
             </div>
             <div className="flex-[3]">
-              <input type="text" placeholder={t('team_input_note')} value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+              <input type="text" placeholder="비고 (선택사항)" value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
             </div>
-            <button onClick={addDailyLog} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors">{t('team_btn_record')}</button>
+            <button onClick={addDailyLog} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors">기록하기</button>
           </div>
 
           <div className="flex-1 overflow-auto">
@@ -296,7 +295,7 @@ export default function TeamTab() {
 
         {/* Right: Todo List */}
         <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 overflow-hidden shadow-sm" ref={threadRef}>
-          <div className="flex items-center gap-2 mb-4"><CheckSquare size={18} className="text-green-500" /><h3 className="font-bold text-slate-800">{t('team_todo_list')}</h3></div>
+          <div className="flex items-center gap-2 mb-4"><CheckSquare size={18} className="text-green-500" /><h3 className="font-bold text-slate-800">팀 할 일 목록</h3></div>
           <div className="flex gap-2 mb-4">
             <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none" />
             <button onClick={addTodo} className="bg-slate-900 text-white p-2 rounded-lg"><Plus size={18} /></button>
@@ -368,7 +367,7 @@ export default function TeamTab() {
                   <FileText size={22} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-lg">{t('team_memo_board')}</h3>
+                  <h3 className="font-bold text-slate-900 text-lg">팀 메모장</h3>
                   <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Team Shared Knowledge</p>
                 </div>
               </div>
@@ -378,7 +377,7 @@ export default function TeamTab() {
             <div className="p-6 border-b border-slate-50 bg-white">
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 focus-within:border-amber-300 focus-within:ring-4 focus-within:ring-amber-500/5 transition-all">
                 <textarea
-                  placeholder={t('team_memo_placeholder')}
+                  placeholder="팀원들과 공유할 메모나 아이디어를 자유롭게 작성해주세요..."
                   value={newMemo}
                   onChange={e => setNewMemo(e.target.value)}
                   className="w-full text-sm p-0 bg-transparent outline-none min-h-[120px] resize-none text-slate-700 placeholder:text-slate-400 leading-relaxed"
@@ -389,7 +388,7 @@ export default function TeamTab() {
                     onClick={addMemo}
                     className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2"
                   >
-                    <Plus size={18} /> {t('team_btn_add_memo')}
+                    <Plus size={18} /> 메모 저장하기
                   </button>
                 </div>
               </div>
@@ -512,6 +511,8 @@ export default function TeamTab() {
           </div>
         )}
       </div>
+
+      <MiniChatBar currentUser={currentUser} />
     </div>
   );
 }
