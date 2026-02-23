@@ -12,7 +12,7 @@ export default function HostRegisterPage() {
   const { showToast } = useToast(); // 🟢 훅 사용
 
   const [step, setStep] = useState(1);
-  const totalSteps = 8;
+  const totalSteps = 9;
   const [loading, setLoading] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
 
@@ -27,7 +27,7 @@ export default function HostRegisterPage() {
     idCardFile: null as string | null,
     hostNationality: '',
     bankName: '', accountNumber: '', accountHolder: '',
-    motivation: '', agreeTerms: false
+    motivation: '', agreeTerms: false, educationCompleted: false, agreeSafetyPolicy: false
   });
 
   const [files, setFiles] = useState<{ profile?: File, idCard?: File }>({});
@@ -66,7 +66,9 @@ export default function HostRegisterPage() {
           accountNumber: data.account_number || '',
           accountHolder: data.account_holder || '',
           motivation: data.motivation || '',
-          agreeTerms: true
+          agreeTerms: true,
+          educationCompleted: true,
+          agreeSafetyPolicy: true
         }));
       }
     };
@@ -99,8 +101,9 @@ export default function HostRegisterPage() {
   };
 
   const handleSubmit = async () => {
-    // 🟢 alert -> showToast (경고)
-    if (!formData.agreeTerms) return showToast('약관에 동의해주세요.', 'error');
+    if (!formData.agreeTerms || !formData.educationCompleted || !formData.agreeSafetyPolicy) {
+      return showToast('모든 필수 교육 시청 및 서약에 동의해주세요.', 'error');
+    }
     setLoading(true);
 
     try {

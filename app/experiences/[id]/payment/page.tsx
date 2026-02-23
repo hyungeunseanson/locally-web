@@ -23,7 +23,9 @@ function PaymentContent() {
   const [customerPhone, setCustomerPhone] = useState('');
   // 🟢 message state는 DB 저장을 위해 남겨두되, 입력란은 삭제했으므로 빈 값으로 유지
   const [message, setMessage] = useState('');
-  const [agreed, setAgreed] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreeSafety, setAgreeSafety] = useState(false);
+  const [agreeNoOffPlatform, setAgreeNoOffPlatform] = useState(false);
   // 🟢 [추가] 결제 수단 상태 ('card' | 'bank')
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
 
@@ -99,8 +101,10 @@ function PaymentContent() {
   };
 
   const handlePayment = async () => {
-    if (!agreed) return showToast('필수 약관에 동의해주세요.', 'error');
     if (!customerName || !customerPhone) return showToast('예약자 정보를 입력해주세요.', 'error');
+    if (!agreeTerms || !agreeSafety || !agreeNoOffPlatform) {
+      return showToast('모든 필수 안전 및 이용 규정에 동의해주세요.', 'error');
+    }
 
     setIsProcessing(true);
 
@@ -293,11 +297,31 @@ function PaymentContent() {
             <div className="border-t border-slate-100 pt-4 mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
           </div>
 
-          <div className="mb-6">
-            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition-colors">
-              <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${agreed ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}><CheckCircle2 size={14} /></div>
-              <input type="checkbox" className="hidden" checked={agreed} onChange={() => setAgreed(!agreed)} />
-              <span className="text-sm font-medium text-slate-600">[필수] 구매 조건 및 취소/환불 규정에 동의합니다.</span>
+          <div className="mb-6 space-y-3 bg-red-50/50 p-5 rounded-2xl border border-red-100">
+            <h3 className="text-sm font-bold text-red-600 mb-3 flex items-center gap-1.5"><ShieldCheck size={16} /> 게스트 안전 필수 동의</h3>
+
+            <label className="flex items-start gap-3 cursor-pointer hover:bg-white/50 p-2 -ml-2 rounded-xl transition-colors">
+              <div className={`mt-0.5 min-w-[20px] h-5 rounded border flex items-center justify-center transition-colors ${agreeNoOffPlatform ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 size={14} /></div>
+              <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
+              <div className="text-sm font-medium text-slate-700 leading-snug">
+                <span className="text-red-600 font-bold">[필수]</span> 호스트와의 직접 연락 및 플랫폼 외부 결제 유도를 단호히 거부하며, 적발 시 계정 영구 정지 처분에 동의합니다.
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer hover:bg-white/50 p-2 -ml-2 rounded-xl transition-colors">
+              <div className={`mt-0.5 min-w-[20px] h-5 rounded border flex items-center justify-center transition-colors ${agreeSafety ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 size={14} /></div>
+              <input type="checkbox" className="hidden" checked={agreeSafety} onChange={() => setAgreeSafety(!agreeSafety)} />
+              <div className="text-sm font-medium text-slate-700 leading-snug">
+                <span className="text-red-600 font-bold">[필수]</span> 플랫폼 내 게스트 안전 가이드라인을 숙지하였으며, 상호 존중하는 올바른 호스팅 문화에 기여하겠습니다.
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer hover:bg-white/50 p-2 -ml-2 rounded-xl transition-colors">
+              <div className={`mt-0.5 min-w-[20px] h-5 rounded border flex items-center justify-center transition-colors ${agreeTerms ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 size={14} /></div>
+              <input type="checkbox" className="hidden" checked={agreeTerms} onChange={() => setAgreeTerms(!agreeTerms)} />
+              <div className="text-sm font-medium text-slate-700 leading-snug">
+                <span className="text-slate-900 font-bold">[필수]</span> 구매 조건, 취소/환불 규정을 모두 확인하였으며 본 플랫폼 서비스 이용 약관에 동의합니다.
+              </div>
             </label>
           </div>
 
