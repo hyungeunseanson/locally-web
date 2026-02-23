@@ -101,6 +101,8 @@ export function useAdminData() {
         { data: reviewData },
         { data: searchLogsData },
         { data: analyticsEventsData },
+        { data: inquiriesData }, // 🟢 추가
+        { data: inquiryMessagesData }, // 🟢 추가
         { data: bookingRawData, error: bookingError }
       ] = await Promise.all([
         supabase.from('host_applications').select('*').order('created_at', { ascending: false }),
@@ -109,6 +111,8 @@ export function useAdminData() {
         supabase.from('reviews').select('rating, experience_id, created_at'),
         supabase.from('search_logs').select('*').order('created_at', { ascending: false }).limit(2000), // 🟢 최근 검색 로그
         supabase.from('analytics_events').select('*').order('created_at', { ascending: false }).limit(10000), // 🟢 이벤트 로그 (퍼널용)
+        supabase.from('inquiries').select('id, created_at, host_id').order('created_at', { ascending: false }).limit(2000), // 🟢 호스트 응답률 계산용
+        supabase.from('inquiry_messages').select('inquiry_id, sender_id, created_at').order('created_at', { ascending: false }).limit(10000), // 🟢 호스트 응답 시간 계산용
         supabase.from('bookings')
           .select('*')
           .order('created_at', { ascending: false })
@@ -128,6 +132,8 @@ export function useAdminData() {
         reviews: reviewData || [],
         searchLogs: searchLogsData || [], // 🟢 저장
         analyticsEvents: analyticsEventsData || [], // 🟢 저장
+        inquiries: inquiriesData || [], // 🟢 저장
+        inquiryMessages: inquiryMessagesData || [], // 🟢 저장
         isLoading: false
       }));
 

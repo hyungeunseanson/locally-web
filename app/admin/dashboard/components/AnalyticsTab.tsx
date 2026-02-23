@@ -20,9 +20,11 @@ interface AnalyticsTabProps {
   reviews: any[];
   searchLogs?: any[]; // 🟢 추가
   analyticsEvents?: any[]; // 🟢 추가
+  inquiries?: any[]; // 🟢 추가
+  inquiryMessages?: any[]; // 🟢 추가
 }
 
-export default function AnalyticsTab({ bookings, users, exps, apps, reviews, searchLogs, analyticsEvents }: AnalyticsTabProps) {
+export default function AnalyticsTab({ bookings, users, exps, apps, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages }: AnalyticsTabProps) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
@@ -99,8 +101,8 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       nationalities: [] as { name: string, count: number, percent: number }[],
       funnel: { applied: 0, approved: 0, active: 0, booked: 0 }
     },
-    avgResponseTime: 28,
-    responseRate: 96.5
+    avgResponseTime: 0,
+    responseRate: 0
   });
 
   useEffect(() => {
@@ -109,7 +111,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
     } else {
       setLoading(false);
     }
-  }, [bookings, users, exps, reviews, apps, searchLogs, analyticsEvents, dateRange]);
+  }, [bookings, users, exps, reviews, apps, searchLogs, analyticsEvents, inquiries, inquiryMessages, dateRange]);
 
   const processData = () => {
     try {
@@ -318,6 +320,39 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         });
       });
 
+      // 🟢 호스트 응답률 및 응답 시간 계산
+      let totalHostInquiries = 0;
+      let answeredHostInquiries = 0;
+      let totalResponseTimeMs = 0;
+
+      const messagesByInquiry: Record<string, any[]> = {};
+      inquiryMessages?.forEach(m => {
+        if (!messagesByInquiry[m.inquiry_id]) messagesByInquiry[m.inquiry_id] = [];
+        messagesByInquiry[m.inquiry_id].push(m);
+      });
+      Object.keys(messagesByInquiry).forEach(id => {
+        messagesByInquiry[id].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      });
+
+      inquiries?.forEach(inq => {
+        if (!inq.host_id || !isWithinDateRange(inq.created_at)) return;
+        totalHostInquiries++;
+        const msgs = messagesByInquiry[inq.id] || [];
+
+        // 첫 호스트 응답 탐색
+        const firstHostMsg = msgs.find(m => m.sender_id === inq.host_id);
+        if (firstHostMsg) {
+          answeredHostInquiries++;
+          const guestMsg = msgs.find(m => m.sender_id !== inq.host_id);
+          const startTime = guestMsg ? new Date(guestMsg.created_at).getTime() : new Date(inq.created_at).getTime();
+          const responseTimeMs = new Date(firstHostMsg.created_at).getTime() - startTime;
+          if (responseTimeMs > 0) totalResponseTimeMs += responseTimeMs;
+        }
+      });
+
+      const avgRespMins = answeredHostInquiries > 0 ? (totalResponseTimeMs / answeredHostInquiries) / (1000 * 60) : 0;
+      const respRatePct = totalHostInquiries > 0 ? (answeredHostInquiries / totalHostInquiries) * 100 : 0;
+
       // 등록된 Active 체험을 보유한 호스트 수 계산
       exps?.forEach((e: any) => {
         if (e.status === 'active' && e.host_id) activeHosts.add(e.host_id);
@@ -367,8 +402,8 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           nationalities: topNats,
           funnel: { applied, approved, active: activeHosts.size, booked: bookedHosts.size }
         },
-        avgResponseTime: 28,
-        responseRate: 96.5
+        avgResponseTime: avgRespMins > 0 ? Math.round(avgRespMins) : 0, // 🟢 리얼 응답 시간(분)
+        responseRate: respRatePct > 0 ? Number(respRatePct.toFixed(1)) : 0 // 🟢 리얼 응답률(%)
       });
 
     } catch (err) {
@@ -766,6 +801,32 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                   )}
                 </React.Fragment>
               ))}
+            </div>
+          </section>
+
+          {/* 1.5. 호스트 활동 및 응답 (Host Activity) */}
+          <section>
+            <div className="flex items-center justify-between mb-4 mt-8">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                💬 커뮤니케이션 현황 <span className="text-xs font-normal text-slate-400">게스트 문의 대비 응답 속도</span>
+              </h2>
+              <Activity size={20} className="text-blue-500" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SimpleKpi
+                label="평균 응답 시간 (Average Response Time)"
+                value={stats.avgResponseTime}
+                unit="분"
+                sub="문의 접수 후"
+                className={stats.avgResponseTime < 60 ? "text-emerald-500" : "text-rose-500"}
+              />
+              <SimpleKpi
+                label="호스트 응답률 (Response Rate)"
+                value={stats.responseRate}
+                unit="%"
+                sub="전체 문의 대비"
+                className={stats.responseRate >= 90 ? "text-emerald-500" : "text-amber-500"}
+              />
             </div>
           </section>
 

@@ -70,4 +70,6 @@ export interface AdminDashboardState {
   isLoading: boolean;
   searchLogs?: any[]; // 🟢 추가: 검색 트렌드 분석용
   analyticsEvents?: any[]; // 🟢 추가: 퍼널 분석용
+  inquiries?: any[]; // 🟢 추가: 호스트 응답률 계산용
+  inquiryMessages?: any[]; // 🟢 추가: 호스트 응답 시간 계산용
 }
