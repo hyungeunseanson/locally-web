@@ -126,7 +126,7 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                         className="w-full min-h-[300px] h-full resize-none outline-none bg-transparent text-sm leading-loose text-slate-800 placeholder:text-slate-500 font-mono"
                     />
                 ) : (
-                    <div className="prose prose-sm text-[13px] max-w-none prose-slate text-slate-800 prose-p:text-slate-800 prose-p:text-[13px] prose-strong:text-slate-900 prose-li:text-slate-800 prose-li:text-[13px] prose-img:rounded-xl prose-img:shadow-sm prose-img:max-w-[50%] prose-img:h-auto prose-img:object-contain prose-img:my-2 prose-headings:font-bold prose-headings:text-slate-900 prose-a:text-blue-600">
+                    <div className="prose prose-slate max-w-none !text-[13px] [&_p]:!text-[13px] [&_p]:!text-slate-700 [&_p]:!leading-relaxed [&_li]:!text-[13px] [&_li]:!text-slate-700 [&_img]:!max-w-[50%] [&_img]:!h-auto [&_img]:!object-contain [&_img]:!rounded-xl [&_img]:!shadow-sm [&_img]:!my-2 [&_a]:!text-blue-600 prose-headings:font-bold prose-headings:text-slate-800">
                         {content ? (
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                         ) : (
