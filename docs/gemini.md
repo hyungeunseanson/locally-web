@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
-**Last Updated:** 2026-02-23
-**Version:** 2.4.4 (Team Collaboration Overhaul: Global Chat & Markdown Memo)
+**Last Updated:** 2026-02-25
+**Version:** 2.6.0 (Mobile Pixel-Perfect Airbnb UX Complete)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -92,7 +92,7 @@
 
 ## 4. ✅ 개발 현황 및 완료된 기능 (Development Status)
 
-**전체 진행률: 약 85%** (시스템 안정화 및 최적화 완료)
+**전체 진행률: 약 92%** (모바일 UI 픽셀퍼펙트 완성)
 
 ### Phase 1: 기반 구축 (Foundation) - ✅ 완료
 - [x] Supabase Auth & Profile 시스템
@@ -224,6 +224,50 @@
 - [x] **'N' 배지 매핑 및 가시성 표준화:**
   - `Sidebar.tsx` 카운트를 전체 Task(Memo 포함)로 확장하여 정확도를 높이고, 흩어져 있던 알림 배지 UI를 `w-4 h-4 bg-rose-500` 스펙의 붉은색 원형 마크 'N'으로 모두 통일.
 
+### Phase 4.11: 에어비앤비 스타일 모바일 홈화면 픽셀퍼펙트 리디자인 (Mobile Airbnb UX V1) - ✅ 완료
+
+> **2026-02-24** | 수정 파일: `HomeHero.tsx`, `HomePageClient.tsx`, `MobileSearchModal.tsx`
+
+- [x] **홈화면 검색 캡슐 고도화:**
+  - `sticky top-0` 고정 — 스크롤 시 검색바 + 아이콘 탭 항상 노출.
+  - 에어비앤비 스타일의 큰 둥근 캡슐(`rounded-full`) + 정교한 `box-shadow` 적용.
+  - 스크롤 시 아이콘 탭 → 텍스트 탭 (`justify-evenly`) 자동 전환.
+- [x] **아이콘 탭 인터랙션:**
+  - 아이콘 52px → 60px → 64px 점진적 확대.
+  - 탭 클릭 시 `active:scale-[0.90]` 바운스 애니메이션.
+  - 선택됨=`font-bold` 검정, 미선택=`font-normal` 회색으로 명확한 시각적 차이.
+- [x] **MobileSearchModal 전면 재작성:**
+  - 아이콘 탭 좌측 → **중앙 정렬** (`flex-1 justify-center`).
+  - `backdrop-blur(8px)` + 슬라이드업 전환 애니메이션 (`translateY 20px → 0`).
+  - 핑크 그라데이션 검색 버튼: `linear-gradient(#E61E4D → #D70466)`.
+- [x] **HomePageClient 다중 섹션:**
+  - '인기 체험' / '신규 등록된 체험' / 언어별 체험(`한국어·일본어·영어·중국어`) 자동 분류.
+  - `languages` 필드 기반 동적 필터링.
+
+### Phase 4.12: 에어비앤비 최종 디테일 리파인 (Mobile Airbnb UX V2) - ✅ 완료
+
+> **2026-02-25** | 수정 파일: `HomeHero.tsx`, `ExperienceCard.tsx`, `HomePageClient.tsx`, `MobileSearchModal.tsx`
+> Git 커밋: `997e6c2`
+
+- [x] **배경색 통일:** 홈 + 모달 전체 `#EDEDED` 단일 컬러로 통합 (에어비앤비 warm gray 재현).
+- [x] **검색바 세밀 조정:**
+  - 위치를 위로 이동 (`pt-8px`), 텍스트 13px 축소, `py-14px`로 컴팩트화.
+- [x] **아이콘 탭 최종 픽셀 보정:**
+  - 아이콘↔텍스트 간격 `mb-0` (완전 밀착).
+  - 탭 사이 간격 `gap-56px → gap-40px` 좁힘.
+- [x] **NEW 배지 리포지셔닝:**
+  - 위치: `-top-1.5 -right-1` → `top-0 -right-2.5` (아이콘 대각 상단 정확히 배치).
+  - 크기: `text-[7px] px-5` → `text-[8px] px-6` 약 30% 확대.
+- [x] **구분선 그라데이션 자연화:**
+  - `h-6px rgba(0,0,0,0.06)` (바처럼 보이는 문제) → `h-8px rgba(0,0,0,0.04)→transparent` 자연스러운 명암 페이드.
+- [x] **ExperienceCard 모바일 폰트 축소:**
+  - `md:` 반응형으로 분기: 모바일 12/11px, 데스크탑 15px 유지.
+- [x] **섹션 헤더 15px:** 기존 18px → 15px.
+- [x] **여행지 검색 풀스크린 구현:**
+  - 위치 패널의 검색 input 클릭 시 → 에어비앤비 스타일 풀스크린 전환.
+  - `← ArrowLeft` 뒤로가기 + **최근 검색** (최근 도시 2개) + **추천 여행지** (6개, 이모지+설명) 섹션.
+  - `autoFocus` 적용으로 즉시 타이핑 가능.
+
 ---
 
 ## 5. 🚧 핵심 개발 규칙 (Development Rules)
@@ -261,6 +305,7 @@
 - [ ] **SEO & i18n:** 다국어 지원 아키텍처 개편 (`next-intl` 도입 검토).
 - [ ] **지도 서비스:** 국내(카카오맵) 및 해외(구글맵) 분기 처리 및 지도 기반 검색 구현.
 - [ ] **메시징 고도화:** 현재의 단순 채팅을 넘어선 미디어 전송, 읽음 확인 등이 포함된 실시간 채팅 시스템.
+- [ ] **모바일 추가 최적화:** ServiceCard 폰트 축소, 언어 섹션 제목 번역 처리, iOS Safari sticky 검증.
 
 ### Phase 6: 운영 효율화 (Enterprise Admin)
 - [ ] **RBAC 심화:** 슈퍼 관리자, 일반 관리자, 재무 담당자 등으로 권한 세분화.
