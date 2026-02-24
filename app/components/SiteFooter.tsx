@@ -10,7 +10,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 export default function SiteFooter() {
   const { t, lang } = useLanguage();
   const [instaOpen, setInstaOpen] = useState(false);
-  
+
   // 모달 상태 관리 ('terms', 'privacy', 'travel', 'refund', null)
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
@@ -41,53 +41,53 @@ export default function SiteFooter() {
       case 'en': return 'English (US)';
       case 'ja': return '日本語 (JP)';
       case 'zh': return '中文 (CN)';
-      case 'ko': 
+      case 'ko':
       default: return '한국어 (KR)';
     }
   };
-// 🟢 [추가] 메뉴 데이터 번역 적용
-const footerSections = [
-  {
-    title: t('footer_support'),
-    links: [
-      { label: t('footer_intro'), href: '/about' },
-      { label: t('footer_notice'), href: '/company/notices' },
-      { label: t('footer_help'), href: '/help' },
-      { label: t('footer_admin'), href: '/admin/dashboard' },
-    ]
-  },
-  {
-    title: t('footer_hosting'),
-    links: [
-      { label: t('footer_become_host'), href: '/become-a-host' },
-      { label: t('footer_community'), href: '/company/community' },
-    ]
-  },
-  {
-    title: t('footer_locally'),
-    links: [
-      { label: t('footer_news'), href: '/company/news' },
-      { label: t('footer_careers'), href: '/company/careers' },
-      { label: t('footer_investors'), href: '/company/investors' },
-      { label: t('footer_partnership'), href: '/company/partnership' },
-    ]
-  },
-  {
-    title: t('footer_social'),
-    links: [
-      { label: 'Instagram', href: 'https://instagram.com' },
-      { label: 'Naver Blog', href: 'https://blog.naver.com' },
-    ]
-  }
-];
+  // 🟢 [추가] 메뉴 데이터 번역 적용
+  const footerSections = [
+    {
+      title: t('footer_support'),
+      links: [
+        { label: t('footer_intro'), href: '/about' },
+        { label: t('footer_notice'), href: '/company/notices' },
+        { label: t('footer_help'), href: '/help' },
+        { label: t('footer_admin'), href: '/admin/dashboard' },
+      ]
+    },
+    {
+      title: t('footer_hosting'),
+      links: [
+        { label: t('footer_become_host'), href: '/become-a-host' },
+        { label: t('footer_community'), href: '/company/community' },
+      ]
+    },
+    {
+      title: t('footer_locally'),
+      links: [
+        { label: t('footer_news'), href: '/company/news' },
+        { label: t('footer_careers'), href: '/company/careers' },
+        { label: t('footer_investors'), href: '/company/investors' },
+        { label: t('footer_partnership'), href: '/company/partnership' },
+      ]
+    },
+    {
+      title: t('footer_social'),
+      links: [
+        { label: 'Instagram', href: 'https://instagram.com' },
+        { label: 'Naver Blog', href: 'https://blog.naver.com' },
+      ]
+    }
+  ];
   return (
     <>
-      <footer className="bg-white border-t border-[#DDDDDD] pt-12 pb-8 text-sm text-[#222222] font-sans">
+      <footer className="hidden md:block bg-white border-t border-[#DDDDDD] pt-12 pb-8 text-sm text-[#222222] font-sans">
         <div className="max-w-[1440px] mx-auto px-6">
-          
-{/* 상단 링크 모음 (4단 그리드) */}
-<div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-            
+
+          {/* 상단 링크 모음 (4단 그리드) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+
             {/* 1. 로컬리 지원 */}
             <div className="space-y-4">
               <h5 className="font-bold">{t('footer_support')}</h5>
@@ -123,17 +123,17 @@ const footerSections = [
             <div className="space-y-4">
               <h5 className="font-bold">{t('footer_social')}</h5>
               <ul className="space-y-3 text-[#717171] font-light relative">
-                
+
                 {/* 인스타그램 (다중 계정 팝업) */}
                 <li className="relative">
-                  <button 
+                  <button
                     onClick={() => setInstaOpen(!instaOpen)}
                     className="hover:text-black flex items-center gap-1 focus:outline-none transition-colors"
                   >
-                    <Instagram size={16}/> Instagram 
-                    {instaOpen ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                    <Instagram size={16} /> Instagram
+                    {instaOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
-                  
+
                   {instaOpen && (
                     <div className="absolute left-0 bottom-full mb-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                       <div className="py-1">
@@ -156,10 +156,10 @@ const footerSections = [
 
                 {/* 네이버 블로그 */}
                 <li>
-                  <Link 
-                    href="https://blog.naver.com/locally-travel" 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
+                  <Link
+                    href="https://blog.naver.com/locally-travel"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="hover:text-black flex items-center gap-2 group text-[#717171] transition-colors"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:stroke-black transition-colors">
@@ -178,19 +178,19 @@ const footerSections = [
           {/* 하단: 저작권 및 약관 링크 (모달 트리거) */}
           <div className="flex flex-col xl:flex-row justify-between items-center gap-4 text-[#717171]">
             <div className="flex flex-wrap justify-center xl:justify-start items-center gap-x-1 gap-y-2 text-xs md:text-sm">
-            <span>{t('copyright')}</span>
+              <span>{t('copyright')}</span>
 
-<span className="hidden md:inline mx-1">·</span>
-<button onClick={() => setActiveModal('privacy')} className="hover:underline hover:text-black transition-colors font-bold">
-  {t('footer_privacy')}
-</button>
+              <span className="hidden md:inline mx-1">·</span>
+              <button onClick={() => setActiveModal('privacy')} className="hover:underline hover:text-black transition-colors font-bold">
+                {t('footer_privacy')}
+              </button>
 
-<span className="hidden md:inline mx-1">·</span>
-<button onClick={() => setActiveModal('terms')} className="hover:underline hover:text-black transition-colors">
-  {t('footer_terms')}
-</button>
-              
-<span className="hidden md:inline mx-1">·</span>
+              <span className="hidden md:inline mx-1">·</span>
+              <button onClick={() => setActiveModal('terms')} className="hover:underline hover:text-black transition-colors">
+                {t('footer_terms')}
+              </button>
+
+              <span className="hidden md:inline mx-1">·</span>
               <button onClick={() => setActiveModal('travel')} className="hover:underline hover:text-black transition-colors">
                 {t('footer_travel_terms')} {/* 🟢 교체 */}
               </button>
@@ -205,9 +205,9 @@ const footerSections = [
                 {t('footer_sitemap')} {/* 🟢 교체 */}
               </Link>
             </div>
-            
-{/* 🟢 수정됨: KRW 삭제 및 언어 동적 표시 */}
-<div className="flex items-center gap-6 font-bold text-[#222222]">
+
+            {/* 🟢 수정됨: KRW 삭제 및 언어 동적 표시 */}
+            <div className="flex items-center gap-6 font-bold text-[#222222]">
               <button className="flex items-center gap-2 hover:underline">
                 <Globe size={16} />
                 {getLanguageLabel()} {/* 🟢 한국어 (KR) 대신 함수 호출 */}
@@ -222,17 +222,17 @@ const footerSections = [
       {activeModal && modalData && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           {/* 배경 (클릭 시 닫힘) */}
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
             onClick={() => setActiveModal(null)}
           ></div>
-          
+
           {/* 모달 컨텐츠 */}
           <div className="relative bg-white w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
             {/* 헤더 */}
             <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-shrink-0 bg-white z-10">
               <h2 className="text-xl font-bold text-black tracking-tight">{modalData.title}</h2>
-              <button 
+              <button
                 onClick={() => setActiveModal(null)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-black"
               >
@@ -249,7 +249,7 @@ const footerSections = [
 
             {/* 하단 (선택 사항: 닫기 버튼) */}
             <div className="p-4 border-t border-gray-100 flex justify-end flex-shrink-0 bg-gray-50">
-              <button 
+              <button
                 onClick={() => setActiveModal(null)}
                 className="bg-black text-white px-8 py-3 rounded-lg font-bold text-sm hover:bg-gray-800 transition-colors shadow-lg"
               >

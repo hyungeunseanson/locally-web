@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share, Heart, MapPin, Check, X, Grid, Copy } from 'lucide-react';
+import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
@@ -127,8 +127,23 @@ export default function ExperienceClient({
       <SiteHeader />
       {isCopySuccess && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400" /> 링크가 복사되었습니다.</div>}
 
-      <main className="max-w-[1120px] mx-auto px-6 py-8">
-        <section className="mb-6">
+      {/* 📱 모바일 전용: 에어비앤비 스타일 스티키 헤더 */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm h-12 flex items-center justify-between px-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft size={20} className="text-slate-900" />
+        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={handleShare} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <Share size={18} className="text-slate-900" />
+          </button>
+          <button onClick={toggleWishlist} disabled={isSaveLoading} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <Heart size={18} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
+          </button>
+        </div>
+      </div>
+
+      <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-14 md:pt-8 pb-8 md:py-8">
+        <section className="hidden md:block mb-6">
           {/* 🟢 변환된 제목 표시 */}
           <h1 className="text-3xl font-black mb-2 tracking-tight">{translatedTitle}</h1>
           <div className="flex justify-between items-end">

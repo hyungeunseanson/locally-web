@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
-import { Send, ShieldCheck, User, Loader2, ImagePlus } from 'lucide-react';
+import { Send, ShieldCheck, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 
@@ -156,8 +156,8 @@ function InboxContent() {
         role="host"
       />
 
-      <main className="max-w-[1280px] mx-auto px-6 py-8 h-[calc(100vh-80px)] flex flex-col">
-        <h1 className="text-[32px] md:text-3xl font-black mb-4 md:mb-6 mt-2 md:mt-0 tracking-tight">{t('messages')}</h1>
+      <main className="max-w-[1280px] mx-auto px-0 md:px-6 py-0 md:py-8 h-[calc(100vh-80px)] md:h-[calc(100vh-80px)] flex flex-col">
+        <h1 className="text-[28px] md:text-3xl font-black mb-4 md:mb-6 mt-0 md:mt-0 tracking-tight px-5 md:px-0 pt-4 md:pt-0">{t('messages')}</h1>
 
         <div className="flex-1 flex md:border md:border-slate-200 md:rounded-2xl md:overflow-hidden md:shadow-sm bg-white -mx-6 md:mx-0">
           {/* 좌측: 목록 */}
@@ -201,13 +201,22 @@ function InboxContent() {
           <div className={`flex-1 flex flex-col ${!selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
             {selectedInquiry ? (
               <>
-                <div className="p-4 border-b border-slate-100 font-bold flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleProfileClick(currentHostDisplay.id)}>
-                  <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative">
-                    <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill className="object-cover" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-base leading-tight">{selectedInquiry.type === 'admin' ? t('admin_chat_title') : currentHostDisplay.name}</div> {/* 🟢 번역 */}
-                    <div className="text-xs text-slate-500 font-normal">{selectedInquiry.experiences?.title}</div>
+                <div className="p-3 md:p-4 border-b border-slate-100 font-bold flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors">
+                  {/* 📱 모바일 전용: 뒤로가기 버튼 */}
+                  <button
+                    className="md:hidden p-1.5 -ml-1 hover:bg-slate-100 rounded-full transition-colors shrink-0"
+                    onClick={(e) => { e.stopPropagation(); router.push('/guest/inbox'); }}
+                  >
+                    <ArrowLeft size={20} className="text-slate-700" />
+                  </button>
+                  <div className="flex items-center gap-2 flex-1 min-w-0" onClick={() => handleProfileClick(currentHostDisplay.id)}>
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative shrink-0">
+                      <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill className="object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm md:text-base leading-tight truncate">{selectedInquiry.type === 'admin' ? t('admin_chat_title') : currentHostDisplay.name}</div>
+                      <div className="text-xs text-slate-500 font-normal truncate">{selectedInquiry.experiences?.title}</div>
+                    </div>
                   </div>
                 </div>
 

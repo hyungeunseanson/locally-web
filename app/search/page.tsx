@@ -7,7 +7,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 import SiteFooter from '@/app/components/SiteFooter';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import SearchFilter from './components/SearchFilter';
-import { Map, List, Ghost } from 'lucide-react';
+import { Map, List, Ghost, ArrowLeft, Search } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 
 // 🟢 검색 로직 컴포넌트
@@ -15,7 +15,7 @@ function SearchResults() {
   const searchParams = useSearchParams();
   const supabase = createClient();
   const { showToast } = useToast();
-  
+
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(true); // 기본값은 지도 보기 활성화 (기존 유지)
@@ -46,7 +46,7 @@ function SearchResults() {
 
           // "컬럼명.ilike.%검색어%" 형태의 문자열을 쉼표로 연결하여 OR 조건 생성
           const orQuery = searchFields.map(field => `${field}.ilike.%${location}%`).join(',');
-          
+
           query = query.or(orQuery);
         }
 
@@ -73,33 +73,45 @@ function SearchResults() {
   }, [location, language, startDate, endDate]);
 
   return (
-    <div className="pt-24 pb-12 h-[calc(100vh-80px)] flex flex-col">
+    <div className="pt-0 md:pt-24 pb-12 h-[calc(100vh-60px)] md:h-[calc(100vh-80px)] flex flex-col">
+      {/* 📱 모바일 전용: 검색 헤더 캡슐 */}
+      <div className="md:hidden flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-3 bg-white border-b border-slate-100 sticky top-0 z-40">
+        <button onClick={() => window.history.back()} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors shrink-0">
+          <ArrowLeft size={20} className="text-slate-900" />
+        </button>
+        <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-full px-4 py-2.5 border border-slate-200">
+          <Search size={16} className="text-slate-400 shrink-0" />
+          <span className="text-[14px] text-slate-800 font-medium truncate">{location || '검색 결과'}</span>
+        </div>
+      </div>
+
       {/* 상단 필터 바 */}
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-[80px] bg-white z-40">
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
+      <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 md:top-[80px] bg-white z-40">
+        <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar">
           <SearchFilter label="가격 범위" />
           <SearchFilter label="숙소 유형" />
-          <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
-          <span className="text-sm font-bold text-slate-500 whitespace-nowrap">
+          <div className="h-6 md:h-8 w-[1px] bg-slate-200 mx-1 md:mx-2 shrink-0"></div>
+          <span className="text-xs md:text-sm font-bold text-slate-500 whitespace-nowrap">
             {experiences.length}개의 체험
           </span>
         </div>
-        
-        <button 
-          onClick={() => setShowMap(!showMap)} 
-          className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-black transition-colors"
+
+        {/* 지도 토글 - 데스크탑 전용 */}
+        <button
+          onClick={() => setShowMap(!showMap)}
+          className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-black transition-colors"
         >
-          {showMap ? <><List size={16}/> 리스트 보기</> : <><Map size={16}/> 지도 보기</>}
+          {showMap ? <><List size={16} /> 리스트 보기</> : <><Map size={16} /> 지도 보기</>}
         </button>
       </div>
 
       {/* 메인 콘텐츠 */}
       <div className="flex flex-1 overflow-hidden">
         {/* 리스트 영역 */}
-        <div className={`flex-1 overflow-y-auto px-6 py-6 ${showMap ? 'lg:w-3/5 xl:w-1/2' : 'w-full'}`}>
+        <div className={`flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 ${showMap ? 'lg:w-3/5 xl:w-1/2' : 'w-full'}`}>
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1,2,3,4,5,6].map(i => (
+              {[1, 2, 3, 4, 5, 6].map(i => (
                 <div key={i} className="animate-pulse">
                   <div className="bg-slate-100 aspect-[4/3] rounded-xl mb-3"></div>
                   <div className="h-4 bg-slate-100 rounded w-3/4 mb-2"></div>
@@ -109,7 +121,7 @@ function SearchResults() {
             </div>
           ) : experiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-20">
-              <Ghost size={48} className="text-slate-300 mb-4"/>
+              <Ghost size={48} className="text-slate-300 mb-4" />
               <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
               <p className="text-slate-500 text-sm">다른 날짜나 키워드로 검색해보시거나, 메인에서 전체 체험을 둘러보세요.</p>
             </div>
@@ -122,7 +134,7 @@ function SearchResults() {
             </div>
           )}
           <div className="mt-12">
-              <SiteFooter />
+            <SiteFooter />
           </div>
         </div>
 
@@ -130,7 +142,7 @@ function SearchResults() {
         {showMap && (
           <div className="hidden lg:block flex-1 bg-slate-100 relative h-full border-l border-slate-200">
             <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-400 bg-slate-50">
-              <Map size={48} className="mb-2 opacity-50"/>
+              <Map size={48} className="mb-2 opacity-50" />
               <span className="text-sm font-medium">지도 뷰 준비 중입니다.</span>
               <span className="text-xs text-slate-400 mt-1">(Google Maps API 연동 예정)</span>
             </div>

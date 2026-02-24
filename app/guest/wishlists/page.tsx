@@ -71,8 +71,8 @@ export default function WishlistsPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      <main className="max-w-[1760px] mx-auto px-6 py-12">
-        <h1 className="text-3xl font-black mb-8">{t('wishlist')}</h1> {/* 🟢 번역 */}
+      <main className="max-w-[1760px] mx-auto px-4 md:px-6 py-6 md:py-12">
+        <h1 className="text-[28px] md:text-3xl font-black mb-6 md:mb-8">{t('wishlist')}</h1> {/* 🟢 번역 */}
         {loading ? (
           <div className="flex justify-center py-40">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
@@ -89,7 +89,7 @@ export default function WishlistsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-10">
+          <div className="grid grid-cols-2 gap-3 sm:gap-x-6 sm:gap-y-10 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {wishlists.map((item: any) => {
               const exp = item.experiences;
               // 이미지 처리 (photos 배열 확인)

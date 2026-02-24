@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown } from 'lucide-react'; // 🟢 아이콘 추가
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield } from 'lucide-react'; // 🟢 아이콘 추가
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
@@ -214,7 +214,92 @@ export default function AccountPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      <main className="max-w-6xl mx-auto px-6 py-12">
+      {/* 📱 모바일 전용: 에어비앤비 스타일 프로필 페이지 */}
+      <div className="md:hidden px-5 pt-[calc(env(safe-area-inset-top,0px)+16px)] pb-28">
+        {/* 타이틀 */}
+        <h1 className="text-[28px] font-extrabold tracking-tight mb-6">{t('account_title')}</h1>
+
+        {/* 프로필 카드 (아바타 + 이름) */}
+        <div className="bg-slate-50 rounded-2xl p-5 mb-6 flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden border border-slate-100 shrink-0 relative">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={28} /></div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold text-slate-900 truncate">{profile.full_name || t('label_no_name')}</h2>
+            <p className="text-sm text-slate-500 truncate">{t('account_desc')}</p>
+          </div>
+          <ChevronRight size={20} className="text-slate-400 shrink-0" />
+        </div>
+
+        {/* 호스팅 하기 CTA */}
+        <a href="/become-a-host" className="block bg-slate-50 rounded-2xl p-5 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-rose-100 to-slate-100 flex items-center justify-center shrink-0">
+              <img src="/images/logo.png" alt="Host" className="w-8 h-8 object-contain" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-[15px] text-slate-900">{t('become_host') || '호스팅 하기'}</h3>
+              <p className="text-[13px] text-slate-500 mt-0.5">간단하게 호스팅을 시작하고 부수입을 올릴 수 있습니다.</p>
+            </div>
+          </div>
+        </a>
+
+        {/* 메뉴 리스트 (상단 그룹) */}
+        <div className="mb-6">
+          <a href="/account" className="flex items-center gap-4 py-4 border-b border-slate-100" onClick={(e) => { e.preventDefault(); /* 현재 페이지 스크롤 */ }}>
+            <Settings size={24} className="text-slate-600 shrink-0" />
+            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('account') || '계정 관리'}</span>
+            <ChevronRight size={20} className="text-slate-400" />
+          </a>
+          <a href="/help" className="flex items-center gap-4 py-4 border-b border-slate-100">
+            <HelpCircle size={24} className="text-slate-600 shrink-0" />
+            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('help') || '도움 요청'}</span>
+            <ChevronRight size={20} className="text-slate-400" />
+          </a>
+          <a href="/notifications" className="flex items-center gap-4 py-4 border-b border-slate-100">
+            <Bell size={24} className="text-slate-600 shrink-0" />
+            <span className="flex-1 text-[15px] font-medium text-slate-800">알림</span>
+            <ChevronRight size={20} className="text-slate-400" />
+          </a>
+        </div>
+
+        {/* 메뉴 리스트 (하단 법률 그룹) */}
+        <div className="mb-8">
+          <a href="/about" className="flex items-center gap-4 py-4 border-b border-slate-100">
+            <FileText size={24} className="text-slate-600 shrink-0" />
+            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('footer_terms') || '이용 약관'}</span>
+            <ChevronRight size={20} className="text-slate-400" />
+          </a>
+          <a href="/about" className="flex items-center gap-4 py-4 border-b border-slate-100">
+            <Shield size={24} className="text-slate-600 shrink-0" />
+            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('footer_privacy') || '개인정보 처리방침'}</span>
+            <ChevronRight size={20} className="text-slate-400" />
+          </a>
+          <a href="/company/investors" className="flex items-center gap-4 py-4 border-b border-slate-100">
+            <FileText size={24} className="text-slate-600 shrink-0" />
+            <span className="flex-1 text-[15px] font-medium text-slate-800">회사 세부정보</span>
+            <ChevronRight size={20} className="text-slate-400" />
+          </a>
+        </div>
+
+        {/* 로그아웃 */}
+        <button
+          onClick={async () => {
+            await supabase.auth.signOut();
+            router.push('/');
+          }}
+          className="w-full text-left text-[15px] font-semibold text-slate-800 underline underline-offset-4 mb-6"
+        >
+          {t('logout') || '로그아웃'}
+        </button>
+      </div>
+
+      {/* 🖥️ 데스크탑 전용: 기존 프로필 편집 레이아웃 */}
+      <main className="hidden md:block max-w-6xl mx-auto px-6 py-12">
         <h1 className="text-[32px] tracking-tight md:text-3xl font-black mb-2 md:mb-2 mt-4 md:mt-0 leading-tight">{t('account_title')}</h1>
         <p className="text-slate-500 mb-8 md:mb-10 text-sm md:text-base">{t('account_desc')}</p>
 
