@@ -227,69 +227,69 @@ export default function HomeHero({
         </div>
       </div>
 
-      {/* 📱 모바일 전용: 에어비앤비 정밀 홈화면 (스크롤 시 고정) */}
-      <div className={`md:hidden bg-white sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+6px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+10px)] pb-0'
-        }`}>
-        {/* 검색 캡슐 — 작고 고급스러운 중앙정렬 */}
-        <div className="px-6 mb-1">
+      {/* 📱 모바일: 에어비앤비 홈화면 (warm gray bg + 그라데이션) */}
+      <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+6px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+16px)] pb-0'
+        }`} style={{ background: isScrolled ? '#FFFFFF' : 'linear-gradient(180deg, #F7F7F7 0%, #F2F2F2 60%, #EDEDED 100%)' }}>
+        {/* 검색 캡슐 — 에어비앤비 크기/모양 (크고 둥글고 그림자) */}
+        <div className={`px-5 transition-all duration-300 ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[60px] opacity-100'}`}>
           <button
             onClick={() => setIsMobileSearchOpen(true)}
-            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-4 py-[12px] active:scale-[0.98] transition-transform"
+            className="w-full flex items-center justify-center gap-2.5 bg-white rounded-full px-5 py-[16px] active:scale-[0.98] transition-transform"
             style={{
-              border: '0.5px solid #DDDDDD',
               boxShadow: '0 1px 2px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05)',
+              border: '0.5px solid #E0E0E0',
             }}
           >
-            <Search size={14} className="text-[#222222] shrink-0" strokeWidth={2.5} />
-            <span className="text-[14px] text-[#222222] font-normal tracking-[-0.01em]">검색을 시작해 보세요</span>
+            <Search size={16} className="text-[#222222] shrink-0" strokeWidth={2.5} />
+            <span className="text-[16px] text-[#222222] font-normal">검색을 시작해 보세요</span>
           </button>
         </div>
 
-        {/* 아이콘 탭 — 큰 아이콘(60px) + 텍스트 가까이 + 바운스 */}
-        <div className={`flex items-center justify-center gap-[44px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 py-0' : 'max-h-[100px] opacity-100 pt-2 pb-1'
+        {/* 아이콘 탭 — 대형 아이콘(64px) + 텍스트 거의 붙어있게 */}
+        <div className={`flex items-center justify-center gap-[56px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 py-0' : 'max-h-[110px] opacity-100 pt-2 pb-2'
           }`}>
           {/* 체험 탭 */}
           <button
             onClick={() => setActiveTab('experience')}
-            className="flex flex-col items-center relative active:scale-[0.92] transition-transform duration-150"
+            className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200"
           >
-            <div className="w-[60px] h-[60px] flex items-center justify-center relative mb-[3px]">
+            <div className="w-[64px] h-[64px] flex items-center justify-center relative mb-[1px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
-                alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-35' : 'opacity-100'}`}
+                alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-30' : 'opacity-100'}`}
               />
-              <div className="absolute -top-1 right-[-4px] bg-[#0066CC] text-white text-[7px] font-bold px-[4px] py-[1px] rounded-full z-10 border-[1.5px] border-white leading-none">NEW</div>
+              <div className="absolute -top-1.5 -right-1 bg-[#0066CC] text-white text-[7px] font-bold px-[5px] py-[1.5px] rounded-[4px] z-10 leading-none">NEW</div>
             </div>
-            <span className={`text-[10px] tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
+            <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
               }`}>
               {t('cat_exp')}
             </span>
-            {activeTab === 'experience' && <span className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-[20px] h-[2px] bg-[#222222] rounded-full" />}
+            {activeTab === 'experience' && <span className="absolute -bottom-[4px] left-1/2 -translate-x-1/2 w-[24px] h-[2px] bg-[#222222] rounded-full" />}
           </button>
 
           {/* 서비스 탭 */}
           <button
             onClick={() => setActiveTab('service')}
-            className="flex flex-col items-center relative active:scale-[0.92] transition-transform duration-150"
+            className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200"
           >
-            <div className="w-[60px] h-[60px] flex items-center justify-center relative mb-[3px]">
+            <div className="w-[64px] h-[64px] flex items-center justify-center relative mb-[1px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
-                alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-35' : 'opacity-100'}`}
+                alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-30' : 'opacity-100'}`}
               />
-              <div className="absolute -top-1 right-[-4px] bg-[#0066CC] text-white text-[7px] font-bold px-[4px] py-[1px] rounded-full z-10 border-[1.5px] border-white leading-none">NEW</div>
+              <div className="absolute -top-1.5 -right-1 bg-[#0066CC] text-white text-[7px] font-bold px-[5px] py-[1.5px] rounded-[4px] z-10 leading-none">NEW</div>
             </div>
-            <span className={`text-[10px] tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
+            <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
               }`}>
               {t('cat_service')}
             </span>
-            {activeTab === 'service' && <span className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-[20px] h-[2px] bg-[#222222] rounded-full" />}
+            {activeTab === 'service' && <span className="absolute -bottom-[4px] left-1/2 -translate-x-1/2 w-[24px] h-[2px] bg-[#222222] rounded-full" />}
           </button>
         </div>
 
-        {/* 아이콘 탭 하단 그림자 디바이더 (에어비앤비 정확한 스타일) */}
-        <div className={`transition-all duration-300 ${isScrolled ? 'h-0' : 'h-[1px]'}`}
-          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)' }}
+        {/* 그라데이션 그림자 디바이더 — 부드러운 페이드 */}
+        <div className={`transition-all duration-300 ${isScrolled ? 'h-0 opacity-0' : 'h-[6px] opacity-100'}`}
+          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 40%, transparent 100%)' }}
         />
 
         {/* 스크롤 시 텍스트 탭 — 에어비앤비 (전체 너비 분산) */}
