@@ -113,27 +113,56 @@ export default function HomePageClient() {
             </div>
           ) : (
             <>
-              {/* 📱 모바일: 에어비앤비 정확한 섹션 레이아웃 */}
+              {/* 📱 모바일: 에어비앤비 다중 섹션 레이아웃 */}
               <div className="md:hidden pb-28">
-                {/* 섹션 헤더 — 에어비앤비 정확한 스타일 */}
-                <div className="flex items-center justify-between px-6 pt-6 pb-4">
-                  <h2 className="text-[22px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">인기 체험</h2>
-                  <button
-                    className="w-[28px] h-[28px] rounded-full flex items-center justify-center shrink-0"
-                    style={{ border: '0.5px solid #B0B0B0' }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-                  </button>
-                </div>
+                {/* 섹션 렌더 헬퍼 */}
+                {(() => {
+                  // 섹션별 체험 분류
+                  const popular = filteredExperiences.slice(0, 10);
+                  const newest = [...filteredExperiences].sort((a: any, b: any) =>
+                    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                  ).slice(0, 10);
+                  const koreanExp = filteredExperiences.filter((e: any) => e.languages?.includes('한국어')).slice(0, 10);
+                  const japaneseExp = filteredExperiences.filter((e: any) => e.languages?.includes('일본어')).slice(0, 10);
+                  const englishExp = filteredExperiences.filter((e: any) => e.languages?.includes('영어')).slice(0, 10);
+                  const chineseExp = filteredExperiences.filter((e: any) => e.languages?.includes('중국어')).slice(0, 10);
 
-                {/* 가로 스크롤 카드 — 에어비앤비 42% 너비 */}
-                <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-6 pb-8">
-                  {filteredExperiences.map((item: any) => (
-                    <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
-                      <ExperienceCard data={item} />
+                  // 언어별 섹션 (사용자 언어에 따라 순서 변경)
+                  const langSections: { title: string; data: any[] }[] = [];
+                  if (koreanExp.length > 0) langSections.push({ title: '한국어로 진행되는 체험', data: koreanExp });
+                  if (japaneseExp.length > 0) langSections.push({ title: '日本語の体験', data: japaneseExp });
+                  if (englishExp.length > 0) langSections.push({ title: 'Experiences in English', data: englishExp });
+                  if (chineseExp.length > 0) langSections.push({ title: '中文体验', data: chineseExp });
+
+                  const allSections = [
+                    { title: '인기 체험', data: popular },
+                    { title: '신규 등록된 체험', data: newest },
+                    ...langSections,
+                  ].filter(s => s.data.length > 0);
+
+                  const SectionArrow = () => (
+                    <button className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
+                      style={{ border: '0.5px solid #B0B0B0' }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                    </button>
+                  );
+
+                  return allSections.map((section, idx) => (
+                    <div key={idx}>
+                      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                        <h2 className="text-[18px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
+                        <SectionArrow />
+                      </div>
+                      <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
+                        {section.data.map((item: any) => (
+                          <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
+                            <ExperienceCard data={item} />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  ));
+                })()}
               </div>
 
               {/* 🖥️ 데스크탑: 기존 그리드 */}
@@ -150,16 +179,16 @@ export default function HomePageClient() {
           <>
             {/* 📱 모바일 서비스 */}
             <div className="md:hidden pb-28">
-              <div className="flex items-center justify-between px-6 pt-6 pb-4">
-                <h2 className="text-[22px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">인기 서비스</h2>
+              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                <h2 className="text-[18px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">인기 서비스</h2>
                 <button
-                  className="w-[28px] h-[28px] rounded-full flex items-center justify-center shrink-0"
+                  className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
                   style={{ border: '0.5px solid #B0B0B0' }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                 </button>
               </div>
-              <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-6 pb-8">
+              <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
                 {LOCALLY_SERVICES.map((item) => (
                   <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
                     <ServiceCard item={item} />
