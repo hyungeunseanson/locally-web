@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useState, Suspense, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 // 컴포넌트 import
 import UsersTab from './components/UsersTab';
@@ -20,14 +20,32 @@ function AdminDashboardContent() {
   const [filter, setFilter] = useState('ALL');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const searchParams = useSearchParams();
-  const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPROVALS';
+  const router = useRouter(); // 🟢 라우터 추가
+  const urlTab = searchParams.get('tab')?.toUpperCase();
+
+  // URL에 탭이 있으면 그걸 우선 사용, 없으면 localStorage 확인해서 복원
+  const [activeTab, setActiveTab] = useState<string>('APPROVALS');
+  const [isTabLoaded, setIsTabLoaded] = useState(false);
+
+  useEffect(() => {
+    const savedTab = localStorage.getItem('admin_active_tab');
+    if (urlTab) {
+      setActiveTab(urlTab);
+      localStorage.setItem('admin_active_tab', urlTab);
+    } else if (savedTab) {
+      setActiveTab(savedTab);
+      // URL도 업데이트해서 사이드바와 동기화
+      router.replace(`/admin/dashboard?tab=${savedTab}`);
+    }
+    setIsTabLoaded(true);
+  }, [urlTab, router]);
 
   const {
     apps, exps, users, bookings, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages, onlineUsers, isLoading,
     updateStatus, deleteItem, refresh
   } = useAdminData();
 
-  if (isLoading) {
+  if (isLoading || !isTabLoaded) {
     return (
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] animate-pulse">
         <div className="h-8 bg-slate-100 rounded w-1/4 mb-6"></div>

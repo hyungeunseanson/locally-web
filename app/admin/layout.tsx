@@ -74,15 +74,22 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* 왼쪽: 고정된 관리자 사이드바 */}
-      <div className="w-64 flex-shrink-0 bg-slate-900 min-h-screen sticky top-0">
+      {/* 왼쪽: 고정된 관리자 사이드바 (모바일에서 숨김 — Sidebar 내부에서 모바일 메뉴 처리) */}
+      <div className="hidden md:block w-64 flex-shrink-0 bg-slate-900 min-h-screen sticky top-0">
         <Suspense fallback={<div className="h-full w-full bg-slate-800 animate-pulse" />}>
           <Sidebar />
         </Suspense>
       </div>
 
+      {/* 🟢 모바일 전용: Sidebar를 오버레이로 마운트 (md 미만에서만 렌더) */}
+      <div className="md:hidden">
+        <Suspense fallback={null}>
+          <Sidebar />
+        </Suspense>
+      </div>
+
       {/* 오른쪽: 바뀌는 페이지 내용 */}
-      <main className="flex-1 p-8 overflow-y-auto h-screen scrollbar-hide">
+      <main className="flex-1 p-3 md:p-8 overflow-y-auto h-screen scrollbar-hide">
         <div className="max-w-7xl mx-auto">
           {children}
         </div>

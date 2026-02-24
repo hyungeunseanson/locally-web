@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import {
   Users, MapPin, CheckCircle2, MessageSquare,
   Calendar, BarChart2, CreditCard, LayoutDashboard, ShieldCheck,
-  Briefcase
+  Briefcase, Menu, X
 } from 'lucide-react';
 
 const NavButton = ({ active, onClick, icon, label, count }: any) => (
@@ -35,7 +35,18 @@ export default function Sidebar() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const activeTab = searchParams.get('tab')?.toUpperCase() || 'APPS';
+  const urlTab = searchParams.get('tab')?.toUpperCase();
+  const [activeTab, setActiveTab] = useState<string>('APPS');
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const savedTab = localStorage.getItem('admin_active_tab');
+    if (urlTab) {
+      setActiveTab(urlTab);
+    } else if (savedTab) {
+      setActiveTab(savedTab);
+    }
+  }, [urlTab]);
 
   const [counts, setCounts] = useState({
     apps: 0,
@@ -111,10 +122,12 @@ export default function Sidebar() {
 
   const handleTabChange = (tab: string) => {
     router.push(`/admin/dashboard?tab=${tab}`);
+    setIsMobileOpen(false); // 🟢 모바일에서 탭 전환 시 사이드바 닫기
   };
 
-  return (
-    <aside className="w-64 bg-black text-white flex flex-col p-4 shadow-xl h-screen sticky top-0 border-r border-slate-900">
+  // 🟢 사이드바 내부 콘텐츠 (데스크탑 / 모바일 오버레이 공용)
+  const sidebarContent = (
+    <>
       <div className="mb-10 px-2 mt-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden">
           <img src="/images/logo-new-white.png" alt="Locally Logo" className="w-8 h-8 object-contain" />
@@ -181,6 +194,44 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* ✅ 데스크탑: 기존 고정 사이드바 (변경 없음) */}
+      <aside className="hidden md:flex w-64 bg-black text-white flex-col p-4 shadow-xl h-screen sticky top-0 border-r border-slate-900">
+        {sidebarContent}
+      </aside>
+
+      {/* 🟢 모바일 전용: 상단 헤더 (햄버거 메뉴) */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-[60] bg-black text-white h-14 flex items-center justify-between px-4 shadow-lg">
+        <div className="flex items-center gap-2">
+          <img src="/images/logo-new-white.png" alt="Logo" className="w-7 h-7 object-contain" />
+          <span className="text-[15px] font-bold tracking-tight">Locally</span>
+          <span className="text-[9px] text-slate-400 font-medium tracking-wider uppercase ml-1">Admin</span>
+        </div>
+        <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+          {isMobileOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+      </div>
+
+      {/* 🟢 모바일 전용: 슬라이드-인 오버레이 사이드바 */}
+      {isMobileOpen && (
+        <>
+          <div className="md:hidden fixed inset-0 bg-black/60 z-[70] animate-in fade-in duration-200" onClick={() => setIsMobileOpen(false)} />
+          <aside className="md:hidden fixed top-0 left-0 bottom-0 w-72 bg-black text-white flex flex-col p-4 z-[80] shadow-2xl animate-in slide-in-from-left duration-300">
+            {/* 닫기 버튼 */}
+            <button onClick={() => setIsMobileOpen(false)} className="absolute top-4 right-4 p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+              <X size={20} />
+            </button>
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+
+      {/* 🟢 모바일: 상단 헤더 높이 보정 (콘텐츠가 헤더 아래로 밀리도록 스페이서) */}
+      <div className="md:hidden h-14 shrink-0" />
+    </>
   );
 }

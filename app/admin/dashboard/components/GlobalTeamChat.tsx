@@ -209,7 +209,7 @@ export default function GlobalTeamChat() {
     if (!isClient || !currentUser) return null;
 
     return (
-        <div className={`fixed bottom-0 right-10 w-96 bg-white border border-slate-200 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.15)] transition-all duration-300 z-50 flex flex-col ${isOpen ? 'h-[650px] translate-y-0' : 'h-12 translate-y-0 hover:-translate-y-1'}`}>
+        <div className={`fixed bottom-0 right-0 md:right-10 w-full md:w-96 bg-white border border-slate-200 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.15)] transition-all duration-300 z-50 flex flex-col ${isOpen ? 'h-[100dvh] md:h-[650px] translate-y-0' : 'h-12 translate-y-0 hover:-translate-y-1'}`}>
 
             {/* Header (Toggle) */}
             <button
