@@ -150,7 +150,7 @@ export default function HomePageClient() {
                   return allSections.map((section, idx) => (
                     <div key={idx}>
                       <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                        <h2 className="text-[18px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
+                        <h2 className="text-[15px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
                         <SectionArrow />
                       </div>
                       <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
@@ -180,7 +180,7 @@ export default function HomePageClient() {
             {/* 📱 모바일 서비스 */}
             <div className="md:hidden pb-28">
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                <h2 className="text-[18px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">인기 서비스</h2>
+                <h2 className="text-[15px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">인기 서비스</h2>
                 <button
                   className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
                   style={{ border: '0.5px solid #B0B0B0' }}

@@ -27,7 +27,7 @@ export default function ExperienceCard({ data }: { data: any }) {
   return (
     <Link href={`/experiences/${data.id}`} className="block group">
       {/* 🖼️ 이미지 영역 (프리미엄 쉐도우 및 Lift 애니메이션 적용) */}
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent [box-shadow:var(--shadow-card)] group-hover:[box-shadow:var(--shadow-card-hover)] group-hover:-translate-y-1 transition-all duration-500 ease-out">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-2 md:mb-3 border border-transparent [box-shadow:var(--shadow-card)] group-hover:[box-shadow:var(--shadow-card-hover)] group-hover:-translate-y-1 transition-all duration-500 ease-out">
         <Image
           src={imageUrl}
           alt={title}
@@ -55,31 +55,31 @@ export default function ExperienceCard({ data }: { data: any }) {
       </div>
 
       {/* 📝 텍스트 영역 (원본 레이아웃 복구) */}
-      <div className="space-y-1 px-1">
+      <div className="space-y-0.5 md:space-y-1 px-0.5 md:px-1">
 
         {/* 1열: [지역 · 카테고리] --------- [별점] */}
         <div className="flex justify-between items-start">
-          <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2 tracking-tight">
+          <h3 className="font-bold text-slate-900 text-[12px] md:text-[15px] truncate pr-2 tracking-tight">
             {location} · {category}
           </h3>
-          <div className="flex items-center gap-1 text-sm shrink-0">
-            <Star size={14} fill={data.rating > 0 ? "black" : "none"} className={data.rating > 0 ? "" : "text-slate-300"} />
+          <div className="flex items-center gap-0.5 md:gap-1 text-[11px] md:text-sm shrink-0">
+            <Star size={11} className="md:w-[14px] md:h-[14px]" fill={data.rating > 0 ? "black" : "none"} />
             <span>{data.rating > 0 ? data.rating.toFixed(2) : "New"}</span>
             {data.review_count > 0 && <span className="text-slate-400 font-normal">({data.review_count})</span>}
           </div>
         </div>
 
         {/* 2열: 제목 */}
-        <p className="text-[15px] text-slate-500 line-clamp-1 leading-snug tracking-tight">
+        <p className="text-[11px] md:text-[15px] text-slate-500 line-clamp-1 leading-snug tracking-tight">
           {title}
         </p>
 
         {/* 3열: 가격 */}
-        <div className="mt-1">
-          <span className="font-black text-slate-900 text-[15px] tracking-tight">
+        <div className="mt-0.5 md:mt-1">
+          <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
             ₩{Number(data.price).toLocaleString()}
           </span>
-          <span className="text-[14px] text-slate-500 font-normal ml-0.5">/ 인</span>
+          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal ml-0.5">/ 인</span>
         </div>
       </div>
     </Link>
