@@ -230,47 +230,39 @@ export default function HomeHero({
       {/* 📱 모바일: 에어비앤비 홈화면 */}
       <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+4px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-0'
         }`} style={{
-          background: '#EDEDED',
+          background: '#F5F6F7',
         }}>
 
-        {/* ── Elevation: 헤더 아랫면 소프트 그라데이션 (Airbnb Z-layer 효과) ── */}
+        {/* ── Elevation: 헤더 아래 소프트 블러 드롭썸도우 — 선(line) 없이 자연스러운 층위감 ── */}
         <div
           className="absolute left-0 right-0 bottom-0 pointer-events-none"
           style={{
-            height: 24,
-            background: 'linear-gradient(to bottom, rgba(237,237,237,0.0) 0%, rgba(0,0,0,0.06) 100%)',
+            height: 40,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.055) 100%)',
             transform: 'translateY(100%)',
             zIndex: 1,
-          }}
-        />
-
-        {/* ── 헤더 자체 상단 그림자 (얇은 레이어) ── */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05)',
-            borderRadius: 0,
+            filter: 'blur(4px)',
           }}
         />
 
         {/* 검색 캡슐 + 스크림 */}
-        <div className={`px-5 transition-all duration-300 relative ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[70px] opacity-100'}`}>
-          {/* 스크림 — 검색 캡슐 뒤 비네팅 효과 */}
+        <div className={`px-4 transition-all duration-300 relative ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[80px] opacity-100'}`}>
+          {/* 스크림 — 검색 캡슐 뒤 더 넓고 부드럽게 */}
           <div
             className="absolute inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none"
             style={{
-              height: '200%',
-              background: 'radial-gradient(ellipse 85% 100% at 50% 50%, rgba(0,0,0,0.065) 0%, transparent 68%)',
+              height: '280%',
+              background: 'radial-gradient(ellipse 90% 110% at 50% 50%, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.03) 45%, transparent 72%)',
             }}
           />
           <button
             onClick={() => setIsMobileSearchOpen(true)}
-            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-5 active:scale-[0.98] transition-transform relative z-10"
+            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-6 active:scale-[0.98] transition-transform relative z-10"
             style={{
-              paddingTop: 16,
-              paddingBottom: 16,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.07)',
-              border: '0.5px solid rgba(0,0,0,0.08)',
+              paddingTop: 20,
+              paddingBottom: 20,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.09), 0 12px 36px rgba(0,0,0,0.06)',
+              border: '0.5px solid rgba(0,0,0,0.07)',
             }}
           >
             <Search size={13} className="text-[#222222] shrink-0" strokeWidth={2.5} />
@@ -278,20 +270,20 @@ export default function HomeHero({
           </button>
         </div>
 
-        {/* 아이콘 탭 — 간격 좁게 */}
-        <div className={`flex items-center justify-center gap-[40px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 py-0' : 'max-h-[100px] opacity-100 pt-1 pb-1'
+        {/* 아이콘 탭 */}
+        <div className={`flex items-center justify-center gap-[44px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 py-0' : 'max-h-[100px] opacity-100 pt-2 pb-1'
           }`}>
           {/* 체험 탭 */}
           <button
             onClick={() => setActiveTab('experience')}
             className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200"
           >
-            <div className="w-[58px] h-[58px] flex items-center justify-center relative mb-0">
+            <div className="w-[72px] h-[72px] flex items-center justify-center relative mb-[-4px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
                 alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-30' : 'opacity-100'}`}
               />
-              <div className="absolute top-0 -right-2.5 bg-[#0066CC] text-white text-[8px] font-bold px-[6px] py-[2px] rounded-[4px] z-10 leading-none">NEW</div>
+              <div className="absolute top-[6px] right-[-4px] bg-[#0066CC] text-white text-[7px] font-bold px-[4px] py-[1.5px] rounded-[3px] z-10 leading-none tracking-wide">NEW</div>
             </div>
             <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
               }`}>
@@ -305,12 +297,12 @@ export default function HomeHero({
             onClick={() => setActiveTab('service')}
             className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200"
           >
-            <div className="w-[58px] h-[58px] flex items-center justify-center relative mb-0">
+            <div className="w-[72px] h-[72px] flex items-center justify-center relative mb-[-4px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
                 alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-30' : 'opacity-100'}`}
               />
-              <div className="absolute top-0 -right-2.5 bg-[#0066CC] text-white text-[8px] font-bold px-[6px] py-[2px] rounded-[4px] z-10 leading-none">NEW</div>
+              <div className="absolute top-[6px] right-[-4px] bg-[#0066CC] text-white text-[7px] font-bold px-[4px] py-[1.5px] rounded-[3px] z-10 leading-none tracking-wide">NEW</div>
             </div>
             <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
               }`}>
