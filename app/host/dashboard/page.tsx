@@ -121,8 +121,8 @@ function DashboardContent() {
     return (
       <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6 animate-in fade-in">
         <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto ${status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-            status === 'revision' ? 'bg-orange-100 text-orange-600' :
-              'bg-red-100 text-red-600'
+          status === 'revision' ? 'bg-orange-100 text-orange-600' :
+            'bg-red-100 text-red-600'
           }`}>
           {status === 'pending' ? <Clock size={48} /> :
             status === 'revision' ? <AlertCircle size={48} /> :
@@ -172,34 +172,61 @@ function DashboardContent() {
 
   // 3. 승인된 호스트 대시보드
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8">
+    <div className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-8 flex flex-col md:flex-row gap-0 md:gap-8">
 
-      {/* 사이드바 */}
+      {/* 🟢 모바일 전용: 가로 스크롤 탭 네비게이션 */}
+      <div className="md:hidden mb-4 -mx-3 px-3 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-1.5 pb-2 min-w-max">
+          {[
+            { id: 'reservations', icon: <CalendarCheck size={14} />, label: t('menu_reservation') },
+            { id: 'experiences', icon: <List size={14} />, label: t('menu_my_exp') },
+            { id: 'inquiries', icon: <MessageSquare size={14} />, label: t('menu_inquiry') },
+            { id: 'earnings', icon: <DollarSign size={14} />, label: t('menu_earnings') },
+            { id: 'reviews', icon: <Star size={14} />, label: t('menu_reviews') },
+            { id: 'guidelines', icon: <ShieldCheck size={14} />, label: '가이드라인' },
+            { id: 'profile', icon: <UserCog size={14} />, label: t('menu_profile') },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${activeTab === tab.id
+                  ? (tab.id === 'guidelines' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-slate-900 text-white shadow-sm')
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 데스크탑 사이드바 */}
       <aside className="w-64 hidden md:block shrink-0">
         <div className="sticky top-24 space-y-2">
           <div className="px-4 py-2 mb-4">
-            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold tracking-wide">{t('host_partner')}</span> {/* 🟢 번역 */}
+            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold tracking-wide">{t('host_partner')}</span>
             <p className="text-xs text-slate-400 mt-1">{t('host_approved')}</p>
           </div>
 
           <button onClick={() => handleTabChange('reservations')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'reservations' ? 'bg-slate-900 text-white font-bold shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <CalendarCheck size={20} /> {t('menu_reservation')} {/* 🟢 번역 */}
+            <CalendarCheck size={20} /> {t('menu_reservation')}
           </button>
 
           <button onClick={() => handleTabChange('experiences')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'experiences' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <List size={20} /> {t('menu_my_exp')} {/* 🟢 번역 */}
+            <List size={20} /> {t('menu_my_exp')}
           </button>
 
           <button onClick={() => handleTabChange('inquiries')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'inquiries' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <MessageSquare size={20} /> {t('menu_inquiry')} {/* 🟢 번역 */}
+            <MessageSquare size={20} /> {t('menu_inquiry')}
           </button>
 
           <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <DollarSign size={20} /> {t('menu_earnings')} {/* 🟢 번역 */}
+            <DollarSign size={20} /> {t('menu_earnings')}
           </button>
 
           <button onClick={() => handleTabChange('reviews')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'reviews' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <Star size={20} /> {t('menu_reviews')} {/* 🟢 번역 */}
+            <Star size={20} /> {t('menu_reviews')}
           </button>
 
           <button onClick={() => handleTabChange('guidelines')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'guidelines' ? 'bg-red-50 font-bold text-red-600' : 'text-slate-500 hover:bg-slate-50 hover:text-red-600'}`}>
@@ -208,7 +235,7 @@ function DashboardContent() {
 
           <div className="pt-4 mt-4 border-t border-slate-100">
             <button onClick={() => handleTabChange('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-              <UserCog size={20} /> {t('menu_profile')} {/* 🟢 번역 */}
+              <UserCog size={20} /> {t('menu_profile')}
             </button>
           </div>
         </div>
@@ -216,29 +243,26 @@ function DashboardContent() {
 
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-w-0">
-        <div className="flex justify-between items-end mb-8">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            {activeTab === 'reservations' && t('menu_reservation')} {/* 🟢 번역 */}
-            {activeTab === 'experiences' && t('menu_my_exp')}       {/* 🟢 번역 */}
-            {activeTab === 'inquiries' && t('menu_inquiry')}        {/* 🟢 번역 */}
-            {activeTab === 'earnings' && t('menu_earnings')}        {/* 🟢 번역 */}
-            {activeTab === 'reviews' && t('menu_reviews')}          {/* 🟢 번역 */}
-            {activeTab === 'profile' && t('menu_profile')}          {/* 🟢 번역 */}
+        <div className="flex justify-between items-end mb-4 md:mb-8">
+          <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">
+            {activeTab === 'reservations' && t('menu_reservation')}
+            {activeTab === 'experiences' && t('menu_my_exp')}
+            {activeTab === 'inquiries' && t('menu_inquiry')}
+            {activeTab === 'earnings' && t('menu_earnings')}
+            {activeTab === 'reviews' && t('menu_reviews')}
+            {activeTab === 'profile' && t('menu_profile')}
             {activeTab === 'guidelines' && '호스트 필수 교육'}
           </h1>
           {activeTab === 'experiences' && (
             <Link href="/host/create">
-              <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-transform shadow-md">
-                <Plus size={18} /> {t('exp_new')}
+              <button className="bg-slate-900 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl font-bold flex items-center gap-1.5 md:gap-2 hover:scale-105 transition-transform shadow-md text-xs md:text-sm">
+                <Plus size={16} className="md:w-[18px] md:h-[18px]" /> {t('exp_new')}
               </button>
             </Link>
           )}
         </div>
 
-
-
-
-        {activeTab === 'reservations' && <div className="h-[750px]"><ReservationManager /></div>}
+        {activeTab === 'reservations' && <div className="h-[500px] md:h-[750px]"><ReservationManager /></div>}
         {activeTab === 'experiences' && <MyExperiences />}
         {activeTab === 'inquiries' && <InquiryChat />}
         {activeTab === 'earnings' && <Earnings />}

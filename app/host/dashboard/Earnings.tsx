@@ -150,8 +150,8 @@ export default function Earnings() {
     <div className="max-w-md mx-auto md:max-w-none md:mx-0 min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* 상단 헤더 & 설정 버튼 */}
-      <div className="flex items-center justify-between mb-8 px-2 relative z-50">
-        <h2 className="text-2xl font-bold text-slate-900">호스팅 수입</h2>
+      <div className="flex items-center justify-between mb-4 md:mb-8 px-1 md:px-2 relative z-50">
+        <h2 className="text-lg md:text-2xl font-bold text-slate-900">호스팅 수입</h2>
         <div className="relative">
           <button
             onClick={(e) => {
@@ -183,13 +183,13 @@ export default function Earnings() {
       </div>
 
       {/* 메인 카드 */}
-      <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
+      <div className="bg-white rounded-2xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
 
-        <div className="text-center mb-10 relative z-10">
-          <p className="text-slate-400 font-bold text-xs mb-2 flex items-center justify-center gap-1 uppercase tracking-wider">
+        <div className="text-center mb-6 md:mb-10 relative z-10">
+          <p className="text-slate-400 font-bold text-[10px] md:text-xs mb-1.5 md:mb-2 flex items-center justify-center gap-1 uppercase tracking-wider">
             정산 예정 금액 <Info size={12} />
           </p>
-          <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">
+          <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-2">
             ₩{stats.net.toLocaleString()}
           </h1>
 
@@ -199,7 +199,7 @@ export default function Earnings() {
           </div>
         </div>
 
-        <div className="h-48 flex items-end justify-between gap-2 md:gap-4 relative z-10">
+        <div className="h-36 md:h-48 flex items-end justify-between gap-1 md:gap-4 relative z-10">
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 z-0">
             <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
             <div className="border-t border-slate-900 border-dashed w-full h-px"></div>
@@ -251,7 +251,7 @@ export default function Earnings() {
         {showSummary && (
           <div className="mt-4 bg-slate-50 rounded-3xl p-6 md:p-8 animate-in slide-in-from-top-4 duration-300 fade-in border border-slate-100">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-lg text-slate-800">정산 상세 내역</h3>
+              <h3 className="font-bold text-base md:text-lg text-slate-800">정산 상세 내역</h3>
               <span className="text-[10px] font-bold bg-white border px-2 py-1 rounded text-slate-400 uppercase tracking-wide">
                 Year to Date
               </span>
@@ -279,8 +279,8 @@ export default function Earnings() {
               <div className="border-t border-slate-200 border-dashed my-4"></div>
 
               <div className="flex justify-between items-center">
-                <span className="font-black text-base text-slate-900">최종 지급액 (Net)</span>
-                <span className="font-black text-2xl text-slate-900">₩{stats.net.toLocaleString()}</span>
+                <span className="font-black text-sm md:text-base text-slate-900">최종 지급액 (Net)</span>
+                <span className="font-black text-xl md:text-2xl text-slate-900">₩{stats.net.toLocaleString()}</span>
               </div>
               <p className="text-[10px] text-slate-400 text-right mt-1">* 세금 처리는 호스트 본인의 책임입니다.</p>
             </div>

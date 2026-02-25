@@ -10,11 +10,11 @@ import Skeleton from '@/app/components/ui/Skeleton';
 export default function HostReviews() {
   const supabase = createClient();
   const { showToast } = useToast();
-  
+
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unreplied'>('all');
-  
+
   // 답글 작성 상태
   const [replyingId, setReplyingId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -58,25 +58,25 @@ export default function HostReviews() {
     try {
       const { error } = await supabase
         .from('reviews')
-        .update({ 
-            reply: replyText,
-            reply_at: new Date().toISOString() 
+        .update({
+          reply: replyText,
+          reply_at: new Date().toISOString()
         })
         .eq('id', reviewId);
 
       if (error) throw error;
 
       showToast('답글이 등록되었습니다!', 'success');
-      
-      setReviews(prev => prev.map(r => 
-        r.id === reviewId 
-          ? { ...r, reply: replyText, reply_at: new Date().toISOString() } 
+
+      setReviews(prev => prev.map(r =>
+        r.id === reviewId
+          ? { ...r, reply: replyText, reply_at: new Date().toISOString() }
           : r
       ));
 
       setReplyingId(null);
       setReplyText('');
-      
+
     } catch (error) {
       console.error(error);
       showToast('답글 등록 실패', 'error');
@@ -86,10 +86,10 @@ export default function HostReviews() {
   };
 
   const totalReviews = reviews.length;
-  const averageRating = totalReviews > 0 
-    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1) 
+  const averageRating = totalReviews > 0
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1)
     : '0.0';
-  
+
   const ratingCounts = [5, 4, 3, 2, 1].map(score => ({
     score,
     count: reviews.filter(r => Math.floor(r.rating) === score).length,
@@ -97,9 +97,9 @@ export default function HostReviews() {
   }));
 
   const unrepliedCount = reviews.filter(r => !r.reply).length;
-  
-  const filteredReviews = filter === 'unreplied' 
-    ? reviews.filter(r => !r.reply) 
+
+  const filteredReviews = filter === 'unreplied'
+    ? reviews.filter(r => !r.reply)
     : reviews;
 
   if (loading) return <Skeleton className="w-full h-96 rounded-3xl" />;
@@ -108,7 +108,7 @@ export default function HostReviews() {
     return (
       <div className="text-center py-32 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-           <Star size={32} className="text-slate-300" fill="#cbd5e1" />
+          <Star size={32} className="text-slate-300" fill="#cbd5e1" />
         </div>
         <h3 className="text-lg font-bold text-slate-900">아직 작성된 후기가 없습니다</h3>
         <p className="text-slate-500 mt-2 text-sm">첫 게스트를 맞이하고 멋진 후기를 받아보세요!</p>
@@ -118,64 +118,64 @@ export default function HostReviews() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-           <div>
-             <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">평균 평점</div>
-             <div className="text-4xl font-black text-slate-900 flex items-center gap-2">
-               {averageRating} <Star size={24} className="text-amber-400" fill="#fbbf24"/>
-             </div>
-             <div className="text-xs text-slate-400 mt-2 font-medium">전체 후기 {totalReviews}개</div>
-           </div>
-           <div className="w-32 space-y-1">
-             {ratingCounts.map((rc) => (
-               <div key={rc.score} className="flex items-center gap-2 text-[10px]">
-                 <span className="w-3 font-bold text-slate-400">{rc.score}</span>
-                 <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                   <div className="h-full bg-slate-800 rounded-full" style={{ width: `${rc.percent}%` }}></div>
-                 </div>
-               </div>
-             ))}
-           </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
+        <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">평균 평점</div>
+            <div className="text-2xl md:text-4xl font-black text-slate-900 flex items-center gap-2">
+              {averageRating} <Star size={20} className="text-amber-400 md:w-6 md:h-6" fill="#fbbf24" />
+            </div>
+            <div className="text-xs text-slate-400 mt-2 font-medium">전체 후기 {totalReviews}개</div>
+          </div>
+          <div className="w-32 space-y-1">
+            {ratingCounts.map((rc) => (
+              <div key={rc.score} className="flex items-center gap-2 text-[10px]">
+                <span className="w-3 font-bold text-slate-400">{rc.score}</span>
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-slate-800 rounded-full" style={{ width: `${rc.percent}%` }}></div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between cursor-pointer hover:border-rose-200 transition-colors" onClick={() => setFilter('unreplied')}>
-           <div className="flex justify-between items-start">
-             <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">미답변 후기</div>
-             <div className="bg-rose-100 text-rose-600 p-2 rounded-full"><MessageCircle size={20}/></div>
-           </div>
-           <div>
-             <div className="text-3xl font-black text-slate-900">{unrepliedCount}건</div>
-             <div className="text-xs text-slate-400 mt-1 font-medium">답글을 기다리고 있어요!</div>
-           </div>
+        <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between cursor-pointer hover:border-rose-200 transition-colors" onClick={() => setFilter('unreplied')}>
+          <div className="flex justify-between items-start">
+            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">미답변 후기</div>
+            <div className="bg-rose-100 text-rose-600 p-2 rounded-full"><MessageCircle size={20} /></div>
+          </div>
+          <div>
+            <div className="text-xl md:text-3xl font-black text-slate-900">{unrepliedCount}건</div>
+            <div className="text-xs text-slate-400 mt-1 font-medium">답글을 기다리고 있어요!</div>
+          </div>
         </div>
 
-        <div className="bg-slate-900 p-6 rounded-3xl text-white shadow-lg flex flex-col justify-center relative overflow-hidden">
-           <div className="relative z-10">
-             <h4 className="font-bold text-lg mb-2">답글의 힘! 💪</h4>
-             <p className="text-xs text-slate-300 leading-relaxed">
-               후기에 정성스러운 답글을 남기면<br/>
-               예약률이 평균 <span className="text-amber-400 font-bold">20% 이상 상승</span>합니다.
-             </p>
-           </div>
-           <Star className="absolute -right-4 -bottom-4 text-white/10 w-32 h-32 rotate-12" fill="currentColor"/>
+        <div className="bg-slate-900 p-4 md:p-6 rounded-2xl md:rounded-3xl text-white shadow-lg flex flex-col justify-center relative overflow-hidden">
+          <div className="relative z-10">
+            <h4 className="font-bold text-base md:text-lg mb-1.5 md:mb-2">답글의 힘! 💪</h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              후기에 정성스러운 답글을 남기면<br />
+              예약률이 평균 <span className="text-amber-400 font-bold">20% 이상 상승</span>합니다.
+            </p>
+          </div>
+          <Star className="absolute -right-4 -bottom-4 text-white/10 w-32 h-32 rotate-12" fill="currentColor" />
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex gap-2 bg-slate-50">
-          <button 
-            onClick={() => setFilter('all')} 
+          <button
+            onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${filter === 'all' ? 'bg-white shadow text-black' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            <Filter size={14}/> 전체 보기
+            <Filter size={14} /> 전체 보기
           </button>
-          <button 
-            onClick={() => setFilter('unreplied')} 
+          <button
+            onClick={() => setFilter('unreplied')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${filter === 'unreplied' ? 'bg-white shadow text-rose-500' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            <MessageCircle size={14}/> 미답변만 ({unrepliedCount})
+            <MessageCircle size={14} /> 미답변만 ({unrepliedCount})
           </button>
         </div>
 
@@ -186,15 +186,15 @@ export default function HostReviews() {
             </div>
           ) : (
             filteredReviews.map((review) => (
-              <div key={review.id} className="p-6 md:p-8 hover:bg-slate-50 transition-colors">
+              <div key={review.id} className="p-4 md:p-8 hover:bg-slate-50 transition-colors">
                 <div className="flex gap-4">
-                  
+
                   <div className="shrink-0">
                     <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden relative border border-slate-100">
-                      <Image 
-                        src={review.guest?.avatar_url || 'https://via.placeholder.com/150'} 
-                        alt="Guest" 
-                        fill 
+                      <Image
+                        src={review.guest?.avatar_url || 'https://via.placeholder.com/150'}
+                        alt="Guest"
+                        fill
                         className="object-cover"
                       />
                     </div>
@@ -205,14 +205,14 @@ export default function HostReviews() {
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm">{review.guest?.full_name || '익명 게스트'}</h4>
                         <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
-                           <span>{new Date(review.created_at).toLocaleDateString()}</span>
-                           <span className="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
-                           <span className="truncate max-w-[150px]">{review.experiences?.title}</span>
+                          <span>{new Date(review.created_at).toLocaleDateString()}</span>
+                          <span className="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+                          <span className="truncate max-w-[150px]">{review.experiences?.title}</span>
                         </div>
                       </div>
                       <div className="flex text-amber-400">
                         {[...Array(5)].map((_, i) => (
-                          <Star key={i} size={14} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-slate-200"}/>
+                          <Star key={i} size={14} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-slate-200"} />
                         ))}
                       </div>
                     </div>
@@ -240,19 +240,19 @@ export default function HostReviews() {
                           <p className="text-xs text-slate-600 leading-relaxed">{review.reply}</p>
                         </div>
                         {/* 🟢 [추가] 수정 버튼 (마우스 오버 시 표시) */}
-                        <button 
+                        <button
                           onClick={() => { setReplyingId(review.id); setReplyText(review.reply); }}
                           className="absolute top-2 right-2 p-1.5 bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-black"
                           title="답글 수정"
                         >
-                          <Edit2 size={12}/>
+                          <Edit2 size={12} />
                         </button>
                       </div>
                     ) : (
                       <div className="mt-4">
                         {replyingId === review.id ? (
                           <div className="animate-in fade-in slide-in-from-top-2">
-                            <textarea 
+                            <textarea
                               value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}
                               className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:border-black focus:ring-0 transition-all min-h-[100px]"
@@ -260,13 +260,13 @@ export default function HostReviews() {
                               autoFocus
                             />
                             <div className="flex justify-end gap-2 mt-2">
-                              <button 
+                              <button
                                 onClick={() => { setReplyingId(null); setReplyText(''); }}
                                 className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                               >
                                 취소
                               </button>
-                              <button 
+                              <button
                                 onClick={() => handleSubmitReply(review.id)}
                                 disabled={isSubmitting}
                                 className="px-4 py-2 text-xs font-bold bg-black text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
@@ -276,11 +276,11 @@ export default function HostReviews() {
                             </div>
                           </div>
                         ) : (
-                          <button 
+                          <button
                             onClick={() => { setReplyingId(review.id); setReplyText(''); }}
                             className="text-xs font-bold text-slate-500 hover:text-rose-500 flex items-center gap-1.5 transition-colors border border-slate-200 px-3 py-1.5 rounded-lg hover:border-rose-200 hover:bg-rose-50"
                           >
-                            <MessageCircle size={14}/> 답글 달기
+                            <MessageCircle size={14} /> 답글 달기
                           </button>
                         )}
                       </div>
