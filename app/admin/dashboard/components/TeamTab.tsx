@@ -309,7 +309,7 @@ export default function TeamTab() {
   const isNew = (createdAt: string) => new Date(createdAt) > new Date(lastViewed);
 
   return (
-    <div className="flex flex-col h-full gap-3 md:gap-6 relative">
+    <div className="flex flex-col h-full gap-3 md:gap-6 relative pt-2 md:pt-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-2.5 md:pb-4 gap-2">
         <h2 className="text-[10px] md:text-xl font-bold text-slate-900 flex items-center gap-1.5">
           <ClipboardList size={12} className="text-rose-500" /> Team Sync HQ
@@ -343,14 +343,14 @@ export default function TeamTab() {
               </div>
 
               {/* 입력 영역 */}
-              <div className="p-1.5 md:p-3 bg-blue-50/30 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center gap-1">
+              <div className="p-1.5 md:p-3 bg-blue-50/30 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center gap-1.5 md:gap-2">
                 <div className="flex-[4]">
-                  <input type="text" placeholder="오늘의 주요 업무" value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-[12px] md:text-sm px-2 py-1 rounded-md border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                  <input type="text" placeholder="오늘의 주요 업무" value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-[10px] md:text-sm px-2 py-1.5 md:py-2 rounded-md border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-slate-400" />
                 </div>
                 <div className="flex-[3]">
-                  <input type="text" placeholder="비고" value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-[12px] md:text-sm px-2 py-1 rounded-md border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                  <input type="text" placeholder="비고" value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-[10px] md:text-sm px-2 py-1.5 md:py-2 rounded-md border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-slate-400" />
                 </div>
-                <button onClick={addDailyLog} className="w-full md:w-auto px-2 py-1 bg-blue-600 text-white rounded-md font-bold text-[8px] md:text-sm hover:bg-blue-700 transition-colors">기록</button>
+                <button onClick={addDailyLog} className="w-full md:w-auto px-3 py-1.5 md:py-2 bg-blue-600 text-white rounded-md font-bold text-[10px] md:text-sm hover:bg-blue-700 transition-colors">기록</button>
               </div>
 
               <div className="flex-1 overflow-auto">
@@ -418,9 +418,9 @@ export default function TeamTab() {
             {/* Right: Todo List */}
             <div className="flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-2 md:p-4 overflow-hidden shadow-sm" ref={threadRef}>
               <div className="flex items-center gap-1 mb-2"><CheckSquare size={11} className="text-green-500" /><h3 className="text-[8px] md:text-base font-bold text-slate-800">팀 할 일</h3></div>
-              <div className="flex gap-1 mb-2">
-                <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-[12px] md:text-sm border border-slate-200 rounded-md px-2 py-1 outline-none" />
-                <button onClick={addTodo} className="bg-slate-900 text-white p-1 rounded-md"><Plus size={11} /></button>
+              <div className="flex flex-col md:flex-row gap-1.5 mb-2.5">
+                <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-[10px] md:text-sm border border-slate-200 rounded-md px-2 py-2 md:py-1.5 outline-none placeholder:text-slate-400" />
+                <button onClick={addTodo} className="bg-slate-900 text-white p-2 md:p-1.5 text-[10px] md:text-sm flex justify-center items-center rounded-md font-bold hover:bg-slate-800 transition-colors"><Plus size={14} className="md:hidden" /><span className="hidden md:inline">추가</span></button>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {todos.map(todo => {
@@ -466,9 +466,9 @@ export default function TeamTab() {
                               ))
                             )}
                           </div>
-                          <div className="flex gap-1.5 pt-1.5 border-t border-slate-50" onClick={e => e.stopPropagation()}>
-                            <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[12px] px-2 py-1 rounded border border-slate-100 outline-none focus:ring-1 focus:ring-blue-500/20" />
-                            <button onClick={() => addComment(todo.id)} className="text-blue-500 hover:text-blue-600"><Send size={12} /></button>
+                          <div className="flex gap-1.5 pt-1.5 border-t border-slate-50 mt-1" onClick={e => e.stopPropagation()}>
+                            <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[10px] md:text-[12px] px-2.5 py-1.5 md:py-1 rounded-md border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20 placeholder:text-slate-400" />
+                            <button onClick={() => addComment(todo.id)} className="bg-blue-500 hover:bg-blue-600 text-white px-2.5 rounded-md flex justify-center items-center transition-colors"><Send size={10} /></button>
                           </div>
                         </div>
                       )}
@@ -573,16 +573,16 @@ export default function TeamTab() {
                             </div>
 
                             {/* 댓글 구역 */}
-                            <div className="mt-4 pt-5 border-t-2 border-slate-100 shrink-0 space-y-3 bg-slate-50/80 -mx-6 -mb-6 p-5 rounded-b-2xl shadow-inner">
-                              <div className="max-h-32 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
+                            <div className="mt-4 pt-5 border-t-2 border-slate-100 shrink-0 space-y-3 bg-slate-50/80 -mx-4 md:-mx-6 -mb-4 md:-mb-6 p-4 md:p-5 rounded-b-2xl shadow-inner">
+                              <div className="max-h-32 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                                 {memoComments.length === 0 ? (
-                                  <p className="text-[11px] text-slate-400/80 text-center py-3 font-medium">작성된 답글이 없습니다.</p>
+                                  <p className="text-[10px] md:text-[11px] text-slate-400/80 text-center py-2 font-medium">작성된 답글이 없습니다.</p>
                                 ) : (
                                   memoComments.map(c => (
-                                    <div key={c.id} className="text-[12px] bg-white p-3 rounded-xl border border-slate-200 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.05)]">
+                                    <div key={c.id} className="text-[10px] md:text-[12px] bg-white p-2.5 md:p-3 rounded-xl border border-slate-200 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.05)]">
                                       <div className="flex justify-between items-center mb-1.5">
                                         <span className="font-bold text-slate-800">{c.author_name}</span>
-                                        <span className="text-[10px] text-slate-400 font-medium">{format(new Date(c.created_at), 'MM.dd HH:mm')}</span>
+                                        <span className="text-[9px] md:text-[10px] text-slate-400 font-medium">{format(new Date(c.created_at), 'MM.dd HH:mm')}</span>
                                       </div>
                                       <p className="text-slate-600 leading-relaxed">{c.content}</p>
                                     </div>
@@ -596,10 +596,10 @@ export default function TeamTab() {
                                   value={memoCommentInputs[memo.id] || ''}
                                   onChange={e => setMemoCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
                                   onKeyDown={e => e.key === 'Enter' && addMemoComment(memo.id)}
-                                  className="flex-1 text-xs px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all"
+                                  className="flex-1 text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all"
                                 />
-                                <button onClick={() => addMemoComment(memo.id)} className="bg-slate-900 text-white px-3.5 rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center">
-                                  <Send size={16} />
+                                <button onClick={() => addMemoComment(memo.id)} className="bg-slate-900 text-white px-3 md:px-3.5 rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center">
+                                  <Send size={14} className="md:w-4 md:h-4" />
                                 </button>
                               </div>
                             </div>

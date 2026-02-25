@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR } from "next/font/google"; // 🟢 폰트 변경
 import "./globals.css";
 import { Suspense } from "react";
@@ -49,6 +49,13 @@ export const metadata: Metadata = {
     images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'],
   },
   keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', 'Locally'],
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function RootLayout({

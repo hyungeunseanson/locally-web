@@ -226,11 +226,11 @@ export default function GlobalTeamChat() {
             return (
                 <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     {!isMe && showAuthorInfo && (
-                        <div className="flex items-center gap-2 mb-1.5 ml-1">
-                            <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600">
+                        <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-1.5 ml-1">
+                            <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-slate-200 flex items-center justify-center text-[8px] md:text-[9px] font-bold text-slate-600">
                                 {msg.author_name.slice(0, 2).toUpperCase()}
                             </div>
-                            <span className="text-[11px] font-bold text-slate-600">{msg.author_name}</span>
+                            <span className="text-[10px] md:text-[11px] font-bold text-slate-600">{msg.author_name}</span>
                         </div>
                     )}
                     <div className="flex items-end gap-1.5 group">
@@ -246,7 +246,7 @@ export default function GlobalTeamChat() {
                                 </div>
                             )}
                             {msg.content && msg.content !== '사진 전송 중...' && msg.content !== '사진을 1장 보냈습니다.' && (
-                                <div className={`px-3.5 py-2 text-[13px] leading-relaxed break-words whitespace-pre-wrap ${maxW} ${isMe ? 'bg-black text-white rounded-2xl rounded-tr-sm rounded-br-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm rounded-bl-sm'}`}>
+                                <div className={`px-3 py-1.5 md:px-3.5 md:py-2 text-[11px] md:text-[13px] leading-relaxed break-words whitespace-pre-wrap ${maxW} ${isMe ? 'bg-black text-white rounded-2xl rounded-tr-sm rounded-br-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm rounded-bl-sm'}`}>
                                     {msg.content}
                                 </div>
                             )}
@@ -288,7 +288,7 @@ export default function GlobalTeamChat() {
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
                     placeholder="메시지를 입력하세요..."
-                    className={`flex-1 text-[13px] bg-slate-100 border-transparent focus:bg-white focus:border-slate-300 focus:ring-2 focus:ring-slate-200 rounded-full outline-none transition-all placeholder:text-slate-400 ${isMobile ? 'px-4 py-2.5' : 'px-4 py-3'}`}
+                    className={`flex-1 text-[11px] md:text-[13px] bg-slate-100 border-transparent focus:bg-white focus:border-slate-300 focus:ring-2 focus:ring-slate-200 rounded-full outline-none transition-all placeholder:text-slate-400 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}
                     disabled={isUploading}
                 />
                 <button
@@ -341,7 +341,7 @@ export default function GlobalTeamChat() {
                     className="fixed left-0 right-0 z-[9990] bg-white flex flex-col transition-all duration-300 ease-in-out"
                     style={{
                         bottom: 48,
-                        maxHeight: isOpen ? '55vh' : '0px',
+                        maxHeight: isOpen ? '65vh' : '0px',
                         overflow: isOpen ? 'visible' : 'hidden',
                         boxShadow: isOpen ? '0 -4px 24px rgba(0,0,0,0.12)' : 'none',
                         borderTop: isOpen ? '1px solid #e2e8f0' : 'none',
@@ -360,7 +360,7 @@ export default function GlobalTeamChat() {
                                 </button>
                             </div>
                             {/* 메시지 목록 */}
-                            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3 bg-slate-50 min-h-0" style={{ maxHeight: 'calc(55vh - 100px)' }}>
+                            <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-2 md:px-3 md:py-2 space-y-2 md:space-y-3 bg-slate-50 min-h-0" style={{ maxHeight: 'calc(65vh - 100px)' }}>
                                 {renderMessages(true)}
                             </div>
                             {/* 입력 */}

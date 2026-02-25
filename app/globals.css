@@ -35,24 +35,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── iOS Safari 키보드 줌 방지 ──
-   iOS는 font-size < 16px 인 input에 포커스 시 자동으로 확대(zoom)함.
-   font-size: 16px 로 설정하면 줌 없이 키보드만 올라옴.
-   touch-action: manipulation 으로 300ms 탭 딜레이도 제거. */
-input,
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="search"],
-input[type="number"],
-input[type="tel"],
-input[type="url"],
-textarea,
-select {
-  font-size: 16px !important;
-  touch-action: manipulation;
-}
-
 .text-primary {
   color: var(--color-primary);
 }
