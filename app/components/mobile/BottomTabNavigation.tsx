@@ -18,6 +18,9 @@ export default function BottomTabNavigation() {
     const avatarUrl = user?.user_metadata?.avatar_url;
     const [showLogin, setShowLogin] = useState(false);
 
+    // 어드민 경로에서는 하단 탭바 숨김 (GlobalTeamChat이 대신함)
+    if (pathname?.startsWith('/admin')) return null;
+
     const handleAuthRequired = (e: React.MouseEvent, href: string) => {
         if (!user) {
             e.preventDefault();

@@ -309,10 +309,10 @@ export default function TeamTab() {
   const isNew = (createdAt: string) => new Date(createdAt) > new Date(lastViewed);
 
   return (
-    <div className="flex flex-col h-full gap-4 md:gap-6 relative">
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-3">
-        <h2 className="text-lg md:text-xl font-bold text-slate-900 flex items-center gap-2">
-          <ClipboardList className="text-rose-500" /> Team Sync HQ
+    <div className="flex flex-col h-full gap-3 md:gap-6 relative">
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-2.5 md:pb-4 gap-2">
+        <h2 className="text-[15px] md:text-xl font-bold text-slate-900 flex items-center gap-1.5">
+          <ClipboardList size={15} className="text-rose-500" /> Team Sync HQ
         </h2>
 
         {/* 🟢 구조 개편: Inner Tab Navigation */}
@@ -332,25 +332,24 @@ export default function TeamTab() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 md:gap-6 flex-1 md:overflow-hidden">
-        {/* 🟢 뷰 교체 렌더링 */}
+      <div className="flex flex-col lg:flex-row gap-3 md:gap-6 flex-1 md:overflow-hidden">
         {innerTab === 'todo' ? (
           <>
             {/* Left: Daily Logs */}
-            <div className="flex-[2.5] flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock size={18} className="text-blue-500" /> 업무 일지</h3>
+            <div className="flex-[2.5] flex flex-col bg-white rounded-xl md:rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-300">
+              <div className="p-2.5 md:p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                <h3 className="text-[13px] md:text-base font-bold text-slate-800 flex items-center gap-1.5"><Clock size={14} className="text-blue-500" /> 업무 일지</h3>
               </div>
 
-              {/* 🟢 입력 영역: 모바일 수직 배치 */}
-              <div className="p-3 bg-blue-50/30 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center gap-2">
+              {/* 입력 영역 */}
+              <div className="p-2 md:p-3 bg-blue-50/30 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center gap-1.5">
                 <div className="flex-[4]">
-                  <input type="text" placeholder="오늘의 주요 업무를 입력하세요" value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                  <input type="text" placeholder="오늘의 주요 업무" value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-[12px] md:text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                 </div>
                 <div className="flex-[3]">
-                  <input type="text" placeholder="비고 (선택사항)" value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                  <input type="text" placeholder="비고" value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-[12px] md:text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                 </div>
-                <button onClick={addDailyLog} className="w-full md:w-auto px-5 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors">기록하기</button>
+                <button onClick={addDailyLog} className="w-full md:w-auto px-3 py-1.5 bg-blue-600 text-white rounded-lg font-bold text-[12px] md:text-sm hover:bg-blue-700 transition-colors">기록</button>
               </div>
 
               <div className="flex-1 overflow-auto">
@@ -415,11 +414,11 @@ export default function TeamTab() {
             </div>
 
             {/* Right: Todo List */}
-            <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 overflow-hidden shadow-sm" ref={threadRef}>
-              <div className="flex items-center gap-2 mb-4"><CheckSquare size={18} className="text-green-500" /><h3 className="font-bold text-slate-800">팀 할 일 목록</h3></div>
-              <div className="flex gap-2 mb-4">
-                <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none" />
-                <button onClick={addTodo} className="bg-slate-900 text-white p-2 rounded-lg"><Plus size={18} /></button>
+            <div className="flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-2.5 md:p-4 overflow-hidden shadow-sm" ref={threadRef}>
+              <div className="flex items-center gap-1.5 mb-2.5"><CheckSquare size={14} className="text-green-500" /><h3 className="text-[13px] md:text-base font-bold text-slate-800">팀 할 일</h3></div>
+              <div className="flex gap-1.5 mb-2.5">
+                <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-[12px] md:text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none" />
+                <button onClick={addTodo} className="bg-slate-900 text-white p-1.5 rounded-lg"><Plus size={15} /></button>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {todos.map(todo => {
@@ -477,10 +476,9 @@ export default function TeamTab() {
             </div>
           </>
         ) : (
-          /* 🟢 Right: Notion-style Memos Tab */
-          <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+          /* 팀 메모장 탭 */
+          <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
             {isComposingMemo ? (
-              // 새 메모 작성/수정 에디터
               <MarkdownMemoEditor
                 initialValue={editingMemo?.content || ''}
                 onSave={saveMemo}
@@ -488,20 +486,19 @@ export default function TeamTab() {
                 isSaving={false}
               />
             ) : (
-              // 메모 리스트 뷰
-              <div className="flex-1 flex flex-col bg-slate-50/50 rounded-2xl border border-slate-200 p-4 md:p-6 overflow-hidden shadow-sm">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 shrink-0">
-                      <FileText size={22} />
+              <div className="flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-3 md:p-6 overflow-hidden shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 md:mb-6 gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 md:w-10 md:h-10 bg-amber-100 rounded-lg md:rounded-xl flex items-center justify-center text-amber-600 shrink-0">
+                      <FileText size={15} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900 text-base md:text-lg">Team Knowledge Docs</h3>
-                      <p className="text-xs text-slate-500 font-medium tracking-wider hidden md:block">아이디어부터 정책까지, 자유롭게 쌓아가는 우리 팀의 아카이브</p>
+                      <h3 className="font-bold text-slate-900 text-[13px] md:text-lg">Team Knowledge Docs</h3>
+                      <p className="text-[10px] text-slate-500 font-medium tracking-wider hidden md:block">아이디어부터 정책까지, 자유롭게 쌓아가는 우리 팀의 아카이브</p>
                     </div>
                   </div>
-                  <button onClick={() => { setEditingMemo(null); setIsComposingMemo(true); }} className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all w-full md:w-auto">
-                    <Plus size={18} /> 새 메모 작성
+                  <button onClick={() => { setEditingMemo(null); setIsComposingMemo(true); }} className="flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 md:px-5 py-1.5 md:py-2.5 text-[12px] md:text-sm rounded-lg md:rounded-xl shadow-lg shadow-amber-500/20 transition-all w-full md:w-auto">
+                    <Plus size={14} /> 새 메모 작성
                   </button>
                 </div>
 

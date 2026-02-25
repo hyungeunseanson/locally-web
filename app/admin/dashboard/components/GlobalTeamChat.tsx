@@ -334,42 +334,62 @@ export default function GlobalTeamChat() {
                 )}
             </div>
 
-            {/* ── 모바일: 풀스크린 오버레이 ── */}
+            {/* ── 모바일: 하단 고정 바 + 슬라이드업 드로어 ── */}
             <div className="md:hidden">
-                {isOpen && (
-                    <div className="fixed inset-0 z-[9999] bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-                        {/* 헤더 */}
-                        <div className="flex items-center justify-between px-4 py-3 bg-black text-white shrink-0">
-                            <div className="flex items-center gap-2">
-                                <MessageSquare size={16} />
-                                <span className="font-bold text-sm tracking-tight">Team Chat</span>
+                {/* 슬라이드업 메시지 패널 */}
+                <div
+                    className="fixed left-0 right-0 z-[9990] bg-white flex flex-col transition-all duration-300 ease-in-out"
+                    style={{
+                        bottom: 48,
+                        maxHeight: isOpen ? '55vh' : '0px',
+                        overflow: isOpen ? 'visible' : 'hidden',
+                        boxShadow: isOpen ? '0 -4px 24px rgba(0,0,0,0.12)' : 'none',
+                        borderTop: isOpen ? '1px solid #e2e8f0' : 'none',
+                    }}
+                >
+                    {isOpen && (
+                        <>
+                            {/* 핸들 + 타이틀 */}
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-1 bg-slate-200 rounded-full mx-auto" />
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-500 tracking-widest uppercase">Team Chat</span>
+                                <button onClick={() => setIsOpen(false)} className="p-1 text-slate-400 hover:text-slate-800">
+                                    <X size={15} />
+                                </button>
                             </div>
-                            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                                <X size={18} />
-                            </button>
-                        </div>
-                        {/* 메시지 스크롤 */}
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-3 bg-slate-50 min-h-0">
-                            {renderMessages(true)}
-                        </div>
-                        {/* 입력 영역 */}
-                        {renderInput(true)}
-                    </div>
-                )}
+                            {/* 메시지 목록 */}
+                            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3 bg-slate-50 min-h-0" style={{ maxHeight: 'calc(55vh - 100px)' }}>
+                                {renderMessages(true)}
+                            </div>
+                            {/* 입력 */}
+                            {renderInput(true)}
+                        </>
+                    )}
+                </div>
 
-                {/* 모바일 플로팅 버튼 (닫혔을 때) */}
-                {!isOpen && (
-                    <button
-                        onClick={() => setIsOpen(true)}
-                        className="fixed bottom-4 right-4 z-50 bg-black text-white rounded-full px-4 py-3 flex items-center gap-2 shadow-lg active:scale-95 transition-transform"
-                    >
-                        <MessageSquare size={16} />
-                        <span className="text-[13px] font-bold">Team Chat</span>
-                        {hasUnread && (
+                {/* 하단 슬림 바 — 항상 표시, 탭 하면 드로어 토글 */}
+                <div
+                    className="fixed bottom-0 left-0 right-0 z-[9991] bg-black text-white flex items-center justify-between px-5 cursor-pointer active:bg-slate-900 transition-colors"
+                    style={{
+                        height: 48,
+                        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                    }}
+                    onClick={() => setIsOpen(prev => !prev)}
+                >
+                    <div className="flex items-center gap-2">
+                        <MessageSquare size={15} />
+                        <span className="text-[13px] font-bold tracking-tight">Team Chat</span>
+                        {hasUnread && !isOpen && (
                             <span className="w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center animate-pulse">N</span>
                         )}
-                    </button>
-                )}
+                    </div>
+                    {isOpen
+                        ? <ChevronDown size={16} className="text-slate-400" />
+                        : <ChevronUp size={16} className="text-slate-400" />
+                    }
+                </div>
             </div>
 
             {/* Image Zoom Modal */}
