@@ -103,7 +103,7 @@ export default function BottomTabNavigation() {
             icon: (isActive: boolean) => <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
-            name: '메뉴',
+            name: '더보기',
             href: '/host/menu',
             requireAuth: true,
             icon: (isActive: boolean) => <AlignJustify size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
@@ -115,8 +115,8 @@ export default function BottomTabNavigation() {
     return (
         <>
             <nav
-                className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-[100] px-2 flex items-center justify-between"
-                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)', paddingTop: '8px' }}
+                className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-[100] px-2 flex items-center justify-between pb-safe"
+                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)', paddingTop: '8px' }}
             >
                 {tabs.map((tab, idx) => {
                     const isActive = tab.href === '/'

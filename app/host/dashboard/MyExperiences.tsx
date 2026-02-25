@@ -89,8 +89,8 @@ export default function MyExperiences() {
                 )}
                 {/* 상태 뱃지 */}
                 <div className={`absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase text-white shadow-sm ${exp.status === 'active' ? 'bg-green-500' :
-                    exp.status === 'revision' ? 'bg-orange-500' :
-                      exp.status === 'rejected' ? 'bg-red-500' : 'bg-slate-500'
+                  exp.status === 'revision' ? 'bg-orange-500' :
+                    exp.status === 'rejected' ? 'bg-red-500' : 'bg-slate-500'
                   }`}>
                   {exp.status === 'active' ? t('exp_selling') :
                     exp.status === 'revision' ? t('exp_status_revision') :
@@ -99,7 +99,7 @@ export default function MyExperiences() {
               </div>
 
               <div className="min-w-0">
-                <h2 className="font-bold text-[13px] md:text-xl mb-0.5 truncate max-w-[140px] md:max-w-none">{exp.title}</h2>
+                <h2 className="font-bold text-[13px] md:text-xl mb-0.5 leading-snug">{exp.title}</h2>
                 <div className="flex items-center gap-2 text-[11px] md:text-sm text-slate-500">
                   <span className="flex items-center gap-0.5">
                     <MapPin size={11} className="shrink-0" />
@@ -120,17 +120,15 @@ export default function MyExperiences() {
             <div className="flex flex-col md:flex-row gap-1.5 md:gap-2 shrink-0">
               <Link href={`/host/experiences/${exp.id}/dates`}>
                 <button className="px-2.5 py-1.5 md:px-4 md:py-2.5 border rounded-xl text-[11px] md:text-sm font-bold hover:bg-slate-50 flex items-center gap-1 transition-colors">
-                  <Calendar size={13} className="md:hidden" />
-                  <Calendar size={16} className="hidden md:block" />
-                  <span className="hidden md:inline">{t('exp_schedule')}</span>
+                  <Calendar size={13} />
+                  <span className="text-[11px]">{t('exp_schedule')}</span>
                 </button>
               </Link>
               <Link href={`/host/experiences/${exp.id}/edit`}>
                 <button className={`px-2.5 py-1.5 md:px-4 md:py-2.5 border rounded-xl text-[11px] md:text-sm font-bold flex items-center gap-1 transition-all ${exp.status === 'revision' ? 'bg-black text-white' : 'hover:bg-slate-50'
                   }`}>
-                  <Edit size={13} className="md:hidden" />
-                  <Edit size={16} className="hidden md:block" />
-                  <span className="hidden md:inline">{exp.status === 'revision' ? t('btn_edit_app') : t('exp_edit')}</span>
+                  <Edit size={13} />
+                  <span className="text-[11px]">{exp.status === 'revision' ? t('btn_edit_app') : t('exp_edit')}</span>
                 </button>
               </Link>
               <button

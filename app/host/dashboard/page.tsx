@@ -174,33 +174,6 @@ function DashboardContent() {
   return (
     <div className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-8 flex flex-col md:flex-row gap-0 md:gap-8">
 
-      {/* 🟢 모바일 전용: 가로 스크롤 탭 네비게이션 */}
-      <div className="md:hidden mb-4 -mx-3 px-3 overflow-x-auto scrollbar-hide">
-        <div className="flex gap-1.5 pb-2 min-w-max">
-          {[
-            { id: 'reservations', icon: <CalendarCheck size={14} />, label: t('menu_reservation') },
-            { id: 'experiences', icon: <List size={14} />, label: t('menu_my_exp') },
-            { id: 'inquiries', icon: <MessageSquare size={14} />, label: t('menu_inquiry') },
-            { id: 'earnings', icon: <DollarSign size={14} />, label: t('menu_earnings') },
-            { id: 'reviews', icon: <Star size={14} />, label: t('menu_reviews') },
-            { id: 'guidelines', icon: <ShieldCheck size={14} />, label: '가이드라인' },
-            { id: 'profile', icon: <UserCog size={14} />, label: t('menu_profile') },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${activeTab === tab.id
-                  ? (tab.id === 'guidelines' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-slate-900 text-white shadow-sm')
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* 데스크탑 사이드바 */}
       <aside className="w-64 hidden md:block shrink-0">
         <div className="sticky top-24 space-y-2">

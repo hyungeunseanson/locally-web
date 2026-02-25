@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 
 export default function InquiryChat() {
-  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage } = useChat('host');
+  const { inquiries, selectedInquiry, messages, currentUser, loadMessages, sendMessage, clearSelected } = useChat('host');
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,7 @@ export default function InquiryChat() {
       />
 
       {/* 좌측 리스트 (모바일: 전체폭, 데스크탑: 300px) */}
-      <div className={`w-full md:w-[300px] shrink-0 md:border-r border-slate-200 md:pr-4 overflow-y-auto max-h-[700px] ${selectedInquiry ? 'hidden md:block' : 'block'}`}>
+      <div className={`w-full md:w-[300px] shrink-0 md:border-r border-slate-200 md:pr-4 overflow-y-auto ${selectedInquiry ? 'hidden md:block' : 'block'}`}>
         {inquiries.length === 0 && <div className="text-slate-400 text-sm text-center py-10">문의가 없습니다.</div>}
 
         {inquiries.map((inq) => (
@@ -139,7 +139,7 @@ export default function InquiryChat() {
               {/* 모바일 뒤로가기 버튼 */}
               <button
                 className="md:hidden p-1.5 -ml-1 hover:bg-slate-100 rounded-full transition-colors"
-                onClick={(e) => { e.stopPropagation(); loadMessages(null as any); }}
+                onClick={(e) => { e.stopPropagation(); clearSelected(); }}
               >
                 <ChevronLeft size={20} className="text-slate-600" />
               </button>
@@ -201,8 +201,8 @@ export default function InquiryChat() {
                         )}
 
                         <div className={`p-3 rounded-2xl text-sm leading-relaxed shadow-sm break-words ${isMe
-                            ? 'bg-black text-white rounded-tr-none'
-                            : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
+                          ? 'bg-black text-white rounded-tr-none'
+                          : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
                           }`}>
                           {/* 📸 이미지 렌더링 추가 */}
                           {msg.type === 'image' && msg.image_url && (

@@ -13,7 +13,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [messages, setMessages] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const supabase = createClient();
   const { showToast } = useToast();
 
@@ -29,7 +29,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const fetchInquiries = useCallback(async (showLoading = true) => {
     // 🟢 [수정] 불필요한 로딩 상태 변경 방지 (깜빡임 해결)
     if (showLoading && inquiries.length === 0) setIsLoading(true);
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsLoading(false); return; }
@@ -45,7 +45,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       const { data: inquiriesData, error } = await query;
       if (error) throw error;
-      
+
       if (inquiriesData && inquiriesData.length > 0) {
         const inquiryIds = inquiriesData.map(i => i.id);
         const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
@@ -59,7 +59,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
             .select('inquiry_id')
             .in('inquiry_id', inquiryIds)
             .eq('is_read', false)
-            .neq('sender_id', user.id) 
+            .neq('sender_id', user.id)
         ]);
 
         const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
@@ -105,13 +105,13 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       } else {
         setInquiries([]);
       }
-    } catch (err: any) { console.error(err); } 
+    } catch (err: any) { console.error(err); }
     finally { setIsLoading(false); }
   }, [supabase, role, currentUser]); // 의존성 최적화
 
   const markAsRead = async (inquiryId: number) => {
     if (!currentUser) return;
-    setInquiries(prev => prev.map(inq => 
+    setInquiries(prev => prev.map(inq =>
       inq.id === inquiryId ? { ...inq, unread_count: 0 } : inq
     ));
     await supabase
@@ -128,14 +128,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         .select(`*`)
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
-      
+
       if (error) throw error;
-      
+
       if (data) {
         const senderIds = Array.from(new Set(data.map(m => m.sender_id)));
         const [proRes, appRes] = await Promise.all([
-            supabase.from('profiles').select('*').in('id', senderIds),
-            supabase.from('host_applications').select('*').in('user_id', senderIds)
+          supabase.from('profiles').select('*').in('id', senderIds),
+          supabase.from('host_applications').select('*').in('user_id', senderIds)
         ]);
 
         const profileMap = new Map(proRes.data?.map(p => [p.id, p]));
@@ -161,8 +161,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       const selected = inquiries.find(i => i.id === inquiryId);
       if (selected) {
-          setSelectedInquiry(selected);
-          markAsRead(inquiryId);
+        setSelectedInquiry(selected);
+        markAsRead(inquiryId);
       }
     } catch (err: any) { console.error(err); }
   };
@@ -171,7 +171,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     const cleanContent = sanitizeText(content);
     if (!cleanContent.trim() && !file) return;
     if (!currentUser) return;
-    
+
     let imageUrl = null;
     let type = 'text';
 
@@ -198,40 +198,40 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     const displayContent = cleanContent || (type === 'image' ? '📷 사진을 보냈습니다.' : '');
 
     // UI 낙관적 업데이트
-    setInquiries(prev => prev.map(inq => 
-      inq.id === inquiryId 
-        ? { ...inq, content: displayContent, updated_at: new Date().toISOString() } 
+    setInquiries(prev => prev.map(inq =>
+      inq.id === inquiryId
+        ? { ...inq, content: displayContent, updated_at: new Date().toISOString() }
         : inq
     ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
 
     try {
-      const { error } = await supabase.from('inquiry_messages').insert([{ 
-        inquiry_id: inquiryId, 
-        sender_id: currentUser.id, 
+      const { error } = await supabase.from('inquiry_messages').insert([{
+        inquiry_id: inquiryId,
+        sender_id: currentUser.id,
         content: cleanContent,
         image_url: imageUrl,
         type: type,
         is_read: false
       }]);
-      
+
       if (error) throw error;
-      
-      await supabase.from('inquiries').update({ 
-        content: displayContent, 
-        updated_at: new Date().toISOString() 
+
+      await supabase.from('inquiries').update({
+        content: displayContent,
+        updated_at: new Date().toISOString()
       }).eq('id', inquiryId);
-      
+
       await loadMessages(inquiryId);
-      
+
       // 알림 발송
       const currentInquiry = inquiries.find(i => i.id === inquiryId);
       if (currentInquiry) {
-        const recipientId = currentUser.id === currentInquiry.host_id 
-          ? currentInquiry.user_id 
+        const recipientId = currentUser.id === currentInquiry.host_id
+          ? currentInquiry.user_id
           : currentInquiry.host_id;
 
-        const targetLink = currentUser.id === currentInquiry.host_id 
-          ? '/guest/inbox'            
+        const targetLink = currentUser.id === currentInquiry.host_id
+          ? '/guest/inbox'
           : '/host/dashboard?tab=inquiries';
 
         const senderName = currentUser.user_metadata?.full_name || '상대방';
@@ -265,8 +265,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       type: 'general',
       host_id: hostData.id,
       experience_id: expData.id,
-      host: { 
-        name: hostData.name, 
+      host: {
+        name: hostData.name,
         avatar_url: secureUrl(hostData.avatarUrl || null)
       },
       experiences: { id: expData.id, title: expData.title },
@@ -297,7 +297,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
             fetchInquiries(false);
             if (selectedInquiry && newData.inquiry_id === selectedInquiry.id) {
               loadMessages(selectedInquiry.id);
-             }
+            }
           }
         }
       )
@@ -313,5 +313,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     };
   }, [supabase, fetchInquiries, selectedInquiry, currentUser]); // loadMessages는 의존성에서 제외 (무한루프 방지)
 
-  return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, refresh: fetchInquiries };
+  const clearSelected = () => { setSelectedInquiry(null); setMessages([]); };
+
+  return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, clearSelected, refresh: fetchInquiries };
 }

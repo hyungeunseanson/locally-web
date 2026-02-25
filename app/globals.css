@@ -21,12 +21,7 @@
   --foreground: #222222;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* 다크모드 비활성화 – Locally는 라이트 모드 전용 서비스입니다 */
 
 body {
   background: var(--background);
