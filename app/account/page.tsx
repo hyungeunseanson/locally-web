@@ -371,8 +371,8 @@ export default function AccountPage() {
           onClick={() => setShowHostTransition(true)}
           className="pointer-events-auto flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-lg text-[13px] font-semibold active:scale-95 transition-transform"
         >
-          <img src="/images/logo.png" alt="" className="w-4 h-4 object-contain grayscale brightness-[10]" style={{ transform: 'scale(1.3)' }} />
           호스트 모드로 전환
+          <ChevronRight size={15} strokeWidth={2.5} />
         </button>
       </div>
 
