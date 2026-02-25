@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Gift, Globe, MessageSquare } from 'lucide-react';
@@ -788,19 +789,32 @@ function MobileMenuItem({
   icon: React.ReactNode;
   label: string;
   href: string;
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
-  return (
-    <a
-      href={href}
-      onClick={onClick}
-      className="flex items-center gap-3.5 py-3.5 border-b border-slate-100"
-    >
-      <span className="text-slate-600 shrink-0">{icon}</span>
-      <span className="flex-1 text-[13px] font-medium text-slate-800">{label}</span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+  const inner = (
+    <>
+      <span className="text-gray-500 shrink-0">{icon}</span>
+      <span className="flex-1 text-[13px] font-medium text-gray-800">{label}</span>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
         <path d="M9 18l6-6-6-6" />
       </svg>
-    </a>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="w-full flex items-center gap-3.5 py-3.5 border-b border-gray-100 text-left"
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <Link href={href} className="flex items-center gap-3.5 py-3.5 border-b border-gray-100">
+      {inner}
+    </Link>
   );
 }
