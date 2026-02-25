@@ -17,12 +17,12 @@ const NavButton = ({ active, onClick, icon, label, count }: any) => (
       : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       }`}
   >
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2.5 md:gap-3">
       {icon}
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-[11px] md:text-sm font-medium">{label}</span>
     </div>
     {count !== undefined && count !== 0 && (
-      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
+      <span className={`text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 rounded-full font-bold ${active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
         }`}>
         {count}
       </span>
@@ -140,28 +140,28 @@ export default function Sidebar() {
 
       <div className="space-y-8 flex-1 overflow-y-auto scrollbar-hide">
         <div>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Management</h2>
-          <div className="space-y-1">
+          <h2 className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Management</h2>
+          <div className="space-y-0.5 md:space-y-1">
             <NavButton
               active={activeTab === 'APPROVALS' || activeTab === 'APPS' || activeTab === 'EXPS'}
               onClick={() => handleTabChange('APPROVALS')}
-              icon={<CheckCircle2 size={18} />}
+              icon={<CheckCircle2 size={16} className="md:w-[18px] md:h-[18px]" />}
               label="Approvals"
               count={counts.apps + counts.exps}
             />
-            <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={18} />} label="User Management" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
+            <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={16} className="md:w-[18px] md:h-[18px]" />} label="User Management" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
           </div>
         </div>
 
         <div>
-          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Operation</h2>
-          <div className="space-y-1">
+          <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
+          <div className="space-y-0.5 md:space-y-1">
             {/* BOOKINGS 제거됨 */}
-            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={18} />} label="Message Monitoring" />
+            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" />
             <NavButton
               active={activeTab === 'TEAM'}
               onClick={() => handleTabChange('TEAM')}
-              icon={<Briefcase size={18} />}
+              icon={<Briefcase size={16} className="md:w-[18px] md:h-[18px]" />}
               label="Team Workspace"
               count={activeTab !== 'TEAM' ? counts.teamNewCount : undefined}
             />
@@ -169,12 +169,12 @@ export default function Sidebar() {
         </div>
 
         <div>
-          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Finance</h2>
-          <div className="space-y-1">
-            <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={18} />} label="Master Ledger" count={counts.pendingBookings} />
-            <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={18} />} label="Billing & Revenue" />
-            <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={18} />} label="Data Analytics" />
-            <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={18} />} label="Audit Logs" />
+          <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Finance</h2>
+          <div className="space-y-0.5 md:space-y-1">
+            <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" count={counts.pendingBookings} />
+            <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={16} className="md:w-[18px] md:h-[18px]" />} label="Billing & Revenue" />
+            <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={16} className="md:w-[18px] md:h-[18px]" />} label="Data Analytics" />
+            <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />} label="Audit Logs" />
           </div>
         </div>
       </div>
@@ -220,10 +220,10 @@ export default function Sidebar() {
       {isMobileOpen && (
         <>
           <div className="md:hidden fixed inset-0 bg-black/60 z-[70] animate-in fade-in duration-200" onClick={() => setIsMobileOpen(false)} />
-          <aside className="md:hidden fixed top-0 left-0 bottom-0 w-72 bg-black text-white flex flex-col p-4 z-[80] shadow-2xl animate-in slide-in-from-left duration-300">
+          <aside className="md:hidden fixed top-0 left-0 bottom-0 w-60 bg-black text-white flex flex-col p-3 z-[80] shadow-2xl animate-in slide-in-from-left duration-300">
             {/* 닫기 버튼 */}
-            <button onClick={() => setIsMobileOpen(false)} className="absolute top-4 right-4 p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
-              <X size={20} />
+            <button onClick={() => setIsMobileOpen(false)} className="absolute top-3 right-3 p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+              <X size={18} />
             </button>
             {sidebarContent}
           </aside>

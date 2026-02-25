@@ -553,7 +553,7 @@ export default function TeamTab() {
                             </div>
 
                             {/* 리치 텍스트 렌더러 기반 뷰어 */}
-                            <div className="flex-1 overflow-y-auto prose prose-slate max-w-none !text-[13px] [&_p]:!text-[13px] [&_p]:!text-slate-700 [&_p]:!leading-relaxed [&_li]:!text-[13px] [&_li]:!text-slate-700 [&_img]:!max-w-[50%] [&_img]:!h-auto [&_img]:!object-contain [&_img]:!rounded-xl [&_img]:!shadow-sm [&_img]:!cursor-pointer hover:[&_img]:!opacity-90 [&_img]:!transition-opacity [&_img]:!my-2 [&_a]:!text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
+                            <div className="flex-1 overflow-y-auto prose prose-slate max-w-none text-[11px] md:text-[13px] [&_p]:text-[11px] md:[&_p]:text-[13px] [&_p]:text-slate-700 [&_p]:leading-relaxed [&_li]:text-[11px] md:[&_li]:text-[13px] [&_li]:text-slate-700 [&_img]:max-w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-xl [&_img]:shadow-sm [&_img]:cursor-pointer hover:[&_img]:opacity-90 [&_img]:transition-opacity [&_img]:my-2 [&_a]:text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{

@@ -382,16 +382,19 @@ export default function GlobalTeamChat() {
 
                 {/* 하단 플로팅 Pill 버튼 — Drawer가 열려있지 않을 때만 표시 */}
                 <div
-                    className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9989] transition-all duration-300 ${isOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 translate-y-0'}`}
+                    className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-[9989] transition-all duration-300 ${isOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 translate-y-0'}`}
                 >
                     <div
-                        className="bg-black text-white flex items-center gap-2 px-5 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] cursor-pointer active:scale-95 transition-all"
-                        onClick={() => setIsOpen(true)}
+                        className="bg-black text-white flex items-center justify-center gap-2 px-8 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] cursor-pointer active:scale-95 transition-all"
+                        onClick={() => {
+                            setHasUnread(false);
+                            setIsOpen(true);
+                        }}
                     >
                         <MessageSquare size={16} />
                         <span className="text-[13px] font-bold tracking-tight">Team Chat</span>
                         {hasUnread && (
-                            <span className="w-4 h-4 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center animate-pulse ml-1 shadow-[0_0_10px_rgba(244,63,94,0.6)]">N</span>
+                            <span className="w-4 h-4 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center ml-1 shadow-[0_0_10px_rgba(244,63,94,0.6)]">N</span>
                         )}
                     </div>
                 </div>

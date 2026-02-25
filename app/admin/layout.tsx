@@ -89,7 +89,7 @@ export default async function AdminLayout({
       </div>
 
       {/* 오른쪽: 바뀌는 페이지 내용 */}
-      <main className="flex-1 p-2 pt-16 md:p-8 md:pt-8 overflow-y-auto h-screen scrollbar-hide pb-14 md:pb-8">
+      <main className="flex-1 p-2 pt-16 md:p-8 md:pt-8 overflow-y-auto h-screen scrollbar-hide pb-2 md:pb-8">
         <div className="max-w-7xl mx-auto">
           {children}
         </div>
