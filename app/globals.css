@@ -6,19 +6,19 @@
 
   --color-primary: #FF385C;
   --color-primary-hover: #D90B3E;
-  
+
   /* 🟢 프리미엄 쉐도우 (Soft Layered Shadows) */
-  --shadow-card: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-  --shadow-card-hover: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
-  --shadow-floating: 0 30px 60px -12px rgba(0,0,0,0.25), 0 18px 36px -18px rgba(0,0,0,0.3);
-  
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-card-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-floating: 0 30px 60px -12px rgba(0, 0, 0, 0.25), 0 18px 36px -18px rgba(0, 0, 0, 0.3);
+
   --radius-card: 12px;
   --radius-button: 8px;
 }
 
 :root {
   --background: #ffffff;
-  --foreground: #222222; 
+  --foreground: #222222;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,12 +32,31 @@ body {
   background: var(--background);
   color: var(--foreground);
   /* font-family: Arial, Helvetica, sans-serif; */
-  -webkit-font-smoothing: antialiased; 
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── iOS Safari 키보드 줌 방지 ──
+   iOS는 font-size < 16px 인 input에 포커스 시 자동으로 확대(zoom)함.
+   font-size: 16px 로 설정하면 줌 없이 키보드만 올라옴.
+   touch-action: manipulation 으로 300ms 탭 딜레이도 제거. */
+input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+textarea,
+select {
+  font-size: 16px !important;
+  touch-action: manipulation;
 }
 
 .text-primary {
   color: var(--color-primary);
 }
+
 .bg-primary {
   background-color: var(--color-primary);
 }

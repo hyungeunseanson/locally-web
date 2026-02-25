@@ -311,45 +311,46 @@ export default function TeamTab() {
   return (
     <div className="flex flex-col h-full gap-3 md:gap-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-2.5 md:pb-4 gap-2">
-        <h2 className="text-[15px] md:text-xl font-bold text-slate-900 flex items-center gap-1.5">
-          <ClipboardList size={15} className="text-rose-500" /> Team Sync HQ
+        <h2 className="text-[10px] md:text-xl font-bold text-slate-900 flex items-center gap-1.5">
+          <ClipboardList size={12} className="text-rose-500" /> Team Sync HQ
         </h2>
 
         {/* 🟢 구조 개편: Inner Tab Navigation */}
-        <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto">
+        <div className="flex bg-slate-100 p-0.5 rounded-lg w-full md:w-auto">
           <button
             onClick={() => setInnerTab('todo')}
-            className={`flex-1 md:flex-initial px-4 md:px-6 py-2 rounded-lg text-sm font-bold transition-all ${innerTab === 'todo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all ${innerTab === 'todo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             Daily Log & Tasks
           </button>
           <button
             onClick={() => setInnerTab('memo')}
-            className={`flex-1 md:flex-initial px-4 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 flex-nowrap whitespace-nowrap ${innerTab === 'memo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'memo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            <NotebookPen size={16} /> 팀 메모장
+            <NotebookPen size={11} /> 팀 메모장
           </button>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3 md:gap-6 flex-1 md:overflow-hidden">
+      {/* 탭 내용 — 위 여백 살짝 */}
+      <div className="flex flex-col lg:flex-row gap-3 md:gap-6 flex-1 md:overflow-hidden pt-1 md:pt-0">
         {innerTab === 'todo' ? (
           <>
             {/* Left: Daily Logs */}
             <div className="flex-[2.5] flex flex-col bg-white rounded-xl md:rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-300">
-              <div className="p-2.5 md:p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                <h3 className="text-[13px] md:text-base font-bold text-slate-800 flex items-center gap-1.5"><Clock size={14} className="text-blue-500" /> 업무 일지</h3>
+              <div className="p-2 md:p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                <h3 className="text-[8px] md:text-base font-bold text-slate-800 flex items-center gap-1"><Clock size={11} className="text-blue-500" /> 업무 일지</h3>
               </div>
 
               {/* 입력 영역 */}
-              <div className="p-2 md:p-3 bg-blue-50/30 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center gap-1.5">
+              <div className="p-1.5 md:p-3 bg-blue-50/30 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center gap-1">
                 <div className="flex-[4]">
-                  <input type="text" placeholder="오늘의 주요 업무" value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-[12px] md:text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                  <input type="text" placeholder="오늘의 주요 업무" value={newLog.task} onChange={e => setNewLog({ ...newLog, task: e.target.value })} className="w-full text-[12px] md:text-sm px-2 py-1 rounded-md border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                 </div>
                 <div className="flex-[3]">
-                  <input type="text" placeholder="비고" value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-[12px] md:text-sm px-2.5 py-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                  <input type="text" placeholder="비고" value={newLog.note} onChange={e => setNewLog({ ...newLog, note: e.target.value })} onKeyDown={e => e.key === 'Enter' && addDailyLog()} className="w-full text-[12px] md:text-sm px-2 py-1 rounded-md border border-slate-200 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                 </div>
-                <button onClick={addDailyLog} className="w-full md:w-auto px-3 py-1.5 bg-blue-600 text-white rounded-lg font-bold text-[12px] md:text-sm hover:bg-blue-700 transition-colors">기록</button>
+                <button onClick={addDailyLog} className="w-full md:w-auto px-2 py-1 bg-blue-600 text-white rounded-md font-bold text-[8px] md:text-sm hover:bg-blue-700 transition-colors">기록</button>
               </div>
 
               <div className="flex-1 overflow-auto">
@@ -388,25 +389,26 @@ export default function TeamTab() {
                   </tbody>
                 </table>
 
-                {/* 🟢 모바일: 카드형 리스트 뷰 */}
+                {/* 모바일: 카드형 리스트 */}
                 <div className="md:hidden divide-y divide-slate-100">
                   {dailyLogs.map(log => (
-                    <div key={log.id} className="p-3 group">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          {isNew(log.created_at) && <span className="w-4 h-4 bg-rose-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
-                          <span className="text-xs font-bold text-rose-500">{log.author_name}</span>
-                          <span className="text-[10px] text-slate-400">{format(new Date(log.created_at), 'MM.dd')}</span>
+                    <div key={log.id} className="px-2 py-1.5 group">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          {isNew(log.created_at) && <span className="w-3 h-3 bg-rose-500 text-[7px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
+                          <span className="text-[8px] font-bold text-rose-500">{log.author_name}</span>
+                          {/* 날짜: 10%만 축소 → text-[9px] */}
+                          <span className="text-[9px] text-slate-400">{format(new Date(log.created_at), 'MM.dd')}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); toggleStatus(log.id, log.is_completed); }} className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap transition-colors ${log.is_completed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{log.is_completed ? 'Done' : 'Progress'}</button>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={(e) => { e.stopPropagation(); toggleStatus(log.id, log.is_completed); }} className={`text-[7px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap transition-colors ${log.is_completed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{log.is_completed ? 'Done' : 'Progress'}</button>
                           {log.author_id === currentUser?.id && (
-                            <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', log.id); }} className="text-slate-300 hover:text-rose-500"><Trash2 size={13} /></button>
+                            <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', log.id); }} className="text-slate-300 hover:text-rose-500"><Trash2 size={10} /></button>
                           )}
                         </div>
                       </div>
-                      <p className="text-sm text-slate-700 font-medium">{log.content}</p>
-                      {log.metadata?.note && <p className="text-xs text-slate-400 italic mt-1">{log.metadata.note}</p>}
+                      <p className="text-[9px] text-slate-700 font-medium">{log.content}</p>
+                      {log.metadata?.note && <p className="text-[8px] text-slate-400 italic mt-0.5">{log.metadata.note}</p>}
                     </div>
                   ))}
                 </div>
@@ -414,11 +416,11 @@ export default function TeamTab() {
             </div>
 
             {/* Right: Todo List */}
-            <div className="flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-2.5 md:p-4 overflow-hidden shadow-sm" ref={threadRef}>
-              <div className="flex items-center gap-1.5 mb-2.5"><CheckSquare size={14} className="text-green-500" /><h3 className="text-[13px] md:text-base font-bold text-slate-800">팀 할 일</h3></div>
-              <div className="flex gap-1.5 mb-2.5">
-                <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-[12px] md:text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none" />
-                <button onClick={addTodo} className="bg-slate-900 text-white p-1.5 rounded-lg"><Plus size={15} /></button>
+            <div className="flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-2 md:p-4 overflow-hidden shadow-sm" ref={threadRef}>
+              <div className="flex items-center gap-1 mb-2"><CheckSquare size={11} className="text-green-500" /><h3 className="text-[8px] md:text-base font-bold text-slate-800">팀 할 일</h3></div>
+              <div className="flex gap-1 mb-2">
+                <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-[12px] md:text-sm border border-slate-200 rounded-md px-2 py-1 outline-none" />
+                <button onClick={addTodo} className="bg-slate-900 text-white p-1 rounded-md"><Plus size={11} /></button>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {todos.map(todo => {
@@ -427,45 +429,46 @@ export default function TeamTab() {
                   const isTodoNew = isNew(todo.created_at);
 
                   return (
-                    <div key={todo.id} className="flex flex-col gap-2">
+                    <div key={todo.id} className="flex flex-col gap-1.5">
                       <div
                         onClick={() => setExpandedTodo(expandedTodo === todo.id ? null : todo.id)}
-                        className={`flex items-center gap-3 p-3 rounded-xl border group transition-all cursor-pointer ${expandedTodo === todo.id ? 'border-blue-300 ring-2 ring-blue-500/10' : ''} ${todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm hover:border-slate-300'}`}
+                        className={`flex items-center gap-2 p-2 rounded-lg border group transition-all cursor-pointer ${expandedTodo === todo.id ? 'border-blue-300 ring-1 ring-blue-500/10' : ''} ${todo.is_completed ? 'bg-slate-100/50 border-slate-100' : 'bg-white border-slate-200 shadow-sm hover:border-slate-300'}`}
                       >
-                        <button onClick={(e) => { e.stopPropagation(); toggleStatus(todo.id, todo.is_completed); }} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>{todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}</button>
+                        <button onClick={(e) => { e.stopPropagation(); toggleStatus(todo.id, todo.is_completed); }} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>{todo.is_completed ? <CheckCircle2 size={14} /> : <Circle size={14} />}</button>
                         <div className="flex-1 relative">
-                          <p className={`text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
-                          <div className="flex items-center gap-2 mt-1">
+                          <p className={`text-[9px] md:text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {/* author_name — 수정 불필요 (유지) */}
                             <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
-                            {(isTodoNew || hasNewComment) && <span className="w-4 h-4 bg-rose-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
-                            <div className="flex items-center gap-1 text-[10px] text-blue-500 font-bold">
-                              <MessageCircle size={12} /> {taskComments.length}
+                            {(isTodoNew || hasNewComment) && <span className="w-3 h-3 bg-rose-500 text-[7px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
+                            <div className="flex items-center gap-0.5 text-[8px] text-blue-500 font-bold">
+                              <MessageCircle size={9} /> {taskComments.length}
                             </div>
                           </div>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', todo.id); }} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', todo.id); }} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={11} /></button>
                       </div>
 
                       {expandedTodo === todo.id && (
-                        <div className="ml-8 p-3 bg-white rounded-xl border border-slate-100 shadow-inner space-y-2 animate-in slide-in-from-top-2 duration-200">
-                          <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        <div className="ml-5 p-2 bg-white rounded-lg border border-slate-100 shadow-inner space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                             {taskComments.length === 0 ? (
-                              <p className="text-[11px] text-slate-400 text-center py-2">댓글이 없습니다.</p>
+                              <p className="text-[8px] text-slate-400 text-center py-1">댓글이 없습니다.</p>
                             ) : (
                               taskComments.map(comment => (
-                                <div key={comment.id} className="text-[12px] bg-slate-50 p-2 rounded-lg">
-                                  <div className="flex justify-between items-center mb-1">
+                                <div key={comment.id} className="text-[8px] bg-slate-50 p-1.5 rounded-md">
+                                  <div className="flex justify-between items-center mb-0.5">
                                     <span className="font-bold text-slate-700">{comment.author_name}</span>
-                                    <span className="text-[9px] text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
+                                    <span className="text-[7px] text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
                                   </div>
                                   <p className="text-slate-600">{comment.content}</p>
                                 </div>
                               ))
                             )}
                           </div>
-                          <div className="flex gap-2 pt-2 border-t border-slate-50" onClick={e => e.stopPropagation()}>
-                            <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[11px] px-2 py-1.5 rounded border border-slate-100 outline-none focus:ring-1 focus:ring-blue-500/20" />
-                            <button onClick={() => addComment(todo.id)} className="text-blue-500 hover:text-blue-600"><Send size={16} /></button>
+                          <div className="flex gap-1.5 pt-1.5 border-t border-slate-50" onClick={e => e.stopPropagation()}>
+                            <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[12px] px-2 py-1 rounded border border-slate-100 outline-none focus:ring-1 focus:ring-blue-500/20" />
+                            <button onClick={() => addComment(todo.id)} className="text-blue-500 hover:text-blue-600"><Send size={12} /></button>
                           </div>
                         </div>
                       )}
