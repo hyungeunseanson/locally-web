@@ -137,29 +137,33 @@ export default function AuditLogTab() {
                         className={`group hover:bg-slate-50/80 transition-all cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
                         onClick={() => setExpandedId(isExpanded ? null : log.id)}
                       >
-                        <td className="px-3 md:px-6 py-3 md:py-5 text-slate-500 font-mono text-[9px] md:text-[11px] whitespace-nowrap">
-                          {new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        <td className="px-3 md:px-6 py-2.5 md:py-5 text-slate-500 font-mono text-[9px] md:text-[11px] whitespace-nowrap">
+                          {/* 🟢 두 줄로 분리된 타임스탬프 */}
+                          <div className="flex flex-col">
+                            <span>{new Date(log.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</span>
+                            <span className="font-bold text-slate-400">{new Date(log.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+                          </div>
                         </td>
-                        <td className="px-3 md:px-6 py-3 md:py-5">
+                        <td className="px-3 md:px-6 py-2.5 md:py-5">
                           <div className="flex items-center gap-1.5 md:gap-2">
                             <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-slate-100 flex items-center justify-center text-[9px] md:text-[10px] font-bold text-slate-500 shrink-0">
                               {log.admin_email?.[0].toUpperCase()}
                             </div>
-                            <span className="font-bold text-slate-700 text-[10px] md:text-xs truncate max-w-[80px] md:max-w-[120px]">{log.admin_email}</span>
+                            <span className="font-bold text-slate-700 text-[9px] md:text-xs truncate max-w-[60px] md:max-w-[120px]">{log.admin_email}</span>
                           </div>
                         </td>
-                        <td className="px-3 md:px-6 py-3 md:py-5">
-                          <span className={`px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-md md:rounded-lg text-[9px] md:text-[10px] font-black border whitespace-nowrap ${action.color}`}>
+                        <td className="px-3 md:px-6 py-2.5 md:py-5">
+                          <span className={`px-1.5 md:px-2.5 py-0.5 md:py-1 rounded text-[8px] md:text-[10px] font-black border whitespace-nowrap ${action.color}`}>
                             {action.label}
                           </span>
                         </td>
-                        <td className="px-3 md:px-6 py-3 md:py-5">
+                        <td className="px-3 md:px-6 py-2.5 md:py-5">
                           <div className="flex flex-col min-w-0">
                             <span className="font-bold text-slate-900 text-[10px] md:text-xs line-clamp-1">{log.details?.target_info || log.target_id}</span>
-                            <span className="text-[9px] md:text-[10px] text-slate-400 font-mono mt-0.5 uppercase truncate">{log.target_type} ID: {log.target_id.slice(0, 8)}...</span>
+                            <span className="text-[8px] md:text-[10px] text-slate-400 font-mono mt-0.5 uppercase truncate">{log.target_type} ID: {log.target_id.slice(0, 8)}...</span>
                           </div>
                         </td>
-                        <td className="px-3 md:px-6 py-3 md:py-5 text-right w-12 md:w-16">
+                        <td className="px-3 md:px-6 py-2.5 md:py-5 text-right w-10 md:w-16">
                           <div className={`inline-flex p-1 md:p-1.5 rounded-full transition-all ${isExpanded ? 'bg-slate-200 text-slate-900' : 'text-slate-300 group-hover:text-slate-600'}`}>
                             {isExpanded ? <ChevronUp size={14} className="w-3 h-3 md:w-3.5 md:h-3.5" /> : <ChevronDown size={14} className="w-3 h-3 md:w-3.5 md:h-3.5" />}
                           </div>

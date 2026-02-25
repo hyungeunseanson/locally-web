@@ -89,11 +89,11 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
   };
 
   return (
-    <div className="flex-[1.5] w-full bg-white md:rounded-2xl md:border md:border-slate-200 overflow-hidden flex flex-col p-4 md:p-8 overflow-y-auto shadow-sm">
-      <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+    <div className="flex-[1.5] w-full bg-white md:rounded-2xl md:border md:border-slate-200 overflow-hidden flex flex-col p-3 md:p-6 overflow-y-auto shadow-sm">
+      <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
 
         {/* 공통 헤더 */}
-        <div className="border-b border-slate-100 pb-4 md:pb-6 flex justify-between items-start relative">
+        <div className="border-b border-slate-100 pb-3 md:pb-5 flex justify-between items-start relative">
           {/* 🟢 [추가] 모바일 닫기 버튼 */}
           <button
             onClick={() => setSelectedItem?.(null)}
@@ -102,20 +102,20 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             <X size={20} />
           </button>
 
-          <div className="flex items-center gap-3 md:gap-4 pr-10">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+          <div className="flex items-center gap-2.5 md:gap-4 pr-10">
+            <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
               {selectedItem.profile_photo || selectedItem.avatar_url ? (
                 <img src={selectedItem.profile_photo || selectedItem.avatar_url} className="w-full h-full object-cover" />
               ) : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}
             </div>
             <div>
-              <span className={`inline-block px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold mb-1 md:mb-2 uppercase tracking-wide ${activeTab === 'USERS' ? 'bg-slate-100 text-slate-600' : selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+              <span className={`inline-block px-1.5 py-0.5 md:px-2 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold mb-0.5 md:mb-1 uppercase tracking-wide ${activeTab === 'USERS' ? 'bg-slate-100 text-slate-600' : selectedItem.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
                 {activeTab === 'USERS' ? 'Customer' : selectedItem.status}
               </span>
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 leading-tight pr-4">
+              <h2 className="text-base md:text-xl font-black text-slate-900 leading-tight pr-4">
                 {selectedItem.name || selectedItem.title || 'Unknown'}
               </h2>
-              <p className="text-[10px] md:text-xs text-slate-400 mt-1 font-mono break-all pr-4">ID: {selectedItem.id}</p>
+              <p className="text-[9px] md:text-[10px] text-slate-400 mt-0.5 font-mono break-all pr-4">ID: {selectedItem.id}</p>
             </div>
           </div>
           {(activeTab === 'USERS' || activeTab === 'BOOKINGS') && (
@@ -128,10 +128,10 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
 
         {/* 🔵 [USERS] 고객 상세 정보 */}
         {activeTab === 'USERS' && (
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><User size={12} /> 고객 프로필</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3 flex items-center gap-1"><User size={12} /> 고객 프로필</h4>
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
                 <InfoBox label="이메일" value={selectedItem.email} icon={<Mail size={14} />} />
                 <InfoBox label="연락처" value={selectedItem.phone} icon={<Phone size={14} />} />
                 <InfoBox label="생년월일" value={selectedItem.birth_date ? `${selectedItem.birth_date} ${calculateAge(selectedItem.birth_date)}` : null} icon={<Cake size={14} />} />
@@ -142,8 +142,8 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             </div>
 
             <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1"><ShoppingBag size={12} /> 구매 활동</h4>
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3 flex items-center gap-1"><ShoppingBag size={12} /> 구매 활동</h4>
+              <div className="grid grid-cols-3 gap-2 md:gap-3 mb-3 md:mb-4">
                 <StatSmall label="총 구매액" value="₩1,250,000" color="bg-blue-50 text-blue-700" />
                 <StatSmall label="구매 횟수" value="5회" color="bg-green-50 text-green-700" />
                 <StatSmall label="마지막 구매" value="3일 전" color="bg-slate-50 text-slate-700" />
@@ -157,8 +157,8 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
 
         {/* 🟠 [APPS] 호스트 지원서 상세 */}
         {activeTab === 'APPS' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-5 md:space-y-6">
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
               <InfoBox label="연락처" value={selectedItem.phone} icon={<Phone size={14} />} />
               <InfoBox label="이메일" value={selectedItem.email} icon={<Mail size={14} />} />
               <InfoBox label="국적" value={selectedItem.host_nationality === 'Korea' ? '🇰🇷 한국인' : '🇯🇵 일본인'} icon={<Globe size={14} />} />
@@ -166,49 +166,49 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             </div>
 
             {/* 프로필 사진 */}
-            <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="w-20 h-20 rounded-full bg-white overflow-hidden border border-slate-200 flex-shrink-0">
-                {selectedItem.profile_photo ? <img src={selectedItem.profile_photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={32} /></div>}
+            <div className="flex items-center gap-3 bg-slate-50 p-2.5 md:p-3.5 rounded-xl border border-slate-100">
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white overflow-hidden border border-slate-200 flex-shrink-0">
+                {selectedItem.profile_photo ? <img src={selectedItem.profile_photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}
               </div>
               <div>
-                <div className="text-xs font-bold text-slate-400 uppercase mb-1">프로필 사진</div>
-                {selectedItem.profile_photo ? <a href={selectedItem.profile_photo} target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs font-bold">원본 보기</a> : <span className="text-slate-400 text-xs">사진 없음</span>}
+                <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5">프로필 사진</div>
+                {selectedItem.profile_photo ? <a href={selectedItem.profile_photo} target="_blank" rel="noreferrer" className="text-blue-600 underline text-[10px] md:text-xs font-bold">원본 보기</a> : <span className="text-slate-400 text-[10px]">사진 없음</span>}
               </div>
             </div>
 
             {/* 언어 */}
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase mb-2"><MessageCircle size={14} /> 언어</div>
-              <div className="flex flex-wrap gap-2">
+            <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100">
+              <div className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1.5"><MessageCircle size={12} /> 언어</div>
+              <div className="flex flex-wrap gap-1.5">
                 {Array.isArray(selectedItem.languages) && selectedItem.languages.length > 0
-                  ? selectedItem.languages.map((l: string) => <span key={l} className="px-2 py-1 bg-white border rounded text-xs font-bold">{l}</span>)
-                  : <span className="text-sm font-bold text-slate-900">{selectedItem.target_language || '-'}</span>}
+                  ? selectedItem.languages.map((l: string) => <span key={l} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">{l}</span>)
+                  : <span className="text-xs md:text-sm font-bold text-slate-900">{selectedItem.target_language || '-'}</span>}
               </div>
             </div>
 
             {/* 소셜 & 유입경로 */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100"><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Instagram</div><div className="font-bold text-sm">{selectedItem.instagram || '-'}</div></div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100"><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">가입 경로</div><div className="font-bold text-sm">{selectedItem.source || '-'}</div></div>
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
+              <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">Instagram</div><div className="font-bold text-xs md:text-sm">{selectedItem.instagram || '-'}</div></div>
+              <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">가입 경로</div><div className="font-bold text-xs md:text-sm">{selectedItem.source || '-'}</div></div>
             </div>
 
-            <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">자기소개</h4><div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.self_intro}</div></div>
-            <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">지원 동기</h4><div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.motivation || '(내용 없음)'}</div></div>
+            <div><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5 md:mb-2">자기소개</h4><div className="bg-slate-50 p-3 md:p-4 rounded-xl text-[11px] md:text-xs leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.self_intro}</div></div>
+            <div><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5 md:mb-2">지원 동기</h4><div className="bg-slate-50 p-3 md:p-4 rounded-xl text-[11px] md:text-xs leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.motivation || '(내용 없음)'}</div></div>
 
             {/* 정산 계좌 */}
-            <div className="bg-green-50 p-5 rounded-xl border border-green-100">
-              <h4 className="text-xs font-bold text-green-700 uppercase mb-3 flex items-center gap-1"><CreditCard size={14} /> 정산 계좌 정보</h4>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div><span className="text-xs text-green-600 block mb-1">은행</span><span className="font-bold">{selectedItem.bank_name || '-'}</span></div>
-                <div><span className="text-xs text-green-600 block mb-1">계좌번호</span><span className="font-bold">{selectedItem.account_number || '-'}</span></div>
-                <div><span className="text-xs text-green-600 block mb-1">예금주</span><span className="font-bold">{selectedItem.account_holder || '-'}</span></div>
+            <div className="bg-green-50 p-3 md:p-4 rounded-xl border border-green-100">
+              <h4 className="text-[10px] md:text-xs font-bold text-green-700 uppercase mb-2 md:mb-3 flex items-center gap-1"><CreditCard size={12} /> 정산 계좌 정보</h4>
+              <div className="grid grid-cols-3 gap-2 md:gap-3 text-[10px] md:text-xs">
+                <div><span className="text-[9px] md:text-[10px] text-green-600 block mb-0.5 md:mb-1">은행</span><span className="font-bold">{selectedItem.bank_name || '-'}</span></div>
+                <div><span className="text-[9px] md:text-[10px] text-green-600 block mb-0.5 md:mb-1">계좌번호</span><span className="font-bold break-all">{selectedItem.account_number || '-'}</span></div>
+                <div><span className="text-[9px] md:text-[10px] text-green-600 block mb-0.5 md:mb-1">예금주</span><span className="font-bold">{selectedItem.account_holder || '-'}</span></div>
               </div>
             </div>
 
             {/* 🟢 [수정됨] 신분증 확인 섹션 (보안 URL 적용) */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-              <h4 className="text-xs font-bold text-purple-700 uppercase mb-3 flex items-center gap-1">
-                <Shield size={14} /> 신분증/자격증 확인 (관리자 전용)
+            <div className="p-3 md:p-4 bg-slate-50 rounded-xl md:rounded-2xl border border-slate-200">
+              <h4 className="text-[10px] md:text-xs font-bold text-purple-700 uppercase mb-2 md:mb-3 flex items-center gap-1">
+                <Shield size={12} /> 신분증/자격증 확인 (관리자 전용)
               </h4>
               {signedUrl ? (
                 <div className="space-y-3">
@@ -229,11 +229,11 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             </div>
 
             {/* 승인/거절 버튼 */}
-            <div className="pt-6 md:pt-8 mt-6 md:mt-8 border-t border-slate-100 grid grid-cols-2 gap-3 md:gap-4 sticky bottom-0 bg-white pb-4 z-10">
-              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'revision')} className="py-3 md:py-4 rounded-xl font-bold text-sm md:text-base text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100">보완 요청</button>
-              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'rejected')} className="py-3 md:py-4 rounded-xl font-bold text-sm md:text-base text-red-600 bg-red-50 border border-red-100 hover:bg-red-100">거절</button>
-              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-3 md:py-4 rounded-xl font-bold text-sm md:text-base text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2"><Check size={18} /> 승인 (호스트 권한 부여)</button>
-              <button onClick={() => deleteItem('host_applications', selectedItem.id)} className="col-span-2 text-xs text-slate-400 hover:text-red-500 py-2 flex items-center justify-center gap-1"><Trash2 size={12} /> 영구 삭제</button>
+            <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-slate-100 grid grid-cols-2 gap-2 md:gap-3 sticky bottom-0 bg-white pb-3 md:pb-4 z-10">
+              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100">보완 요청</button>
+              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100">거절</button>
+              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2"><Check size={16} /> 승인 (호스트 권한 부여)</button>
+              <button onClick={() => deleteItem('host_applications', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 영구 삭제</button>
             </div>
           </div>
         )}
@@ -243,8 +243,8 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
           <div className="space-y-8">
             {selectedItem.photos && (
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">등록된 사진</h4>
-                <div className="grid grid-cols-4 gap-2">
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3">등록된 사진</h4>
+                <div className="grid grid-cols-4 gap-1.5 md:gap-2">
                   {selectedItem.photos.map((url: string, i: number) => (
                     <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-100"><img src={url} className="w-full h-full object-cover" /></div>
                   ))}
@@ -252,53 +252,53 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
               <InfoBox label="가격" value={selectedItem.price !== undefined ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
               <InfoBox label="소요 시간" value={selectedItem.duration ? `${selectedItem.duration}시간` : '-'} />
               <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
               <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}` : '-'} />
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
-              <MapPin size={20} className="text-slate-400 mt-0.5 flex-shrink-0" />
+            <div className="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-100 flex items-start gap-2.5 md:gap-3">
+              <MapPin size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="text-xs font-bold text-slate-400 uppercase mb-1">만나는 장소 (Meeting Point)</div>
-                <div className="font-bold text-slate-900 text-sm">
+                <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5 md:mb-1">만나는 장소 (Meeting Point)</div>
+                <div className="font-bold text-slate-900 text-xs md:text-sm">
                   {selectedItem.meeting_point || '정보 없음'}
                 </div>
               </div>
             </div>
 
             <Link href={`/host/experiences/${selectedItem.id}/edit`}>
-              <button className="w-full py-3 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors mb-4">
-                <Edit size={16} /> 관리자 권한으로 수정하기
+              <button className="w-full py-2.5 md:py-3 bg-black text-white rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-slate-800 transition-colors mb-2 md:mb-4">
+                <Edit size={14} /> 관리자 권한으로 수정하기
               </button>
             </Link>
 
             <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">상세 설명</h4>
-              <div className="bg-slate-50 p-5 rounded-xl text-sm leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div>
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5 md:mb-2">상세 설명</h4>
+              <div className="bg-slate-50 p-3 md:p-4 rounded-xl text-[11px] md:text-xs leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.description}</div>
             </div>
 
             {selectedItem.itinerary && (
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">진행 코스</h4>
-                <div className="space-y-3 pl-4 border-l-2 border-slate-100">
-                  {selectedItem.itinerary.map((it: any, i: number) => <div key={i} className="relative pl-6"><div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-slate-300 border-2 border-white"></div><div className="font-bold text-sm">{it.title}</div><div className="text-xs text-slate-500 mt-1">{it.description}</div></div>)}
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3">진행 코스</h4>
+                <div className="space-y-2 md:space-y-3 pl-3 md:pl-4 border-l-2 border-slate-100">
+                  {selectedItem.itinerary.map((it: any, i: number) => <div key={i} className="relative pl-4 md:pl-6"><div className="absolute -left-[19px] md:-left-[21px] top-1 w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300 border-2 border-white"></div><div className="font-bold text-[11px] md:text-xs">{it.title}</div><div className="text-[10px] md:text-[11px] text-slate-500 mt-0.5 md:mt-1">{it.description}</div></div>)}
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-6">
-              <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">포함</h4><ul className="text-sm space-y-1">{selectedItem.inclusions?.map((t: string, i: number) => <li key={i} className="flex gap-2 items-center"><CheckCircle2 size={12} className="text-green-500" /> {t}</li>)}</ul></div>
-              <div><h4 className="text-xs font-bold text-slate-400 uppercase mb-2">불포함</h4><ul className="text-sm space-y-1 text-slate-500">{selectedItem.exclusions?.map((t: string, i: number) => <li key={i}>- {t}</li>)}</ul></div>
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              <div><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5 md:mb-2">포함</h4><ul className="text-[10px] md:text-[11px] space-y-1">{selectedItem.inclusions?.map((t: string, i: number) => <li key={i} className="flex gap-1.5 items-center"><CheckCircle2 size={12} className="text-green-500" /> {t}</li>)}</ul></div>
+              <div><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5 md:mb-2">불포함</h4><ul className="text-[10px] md:text-[11px] space-y-1 text-slate-500">{selectedItem.exclusions?.map((t: string, i: number) => <li key={i}>- {t}</li>)}</ul></div>
             </div>
 
-            <div className="pt-8 mt-8 border-t border-slate-100 grid grid-cols-2 gap-4 sticky bottom-0 bg-white pb-4">
-              <button onClick={() => updateStatus('experiences', selectedItem.id, 'revision')} className="py-4 rounded-xl font-bold text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
-              <button onClick={() => updateStatus('experiences', selectedItem.id, 'rejected')} className="py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절</button>
-              <button onClick={() => updateStatus('experiences', selectedItem.id, 'approved')} className="col-span-2 py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>
-              <button onClick={() => deleteItem('experiences', selectedItem.id)} className="col-span-2 text-xs text-slate-400 hover:text-red-500 py-2 flex items-center justify-center gap-1"><Trash2 size={12} /> 체험 영구 삭제</button>
+            <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-slate-100 grid grid-cols-2 gap-2 md:gap-3 sticky bottom-0 bg-white pb-3 md:pb-4 z-10">
+              <button onClick={() => updateStatus('experiences', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
+              <button onClick={() => updateStatus('experiences', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절</button>
+              <button onClick={() => updateStatus('experiences', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>
+              <button onClick={() => deleteItem('experiences', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 체험 영구 삭제</button>
             </div>
           </div>
         )}
@@ -340,9 +340,9 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
 
 // 🟡 내부 컴포넌트
 function InfoBox({ label, value, icon }: any) {
-  return <div className="bg-slate-50 p-3 rounded-lg border border-slate-100"><div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase mb-1">{icon} {label}</div><div className="font-bold text-slate-900 text-sm truncate">{value || '-'}</div></div>;
+  return <div className="bg-slate-50 p-2 md:p-3 rounded-lg border border-slate-100"><div className="flex items-center gap-1 md:gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5 md:mb-1">{icon} {label}</div><div className="font-bold text-slate-900 text-xs md:text-sm truncate">{value || '-'}</div></div>;
 }
 
 function StatSmall({ label, value, color }: any) {
-  return <div className={`p-4 rounded-xl border border-transparent ${color || 'bg-slate-50 text-slate-700'}`}><div className="text-[10px] font-bold opacity-70 mb-1 uppercase">{label}</div><div className="text-lg font-black">{value}</div></div>;
+  return <div className={`p-2.5 md:p-3 rounded-xl border border-transparent ${color || 'bg-slate-50 text-slate-700'}`}><div className="text-[9px] md:text-[10px] font-bold opacity-70 mb-0.5 uppercase">{label}</div><div className="text-sm md:text-base font-black truncate">{value}</div></div>;
 }

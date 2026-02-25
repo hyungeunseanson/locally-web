@@ -186,26 +186,26 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden flex-col md:flex-row">
       <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 shrink-0">
-          <div className="bg-slate-900 p-4 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sales</div>
-            <div className="text-xl md:text-2xl font-black">₩{totals.totalSales.toLocaleString()}</div>
-            <div className="text-[9px] md:text-[10px] text-slate-500 mt-1">실결제 매출</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 shrink-0">
+          <div className="bg-slate-900 p-3 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Total Sales</div>
+            <div className="text-sm md:text-2xl font-black">₩{totals.totalSales.toLocaleString()}</div>
+            <div className="text-[8px] md:text-[10px] text-slate-500 mt-0.5 md:mt-1">실결제 매출</div>
           </div>
-          <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payout (80%)</div>
-            <div className="text-xl md:text-2xl font-black text-rose-600">₩{totals.totalPayout.toLocaleString()}</div>
-            <div className="text-[9px] md:text-[10px] text-slate-400 mt-1">지급 예정액</div>
+          <div className="bg-white p-3 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Payout (80%)</div>
+            <div className="text-sm md:text-2xl font-black text-rose-600">₩{totals.totalPayout.toLocaleString()}</div>
+            <div className="text-[8px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">지급 예정액</div>
           </div>
-          <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Revenue</div>
-            <div className="text-xl md:text-2xl font-black text-blue-600">₩{totals.totalProfit.toLocaleString()}</div>
-            <div className="text-[9px] md:text-[10px] text-slate-400 mt-1">순수익</div>
+          <div className="bg-white p-3 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Net Revenue</div>
+            <div className="text-sm md:text-2xl font-black text-blue-600">₩{totals.totalProfit.toLocaleString()}</div>
+            <div className="text-[8px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">순수익</div>
           </div>
-          <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bookings</div>
-            <div className="text-xl md:text-2xl font-black text-slate-900">{ledgerData.length}건</div>
-            <div className="text-[9px] md:text-[10px] text-slate-400 mt-1 truncate">
+          <div className="bg-white p-3 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Bookings</div>
+            <div className="text-sm md:text-2xl font-black text-slate-900">{ledgerData.length}건</div>
+            <div className="text-[8px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 truncate">
               {dateRange[0].startDate && dateRange[0].endDate ?
                 `${format(dateRange[0].startDate, 'yy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yy.MM.dd')}`
                 : '전체 기간'
@@ -214,23 +214,23 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm shrink-0 gap-3 md:gap-0">
-          <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:items-center w-full md:w-auto">
+        <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-2.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm shrink-0 gap-2.5 md:gap-0">
+          <div className="flex flex-col md:flex-row gap-2.5 md:gap-4 md:items-center w-full md:w-auto">
 
             {/* 🗓️ 통합 달력(DateRangePicker) UI */}
             <div className="relative w-full md:w-auto">
               <button
                 onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                className="flex items-center justify-center md:justify-start w-full md:w-auto gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex items-center justify-center md:justify-start w-full md:w-auto gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl text-[11px] md:text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
               >
-                <Calendar size={16} className="text-blue-600" />
+                <Calendar size={14} className="text-blue-600 md:w-4 md:h-4" />
                 {dateRange[0].startDate && dateRange[0].endDate
                   ? `${format(dateRange[0].startDate, 'yyyy.MM.dd')} - ${format(dateRange[0].endDate, 'yyyy.MM.dd')}`
                   : '전체 기간 선택'}
               </button>
 
               {isCalendarOpen && (
-                <div className="absolute top-12 left-0 z-50 bg-white border border-slate-200 shadow-2xl rounded-2xl p-2 animate-in fade-in zoom-in-95">
+                <div className="absolute top-10 md:top-12 left-0 z-50 bg-white border border-slate-200 shadow-2xl rounded-xl md:rounded-2xl p-2 animate-in fade-in zoom-in-95">
                   <DateRange
                     editableDateInputs={true}
                     onChange={item => setDateRange([item.selection])}
@@ -259,7 +259,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
               )}
             </div>
 
-            <div className="flex flex-wrap bg-slate-100 p-1 rounded-xl w-full md:w-auto justify-center">
+            <div className="flex flex-wrap bg-slate-100 p-1 rounded-lg w-full md:w-auto justify-center">
               {[
                 { id: 'ALL', label: '전체' },
                 { id: 'PENDING', label: '입금대기' },
@@ -269,47 +269,47 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id as any)}
-                  className={`flex-1 md:flex-none px-2 py-1.5 md:px-3 text-[10px] md:text-xs font-bold rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`flex-1 md:flex-none px-1.5 py-1 md:px-3 text-[10px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
           </div>
-          <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+          <div className="flex gap-2 w-full md:w-auto mt-0 md:mt-0">
             <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
               <input
                 type="text"
                 placeholder="검색 (이름, 예약번호)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none"
+                className="w-full pl-8 md:pl-9 pr-3 py-1.5 md:py-2 bg-slate-50 border border-slate-100 rounded-lg md:rounded-xl text-[11px] md:text-xs focus:outline-none"
               />
             </div>
             <button
               onClick={downloadLedgerCSV}
-              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all shrink-0"
+              className="flex items-center justify-center gap-1.5 md:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[11px] md:text-sm font-bold transition-all shrink-0"
             >
-              <Download size={18} />
+              <Download size={14} className="md:w-[18px] md:h-[18px]" />
             </button>
           </div>
         </div>
 
         <div className="bg-white rounded-xl md:rounded-[24px] border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
           <div className="overflow-x-auto overflow-y-auto flex-1 scrollbar-hide">
-            <table className="w-full text-xs md:text-[13px] text-left border-collapse min-w-[800px]">
+            <table className="w-full text-[10px] md:text-[13px] text-left border-collapse min-w-[700px] md:min-w-[800px]">
               <thead className="bg-slate-50 text-[9px] md:text-[10px] font-black text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
                 <tr>
-                  <th className="px-3 md:px-4 py-3 md:py-4 w-20 md:w-24">Status</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4">Date</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4">Host</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4">Tour Item</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4 text-center">Customer</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4 text-right">Price</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4 text-right">Payout(80%)</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4 text-right text-slate-900 bg-slate-100/50">매출(Paid)</th>
-                  <th className="px-3 md:px-4 py-3 md:py-4 text-right text-blue-600">수익</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 w-16 md:w-24">Status</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4">Date</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4">Host</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4">Tour Item</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-center">Customer</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right">Price</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right">Payout(80%)</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-slate-900 bg-slate-100/50">매출(Paid)</th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-blue-600">수익</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -322,27 +322,27 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                       onClick={() => handleSelectBooking(b)}
                       className={`hover:bg-slate-50 transition-colors cursor-pointer group ${selectedBooking?.id === b.id ? 'bg-blue-50/50' : ''}`}
                     >
-                      <td className="px-4 py-4">{renderStatusBadge(b.status)}</td>
-                      <td className="px-4 py-4 font-mono text-slate-500">{b.date?.slice(5)}</td>
-                      <td className="px-4 py-4 font-bold text-slate-900">{b.experiences?.profiles?.name || '-'}</td>
-                      <td className="px-4 py-4">
-                        <div className="max-w-[150px] truncate font-medium text-slate-700" title={b.experiences?.title}>
+                      <td className="px-2 md:px-4 py-2.5 md:py-4">{renderStatusBadge(b.status)}</td>
+                      <td className="px-2 md:px-4 py-2.5 md:py-4 font-mono text-[9px] md:text-xs text-slate-500">{b.date?.slice(5)}</td>
+                      <td className="px-2 md:px-4 py-2.5 md:py-4 font-bold text-slate-900 truncate max-w-[80px]">{b.experiences?.profiles?.name || '-'}</td>
+                      <td className="px-2 md:px-4 py-2.5 md:py-4">
+                        <div className="max-w-[120px] md:max-w-[150px] truncate font-medium text-slate-700" title={b.experiences?.title}>
                           {b.experiences?.title}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-center text-slate-600">
+                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-center text-[10px] md:text-sm text-slate-600 truncate max-w-[80px]">
                         {b.contact_name}({b.guests})
                       </td>
-                      <td className="px-4 py-4 text-right font-mono text-slate-400">
+                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[9px] md:text-sm text-slate-400">
                         {Number(b.price_at_booking).toLocaleString()}
                       </td>
-                      <td className="px-4 py-4 text-right font-mono font-black text-rose-600 bg-rose-50/30">
+                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-rose-600 bg-rose-50/30">
                         {Number(b.host_payout_amount || (b.total_experience_price * 0.8)).toLocaleString()}
                       </td>
-                      <td className="px-4 py-4 text-right font-mono font-black text-slate-900 bg-slate-100/50">
+                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-slate-900 bg-slate-100/50">
                         {Number(b.amount).toLocaleString()}
                       </td>
-                      <td className="px-4 py-4 text-right font-mono font-black text-blue-600">
+                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-blue-600">
                         {Number(b.platform_revenue || (b.amount - (b.total_experience_price * 0.8))).toLocaleString()}
                       </td>
                     </tr>
@@ -355,55 +355,55 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       </div>
 
       {selectedBooking && (
-        <div className="absolute inset-0 z-30 md:relative md:w-[400px] w-full bg-white md:rounded-2xl md:shadow-2xl md:border md:border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 right-0 top-0 bottom-0 h-full">
+        <div className="absolute inset-0 z-[100] md:z-30 md:relative md:w-[400px] w-full bg-white md:rounded-2xl md:shadow-2xl md:border md:border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 right-0 top-0 bottom-0 h-full">
           {/* Header */}
-          <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+          <div className="p-3 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
             <div className="flex-1 pr-2">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
+              <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-1.5">
+                <div className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
                   ['paid', 'confirmed', 'completed'].includes(selectedBooking.status.toLowerCase()) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                   }`}>
                   {selectedBooking.status}
                 </div>
-                <span className="text-[10px] text-slate-400 font-bold">#{selectedBooking.id.slice(0, 8)}</span>
+                <span className="text-[9px] md:text-[10px] text-slate-400 font-bold">#{selectedBooking.id.slice(0, 8)}</span>
               </div>
-              <h3 className="text-base font-black text-slate-900 leading-tight mb-2 line-clamp-2">{selectedBooking.experiences?.title}</h3>
-              <div className="flex items-center gap-3 text-xs text-slate-600 font-medium">
+              <h3 className="text-[13px] md:text-base font-black text-slate-900 leading-tight mb-1.5 md:mb-2 line-clamp-2">{selectedBooking.experiences?.title}</h3>
+              <div className="flex items-center gap-2 md:gap-3 text-[10px] md:text-xs text-slate-600 font-medium">
                 <span>{selectedBooking.date} {selectedBooking.time}</span>
-                <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                <span className="w-0.5 h-0.5 md:w-1 md:h-1 bg-slate-300 rounded-full"></span>
                 <span>게스트 {selectedBooking.guests}명</span>
               </div>
             </div>
-            <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-900 p-1 bg-white rounded-full border border-slate-100 shadow-sm"><X size={16} /></button>
+            <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-900 p-1 md:bg-white rounded-full bg-slate-200/50 md:border md:border-slate-100 md:shadow-sm"><X size={14} className="md:w-4 md:h-4" /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide bg-white">
+          <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 md:space-y-6 scrollbar-hide bg-white pb-10">
             {/* 예약/결제 시점 */}
-            <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-              <Clock size={12} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-[11px] text-slate-500 bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100">
+              <Clock size={12} className="text-slate-400 md:w-3.5 md:h-3.5" />
               <span>접수: <span className="font-bold text-slate-700">{format(new Date(selectedBooking.created_at), 'yyyy.MM.dd HH:mm:ss', { locale: ko })}</span></span>
             </div>
 
             {/* 게스트 정보 (Compact) */}
             <div>
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><User size={10} /> Guest Info</h4>
-              <div className="grid grid-cols-1 gap-0 text-sm border border-slate-100 rounded-xl overflow-hidden">
-                <div className="flex justify-between items-center px-3 py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <span className="text-slate-500 text-xs">Name</span>
-                  <span className="font-bold text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_name)}>
-                    {selectedBooking.contact_name} <Copy size={10} className="text-slate-300" />
+              <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 md:mb-2 flex items-center gap-1"><User size={10} /> Guest Info</h4>
+              <div className="grid grid-cols-1 gap-0 text-xs md:text-sm border border-slate-100 rounded-lg md:rounded-xl overflow-hidden">
+                <div className="flex justify-between items-center px-2.5 md:px-3 py-2 md:py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <span className="text-slate-500 text-[11px] md:text-xs">Name</span>
+                  <span className="font-bold text-[11px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_name)}>
+                    {selectedBooking.contact_name} <Copy size={10} className="text-slate-300 md:w-3 md:h-3" />
                   </span>
                 </div>
-                <div className="flex justify-between items-center px-3 py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <span className="text-slate-500 text-xs">Phone</span>
-                  <span className="font-bold text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_phone)}>
-                    {selectedBooking.contact_phone} <Copy size={10} className="text-slate-300" />
+                <div className="flex justify-between items-center px-2.5 md:px-3 py-2 md:py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <span className="text-slate-500 text-[11px] md:text-xs">Phone</span>
+                  <span className="font-bold text-[11px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_phone)}>
+                    {selectedBooking.contact_phone} <Copy size={10} className="text-slate-300 md:w-3 md:h-3" />
                   </span>
                 </div>
-                <div className="flex justify-between items-center px-3 py-2.5 hover:bg-slate-50 transition-colors">
-                  <span className="text-slate-500 text-xs">Email</span>
-                  <span className="font-bold text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600 truncate max-w-[200px]" onClick={() => handleCopy(selectedBooking.profiles?.email)}>
-                    {selectedBooking.profiles?.email} <Copy size={10} className="text-slate-300" />
+                <div className="flex justify-between items-center px-2.5 md:px-3 py-2 md:py-2.5 hover:bg-slate-50 transition-colors">
+                  <span className="text-slate-500 text-[11px] md:text-xs">Email</span>
+                  <span className="font-bold text-[11px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600 truncate max-w-[150px] md:max-w-[200px]" onClick={() => handleCopy(selectedBooking.profiles?.email)}>
+                    {selectedBooking.profiles?.email} <Copy size={10} className="text-slate-300 md:w-3 md:h-3" />
                   </span>
                 </div>
               </div>
@@ -411,39 +411,39 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
             {/* 결제 및 정산 (Compact List) */}
             <div>
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><CreditCard size={10} /> Payment Breakdown</h4>
-              <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100">
+              <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 md:mb-2 flex items-center gap-1"><CreditCard size={10} /> Payment Breakdown</h4>
+              <div className="bg-slate-50 rounded-xl p-2.5 md:p-3 space-y-1.5 md:space-y-2 border border-slate-100">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500">결제 수단</span>
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <span className="text-[11px] md:text-xs text-slate-500">결제 수단</span>
+                  <span className="text-[11px] md:text-xs font-bold text-slate-700 flex items-center gap-1">
                     {/* 결제수단 로직 개선: payment_method 필드 자체를 확인 */}
                     {selectedBooking.payment_method === 'bank' || (selectedBooking.payment_method && selectedBooking.payment_method.includes('bank')) ? '🏛️ 무통장 입금' : '💳 카드 결제'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500">결제 금액</span>
-                  <span className="text-sm font-black text-slate-900">₩{Number(selectedBooking.amount).toLocaleString()}</span>
+                  <span className="text-[11px] md:text-xs text-slate-500">결제 금액</span>
+                  <span className="text-xs md:text-sm font-black text-slate-900">₩{Number(selectedBooking.amount).toLocaleString()}</span>
                 </div>
-                <div className="h-px bg-slate-200 my-1"></div>
+                <div className="h-px bg-slate-200 my-0.5 md:my-1"></div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500">호스트 정산 (80%)</span>
-                  <span className="text-xs font-bold text-rose-500">₩{Number(selectedBooking.host_payout_amount || (selectedBooking.total_experience_price * 0.8)).toLocaleString()}</span>
+                  <span className="text-[11px] md:text-xs text-slate-500">호스트 정산 (80%)</span>
+                  <span className="text-[11px] md:text-xs font-bold text-rose-500">₩{Number(selectedBooking.host_payout_amount || (selectedBooking.total_experience_price * 0.8)).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500">플랫폼 수익 (Net)</span>
-                  <span className="text-xs font-bold text-blue-600">₩{Number(selectedBooking.platform_revenue || (selectedBooking.amount - (selectedBooking.total_experience_price * 0.8))).toLocaleString()}</span>
+                  <span className="text-[11px] md:text-xs text-slate-500">플랫폼 수익 (Net)</span>
+                  <span className="text-[11px] md:text-xs font-bold text-blue-600">₩{Number(selectedBooking.platform_revenue || (selectedBooking.amount - (selectedBooking.total_experience_price * 0.8))).toLocaleString()}</span>
                 </div>
               </div>
-              <p className="text-[9px] text-slate-400 mt-2 text-right flex justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
+              <p className="text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right flex justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
             </div>
 
             {/* 관리자 액션 */}
-            <div className="pt-2">
+            <div className="pt-1 md:pt-2">
               {selectedBooking.status === 'PENDING' && (
                 <button
                   onClick={() => handleConfirmPayment(selectedBooking.id)}
                   disabled={isProcessing}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
+                  className="w-full py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] md:text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
                 >
                   {isProcessing ? '처리 중...' : (
                     <>
@@ -458,7 +458,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 <button
                   onClick={() => handleForceCancel(selectedBooking.id)}
                   disabled={isProcessing}
-                  className="w-full py-3 bg-white hover:bg-red-50 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-100 flex items-center justify-center gap-2"
+                  className="w-full py-2.5 md:py-3 bg-white hover:bg-red-50 text-red-600 rounded-xl text-[11px] md:text-xs font-bold transition-all border border-red-100 flex items-center justify-center gap-2"
                 >
                   {isProcessing ? '처리 중...' : '⚠️ 예약 강제 취소 (전액 환불)'}
                 </button>

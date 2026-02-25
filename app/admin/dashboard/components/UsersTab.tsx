@@ -94,22 +94,22 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
       <div className={`flex-1 flex overflow-y-auto p-1 animate-in fade-in zoom-in-95 duration-300 ${selectedUser ? 'hidden md:flex flex-col md:w-2/3 md:pr-4' : 'flex-col w-full'}`}>
 
         {/* 1. 실시간 접속자 섹션 */}
-        <section className="bg-white rounded-lg md:rounded-2xl border border-slate-200 p-4 md:p-6 mb-4 md:mb-6 shadow-sm shrink-0">
-          <h3 className="font-bold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2">
-            <Wifi size={20} className="text-green-500 animate-pulse" /> 실시간 접속 유저 ({onlineUsers.length}명)
+        <section className="bg-white rounded-lg md:rounded-2xl border border-slate-200 p-3 md:p-6 mb-3 md:mb-6 shadow-sm shrink-0">
+          <h3 className="font-bold text-sm md:text-lg mb-2.5 md:mb-4 flex items-center gap-1.5 md:gap-2">
+            <Wifi size={16} className="text-green-500 animate-pulse md:w-5 md:h-5" /> 실시간 접속 유저 ({onlineUsers.length}명)
           </h3>
           {onlineUsers.length > 0 ? (
-            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex gap-2.5 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide">
               {onlineUsers.map((u: any, idx: number) => (
-                <div key={idx} className="flex-shrink-0 w-48 p-4 bg-slate-50 border border-green-100 rounded-xl flex items-center gap-3 relative overflow-hidden">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-blue-500'}`}>
+                <div key={idx} className="flex-shrink-0 w-36 md:w-48 p-2.5 md:p-4 bg-slate-50 border border-green-100 rounded-xl flex items-center gap-2.5 md:gap-3 relative overflow-hidden">
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-blue-500'}`}>
                     {u.email ? u.email[0].toUpperCase() : 'G'}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold truncate text-slate-900">{u.email || '비회원'}</div>
-                    <div className="text-[10px] text-green-600 font-medium">지금 활동 중</div>
+                    <div className="text-[10px] md:text-xs font-bold truncate text-slate-900">{u.email || '비회원'}</div>
+                    <div className="text-[9px] md:text-[10px] text-green-600 font-medium leading-none mt-0.5">지금 활동 중</div>
                   </div>
-                  <div className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                  <div className="absolute top-2 right-2 w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-ping"></div>
                 </div>
               ))}
             </div>
@@ -120,10 +120,10 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
 
         {/* 2. 전체 유저 목록 섹션 */}
         <section className="bg-white rounded-lg md:rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
-          <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 md:gap-0 justify-between md:items-center shrink-0">
-            <h3 className="font-bold text-base md:text-lg">전체 회원 ({users.length})</h3>
+          <div className="p-3 md:p-6 border-b border-slate-100 flex flex-col md:flex-row gap-3 md:gap-0 justify-between md:items-center shrink-0">
+            <h3 className="font-bold text-sm md:text-lg">전체 회원 ({users.length})</h3>
 
-            <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+            <div className="flex items-center gap-2.5 md:gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
               {/* 🟢 [추가] 선택된 유저가 있을 때 버튼 표시 */}
               {selectedUserIds.length > 0 && (
                 <button
@@ -136,13 +136,13 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
 
               <div className="relative w-full md:w-64 shrink-0">
 
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5 md:w-4 md:h-4" />
                 <input
                   type="text"
                   placeholder="이름/이메일 검색"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs md:text-sm focus:outline-none focus:border-slate-400 transition-colors"
+                  className="w-full pl-8 md:pl-9 pr-3 md:pr-4 py-1.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] md:text-sm focus:outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
             </div>
@@ -152,18 +152,18 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               <thead className="text-[10px] md:text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   {/* 🟢 [추가] 전체 선택 체크박스 */}
-                  <th className="px-4 md:px-6 py-3 w-10">
+                  <th className="px-2 md:px-6 py-2 md:py-3 w-8 md:w-10">
                     <button onClick={toggleSelectAll}>
                       {filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length
-                        ? <CheckSquare size={16} className="text-slate-900" />
-                        : <Square size={16} className="text-slate-300" />}
+                        ? <CheckSquare className="text-slate-900 w-3.5 h-3.5 md:w-4 md:h-4" />
+                        : <Square className="text-slate-300 w-3.5 h-3.5 md:w-4 md:h-4" />}
                     </button>
                   </th>
-                  <th className="px-4 md:px-6 py-3">유저 정보</th>
-                  <th className="px-4 md:px-6 py-3">연락처</th>
-                  <th className="px-4 md:px-6 py-3">최근 접속</th> {/* 🟢 추가됨 */}
-                  <th className="px-4 md:px-6 py-3">구분</th>
-                  <th className="px-4 md:px-6 py-3 text-right">관리</th>
+                  <th className="px-2 md:px-6 py-2 md:py-3">유저 정보</th>
+                  <th className="px-2 md:px-6 py-2 md:py-3">연락처</th>
+                  <th className="px-2 md:px-6 py-2 md:py-3">최근 접속</th> {/* 🟢 추가됨 */}
+                  <th className="px-2 md:px-6 py-2 md:py-3">구분</th>
+                  <th className="px-2 md:px-6 py-2 md:py-3 text-right">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -178,47 +178,47 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                       className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50' : ''} ${selectedUser?.id === user.id ? 'bg-blue-100' : 'hover:bg-slate-50'}`}
                     >
                       {/* 🟢 [추가] 개별 선택 체크박스 */}
-                      <td className="px-6 py-4" onClick={(e) => { e.stopPropagation(); toggleSelectUser(user.id); }}>
+                      <td className="px-2 md:px-6 py-2.5 md:py-4" onClick={(e) => { e.stopPropagation(); toggleSelectUser(user.id); }}>
                         {isSelected
-                          ? <CheckSquare size={18} className="text-slate-900" />
-                          : <Square size={18} className="text-slate-300 hover:text-slate-400" />}
+                          ? <CheckSquare className="text-slate-900 w-4 h-4 md:w-[18px] md:h-[18px]" />
+                          : <Square className="text-slate-300 hover:text-slate-400 w-4 h-4 md:w-[18px] md:h-[18px]" />}
                       </td>
 
-                      <td className="px-6 py-4 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden border border-slate-100 relative">
-                          {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : <User size={16} />}
+                      <td className="px-2 md:px-6 py-2.5 md:py-4 flex items-center gap-2 md:gap-3">
+                        <div className="w-7 h-7 md:w-9 md:h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden border border-slate-100 relative">
+                          {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : <User className="w-3.5 h-3.5 md:w-4 md:h-4" />}
                           {/* 🟢 온라인 상태일 때 초록색 점 표시 */}
-                          {isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
+                          {isOnline && <div className="absolute bottom-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900">{user.name || '이름 없음'}</div>
-                          <div className="text-xs text-slate-400">{user.email}</div>
+                          <div className="font-bold text-[11px] md:text-sm text-slate-900">{user.name || '이름 없음'}</div>
+                          <div className="text-[9px] md:text-xs text-slate-400">{user.email}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-500">{user.phone || '-'}</td>
+                      <td className="px-2 md:px-6 py-2.5 md:py-4 text-slate-500 text-[10px] md:text-sm">{user.phone || '-'}</td>
 
                       {/* 🟢 최근 접속 시간 표시 (수정됨) */}
-                      <td className="px-6 py-4">
+                      <td className="px-2 md:px-6 py-2.5 md:py-4">
                         {isOnline ? (
-                          <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded">Online</span>
+                          <span className="text-green-600 font-bold text-[9px] md:text-xs bg-green-50 px-1.5 md:px-2 py-0.5 md:py-1 rounded">Online</span>
                         ) : (
-                          <span className="text-slate-500 text-xs flex items-center gap-1">
-                            <Clock size={12} /> {timeAgo(user.last_active_at)}
+                          <span className="text-slate-500 text-[9px] md:text-xs flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> {timeAgo(user.last_active_at)}
                           </span>
                         )}
                       </td>
 
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'host' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
+                      <td className="px-2 md:px-6 py-2.5 md:py-4">
+                        <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-[8px] md:text-[10px] font-bold uppercase ${user.role === 'host' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
                           {user.role || 'USER'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-2 md:px-6 py-2.5 md:py-4 text-right">
                         <button
                           onClick={(e) => { e.stopPropagation(); deleteItem('profiles', user.id); }}
-                          className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                          className="text-slate-400 hover:text-red-500 p-1.5 md:p-2 hover:bg-red-50 rounded-lg transition-colors"
                         >
-                          <MoreHorizontal size={16} />
+                          <MoreHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" />
                         </button>
                       </td>
                     </tr>
@@ -232,37 +232,37 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
 
       {/* 🟢 유저 상세 정보 패널 (우측 슬라이드) - 오버레이 적용됨 */}
       {selectedUser && (
-        <div className="absolute inset-0 z-30 md:relative md:w-[450px] border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 right-0 top-0">
+        <div className="absolute inset-0 z-[100] md:z-30 md:relative md:w-[450px] border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 right-0 top-0">
 
           {/* 헤더 */}
-          <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div className="p-3 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <div>
-              <h3 className="font-bold text-base md:text-lg text-slate-900">Customer</h3>
-              <div className="text-[10px] text-slate-400 font-mono break-all pr-4">ID: {selectedUser.id}</div>
+              <h3 className="font-bold text-sm md:text-lg text-slate-900">Customer</h3>
+              <div className="text-[9px] md:text-[10px] text-slate-400 font-mono break-all pr-4">ID: {selectedUser.id}</div>
             </div>
-            <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-900 p-2 rounded-full hover:bg-slate-200 transition-colors shrink-0">
-              <X size={20} />
+            <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-900 p-1.5 md:p-2 rounded-full hover:bg-slate-200 transition-colors shrink-0">
+              <X className="w-4 h-4 md:w-5 md:h-5" />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {/* 1. 기본 정보 */}
-            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center gap-4 md:gap-5">
-              <div className="w-20 h-20 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-                {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={32} /></div>}
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center gap-3 md:gap-5">
+              <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+                {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><User className="w-6 h-6 md:w-8 md:h-8" /></div>}
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900">{selectedUser.name || 'Locally User'}</h2>
+                <h2 className="text-base md:text-xl font-bold text-slate-900 leading-tight">{selectedUser.name || 'Locally User'}</h2>
 
                 {/* 🟢 상세 페이지 최근 접속 표시 (수정됨) */}
-                <div className={`flex items-center gap-2 text-xs font-bold mt-1 px-2 py-1 rounded w-fit ${onlineUserIds.has(selectedUser.id) ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                <div className={`flex items-center gap-1.5 text-[9px] md:text-xs font-bold mt-1 px-1.5 md:px-2 py-0.5 md:py-1 rounded w-fit ${onlineUserIds.has(selectedUser.id) ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
                   {onlineUserIds.has(selectedUser.id) ? (
                     <>
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 지금 활동 중 (Online)
+                      <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-500 animate-pulse"></span> 지금 활동 중 (Online)
                     </>
                   ) : (
                     <>
-                      <Clock size={12} /> 마지막 접속: {timeAgo(selectedUser.last_active_at)}
+                      <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> 마지막 접속: {timeAgo(selectedUser.last_active_at)}
                     </>
                   )}
                 </div>
@@ -270,51 +270,51 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
             </div>
 
             {/* 2. 고객 프로필 (기존 유지) */}
-            <div className="p-6 border-b border-slate-100">
-              <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">고객 프로필</h4>
-              <div className="space-y-4 text-sm">
-                <InfoRow icon={<Mail size={16} />} label="이메일" value={selectedUser.email} />
-                <InfoRow icon={<Phone size={16} />} label="연락처" value={selectedUser.phone || '+82 10-0000-0000'} />
-                <InfoRow icon={<Calendar size={16} />} label="생년월일" value={selectedUser.birthdate || '1999-09-01 (만 26세)'} />
-                <InfoRow icon={<MapPin size={16} />} label="국적" value={selectedUser.nationality || 'KR (대한민국)'} />
-                <InfoRow icon={<MessageCircle size={16} />} label="카카오톡 ID" value={selectedUser.kakao_id || '미등록'} />
-                <InfoRow icon={<Smile size={16} />} label="MBTI" value={selectedUser.mbti || 'ENTP'} />
+            <div className="p-4 md:p-6 border-b border-slate-100">
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">고객 프로필</h4>
+              <div className="space-y-3 md:space-y-4 text-xs md:text-sm">
+                <InfoRow icon={<Mail className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="이메일" value={selectedUser.email} />
+                <InfoRow icon={<Phone className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="연락처" value={selectedUser.phone || '+82 10-0000-0000'} />
+                <InfoRow icon={<Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="생년월일" value={selectedUser.birthdate || '1999-09-01 (만 26세)'} />
+                <InfoRow icon={<MapPin className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="국적" value={selectedUser.nationality || 'KR (대한민국)'} />
+                <InfoRow icon={<MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="카카오톡 ID" value={selectedUser.kakao_id || '미등록'} />
+                <InfoRow icon={<Smile className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="MBTI" value={selectedUser.mbti || 'ENTP'} />
               </div>
             </div>
 
             {/* 3. 구매 활동 (기존 유지) */}
-            <div className="p-6 border-b border-slate-100">
-              <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">구매 활동</h4>
-              <div className="grid grid-cols-3 gap-2 mb-6">
-                <div className="bg-slate-50 p-3 rounded-lg text-center">
-                  <div className="text-[10px] text-slate-500 mb-1">총 구매액</div>
-                  <div className="font-bold text-slate-900">₩1.25M</div>
+            <div className="p-4 md:p-6 border-b border-slate-100">
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">구매 활동</h4>
+              <div className="grid grid-cols-3 gap-2 mb-4 md:mb-6">
+                <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
+                  <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">총 구매액</div>
+                  <div className="font-bold text-[11px] md:text-sm text-slate-900">₩1.25M</div>
                 </div>
-                <div className="bg-slate-50 p-3 rounded-lg text-center">
-                  <div className="text-[10px] text-slate-500 mb-1">구매 횟수</div>
-                  <div className="font-bold text-slate-900">5회</div>
+                <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
+                  <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">구매 횟수</div>
+                  <div className="font-bold text-[11px] md:text-sm text-slate-900">5회</div>
                 </div>
-                <div className="bg-slate-50 p-3 rounded-lg text-center">
-                  <div className="text-[10px] text-slate-500 mb-1">마지막 구매</div>
-                  <div className="font-bold text-slate-900">3일 전</div>
+                <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
+                  <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">마지막 구매</div>
+                  <div className="font-bold text-[11px] md:text-sm text-slate-900">3일 전</div>
                 </div>
               </div>
 
-              <div className="border rounded-lg overflow-hidden text-xs">
+              <div className="border rounded-lg overflow-hidden text-[10px] md:text-xs">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
-                      <th className="px-3 py-2 font-medium">체험명</th>
-                      <th className="px-3 py-2 font-medium">날짜</th>
-                      <th className="px-3 py-2 font-medium text-right">금액</th>
+                      <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium">체험명</th>
+                      <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium">날짜</th>
+                      <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium text-right">금액</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {[1, 2, 3].map((i) => (
                       <tr key={i}>
-                        <td className="px-3 py-2 text-slate-900 truncate max-w-[120px]">을지로 노포 투어 - {i}차</td>
-                        <td className="px-3 py-2 text-slate-500">2026.02.0{i}</td>
-                        <td className="px-3 py-2 text-right font-bold">₩50,000</td>
+                        <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-900 truncate max-w-[100px] md:max-w-[120px]">을지로 노포 투어 - {i}차</td>
+                        <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-500">2026.02.0{i}</td>
+                        <td className="px-2 md:px-3 py-1.5 md:py-2 text-right font-bold">₩50,000</td>
                       </tr>
                     ))}
                   </tbody>
@@ -323,47 +323,47 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
             </div>
 
             {/* 4. 받은 리뷰 (기존 유지) */}
-            <div className="p-6 border-b border-slate-100">
-              <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">받은 리뷰 (3개)</h4>
-              <div className="space-y-4">
+            <div className="p-4 md:p-6 border-b border-slate-100">
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">받은 리뷰 (3개)</h4>
+              <div className="space-y-3 md:space-y-4">
                 {[1, 2].map((i) => (
-                  <div key={i} className="bg-slate-50 p-3 rounded-xl">
+                  <div key={i} className="bg-slate-50 p-2.5 md:p-3 rounded-xl">
                     <div className="flex justify-between items-start mb-1">
-                      <span className="font-bold text-xs">Host Kim</span>
-                      <div className="flex items-center text-[10px] font-bold text-orange-500"><Star size={10} fill="currentColor" className="mr-0.5" /> 5.0</div>
+                      <span className="font-bold text-[11px] md:text-xs">Host Kim</span>
+                      <div className="flex items-center text-[9px] md:text-[10px] font-bold text-orange-500"><Star size={10} fill="currentColor" className="mr-0.5" /> 5.0</div>
                     </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">약속 시간도 잘 지켜주시고 매너가 너무 좋으신 게스트님이었습니다.</p>
-                    <div className="text-[10px] text-slate-400 mt-2">2026.01.1{i}</div>
+                    <p className="text-[10px] md:text-xs text-slate-600 leading-relaxed">약속 시간도 잘 지켜주시고 매너가 너무 좋으신 게스트님이었습니다.</p>
+                    <div className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 md:mt-2">2026.01.1{i}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* 5. 관리자 메모 (기존 유지) */}
-            <div className="p-6">
-              <h4 className="text-xs font-bold text-slate-900 uppercase mb-2">관리자 메모</h4>
+            <div className="p-4 md:p-6">
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-2">관리자 메모</h4>
               <textarea
-                className="w-full bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm focus:outline-none focus:border-yellow-400 min-h-[80px]"
+                className="w-full bg-yellow-50 border border-yellow-200 rounded-xl p-2.5 md:p-3 text-[11px] md:text-sm focus:outline-none focus:border-yellow-400 min-h-[60px] md:min-h-[80px]"
                 placeholder="특이사항을 입력하세요..."
               />
             </div>
           </div>
 
           {/* 하단 버튼 */}
-          <div className="p-5 border-t border-slate-100 bg-white sticky bottom-0">
+          <div className="p-3 md:p-5 border-t border-slate-100 bg-white sticky bottom-0">
             {/* 🟢 [추가] 개별 알림 버튼 */}
             <button
               onClick={() => { setSelectedUserIds([selectedUser.id]); setIsNotiModalOpen(true); }}
-              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mb-2"
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-2.5 md:py-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 md:gap-2 mb-2 text-xs md:text-sm"
             >
-              <Bell size={16} /> 이 유저에게 알림 보내기
+              <Bell className="w-3.5 h-3.5 md:w-4 md:h-4" /> 이 유저에게 알림 보내기
             </button>
 
             <button
               onClick={() => { if (confirm('정말 계정을 영구 삭제하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
-              className="w-full bg-slate-900 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-slate-900 hover:bg-red-600 text-white font-bold py-2.5 md:py-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 md:gap-2 text-xs md:text-sm"
             >
-              <Trash2 size={16} /> 계정 영구 삭제
+              <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /> 계정 영구 삭제
             </button>
           </div>
         </div>
@@ -398,13 +398,13 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
 // 헬퍼 컴포넌트 (아이콘 + 라벨 + 값)
 function InfoRow({ icon, label, value }: any) {
   return (
-    <div className="flex items-center gap-4">
-      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+    <div className="flex items-center gap-3 md:gap-4">
+      <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
         {icon}
       </div>
-      <div>
-        <div className="text-[10px] text-slate-400 font-bold uppercase">{label}</div>
-        <div className="text-sm font-medium text-slate-900">{value}</div>
+      <div className="min-w-0">
+        <div className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase truncate">{label}</div>
+        <div className="text-[11px] md:text-sm font-medium text-slate-900 truncate">{value}</div>
       </div>
     </div>
   );

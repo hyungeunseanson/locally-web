@@ -38,6 +38,7 @@ export default function Sidebar() {
   const urlTab = searchParams.get('tab')?.toUpperCase();
   const [activeTab, setActiveTab] = useState<string>('APPS');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     const savedTab = localStorage.getItem('admin_active_tab');
@@ -94,8 +95,18 @@ export default function Sidebar() {
     }
   };
 
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    } catch (e) {
+      console.log('Error fetching user:', e);
+    }
+  };
+
   useEffect(() => {
     fetchCounts();
+    fetchCurrentUser();
 
     // 열람 상태 변경 감지를 위한 이벤트 리스너
     window.addEventListener('booking-viewed', fetchCounts);
@@ -156,7 +167,6 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
           <div className="space-y-0.5 md:space-y-1">
-            {/* BOOKINGS 제거됨 */}
             <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" />
             <NavButton
               active={activeTab === 'TEAM'}
@@ -179,18 +189,20 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div className="mt-auto pt-6 border-t border-slate-900 px-2">
+      <div className="mt-auto md:pt-6 md:pb-6 border-t border-slate-900 px-2 min-h-[140px] md:min-h-0 flex flex-col justify-end">
         <div className="flex items-center gap-2 mb-4 px-1">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
             {counts.online} Online Now
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">AD</div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">Master Admin</p>
-            <p className="text-xs text-slate-400 truncate">admin@locally.com</p>
+        <div className="flex items-center gap-2.5 md:gap-3">
+          <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] md:text-xs font-bold text-white shrink-0">
+            {currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : 'AD'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] md:text-sm font-medium text-white truncate">Master Admin</p>
+            <p className="text-[9px] md:text-xs text-slate-400 truncate">{currentUser?.email || 'Loading...'}</p>
           </div>
         </div>
       </div>

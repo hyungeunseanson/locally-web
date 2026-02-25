@@ -71,11 +71,11 @@ export default function ChatMonitor() {
   return (
     <div className="flex h-full gap-4 md:gap-6 w-full relative">
       {/* 왼쪽 목록 패널 */}
-      <div className={`w-full md:w-1/3 bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-1/3 bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} min-h-[500px]`}>
         <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex justify-between items-center mb-3 md:mb-4">
-            <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">
-              <MessageCircle size={16} className="md:w-[18px] md:h-[18px]" /> 채팅 관리
+            <h3 className="font-bold text-sm md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">
+              <MessageCircle size={14} className="md:w-[18px] md:h-[18px]" /> 채팅 관리
             </h3>
             <button onClick={refresh} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
               <RefreshCw size={14} className={`md:w-4 md:h-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -147,16 +147,16 @@ export default function ChatMonitor() {
       </div>
 
       {/* 오른쪽 채팅창 (모바일에서는 오버레이처럼 보이거나 교체됨) */}
-      <div className={`flex-1 bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex absolute inset-0 z-20 md:relative md:inset-auto md:z-0' : 'hidden md:flex'}`}>
+      <div className={`flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex absolute inset-0 z-[100] w-[100vw] h-[100vh] fixed top-0 left-0 -ml-4 md:ml-0 md:static md:w-auto md:h-auto md:z-0 md:rounded-2xl' : 'hidden md:flex'}`}>
         {selectedInquiry ? (
           <>
-            <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0">
-              <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 pt-6 md:pt-4">
+              <div className="flex items-center gap-1.5 md:gap-4 min-w-0">
                 <button
                   onClick={() => loadMessages(null)} // 목록으로 돌아가기
-                  className="md:hidden p-1.5 -ml-1.5 hover:bg-slate-200 rounded-lg text-slate-500 shrink-0"
+                  className="md:hidden p-1.5 -ml-1 text-slate-500 shrink-0 bg-slate-100 rounded-full"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
                 </button>
 
                 <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-200 shadow-sm shrink-0">
@@ -167,22 +167,22 @@ export default function ChatMonitor() {
                   )}
                 </div>
                 <div className="flex flex-col gap-0.5 min-w-0">
-                  <div className="font-bold text-sm md:text-lg text-slate-900 flex items-center gap-1.5 md:gap-2 truncate">
+                  <div className="font-bold text-xs md:text-lg text-slate-900 flex items-center gap-1 md:gap-2 truncate">
                     <span className="truncate">{getGuestName(selectedInquiry.guest)}</span>
                     {selectedInquiry.type === 'admin' ? (
-                      <span className="text-[8px] md:text-[10px] bg-green-100 text-green-700 px-1.5 md:px-2 py-0.5 rounded-full font-bold border border-green-200 shrink-0">1:1 문의</span>
+                      <span className="text-[7px] md:text-[10px] bg-green-100 text-green-700 px-1 md:px-2 py-0.5 rounded-full font-bold border border-green-200 shrink-0">1:1 문의</span>
                     ) : (
-                      <span className="text-[8px] md:text-[10px] bg-blue-100 text-blue-700 px-1.5 md:px-2 py-0.5 rounded-full font-bold border border-blue-200 shrink-0">일반 유저</span>
+                      <span className="text-[7px] md:text-[10px] bg-blue-100 text-blue-700 px-1 md:px-2 py-0.5 rounded-full font-bold border border-blue-200 shrink-0">일반 유저</span>
                     )}
                   </div>
-                  <div className="text-[9px] md:text-[11px] text-slate-500 font-medium truncate">
+                  <div className="text-[8px] md:text-[11px] text-slate-500 font-medium truncate leading-none">
                     {selectedInquiry.guest?.email || '이메일 정보 없음'} {selectedInquiry.guest?.phone ? ` | ${selectedInquiry.guest.phone}` : ''}
                   </div>
-                  <div className="text-[9px] md:text-[11px] text-slate-400 flex items-center gap-1 mt-px md:mt-0.5 truncate">
+                  <div className="text-[8px] md:text-[11px] text-slate-400 flex items-center gap-1 mt-0 md:mt-0.5 truncate leading-none">
                     {selectedInquiry.type === 'admin' ? (
                       <span className="text-emerald-600 font-medium whitespace-nowrap">💬 관리자 직통 상담 중</span>
                     ) : (
-                      <span className="truncate">호스트: <span className="font-bold text-slate-700 bg-slate-100 px-1 md:px-1.5 py-0.5 rounded">{selectedInquiry.host?.full_name || '알수없음'}</span> 님과의 대화 모니터링 중</span>
+                      <span className="truncate">호스트: <span className="font-bold text-slate-700 bg-slate-100 px-1 py-0 md:px-1.5 md:py-0.5 rounded">{selectedInquiry.host?.full_name || '알수없음'}</span> 님과의 대화 모니터링</span>
                     )}
                   </div>
                 </div>
@@ -216,9 +216,9 @@ export default function ChatMonitor() {
               })}
             </div>
 
-            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex gap-2 shrink-0">
+            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex gap-1.5 md:gap-2 shrink-0 pb-6 md:pb-4">
               <input
-                className="flex-1 border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-xs md:text-sm"
+                className="flex-1 border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-[11px] md:text-sm"
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
@@ -230,8 +230,8 @@ export default function ChatMonitor() {
                   }
                 }}
               />
-              <button onClick={handleSend} className="bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0">
-                <Send className="w-4 h-4 md:w-[18px] md:h-[18px]" />
+              <button onClick={handleSend} className="bg-black text-white px-3 md:px-5 py-2 rounded-lg md:rounded-xl hover:bg-slate-800 transition-colors shrink-0 flex items-center justify-center">
+                <Send className="w-3.5 h-3.5 md:w-[18px] md:h-[18px]" />
               </button>
             </div>
           </>
