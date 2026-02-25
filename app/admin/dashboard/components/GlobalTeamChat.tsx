@@ -74,7 +74,13 @@ export default function GlobalTeamChat() {
                 setMessages(data.reverse()); // Reverse to show oldest first at top, newest at bottom
                 if (!isOpen && data.length > 0) {
                     const lastMsg = data[data.length - 1];
-                    if (lastMsg.author_id !== currentUser.id) setHasUnread(true);
+                    const lastViewed = localStorage.getItem('global_chat_last_viewed');
+                    if (
+                        lastMsg.author_id !== currentUser.id &&
+                        (!lastViewed || new Date(lastMsg.created_at) > new Date(lastViewed))
+                    ) {
+                        setHasUnread(true);
+                    }
                 }
             }
         };
@@ -112,6 +118,7 @@ export default function GlobalTeamChat() {
     useEffect(() => {
         if (isOpen) {
             setHasUnread(false);
+            localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
             setTimeout(() => {
                 if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
             }, 100);
@@ -128,7 +135,11 @@ export default function GlobalTeamChat() {
             document.body.style.overflow = '';
         };
     }, [isOpen, messages.length]);
-
+    useEffect(() => {
+        if (isOpen && messages.length > 0) {
+            localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
+        }
+    }, [messages.length]);
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {

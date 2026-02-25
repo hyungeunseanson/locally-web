@@ -8,6 +8,7 @@ import { NotificationProvider } from '@/app/context/NotificationContext';
 import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
 import BottomTabNavigation from "@/app/components/mobile/BottomTabNavigation";
+import ClientMainWrapper from '@/app/components/ClientMainWrapper';
 import Script from "next/script";
 import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
@@ -108,9 +109,9 @@ export default async function RootLayout({
                   </Suspense>
 
                   <div className="flex flex-col min-h-screen">
-                    <main className="flex-1 pb-20 md:pb-0">
+                    <ClientMainWrapper>
                       {children}
-                    </main>
+                    </ClientMainWrapper>
                     <SiteFooter />
                     <BottomTabNavigation />
                   </div>
