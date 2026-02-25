@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-25
-**Version:** 2.7.0 (Admin Mobile UX Polish & Bug-Free Complete)
+**Version:** 2.8.0 (Admin Mobile UX Full Polish & Live Data Sync)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -270,7 +270,7 @@
 
 ### Phase 4.13: 어드민 모바일 UX 고도화 및 버그 잔상 제거 (Mobile Admin Polish V4-V5) - ✅ 완료
 
-> **2026-02-25** | 수정 파일: `Sidebar.tsx`, `GlobalTeamChat.tsx`, `TeamTab.tsx`, `layout.tsx`, `ChatMonitor.tsx`, `AuditLogTab.tsx`, `AnalyticsTab.tsx` (Admin)
+> **2026-02-25** | 수정 파일: `Sidebar.tsx`, `GlobalTeamChat.tsx`, `TeamTab.tsx`, `layout.tsx`, `ChatMonitor.tsx`, `AuditLogTab.tsx`, `AnalyticsTab.tsx`, `MasterLedgerTab.tsx`, `UsersTab.tsx` (Admin)
 
 - [x] **GlobalTeamChat 플로팅 캡슐(Pill) 디자인:**
   - 하단의 밋밋한 사각 버튼을 중앙 정렬된 둥근 모서리 플로팅 캡슐 형태로 개편.
@@ -282,11 +282,12 @@
   - 루트 레이아웃(`app/layout.tsx`)의 전역 모바일 패딩(`pb-20`)이 어드민 뷰와 겹쳐 오버스크롤 시 검은 여백이 생기던 문제 해결.
   - `ClientMainWrapper`를 신설하여 `/admin` 경로 진입 시 하단 여백을 원천 소거하는 조건부 렌더링 적용.
 - [x] **시각적 정보 밀집도 및 오버레이/마스터-디테일 패턴 전면 적용:**
-  - **사이드바:** 슬라이드 너비 축소(`w-72` -> `w-60`), 폰트(`xs`) 및 아이콘(`16px`) 사이즈 하향으로 모바일 컴팩트 UX 완성.
-  - **채팅 모니터링(`ChatMonitor`):** 좌측 리스트 뷰와 우측 대화창을 모바일에서는 화면을 덮는 형태(Master-Detail 오버레이)로 전환하여 좁은 화면에서도 완벽한 가독성 확보.
-  - **팀 메모장(`TeamTab`):** 할 일/메모 네비게이션을 상하에서 탭으로 변경하고 마크다운 폰트를 `11px` 로 하향하여 모바일 톤앤매너 일치화.
-  - **통계 및 로그(`AnalyticsTab`, `AuditLogTab`):** 모바일에서 여백(Padding)을 최소화하고, 그리드뷰를 세로로 재배치하며 텍스트 크기를 대폭 낮추어 정보량을 에어비앤비 호스트 대시보드 수준으로 압축.
-  - **공통 레이아웃 보정:** 모바일 전역에서 불필요한 공백을 걷어내고(`Dashboard page.tsx p-2 md:p-6`) 콘텐츠 중심의 UI/UX 완성.
+  - **사이드바(Sidebar):** 슬라이드 너비 축소(`w-72` -> `w-60`), 폰트(`xs`) 및 아이콘(`16px`) 사이즈 하향. 하단 **'Online Now' 실시간 연동** 및 현재 로그인된 **관리자 프로필(이메일) 동적 바인딩** 완료.
+  - **채팅 모니터링(`ChatMonitor`):** 좌측 리스트 뷰와 우측 대화창을 모바일에서는 화면을 덮는 형태(Master-Detail 오버레이)로 전환. 채팅창 진입 시 배경이 비치거나 UI가 우측으로 밀리던 현상을 `absolute z-[100] fixed` 구조로 완전 해결.
+  - **팀 메모장(`TeamTab`):** 할 일/메모 네비게이션을 상하에서 탭으로 변경하고 마크다운 폰트를 `11px` 로 하향하여 모바일 톤앤메너 일치화.
+  - **마스터 장부(`MasterLedgerTab`):** 모바일에서 거대했던 캘린더 UI를 컴팩트한 상단 버튼형으로 교체(`AnalyticsTab` 스타일). 예약 상세 내역을 풀스크린 오버레이(`z-[100]`)로 전환하여 정보 가독성 극대화.
+  - **통계 및 로그(`AnalyticsTab`, `AuditLogTab`):** 모바일 여백 최소화 및 리스트 그리드 재배치. 활동 로그(`AuditLog`)의 **타임스탬프를 두 줄(날짜/시간)로 분리**하여 좁은 화면에서의 가독성 200% 상향.
+  - **공통 레이아웃 보정:** `UsersTab` 리스트 및 상세 패널 텍스트 밀집도 튜닝. 모바일 전역에서 불필요한 공백을 걷어내고(`Dashboard page.tsx p-2 md:p-6`) 콘텐츠 중심의 UI/UX 완성.
 
 ---
 
