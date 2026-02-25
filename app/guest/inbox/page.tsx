@@ -157,7 +157,7 @@ function InboxContent() {
       />
 
       {/* ── 메인 컨테이너 ── */}
-      <main className="flex-1 max-w-[1280px] w-full mx-auto flex flex-col md:flex-row md:px-6 md:py-8 md:gap-0 overflow-hidden">
+      <main className="flex-1 max-w-[1280px] w-full mx-auto flex flex-col md:flex-row md:px-6 md:py-8 md:gap-0 overflow-hidden min-h-0">
 
         {/* 제목 (모바일: 목록 화면에서만, 채팅창 열리면 숨김) */}
         {!selectedInquiry && (

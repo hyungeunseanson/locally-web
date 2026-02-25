@@ -13,10 +13,10 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
     const router = useRouter();
 
     useEffect(() => {
-        // 2초 뒤 페이드아웃 시작
-        const t1 = setTimeout(() => setPhase('out'), 2000);
+        // 2.5초 뒤 페이드아웃 시작
+        const t1 = setTimeout(() => setPhase('out'), 2500);
 
-        // 2.5초 뒤 실제 라우팅 + 완료 콜백
+        // 3.5초 뒤 실제 라우팅 + 완료 콜백
         const t2 = setTimeout(() => {
             if (targetMode === 'host') {
                 router.push('/host/menu');
@@ -24,7 +24,7 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
                 router.push('/');
             }
             onComplete?.();
-        }, 2500);
+        }, 3500);
 
         return () => { clearTimeout(t1); clearTimeout(t2); };
     }, []);
