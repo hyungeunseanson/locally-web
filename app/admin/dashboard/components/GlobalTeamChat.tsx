@@ -115,7 +115,18 @@ export default function GlobalTeamChat() {
             setTimeout(() => {
                 if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
             }, 100);
+
+            // 🟢 모바일 버블 오픈 시 Body Scroll Lock (배경화면 오버스크롤 방지)
+            if (window.innerWidth < 768) {
+                document.body.style.overflow = 'hidden';
+            }
+        } else {
+            document.body.style.overflow = '';
         }
+
+        return () => {
+            document.body.style.overflow = '';
+        };
     }, [isOpen, messages.length]);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -369,26 +380,20 @@ export default function GlobalTeamChat() {
                     )}
                 </div>
 
-                {/* 하단 슬림 바 — 항상 표시, 탭 하면 드로어 토글 */}
+                {/* 하단 플로팅 Pill 버튼 — Drawer가 열려있지 않을 때만 표시 */}
                 <div
-                    className="fixed bottom-0 left-0 right-0 z-[9991] bg-black text-white flex items-center justify-between px-5 cursor-pointer active:bg-slate-900 transition-colors"
-                    style={{
-                        height: 48,
-                        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-                    }}
-                    onClick={() => setIsOpen(prev => !prev)}
+                    className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9989] transition-all duration-300 ${isOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 translate-y-0'}`}
                 >
-                    <div className="flex items-center gap-2">
-                        <MessageSquare size={15} />
+                    <div
+                        className="bg-black text-white flex items-center gap-2 px-5 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] cursor-pointer active:scale-95 transition-all"
+                        onClick={() => setIsOpen(true)}
+                    >
+                        <MessageSquare size={16} />
                         <span className="text-[13px] font-bold tracking-tight">Team Chat</span>
-                        {hasUnread && !isOpen && (
-                            <span className="w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center animate-pulse">N</span>
+                        {hasUnread && (
+                            <span className="w-4 h-4 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center animate-pulse ml-1 shadow-[0_0_10px_rgba(244,63,94,0.6)]">N</span>
                         )}
                     </div>
-                    {isOpen
-                        ? <ChevronDown size={16} className="text-slate-400" />
-                        : <ChevronUp size={16} className="text-slate-400" />
-                    }
                 </div>
             </div>
 
