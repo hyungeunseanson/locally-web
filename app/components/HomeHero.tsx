@@ -234,24 +234,16 @@ export default function HomeHero({
           boxShadow: '0 3px 8px -1px rgba(0,0,0,0.04), 0 1px 3px -1px rgba(0,0,0,0.03)',
         }}>
 
-        {/* 검색 캡슐 + 스크림 */}
-        <div className={`px-4 transition-all duration-300 relative ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[80px] opacity-100'}`}>
-          {/* 스크림 — 3~4% 투명도로 최소화, 햄제마다 안보이도로 */}
-          <div
-            className="absolute inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{
-              height: '320%',
-              background: 'radial-gradient(ellipse 95% 120% at 50% 50%, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.01) 55%, transparent 78%)',
-            }}
-          />
+        {/* 검색 캡슐 — 스크림 없이 바로 사용, 배경은 부모에서 상속 */}
+        <div className={`px-4 transition-all duration-300 ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[80px] opacity-100'}`}>
           <button
             onClick={() => setIsMobileSearchOpen(true)}
-            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-6 active:scale-[0.98] transition-transform relative z-10"
+            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-6 active:scale-[0.98] transition-transform"
             style={{
               paddingTop: 20,
               paddingBottom: 20,
-              boxShadow: '0 4px 16px rgba(0,0,0,0.09), 0 12px 36px rgba(0,0,0,0.06)',
-              border: '0.5px solid rgba(0,0,0,0.07)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)',
+              border: '0.5px solid rgba(0,0,0,0.06)',
             }}
           >
             <Search size={13} className="text-[#222222] shrink-0" strokeWidth={2.5} />
@@ -272,7 +264,7 @@ export default function HomeHero({
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
                 alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-30' : 'opacity-100'}`}
               />
-              <div className="absolute top-[6px] right-[-4px] bg-[#0066CC] text-white text-[10.5px] font-bold px-[6px] py-[2.5px] rounded-[4px] z-10 leading-none tracking-wide">NEW</div>
+              <div className="absolute top-[6px] right-[-8px] bg-[#0066CC] text-white text-[7.5px] font-bold px-[4px] py-[1.5px] rounded-[3px] z-10 leading-none tracking-wide">NEW</div>
             </div>
             <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
               }`}>
@@ -291,7 +283,7 @@ export default function HomeHero({
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
                 alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-30' : 'opacity-100'}`}
               />
-              <div className="absolute top-[6px] right-[-4px] bg-[#0066CC] text-white text-[10.5px] font-bold px-[6px] py-[2.5px] rounded-[4px] z-10 leading-none tracking-wide">NEW</div>
+              <div className="absolute top-[6px] right-[-8px] bg-[#0066CC] text-white text-[7.5px] font-bold px-[4px] py-[1.5px] rounded-[3px] z-10 leading-none tracking-wide">NEW</div>
             </div>
             <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
               }`}>
