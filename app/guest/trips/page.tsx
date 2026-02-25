@@ -30,7 +30,6 @@ export default function GuestTripsPage() {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
-  const [mobileTripsTab, setMobileTripsTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const openReceipt = (trip: any) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
   const openReview = (trip: any) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
@@ -51,51 +50,37 @@ export default function GuestTripsPage() {
           </div>
         )}
 
-        {/* 📱 모바일 전용: 탭 전환 */}
+        {/* 📱 모바일 전용: 스크롤 레이아웃 (예정 위, 지난 여행 아래) */}
         <div className="md:hidden">
-          <div className="flex gap-6 mb-6 border-b border-slate-100">
-            <button
-              onClick={() => setMobileTripsTab('upcoming')}
-              className={`relative pb-3 text-[15px] font-semibold transition-all ${mobileTripsTab === 'upcoming' ? 'text-[#222222]' : 'text-[#717171]'
-                }`}
-            >
-              {t('trip_upcoming')} <span className="text-xs text-slate-400">({upcomingTrips.length})</span>
-              {mobileTripsTab === 'upcoming' && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#222222] rounded-full" />}
-            </button>
-            <button
-              onClick={() => setMobileTripsTab('past')}
-              className={`relative pb-3 text-[15px] font-semibold transition-all ${mobileTripsTab === 'past' ? 'text-[#222222]' : 'text-[#717171]'
-                }`}
-            >
-              {t('trip_past')} <span className="text-xs text-slate-400">({pastTrips.length})</span>
-              {mobileTripsTab === 'past' && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#222222] rounded-full" />}
-            </button>
+          {/* ── 예정된 여행 ── */}
+          <div className="flex flex-col gap-4 mb-8">
+            {upcomingTrips.length > 0 ? (
+              upcomingTrips.map((trip: any) => (
+                <TripCard key={trip.id} trip={trip} onRequestCancel={requestCancel} isProcessing={isProcessing} onOpenReceipt={openReceipt} />
+              ))
+            ) : (
+              <div className="border border-dashed border-slate-200 rounded-2xl py-12 text-center flex flex-col items-center justify-center bg-slate-50/50">
+                <Ghost className="text-slate-300 mb-3" size={24} />
+                <p className="text-[13px] font-medium text-slate-700 mb-1">{t('trip_empty_title')}</p>
+                <Link href="/" className="text-[12px] text-slate-400 hover:text-black underline underline-offset-4">{t('explore_exp')}</Link>
+              </div>
+            )}
           </div>
 
-          {mobileTripsTab === 'upcoming' ? (
-            <div className="flex flex-col gap-6">
-              {upcomingTrips.length > 0 ? (
-                upcomingTrips.map((trip: any) => (
-                  <TripCard key={trip.id} trip={trip} onRequestCancel={requestCancel} isProcessing={isProcessing} onOpenReceipt={openReceipt} />
-                ))
-              ) : (
-                <div className="border border-dashed border-slate-200 rounded-2xl py-16 text-center flex flex-col items-center justify-center bg-slate-50/50">
-                  <Ghost className="text-slate-300 mb-4" size={28} />
-                  <p className="text-base font-medium text-slate-900 mb-1">{t('trip_empty_title')}</p>
-                  <Link href="/" className="text-sm text-slate-500 hover:text-black underline underline-offset-4">{t('explore_exp')}</Link>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {pastTrips.length > 0 ? (
-                pastTrips.map((trip: any) => (
+          {/* ── 지난 여행 ── */}
+          {pastTrips.length > 0 && (
+            <>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-px flex-1 bg-slate-100" />
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{t('trip_past')}</span>
+                <div className="h-px flex-1 bg-slate-100" />
+              </div>
+              <div className="space-y-3">
+                {pastTrips.map((trip: any) => (
                   <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
-                ))
-              ) : (
-                <div className="text-slate-400 text-sm py-4">{t('trip_past_empty')}</div>
-              )}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
 

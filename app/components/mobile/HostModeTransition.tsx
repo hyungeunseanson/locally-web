@@ -9,44 +9,44 @@ interface HostModeTransitionProps {
 }
 
 export default function HostModeTransition({ targetMode, onComplete }: HostModeTransitionProps) {
-    const [visible, setVisible] = useState(true);
+    const [phase, setPhase] = useState<'in' | 'out'>('in');
     const router = useRouter();
 
     useEffect(() => {
-        const t = setTimeout(() => {
-            setVisible(false);
+        // 2초 뒤 페이드아웃 시작
+        const t1 = setTimeout(() => setPhase('out'), 2000);
+
+        // 2.5초 뒤 실제 라우팅 + 완료 콜백
+        const t2 = setTimeout(() => {
             if (targetMode === 'host') {
-                router.push('/host/dashboard');
+                router.push('/host/menu');
             } else {
                 router.push('/');
             }
             onComplete?.();
         }, 2500);
 
-        return () => clearTimeout(t);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
     }, []);
 
-    if (!visible) return null;
-
-    // 게스트→호스트: 해변 섬 일러스트
-    // 호스트→게스트: 아늑한 집 일러스트
     const imageSrc = targetMode === 'host'
         ? '/images/host-transition.png'
         : '/images/guest-transition.png';
 
     return (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white">
+        <div
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white"
+            style={{
+                opacity: phase === 'out' ? 0 : 1,
+                transition: 'opacity 0.5s ease-in-out',
+                pointerEvents: 'none',
+            }}
+        >
             <style>{`
                 @keyframes float-gently {
-                    0%, 100% {
-                        transform: translateY(0px) rotate(-1deg) scale(1);
-                    }
-                    33% {
-                        transform: translateY(-12px) rotate(1deg) scale(1.02);
-                    }
-                    66% {
-                        transform: translateY(-6px) rotate(-0.5deg) scale(1.01);
-                    }
+                    0%, 100% { transform: translateY(0px) rotate(-1deg) scale(1); }
+                    33%       { transform: translateY(-12px) rotate(1deg) scale(1.02); }
+                    66%       { transform: translateY(-6px) rotate(-0.5deg) scale(1.01); }
                 }
                 @keyframes shadow-breathe {
                     0%, 100% { transform: scaleX(1); opacity: 0.12; }
@@ -68,6 +68,7 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
                     width: 260,
                     height: 260,
                     animation: 'img-appear 0.5s ease-out forwards, float-gently 4s ease-in-out 0.5s infinite',
+                    pointerEvents: 'none',
                 }}
             >
                 <img

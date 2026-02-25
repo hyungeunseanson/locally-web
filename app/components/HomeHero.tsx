@@ -229,12 +229,23 @@ export default function HomeHero({
 
       {/* 📱 모바일: 에어비앤비 홈화면 */}
       <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+4px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-0'
-        }`} style={{ background: '#EDEDED' }}>
+        }`} style={{
+          background: '#EDEDED',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.05)',
+        }}>
         {/* 검색 캡슐 — 에어비앤비 크기/모양 (크고 둥글고 그림자) */}
-        <div className={`px-5 transition-all duration-300 ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[60px] opacity-100'}`}>
+        <div className={`px-5 transition-all duration-300 relative ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[60px] opacity-100'}`}>
+          {/* 스크림 — 검색 캡슐 뒤 비네팅 효과 */}
+          <div
+            className="absolute inset-0 pointer-events-none rounded-full"
+            style={{
+              background: 'radial-gradient(ellipse 90% 180% at 50% 50%, rgba(0,0,0,0.055) 0%, transparent 70%)',
+              transform: 'scaleX(1.15)',
+            }}
+          />
           <button
             onClick={() => setIsMobileSearchOpen(true)}
-            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-5 py-[14px] active:scale-[0.98] transition-transform"
+            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-5 py-[14px] active:scale-[0.98] transition-transform relative z-10"
             style={{
               boxShadow: '0 1px 2px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05)',
               border: '0.5px solid #E0E0E0',

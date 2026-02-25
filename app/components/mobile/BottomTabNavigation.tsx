@@ -3,7 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Heart, MessageSquare, User, Bookmark, CalendarDays, List, AlignJustify } from 'lucide-react';
+import {
+    Search, Heart, MessageSquare, User,
+    CalendarCheck, LayoutList, BookOpen, AlignJustify
+} from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import LoginModal from '@/app/components/LoginModal';
 
@@ -15,7 +18,6 @@ export default function BottomTabNavigation() {
     const avatarUrl = user?.user_metadata?.avatar_url;
     const [showLogin, setShowLogin] = useState(false);
 
-    // 미로그인 상태에서 인증이 필요한 탭 클릭 시 로그인 모달 표시
     const handleAuthRequired = (e: React.MouseEvent, href: string) => {
         if (!user) {
             e.preventDefault();
@@ -30,26 +32,21 @@ export default function BottomTabNavigation() {
             name: '검색',
             href: '/',
             requireAuth: false,
-            icon: (isActive: boolean) => <Search size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+            icon: (isActive: boolean) => <Search size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '위시리스트',
             href: '/guest/wishlists',
             requireAuth: true,
-            icon: (isActive: boolean) => <Heart size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2 : 2} />
+            icon: (isActive: boolean) => <Heart size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
             name: '여행',
             href: '/guest/trips',
             requireAuth: false,
             icon: (isActive: boolean) => (
-                <div className={`w-7 h-7 flex items-center justify-center overflow-hidden ${isActive ? '' : 'opacity-50'}`}>
-                    <img
-                        src="/images/logo.png"
-                        alt="여행"
-                        className="w-full h-full object-cover"
-                        style={{ transform: 'scale(1.35)' }}
-                    />
+                <div className={`w-6 h-6 flex items-center justify-center overflow-hidden ${isActive ? '' : 'opacity-50'}`}>
+                    <img src="/images/logo.png" alt="여행" className="w-full h-full object-cover" style={{ transform: 'scale(1.35)' }} />
                 </div>
             )
         },
@@ -57,7 +54,7 @@ export default function BottomTabNavigation() {
             name: '메시지',
             href: '/guest/inbox',
             requireAuth: true,
-            icon: (isActive: boolean) => <MessageSquare size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
+            icon: (isActive: boolean) => <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
             name: '프로필',
@@ -66,46 +63,47 @@ export default function BottomTabNavigation() {
             icon: (isActive: boolean) => {
                 if (avatarUrl) {
                     return (
-                        <div className={`w-7 h-7 rounded-full overflow-hidden border-2 ${isActive ? 'border-[#FF385C]' : 'border-gray-200'}`}>
+                        <div className={`w-6 h-6 rounded-full overflow-hidden border-2 ${isActive ? 'border-[#FF385C]' : 'border-gray-200'}`}>
                             <img src={avatarUrl} alt="profile" className="w-full h-full object-cover" />
                         </div>
                     );
                 }
-                return <User size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />;
+                return <User size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />;
             }
         }
     ];
 
+    // 새로운 호스트 탭 구조: 예약 | 관리 | 교육 | 메시지 | 메뉴
     const hostTabs = [
         {
-            name: '투데이',
-            href: '/host/dashboard',
+            name: '예약',
+            href: '/host/dashboard?tab=reservations',
             requireAuth: true,
-            icon: (isActive: boolean) => <Bookmark size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+            icon: (isActive: boolean) => <CalendarCheck size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
-            name: '달력',
-            href: '/host/dashboard?tab=calendar',
-            requireAuth: true,
-            icon: (isActive: boolean) => <CalendarDays size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
-        },
-        {
-            name: '리스팅',
+            name: '관리',
             href: '/host/dashboard?tab=experiences',
             requireAuth: true,
-            icon: (isActive: boolean) => <List size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+            icon: (isActive: boolean) => <LayoutList size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+        },
+        {
+            name: '교육',
+            href: '/host/dashboard?tab=guidelines',
+            requireAuth: true,
+            icon: (isActive: boolean) => <BookOpen size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '메시지',
             href: '/host/dashboard?tab=inquiries',
             requireAuth: true,
-            icon: (isActive: boolean) => <MessageSquare size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
+            icon: (isActive: boolean) => <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
             name: '메뉴',
             href: '/host/menu',
             requireAuth: true,
-            icon: (isActive: boolean) => <AlignJustify size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+            icon: (isActive: boolean) => <AlignJustify size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         }
     ];
 
@@ -118,10 +116,11 @@ export default function BottomTabNavigation() {
                 style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)', paddingTop: '8px' }}
             >
                 {tabs.map((tab, idx) => {
-                    const isActive = tab.href === '/' ? pathname === '/' : pathname?.startsWith(tab.href.split('?')[0]);
+                    const isActive = tab.href === '/'
+                        ? pathname === '/'
+                        : pathname?.startsWith(tab.href.split('?')[0]);
 
                     if (tab.requireAuth && !user) {
-                        // 미로그인: 클릭 시 LoginModal
                         return (
                             <button
                                 key={idx}
@@ -147,7 +146,6 @@ export default function BottomTabNavigation() {
                 })}
             </nav>
 
-            {/* 로그인 모달 */}
             <LoginModal
                 isOpen={showLogin}
                 onClose={() => setShowLogin(false)}
