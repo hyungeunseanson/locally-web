@@ -3,10 +3,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield } from 'lucide-react'; // 🟢 아이콘 추가
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Gift } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
-import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
+import { useLanguage } from '@/app/context/LanguageContext';
+import MobileProfileView from '@/app/components/mobile/MobileProfileView';
+import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 
 export default function AccountPage() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
@@ -34,6 +36,8 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [showProfileView, setShowProfileView] = useState(false);
+  const [showHostTransition, setShowHostTransition] = useState(false);
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -214,87 +218,87 @@ export default function AccountPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      {/* 📱 모바일 전용: 에어비앤비 스타일 프로필 페이지 */}
-      <div className="md:hidden px-5 pt-[calc(env(safe-area-inset-top,0px)+16px)] pb-28">
-        {/* 타이틀 */}
-        <h1 className="text-[28px] font-extrabold tracking-tight mb-6">{t('account_title')}</h1>
+      {/* 📱 모바일 전용: 에어비앤비 스타일 프로필 페이지 (이미지 2 기준) */}
 
-        {/* 프로필 카드 (아바타 + 이름) */}
-        <div className="bg-slate-50 rounded-2xl p-5 mb-6 flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden border border-slate-100 shrink-0 relative">
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={28} /></div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-slate-900 truncate">{profile.full_name || t('label_no_name')}</h2>
-            <p className="text-sm text-slate-500 truncate">{t('account_desc')}</p>
-          </div>
-          <ChevronRight size={20} className="text-slate-400 shrink-0" />
-        </div>
+      {/* 프로필 보기/수정 전체화면 */}
+      {showProfileView && (
+        <MobileProfileView
+          profile={profile}
+          userId={user?.id || ''}
+          guestReviews={guestReviews}
+          onBack={() => setShowProfileView(false)}
+          onProfileUpdate={(updated) => {
+            setProfile(prev => ({ ...prev, ...updated }));
+            setShowProfileView(false);
+          }}
+        />
+      )}
 
-        {/* 호스팅 하기 CTA */}
-        <a href="/become-a-host" className="block bg-slate-50 rounded-2xl p-5 mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-rose-100 to-slate-100 flex items-center justify-center shrink-0">
-              <img src="/images/logo.png" alt="Host" className="w-8 h-8 object-contain" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-[15px] text-slate-900">{t('become_host') || '호스팅 하기'}</h3>
-              <p className="text-[13px] text-slate-500 mt-0.5">간단하게 호스팅을 시작하고 부수입을 올릴 수 있습니다.</p>
-            </div>
-          </div>
-        </a>
+      {/* 호스트 전환 애니메이션 */}
+      {showHostTransition && (
+        <HostModeTransition targetMode="host" onComplete={() => setShowHostTransition(false)} />
+      )}
 
-        {/* 메뉴 리스트 (상단 그룹) */}
-        <div className="mb-6">
-          <a href="/account" className="flex items-center gap-4 py-4 border-b border-slate-100" onClick={(e) => { e.preventDefault(); /* 현재 페이지 스크롤 */ }}>
-            <Settings size={24} className="text-slate-600 shrink-0" />
-            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('account') || '계정 관리'}</span>
-            <ChevronRight size={20} className="text-slate-400" />
-          </a>
-          <a href="/help" className="flex items-center gap-4 py-4 border-b border-slate-100">
-            <HelpCircle size={24} className="text-slate-600 shrink-0" />
-            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('help') || '도움 요청'}</span>
-            <ChevronRight size={20} className="text-slate-400" />
-          </a>
-          <a href="/notifications" className="flex items-center gap-4 py-4 border-b border-slate-100">
-            <Bell size={24} className="text-slate-600 shrink-0" />
-            <span className="flex-1 text-[15px] font-medium text-slate-800">알림</span>
-            <ChevronRight size={20} className="text-slate-400" />
+      <div className="md:hidden pb-28">
+        {/* 헤더: 프로필 + 알림 벨 */}
+        <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-4">
+          <h1 className="text-[20px] font-extrabold tracking-tight text-slate-900">프로필</h1>
+          <a href="/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full bg-slate-100">
+            <Bell size={17} className="text-slate-600" />
           </a>
         </div>
 
-        {/* 메뉴 리스트 (하단 법률 그룹) */}
-        <div className="mb-8">
-          <a href="/about" className="flex items-center gap-4 py-4 border-b border-slate-100">
-            <FileText size={24} className="text-slate-600 shrink-0" />
-            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('footer_terms') || '이용 약관'}</span>
-            <ChevronRight size={20} className="text-slate-400" />
-          </a>
-          <a href="/about" className="flex items-center gap-4 py-4 border-b border-slate-100">
-            <Shield size={24} className="text-slate-600 shrink-0" />
-            <span className="flex-1 text-[15px] font-medium text-slate-800">{t('footer_privacy') || '개인정보 처리방침'}</span>
-            <ChevronRight size={20} className="text-slate-400" />
-          </a>
-          <a href="/company/investors" className="flex items-center gap-4 py-4 border-b border-slate-100">
-            <FileText size={24} className="text-slate-600 shrink-0" />
-            <span className="flex-1 text-[15px] font-medium text-slate-800">회사 세부정보</span>
-            <ChevronRight size={20} className="text-slate-400" />
-          </a>
+        {/* 메뉴 그룹 1 */}
+        <div className="px-5">
+          <MobileMenuItem icon={<Settings size={17} />} label="계정 관리" href="/account" onClick={(e) => e.preventDefault()} />
+          <MobileMenuItem icon={<HelpCircle size={17} />} label="도움 요청" href="/help" />
+          <MobileMenuItem icon={<User size={17} />} label="프로필 보기" href="#" onClick={(e) => { e.preventDefault(); setShowProfileView(true); }} />
+          <MobileMenuItem icon={<Shield size={17} />} label="개인정보 보호" href="/about" />
+        </div>
+
+        {/* 구분선 */}
+        <div className="my-5 mx-5 border-t border-slate-100" />
+
+        {/* 메뉴 그룹 2: 법률 */}
+        <div className="px-5">
+          <MobileMenuItem icon={<FileText size={17} />} label="이용 약관" href="/about" />
+          <MobileMenuItem icon={<Shield size={17} />} label="개인정보 처리방침" href="/about" />
+          <MobileMenuItem icon={<FileText size={17} />} label="회사 세부정보" href="/company/investors" />
+          <MobileMenuItem icon={<BookOpen size={17} />} label="오픈 소스 라이선스" href="/about" />
+        </div>
+
+        {/* 구분선 */}
+        <div className="my-5 mx-5 border-t border-slate-100" />
+
+        {/* 메뉴 그룹 3: 커뮤니티 */}
+        <div className="px-5">
+          <MobileMenuItem icon={<Gift size={17} />} label="친구 추천하기" href="/about" />
+          <MobileMenuItem icon={<Users size={17} />} label="호스트 추천하기" href="/become-a-host" />
+          <MobileMenuItem icon={<Users size={17} />} label="공동 호스트 찾기" href="/host/dashboard" />
         </div>
 
         {/* 로그아웃 */}
+        <div className="px-5 mt-6 mb-4">
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push('/');
+            }}
+            className="text-[13px] font-semibold text-slate-700 underline underline-offset-2"
+          >
+            {t('logout') || '로그아웃'}
+          </button>
+        </div>
+      </div>
+
+      {/* 호스트 모드 전환 플로팅 버튼 (모바일 전용) */}
+      <div className="md:hidden fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none">
         <button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            router.push('/');
-          }}
-          className="w-full text-left text-[15px] font-semibold text-slate-800 underline underline-offset-4 mb-6"
+          onClick={() => setShowHostTransition(true)}
+          className="pointer-events-auto flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-full shadow-lg text-[13px] font-semibold active:scale-95 transition-transform"
         >
-          {t('logout') || '로그아웃'}
+          <img src="/images/logo.png" alt="" className="w-4 h-4 object-contain grayscale brightness-[10]" />
+          호스트 모드로 전환
         </button>
       </div>
 
@@ -698,5 +702,32 @@ export default function AccountPage() {
       )}
 
     </div>
+  );
+}
+
+// 모바일 메뉴 아이템 헬퍼 컴포넌트
+function MobileMenuItem({
+  icon,
+  label,
+  href,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+}) {
+  return (
+    <a
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-3.5 py-3.5 border-b border-slate-100"
+    >
+      <span className="text-slate-600 shrink-0">{icon}</span>
+      <span className="flex-1 text-[13px] font-medium text-slate-800">{label}</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+        <path d="M9 18l6-6-6-6" />
+      </svg>
+    </a>
   );
 }
