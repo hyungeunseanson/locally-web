@@ -139,7 +139,7 @@ export default function MobileHostMenu() {
 
             {/* ── 메뉴 그룹 3 ── */}
             <div className="px-5">
-                <HostMenuItem href="/account" icon={<Settings size={17} />} label="프로필 설정" />
+                <HostMenuItem href="/host/dashboard?tab=profile" icon={<Settings size={17} />} label="프로필 설정" />
                 <HostMenuItem href="/help" icon={<HelpCircle size={17} />} label="도움말 센터" />
             </div>
 
