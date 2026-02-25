@@ -1,39 +1,54 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Search, Heart, MessageSquare, User, Bookmark, CalendarDays, List, AlignJustify } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
+import LoginModal from '@/app/components/LoginModal';
 
 export default function BottomTabNavigation() {
     const pathname = usePathname();
+    const router = useRouter();
     const isHostMode = pathname?.startsWith('/host');
     const { user } = useAuth();
     const avatarUrl = user?.user_metadata?.avatar_url;
+    const [showLogin, setShowLogin] = useState(false);
+
+    // 미로그인 상태에서 인증이 필요한 탭 클릭 시 로그인 모달 표시
+    const handleAuthRequired = (e: React.MouseEvent, href: string) => {
+        if (!user) {
+            e.preventDefault();
+            setShowLogin(true);
+        } else {
+            router.push(href);
+        }
+    };
 
     const guestTabs = [
         {
             name: '검색',
             href: '/',
+            requireAuth: false,
             icon: (isActive: boolean) => <Search size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '위시리스트',
             href: '/guest/wishlists',
-            icon: (isActive: boolean) => <Heart size={24} className={isActive ? 'text-[#FF385C] fill-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 0 : 2} />
+            requireAuth: true,
+            icon: (isActive: boolean) => <Heart size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2 : 2} />
         },
         {
             name: '여행',
             href: '/guest/trips',
-            // 여백 없이 로고 자체를 꽉 채워 표시 (clip으로 여백 제거 효과)
+            requireAuth: false,
             icon: (isActive: boolean) => (
                 <div className={`w-7 h-7 flex items-center justify-center overflow-hidden ${isActive ? '' : 'opacity-50'}`}>
                     <img
                         src="/images/logo.png"
                         alt="여행"
                         className="w-full h-full object-cover"
-                        style={{ transform: 'scale(1.35)' }} // 여백 부분 잘라내기
+                        style={{ transform: 'scale(1.35)' }}
                     />
                 </div>
             )
@@ -41,11 +56,13 @@ export default function BottomTabNavigation() {
         {
             name: '메시지',
             href: '/guest/inbox',
-            icon: (isActive: boolean) => <MessageSquare size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2 : 2} />
+            requireAuth: true,
+            icon: (isActive: boolean) => <MessageSquare size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
             name: '프로필',
             href: '/account',
+            requireAuth: true,
             icon: (isActive: boolean) => {
                 if (avatarUrl) {
                     return (
@@ -63,26 +80,31 @@ export default function BottomTabNavigation() {
         {
             name: '투데이',
             href: '/host/dashboard',
+            requireAuth: true,
             icon: (isActive: boolean) => <Bookmark size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '달력',
             href: '/host/dashboard?tab=calendar',
+            requireAuth: true,
             icon: (isActive: boolean) => <CalendarDays size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '리스팅',
             href: '/host/dashboard?tab=experiences',
+            requireAuth: true,
             icon: (isActive: boolean) => <List size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '메시지',
             href: '/host/dashboard?tab=inquiries',
-            icon: (isActive: boolean) => <MessageSquare size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2 : 2} />
+            requireAuth: true,
+            icon: (isActive: boolean) => <MessageSquare size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
             name: '메뉴',
             href: '/host/menu',
+            requireAuth: true,
             icon: (isActive: boolean) => <AlignJustify size={24} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         }
     ];
@@ -90,21 +112,47 @@ export default function BottomTabNavigation() {
     const tabs = isHostMode ? hostTabs : guestTabs;
 
     return (
-        <nav
-            className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-[100] px-2 flex items-center justify-between"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)', paddingTop: '8px' }}
-        >
-            {tabs.map((tab, idx) => {
-                const isActive = tab.href === '/' ? pathname === '/' : pathname?.startsWith(tab.href.split('?')[0]);
-                return (
-                    <Link key={idx} href={tab.href} className="flex flex-col items-center justify-center gap-0.5 min-w-[60px] py-1">
-                        {tab.icon(isActive)}
-                        <span className={`text-[10px] font-medium ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
-                            {tab.name}
-                        </span>
-                    </Link>
-                );
-            })}
-        </nav>
+        <>
+            <nav
+                className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-[100] px-2 flex items-center justify-between"
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)', paddingTop: '8px' }}
+            >
+                {tabs.map((tab, idx) => {
+                    const isActive = tab.href === '/' ? pathname === '/' : pathname?.startsWith(tab.href.split('?')[0]);
+
+                    if (tab.requireAuth && !user) {
+                        // 미로그인: 클릭 시 LoginModal
+                        return (
+                            <button
+                                key={idx}
+                                onClick={(e) => handleAuthRequired(e, tab.href)}
+                                className="flex flex-col items-center justify-center gap-0.5 min-w-[60px] py-1"
+                            >
+                                {tab.icon(false)}
+                                <span className="text-[10px] font-medium text-gray-400">
+                                    {tab.name}
+                                </span>
+                            </button>
+                        );
+                    }
+
+                    return (
+                        <Link key={idx} href={tab.href} className="flex flex-col items-center justify-center gap-0.5 min-w-[60px] py-1">
+                            {tab.icon(isActive)}
+                            <span className={`text-[10px] font-medium ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                                {tab.name}
+                            </span>
+                        </Link>
+                    );
+                })}
+            </nav>
+
+            {/* 로그인 모달 */}
+            <LoginModal
+                isOpen={showLogin}
+                onClose={() => setShowLogin(false)}
+                onLoginSuccess={() => setShowLogin(false)}
+            />
+        </>
     );
 }
