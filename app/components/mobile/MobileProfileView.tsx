@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ArrowLeft, Camera, Loader2, User, BriefcaseBusiness,
     GraduationCap, Globe, ShieldCheck, Star, ChevronRight
@@ -41,8 +41,29 @@ export default function MobileProfileView({
     const [editData, setEditData] = useState({ ...profile });
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 1 });
     const supabase = createClient();
     const { showToast } = useToast();
+
+    // 통계 데이터 fetch
+    useEffect(() => {
+        if (!userId) return;
+        const fetchStats = async () => {
+            const [{ count: tripCount }, { count: reviewCount }] = await Promise.all([
+                supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'confirmed'),
+                supabase.from('guest_reviews').select('*', { count: 'exact', head: true }).eq('guest_id', userId),
+            ]);
+            const { data: userData } = await supabase.auth.getUser();
+            const createdAt = userData?.user?.created_at ? new Date(userData.user.created_at) : new Date();
+            const joinYears = Math.max(1, new Date().getFullYear() - createdAt.getFullYear());
+            setStats({
+                tripCount: tripCount || 0,
+                reviewCount: reviewCount || guestReviews.length,
+                joinYears,
+            });
+        };
+        fetchStats();
+    }, [userId]);
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -91,66 +112,88 @@ export default function MobileProfileView({
     return (
         <div className="fixed inset-0 bg-white z-[200] flex flex-col overflow-y-auto">
             {/* 헤더 */}
-            <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-3 border-b border-slate-100 sticky top-0 bg-white z-10">
+            <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">
                 <button
                     onClick={onBack}
-                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
                 >
                     <ArrowLeft size={20} strokeWidth={2} />
                 </button>
                 <button
                     onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                     disabled={saving}
-                    className="text-[13px] font-semibold text-slate-800 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors disabled:opacity-50"
+                    className="text-[13px] font-semibold text-gray-800 px-4 py-1.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                     {saving ? '저장 중...' : isEditing ? '완료' : '수정하기'}
                 </button>
             </div>
 
-            {/* 프로필 카드 */}
-            <div className="mx-5 mt-5 bg-slate-50 rounded-2xl py-7 px-5 flex flex-col items-center">
-                {/* 아바타 */}
-                <div className="relative mb-4">
-                    <div className="w-20 h-20 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-md">
-                        {displayProfile.avatar_url ? (
-                            <img src={displayProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                <User size={32} />
-                            </div>
-                        )}
-                        {uploading && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <Loader2 size={18} className="text-white animate-spin" />
-                            </div>
+            {/* ── 프로필 카드 (이미지 4 스타일) ── */}
+            <div className="mx-5 mt-5 bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex items-end gap-5">
+                {/* 좌측: 아바타 + 인증 배지 + 사진 편집 + 이름/거주지 */}
+                <div className="flex flex-col items-center shrink-0">
+                    <div className="relative mb-2">
+                        <div className="w-[80px] h-[80px] rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-md">
+                            {displayProfile.avatar_url ? (
+                                <img src={displayProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    <User size={32} />
+                                </div>
+                            )}
+                            {uploading && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full">
+                                    <Loader2 size={18} className="text-white animate-spin" />
+                                </div>
+                            )}
+                        </div>
+                        {/* 인증 배지 */}
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF385C] flex items-center justify-center border-2 border-white">
+                            <ShieldCheck size={11} className="text-white" strokeWidth={2.5} />
+                        </div>
+                        {/* 사진 편집 (편집 모드) */}
+                        {isEditing && (
+                            <label className="absolute inset-0 flex items-center justify-center cursor-pointer rounded-full">
+                                <div className="bg-black/40 rounded-full w-full h-full flex items-center justify-center">
+                                    <Camera size={18} className="text-white" />
+                                </div>
+                                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                            </label>
                         )}
                     </div>
-                    {/* 인증 배지 */}
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-pink-500 flex items-center justify-center border-2 border-white">
-                        <ShieldCheck size={12} className="text-white" strokeWidth={2.5} />
-                    </div>
-                    {/* 사진 편집 버튼 (편집 모드일 때) */}
-                    {isEditing && (
-                        <label className="absolute inset-0 flex items-center justify-center cursor-pointer rounded-full">
-                            <div className="bg-black/40 rounded-full w-full h-full flex items-center justify-center">
-                                <Camera size={18} className="text-white" />
-                            </div>
-                            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-                        </label>
+                    {/* 이름 */}
+                    {isEditing ? (
+                        <input
+                            value={editData.full_name}
+                            onChange={e => setEditData(prev => ({ ...prev, full_name: e.target.value }))}
+                            className="text-[14px] font-bold text-gray-900 text-center bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 w-[110px] outline-none focus:border-gray-400"
+                        />
+                    ) : (
+                        <p className="text-[15px] font-bold text-gray-900 text-center leading-snug">{displayProfile.full_name || '이름 없음'}</p>
                     )}
+                    <p className="text-[11px] text-gray-400 mt-0.5">로컬리 회원</p>
                 </div>
 
-                {/* 이름 */}
-                {isEditing ? (
-                    <input
-                        value={editData.full_name}
-                        onChange={e => setEditData(prev => ({ ...prev, full_name: e.target.value }))}
-                        className="text-[17px] font-bold text-slate-900 text-center bg-white border border-slate-200 rounded-xl px-3 py-1.5 mb-1 w-full max-w-[220px] outline-none focus:border-slate-400"
-                    />
-                ) : (
-                    <h2 className="text-[17px] font-bold text-slate-900 mb-1">{displayProfile.full_name || '이름 없음'}</h2>
-                )}
-                <span className="text-[11px] text-slate-500 font-medium">호스트</span>
+                {/* 구분선 */}
+                <div className="w-px self-stretch bg-gray-100" />
+
+                {/* 우측: 통계 3개 */}
+                <div className="flex-1 flex flex-col gap-3 pb-0.5">
+                    <div>
+                        <p className="text-[11px] text-gray-400 leading-none">Locally를 통한 여행</p>
+                        <p className="text-[20px] font-extrabold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[13px] font-semibold">회</span></p>
+                    </div>
+                    <div className="border-t border-gray-100" />
+                    <div>
+                        <p className="text-[11px] text-gray-400 leading-none">후기</p>
+                        <p className="text-[20px] font-extrabold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[13px] font-semibold">개</span></p>
+                    </div>
+                    <div className="border-t border-gray-100" />
+                    <div>
+                        <p className="text-[11px] text-gray-400 leading-none">Locally 가입 기간</p>
+                        <p className="text-[20px] font-extrabold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[13px] font-semibold">년</span></p>
+                    </div>
+                </div>
             </div>
 
             {/* 상세 정보 */}
@@ -208,8 +251,8 @@ export default function MobileProfileView({
                                             }));
                                         }}
                                         className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${(editData.languages || []).includes(lang)
-                                                ? 'bg-slate-900 text-white border-slate-900'
-                                                : 'bg-white text-slate-500 border-slate-200'
+                                            ? 'bg-slate-900 text-white border-slate-900'
+                                            : 'bg-white text-slate-500 border-slate-200'
                                             }`}
                                     >
                                         {lang}

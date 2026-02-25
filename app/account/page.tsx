@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Gift } from 'lucide-react';
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Gift, Globe, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -38,6 +38,8 @@ export default function AccountPage() {
   const [user, setUser] = useState<any>(null);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
+  // 프로필 카드용 통계
+  const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 0 });
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -124,6 +126,27 @@ export default function AccountPage() {
         .order('created_at', { ascending: false });
 
       if (reviewData) setGuestReviews(reviewData);
+
+      // 📊 통계: 여행 횟수, 후기 수, 가입 기간
+      const { count: tripCount } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'confirmed');
+
+      const { count: reviewCount } = await supabase
+        .from('guest_reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('guest_id', user.id);
+
+      const createdAt = new Date(user.created_at);
+      const joinYears = Math.max(1, new Date().getFullYear() - createdAt.getFullYear());
+
+      setStats({
+        tripCount: tripCount || 0,
+        reviewCount: reviewCount || (reviewData?.length || 0),
+        joinYears,
+      });
 
       setLoading(false);
     };
@@ -218,9 +241,9 @@ export default function AccountPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      {/* 📱 모바일 전용: 에어비앤비 스타일 프로필 페이지 (이미지 2 기준) */}
+      {/* 📱 모바일 전용 (이미지 3 기준) */}
 
-      {/* 프로필 보기/수정 전체화면 */}
+      {/* 프로필 상세 보기/수정 전체화면 */}
       {showProfileView && (
         <MobileProfileView
           profile={profile}
@@ -240,53 +263,103 @@ export default function AccountPage() {
       )}
 
       <div className="md:hidden pb-28">
-        {/* 헤더: 프로필 + 알림 벨 */}
-        <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-4">
-          <h1 className="text-[20px] font-extrabold tracking-tight text-slate-900">프로필</h1>
-          <a href="/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full bg-slate-100">
-            <Bell size={17} className="text-slate-600" />
+        {/* ── 헤더: "프로필" 타이틀 + 알림 벨 ── */}
+        <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-3">
+          <h1 className="text-[22px] font-extrabold tracking-tight text-gray-900">프로필</h1>
+          <a href="/notifications" className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100">
+            <Bell size={17} className="text-gray-600" />
           </a>
         </div>
 
-        {/* 메뉴 그룹 1 */}
+        {/* ── 프로필 카드 (이미지 3) ── */}
+        <button
+          onClick={() => setShowProfileView(true)}
+          className="mx-5 mb-5 w-[calc(100%-40px)] bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex items-end gap-5 text-left active:scale-[0.98] transition-transform"
+        >
+          {/* 좌측: 아바타 + 인증 배지 + 이름/도시 */}
+          <div className="flex flex-col items-center shrink-0">
+            <div className="relative mb-2">
+              <div className="w-[72px] h-[72px] rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-md">
+                {profile.avatar_url
+                  ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                  : <div className="w-full h-full flex items-center justify-center">
+                    <User size={28} className="text-gray-400" />
+                  </div>
+                }
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF385C] flex items-center justify-center border-2 border-white">
+                <ShieldCheck size={11} className="text-white" strokeWidth={2.5} />
+              </div>
+            </div>
+            <p className="text-[15px] font-bold text-gray-900 text-center leading-snug">{profile.full_name || '이름 없음'}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {profile.nationality
+                ? countries.find(c => c.code === profile.nationality)?.name?.split(' (')[0] || profile.nationality
+                : '로컬리 회원'}
+            </p>
+          </div>
+
+          {/* 구분선 */}
+          <div className="w-px self-stretch bg-gray-100 mx-1" />
+
+          {/* 우측: 통계 3개 */}
+          <div className="flex-1 flex flex-col gap-3">
+            <div>
+              <p className="text-[11px] text-gray-400 leading-none">Locally를 통한 여행</p>
+              <p className="text-[18px] font-extrabold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[14px] font-semibold">회</span></p>
+            </div>
+            <div className="border-t border-gray-100" />
+            <div>
+              <p className="text-[11px] text-gray-400 leading-none">후기</p>
+              <p className="text-[18px] font-extrabold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[14px] font-semibold">개</span></p>
+            </div>
+            <div className="border-t border-gray-100" />
+            <div>
+              <p className="text-[11px] text-gray-400 leading-none">Locally 가입 기간</p>
+              <p className="text-[18px] font-extrabold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[14px] font-semibold">년</span></p>
+            </div>
+          </div>
+        </button>
+
+        {/* ── 메뉴 그룹 1: 기본 메뉴 ── */}
         <div className="px-5">
-          <MobileMenuItem icon={<Settings size={17} />} label="계정 관리" href="/account" onClick={(e) => e.preventDefault()} />
-          <MobileMenuItem icon={<HelpCircle size={17} />} label="도움 요청" href="/help" />
-          <MobileMenuItem icon={<User size={17} />} label="프로필 보기" href="#" onClick={(e) => { e.preventDefault(); setShowProfileView(true); }} />
-          <MobileMenuItem icon={<Shield size={17} />} label="개인정보 보호" href="/about" />
+          <MobileMenuItem icon={<MessageSquare size={17} />} label="메시지" href="/guest/inbox" />
+          <MobileMenuItem icon={<Smile size={17} />} label="나의 여행" href="/guest/trips" />
+          <MobileMenuItem icon={<Star size={17} />} label="위시리스트" href="/guest/wishlists" />
         </div>
 
-        {/* 구분선 */}
-        <div className="my-5 mx-5 border-t border-slate-100" />
+        <div className="my-4 mx-5 border-t border-gray-100" />
 
-        {/* 메뉴 그룹 2: 법률 */}
+        {/* ── 메뉴 그룹 2: 설정 ── */}
         <div className="px-5">
-          <MobileMenuItem icon={<FileText size={17} />} label="이용 약관" href="/about" />
-          <MobileMenuItem icon={<Shield size={17} />} label="개인정보 처리방침" href="/about" />
-          <MobileMenuItem icon={<FileText size={17} />} label="회사 세부정보" href="/company/investors" />
-          <MobileMenuItem icon={<BookOpen size={17} />} label="오픈 소스 라이선스" href="/about" />
+          <MobileMenuItem icon={<Settings size={17} />} label="계정 관리" href="#" onClick={(e) => { e.preventDefault(); setShowProfileView(true); }} />
+          <MobileMenuItem icon={<Users size={17} />} label="호스트 되기" href="/become-a-host" />
+          <MobileMenuItem icon={<HelpCircle size={17} />} label="도움말 센터" href="/help" />
         </div>
 
-        {/* 구분선 */}
-        <div className="my-5 mx-5 border-t border-slate-100" />
+        <div className="my-4 mx-5 border-t border-gray-100" />
 
-        {/* 메뉴 그룹 3: 커뮤니티 */}
+        {/* ── 메뉴 그룹 3: Locally & 커뮤니티 ── */}
         <div className="px-5">
-          <MobileMenuItem icon={<Gift size={17} />} label="친구 추천하기" href="/about" />
-          <MobileMenuItem icon={<Users size={17} />} label="호스트 추천하기" href="/become-a-host" />
-          <MobileMenuItem icon={<Users size={17} />} label="공동 호스트 찾기" href="/host/dashboard" />
+          <MobileMenuItem icon={<FileText size={17} />} label="로컬리 소개" href="/about" />
+          <MobileMenuItem icon={<Bell size={17} />} label="공지사항" href="/company/notices" />
+          <MobileMenuItem icon={<Users size={17} />} label="커뮤니티" href="/company/community" />
+          <MobileMenuItem icon={<BookOpen size={17} />} label="뉴스" href="/company/news" />
+          <MobileMenuItem icon={<Globe size={17} />} label="소셜 미디어" href="/company/partnership" />
         </div>
 
-        {/* 로그아웃 */}
-        <div className="px-5 mt-6 mb-4">
+        <div className="my-4 mx-5 border-t border-gray-100" />
+
+        {/* ── 로그아웃 ── */}
+        <div className="px-5 pb-4">
           <button
             onClick={async () => {
               await supabase.auth.signOut();
               router.push('/');
             }}
-            className="text-[13px] font-semibold text-slate-700 underline underline-offset-2"
+            className="text-[13px] font-semibold text-gray-500 py-1"
           >
-            {t('logout') || '로그아웃'}
+            로그아웃
           </button>
         </div>
       </div>
@@ -295,9 +368,9 @@ export default function AccountPage() {
       <div className="md:hidden fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none">
         <button
           onClick={() => setShowHostTransition(true)}
-          className="pointer-events-auto flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-full shadow-lg text-[13px] font-semibold active:scale-95 transition-transform"
+          className="pointer-events-auto flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-lg text-[13px] font-semibold active:scale-95 transition-transform"
         >
-          <img src="/images/logo.png" alt="" className="w-4 h-4 object-contain grayscale brightness-[10]" />
+          <img src="/images/logo.png" alt="" className="w-4 h-4 object-contain grayscale brightness-[10]" style={{ transform: 'scale(1.3)' }} />
           호스트 모드로 전환
         </button>
       </div>
