@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-25
-**Version:** 2.6.0 (Mobile Pixel-Perfect Airbnb UX Complete)
+**Version:** 2.7.0 (Admin Mobile UX Polish & Bug-Free Complete)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -266,7 +266,26 @@
 - [x] **여행지 검색 풀스크린 구현:**
   - 위치 패널의 검색 input 클릭 시 → 에어비앤비 스타일 풀스크린 전환.
   - `← ArrowLeft` 뒤로가기 + **최근 검색** (최근 도시 2개) + **추천 여행지** (6개, 이모지+설명) 섹션.
-  - `autoFocus` 적용으로 즉시 타이핑 가능.
+  - [x] `autoFocus` 적용으로 즉시 타이핑 가능.
+
+### Phase 4.13: 어드민 모바일 UX 고도화 및 버그 잔상 제거 (Mobile Admin Polish V4-V5) - ✅ 완료
+
+> **2026-02-25** | 수정 파일: `Sidebar.tsx`, `GlobalTeamChat.tsx`, `TeamTab.tsx`, `layout.tsx` (Admin/Root)
+> Git 커밋: `mobileopt22`
+
+- [x] **GlobalTeamChat 플로팅 캡슐(Pill) 디자인:**
+  - 하단의 밋밋한 사각 버튼을 중앙 정렬된 둥근 모서리 플로팅 캡슐 형태로 개편.
+  - 가로폭 확장(`px-8`) 및 위치 하향(`bottom-3`)으로 클릭 가시성 및 디자인 밸런스 확보.
+- [x] **'N' 배지 부활(좀비 배지) 버그 해결:**
+  - 단순 클릭 이벤트 방식에서 `localStorage` 타임스탬프(`global_chat_last_viewed`) 비교 방식으로 로직 고도화.
+  - 사용자가 마지막으로 채팅을 확인한 시간 이후의 새 메시지만 배지를 띄우도록 설계하여 중복 알림 이슈 완벽 해결.
+- [x] **어드민 레이아웃 하단 블랙박스(심연) 박멸:**
+  - 루트 레이아웃(`app/layout.tsx`)의 전역 모바일 패딩(`pb-20`)이 어드민 뷰와 겹쳐 오버스크롤 시 검은 여백이 생기던 문제 해결.
+  - `ClientMainWrapper`를 신설하여 `/admin` 경로 진입 시 하단 여백을 원천 소거하는 조건부 렌더링 적용.
+- [x] **시각적 정보 밀집도 및 오버레이 최적화:**
+  - **사이드바:** 슬라이드 너비 축소(`w-72` -> `w-60`), 폰트(`xs`) 및 아이콘(`16px`) 사이즈 하향으로 모바일 컴팩트 UX 완성.
+  - **팀 메모장:** 마크다운 본문 폰트 크기를 `11px` 로 하향하여 데일리 로그와 시각적 톤앤매너 일치화.
+  - **레이아웃 보정:** 상단 헤더 짤림 방지(`pt-16`) 및 `globals.css` 16px 강제성 롤백(viewport 설정 대체).
 
 ---
 
