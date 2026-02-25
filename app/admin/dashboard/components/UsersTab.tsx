@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 // 🟢 [수정] 아이콘 추가 및 유틸리티 import
-import { 
-  Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Clock, MapPin, 
-  MessageCircle, Smile, Trash2, Star, Bell, Send, CheckSquare, Square, CheckCircle 
+import {
+  Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Clock, MapPin,
+  MessageCircle, Smile, Trash2, Star, Bell, Send, CheckSquare, Square, CheckCircle
 } from 'lucide-react';
 import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
@@ -12,7 +12,7 @@ import { useToast } from '@/app/context/ToastContext';
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
 function timeAgo(dateString: string | null) {
   if (!dateString) return '기록 없음';
-  
+
   const now = new Date();
   const past = new Date(dateString);
   const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
@@ -36,7 +36,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [notiMessage, setNotiMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   // 1분마다 화면을 갱신해서 "몇 분 전" 시간을 최신화하는 코드
-  const [tick, setTick] = useState(0); 
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -46,57 +46,57 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
     return () => clearInterval(timer);
   }, []);
   // 검색 필터링
-  const filteredUsers = users.filter((u: any) => 
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredUsers = users.filter((u: any) =>
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-// 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
-const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
+  // 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
+  const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
 
-// 🟢 [추가] 전체 선택/해제
-const toggleSelectAll = () => {
-  if (selectedUserIds.length === filteredUsers.length) setSelectedUserIds([]);
-  else setSelectedUserIds(filteredUsers.map((u: any) => u.id));
-};
+  // 🟢 [추가] 전체 선택/해제
+  const toggleSelectAll = () => {
+    if (selectedUserIds.length === filteredUsers.length) setSelectedUserIds([]);
+    else setSelectedUserIds(filteredUsers.map((u: any) => u.id));
+  };
 
-// 🟢 [추가] 개별 선택/해제
-const toggleSelectUser = (id: string) => {
-  setSelectedUserIds(prev => prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]);
-};
+  // 🟢 [추가] 개별 선택/해제
+  const toggleSelectUser = (id: string) => {
+    setSelectedUserIds(prev => prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]);
+  };
 
-// 🟢 [추가] 알림 발송 로직
-const handleSendNotification = async () => {
-  if (!notiTitle.trim() || !notiMessage.trim()) {
-    showToast('제목과 내용을 입력해주세요.', 'error');
-    return;
-  }
-  setIsSending(true);
-  try {
-    await sendNotification({
-      recipient_ids: selectedUserIds,
-      type: 'admin_alert',
-      title: notiTitle,
-      message: notiMessage,
-      link: '/notifications'
-    });
-    showToast(`${selectedUserIds.length}명에게 전송 완료!`, 'success');
-    setIsNotiModalOpen(false);
-    setNotiTitle(''); setNotiMessage(''); setSelectedUserIds([]);
-  } catch (e) { console.error(e); showToast('전송 실패', 'error'); } 
-  finally { setIsSending(false); }
-};
+  // 🟢 [추가] 알림 발송 로직
+  const handleSendNotification = async () => {
+    if (!notiTitle.trim() || !notiMessage.trim()) {
+      showToast('제목과 내용을 입력해주세요.', 'error');
+      return;
+    }
+    setIsSending(true);
+    try {
+      await sendNotification({
+        recipient_ids: selectedUserIds,
+        type: 'admin_alert',
+        title: notiTitle,
+        message: notiMessage,
+        link: '/notifications'
+      });
+      showToast(`${selectedUserIds.length}명에게 전송 완료!`, 'success');
+      setIsNotiModalOpen(false);
+      setNotiTitle(''); setNotiMessage(''); setSelectedUserIds([]);
+    } catch (e) { console.error(e); showToast('전송 실패', 'error'); }
+    finally { setIsSending(false); }
+  };
 
-return (
-    <div className="flex-1 h-full flex overflow-hidden relative">
-      
+  return (
+    <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden relative">
+
       {/* 🟢 메인 콘텐츠 (리스트 영역) */}
-      <div className={`flex-1 flex flex-col space-y-6 overflow-y-auto p-1 animate-in fade-in zoom-in-95 duration-300 ${selectedUser ? 'w-2/3 pr-4' : 'w-full'}`}>
-        
+      <div className={`flex-1 flex overflow-y-auto p-1 animate-in fade-in zoom-in-95 duration-300 ${selectedUser ? 'hidden md:flex flex-col md:w-2/3 md:pr-4' : 'flex-col w-full'}`}>
+
         {/* 1. 실시간 접속자 섹션 */}
-        <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm shrink-0">
-          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-            <Wifi size={20} className="text-green-500 animate-pulse"/> 실시간 접속 유저 ({onlineUsers.length}명)
+        <section className="bg-white rounded-lg md:rounded-2xl border border-slate-200 p-4 md:p-6 mb-4 md:mb-6 shadow-sm shrink-0">
+          <h3 className="font-bold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2">
+            <Wifi size={20} className="text-green-500 animate-pulse" /> 실시간 접속 유저 ({onlineUsers.length}명)
           </h3>
           {onlineUsers.length > 0 ? (
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
@@ -118,75 +118,75 @@ return (
           )}
         </section>
 
-{/* 2. 전체 유저 목록 섹션 */}
-<section className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
-            <h3 className="font-bold text-lg">전체 회원 ({users.length})</h3>
-            
-            <div className="flex items-center gap-3">
+        {/* 2. 전체 유저 목록 섹션 */}
+        <section className="bg-white rounded-lg md:rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
+          <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 md:gap-0 justify-between md:items-center shrink-0">
+            <h3 className="font-bold text-base md:text-lg">전체 회원 ({users.length})</h3>
+
+            <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
               {/* 🟢 [추가] 선택된 유저가 있을 때 버튼 표시 */}
               {selectedUserIds.length > 0 && (
-                <button 
+                <button
                   onClick={() => setIsNotiModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors animate-in fade-in"
+                  className="flex shrink-0 items-center gap-2 px-3 md:px-4 py-2 bg-slate-900 text-white text-xs md:text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors animate-in fade-in"
                 >
-                  <Bell size={16}/> {selectedUserIds.length}명에게 알림 발송
+                  <Bell size={16} /> {selectedUserIds.length}명에게 알림 발송
                 </button>
               )}
 
-              <div className="relative w-64">
-              
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
-              <input 
-                type="text" 
-                placeholder="이름/이메일 검색" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-slate-400 transition-colors"
-              />
+              <div className="relative w-full md:w-64 shrink-0">
+
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="이름/이메일 검색"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs md:text-sm focus:outline-none focus:border-slate-400 transition-colors"
+                />
+              </div>
             </div>
           </div>
-        </div>
-          <div className="overflow-y-auto flex-1">
-            <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+          <div className="overflow-x-auto overflow-y-auto flex-1">
+            <table className="w-full text-xs md:text-sm text-left min-w-[600px]">
+              <thead className="text-[10px] md:text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   {/* 🟢 [추가] 전체 선택 체크박스 */}
-                  <th className="px-6 py-3 w-10">
+                  <th className="px-4 md:px-6 py-3 w-10">
                     <button onClick={toggleSelectAll}>
-                      {filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length 
-                        ? <CheckSquare size={18} className="text-slate-900"/> 
-                        : <Square size={18} className="text-slate-300"/>}
+                      {filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length
+                        ? <CheckSquare size={16} className="text-slate-900" />
+                        : <Square size={16} className="text-slate-300" />}
                     </button>
                   </th>
-                  <th className="px-6 py-3">유저 정보</th>
-                  <th className="px-6 py-3">연락처</th>
-                  <th className="px-6 py-3">최근 접속</th> {/* 🟢 추가됨 */}
-                  <th className="px-6 py-3">구분</th>
-                  <th className="px-6 py-3 text-right">관리</th>
+                  <th className="px-4 md:px-6 py-3">유저 정보</th>
+                  <th className="px-4 md:px-6 py-3">연락처</th>
+                  <th className="px-4 md:px-6 py-3">최근 접속</th> {/* 🟢 추가됨 */}
+                  <th className="px-4 md:px-6 py-3">구분</th>
+                  <th className="px-4 md:px-6 py-3 text-right">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-              {filteredUsers.map((user: any) => {
+                {filteredUsers.map((user: any) => {
                   const isOnline = onlineUserIds.has(user.id);
                   const isSelected = selectedUserIds.includes(user.id); // 🟢 추가
 
                   return (
-                    <tr 
-                      key={user.id} 
-                      onClick={() => setSelectedUser(user)} 
+                    <tr
+                      key={user.id}
+                      onClick={() => setSelectedUser(user)}
                       className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50' : ''} ${selectedUser?.id === user.id ? 'bg-blue-100' : 'hover:bg-slate-50'}`}
                     >
                       {/* 🟢 [추가] 개별 선택 체크박스 */}
                       <td className="px-6 py-4" onClick={(e) => { e.stopPropagation(); toggleSelectUser(user.id); }}>
-                         {isSelected 
-                           ? <CheckSquare size={18} className="text-slate-900"/> 
-                           : <Square size={18} className="text-slate-300 hover:text-slate-400"/>}
+                        {isSelected
+                          ? <CheckSquare size={18} className="text-slate-900" />
+                          : <Square size={18} className="text-slate-300 hover:text-slate-400" />}
                       </td>
 
                       <td className="px-6 py-4 flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden border border-slate-100 relative">
-                          {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover"/> : <User size={16}/>}
+                          {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : <User size={16} />}
                           {/* 🟢 온라인 상태일 때 초록색 점 표시 */}
                           {isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
                         </div>
@@ -196,14 +196,14 @@ return (
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{user.phone || '-'}</td>
-                      
+
                       {/* 🟢 최근 접속 시간 표시 (수정됨) */}
                       <td className="px-6 py-4">
                         {isOnline ? (
                           <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded">Online</span>
                         ) : (
                           <span className="text-slate-500 text-xs flex items-center gap-1">
-                            <Clock size={12}/> {timeAgo(user.last_active_at)}
+                            <Clock size={12} /> {timeAgo(user.last_active_at)}
                           </span>
                         )}
                       </td>
@@ -214,11 +214,11 @@ return (
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); deleteItem('profiles', user.id); }} 
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteItem('profiles', user.id); }}
                           className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
                         >
-                          <MoreHorizontal size={16}/>
+                          <MoreHorizontal size={16} />
                         </button>
                       </td>
                     </tr>
@@ -230,30 +230,30 @@ return (
         </section>
       </div>
 
-      {/* 🟢 유저 상세 정보 패널 (우측 슬라이드) - 기존 내용 복구됨 */}
+      {/* 🟢 유저 상세 정보 패널 (우측 슬라이드) - 오버레이 적용됨 */}
       {selectedUser && (
-        <div className="w-[450px] border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 absolute right-0 top-0 z-20">
-          
+        <div className="absolute inset-0 z-30 md:relative md:w-[450px] border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 right-0 top-0">
+
           {/* 헤더 */}
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <div>
-              <h3 className="font-bold text-lg text-slate-900">Customer</h3>
-              <div className="text-[10px] text-slate-400 font-mono">ID: {selectedUser.id}</div>
+              <h3 className="font-bold text-base md:text-lg text-slate-900">Customer</h3>
+              <div className="text-[10px] text-slate-400 font-mono break-all pr-4">ID: {selectedUser.id}</div>
             </div>
-            <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-900 p-2 rounded-full hover:bg-slate-200 transition-colors">
-              <X size={20}/>
+            <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-900 p-2 rounded-full hover:bg-slate-200 transition-colors shrink-0">
+              <X size={20} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {/* 1. 기본 정보 */}
-            <div className="p-6 border-b border-slate-100 flex items-center gap-5">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center gap-4 md:gap-5">
               <div className="w-20 h-20 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-                {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={32}/></div>}
+                {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={32} /></div>}
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selectedUser.name || 'Locally User'}</h2>
-                
+
                 {/* 🟢 상세 페이지 최근 접속 표시 (수정됨) */}
                 <div className={`flex items-center gap-2 text-xs font-bold mt-1 px-2 py-1 rounded w-fit ${onlineUserIds.has(selectedUser.id) ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
                   {onlineUserIds.has(selectedUser.id) ? (
@@ -262,7 +262,7 @@ return (
                     </>
                   ) : (
                     <>
-                      <Clock size={12}/> 마지막 접속: {timeAgo(selectedUser.last_active_at)}
+                      <Clock size={12} /> 마지막 접속: {timeAgo(selectedUser.last_active_at)}
                     </>
                   )}
                 </div>
@@ -273,12 +273,12 @@ return (
             <div className="p-6 border-b border-slate-100">
               <h4 className="text-xs font-bold text-slate-900 uppercase mb-4">고객 프로필</h4>
               <div className="space-y-4 text-sm">
-                <InfoRow icon={<Mail size={16}/>} label="이메일" value={selectedUser.email} />
-                <InfoRow icon={<Phone size={16}/>} label="연락처" value={selectedUser.phone || '+82 10-0000-0000'} />
-                <InfoRow icon={<Calendar size={16}/>} label="생년월일" value={selectedUser.birthdate || '1999-09-01 (만 26세)'} />
-                <InfoRow icon={<MapPin size={16}/>} label="국적" value={selectedUser.nationality || 'KR (대한민국)'} />
-                <InfoRow icon={<MessageCircle size={16}/>} label="카카오톡 ID" value={selectedUser.kakao_id || '미등록'} />
-                <InfoRow icon={<Smile size={16}/>} label="MBTI" value={selectedUser.mbti || 'ENTP'} />
+                <InfoRow icon={<Mail size={16} />} label="이메일" value={selectedUser.email} />
+                <InfoRow icon={<Phone size={16} />} label="연락처" value={selectedUser.phone || '+82 10-0000-0000'} />
+                <InfoRow icon={<Calendar size={16} />} label="생년월일" value={selectedUser.birthdate || '1999-09-01 (만 26세)'} />
+                <InfoRow icon={<MapPin size={16} />} label="국적" value={selectedUser.nationality || 'KR (대한민국)'} />
+                <InfoRow icon={<MessageCircle size={16} />} label="카카오톡 ID" value={selectedUser.kakao_id || '미등록'} />
+                <InfoRow icon={<Smile size={16} />} label="MBTI" value={selectedUser.mbti || 'ENTP'} />
               </div>
             </div>
 
@@ -299,7 +299,7 @@ return (
                   <div className="font-bold text-slate-900">3일 전</div>
                 </div>
               </div>
-              
+
               <div className="border rounded-lg overflow-hidden text-xs">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 text-slate-500">
@@ -330,7 +330,7 @@ return (
                   <div key={i} className="bg-slate-50 p-3 rounded-xl">
                     <div className="flex justify-between items-start mb-1">
                       <span className="font-bold text-xs">Host Kim</span>
-                      <div className="flex items-center text-[10px] font-bold text-orange-500"><Star size={10} fill="currentColor" className="mr-0.5"/> 5.0</div>
+                      <div className="flex items-center text-[10px] font-bold text-orange-500"><Star size={10} fill="currentColor" className="mr-0.5" /> 5.0</div>
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">약속 시간도 잘 지켜주시고 매너가 너무 좋으신 게스트님이었습니다.</p>
                     <div className="text-[10px] text-slate-400 mt-2">2026.01.1{i}</div>
@@ -342,57 +342,57 @@ return (
             {/* 5. 관리자 메모 (기존 유지) */}
             <div className="p-6">
               <h4 className="text-xs font-bold text-slate-900 uppercase mb-2">관리자 메모</h4>
-              <textarea 
+              <textarea
                 className="w-full bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm focus:outline-none focus:border-yellow-400 min-h-[80px]"
                 placeholder="특이사항을 입력하세요..."
               />
             </div>
           </div>
 
-{/* 하단 버튼 */}
-<div className="p-5 border-t border-slate-100 bg-white sticky bottom-0">
+          {/* 하단 버튼 */}
+          <div className="p-5 border-t border-slate-100 bg-white sticky bottom-0">
             {/* 🟢 [추가] 개별 알림 버튼 */}
-            <button 
+            <button
               onClick={() => { setSelectedUserIds([selectedUser.id]); setIsNotiModalOpen(true); }}
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mb-2"
             >
-              <Bell size={16}/> 이 유저에게 알림 보내기
+              <Bell size={16} /> 이 유저에게 알림 보내기
             </button>
 
-            <button 
-              onClick={() => { if(confirm('정말 계정을 영구 삭제하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
+            <button
+              onClick={() => { if (confirm('정말 계정을 영구 삭제하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
               className="w-full bg-slate-900 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-              <Trash2 size={16}/> 계정 영구 삭제
+              <Trash2 size={16} /> 계정 영구 삭제
             </button>
           </div>
         </div>
-)}
+      )}
 
-{/* 🟢 [추가] 알림 발송 모달 */}
-{isNotiModalOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-    <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-      <button onClick={() => setIsNotiModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X size={20}/></button>
-      
-      <div className="mb-6 text-center">
-        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 mx-auto"><Send size={24}/></div>
-        <h3 className="text-xl font-black">알림 보내기</h3>
-        <p className="text-sm text-slate-500">선택된 <span className="font-bold text-slate-900">{selectedUserIds.length}명</span>에게 메시지를 보냅니다.</p>
-      </div>
+      {/* 🟢 [추가] 알림 발송 모달 */}
+      {isNotiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setIsNotiModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X size={20} /></button>
 
-      <div className="space-y-4">
-        <input type="text" value={notiTitle} onChange={(e) => setNotiTitle(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-sm" placeholder="제목" autoFocus />
-        <textarea value={notiMessage} onChange={(e) => setNotiMessage(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl text-sm h-32 resize-none" placeholder="내용" />
-        <button onClick={handleSendNotification} disabled={isSending} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black">
-          {isSending ? '발송 중...' : <><CheckCircle size={18}/> 발송하기</>}
-        </button>
-      </div>
+            <div className="mb-6 text-center">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 mx-auto"><Send size={24} /></div>
+              <h3 className="text-xl font-black">알림 보내기</h3>
+              <p className="text-sm text-slate-500">선택된 <span className="font-bold text-slate-900">{selectedUserIds.length}명</span>에게 메시지를 보냅니다.</p>
+            </div>
+
+            <div className="space-y-4">
+              <input type="text" value={notiTitle} onChange={(e) => setNotiTitle(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-sm" placeholder="제목" autoFocus />
+              <textarea value={notiMessage} onChange={(e) => setNotiMessage(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl text-sm h-32 resize-none" placeholder="내용" />
+              <button onClick={handleSendNotification} disabled={isSending} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black">
+                {isSending ? '발송 중...' : <><CheckCircle size={18} /> 발송하기</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-)}
-</div>
-);
+  );
 }
 
 // 헬퍼 컴포넌트 (아이콘 + 라벨 + 값)

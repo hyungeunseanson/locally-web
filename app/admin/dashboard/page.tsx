@@ -59,7 +59,7 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[80vh]">
+    <div className="bg-white p-2 md:p-6 rounded-lg md:rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] flex flex-col h-full lg:h-auto overflow-hidden lg:overflow-visible">
       {activeTab === 'USERS' ? (
         <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />
       ) : activeTab === 'LEDGER' ? (

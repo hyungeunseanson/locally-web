@@ -492,35 +492,35 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
     <div className="space-y-8 animate-in fade-in duration-500">
 
       {/* 헤더 & 필터 구간 추가 */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
         <div className="flex items-center gap-2">
-          <TrendingUp className="text-rose-500" />
-          <h2 className="text-2xl font-black text-slate-900">데이터 심층 분석</h2>
+          <TrendingUp className="text-rose-500 w-5 h-5 md:w-6 md:h-6" />
+          <h2 className="text-xl md:text-2xl font-black text-slate-900">데이터 심층 분석</h2>
         </div>
-        <div className="flex items-center gap-3 relative">
-          <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-3 relative">
+          <div className="bg-slate-100 p-1 rounded-lg flex text-[10px] md:text-xs font-bold overflow-x-auto scrollbar-hide shrink-0">
             {['1D', '7D', '30D', '3M', '1Y', 'ALL'].map(f => (
               <button
                 key={f} onClick={() => handlePresetClick(f)}
-                className={`px-3 py-1.5 rounded-md transition-all ${activePreset === f ? 'bg-white shadow text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex-1 md:flex-none px-2 md:px-3 py-1.5 md:py-2 rounded-md transition-all whitespace-nowrap ${activePreset === f ? 'bg-white shadow text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 {f}
               </button>
             ))}
           </div>
 
-          <div className="relative" ref={datePickerRef}>
+          <div className="relative w-full sm:w-auto" ref={datePickerRef}>
             <button
               onClick={() => setShowDatePicker(!showDatePicker)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shrink-0"
+              className="flex items-center justify-center gap-2 w-full px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs md:text-sm font-medium hover:bg-slate-50 transition-colors shrink-0"
             >
-              <CalendarIcon size={16} className="text-slate-400" />
-              <span className="text-slate-700 min-w-[170px] text-center">
+              <CalendarIcon size={14} className="text-slate-400 md:w-4 md:h-4" />
+              <span className="text-slate-700 md:min-w-[170px] text-center">
                 {dateRange[0].startDate && dateRange[0].endDate
                   ? `${format(dateRange[0].startDate, 'yyyy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yyyy.MM.dd')}`
                   : '기간 선택'}
               </span>
-              <ChevronDown size={16} className="text-slate-400 ml-1" />
+              <ChevronDown size={14} className="text-slate-400 ml-1 md:w-4 md:h-4" />
             </button>
 
             {showDatePicker && (
@@ -536,7 +536,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                   ranges={dateRange}
                   months={1}
                   direction="horizontal"
-                  className="!border-0 text-sm"
+                  className="!border-0 text-xs md:text-sm"
                   rangeColors={['#0f172a']}
                 />
               </div>
@@ -546,10 +546,10 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       </div>
 
       {/* 🟢 신설: 메인 탭 전환 (Business vs Host) */}
-      <div className="flex gap-2 p-1 bg-slate-100 rounded-xl w-fit mb-8">
+      <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-fit mb-6 md:mb-8">
         <button
           onClick={() => setActiveMainTab('business')}
-          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${activeMainTab === 'business'
+          className={`flex-1 md:flex-none px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 ${activeMainTab === 'business'
             ? 'bg-white text-slate-900 shadow-sm'
             : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
             }`}
@@ -558,7 +558,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         </button>
         <button
           onClick={() => setActiveMainTab('host')}
-          className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${activeMainTab === 'host'
+          className={`flex-1 md:flex-none px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 ${activeMainTab === 'host'
             ? 'bg-white text-slate-900 shadow-sm'
             : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
             }`}
@@ -598,23 +598,23 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
             </div>
           </section>
 
-          <div className="w-full h-px bg-slate-100 my-8"></div>
+          <div className="w-full h-px bg-slate-100 my-6 md:my-8"></div>
 
           {/* 🟢 신규: Demographics (인구통계학) - PURE TAILWIND */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                🌍 게스트 인구통계 <span className="text-xs font-normal text-slate-400">결제 유저 기준</span>
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                🌍 게스트 인구통계 <span className="text-[10px] md:text-xs font-normal text-slate-400">결제 유저 기준</span>
               </h2>
-              <div onClick={() => setSelectedMetric('demographics')} className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                전체 통계 보기
+              <div onClick={() => setSelectedMetric('demographics')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                상세보기
               </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
               {/* 국적 차트 */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                  🌍 게스트 국적 비중 <span className="text-xs font-normal text-slate-400 ml-auto">기간 내 결제 유저 기준</span>
+              <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span>🌍 게스트 국적 비중</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">기간 내 결제 유저 기준</span>
                 </h3>
                 <div className="space-y-4">
                   {stats.demographics.nationalities.length > 0 ? stats.demographics.nationalities.map((nat) => (
@@ -632,37 +632,37 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
 
               {/* 연령대 차트 */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                  👤 게스트 주요 연령대 <span className="text-xs font-normal text-slate-400 ml-auto">기간 내 결제 유저 기준</span>
+              <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span>👤 게스트 주요 연령대</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">기간 내 결제 유저 기준</span>
                 </h3>
-                <div className="flex items-end justify-around h-40 mt-4 pb-2 border-b border-slate-100 relative">
+                <div className="flex items-end justify-around h-32 md:h-40 mt-4 pb-2 border-b border-slate-100 relative">
                   {/* 눈금선 */}
                   <div className="absolute top-0 w-full border-t border-slate-50 border-dashed"></div>
                   <div className="absolute top-1/2 w-full border-t border-slate-50 border-dashed"></div>
 
                   {stats.demographics.ages.map(age => (
-                    <div key={age.name} className="flex flex-col items-center gap-2 group w-1/5">
-                      <span className="text-[10px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div key={age.name} className="flex flex-col items-center gap-1 md:gap-2 group w-1/5">
+                      <span className="text-[9px] md:text-[10px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
                         {age.percent.toFixed(1)}%
                       </span>
                       {/* Column Bar */}
-                      <div className="w-full bg-slate-100 rounded-t-lg relative flex items-end justify-center h-28">
+                      <div className="w-full bg-slate-100 rounded-t-sm md:rounded-t-lg relative flex items-end justify-center h-20 md:h-28">
                         <div
-                          className="w-full bg-rose-400 rounded-t-lg transition-all duration-1000 hover:bg-rose-500 shadow-inner"
+                          className="w-full bg-rose-400 rounded-t-sm md:rounded-t-lg transition-all duration-1000 hover:bg-rose-500 shadow-inner"
                           style={{ height: `${age.percent}%`, minHeight: age.percent > 0 ? '4px' : '0' }}
                         ></div>
                       </div>
-                      <span className="text-xs font-bold text-slate-600">{age.name}</span>
+                      <span className="text-[10px] md:text-xs font-bold text-slate-600 truncate w-full text-center">{age.name}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* 🟢 성별 바 차트 (새로 추가) */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                  🚻 게스트 성별 비율 <span className="text-xs font-normal text-slate-400 ml-auto">전체 결제 기준</span>
+              <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span>🚻 게스트 성별 비율</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">전체 결제 기준</span>
                 </h3>
                 <div className="flex-1 flex flex-col justify-center space-y-5">
                   {stats.demographics.genders.length > 0 ? stats.demographics.genders.map((gen) => (
@@ -687,24 +687,24 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           </section>
 
           {/* 2. 인기 검색어 (트렌드) */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Search size={18} /> 실시간 인기 트렌드
+          <section className="pt-4 md:pt-6">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h2 className="text-base md:text-lg font-bold flex items-center gap-2">
+                <Search size={16} className="md:w-[18px] md:h-[18px]" /> 실시간 인기 트렌드
               </h2>
-              <div onClick={() => setSelectedMetric('searchTrends')} className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                전체 순위 보기
+              <div onClick={() => setSelectedMetric('searchTrends')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                상세보기
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 md:gap-3">
               {stats.searchTrends.length > 0 ? stats.searchTrends.map((trend, i) => (
                 <button
                   key={trend.keyword}
                   onClick={() => setSelectedMetric('searchTrends')}
-                  className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all duration-200 shadow-sm active:scale-95 flex items-center gap-2"
+                  className="px-3 md:px-4 py-1.5 md:py-2 bg-white border border-gray-200 rounded-full text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all duration-200 shadow-sm active:scale-95 flex items-center gap-1 md:gap-2"
                 >
                   <span className="text-rose-500 font-bold">{i + 1}.</span> {trend.keyword}
-                  <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">{trend.count}건</span>
+                  <span className="text-[9px] md:text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">{trend.count}건</span>
                 </button>
               )) : (
                 <span className="text-sm text-slate-400">데이터를 수집 중입니다.</span>
@@ -713,37 +713,37 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           </section>
 
           {/* 시계열 및 퍼널 차트 섹션 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 pt-4 md:pt-6">
             {/* 🟢 신규: 시계열 차트 (Time-Series) */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  📈 구간별 매출 트렌드 <span className="text-xs font-normal text-slate-400">최근 발생일자 기준 (최대 7일)</span>
+            <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <div className="flex items-start justify-between mb-6 md:mb-8">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span>📈 구간별 매출 트렌드</span> <span className="text-[10px] md:text-xs font-normal text-slate-400">최근 발생일자 기준 (최대 7일)</span>
                 </h3>
-                <Activity size={18} className="text-blue-500" />
+                <Activity size={16} className="text-blue-500 md:w-[18px] md:h-[18px] shrink-0" />
               </div>
 
-              <div className="flex items-end justify-between h-48 w-full relative px-2">
+              <div className="flex items-end justify-between h-36 md:h-48 w-full relative px-1 md:px-2">
                 {/* 100% 가이드 라인 */}
                 <div className="absolute top-0 left-0 w-full border-t border-slate-100 border-dashed"></div>
                 <div className="absolute top-1/2 left-0 w-full border-t border-slate-100 border-dashed"></div>
                 <div className="absolute bottom-0 left-0 w-full border-t border-slate-100"></div>
 
                 {stats.timeSeries.length > 0 ? stats.timeSeries.map((ts, idx) => (
-                  <div key={idx} className="flex flex-col items-center gap-2 group w-12 z-10">
-                    <span className="text-[10px] font-bold text-slate-500 bg-white px-1 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 whitespace-nowrap">
-                      ₩{ts.amount.toLocaleString()}
+                  <div key={idx} className="flex flex-col items-center gap-1 md:gap-2 group w-8 md:w-12 z-10">
+                    <span className="text-[9px] md:text-[10px] font-bold text-slate-500 bg-white px-1 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 md:-top-6 whitespace-nowrap">
+                      ₩{(ts.amount / 10000).toFixed(0)}만
                     </span>
-                    <div className="w-full h-40 flex items-end justify-center pb-0">
+                    <div className="w-full h-28 md:h-40 flex items-end justify-center pb-0">
                       <div
-                        className="w-10 bg-slate-800 rounded-t-md transition-all duration-1000 hover:bg-blue-600 shadow-sm"
+                        className="w-6 md:w-10 bg-slate-800 rounded-t-sm md:rounded-t-md transition-all duration-1000 hover:bg-blue-600 shadow-sm"
                         style={{ height: `${Math.max(ts.height, 5)}%` }}
                       ></div>
                     </div>
-                    <span className="text-xs font-medium text-slate-500 mt-2">{ts.dateStr}</span>
+                    <span className="text-[9px] md:text-xs font-medium text-slate-500 mt-1 md:mt-2">{ts.dateStr}</span>
                   </div>
                 )) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs md:text-sm">
                     선택된 구간에 매출 데이터가 없습니다.
                   </div>
                 )}
@@ -751,14 +751,14 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
             </div>
 
             {/* 퍼널 차트 */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  🎯 예약 퍼널 분석 <span className="text-xs font-normal text-slate-400">유입 대비 결제 전환률</span>
+            <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span>🎯 예약 퍼널 분석</span> <span className="text-[10px] md:text-xs font-normal text-slate-400">유입 대비 결제 전환률</span>
                 </h3>
-                <Activity size={18} className="text-slate-400" />
+                <Activity size={16} className="text-slate-400 md:w-[18px] md:h-[18px]" />
               </div>
-              <div className="space-y-5 mt-4">
+              <div className="space-y-4 md:space-y-5 mt-2 md:mt-4">
                 <FunnelBar label="상품 노출" value={stats.funnel.views} max={stats.funnel.views} color="bg-slate-200" />
                 <FunnelBar label="예약 클릭" value={stats.funnel.clicks} max={stats.funnel.views} color="bg-slate-300" />
                 <FunnelBar label="결제 시도" value={stats.funnel.paymentInit} max={stats.funnel.views} color="bg-slate-400" />
@@ -769,39 +769,37 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
 
           {/* 3. 매출 견인 Top 5 인기 체험 */}
-          <section className="pt-4">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  🏆 매출 견인 Top 5 인기 체험 <span className="text-xs font-normal text-slate-400">결제 완료 건수 기준</span>
+          <section className="pt-4 md:pt-6">
+            <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span>🏆 매출 견인 Top 5 인기 체험</span> <span className="text-[10px] md:text-xs font-normal text-slate-400">결제 완료 건수 기준</span>
                 </h3>
-                <div onClick={() => setSelectedMetric('topExps')} className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                  전체 랭킹 보기
+                <div onClick={() => setSelectedMetric('topExps')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors shrink-0">
+                  상세보기
                 </div>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {stats.topExperiences.length > 0 ? stats.topExperiences.map((exp: any, idx: number) => (
-                  <div key={exp.id} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 border border-slate-200">
+                  <div key={exp.id} className="flex items-center gap-3 md:gap-4 p-2 md:p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 border border-slate-200 text-sm md:text-base shrink-0">
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-slate-900 truncate">{exp.title}</div>
-                      <div className="text-xs font-medium text-slate-500 flex gap-2">
+                      <div className="text-xs md:text-sm font-bold text-slate-900 truncate">{exp.title}</div>
+                      <div className="text-[10px] md:text-xs font-medium text-slate-500 flex gap-2">
                         <span>예약 {exp.bookingCount}건</span>
-                        <span>매출 ₩{exp.totalRevenue.toLocaleString()}</span>
+                        <span>매출 ₩{(exp.totalRevenue / 10000).toFixed(0)}만</span>
                       </div>
                     </div>
-                    <div className="text-right flex flex-col items-end">
-                      <div className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
-                        평점 {exp.rating} ({exp.reviewCount})
+                    <div className="text-right flex flex-col items-end shrink-0">
+                      <div className="text-[9px] md:text-xs font-bold text-slate-700 bg-slate-100 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md md:rounded-lg whitespace-nowrap">
+                        ★ {exp.rating} ({exp.reviewCount})
                       </div>
                     </div>
                   </div>
                 )) : (
-                  <div className="h-40 flex flex-col items-center justify-center text-slate-400 text-sm">
-                    기간 내 결제된 인기 체험이 없습니다.
-                  </div>
+                  <div className="text-center py-6 md:py-8 text-slate-400 text-xs md:text-sm">기간 내 체험 예약 데이터가 없습니다.</div>
                 )}
               </div>
             </div>
@@ -817,8 +815,8 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </h2>
               <Activity size={20} className="text-emerald-500" />
             </div>
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-8 items-center justify-center relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full translate-x-32 -translate-y-32 blur-3xl"></div>
+            <div className="bg-white p-4 md:p-8 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 md:w-64 h-32 md:h-64 bg-emerald-50 rounded-full translate-x-16 md:translate-x-32 -translate-y-16 md:-translate-y-32 blur-2xl md:blur-3xl"></div>
 
               {[
                 { label: "지원서 접수", val: stats.hostEcosystem.funnel.applied, color: "bg-slate-200 text-slate-600" },
@@ -827,10 +825,10 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                 { label: "첫 예약 달성", val: stats.hostEcosystem.funnel.booked, color: "bg-emerald-500 text-white" }
               ].map((step, i, arr) => (
                 <React.Fragment key={i}>
-                  <div className="flex flex-col items-center">
-                    <div className={`w-28 h-28 rounded-2xl flex flex-col items-center justify-center font-black text-2xl shadow-sm border border-white/50 ${step.color} relative z-10`}>
-                      {step.val.toLocaleString()}
-                      <span className="text-[10px] font-bold opacity-80 mt-1">{step.label}</span>
+                  <div className="flex flex-col items-center w-full md:w-auto">
+                    <div className={`w-full md:w-28 h-16 md:h-28 rounded-xl md:rounded-2xl flex md:flex-col items-center justify-between md:justify-center px-4 md:px-0 font-black text-xl md:text-2xl shadow-sm border border-white/50 ${step.color} relative z-10`}>
+                      <span className="text-xs md:text-[10px] font-bold opacity-80 md:mt-1 order-1 md:order-2">{step.label}</span>
+                      <span className="order-2 md:order-1">{step.val.toLocaleString()}</span>
                     </div>
                     {i > 0 && stats.hostEcosystem.funnel.applied > 0 && (
                       <div className="mt-4 text-xs font-bold text-slate-400">
@@ -851,12 +849,15 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           {/* 🟢 이동 배치됨: 호스트 리스크 모니터링 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 mt-8">
             {/* 우수 호스트 후보 리스트 */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  ⭐ 슈퍼 호스트 유망주 <span className="text-xs font-normal text-slate-400">평점 4.0 이상 & 취소 0</span>
+            <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 flex items-center gap-1 md:gap-2">
+                  <Star size={16} className="text-emerald-500 hidden md:block" />
+                  <span className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <span>⭐ 슈퍼 호스트 유망주</span> <span className="text-[10px] md:text-xs font-normal text-slate-400">평점 4.0↑ 취소 0</span>
+                  </span>
                 </h3>
-                <UserCheck size={18} className="text-emerald-500" />
+                <UserCheck size={16} className="text-emerald-500 md:w-[18px] md:h-[18px]" />
               </div>
               <div className="space-y-4">
                 {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((host: any, idx: number) => (
@@ -884,13 +885,16 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
             </div>
 
             {/* 집중 관리 호스트 리스트 */}
-            <div className="bg-white p-6 rounded-2xl border border-rose-200 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-full translate-x-16 -translate-y-16 blur-2xl"></div>
-              <div className="flex items-center justify-between mb-6 relative z-10">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  🚨 집중 관리 호스트 (Risk) <span className="text-xs font-normal text-rose-400">잦은 취소 또는 평점 저하</span>
+            <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-rose-200 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 bg-rose-50 rounded-full translate-x-12 md:translate-x-16 -translate-y-12 md:-translate-y-16 blur-xl md:blur-2xl"></div>
+              <div className="flex items-center justify-between mb-4 md:mb-6 relative z-10">
+                <h3 className="text-base md:text-lg font-bold text-slate-800 flex items-center gap-1 md:gap-2">
+                  <AlertTriangle size={16} className="text-rose-500 hidden md:block" />
+                  <span className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <span>🚨 집중 관리 호스트</span> <span className="text-[10px] md:text-xs font-normal text-rose-400">예의/평점 주의</span>
+                  </span>
                 </h3>
-                <AlertTriangle size={18} className="text-rose-500 animate-pulse" />
+                <AlertTriangle size={16} className="text-rose-500 animate-pulse md:w-[18px] md:h-[18px]" />
               </div>
               <div className="space-y-4 relative z-10">
                 {stats.riskHosts.length > 0 ? stats.riskHosts.map((host: any, idx: number) => (
@@ -925,12 +929,12 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
           {/* 1.5. 호스트 활동 및 응답 (Host Activity) */}
           <section>
-            <div className="flex items-center justify-between mb-4 mt-8">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                💬 커뮤니케이션 현황 <span className="text-xs font-normal text-slate-400">게스트 문의 대비 응답 속도</span>
+            <div className="flex items-center justify-between mb-3 md:mb-4 mt-6 md:mt-8">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                💬 커뮤니케이션 현황 <span className="text-[10px] md:text-xs font-normal text-slate-400">문의 대비 응답 시간</span>
               </h2>
-              <div onClick={() => setSelectedMetric('response')} className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                상세 랭킹 보기
+              <div onClick={() => setSelectedMetric('response')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                상세보기
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -955,19 +959,19 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
           {/* 2. 공급자 인구통계 및 유입 채널 */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
                 👥 호스트 생태계 통계
               </h2>
-              <div onClick={() => setSelectedMetric('hostDemographics')} className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                전체 통계 보기
+              <div onClick={() => setSelectedMetric('hostDemographics')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                상세보기
               </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
               {/* 유입 채널 (Acquisition) */}
-              <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full translate-x-12 -translate-y-12 blur-2xl"></div>
-                <h3 className="text-lg font-bold mb-6 flex items-center gap-2 relative z-10"><Search size={18} className="text-indigo-400" /> 주요 유입 경로</h3>
+              <div className="bg-slate-900 text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 bg-indigo-500/20 rounded-full translate-x-8 md:translate-x-12 -translate-y-8 md:-translate-y-12 blur-xl md:blur-2xl"></div>
+                <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 flex items-center gap-2 relative z-10"><Search size={16} className="text-indigo-400 md:w-[18px] md:h-[18px]" /> 주요 유입 경로</h3>
                 <div className="space-y-5 relative z-10">
                   {stats.hostEcosystem.sources.map((src, i) => (
                     <div key={i}>
@@ -984,24 +988,24 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
 
               {/* 국적 및 언어 (Demographics) */}
-              <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-8">
+              <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 md:gap-8">
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><UserCheck size={18} className="text-blue-500" /> 호스트 국적 비율</h3>
-                  <div className="flex h-32 items-end gap-2 border-b border-slate-100 pb-2">
+                  <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex items-center gap-2"><UserCheck size={16} className="text-blue-500 md:w-[18px] md:h-[18px]" /> 호스트 국적 비율</h3>
+                  <div className="flex h-24 md:h-32 items-end gap-2 border-b border-slate-100 pb-2">
                     {stats.hostEcosystem.nationalities.map((nat, i) => (
                       <div key={i} className="flex-1 flex flex-col justify-end group cursor-pointer relative">
-                        <div className="absolute -top-8 w-full text-center text-xs font-bold text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute -top-6 md:-top-8 w-full text-center text-[10px] md:text-xs font-bold text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
                           {nat.count}명
                         </div>
-                        <div className="w-full bg-blue-100 group-hover:bg-blue-300 rounded-t-md transition-all duration-300" style={{ height: `${Math.max(nat.percent, 5)}%` }}></div>
-                        <div className="text-center mt-2 text-xs font-bold text-slate-600 truncate">{nat.name}</div>
+                        <div className="w-full bg-blue-100 group-hover:bg-blue-300 rounded-t-sm md:rounded-t-md transition-all duration-300" style={{ height: `${Math.max(nat.percent, 5)}%` }}></div>
+                        <div className="text-center mt-1 md:mt-2 text-[10px] md:text-xs font-bold text-slate-600 truncate">{nat.name}</div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Star size={18} className="text-yellow-500" /> 보유 언어 역량</h3>
+                <div className="flex-1 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-slate-100 md:pl-8">
+                  <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex items-center gap-2"><Star size={16} className="text-yellow-500 md:w-[18px] md:h-[18px]" /> 보유 언어 역량</h3>
                   <div className="space-y-4">
                     {stats.hostEcosystem.languages.map((lang, i) => (
                       <div key={i} className="flex items-center gap-3">
@@ -1378,14 +1382,14 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 // 작은 컴포넌트들
 function SimpleKpi({ label, value, unit, className, sub, onClick }: any) {
   return (
-    <div onClick={onClick} className={`p-5 bg-white border border-slate-200 rounded-2xl shadow-sm transition-all flex flex-col justify-between ${onClick ? 'cursor-pointer hover:border-slate-400 hover:shadow-md' : ''}`}>
-      <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide flex items-center justify-between">
-        {label}
-        {sub && <span className="text-[10px] text-slate-300 normal-case bg-slate-50 px-1.5 py-0.5 rounded">{sub}</span>}
+    <div onClick={onClick} className={`p-4 md:p-5 bg-white border border-slate-200 rounded-xl md:rounded-2xl shadow-sm transition-all flex flex-col justify-between h-28 md:h-32 ${onClick ? 'cursor-pointer hover:border-slate-400 hover:shadow-md' : ''}`}>
+      <div className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center justify-between gap-1">
+        <span className="truncate">{label}</span>
+        {sub && <span className="text-[8px] md:text-[10px] text-slate-300 normal-case bg-slate-50 px-1 md:px-1.5 py-0.5 rounded whitespace-nowrap">{sub}</span>}
       </div>
-      <div className={`text-2xl font-black text-slate-900 tracking-tight mt-auto ${className}`}>
+      <div className={`text-xl md:text-2xl font-black text-slate-900 tracking-tight mt-auto truncate ${className}`}>
         {typeof value === 'number' ? value.toLocaleString() : value}
-        <span className="text-sm font-medium text-slate-400 ml-1">{unit}</span>
+        <span className="text-xs md:text-sm font-medium text-slate-400 ml-1">{unit}</span>
       </div>
     </div>
   );
@@ -1394,15 +1398,15 @@ function SimpleKpi({ label, value, unit, className, sub, onClick }: any) {
 function FunnelBar({ label, value, max, isFinal, color }: any) {
   const percent = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex items-center gap-4 group">
-      <div className="w-20 text-xs font-bold text-slate-500 text-right">{label}</div>
-      <div className="flex-1 h-10 bg-slate-50 rounded-xl overflow-hidden relative">
+    <div className="flex items-center gap-2 md:gap-4 group">
+      <div className="w-16 md:w-20 text-[10px] md:text-xs font-bold text-slate-500 text-right">{label}</div>
+      <div className="flex-1 h-8 md:h-10 bg-slate-50 rounded-lg md:rounded-xl overflow-hidden relative">
         <div className={`h-full absolute top-0 left-0 transition-all duration-1000 ${color}`} style={{ width: `${Math.max(percent, 2)}%` }}></div>
-        <div className={`absolute top-0 left-3 h-full flex items-center text-sm font-bold ${isFinal && percent > 20 ? 'text-white' : 'text-slate-700'}`}>
+        <div className={`absolute top-0 left-2 md:left-3 h-full flex items-center text-xs md:text-sm font-bold ${isFinal && percent > 20 ? 'text-white' : 'text-slate-700'}`}>
           {value.toLocaleString()}
         </div>
       </div>
-      <div className="w-14 text-right text-sm font-mono text-slate-400 group-hover:text-slate-900 transition-colors">
+      <div className="w-10 md:w-14 text-right text-xs md:text-sm font-mono text-slate-400 group-hover:text-slate-900 transition-colors">
         {percent.toFixed(1)}%
       </div>
     </div>

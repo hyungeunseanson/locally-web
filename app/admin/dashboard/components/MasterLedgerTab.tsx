@@ -183,29 +183,29 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   };
 
   return (
-    <div className="flex h-full gap-6 relative">
-      <div className={`flex-1 flex flex-col space-y-6 transition-all duration-300 ${selectedBooking ? 'w-2/3' : 'w-full'}`}>
+    <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden flex-col md:flex-row">
+      <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
-          <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-lg shadow-slate-200">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sales</div>
-            <div className="text-2xl font-black">₩{totals.totalSales.toLocaleString()}</div>
-            <div className="text-[10px] text-slate-500 mt-1">실결제 매출</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 shrink-0">
+          <div className="bg-slate-900 p-4 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sales</div>
+            <div className="text-xl md:text-2xl font-black">₩{totals.totalSales.toLocaleString()}</div>
+            <div className="text-[9px] md:text-[10px] text-slate-500 mt-1">실결제 매출</div>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payout (80%)</div>
-            <div className="text-2xl font-black text-rose-600">₩{totals.totalPayout.toLocaleString()}</div>
-            <div className="text-[10px] text-slate-400 mt-1">지급 예정액</div>
+          <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payout (80%)</div>
+            <div className="text-xl md:text-2xl font-black text-rose-600">₩{totals.totalPayout.toLocaleString()}</div>
+            <div className="text-[9px] md:text-[10px] text-slate-400 mt-1">지급 예정액</div>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Revenue</div>
-            <div className="text-2xl font-black text-blue-600">₩{totals.totalProfit.toLocaleString()}</div>
-            <div className="text-[10px] text-slate-400 mt-1">순수익</div>
+          <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Revenue</div>
+            <div className="text-xl md:text-2xl font-black text-blue-600">₩{totals.totalProfit.toLocaleString()}</div>
+            <div className="text-[9px] md:text-[10px] text-slate-400 mt-1">순수익</div>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bookings</div>
-            <div className="text-2xl font-black text-slate-900">{ledgerData.length}건</div>
-            <div className="text-[10px] text-slate-400 mt-1">
+          <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bookings</div>
+            <div className="text-xl md:text-2xl font-black text-slate-900">{ledgerData.length}건</div>
+            <div className="text-[9px] md:text-[10px] text-slate-400 mt-1 truncate">
               {dateRange[0].startDate && dateRange[0].endDate ?
                 `${format(dateRange[0].startDate, 'yy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yy.MM.dd')}`
                 : '전체 기간'
@@ -214,14 +214,14 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
           </div>
         </div>
 
-        <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0">
-          <div className="flex gap-4 items-center">
+        <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm shrink-0 gap-3 md:gap-0">
+          <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:items-center w-full md:w-auto">
 
             {/* 🗓️ 통합 달력(DateRangePicker) UI */}
-            <div className="relative">
+            <div className="relative w-full md:w-auto">
               <button
                 onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex items-center justify-center md:justify-start w-full md:w-auto gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <Calendar size={16} className="text-blue-600" />
                 {dateRange[0].startDate && dateRange[0].endDate
@@ -259,7 +259,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
               )}
             </div>
 
-            <div className="flex bg-slate-100 p-1 rounded-xl">
+            <div className="flex flex-wrap bg-slate-100 p-1 rounded-xl w-full md:w-auto justify-center">
               {[
                 { id: 'ALL', label: '전체' },
                 { id: 'PENDING', label: '입금대기' },
@@ -269,47 +269,47 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id as any)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`flex-1 md:flex-none px-2 py-1.5 md:px-3 text-[10px] md:text-xs font-bold rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
           </div>
-          <div className="flex gap-3">
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               <input
                 type="text"
-                placeholder="장부 검색 (이름, 예약번호)"
+                placeholder="검색 (이름, 예약번호)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none"
               />
             </div>
             <button
               onClick={downloadLedgerCSV}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
+              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all shrink-0"
             >
               <Download size={18} />
             </button>
           </div>
         </div>
 
-        <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
-          <div className="overflow-y-auto flex-1 scrollbar-hide">
-            <table className="w-full text-[13px] text-left border-collapse">
-              <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
+        <div className="bg-white rounded-xl md:rounded-[24px] border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
+          <div className="overflow-x-auto overflow-y-auto flex-1 scrollbar-hide">
+            <table className="w-full text-xs md:text-[13px] text-left border-collapse min-w-[800px]">
+              <thead className="bg-slate-50 text-[9px] md:text-[10px] font-black text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
                 <tr>
-                  <th className="px-4 py-4 w-24">Status</th>
-                  <th className="px-4 py-4">Date</th>
-                  <th className="px-4 py-4">Host</th>
-                  <th className="px-4 py-4">Tour Item</th>
-                  <th className="px-4 py-4 text-center">Customer</th>
-                  <th className="px-4 py-4 text-right">Price</th>
-                  <th className="px-4 py-4 text-right">Payout(80%)</th>
-                  <th className="px-4 py-4 text-right text-slate-900 bg-slate-100/50">매출(Paid)</th>
-                  <th className="px-4 py-4 text-right text-blue-600">수익</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4 w-20 md:w-24">Status</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4">Date</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4">Host</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4">Tour Item</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4 text-center">Customer</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4 text-right">Price</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4 text-right">Payout(80%)</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4 text-right text-slate-900 bg-slate-100/50">매출(Paid)</th>
+                  <th className="px-3 md:px-4 py-3 md:py-4 text-right text-blue-600">수익</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -355,9 +355,9 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       </div>
 
       {selectedBooking && (
-        <div className="w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 absolute right-0 top-0 bottom-0 z-20">
+        <div className="absolute inset-0 z-30 md:relative md:w-[400px] w-full bg-white md:rounded-2xl md:shadow-2xl md:border md:border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 right-0 top-0 bottom-0 h-full">
           {/* Header */}
-          <div className="p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+          <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
             <div className="flex-1 pr-2">
               <div className="flex items-center gap-2 mb-1.5">
                 <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :

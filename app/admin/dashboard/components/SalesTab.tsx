@@ -240,23 +240,23 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   };
 
   return (
-    <div className="flex-1 space-y-8 overflow-y-auto p-2 animate-in fade-in zoom-in-95 duration-300">
+    <div className="flex-1 space-y-4 md:space-y-8 overflow-y-auto p-1 md:p-2 animate-in fade-in zoom-in-95 duration-300">
 
       {/* 헤더 & 필터 */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 md:gap-0">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <Wallet className="text-yellow-500" /> 매출 및 재무 현황
+          <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
+            <Wallet className="text-yellow-500 w-5 h-5 md:w-6 md:h-6" /> 매출 및 재무 현황
           </h2>
-          <p className="text-sm text-slate-500 mt-1">기간별 매출 추이와 호스트 정산 내역을 관리합니다.</p>
+          <p className="text-xs md:text-sm text-slate-500 mt-1">기간별 매출 추이와 호스트 정산 내역을 관리합니다.</p>
         </div>
-        <div className="flex items-center gap-3 relative">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-3 relative">
           {/* Preset Buttons */}
-          <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold shrink-0">
+          <div className="bg-slate-100 p-1 rounded-lg flex text-[10px] md:text-xs font-bold overflow-x-auto scrollbar-hide shrink-0">
             {['1D', '7D', '30D', '3M', '1Y', 'ALL'].map(f => (
               <button
                 key={f} onClick={() => handlePresetClick(f)}
-                className={`px-3 py-1.5 rounded-md transition-all ${activePreset === f ? 'bg-white shadow text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex-1 md:flex-none px-2 md:px-3 py-1.5 md:py-2 rounded-md transition-all whitespace-nowrap ${activePreset === f ? 'bg-white shadow text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 {f}
               </button>
@@ -264,18 +264,18 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
           </div>
 
           {/* Custom Date Picker Toggle */}
-          <div className="relative" ref={datePickerRef}>
+          <div className="relative w-full sm:w-auto" ref={datePickerRef}>
             <button
               onClick={() => setShowDatePicker(!showDatePicker)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shrink-0"
+              className="flex items-center justify-center gap-2 w-full px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs md:text-sm font-medium hover:bg-slate-50 transition-colors shrink-0"
             >
-              <CalendarIcon size={16} className="text-slate-400" />
-              <span className="text-slate-700 min-w-[170px] text-center">
+              <CalendarIcon size={14} className="text-slate-400 md:w-4 md:h-4" />
+              <span className="text-slate-700 md:min-w-[170px] text-center">
                 {dateRange[0].startDate && dateRange[0].endDate
                   ? `${format(dateRange[0].startDate, 'yyyy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yyyy.MM.dd')}`
                   : '기간 선택'}
               </span>
-              <ChevronDown size={16} className="text-slate-400 ml-1" />
+              <ChevronDown size={14} className="text-slate-400 ml-1 md:w-4 md:h-4" />
             </button>
 
             {/* Dropdown Calendar */}
@@ -295,7 +295,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
                   ranges={dateRange}
                   months={1}
                   direction="horizontal"
-                  className="!border-0 text-sm"
+                  className="!border-0 text-xs md:text-sm"
                   rangeColors={['#0f172a']} // slate-900
                 />
               </div>
@@ -305,150 +305,152 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
       </div>
 
       {/* KPI 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="총 거래액 (GMV)" value={`₩${totalRevenue.toLocaleString()}`} sub={`기간 내 총 결제`} icon={<DollarSign size={20} className="text-white" />} bg="bg-slate-900" />
-        <StatCard title="순매출 (Net Revenue)" value={`₩${platformFee.toLocaleString()}`} sub="플랫폼 수익 (수수료)" icon={<TrendingUp size={20} className="text-white" />} bg="bg-blue-600" />
-        <StatCard title="정산 예정금 (AP)" value={`₩${hostPayout.toLocaleString()}`} sub="호스트 지급액" icon={<CreditCard size={20} className="text-white" />} bg="bg-purple-600" />
-        <StatCard title="객단가 (AOV)" value={`₩${Math.round(averageOrderValue).toLocaleString()}`} sub="건당 평균 결제액" icon={<Wallet size={20} className="text-slate-900" />} bg="bg-yellow-400" text="text-slate-900" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <StatCard title="총 거래액 (GMV)" value={`₩${totalRevenue.toLocaleString()}`} sub={`기간 내 총 결제`} icon={<DollarSign size={16} className="text-white md:w-5 md:h-5" />} bg="bg-slate-900" />
+        <StatCard title="순매출 (Net Revenue)" value={`₩${platformFee.toLocaleString()}`} sub="플랫폼 수익 (수수료)" icon={<TrendingUp size={16} className="text-white md:w-5 md:h-5" />} bg="bg-blue-600" />
+        <StatCard title="정산 예정금 (AP)" value={`₩${hostPayout.toLocaleString()}`} sub="호스트 지급액" icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />} bg="bg-purple-600" />
+        <StatCard title="객단가 (AOV)" value={`₩${Math.round(averageOrderValue).toLocaleString()}`} sub="건당 평균 결제액" icon={<Wallet size={16} className="text-slate-900 md:w-5 md:h-5" />} bg="bg-yellow-400" text="text-slate-900" />
       </div>
 
       {/* 정산 리스트 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <div className="flex gap-6">
-            <button onClick={() => setSettlementTab('PENDING')} className={`font-bold text-sm pb-0 border-b-2 transition-all ${settlementTab === 'PENDING' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 대기 (Pending)</button>
-            <button onClick={() => setSettlementTab('COMPLETED')} className={`font-bold text-sm pb-0 border-b-2 transition-all ${settlementTab === 'COMPLETED' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 완료 (History)</button>
+      <div className="bg-white rounded-xl md:rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center bg-slate-50 gap-4 sm:gap-0">
+          <div className="flex gap-4 md:gap-6 border-b border-slate-200 sm:border-0">
+            <button onClick={() => setSettlementTab('PENDING')} className={`font-bold text-xs md:text-sm pb-2 sm:pb-0 border-b-2 sm:border-b-2 sm:-mb-[17px] md:-mb-[25px] transition-all ${settlementTab === 'PENDING' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 대기 (Pending)</button>
+            <button onClick={() => setSettlementTab('COMPLETED')} className={`font-bold text-xs md:text-sm pb-2 sm:pb-0 border-b-2 sm:border-b-2 sm:-mb-[17px] md:-mb-[25px] transition-all ${settlementTab === 'COMPLETED' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 완료 (History)</button>
           </div>
           {settlementTab === 'PENDING' && (
-            <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors">
-              <CheckCircle size={14} /> 정산 탭에서 지급 실행
+            <button className="bg-slate-900 text-white px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors w-full sm:w-auto">
+              <CheckCircle size={14} /> 지급 실행
             </button>
           )}
         </div>
 
-        <table className="w-full text-sm text-left">
-          <thead className="bg-white text-slate-500 text-xs uppercase border-b border-slate-100">
-            <tr>
-              <th className="px-6 py-4">호스트 정보</th>
-              <th className="px-6 py-4">지급 총액</th>
-              <th className="px-6 py-4">계좌 정보</th>
-              <th className="px-6 py-4">건수</th>
-              <th className="px-6 py-4 text-right">상태</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {settlementList.length > 0 ? settlementList.map((item: any, idx: number) => (
-              <React.Fragment key={idx}>
-                <tr
-                  className={`hover:bg-slate-50 cursor-pointer transition-colors ${expandedHostId === item.id ? 'bg-slate-50' : ''}`}
-                  onClick={() => toggleExpand(item.id)}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {expandedHostId === item.id ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
-                      <div>
-                        <div className="font-bold text-slate-900">{item.hostName}</div>
-                        <div className="text-xs text-slate-400">{item.accountHolder}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-mono font-bold text-purple-600">₩{item.totalAmount.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-slate-500 flex items-center gap-1">
-                    {item.bank === '계좌 미등록' ? <AlertTriangle size={14} className="text-red-500" /> : <CreditCard size={14} />}
-                    {item.bank} {item.accountNumber}
-                  </td>
-                  <td className="px-6 py-4 text-slate-500">{item.count}건</td>
-                  <td className="px-6 py-4 text-right">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.bank === '계좌 미등록' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {item.bank === '계좌 미등록' ? '계좌 필요' : (settlementTab === 'PENDING' ? '지급 대기' : '지급 완료')}
-                    </span>
-                  </td>
-                </tr>
-
-                {/* 상세 내역 아코디언 */}
-                {expandedHostId === item.id && (
-                  <tr>
-                    <td colSpan={5} className="bg-slate-50 p-0 border-b border-slate-100">
-                      <div className="px-14 py-6">
-                        <div className="flex justify-between items-center mb-4">
-                          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                            <Wallet size={16} className="text-slate-500" /> 세부 정산 내역
-                          </h4>
-                          <div className="flex gap-2">
-                            {/* 향후 CSV 다운로드 / 지급 연결 등 */}
-                            <button
-                              onClick={() => handleDownloadCSV(item)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-sm"
-                            >
-                              <Download size={14} /> 명세서 다운로드
-                            </button>
-                            {settlementTab === 'PENDING' && (
-                              <button
-                                onClick={() => handleSettlePayout(item.id, item.bookings.map((b: any) => b.id))}
-                                disabled={isProcessing}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg transition-colors shadow-sm ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-800'}`}
-                              >
-                                <Check size={14} /> {isProcessing ? '처리 중...' : '일괄 지급 완료 처리'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                          <table className="w-full text-xs text-left">
-                            <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
-                              <tr>
-                                <th className="px-4 py-3">결제일</th>
-                                <th className="px-4 py-3">예약 ID</th>
-                                <th className="px-4 py-3">게스트</th>
-                                <th className="px-4 py-3">진행 상태</th>
-                                <th className="px-4 py-3 text-right">결제 금액</th>
-                                <th className="px-4 py-3 text-right text-purple-600">정산 대상액</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                              {item.bookings.map((b: any) => (
-                                <tr key={b.id} className="hover:bg-slate-50">
-                                  <td className="px-4 py-3 text-slate-500">{format(new Date(b.created_at), 'yyyy.MM.dd HH:mm')}</td>
-                                  <td className="px-4 py-3 font-mono text-slate-400">{b.id.split('-').pop()}</td>
-                                  <td className="px-4 py-3 font-medium text-slate-700">{b.profiles?.name || 'Unknown'}</td>
-                                  <td className="px-4 py-3">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${b.status === 'completed' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                                      {b.status === 'completed' ? '완료됨' : '취소/위약금'}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right text-slate-500">₩{(b.amount || 0).toLocaleString()}</td>
-                                  <td className="px-4 py-3 text-right font-bold text-purple-600">₩{b.calculatedPayout.toLocaleString()}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm text-left min-w-[600px]">
+            <thead className="bg-white text-slate-500 text-[10px] md:text-xs uppercase border-b border-slate-100">
+              <tr>
+                <th className="px-4 md:px-6 py-3 md:py-4">호스트 정보</th>
+                <th className="px-4 md:px-6 py-3 md:py-4">지급 총액</th>
+                <th className="px-4 md:px-6 py-3 md:py-4">계좌 정보</th>
+                <th className="px-4 md:px-6 py-3 md:py-4">건수</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-right">상태</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {settlementList.length > 0 ? settlementList.map((item: any, idx: number) => (
+                <React.Fragment key={idx}>
+                  <tr
+                    className={`hover:bg-slate-50 cursor-pointer transition-colors ${expandedHostId === item.id ? 'bg-slate-50' : ''}`}
+                    onClick={() => toggleExpand(item.id)}
+                  >
+                    <td className="px-4 md:px-6 py-3 md:py-4">
+                      <div className="flex items-center gap-1 md:gap-2">
+                        {expandedHostId === item.id ? <ChevronUp size={14} className="text-slate-400 md:w-4 md:h-4" /> : <ChevronRight size={14} className="text-slate-400 md:w-4 md:h-4" />}
+                        <div>
+                          <div className="font-bold text-slate-900 text-xs md:text-sm">{item.hostName}</div>
+                          <div className="text-[10px] md:text-xs text-slate-400">{item.accountHolder}</div>
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 md:px-6 py-3 md:py-4 font-mono font-bold text-purple-600 text-xs md:text-sm">₩{item.totalAmount.toLocaleString()}</td>
+                    <td className="px-4 md:px-6 py-3 md:py-4 text-slate-500 flex items-center gap-1 text-[10px] md:text-xs">
+                      {item.bank === '계좌 미등록' ? <AlertTriangle size={12} className="text-red-500 md:w-3.5 md:h-3.5" /> : <CreditCard size={12} className="md:w-3.5 md:h-3.5" />}
+                      {item.bank} {item.accountNumber}
+                    </td>
+                    <td className="px-4 md:px-6 py-3 md:py-4 text-slate-500 text-xs md:text-sm">{item.count}건</td>
+                    <td className="px-4 md:px-6 py-3 md:py-4 text-right">
+                      <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-[9px] md:text-[10px] font-bold uppercase ${item.bank === '계좌 미등록' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {item.bank === '계좌 미등록' ? '계좌 필요' : (settlementTab === 'PENDING' ? '지급 대기' : '지급 완료')}
+                      </span>
+                    </td>
                   </tr>
-                )}
-              </React.Fragment>
-            )) : (
-              <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400">내역이 없습니다.</td></tr>
-            )}
-          </tbody>
-        </table>
+
+                  {/* 상세 내역 아코디언 */}
+                  {expandedHostId === item.id && (
+                    <tr>
+                      <td colSpan={5} className="bg-slate-50 p-0 border-b border-slate-100">
+                        <div className="px-4 md:px-14 py-4 md:py-6 overflow-x-auto">
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-3 md:mb-4 gap-3 sm:gap-0">
+                            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                              <Wallet size={16} className="text-slate-500" /> 세부 정산 내역
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {/* 향후 CSV 다운로드 / 지급 연결 등 */}
+                              <button
+                                onClick={() => handleDownloadCSV(item)}
+                                className="flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium bg-white text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-sm w-full sm:w-auto"
+                              >
+                                <Download size={14} /> 명세서 다운로드
+                              </button>
+                              {settlementTab === 'PENDING' && (
+                                <button
+                                  onClick={() => handleSettlePayout(item.id, item.bookings.map((b: any) => b.id))}
+                                  disabled={isProcessing}
+                                  className={`flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg transition-colors shadow-sm w-full sm:w-auto ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-800'}`}
+                                >
+                                  <Check size={14} /> {isProcessing ? '처리 중...' : '일괄 지급 완료 처리'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto shadow-sm">
+                            <table className="w-full text-[10px] md:text-xs text-left min-w-[500px]">
+                              <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                                <tr>
+                                  <th className="px-3 md:px-4 py-2 md:py-3">결제일</th>
+                                  <th className="px-3 md:px-4 py-2 md:py-3">예약 ID</th>
+                                  <th className="px-3 md:px-4 py-2 md:py-3">게스트</th>
+                                  <th className="px-3 md:px-4 py-2 md:py-3">진행 상태</th>
+                                  <th className="px-3 md:px-4 py-2 md:py-3 text-right">결제 금액</th>
+                                  <th className="px-3 md:px-4 py-2 md:py-3 text-right text-purple-600">정산 대상액</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-50">
+                                {item.bookings.map((b: any) => (
+                                  <tr key={b.id} className="hover:bg-slate-50">
+                                    <td className="px-3 md:px-4 py-2 md:py-3 text-slate-500">{format(new Date(b.created_at), 'yy.MM.dd')} <span className="text-[9px]">{format(new Date(b.created_at), 'HH:mm')}</span></td>
+                                    <td className="px-3 md:px-4 py-2 md:py-3 font-mono text-slate-400">{b.id.split('-').pop()}</td>
+                                    <td className="px-3 md:px-4 py-2 md:py-3 font-medium text-slate-700">{b.profiles?.name || 'Unknown'}</td>
+                                    <td className="px-3 md:px-4 py-2 md:py-3">
+                                      <span className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold uppercase ${b.status === 'completed' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                        {b.status === 'completed' ? '완료' : '위약금'}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 md:px-4 py-2 md:py-3 text-right text-slate-500">₩{(b.amount || 0).toLocaleString()}</td>
+                                    <td className="px-3 md:px-4 py-2 md:py-3 text-right font-bold text-purple-600">₩{b.calculatedPayout.toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              )) : (
+                <tr><td colSpan={5} className="px-4 md:px-6 py-8 md:py-10 text-center text-xs md:text-sm text-slate-400">내역이 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
 
-// (StatCard 컴포넌트는 기존과 동일)
+// (StatCard 컴포넌트는 기존과 동일하되 비율 튜닝)
 function StatCard({ title, value, sub, icon, bg, text = 'text-white' }: any) {
   return (
-    <div className={`p-5 rounded-2xl shadow-sm border border-slate-100 bg-white flex flex-col justify-between h-32 relative overflow-hidden group`}>
-      <div className={`absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center ${bg} shadow-md group-hover:scale-110 transition-transform`}>
+    <div className={`p-4 md:p-5 rounded-xl md:rounded-2xl shadow-sm border border-slate-100 bg-white flex flex-col justify-between h-28 md:h-32 relative overflow-hidden group w-full`}>
+      <div className={`absolute top-4 right-4 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${bg} shadow-md group-hover:scale-110 transition-transform`}>
         {icon}
       </div>
-      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</div>
+      <div className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-wider pr-10">{title}</div>
       <div>
-        <div className={`text-2xl font-black ${text === 'text-white' ? 'text-slate-900' : text} tracking-tight`}>{value}</div>
-        <div className="text-[10px] text-slate-400 mt-1 font-medium">{sub}</div>
+        <div className={`text-lg md:text-2xl font-black ${text === 'text-white' ? 'text-slate-900' : text} tracking-tight truncate pr-8`}>{value}</div>
+        <div className="text-[9px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 font-medium">{sub}</div>
       </div>
     </div>
   );
