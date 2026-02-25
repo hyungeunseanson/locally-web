@@ -206,151 +206,176 @@ export default function GlobalTeamChat() {
         }
     };
 
+    // ── 메시지 목록 렌더러 ──
+    const renderMessages = (isMobile = false) => {
+        if (messages.length === 0) {
+            return (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
+                    <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
+                        <MessageSquare size={22} className="text-slate-400" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">첫 메시지를 남겨보세요.</p>
+                    <p className="text-xs text-slate-500 mt-1.5 text-center leading-relaxed">메시지와 사진은 실시간 유지됩니다.</p>
+                </div>
+            );
+        }
+        return messages.map((msg, idx) => {
+            const isMe = msg.author_id === currentUser.id;
+            const showAuthorInfo = idx === 0 || messages[idx - 1].author_id !== msg.author_id;
+            const maxW = isMobile ? 'max-w-[75vw]' : 'max-w-[240px]';
+            return (
+                <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    {!isMe && showAuthorInfo && (
+                        <div className="flex items-center gap-2 mb-1.5 ml-1">
+                            <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600">
+                                {msg.author_name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-600">{msg.author_name}</span>
+                        </div>
+                    )}
+                    <div className="flex items-end gap-1.5 group">
+                        {isMe && (
+                            <span className="text-[10px] text-slate-400 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                {format(new Date(msg.created_at), 'aa h:mm', { locale: ko })}
+                            </span>
+                        )}
+                        <div className={`flex flex-col gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
+                            {msg.metadata?.image_url && (
+                                <div onClick={() => setZoomImage(msg.metadata!.image_url!)} className={`p-1 bg-white border border-slate-200 ${maxW} cursor-pointer hover:opacity-90 transition-opacity rounded-2xl ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'}`}>
+                                    <img src={msg.metadata.image_url} alt="attached" className="rounded-xl w-full object-cover max-h-48" loading="lazy" />
+                                </div>
+                            )}
+                            {msg.content && msg.content !== '사진 전송 중...' && msg.content !== '사진을 1장 보냈습니다.' && (
+                                <div className={`px-3.5 py-2 text-[13px] leading-relaxed break-words whitespace-pre-wrap ${maxW} ${isMe ? 'bg-black text-white rounded-2xl rounded-tr-sm rounded-br-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm rounded-bl-sm'}`}>
+                                    {msg.content}
+                                </div>
+                            )}
+                            {msg.content === '사진 전송 중...' && (
+                                <div className="px-3 py-1.5 text-xs bg-slate-100 text-slate-500 rounded-2xl animate-pulse border border-slate-200">사진 전송 중...</div>
+                            )}
+                        </div>
+                        {!isMe && (
+                            <span className="text-[10px] text-slate-400 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                {format(new Date(msg.created_at), 'aa h:mm', { locale: ko })}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            );
+        });
+    };
+
+    // ── 입력 영역 렌더러 ──
+    const renderInput = (isMobile = false) => (
+        <div className={`border-t border-slate-200 bg-white z-10 ${isMobile ? 'p-2.5' : 'p-3'}`}>
+            {selectedImage && (
+                <div className="mb-2 relative inline-block">
+                    <div className="p-1 border border-slate-200 rounded-xl bg-slate-50 relative">
+                        <img src={selectedImage.url} alt="preview" className="h-16 w-auto rounded-lg object-cover" />
+                        <button onClick={clearSelectedImage} className="absolute -top-1.5 -right-1.5 bg-slate-800 text-white p-0.5 rounded-full shadow-md hover:bg-slate-900">
+                            <X size={10} />
+                        </button>
+                    </div>
+                </div>
+            )}
+            <form onSubmit={sendMessage} className="flex gap-2 items-center">
+                <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className={`text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors shrink-0 ${isMobile ? 'p-2' : 'p-2.5'}`}>
+                    <Paperclip size={isMobile ? 17 : 19} />
+                </button>
+                <input
+                    type="text"
+                    value={newMessage}
+                    onChange={e => setNewMessage(e.target.value)}
+                    placeholder="메시지를 입력하세요..."
+                    className={`flex-1 text-[13px] bg-slate-100 border-transparent focus:bg-white focus:border-slate-300 focus:ring-2 focus:ring-slate-200 rounded-full outline-none transition-all placeholder:text-slate-400 ${isMobile ? 'px-4 py-2.5' : 'px-4 py-3'}`}
+                    disabled={isUploading}
+                />
+                <button
+                    type="submit"
+                    disabled={(!newMessage.trim() && !selectedImage) || isUploading}
+                    className={`bg-black text-white flex items-center justify-center rounded-full shadow-md hover:bg-slate-800 disabled:opacity-40 disabled:bg-slate-300 disabled:shadow-none transition-all shrink-0 ${isMobile ? 'w-9 h-9' : 'w-10 h-10'}`}
+                >
+                    <Send size={isMobile ? 14 : 16} className={isUploading ? 'animate-pulse' : ''} />
+                </button>
+            </form>
+        </div>
+    );
+
     if (!isClient || !currentUser) return null;
 
     return (
-        <div className={`fixed bottom-0 right-0 md:right-10 w-full md:w-96 bg-white border border-slate-200 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.15)] transition-all duration-300 z-50 flex flex-col ${isOpen ? 'h-[100dvh] md:h-[650px] translate-y-0' : 'h-12 translate-y-0 hover:-translate-y-1'}`}>
-
-            {/* Header (Toggle) */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full h-12 px-5 flex items-center justify-between border-b border-slate-800 bg-black text-white rounded-t-2xl hover:bg-slate-900 transition-colors shrink-0"
-            >
-                <div className="flex items-center gap-2">
-                    <MessageSquare size={18} />
-                    <span className="font-bold tracking-tight">Team Chat</span>
-                    {hasUnread && !isOpen && (
-                        <span className="w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center ml-2 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">N</span>
-                    )}
-                </div>
-                {isOpen ? <ChevronDown size={20} className="text-slate-300" /> : <ChevronUp size={20} className="text-slate-300" />}
-            </button>
-
-            {/* Chat Area */}
-            {isOpen && (
-                <>
-                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
-                        {messages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-500">
-                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-                                    <MessageSquare size={24} className="text-slate-400" />
-                                </div>
-                                <p className="text-sm font-bold text-slate-700">첫 메시지를 남겨보세요.</p>
-                                <p className="text-xs text-slate-500 mt-2 text-center leading-relaxed">여기에 작성한 메시지와 사진은<br />페이지 이동 후에도 실시간 유지됩니다.</p>
-                            </div>
-                        ) : (
-                            messages.map((msg, idx) => {
-                                const isMe = msg.author_id === currentUser.id;
-                                const showAuthorInfo = idx === 0 || messages[idx - 1].author_id !== msg.author_id;
-
-                                return (
-                                    <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                        {!isMe && showAuthorInfo && (
-                                            <div className="flex items-center gap-2 mb-2 ml-1">
-                                                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
-                                                    {msg.author_name.slice(0, 2).toUpperCase()}
-                                                </div>
-                                                <span className="text-xs font-bold text-slate-700">{msg.author_name}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex items-end gap-2 max-w-[85%] group">
-                                            {isMe && (
-                                                <span className="text-[10px] text-slate-400 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                                    {format(new Date(msg.created_at), 'aa h:mm', { locale: ko })}
-                                                </span>
-                                            )}
-
-                                            <div className={`flex flex-col gap-1 rounded-2xl shadow-sm overflow-hidden ${isMe ? 'items-end' : 'items-start'}`}>
-                                                {/* Image Attachment */}
-                                                {msg.metadata?.image_url && (
-                                                    <div
-                                                        onClick={() => setZoomImage(msg.metadata!.image_url!)}
-                                                        className={`p-1 bg-white border border-slate-200 max-w-[240px] cursor-pointer hover:opacity-90 transition-opacity ${isMe ? 'rounded-2xl rounded-br-sm bg-slate-50 border-slate-100' : 'rounded-2xl rounded-bl-sm'}`}
-                                                    >
-                                                        <img src={msg.metadata.image_url} alt="attached" className="rounded-xl w-full object-cover max-h-48" loading="lazy" />
-                                                    </div>
-                                                )}
-
-                                                {/* Text Content */}
-                                                {msg.content && msg.content !== '사진 전송 중...' && msg.content !== '사진을 1장 보냈습니다.' && (
-                                                    <div
-                                                        className={`px-4 py-2.5 shadow-sm text-[13px] leading-relaxed break-words whitespace-pre-wrap max-w-[240px] ${isMe
-                                                            ? 'bg-black border border-slate-800 text-white rounded-2xl rounded-tr-sm rounded-br-sm'
-                                                            : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm rounded-bl-sm'
-                                                            }`}
-                                                    >
-                                                        {msg.content}
-                                                    </div>
-                                                )}
-                                                {/* Optimistic Uploading Text */}
-                                                {(msg.content === '사진 전송 중...') && (
-                                                    <div className="flex justify-end mt-1">
-                                                        <div className="px-4 py-2 text-xs bg-slate-100 text-slate-500 rounded-2xl animate-pulse font-medium border border-slate-200">
-                                                            사진 전송 중...
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {!isMe && (
-                                                <span className="text-[10px] text-slate-400 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                                    {format(new Date(msg.created_at), 'aa h:mm', { locale: ko })}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })
+        <>
+            {/* ── 데스크탑: 우하단 플로팅 패널 ── */}
+            <div className={`hidden md:flex fixed bottom-0 right-10 w-96 bg-white border border-slate-200 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.15)] transition-all duration-300 z-50 flex-col ${isOpen ? 'h-[650px]' : 'h-12 hover:-translate-y-1'}`}>
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="w-full h-12 px-5 flex items-center justify-between border-b border-slate-800 bg-black text-white rounded-t-2xl hover:bg-slate-900 transition-colors shrink-0"
+                >
+                    <div className="flex items-center gap-2">
+                        <MessageSquare size={18} />
+                        <span className="font-bold tracking-tight">Team Chat</span>
+                        {hasUnread && !isOpen && (
+                            <span className="w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center ml-2 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">N</span>
                         )}
                     </div>
+                    {isOpen ? <ChevronDown size={20} className="text-slate-300" /> : <ChevronUp size={20} className="text-slate-300" />}
+                </button>
 
-                    {/* Input Area */}
-                    <div className="p-3 border-t border-slate-200 bg-white shadow-2xl z-10">
-                        {/* Image Preview Area */}
-                        {selectedImage && (
-                            <div className="mb-3 relative inline-block">
-                                <div className="p-1 border border-slate-200 rounded-xl bg-slate-50 relative">
-                                    <img src={selectedImage.url} alt="preview" className="h-20 w-auto rounded-lg object-cover" />
-                                    <button onClick={clearSelectedImage} className="absolute -top-2 -right-2 bg-slate-800 text-white p-1 rounded-full shadow-md hover:bg-slate-900">
-                                        <X size={12} />
-                                    </button>
-                                </div>
+                {isOpen && (
+                    <>
+                        {/* 메시지 목록 */}
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
+                            {renderMessages()}
+                        </div>
+                        {/* 입력 영역 */}
+                        {renderInput()}
+                    </>
+                )}
+            </div>
+
+            {/* ── 모바일: 풀스크린 오버레이 ── */}
+            <div className="md:hidden">
+                {isOpen && (
+                    <div className="fixed inset-0 z-[9999] bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                        {/* 헤더 */}
+                        <div className="flex items-center justify-between px-4 py-3 bg-black text-white shrink-0">
+                            <div className="flex items-center gap-2">
+                                <MessageSquare size={16} />
+                                <span className="font-bold text-sm tracking-tight">Team Chat</span>
                             </div>
-                        )}
-
-                        <form onSubmit={sendMessage} className="flex gap-2">
-                            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
-                            >
-                                <Paperclip size={20} />
+                            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <X size={18} />
                             </button>
-                            <input
-                                type="text"
-                                value={newMessage}
-                                onChange={e => setNewMessage(e.target.value)}
-                                placeholder="메시지를 입력하세요..."
-                                className="flex-1 text-sm bg-slate-100 border-transparent focus:bg-white focus:border-slate-300 focus:ring-2 focus:ring-slate-200 rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-500"
-                                disabled={isUploading}
-                            />
-                            <button
-                                type="submit"
-                                disabled={(!newMessage.trim() && !selectedImage) || isUploading}
-                                className="bg-black text-white p-3 flex items-center justify-center rounded-xl shadow-md hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none transition-all"
-                            >
-                                <Send size={18} className={isUploading ? 'animate-pulse' : ''} />
-                            </button>
-                        </form>
+                        </div>
+                        {/* 메시지 스크롤 */}
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-3 bg-slate-50 min-h-0">
+                            {renderMessages(true)}
+                        </div>
+                        {/* 입력 영역 */}
+                        {renderInput(true)}
                     </div>
-                </>
-            )}
+                )}
 
-            {/* Image Zoom Modal using React Portal to escape fixed container */}
+                {/* 모바일 플로팅 버튼 (닫혔을 때) */}
+                {!isOpen && (
+                    <button
+                        onClick={() => setIsOpen(true)}
+                        className="fixed bottom-4 right-4 z-50 bg-black text-white rounded-full px-4 py-3 flex items-center gap-2 shadow-lg active:scale-95 transition-transform"
+                    >
+                        <MessageSquare size={16} />
+                        <span className="text-[13px] font-bold">Team Chat</span>
+                        {hasUnread && (
+                            <span className="w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center animate-pulse">N</span>
+                        )}
+                    </button>
+                )}
+            </div>
+
+            {/* Image Zoom Modal */}
             {zoomImage && createPortal(
                 <div
-                    className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
+                    className="fixed inset-0 z-[99999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
                     onClick={() => setZoomImage(null)}
                 >
                     <button
@@ -363,11 +388,12 @@ export default function GlobalTeamChat() {
                         src={zoomImage}
                         alt="Zoomed"
                         className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
-                        onClick={e => e.stopPropagation()} // Prevent close when clicking the image itself
+                        onClick={e => e.stopPropagation()}
                     />
                 </div>,
                 document.body
             )}
-        </div>
+        </>
     );
 }
+
