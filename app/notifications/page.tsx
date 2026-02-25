@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useNotification } from '@/app/context/NotificationContext';
-import { 
-  Bell, Check, Trash2, Calendar, MessageSquare, 
-  Info, AlertTriangle, ChevronRight 
+import {
+  Bell, Check, Trash2, Calendar, MessageSquare,
+  Info, AlertTriangle, ChevronRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -22,7 +22,7 @@ export default function NotificationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   // 🟢 [추가] 펼쳐진 알림 ID 목록 (아코디언 기능용)
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
-  
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -36,13 +36,13 @@ export default function NotificationsPage() {
   // 🟢 [정석] 알림 삭제 (DB에서 영구 삭제)
   const deleteNotification = async (id: number) => {
     // UI 즉시 반영 (낙관적 업데이트)
-    setLocalNotifications(prev => prev.filter(n => n.id !== id)); 
+    setLocalNotifications(prev => prev.filter(n => n.id !== id));
     try {
       await supabase.from('notifications').delete().eq('id', id);
     } catch (error) {
       console.error('삭제 실패:', error);
       showToast(t('noti_delete_fail'), 'error'); // 🟢 번역
-      setLocalNotifications([...notifications]); 
+      setLocalNotifications([...notifications]);
     }
   };
 
@@ -61,8 +61,8 @@ export default function NotificationsPage() {
     }
 
     // 3. 링크가 없거나 현재 페이지면 내용 펼치기/접기 (관리자 공지 등)
-    setExpandedIds(prev => 
-      prev.includes(noti.id) 
+    setExpandedIds(prev =>
+      prev.includes(noti.id)
         ? prev.filter(id => id !== noti.id) // 닫기
         : [...prev, noti.id] // 펼치기
     );
@@ -74,119 +74,114 @@ export default function NotificationsPage() {
   });
 
   const getIcon = (type: string) => {
-    if (type.includes('booking')) return <Calendar size={18} className="text-blue-500"/>;
-    if (type.includes('message')) return <MessageSquare size={18} className="text-indigo-500"/>;
-    if (type.includes('cancel')) return <AlertTriangle size={18} className="text-orange-500"/>;
-    return <Info size={18} className="text-slate-500"/>;
+    if (type.includes('booking')) return <Calendar size={18} className="text-blue-500" />;
+    if (type.includes('message')) return <MessageSquare size={18} className="text-indigo-500" />;
+    if (type.includes('cancel')) return <AlertTriangle size={18} className="text-orange-500" />;
+    return <Info size={18} className="text-slate-500" />;
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
-      
-      <main className="max-w-2xl mx-auto px-6 py-12">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-            <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-              {t('noti_title')} {/* 🟢 번역 */}
+
+      <main className="max-w-2xl mx-auto px-4 md:px-6 py-6 md:py-12">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
+          <div>
+            <h1 className="text-[18px] md:text-2xl font-black mb-1 flex items-center gap-2">
+              {t('noti_title')}
               {unreadCount > 0 && (
-                <span className="bg-rose-500 text-white text-sm px-2.5 py-1 rounded-full font-bold animate-pulse">
+                <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
                   {unreadCount}
                 </span>
               )}
-</h1>
-            <p className="text-slate-500">{t('noti_desc')}</p> {/* 🟢 번역 */}
+            </h1>
+            <p className="text-[11px] text-slate-500">{t('noti_desc')}</p>
           </div>
 
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setFilter('all')} 
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
             >
-{t('noti_filter_all')} {/* 🟢 번역 */}
+              {t('noti_filter_all')}
             </button>
-            <button 
-              onClick={() => setFilter('unread')} 
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${filter === 'unread' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+            <button
+              onClick={() => setFilter('unread')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${filter === 'unread' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
             >
-{t('noti_filter_unread')} {/* 🟢 번역 */}
+              {t('noti_filter_unread')}
             </button>
           </div>
         </div>
 
-        <div className="flex justify-end mb-4">
-          <button 
+        <div className="flex justify-end mb-3">
+          <button
             onClick={markAllAsRead}
             disabled={unreadCount === 0}
-            className="text-sm font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="text-[11px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-<Check size={16}/> {t('noti_mark_all_read')} {/* 🟢 번역 */}
+            <Check size={12} /> {t('noti_mark_all_read')}
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-2">
           {isLoading ? (
-            [1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)
+            [1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)
           ) : filteredList.length === 0 ? (
-<div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50">
-              <Bell size={48} className="mx-auto text-slate-300 mb-4"/>
-              <h3 className="text-lg font-bold text-slate-400">{t('noti_empty_title')}</h3> {/* 🟢 번역 */}
-              <p className="text-slate-400 text-sm mt-1">
-                {filter === 'unread' ? t('noti_empty_unread') : t('noti_empty_all')} {/* 🟢 번역 */}
+            <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50">
+              <Bell size={28} className="mx-auto text-slate-300 mb-2" />
+              <h3 className="text-[13px] font-bold text-slate-400">{t('noti_empty_title')}</h3>
+              <p className="text-slate-400 text-[11px] mt-0.5">
+                {filter === 'unread' ? t('noti_empty_unread') : t('noti_empty_all')}
               </p>
             </div>
           ) : (
             filteredList.map((noti) => (
-              <div 
-                key={noti.id} 
-                className={`relative group rounded-2xl p-5 border transition-all hover:shadow-md cursor-pointer ${
-                  !noti.is_read 
-                    ? 'bg-blue-50/50 border-blue-100 ring-1 ring-blue-100' 
+              <div
+                key={noti.id}
+                className={`relative group rounded-xl px-4 py-3 border transition-all cursor-pointer ${!noti.is_read
+                    ? 'bg-blue-50/40 border-blue-100'
                     : 'bg-white border-slate-100 hover:border-slate-200'
-                }`}
+                  }`}
                 onClick={() => handleNotificationClick(noti)}
               >
-                <div className="flex gap-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
-                    !noti.is_read ? 'bg-white shadow-sm' : 'bg-slate-100'
-                  }`}>
+                <div className="flex gap-3 items-start">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${!noti.is_read ? 'bg-white shadow-sm' : 'bg-slate-100'
+                    }`}>
                     {getIcon(noti.type)}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                      <h3 className={`font-bold text-base mb-1 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
+                      <h3 className={`font-semibold text-[12px] mb-0.5 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
                         {noti.title}
-                        {!noti.is_read && <span className="ml-2 w-2 h-2 inline-block bg-rose-500 rounded-full align-middle"></span>}
+                        {!noti.is_read && <span className="ml-1.5 w-1.5 h-1.5 inline-block bg-rose-500 rounded-full align-middle"></span>}
                       </h3>
-                      <span className="text-xs text-slate-400 shrink-0 ml-2">
-                        {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')} {/* 🟢 다국어 날짜 */}
+                      <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                        {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')}
                       </span>
-                      </div>
-                    {/* 🟢 [수정] 펼쳐졌으면 전체 보이기, 아니면 2줄만 보이기 */}
-                    <p className={`text-sm leading-relaxed whitespace-pre-wrap transition-all duration-300 ${
-                      expandedIds.includes(noti.id) ? '' : 'line-clamp-2'
-                    } ${!noti.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
+                    </div>
+                    <p className={`text-[11px] leading-relaxed whitespace-pre-wrap transition-all duration-300 ${expandedIds.includes(noti.id) ? '' : 'line-clamp-2'
+                      } ${!noti.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
                       {noti.message}
                     </p>
                   </div>
 
-                  {/* 🟢 [수정] 화살표 아이콘: 이동 가능한 링크면 오른쪽 화살표, 펼치기면 아래쪽 화살표 */}
-                  <div className="hidden md:flex items-center text-slate-300 group-hover:text-slate-500 transition-all">
+                  <div className="flex items-center text-slate-300 group-hover:text-slate-500 transition-all ml-1">
                     {noti.link && noti.link !== '/notifications' ? (
-                       <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform"/>
+                      <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                     ) : (
-                       <ChevronRight size={20} className={`transition-transform duration-300 ${expandedIds.includes(noti.id) ? 'rotate-90' : ''}`}/>
+                      <ChevronRight size={14} className={`transition-transform duration-300 ${expandedIds.includes(noti.id) ? 'rotate-90' : ''}`} />
                     )}
                   </div>
                 </div>
 
-                <button 
+                <button
                   onClick={(e) => { e.stopPropagation(); deleteNotification(noti.id); }}
-                  className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                  title={t('noti_delete')} // 🟢 번역
+                  className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                  title={t('noti_delete')}
                 >
-                  <Trash2 size={16}/>
+                  <Trash2 size={12} />
                 </button>
               </div>
             ))

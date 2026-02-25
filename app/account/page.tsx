@@ -292,8 +292,8 @@ export default function AccountPage() {
                 <ShieldCheck size={11} className="text-white" strokeWidth={2.5} />
               </div>
             </div>
-            <p className="text-[15px] font-bold text-gray-900 text-center leading-snug">{profile.full_name || '이름 없음'}</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
+            <p className="text-[16px] font-bold text-gray-900 text-center leading-snug">{profile.full_name || '이름 없음'}</p>
+            <p className="text-[9px] text-gray-400 mt-0.5">
               {profile.nationality
                 ? countries.find(c => c.code === profile.nationality)?.name?.split(' (')[0] || profile.nationality
                 : '로컬리 회원'}
@@ -304,20 +304,20 @@ export default function AccountPage() {
           <div className="w-px self-stretch bg-gray-100 mx-1" />
 
           {/* 우측: 통계 3개 */}
-          <div className="flex-1 flex flex-col gap-3">
+          <div className="flex-1 flex flex-col gap-2">
             <div>
-              <p className="text-[11px] text-gray-400 leading-none">Locally를 통한 여행</p>
-              <p className="text-[18px] font-extrabold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[14px] font-semibold">회</span></p>
+              <p className="text-[8px] text-gray-400 leading-none mb-0.5">Locally를 통한 여행</p>
+              <p className="text-[13px] font-bold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[10px] font-semibold">회</span></p>
             </div>
             <div className="border-t border-gray-100" />
             <div>
-              <p className="text-[11px] text-gray-400 leading-none">후기</p>
-              <p className="text-[18px] font-extrabold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[14px] font-semibold">개</span></p>
+              <p className="text-[8px] text-gray-400 leading-none mb-0.5">후기</p>
+              <p className="text-[13px] font-bold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[10px] font-semibold">개</span></p>
             </div>
             <div className="border-t border-gray-100" />
             <div>
-              <p className="text-[11px] text-gray-400 leading-none">Locally 가입 기간</p>
-              <p className="text-[18px] font-extrabold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[14px] font-semibold">년</span></p>
+              <p className="text-[8px] text-gray-400 leading-none mb-0.5">Locally 가입 기간</p>
+              <p className="text-[13px] font-bold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[10px] font-semibold">년</span></p>
             </div>
           </div>
         </button>

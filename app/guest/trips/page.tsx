@@ -42,7 +42,7 @@ export default function GuestTripsPage() {
       <SiteHeader />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-16">
-        <h1 className="text-[28px] md:text-4xl font-extrabold mb-4 md:mb-12 mt-2 md:mt-0 tracking-tight leading-tight text-slate-900">{t('my_trips')}</h1>
+        <h1 className="text-[20px] md:text-4xl font-extrabold mb-4 md:mb-12 mt-2 md:mt-0 tracking-tight leading-tight text-slate-900">{t('my_trips')}</h1>
 
         {errorMsg && (
           <div className="bg-red-50 text-red-600 p-4 mb-6 md:mb-8 rounded-xl flex items-center gap-3 text-sm font-medium">

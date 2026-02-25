@@ -157,7 +157,7 @@ function InboxContent() {
       />
 
       <main className="max-w-[1280px] mx-auto px-0 md:px-6 py-0 md:py-8 h-[calc(100vh-80px)] md:h-[calc(100vh-80px)] flex flex-col">
-        <h1 className="text-[28px] md:text-3xl font-black mb-4 md:mb-6 mt-0 md:mt-0 tracking-tight px-5 md:px-0 pt-4 md:pt-0">{t('messages')}</h1>
+        <h1 className="text-[20px] md:text-3xl font-black mb-3 md:mb-6 mt-0 tracking-tight px-5 md:px-0 pt-4 md:pt-0">{t('messages')}</h1>
 
         <div className="flex-1 flex md:border md:border-slate-200 md:rounded-2xl md:overflow-hidden md:shadow-sm bg-white -mx-6 md:mx-0">
           {/* 좌측: 목록 */}
@@ -168,14 +168,14 @@ function InboxContent() {
               {inquiries.map((inq) => {
                 const display = getDisplayHost(inq);
                 return (
-                  <div key={inq.id} onClick={() => handleSelectInquiry(inq.id)} className={`relative p-5 md:p-4 cursor-pointer hover:bg-slate-50 flex gap-4 border-b border-slate-100 last:border-b-0 md:border-b-0 md:border-transparent ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
+                  <div key={inq.id} onClick={() => handleSelectInquiry(inq.id)} className={`relative px-4 py-3 md:p-4 cursor-pointer hover:bg-slate-50 flex gap-3 border-b border-slate-100 last:border-b-0 md:border-b-0 md:border-transparent ${selectedInquiry?.id === inq.id ? 'bg-slate-100' : ''}`}>
 
                     {inq.unread_count > 0 && (
-                      <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-bounce z-10">N</div>
+                      <div className="absolute top-2.5 right-2.5 bg-rose-500 text-white text-[9px] font-bold px-1 py-0.5 rounded-full z-10">N</div>
                     )}
 
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 relative ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
-                      {inq.type === 'admin' ? <ShieldCheck size={20} /> : (
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 relative ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-slate-50'}`}>
+                      {inq.type === 'admin' ? <ShieldCheck size={16} /> : (
                         <Image
                           src={secureUrl(display.avatar)}
                           alt="host"
@@ -185,9 +185,9 @@ function InboxContent() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <div className="font-bold text-sm truncate">{inq.type === 'admin' ? t('admin_name') : display.name}</div> {/* 🟢 번역 */}
-                      <div className="text-xs text-slate-500 truncate flex items-center gap-1">
-                        <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600 font-medium truncate max-w-[120px]">{inq.experiences?.title}</span>
+                      <div className="font-semibold text-[13px] truncate">{inq.type === 'admin' ? t('admin_name') : display.name}</div>
+                      <div className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                        <span className="bg-slate-100 px-1 py-0.5 rounded text-[9px] text-slate-600 font-medium truncate max-w-[100px]">{inq.experiences?.title}</span>
                         <span className="truncate">{inq.content}</span>
                       </div>
                     </div>

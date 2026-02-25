@@ -72,7 +72,7 @@ export default function WishlistsPage() {
       <SiteHeader />
 
       <main className="max-w-[1760px] mx-auto px-4 md:px-6 py-6 md:py-12">
-        <h1 className="text-[28px] md:text-3xl font-black mb-6 md:mb-8">{t('wishlist')}</h1> {/* 🟢 번역 */}
+        <h1 className="text-[20px] md:text-3xl font-black mb-4 md:mb-8">{t('wishlist')}</h1>
         {loading ? (
           <div className="flex justify-center py-40">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
@@ -89,15 +89,14 @@ export default function WishlistsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:gap-x-6 sm:gap-y-10 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-x-6 sm:gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {wishlists.map((item: any) => {
               const exp = item.experiences;
-              // 이미지 처리 (photos 배열 확인)
               const imageUrl = exp.photos && exp.photos.length > 0 ? exp.photos[0] : (exp.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
 
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-3 border border-transparent group-hover:shadow-md transition-shadow">
+                  <div className="relative aspect-square overflow-hidden rounded-xl bg-slate-200 mb-2 border border-transparent group-hover:shadow-md transition-shadow">
                     <Image
                       src={imageUrl}
                       alt={exp.title}
@@ -107,24 +106,24 @@ export default function WishlistsPage() {
                     {/* 찜 해제 버튼 */}
                     <button
                       onClick={(e) => handleRemove(e, item.id, exp.id)}
-                      className="absolute top-3 right-3 text-rose-500 hover:scale-110 transition-all z-10"
+                      className="absolute top-2 right-2 text-rose-500 hover:scale-110 transition-all z-10"
                     >
-                      <Heart size={24} fill="#F43F5E" strokeWidth={2} />
+                      <Heart size={18} fill="#F43F5E" strokeWidth={2} />
                     </button>
                   </div>
 
-                  <div className="space-y-1 px-1">
+                  <div className="space-y-0.5 px-0.5">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-bold text-slate-900 text-[15px] truncate pr-2">{exp.city || exp.location || '서울'} · {exp.category}</h3>
-                      <div className="flex items-center gap-1 text-sm shrink-0">
-                        <Star size={14} fill={exp.rating > 0 ? "black" : "none"} className={exp.rating > 0 ? "" : "text-slate-300"} />
-                        <span>{exp.rating > 0 ? exp.rating.toFixed(2) : "New"}</span>
+                      <h3 className="font-semibold text-slate-900 text-[12px] truncate pr-1">{exp.city || exp.location || '서울'} · {exp.category}</h3>
+                      <div className="flex items-center gap-0.5 text-[11px] shrink-0">
+                        <Star size={11} fill={exp.rating > 0 ? "black" : "none"} className={exp.rating > 0 ? "" : "text-slate-300"} />
+                        <span>{exp.rating > 0 ? exp.rating.toFixed(1) : "New"}</span>
                       </div>
                     </div>
-                    <p className="text-[15px] text-slate-500 line-clamp-1">{exp.title}</p>
-                    <div className="mt-1">
-                      <span className="font-bold text-slate-900 text-[15px]">₩{Number(exp.price).toLocaleString()}</span>
-                      <span className="text-[15px] text-slate-900 font-normal"> {t('per_person')}</span> {/* 🟢 번역 */}
+                    <p className="text-[11px] text-slate-500 line-clamp-1">{exp.title}</p>
+                    <div className="mt-0.5">
+                      <span className="font-bold text-slate-900 text-[12px]">₩{Number(exp.price).toLocaleString()}</span>
+                      <span className="text-[11px] text-slate-500 font-normal"> {t('per_person')}</span>
                     </div>
                   </div>
                 </Link>
