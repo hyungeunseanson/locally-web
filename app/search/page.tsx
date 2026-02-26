@@ -1,29 +1,118 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useEffect, useMemo, useState, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import SiteFooter from '@/app/components/SiteFooter';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import SearchFilter from './components/SearchFilter';
-import { Map, List, Ghost, ArrowLeft, Search } from 'lucide-react';
+import {
+  Map,
+  List,
+  Ghost,
+  ArrowLeft,
+  SlidersHorizontal,
+  ChevronDown,
+  X,
+  Heart,
+  Camera,
+  Building2,
+  Ticket,
+  Utensils,
+  Flag,
+  Landmark,
+  Sparkles,
+  Plane,
+  ShoppingBag,
+  Waves,
+  UtensilsCrossed,
+  TreePine,
+  Palette,
+  Flower2,
+  Dumbbell,
+  ChefHat,
+} from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
+import { getContent } from '@/app/utils/contentHelper';
 
-// 🟢 검색 로직 컴포넌트
+interface SearchExperience {
+  id: string;
+  title?: string;
+  category?: string;
+  city?: string;
+  country?: string;
+  image_url?: string;
+  photos?: string[];
+  rating?: number;
+  price?: number | string;
+  [key: string]: unknown;
+}
+
+const TIME_OPTIONS = [
+  { id: 'morning', label: '오전', desc: '낮 12시 이전' },
+  { id: 'afternoon', label: '오후', desc: '오후 12시~오후 5시' },
+  { id: 'evening', label: '저녁', desc: '오후 5시 이후' },
+] as const;
+
+const TYPE_OPTIONS = [
+  { id: 'gallery', label: '갤러리', icon: Camera, keywords: ['갤러리', '전시'] },
+  { id: 'architecture', label: '건축', icon: Building2, keywords: ['건축', '역사'] },
+  { id: 'show', label: '공연', icon: Ticket, keywords: ['공연', '콘서트'] },
+  { id: 'dining', label: '다이닝', icon: Utensils, keywords: ['다이닝', '식사'] },
+  { id: 'landmark', label: '랜드마크', icon: Flag, keywords: ['랜드마크', '명소'] },
+  { id: 'culture', label: '문화 체험', icon: Landmark, keywords: ['문화', '체험'] },
+  { id: 'museum', label: '박물관', icon: Building2, keywords: ['박물관', '미술관'] },
+  { id: 'beauty', label: '뷰티', icon: Sparkles, keywords: ['뷰티', '메이크업'] },
+  { id: 'flight', label: '비행', icon: Plane, keywords: ['비행', '항공'] },
+  { id: 'shopping', label: '쇼핑 & 패션', icon: ShoppingBag, keywords: ['쇼핑', '패션'] },
+  { id: 'water', label: '수상스포츠', icon: Waves, keywords: ['수상', '서핑'] },
+  { id: 'tasting', label: '식사·시음', icon: UtensilsCrossed, keywords: ['시음', '와인', '식사'] },
+  { id: 'foodtrip', label: '식도락 탐방', icon: Utensils, keywords: ['식도락', '음식'] },
+  { id: 'outdoor', label: '아웃도어', icon: TreePine, keywords: ['아웃도어', '야외'] },
+  { id: 'artclass', label: '아트 원데이 클래스', icon: Palette, keywords: ['아트', '클래스'] },
+  { id: 'wildlife', label: '야생동식물', icon: Flower2, keywords: ['야생', '동식물'] },
+  { id: 'workout', label: '운동', icon: Dumbbell, keywords: ['운동', '피트니스'] },
+  { id: 'wellness', label: '웰니스', icon: Flower2, keywords: ['웰니스', '힐링'] },
+  { id: 'cooking', label: '쿠킹', icon: ChefHat, keywords: ['쿠킹', '요리'] },
+] as const;
+
+function formatShortDate(iso: string | null) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
 function SearchResults() {
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
+  const { lang } = useLanguage();
 
-  const [experiences, setExperiences] = useState<any[]>([]);
+  const [experiences, setExperiences] = useState<SearchExperience[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMap, setShowMap] = useState(true); // 기본값은 지도 보기 활성화 (기존 유지)
+  const [showMap, setShowMap] = useState(true);
+
+  const [activeSheet, setActiveSheet] = useState<'type' | 'time' | null>(null);
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
 
   const location = searchParams.get('location') || '';
   const language = searchParams.get('language') || 'all';
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
+
+  const headerTitle = location ? `${location}의 체험` : '체험 검색';
+  const headerSub = [
+    startDate ? formatShortDate(startDate) : '',
+    endDate ? formatShortDate(endDate) : '',
+    language && language !== 'all' ? language : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   useEffect(() => {
     const fetchSearchResults = async () => {
@@ -32,31 +121,32 @@ function SearchResults() {
         let query = supabase
           .from('experiences')
           .select('*')
-          .eq('status', 'active'); // 활성화된 체험만 검색
+          .eq('status', 'active');
 
-        // 🟢 [업그레이드] 다국어 검색 로직 적용
         if (location) {
-          // 검색 대상 컬럼 목록 (기존 + 다국어)
           const searchFields = [
-            'title', 'description', 'city', 'country', // 기본(한국어) 및 공통
-            'title_en', 'description_en', 'category_en', // 영어
-            'title_ja', 'description_ja', 'category_ja', // 일본어
-            'title_zh', 'description_zh', 'category_zh'  // 중국어
+            'title',
+            'description',
+            'city',
+            'country',
+            'title_en',
+            'description_en',
+            'category_en',
+            'title_ja',
+            'description_ja',
+            'category_ja',
+            'title_zh',
+            'description_zh',
+            'category_zh',
           ];
 
-          // "컬럼명.ilike.%검색어%" 형태의 문자열을 쉼표로 연결하여 OR 조건 생성
-          const orQuery = searchFields.map(field => `${field}.ilike.%${location}%`).join(',');
-
+          const orQuery = searchFields.map((field) => `${field}.ilike.%${location}%`).join(',');
           query = query.or(orQuery);
         }
 
-        // 언어 필터 (호스트가 진행 가능한 언어)
         if (language !== 'all') {
           query = query.contains('languages', [language]);
         }
-
-        // 날짜 필터 (예약 가능한 날짜가 있는지 확인하는 로직이 필요하다면 추가)
-        // 현재는 메타데이터 검색 위주이므로 패스
 
         const { data, error } = await query;
         if (error) throw error;
@@ -70,94 +160,320 @@ function SearchResults() {
     };
 
     fetchSearchResults();
-  }, [location, language, startDate, endDate]);
+  }, [location, language, startDate, endDate, showToast, supabase]);
+
+  const filteredExperiences = useMemo(() => {
+    if (selectedTypes.length === 0) return experiences;
+
+    const selectedTypeConfig = TYPE_OPTIONS.filter((option) => selectedTypes.includes(option.id));
+
+    return experiences.filter((item) => {
+      const haystack = `${getContent(item, 'title', lang) || ''} ${getContent(item, 'category', lang) || ''} ${item.city || ''}`.toLowerCase();
+      return selectedTypeConfig.some((option) => option.keywords.some((keyword) => haystack.includes(keyword.toLowerCase())));
+    });
+  }, [experiences, selectedTypes, lang]);
+
+  const mobileSections = useMemo(() => {
+    const sectionBase = filteredExperiences;
+    const bucketTitle = `${location || '도쿄'} 버킷리스트`;
+
+    return [
+      { id: 'custom', title: '내가 원하는 대로 둘러보는 맞춤 탐방', items: sectionBase.slice(0, 12) },
+      { id: 'bucket', title: bucketTitle, items: [...sectionBase.slice(2), ...sectionBase].slice(0, 12) },
+    ];
+  }, [filteredExperiences, location]);
+
+  const toggleTime = (id: string) => {
+    setSelectedTimes((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  };
+
+  const toggleType = (id: string) => {
+    setSelectedTypes((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  };
+
+  const clearSheetFilters = () => {
+    if (activeSheet === 'time') setSelectedTimes([]);
+    if (activeSheet === 'type') setSelectedTypes([]);
+  };
+
+  const hasSheetSelection = activeSheet === 'time' ? selectedTimes.length > 0 : selectedTypes.length > 0;
+
+  const renderMobileCard = (item: SearchExperience) => {
+    const imageUrl =
+      item.photos?.[0] ||
+      item.image_url ||
+      'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=800&q=80';
+    const title = getContent(item, 'title', lang) || '로컬 체험';
+    const city = item.city || location || '도쿄';
+    const rating = item.rating && item.rating > 0 ? item.rating.toFixed(2) : '4.99';
+    const rawPrice = typeof item.price === 'number' ? item.price : Number(item.price);
+    const price = Number.isFinite(rawPrice) ? Number(rawPrice).toLocaleString() : '45,000';
+
+    return (
+      <Link key={item.id} href={`/experiences/${item.id}`} className="w-[168px] shrink-0">
+        <div className="relative w-full aspect-[0.95] rounded-[16px] overflow-hidden bg-slate-200">
+          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+          <button className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/20 backdrop-blur-[1px] border border-white/70 flex items-center justify-center">
+            <Heart size={16} className="text-white" />
+          </button>
+        </div>
+        <div className="pt-2">
+          <p className="text-[13px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
+          <p className="mt-0.5 text-[11px] text-[#6B6B6B] line-clamp-1">{city} · 6시간</p>
+          <p className="mt-0.5 text-[11px] text-[#3E3E3E]">
+            그룹 <span className="font-semibold">₩{price}부터</span> · ★ {rating}
+          </p>
+        </div>
+      </Link>
+    );
+  };
 
   return (
-    <div className="pt-0 md:pt-24 pb-12 h-[calc(100vh-60px)] md:h-[calc(100vh-80px)] flex flex-col">
-      {/* 📱 모바일 전용: 검색 헤더 캡슐 */}
-      <div className="md:hidden flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-3 bg-white border-b border-slate-100 sticky top-0 z-40">
-        <button onClick={() => window.history.back()} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors shrink-0">
-          <ArrowLeft size={20} className="text-slate-900" />
-        </button>
-        <div className="flex-1 flex items-center gap-2 bg-slate-50 rounded-full px-4 py-2.5 border border-slate-200">
-          <Search size={16} className="text-slate-400 shrink-0" />
-          <span className="text-[14px] text-slate-800 font-medium truncate">{location || '검색 결과'}</span>
+    <>
+      <div className="md:hidden min-h-screen bg-[#F7F7F7] pb-[88px]">
+        <div className="sticky top-0 z-40 bg-[#F7F7F7] px-4 pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-2">
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="w-9 h-9 flex items-center justify-center text-[#222]">
+              <ArrowLeft size={20} />
+            </button>
+
+            <div className="flex-1 rounded-full bg-white border border-[#E6E6E6] px-4 py-[7px] text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+              <div className="text-[13px] font-semibold text-[#202020] leading-tight">{headerTitle}</div>
+              {headerSub && <div className="text-[11px] text-[#787878] leading-tight mt-[1px]">{headerSub}</div>}
+            </div>
+
+            <button className="w-9 h-9 flex items-center justify-center text-[#222]">
+              <SlidersHorizontal size={18} />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setActiveSheet('type')}
+              className={`h-8 px-4 rounded-full border flex items-center gap-1.5 text-[12px] font-medium whitespace-nowrap ${
+                selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
+              }`}
+            >
+              유형
+              <ChevronDown size={13} />
+            </button>
+            <button
+              onClick={() => setActiveSheet('time')}
+              className={`h-8 px-4 rounded-full border flex items-center gap-1.5 text-[12px] font-medium whitespace-nowrap ${
+                selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
+              }`}
+            >
+              시간대
+              <ChevronDown size={13} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* 상단 필터 바 */}
-      <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 md:top-[80px] bg-white z-40">
-        <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar">
-          <SearchFilter label="가격 범위" />
-          <SearchFilter label="숙소 유형" />
-          <div className="h-6 md:h-8 w-[1px] bg-slate-200 mx-1 md:mx-2 shrink-0"></div>
-          <span className="text-xs md:text-sm font-bold text-slate-500 whitespace-nowrap">
-            {experiences.length}개의 체험
-          </span>
-        </div>
-
-        {/* 지도 토글 - 데스크탑 전용 */}
-        <button
-          onClick={() => setShowMap(!showMap)}
-          className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-black transition-colors"
-        >
-          {showMap ? <><List size={16} /> 리스트 보기</> : <><Map size={16} /> 지도 보기</>}
-        </button>
-      </div>
-
-      {/* 메인 콘텐츠 */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 리스트 영역 */}
-        <div className={`flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 ${showMap ? 'lg:w-3/5 xl:w-1/2' : 'w-full'}`}>
+        <div className="px-4 pt-3">
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="animate-pulse">
-                  <div className="bg-slate-100 aspect-[4/3] rounded-xl mb-3"></div>
-                  <div className="h-4 bg-slate-100 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+            <div className="space-y-6">
+              {[1, 2].map((row) => (
+                <div key={row}>
+                  <div className="h-5 w-52 bg-slate-200 rounded mb-3 animate-pulse" />
+                  <div className="flex gap-3 overflow-hidden">
+                    {[1, 2, 3].map((card) => (
+                      <div key={card} className="w-[168px] shrink-0 animate-pulse">
+                        <div className="aspect-[0.95] rounded-[16px] bg-slate-200 mb-2" />
+                        <div className="h-3 bg-slate-200 rounded mb-1" />
+                        <div className="h-3 w-2/3 bg-slate-200 rounded" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
-          ) : experiences.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center py-20">
-              <Ghost size={48} className="text-slate-300 mb-4" />
-              <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
-              <p className="text-slate-500 text-sm">다른 날짜나 키워드로 검색해보시거나, 메인에서 전체 체험을 둘러보세요.</p>
+          ) : filteredExperiences.length === 0 ? (
+            <div className="min-h-[66vh] flex flex-col items-center justify-center text-center">
+              <div className="relative w-[154px] h-[112px] mb-5">
+                <img
+                  src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=480&q=80"
+                  alt="thumb1"
+                  className="absolute top-0 left-[42px] w-[84px] h-[60px] object-cover rounded-[10px] rotate-[7deg]"
+                />
+                <img
+                  src="https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?auto=format&fit=crop&w=480&q=80"
+                  alt="thumb2"
+                  className="absolute top-[18px] left-[14px] w-[92px] h-[66px] object-cover rounded-[12px] -rotate-[14deg]"
+                />
+                <img
+                  src="https://images.unsplash.com/photo-1480796927426-f609979314bd?auto=format&fit=crop&w=480&q=80"
+                  alt="thumb3"
+                  className="absolute top-[24px] left-[60px] w-[98px] h-[70px] object-cover rounded-[12px] rotate-[2deg]"
+                />
+              </div>
+              <h3 className="text-[30px] font-extrabold text-[#212121] leading-tight">일치하는 결과 없음</h3>
+              <p className="mt-2 text-[15px] text-[#7A7A7A] leading-snug">날짜나 위치를 변경해 다시 검색해 보세요.</p>
             </div>
           ) : (
-            <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
-              {experiences.map((item) => (
-                // 🟢 [확인완료] data={item} 사용 (ExperienceCard 최신 스펙 준수)
-                <ExperienceCard key={item.id} data={item} />
+            <div className="space-y-8 pb-6">
+              {mobileSections.map((section) => (
+                <section key={section.id}>
+                  <h3 className="text-[31px] font-extrabold text-[#202020] tracking-[-0.02em] leading-tight mb-3">{section.title}</h3>
+                  <div className="flex gap-3 overflow-x-auto no-scrollbar pr-4">{section.items.map((item) => renderMobileCard(item))}</div>
+                </section>
               ))}
             </div>
           )}
-          <div className="mt-12">
-            <SiteFooter />
+        </div>
+      </div>
+
+      <div className="hidden md:flex pt-0 md:pt-24 pb-12 h-[calc(100vh-80px)] flex-col">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between sticky top-[80px] bg-white z-40">
+          <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar">
+            <SearchFilter label="가격 범위" />
+            <SearchFilter label="숙소 유형" />
+            <div className="h-8 w-[1px] bg-slate-200 mx-2 shrink-0"></div>
+            <span className="text-sm font-bold text-slate-500 whitespace-nowrap">{filteredExperiences.length}개의 체험</span>
           </div>
+
+          <button
+            onClick={() => setShowMap(!showMap)}
+            className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md hover:bg-black transition-colors"
+          >
+            {showMap ? (
+              <>
+                <List size={16} /> 리스트 보기
+              </>
+            ) : (
+              <>
+                <Map size={16} /> 지도 보기
+              </>
+            )}
+          </button>
         </div>
 
-        {/* 지도 영역 (기존 디자인 유지) */}
-        {showMap && (
-          <div className="hidden lg:block flex-1 bg-slate-100 relative h-full border-l border-slate-200">
-            <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-400 bg-slate-50">
-              <Map size={48} className="mb-2 opacity-50" />
-              <span className="text-sm font-medium">지도 뷰 준비 중입니다.</span>
-              <span className="text-xs text-slate-400 mt-1">(Google Maps API 연동 예정)</span>
+        <div className="flex flex-1 overflow-hidden">
+          <div className={`flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 ${showMap ? 'lg:w-3/5 xl:w-1/2' : 'w-full'}`}>
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="bg-slate-100 aspect-[4/3] rounded-xl mb-3"></div>
+                    <div className="h-4 bg-slate-100 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredExperiences.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <Ghost size={48} className="text-slate-300 mb-4" />
+                <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
+                <p className="text-slate-500 text-sm">다른 날짜나 키워드로 검색해보시거나, 메인에서 전체 체험을 둘러보세요.</p>
+              </div>
+            ) : (
+              <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
+                {filteredExperiences.map((item) => (
+                  <ExperienceCard key={item.id} data={item} />
+                ))}
+              </div>
+            )}
+            <div className="mt-12">
+              <SiteFooter />
             </div>
           </div>
-        )}
+
+          {showMap && (
+            <div className="hidden lg:block flex-1 bg-slate-100 relative h-full border-l border-slate-200">
+              <div className="absolute inset-0 flex items-center justify-center flex-col text-slate-400 bg-slate-50">
+                <Map size={48} className="mb-2 opacity-50" />
+                <span className="text-sm font-medium">지도 뷰 준비 중입니다.</span>
+                <span className="text-xs text-slate-400 mt-1">(Google Maps API 연동 예정)</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {activeSheet && (
+        <div className="fixed inset-0 z-[190] md:hidden">
+          <button className="absolute inset-0 bg-black/35" onClick={() => setActiveSheet(null)} aria-label="close-overlay" />
+
+          <div
+            className={`absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] shadow-[0_-12px_32px_rgba(0,0,0,0.16)] flex flex-col ${
+              activeSheet === 'time' ? 'h-[48dvh]' : 'h-[60dvh]'
+            }`}
+          >
+            <div className="flex items-center justify-between px-6 pt-6 pb-4">
+              <h3 className="text-[39px] font-extrabold text-[#1F1F1F] leading-tight">{activeSheet === 'time' ? '시간대' : '체험 유형'}</h3>
+              <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]">
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="px-6 overflow-y-auto">
+              {activeSheet === 'time' ? (
+                <div className="pt-2 space-y-5">
+                  {TIME_OPTIONS.map((option) => (
+                    <button key={option.id} onClick={() => toggleTime(option.id)} className="w-full flex items-center justify-between text-left">
+                      <div>
+                        <p className="text-[24px] font-semibold text-[#222] leading-tight">{option.label}</p>
+                        <p className="mt-1 text-[20px] text-[#8A8A8A] leading-tight">{option.desc}</p>
+                      </div>
+                      <div
+                        className={`w-8 h-8 rounded-[9px] border-2 flex items-center justify-center ${
+                          selectedTimes.includes(option.id) ? 'border-[#222] bg-[#222]' : 'border-[#B8B8B8] bg-white'
+                        }`}
+                      >
+                        {selectedTimes.includes(option.id) && <div className="w-3 h-3 rounded-[3px] bg-white" />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="pt-2 flex flex-wrap gap-3 pb-3">
+                  {TYPE_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const selected = selectedTypes.includes(option.id);
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => toggleType(option.id)}
+                        className={`h-11 px-4 rounded-full border flex items-center gap-2 text-[15px] font-medium ${
+                          selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
+                        }`}
+                      >
+                        <Icon size={15} strokeWidth={1.8} />
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-auto border-t border-[#EEEEEE] px-5 py-4 flex items-center justify-between" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)' }}>
+              <button
+                onClick={clearSheetFilters}
+                disabled={!hasSheetSelection}
+                className={`text-[18px] font-semibold ${hasSheetSelection ? 'text-[#333]' : 'text-[#D2D2D2]'}`}
+              >
+                전체 해제
+              </button>
+              <button
+                onClick={() => setActiveSheet(null)}
+                className="h-[52px] px-7 rounded-[12px] bg-[#222429] text-white text-[17px] font-semibold"
+              >
+                300개 이상의 결과 보기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
-// 🟢 메인 페이지 컴포넌트 (Suspense 적용 유지)
 export default function SearchPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      <SiteHeader />
+      <div className="hidden md:block">
+        <SiteHeader />
+      </div>
       <Suspense fallback={<div className="pt-32 text-center">검색 중...</div>}>
         <SearchResults />
       </Suspense>

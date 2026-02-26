@@ -38,7 +38,7 @@ export default function MobileSearchModal({
         if (isOpen) {
             setActivePanel('location');
             setIsSearchExpanded(false);
-            if (!selectedLanguage || selectedLanguage === 'all') {
+            if (!selectedLanguage) {
                 setSelectedLanguage('한국어');
             }
             requestAnimationFrame(() => setIsVisible(true));
@@ -63,6 +63,7 @@ export default function MobileSearchModal({
     if (!isOpen) return null;
 
     const languages = [
+        { label: '전체', value: 'all', sub: 'All', code: '' },
         { label: '한국어', value: '한국어', sub: 'Korean', code: 'kr' },
         { label: '영어', value: '영어', sub: 'English', code: 'us' },
         { label: '일본어', value: '일본어', sub: 'Japanese', code: 'jp' },
@@ -222,7 +223,7 @@ export default function MobileSearchModal({
     const handleClearAll = () => {
         setLocationInput('');
         setDateRange({ start: null, end: null });
-        setSelectedLanguage('한국어');
+        setSelectedLanguage('all');
     };
 
     const formatDateRange = () => {
@@ -485,7 +486,11 @@ export default function MobileSearchModal({
                                         >
                                             <div className="flex items-center gap-2.5">
                                                 <div className="w-[26px] h-[18px] rounded-[4px] overflow-hidden flex items-center justify-center bg-white border border-[#E5E5E5]">
-                                                    <img src={`https://flagcdn.com/w40/${lang.code}.png`} alt={lang.label} className="w-full h-full object-cover" />
+                                                    {lang.code ? (
+                                                        <img src={`https://flagcdn.com/w40/${lang.code}.png`} alt={lang.label} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <span className="text-[10px]">🌐</span>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <span className="text-[12px] font-semibold text-[#222222] block">{lang.label}</span>
@@ -513,7 +518,7 @@ export default function MobileSearchModal({
                     style={{
                         borderTop: '1px solid #EBEBEB',
                         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-                        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+                        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 30px)',
                         boxShadow: '0 -6px 18px rgba(0,0,0,0.08)',
                     }}
                 >
