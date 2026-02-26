@@ -95,62 +95,90 @@ export default function MobileSearchModal({
         setActivePanel('date');
     };
 
-    const PlaceIcon = ({ type }: { type: string }) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
-            {type === 'tokyo' && (
-                <>
-                    <path d="M12 3v18" stroke="#E15B5B" strokeWidth="1.6" />
-                    <path d="M9.5 7h5" stroke="#E15B5B" strokeWidth="1.6" />
-                    <path d="M8 10h8" stroke="#E15B5B" strokeWidth="1.6" />
-                    <path d="M7 13h10" stroke="#E15B5B" strokeWidth="1.6" />
-                    <path d="M6 18h12" stroke="#E15B5B" strokeWidth="1.6" />
-                </>
-            )}
-            {type === 'osaka' && (
-                <>
-                    <path d="M4 7h16" stroke="#C47D3C" strokeWidth="1.6" />
-                    <path d="M7 7v10" stroke="#C47D3C" strokeWidth="1.6" />
-                    <path d="M17 7v10" stroke="#C47D3C" strokeWidth="1.6" />
-                    <path d="M9 10h6" stroke="#C47D3C" strokeWidth="1.6" />
-                    <path d="M9 17h6" stroke="#C47D3C" strokeWidth="1.6" />
-                </>
-            )}
-            {type === 'izakaya' && (
-                <>
-                    <path d="M9 5h6" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <path d="M10 5v2" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <path d="M14 5v2" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <rect x="8" y="7" width="8" height="11" rx="2.5" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <path d="M9.5 11h5" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <path d="M9.5 14h5" stroke="#7C6BE3" strokeWidth="1.6" />
-                </>
-            )}
-            {type === 'seoul' && (
-                <>
-                    <path d="M6 18h12" stroke="#3C7CC4" strokeWidth="1.6" />
-                    <path d="M8 18V8h8v10" stroke="#3C7CC4" strokeWidth="1.6" />
-                    <path d="M9 8l3-3 3 3" stroke="#3C7CC4" strokeWidth="1.6" />
-                    <path d="M9 12h6" stroke="#3C7CC4" strokeWidth="1.6" />
-                </>
-            )}
-        </svg>
-    );
+    const PlaceIcon = ({ type }: { type: string }) => {
+        const colors: Record<string, string> = {
+            tokyo: '#EC6A6A',
+            osaka: '#F0953D',
+            seoul: '#6DA6E9',
+            izakaya: '#CFA223',
+        };
+        const stroke = colors[type] || '#6B7280';
+        const sw = 1.85;
+
+        return (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                {type === 'tokyo' && (
+                    <>
+                        <path d="M12 2.5V5.5" stroke={stroke} strokeWidth={sw} />
+                        <path d="M10.2 5.5H13.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M10 5.5L9 9.2H15L14 5.5" stroke={stroke} strokeWidth={sw} />
+                        <path d="M8.3 10.6H15.7" stroke={stroke} strokeWidth={sw} />
+                        <path d="M9.1 10.6V13.4" stroke={stroke} strokeWidth={sw} />
+                        <path d="M14.9 10.6V13.4" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7 15.2H17" stroke={stroke} strokeWidth={sw} />
+                        <path d="M6 20.5H18" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7 20.5L10.2 15.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M17 20.5L13.8 15.2" stroke={stroke} strokeWidth={sw} />
+                    </>
+                )}
+                {type === 'osaka' && (
+                    <>
+                        <path d="M4.2 6.8C8.8 8 15.2 8 19.8 6.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M5.2 8.8H18.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M6.6 8.8V19.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M17.4 8.8V19.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M9.2 10.6H14.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7.8 13.8H16.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M6 19.8H8.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M15.2 19.8H18" stroke={stroke} strokeWidth={sw} />
+                    </>
+                )}
+                {type === 'seoul' && (
+                    <>
+                        <path d="M12 2.5V5.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M10.8 5.2H13.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M10.2 5.2V7.8H13.8V5.2" stroke={stroke} strokeWidth={sw} />
+                        <rect x="8.7" y="8.5" width="6.6" height="3.6" rx="0.7" stroke={stroke} strokeWidth={sw} />
+                        <path d="M12 12.1V18.4" stroke={stroke} strokeWidth={sw} />
+                        <path d="M9.4 15.2H14.6" stroke={stroke} strokeWidth={sw} />
+                        <path d="M8.8 18.4H15.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7 20.5H17" stroke={stroke} strokeWidth={sw} />
+                    </>
+                )}
+                {type === 'izakaya' && (
+                    <>
+                        <rect x="7.2" y="5.6" width="8.8" height="13.2" rx="2.1" stroke={stroke} strokeWidth={sw} />
+                        <path d="M16 8.8H17.7C18.7 8.8 19.5 9.6 19.5 10.6V15.2C19.5 16.2 18.7 17 17.7 17H16" stroke={stroke} strokeWidth={sw} />
+                        <path d="M9.6 9.3V16" stroke={stroke} strokeWidth={sw} />
+                        <path d="M12 9.3V16" stroke={stroke} strokeWidth={sw} />
+                        <path d="M14.4 9.3V16" stroke={stroke} strokeWidth={sw} />
+                        <path d="M8.3 4.8C8.9 3.8 10.1 3.8 10.7 4.8C11.3 5.8 12.5 5.8 13.1 4.8C13.7 3.8 14.9 3.8 15.5 4.8" stroke={stroke} strokeWidth={sw} />
+                    </>
+                )}
+            </svg>
+        );
+    };
 
     const PlaceBadge = ({ type }: { type: string }) => {
         const styles: Record<string, { bg: string; border: string }> = {
-            tokyo: { bg: 'linear-gradient(135deg, #FFE7E5 0%, #FFF5F0 100%)', border: '#F7C2C2' },
-            osaka: { bg: 'linear-gradient(135deg, #FFE9D4 0%, #FFF6EA 100%)', border: '#F2C49C' },
-            kyoto: { bg: 'linear-gradient(135deg, #E8F4E8 0%, #F4FAF4 100%)', border: '#CFE3D0' },
-            izakaya: { bg: 'linear-gradient(135deg, #EEE9FF 0%, #F7F4FF 100%)', border: '#D8CCFF' },
-            seoul: { bg: 'linear-gradient(135deg, #E7F1FF 0%, #F2F8FF 100%)', border: '#C7DAF7' },
+            tokyo: { bg: 'linear-gradient(135deg, #FEE4E4 0%, #FCEEEE 100%)', border: '#F5C8C8' },
+            osaka: { bg: 'linear-gradient(135deg, #FFE9D6 0%, #FFF3E6 100%)', border: '#F5CEAA' },
+            seoul: { bg: 'linear-gradient(135deg, #DDEEFF 0%, #EAF4FF 100%)', border: '#C7DDF7' },
+            izakaya: { bg: 'linear-gradient(135deg, #F9F0C9 0%, #FFF7DC 100%)', border: '#EBDCA5' },
         };
         const style = styles[type] || { bg: '#F3F4F6', border: '#E5E7EB' };
         return (
             <div
-                className="w-[36px] h-[36px] rounded-[10px] flex items-center justify-center shrink-0"
-                style={{ background: style.bg, border: `1px solid ${style.border}` }}
+                className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center shrink-0"
+                style={{
+                    background: style.bg,
+                    border: `1px solid ${style.border}`,
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.03)',
+                }}
             >
-                <PlaceIcon type={type} />
+                <div style={{ filter: 'contrast(112%) saturate(112%)' }}>
+                    <PlaceIcon type={type} />
+                </div>
             </div>
         );
     };
