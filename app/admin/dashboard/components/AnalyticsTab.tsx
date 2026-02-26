@@ -861,7 +861,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
               <div className="space-y-4">
                 {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((host: any, idx: number) => (
-                  <div key={host.id} onClick={() => window.open(`/users/${host.id}`, '_blank')} className="flex items-center gap-4 p-3 hover:bg-emerald-50/50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-emerald-100">
+                  <div key={host.id} onClick={() => { window.location.href = `/users/${host.id}`; }} className="flex items-center gap-4 p-3 hover:bg-emerald-50/50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-emerald-100">
                     <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
                       {host.name[0]}
                     </div>
@@ -898,7 +898,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
               <div className="space-y-4 relative z-10">
                 {stats.riskHosts.length > 0 ? stats.riskHosts.map((host: any, idx: number) => (
-                  <div key={host.id} onClick={() => window.open(`/users/${host.id}`, '_blank')} className="flex items-center gap-4 p-3 bg-white hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-slate-100 hover:border-rose-200">
+                  <div key={host.id} onClick={() => { window.location.href = `/users/${host.id}`; }} className="flex items-center gap-4 p-3 bg-white hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-slate-100 hover:border-rose-200">
                     <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
                       {host.name[0]}
                     </div>

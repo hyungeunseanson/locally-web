@@ -172,7 +172,7 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
               </div>
               <div>
                 <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5">프로필 사진</div>
-                {selectedItem.profile_photo ? <a href={selectedItem.profile_photo} target="_blank" rel="noreferrer" className="text-blue-600 underline text-[10px] md:text-xs font-bold">원본 보기</a> : <span className="text-slate-400 text-[10px]">사진 없음</span>}
+                {selectedItem.profile_photo ? <a href={selectedItem.profile_photo} rel="noreferrer" className="text-blue-600 underline text-[10px] md:text-xs font-bold">원본 보기</a> : <span className="text-slate-400 text-[10px]">사진 없음</span>}
               </div>
             </div>
 
@@ -214,7 +214,7 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
                 <div className="space-y-3">
                   <div className="relative aspect-[1.6] w-full bg-slate-200 rounded-lg overflow-hidden border border-slate-300 group">
                     <img src={signedUrl} className="w-full h-full object-contain bg-black/5" />
-                    <a href={signedUrl} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm">
+                    <a href={signedUrl} rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm">
                       <Download size={16} className="mr-2" /> 원본 다운로드
                     </a>
                   </div>

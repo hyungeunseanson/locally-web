@@ -99,7 +99,6 @@ export default function AccountPage() {
       desc: 'Locally의 주요 공지와 업데이트를 확인하세요.',
       actions: [
         { label: '공지사항 보기', href: '/company/notices', external: false },
-        { label: '새 창으로 열기', href: '/company/notices', external: true },
       ]
     },
     community: {
@@ -107,7 +106,6 @@ export default function AccountPage() {
       desc: '여행자와 호스트의 이야기를 모았습니다.',
       actions: [
         { label: '커뮤니티 보기', href: '/company/community', external: false },
-        { label: '새 창으로 열기', href: '/company/community', external: true },
       ]
     },
     news: {
@@ -115,7 +113,6 @@ export default function AccountPage() {
       desc: 'Locally의 언론 보도를 확인하세요.',
       actions: [
         { label: '뉴스룸 보기', href: '/company/news', external: false },
-        { label: '새 창으로 열기', href: '/company/news', external: true },
       ]
     },
     social: {
@@ -297,7 +294,7 @@ export default function AccountPage() {
 
   const handleOpenLink = (href: string, external: boolean) => {
     if (external) {
-      window.open(href, '_blank', 'noopener,noreferrer');
+      window.location.href = href;
     } else {
       router.push(href);
     }

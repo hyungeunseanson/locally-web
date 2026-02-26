@@ -169,7 +169,7 @@ guest:profiles!bookings_user_id_fkey (
     const formatTime = (date: Date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
     const dates = `${formatTime(startDate)}/${formatTime(endDate)}`;
 
-    window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`, '_blank');
+    window.location.href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`;
   };
 
   const handleRequestUserCancel = (res: any) => {

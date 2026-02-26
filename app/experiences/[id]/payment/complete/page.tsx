@@ -79,7 +79,7 @@ function PaymentCompleteContent() {
     const details = `Locally 체험 예약: ${experiences.title}\n위치: ${experiences.location}`;
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(experiences.title)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(experiences.location)}`;
     
-    window.open(url, '_blank');
+    window.location.href = url;
   };
 
   // 💌 링크 공유

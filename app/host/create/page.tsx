@@ -187,8 +187,8 @@ export default function CreateExperiencePage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
       {/* 헤더 */}
       {step < TOTAL_STEPS && (
-        <header className="fixed top-0 left-0 right-0 h-14 md:h-20 bg-white/80 backdrop-blur-md z-50 px-4 md:px-6 flex items-center justify-between">
-          <Link href="/host/dashboard" className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-900" /></Link>
+        <header className="fixed top-0 left-0 right-0 h-14 md:h-20 bg-white/80 backdrop-blur-md z-50 px-4 md:px-6 flex items-center justify-between pt-[env(safe-area-inset-top,0px)]">
+          <Link href="/host/dashboard?tab=experiences" className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-900" /></Link>
           <div className="w-1/3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div className="h-full bg-black transition-all duration-500 ease-out" style={{ width: `${(step / (TOTAL_STEPS - 1)) * 100}%` }} />
           </div>
@@ -197,7 +197,7 @@ export default function CreateExperiencePage() {
       )}
 
       {/* 메인 컨텐츠 */}
-      <main className="flex-1 flex flex-col items-center pt-20 md:pt-32 pb-28 md:pb-40 px-4 md:px-6 w-full max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="flex-1 flex flex-col items-center pt-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:pt-32 pb-28 md:pb-40 px-4 md:px-6 w-full max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <ExperienceFormSteps
           step={step}
           formData={formData}

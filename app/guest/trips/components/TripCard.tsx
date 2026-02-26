@@ -23,6 +23,9 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   
   // 🟢 [추가] 환불 예상 정보 상태
   const [refundInfo, setRefundInfo] = useState({ percent: 0, amount: 0, reason: '' });
+  const openExternalLink = (url: string) => {
+    window.location.href = url;
+  };
 
   // 사진 슬라이더 상태
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -52,9 +55,6 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 // TripCard.tsx 내부 calculateRefundFront 함수 교체
 
 const calculateRefundFront = () => {
-  // 🔍 [디버깅] 들어오는 데이터 전체 확인 (F12 개발자 도구 콘솔에서 확인 필수!)
-  console.log("🔍 Trip 전체 데이터:", trip);
-
   const now = new Date();
   // 날짜 형식이 안맞을 경우를 대비한 방어 코드
   const dateString = trip.date || new Date().toISOString().split('T')[0];
@@ -72,8 +72,6 @@ const calculateRefundFront = () => {
   // 🟢 [핵심 수정] 금액 변수명 전부 체크 (문자열일 경우 숫자로 변환)
   const rawPrice = trip.amount || trip.totalPrice || trip.total_price || trip.price || 0;
   const totalAmount = Number(rawPrice);
-
-  console.log(`💰 추출된 금액: ${totalAmount} (원본: ${rawPrice})`);
 
   // 1. 결제 후 24시간 이내 철회 (단, 투어일 2일 전까지만 - 규정 재확인)
   if (hoursSincePayment <= 24 && diffDays > 1) {
@@ -127,7 +125,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
     const location = encodeURIComponent(trip.location);
     const dateStr = trip.date.replace(/-/g, ""); 
     const dates = `${dateStr}/${dateStr}`;
-    window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${location}`, '_blank');
+    openExternalLink(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${location}`);
     setIsMenuOpen(false);
   };
 
@@ -239,7 +237,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
 <MessageSquare size={14}/> {t('messages')} {/* 🟢 교체 */}
 </button>
               <button 
-                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`, '_blank')} // 🟢 지도 링크 수정
+                onClick={() => openExternalLink(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`)}
                 className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
               >
 <Map size={14}/> {t('trip_map')} {/* 🟢 교체 */}

@@ -323,7 +323,7 @@ function InboxContent() {
                           <div className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed shadow-sm break-words ${isMe ? 'bg-black text-white rounded-tr-sm' : 'bg-white border border-gray-200 rounded-tl-sm'}`}>
                             {msg.type === 'image' && msg.image_url && (
                               <div className="mb-1 rounded-lg overflow-hidden">
-                                <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
+                                <a href={msg.image_url} rel="noopener noreferrer">
                                   <Image src={msg.image_url} alt="chat-img" width={240} height={240} className="w-full h-auto object-cover hover:opacity-90 transition-opacity" />
                                 </a>
                               </div>

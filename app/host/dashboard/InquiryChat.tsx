@@ -244,7 +244,7 @@ export default function InquiryChat() {
                           }`}>
                           {msg.type === 'image' && msg.image_url && (
                             <div className="mb-1 rounded-lg overflow-hidden">
-                              <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
+                              <a href={msg.image_url} rel="noopener noreferrer">
                                 <Image
                                   src={msg.image_url}
                                   alt="chat-img"

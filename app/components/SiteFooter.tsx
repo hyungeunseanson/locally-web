@@ -101,16 +101,16 @@ export default function SiteFooter() {
                   {instaOpen && (
                     <div className="absolute left-0 bottom-full mb-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                       <div className="py-1">
-                        <a href="https://www.instagram.com/locally.official/" target="_blank" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                        <a href="https://www.instagram.com/locally.official/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
                           Locally Official (KR)
                         </a>
-                        <a href="https://www.instagram.com/locally.experience/" target="_blank" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                        <a href="https://www.instagram.com/locally.experience/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
                           Locally Experience (KR)
                         </a>
-                        <a href="https://www.instagram.com/locally.japan/" target="_blank" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                        <a href="https://www.instagram.com/locally.japan/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
                           Locally Japan (JP)
                         </a>
-                        <a href="https://www.instagram.com/locally.partners/" target="_blank" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                        <a href="https://www.instagram.com/locally.partners/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
                           Locally Partners (EN)
                         </a>
                       </div>
@@ -122,7 +122,6 @@ export default function SiteFooter() {
                 <li>
                   <Link
                     href="https://blog.naver.com/locally-travel"
-                    target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-black flex items-center gap-2 group text-[#717171] transition-colors"
                   >

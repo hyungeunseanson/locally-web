@@ -126,8 +126,7 @@ export default function ExpMainContent({
 
           <Link
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            rel="noreferrer"
             className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl shadow-lg text-xs font-bold flex items-center gap-2 hover:scale-105 transition-transform border border-slate-200"
           >
             <ExternalLink size={14} /> 큰 지도로 보기

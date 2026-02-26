@@ -82,7 +82,7 @@ function SiteHeaderContent() {
 
   const handleMainHeaderButtonClick = () => {
     if (pathname?.startsWith('/host')) {
-      router.push('/');
+      router.push('/account');
     } else {
       router.push('/become-a-host');
     }
@@ -90,12 +90,12 @@ function SiteHeaderContent() {
 
   const handleDropdownMenuClick = () => {
     if (pathname?.startsWith('/host')) {
-      router.push('/');
+      router.push('/account');
       return;
     }
 
     if (applicationStatus || isHost) {
-      router.push('/host/dashboard');
+      router.push('/host/dashboard?tab=reservations');
     } else {
       router.push('/become-a-host');
     }

@@ -195,24 +195,21 @@ export default function EditExperiencePage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-20 md:pb-0">
       <SiteHeader />
 
-      {/* 상단 고정 헤더 */}
-      <div className="sticky top-20 z-40 bg-white border-b border-slate-100 px-3 md:px-6 py-3 md:py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
+      <main className="max-w-4xl mx-auto px-3 md:px-6 py-5 md:py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
           <button
             onClick={() => router.replace('/host/dashboard?tab=experiences')}
-            className="p-2 hover:bg-slate-50 rounded-full transition-colors"
+            className="flex items-center gap-2 text-slate-500 hover:text-black font-bold text-sm"
             type="button"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={16} /> {t('nav_dashboard')}
           </button>
-          <h1 className="text-sm md:text-lg font-black truncate max-w-[150px] md:max-w-md">{formData.title}</h1>
-        </div>
-        <button onClick={handleUpdate} disabled={saving} className="bg-black text-white px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
+        <button onClick={handleUpdate} disabled={saving} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
           {saving ? <><Loader2 className="animate-spin" size={16} /> {t('btn_save_loading')}</> : <><Save size={16} /> {t('btn_save')}</>} {/* 🟢 번역 */}
         </button>
-      </div>
+        </div>
 
-      <main className="max-w-4xl mx-auto px-3 md:px-6 py-4 md:py-8">
+        <h1 className="text-lg md:text-2xl font-black text-slate-900 leading-tight mb-4 md:mb-6 line-clamp-2">{formData.title}</h1>
 
         {/* 탭 메뉴 */}
         <div className="flex gap-1.5 md:gap-2 mb-4 md:mb-8 bg-slate-100 p-1 rounded-xl w-fit overflow-x-auto">

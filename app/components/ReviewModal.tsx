@@ -99,23 +99,23 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+        className="bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 max-h-[88dvh] md:max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-lg text-slate-900">후기 작성</h3>
+        <div className="px-5 md:px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="font-bold text-base md:text-lg text-slate-900">후기 작성</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900">
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-8">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
+        <div className="p-5 md:p-8 overflow-y-auto">
+          <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
               {trip.image ? <img src={trip.image} alt={trip.title} className="w-full h-full object-cover" /> : <div className="bg-slate-200 w-full h-full" />}
             </div>
             <div>
@@ -124,7 +124,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             </div>
           </div>
 
-          <div className="flex justify-center gap-2 mb-4">
+          <div className="flex justify-center gap-1.5 md:gap-2 mb-3 md:mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
@@ -134,14 +134,14 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
                 className="transition-transform hover:scale-110 p-1 focus:outline-none"
               >
                 <Star
-                  size={32}
+                  size={28}
                   fill={(hoverRating || rating) >= star ? "#FBBF24" : "none"}
                   className={(hoverRating || rating) >= star ? "text-amber-400" : "text-slate-300"}
                 />
               </button>
             ))}
           </div>
-          <p className="text-center text-sm font-bold text-slate-700 mb-8 h-5">
+          <p className="text-center text-xs md:text-sm font-bold text-slate-700 mb-5 md:mb-8 h-5">
             {rating === 5 ? "최고였어요! 😍" :
               rating === 4 ? "좋았어요! 😊" :
                 rating === 3 ? "보통이에요 🙂" :
@@ -151,13 +151,13 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
           </p>
 
           <textarea
-            className="w-full h-32 p-4 border border-slate-300 rounded-xl resize-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm mb-4 placeholder:text-slate-400"
+            className="w-full h-28 md:h-32 p-3.5 md:p-4 border border-slate-300 rounded-xl resize-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm mb-4 placeholder:text-slate-400"
             placeholder="솔직한 후기를 남겨주세요. (최소 10자 이상)"
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
           />
 
-          <div className="flex gap-3 mb-6">
+          <div className="flex gap-2.5 md:gap-3 mb-5 md:mb-6">
             {images.map((img, idx) => (
               <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group">
                 <img src={img} alt="review" className="w-full h-full object-cover" />
@@ -181,7 +181,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
           <button
             onClick={handleSubmit}
             disabled={rating === 0 || reviewText.length < 10 || isSubmitting}
-            className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
+            className="w-full bg-black text-white font-bold py-3.5 md:py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 text-sm md:text-base"
           >
             {isSubmitting ? <><Loader2 className="animate-spin" size={20} /> 저장 중...</> : '후기 등록하기'}
           </button>

@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
 **Last Updated:** 2026-02-26  
-**Version:** 3.2.0 (Mobile UI & Profile Sync)  
+**Version:** 3.2.1 (Mobile UX Routing & Flow Sync)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -82,6 +82,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 안정성: 광범위한 `.single()` -> `.maybeSingle()` 전환
 - 모바일 UX: BottomTabNavigation 충돌/가림/z-index/뒤로가기 이슈 정리
 - 모바일 정보/커뮤니티/뉴스/공지 레이아웃 최적화 및 게스트 프로필(모바일/데스크탑) 기준 정렬
+- 모바일 모드 전환: 게스트↔호스트 전환 시 홈(`/`) 우회 제거, 게스트 메뉴(`/account`) 및 호스트 대시보드(`/host/dashboard?tab=reservations`)로 직접 이동 고정
+- 링크 오픈 정책: 사용자/호스트 주요 화면의 `window.open`/`target="_blank"` 제거, 동일 탭 이동으로 통일 (소셜 미디어 선택 모달 구조는 유지)
+- Host 모바일 폼 동기화: `새 체험 등록` 종료(X) 및 완료 CTA를 `체험 관리 탭`으로 고정하고, 생성/수정 상단 헤더 레이아웃을 일정 수정 화면 패턴과 정렬
+- Guest 모바일 여행 UX: 지난 여행 카드 전체 클릭 동선 복구(체험 상세 이동) 및 후기 작성 모달 높이/패딩/타이포를 모바일 하단 시트 기준으로 최적화
 - Admin: Team Chat 가시성/알림 배지/모바일 디테일 화면 안정화
 - Host: 권한 스코프, 예약/수익 집계 기준, Realtime 범위 검증 정리
 
