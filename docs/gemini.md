@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-26
-**Version:** 2.13.0 (Host Mobile UX & Admin Access Routing Patch)
+**Version:** 2.14.0 (Mobile Back Navigation & Modal Density Patch)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -409,6 +409,28 @@
   - `ProfileEditor`의 `공개 프로필/비공개 정보` 영역에서 모바일 텍스트 크기, 패딩, 섹션 밀도를 축소하고 `md:` 분기 유지로 데스크탑 레이아웃 영향 없이 가독성 개선.
 - [x] **게스트 메시지함 모바일 뒤로가기 안정화:**
   - 모바일 채팅 화면 뒤로가기 시 `clearSelected + router.replace('/guest/inbox')`로 상태/URL을 정리하여 채팅 선택 상태 잔존 리스크를 축소.
+
+### Phase 4.19: 모바일 뒤로가기/모달 밀도 및 어드민 내비 정렬 패치 (Navigation & Modal Density) - ✅ 완료
+
+> **2026-02-26** | 수정 파일: `notifications/page.tsx`, `host/notifications/page.tsx`, `help/page.tsx`, `SiteHeader.tsx`, `MobileHostMenu.tsx`, `BottomTabNavigation.tsx`, `guest/trips/page.tsx`, `guest/wishlists/page.tsx`, `guest/inbox/page.tsx`, `UserProfileModal.tsx`, `host/dashboard/components/GuestProfileModal.tsx`, `host/dashboard/components/ProfileEditor.tsx`, `admin/dashboard/components/Sidebar.tsx`, `admin/dashboard/components/AuditLogTab.tsx`
+
+- [x] **모바일 도움말/알림 뒤로가기 보강:**
+  - `help/page.tsx`, `notifications/page.tsx`에 모바일 전용 뒤로가기 버튼을 추가하고, 히스토리 없을 때 `guest=/account`, `host=/host/menu`로 안전 폴백 처리.
+- [x] **호스트 알림 진입 시 게스트 모드 전환 체감 제거:**
+  - `/host/notifications` 라우트 신설 후 호스트 경로의 알림 진입 링크를 해당 경로로 통일 (`SiteHeader`, `MobileHostMenu`).
+  - `notifications/page.tsx`에서 self-link 판정에 `/host/notifications`를 포함해 불필요한 라우팅 루프 차단.
+  - `BottomTabNavigation` 호스트 허용 경로에 `/host/notifications` 추가.
+- [x] **모바일 게스트 메뉴 뒤로가기 일괄 적용:**
+  - `guest/trips`, `guest/wishlists`, `guest/inbox`(목록 화면)에 모바일 전용 뒤로가기 버튼 추가.
+- [x] **카드 클릭 고객 상세 모달 모바일 밀도 최적화:**
+  - `UserProfileModal`, `GuestProfileModal`의 모바일 최대폭/패딩/타이포/아바타 크기를 축소해 과도한 풀스크린 체감을 완화.
+  - 모바일 우선 크기(`w-[92vw]`, `max-w` 축소, `text-[12px]` 등)와 `md:` 분기 유지로 데스크탑 영향 차단.
+- [x] **호스트 프로필 설정 > 비공개 정보 레이아웃 정돈:**
+  - `ProfileEditor` 비공개 섹션의 모바일 그리드 간격과 카드 패딩을 재정렬.
+  - 연락처/생년월일/국적/계좌 정보가 비어있어도 `미입력` placeholder로 깔끔하게 보이도록 보완.
+- [x] **어드민 Home 메뉴 위치 정정 (요청 반영):**
+  - `AuditLogTab` 내부에 추가했던 홈 버튼을 제거.
+  - `Sidebar`의 Finance 메뉴에 `Home` 항목을 추가해 `Data Analytics → Audit Logs → Home` 흐름으로 정렬.
 
 ---
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Heart, Star, MapPin, ArrowRight } from 'lucide-react';
+import { Heart, Star, MapPin, ArrowRight, ArrowLeft } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -17,6 +17,14 @@ export default function WishlistsPage() {
   const { showToast } = useToast();
   const [wishlists, setWishlists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleMobileBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/account');
+  };
 
   useEffect(() => {
     const fetchWishlists = async () => {
@@ -72,6 +80,16 @@ export default function WishlistsPage() {
       <SiteHeader />
 
       <main className="max-w-[1760px] mx-auto px-4 md:px-6 py-6 md:py-12">
+        <div className="md:hidden mb-3">
+          <button
+            onClick={handleMobileBack}
+            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="뒤로가기"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        </div>
+
         <h1 className="text-[20px] md:text-3xl font-black mb-4 md:mb-8">{t('wishlist')}</h1>
         {loading ? (
           <div className="flex justify-center py-40">

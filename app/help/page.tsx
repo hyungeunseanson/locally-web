@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import {
   Search, ChevronDown, ChevronUp, MessageCircle, Mail,
-  User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, Globe
+  User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, Globe, ArrowLeft
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -123,6 +123,14 @@ export default function HelpCenterPage() {
     )
   })).filter(category => category.items.length > 0);
 
+  const handleMobileBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(pathname?.startsWith('/host') ? '/host/menu' : '/account');
+  };
+
   // 1:1 문의 로직 (기존 유지)
   const handleAdminSupport = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -183,6 +191,15 @@ export default function HelpCenterPage() {
       <SiteHeader />
 
       <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-12 md:py-24">
+        <div className="md:hidden mb-6">
+          <button
+            onClick={handleMobileBack}
+            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="뒤로가기"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        </div>
 
         {/* 헤더 섹션 (뉴스룸 스타일) */}
         <div className="text-center mb-12 md:mb-24">

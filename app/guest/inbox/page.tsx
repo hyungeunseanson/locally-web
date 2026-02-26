@@ -35,6 +35,13 @@ function InboxContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const handleMobileBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/account');
+  };
 
   const hostId = searchParams.get('hostId');
   const expId = searchParams.get('expId');
@@ -167,7 +174,14 @@ function InboxContent() {
 
         {/* 제목 (모바일: 목록 화면에서만, 채팅창 열리면 숨김) */}
         {!selectedInquiry && (
-          <div className="md:hidden px-5 pt-4 pb-2 shrink-0">
+          <div className="md:hidden px-5 pt-4 pb-2 shrink-0 flex items-center gap-3">
+            <button
+              onClick={handleMobileBack}
+              className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+              aria-label="뒤로가기"
+            >
+              <ArrowLeft size={16} />
+            </button>
             <h1 className="text-[20px] font-black tracking-tight">{t('messages')}</h1>
           </div>
         )}

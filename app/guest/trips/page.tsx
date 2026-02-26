@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Loader2, Ghost, AlertCircle, History } from 'lucide-react';
+import { Loader2, Ghost, AlertCircle, History, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewModal from '@/app/components/ReviewModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
+import { useRouter } from 'next/navigation';
 
 // 분리된 컴포넌트 & 훅 import
 import { useGuestTrips } from './hooks/useGuestTrips'; // ✅ 로직은 여기서 가져옴
@@ -15,6 +16,7 @@ import PastTripCard from './components/PastTripCard';
 
 export default function GuestTripsPage() {
   const { t } = useLanguage(); // 🟢 추가
+  const router = useRouter();
   // ✅ [수정] 훅에서 가져오는 변수 이름 변경 (cancelBooking -> requestCancellation)
   const {
     upcomingTrips,
@@ -33,6 +35,13 @@ export default function GuestTripsPage() {
 
   const openReceipt = (trip: any) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
   const openReview = (trip: any) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
+  const handleMobileBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/account');
+  };
 
   if (isLoading) return <div className="min-h-screen bg-white flex items-center justify-center"><Loader2 className="animate-spin text-slate-400" size={32} /></div>;
 
@@ -41,6 +50,16 @@ export default function GuestTripsPage() {
       <SiteHeader />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-16">
+        <div className="md:hidden mb-3">
+          <button
+            onClick={handleMobileBack}
+            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="뒤로가기"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        </div>
+
         <h1 className="text-[20px] md:text-4xl font-extrabold mb-4 md:mb-12 mt-2 md:mt-0 tracking-tight leading-tight text-slate-900">{t('my_trips')}</h1>
 
         {errorMsg && (

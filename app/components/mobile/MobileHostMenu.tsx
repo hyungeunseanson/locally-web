@@ -93,7 +93,7 @@ export default function MobileHostMenu() {
             <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-4">
                 <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">메뉴</h1>
                 <div className="flex items-center gap-2">
-                    <Link href="/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full bg-gray-100">
+                    <Link href="/host/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full bg-gray-100">
                         <Bell size={17} className="text-gray-600" />
                     </Link>
                     <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-100">

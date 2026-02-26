@@ -167,25 +167,25 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
               </div>
             </div>
 
-            <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-100 opacity-90">
+            <div className="bg-slate-50 p-3.5 md:p-6 rounded-2xl border border-slate-100 opacity-90">
               <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><User size={16} className="md:w-[18px] md:h-[18px]" /> 개인 신상 정보</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                 {/* ✅ [수정] 모든 필드 disabled 처리 */}
-                <InputGroup label="연락처" name="phone" value={formData.phone} disabled={true} />
-                <InputGroup label="생년월일" name="dob" value={formData.dob} disabled={true} />
+                <InputGroup label="연락처" name="phone" value={formData.phone} disabled={true} placeholder="미입력" />
+                <InputGroup label="생년월일" name="dob" value={formData.dob} disabled={true} placeholder="미입력" />
                 <div className="col-span-2">
                   {/* ✅ [수정] 국적 필드 InputGroup으로 원복 */}
-                  <InputGroup label="국적" name="host_nationality" value={formData.host_nationality} disabled={true} />
+                  <InputGroup label="국적" name="host_nationality" value={formData.host_nationality} disabled={true} placeholder="미입력" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-100 opacity-90">
+            <div className="bg-slate-50 p-3.5 md:p-6 rounded-2xl border border-slate-100 opacity-90">
               <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><CreditCard size={16} className="md:w-[18px] md:h-[18px]" /> 정산 계좌 정보</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <InputGroup label="은행명" name="bank_name" value={formData.bank_name} disabled={true} />
-                <InputGroup label="계좌번호" name="account_number" value={formData.account_number} disabled={true} />
-                <InputGroup label="예금주" name="account_holder" value={formData.account_holder} disabled={true} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                <InputGroup label="은행명" name="bank_name" value={formData.bank_name} disabled={true} placeholder="미입력" />
+                <InputGroup label="계좌번호" name="account_number" value={formData.account_number} disabled={true} placeholder="미입력" />
+                <InputGroup label="예금주" name="account_holder" value={formData.account_holder} disabled={true} placeholder="미입력" />
               </div>
             </div>
 

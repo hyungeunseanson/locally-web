@@ -136,7 +136,7 @@ function SiteHeaderContent() {
             {/* 🟢 로딩이 끝난 후에만 알림/유저 아이콘 표시 (깜빡임 최소화) */}
             {!isLoading && user ? (
               <Link
-                href="/notifications"
+                href={pathname?.startsWith('/host') ? '/host/notifications' : '/notifications'}
                 className="relative mx-1 p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors inline-block"
               >
                 <Bell size={20} />

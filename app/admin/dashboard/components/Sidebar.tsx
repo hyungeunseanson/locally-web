@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import {
   Users, MapPin, CheckCircle2, MessageSquare,
   Calendar, BarChart2, CreditCard, LayoutDashboard, ShieldCheck,
-  Briefcase, Menu, X
+  Briefcase, Menu, X, House
 } from 'lucide-react';
 
 const NavButton = ({ active, onClick, icon, label, count }: any) => (
@@ -185,6 +185,7 @@ export default function Sidebar() {
             <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={16} className="md:w-[18px] md:h-[18px]" />} label="Billing & Revenue" />
             <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={16} className="md:w-[18px] md:h-[18px]" />} label="Data Analytics" />
             <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />} label="Audit Logs" />
+            <NavButton active={false} onClick={() => router.push('/')} icon={<House size={16} className="md:w-[18px] md:h-[18px]" />} label="Home" />
           </div>
         </div>
       </div>

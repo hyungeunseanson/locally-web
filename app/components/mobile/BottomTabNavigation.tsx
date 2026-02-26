@@ -18,7 +18,8 @@ export default function BottomTabNavigation() {
     const isHostNavPath =
         pathname?.startsWith('/host/dashboard') ||
         pathname?.startsWith('/host/menu') ||
-        pathname?.startsWith('/host/help');
+        pathname?.startsWith('/host/help') ||
+        pathname?.startsWith('/host/notifications');
     const activeHostTab = searchParams?.get('tab') || 'reservations';
     const { user } = useAuth();
     const avatarUrl = user?.user_metadata?.avatar_url;

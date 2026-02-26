@@ -5,9 +5,9 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useNotification } from '@/app/context/NotificationContext';
 import {
   Bell, Check, Trash2, Calendar, MessageSquare,
-  Info, AlertTriangle, ChevronRight
+  Info, AlertTriangle, ChevronRight, ArrowLeft
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import Skeleton from '@/app/components/ui/Skeleton';
 import { useToast } from '@/app/context/ToastContext';
@@ -24,7 +24,9 @@ export default function NotificationsPage() {
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
 
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
+  const isHostNotifications = pathname?.startsWith('/host');
 
   // 🟢 [정석] Context(DB) 데이터와 동기화
   // 더 이상 booking 테이블을 직접 조회하지 않습니다.
@@ -55,7 +57,8 @@ export default function NotificationsPage() {
 
     // 2. 링크가 있고, 그 링크가 '현재 페이지(/notifications)'가 아니면 이동
     // (예약, 메시지 등은 여기 걸려서 이동됨)
-    if (noti.link && noti.link !== '/notifications') {
+    const selfLinks = ['/notifications', '/host/notifications'];
+    if (noti.link && !selfLinks.includes(noti.link)) {
       router.push(noti.link);
       return;
     }
@@ -73,6 +76,14 @@ export default function NotificationsPage() {
     return true;
   });
 
+  const handleMobileBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(isHostNotifications ? '/host/menu' : '/account');
+  };
+
   const getIcon = (type: string) => {
     if (type.includes('booking')) return <Calendar size={18} className="text-blue-500" />;
     if (type.includes('message')) return <MessageSquare size={18} className="text-indigo-500" />;
@@ -85,6 +96,16 @@ export default function NotificationsPage() {
       <SiteHeader />
 
       <main className="max-w-2xl mx-auto px-4 md:px-6 py-6 md:py-12">
+        <div className="md:hidden mb-3">
+          <button
+            onClick={handleMobileBack}
+            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="뒤로가기"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
           <div>
             <h1 className="text-[18px] md:text-2xl font-black mb-1 flex items-center gap-2">
@@ -168,7 +189,7 @@ export default function NotificationsPage() {
                   </div>
 
                   <div className="flex items-center text-slate-300 group-hover:text-slate-500 transition-all ml-1">
-                    {noti.link && noti.link !== '/notifications' ? (
+                    {noti.link && !['/notifications', '/host/notifications'].includes(noti.link) ? (
                       <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                     ) : (
                       <ChevronRight size={14} className={`transition-transform duration-300 ${expandedIds.includes(noti.id) ? 'rotate-90' : ''}`} />
