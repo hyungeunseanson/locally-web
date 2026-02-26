@@ -235,7 +235,7 @@ function SearchResults() {
           </button>
         </div>
         <div className="pt-2">
-          <p className="text-[13px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
+          <p className="text-[12px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
           <p className="mt-0.5 text-[11px] text-[#6B6B6B] line-clamp-1">{city} · 6시간</p>
           <p className="mt-0.5 text-[11px] text-[#3E3E3E]">
             1인당 <span className="font-semibold">₩{price}부터</span> · ★ {rating}

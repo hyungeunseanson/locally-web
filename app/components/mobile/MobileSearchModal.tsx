@@ -474,7 +474,7 @@ export default function MobileSearchModal({
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
                             <div className="p-5">
-                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">체험 언어를 선택하세요</h3>
+                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">진행 언어</h3>
                                 <div className="space-y-0.5">
                                     {languages.map((lang) => (
                                         <button
@@ -489,7 +489,12 @@ export default function MobileSearchModal({
                                                     {lang.code ? (
                                                         <img src={`https://flagcdn.com/w40/${lang.code}.png`} alt={lang.label} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <span className="text-[10px]">🌐</span>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                            <circle cx="12" cy="12" r="9" stroke="#6B7280" strokeWidth="1.6" />
+                                                            <path d="M3 12H21" stroke="#6B7280" strokeWidth="1.2" />
+                                                            <path d="M12 3C14.5 5.5 15.9 8.5 15.9 12C15.9 15.5 14.5 18.5 12 21" stroke="#6B7280" strokeWidth="1.2" />
+                                                            <path d="M12 3C9.5 5.5 8.1 8.5 8.1 12C8.1 15.5 9.5 18.5 12 21" stroke="#6B7280" strokeWidth="1.2" />
+                                                        </svg>
                                                     )}
                                                 </div>
                                                 <div>

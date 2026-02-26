@@ -177,7 +177,7 @@ export default function HomePageClient() {
                     <div key={idx}>
                       {idx > 0 && <div className="h-[12px] w-full mb-1 bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />}
                       <div className="flex items-center justify-between px-5 pt-4 pb-3">
-                        <h2 className="text-[15px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
+                        <h2 className="text-[17px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
                         <SectionArrow />
                       </div>
                       <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
