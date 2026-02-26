@@ -97,64 +97,84 @@ export default function MobileSearchModal({
 
     const PlaceIcon = ({ type }: { type: string }) => {
         const colors: Record<string, string> = {
-            tokyo: '#EC6A6A',
-            osaka: '#F0953D',
-            seoul: '#6DA6E9',
-            izakaya: '#CFA223',
+            tokyo: '#EB6969',
+            osaka: '#F19340',
+            seoul: '#6FA8EB',
+            izakaya: '#CFA328',
         };
         const stroke = colors[type] || '#6B7280';
-        const sw = 1.85;
+        const sw = 1.78;
+        const blurId = `icon-soft-${type}`;
+
+        const paths = () => {
+            if (type === 'tokyo') {
+                return (
+                    <>
+                        <path d="M13 3V6.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M11.1 6.2H14.9" stroke={stroke} strokeWidth={sw} />
+                        <path d="M10.8 6.2L9.7 10.5H16.3L15.2 6.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M8.7 12H17.3" stroke={stroke} strokeWidth={sw} />
+                        <path d="M9.4 12V15.4" stroke={stroke} strokeWidth={sw} />
+                        <path d="M16.6 12V15.4" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7.5 17.3H18.5" stroke={stroke} strokeWidth={sw} />
+                        <path d="M6.2 22H19.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7.5 22L10.8 17.3" stroke={stroke} strokeWidth={sw} />
+                        <path d="M18.5 22L15.2 17.3" stroke={stroke} strokeWidth={sw} />
+                        <path d="M10.8 15.4H15.2" stroke={stroke} strokeWidth={sw} />
+                    </>
+                );
+            }
+            if (type === 'osaka') {
+                return (
+                    <>
+                        <path d="M4.5 7.8C9.2 9.2 16.8 9.2 21.5 7.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M5.4 10.2H20.6" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7.2 10.2V21.5" stroke={stroke} strokeWidth={sw} />
+                        <path d="M18.8 10.2V21.5" stroke={stroke} strokeWidth={sw} />
+                        <path d="M9.8 12.6H16.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M8.5 15.8H17.5" stroke={stroke} strokeWidth={sw} />
+                        <path d="M6.2 21.5H9.4" stroke={stroke} strokeWidth={sw} />
+                        <path d="M16.6 21.5H19.8" stroke={stroke} strokeWidth={sw} />
+                    </>
+                );
+            }
+            if (type === 'seoul') {
+                return (
+                    <>
+                        <path d="M13 2.8V6.1" stroke={stroke} strokeWidth={sw} />
+                        <path d="M11.9 6.1H14.1" stroke={stroke} strokeWidth={sw} />
+                        <path d="M11.3 6.1V9.2H14.7V6.1" stroke={stroke} strokeWidth={sw} />
+                        <rect x="9.6" y="9.9" width="6.8" height="3.9" rx="0.8" stroke={stroke} strokeWidth={sw} />
+                        <path d="M13 13.8V20.1" stroke={stroke} strokeWidth={sw} />
+                        <path d="M10.3 16.6H15.7" stroke={stroke} strokeWidth={sw} />
+                        <path d="M9.8 20.1H16.2" stroke={stroke} strokeWidth={sw} />
+                        <path d="M7.7 22H18.3" stroke={stroke} strokeWidth={sw} />
+                    </>
+                );
+            }
+            return (
+                <>
+                    <rect x="8" y="6.2" width="8.8" height="13.5" rx="2.2" stroke={stroke} strokeWidth={sw} />
+                    <path d="M16.8 9.2H18.6C19.7 9.2 20.5 10 20.5 11.1V15.4C20.5 16.5 19.7 17.3 18.6 17.3H16.8" stroke={stroke} strokeWidth={sw} />
+                    <path d="M10.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+                    <path d="M12.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+                    <path d="M14.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+                    <path d="M9 5.3C9.6 4.3 10.8 4.3 11.4 5.3C12 6.3 13.2 6.3 13.8 5.3C14.4 4.3 15.6 4.3 16.2 5.3" stroke={stroke} strokeWidth={sw} />
+                </>
+            );
+        };
 
         return (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                {type === 'tokyo' && (
-                    <>
-                        <path d="M12 2.5V5.5" stroke={stroke} strokeWidth={sw} />
-                        <path d="M10.2 5.5H13.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M10 5.5L9 9.2H15L14 5.5" stroke={stroke} strokeWidth={sw} />
-                        <path d="M8.3 10.6H15.7" stroke={stroke} strokeWidth={sw} />
-                        <path d="M9.1 10.6V13.4" stroke={stroke} strokeWidth={sw} />
-                        <path d="M14.9 10.6V13.4" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7 15.2H17" stroke={stroke} strokeWidth={sw} />
-                        <path d="M6 20.5H18" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7 20.5L10.2 15.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M17 20.5L13.8 15.2" stroke={stroke} strokeWidth={sw} />
-                    </>
-                )}
-                {type === 'osaka' && (
-                    <>
-                        <path d="M4.2 6.8C8.8 8 15.2 8 19.8 6.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M5.2 8.8H18.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M6.6 8.8V19.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M17.4 8.8V19.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M9.2 10.6H14.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7.8 13.8H16.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M6 19.8H8.8" stroke={stroke} strokeWidth={sw} />
-                        <path d="M15.2 19.8H18" stroke={stroke} strokeWidth={sw} />
-                    </>
-                )}
-                {type === 'seoul' && (
-                    <>
-                        <path d="M12 2.5V5.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M10.8 5.2H13.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M10.2 5.2V7.8H13.8V5.2" stroke={stroke} strokeWidth={sw} />
-                        <rect x="8.7" y="8.5" width="6.6" height="3.6" rx="0.7" stroke={stroke} strokeWidth={sw} />
-                        <path d="M12 12.1V18.4" stroke={stroke} strokeWidth={sw} />
-                        <path d="M9.4 15.2H14.6" stroke={stroke} strokeWidth={sw} />
-                        <path d="M8.8 18.4H15.2" stroke={stroke} strokeWidth={sw} />
-                        <path d="M7 20.5H17" stroke={stroke} strokeWidth={sw} />
-                    </>
-                )}
-                {type === 'izakaya' && (
-                    <>
-                        <rect x="7.2" y="5.6" width="8.8" height="13.2" rx="2.1" stroke={stroke} strokeWidth={sw} />
-                        <path d="M16 8.8H17.7C18.7 8.8 19.5 9.6 19.5 10.6V15.2C19.5 16.2 18.7 17 17.7 17H16" stroke={stroke} strokeWidth={sw} />
-                        <path d="M9.6 9.3V16" stroke={stroke} strokeWidth={sw} />
-                        <path d="M12 9.3V16" stroke={stroke} strokeWidth={sw} />
-                        <path d="M14.4 9.3V16" stroke={stroke} strokeWidth={sw} />
-                        <path d="M8.3 4.8C8.9 3.8 10.1 3.8 10.7 4.8C11.3 5.8 12.5 5.8 13.1 4.8C13.7 3.8 14.9 3.8 15.5 4.8" stroke={stroke} strokeWidth={sw} />
-                    </>
-                )}
+            <svg width="24" height="24" viewBox="0 0 26 26" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <defs>
+                    <filter id={blurId} x="-30%" y="-30%" width="160%" height="160%">
+                        <feGaussianBlur stdDeviation="0.55" />
+                    </filter>
+                </defs>
+                <g opacity="0.34" filter={`url(#${blurId})`} transform="translate(0 0.65)">
+                    {paths()}
+                </g>
+                <g>{paths()}</g>
             </svg>
         );
     };
