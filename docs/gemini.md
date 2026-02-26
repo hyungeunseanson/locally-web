@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
 **Last Updated:** 2026-02-26  
-**Version:** 3.2.6 (Mobile Home CTA Spacing + Search Backdrop Tuning)  
+**Version:** 3.2.7 (Mobile Search Query Logic Hardening)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -116,6 +116,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 모바일 검색 결과/홈 타이포 동기화: 검색 카드 제목은 홈 카드 모바일 제목 크기 기준으로 통일하고, 홈 섹션 헤드라인 크기를 검색 결과 섹션 타이틀과 동일 스케일로 상향
 - 모바일 검색 필터 헤더 확장: 우측 설정 아이콘 탭에서 통합 `필터` 시트를 열어 체험 유형+시간대를 함께 선택하고 CTA 문구를 `결과 보기`로 고정
 - 모바일 검색 언어 라벨 정리: 언어 섹션 헤더를 `진행 언어`로 단순화하고 `전체` 옵션 아이콘을 국기 톤과 어울리는 중립 글로벌 심볼로 교체
+- 모바일 검색 라우팅 파라미터 보강: 홈 검색 모달에서 `startDate/endDate/language/location`을 함께 전달해 검색 화면 헤더/필터 상태와 URL 쿼리 일관성을 유지
+- 검색 매칭 로직 강화: 검색어를 단어 단위로 정규화한 뒤 `title/description/city/country/category + 다국어 필드 + tags` 전체에서 AND 매칭해 도시/제목 키워드 동시 검색 정확도를 상향
+- 모바일 검색 필터 실동작 보강: 날짜 쿼리는 `available_dates` 범위와 실제 교차 검증하고, 시간대 칩 선택은 체험 시간 관련 필드 키워드 기반으로 결과 리스트에 반영
 - Admin: Team Chat 가시성/알림 배지/모바일 디테일 화면 안정화
 - Host: 권한 스코프, 예약/수익 집계 기준, Realtime 범위 검증 정리
 

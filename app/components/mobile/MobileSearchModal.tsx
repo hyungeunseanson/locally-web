@@ -215,7 +215,17 @@ export default function MobileSearchModal({
         setTimeout(() => {
             onClose();
             if (locationInput) {
-                router.push(`/search?location=${encodeURIComponent(locationInput)}&language=${selectedLanguage}`);
+                const params = new URLSearchParams({
+                    location: locationInput,
+                    language: selectedLanguage || 'all',
+                });
+                if (dateRange.start) {
+                    params.set('startDate', dateRange.start.toISOString().split('T')[0]);
+                }
+                if (dateRange.end) {
+                    params.set('endDate', dateRange.end.toISOString().split('T')[0]);
+                }
+                router.push(`/search?${params.toString()}`);
             }
         }, 250);
     };

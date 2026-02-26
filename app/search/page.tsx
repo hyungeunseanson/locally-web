@@ -57,6 +57,12 @@ const TIME_OPTIONS = [
   { id: 'evening', label: '저녁', desc: '오후 5시 이후' },
 ] as const;
 
+const TIME_KEYWORDS: Record<string, string[]> = {
+  morning: ['오전', '아침', 'morning', 'am'],
+  afternoon: ['오후', '낮', 'afternoon', 'pm'],
+  evening: ['저녁', '밤', '야간', 'evening', 'night'],
+};
+
 const TYPE_OPTIONS = [
   { id: 'gallery', label: '갤러리', icon: Camera, keywords: ['갤러리', '전시'] },
   { id: 'architecture', label: '건축', icon: Building2, keywords: ['건축', '역사'] },
@@ -84,6 +90,131 @@ function formatShortDate(iso: string | null) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+function normalizeSearchInput(value: string) {
+  return value
+    .replace(/[(),'"`]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function tokenizeSearchInput(value: string) {
+  const normalized = normalizeSearchInput(value);
+  return normalized ? normalized.split(' ').filter(Boolean) : [];
+}
+
+function asString(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+function arrayToText(value: unknown) {
+  if (!Array.isArray(value)) return '';
+  return value
+    .map((entry) => {
+      if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
+      if (entry && typeof entry === 'object') {
+        const record = entry as Record<string, unknown>;
+        return [record.time, record.start, record.label, record.name].map(asString).join(' ');
+      }
+      return '';
+    })
+    .join(' ');
+}
+
+function buildSearchHaystack(item: SearchExperience) {
+  const record = item as Record<string, unknown>;
+  return [
+    item.title,
+    item.description,
+    item.city,
+    item.country,
+    item.category,
+    record.title_en,
+    record.description_en,
+    record.category_en,
+    record.title_ja,
+    record.description_ja,
+    record.category_ja,
+    record.title_zh,
+    record.description_zh,
+    record.category_zh,
+    arrayToText(record.tags),
+  ]
+    .map(asString)
+    .join(' ')
+    .toLowerCase();
+}
+
+function parseSearchDate(iso: string | null) {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function getExperienceDates(item: SearchExperience) {
+  const record = item as Record<string, unknown>;
+  const candidates = [record.available_dates, record.availableDates];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.map((value) => asString(value)).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function matchesDateRange(item: SearchExperience, startDate: string | null, endDate: string | null) {
+  const start = parseSearchDate(startDate);
+  if (!start) return true;
+
+  const end = parseSearchDate(endDate) || start;
+  const startBoundary = new Date(start);
+  const endBoundary = new Date(end);
+  startBoundary.setHours(0, 0, 0, 0);
+  endBoundary.setHours(23, 59, 59, 999);
+
+  const availableDates = getExperienceDates(item);
+  if (availableDates.length === 0) return false;
+
+  return availableDates.some((dateValue) => {
+    const timestamp = new Date(dateValue).getTime();
+    return Number.isFinite(timestamp) && timestamp >= startBoundary.getTime() && timestamp <= endBoundary.getTime();
+  });
+}
+
+function getTimeHaystack(item: SearchExperience) {
+  const record = item as Record<string, unknown>;
+  return [
+    record.start_time,
+    record.startTime,
+    record.time_slot,
+    record.timeSlot,
+    record.time_of_day,
+    record.timeOfDay,
+    record.session,
+    record.schedule_text,
+    record.scheduleText,
+    arrayToText(record.available_times),
+    arrayToText(record.availableTimes),
+    arrayToText(record.time_slots),
+    arrayToText(record.timeSlots),
+    arrayToText(record.schedules),
+  ]
+    .map(asString)
+    .join(' ')
+    .toLowerCase();
+}
+
+function matchesTimeSelection(item: SearchExperience, selectedTimes: string[]) {
+  if (selectedTimes.length === 0) return true;
+  const haystack = getTimeHaystack(item);
+  if (!haystack) return true;
+
+  return selectedTimes.some((timeId) => (TIME_KEYWORDS[timeId] || []).some((keyword) => haystack.includes(keyword)));
 }
 
 function SearchResults() {
@@ -124,8 +255,8 @@ function SearchResults() {
           .eq('status', 'active');
 
         if (location) {
-          const normalizedLocation = location.replace(/[(),]/g, ' ').trim();
-          if (!normalizedLocation) {
+          const searchTerms = tokenizeSearchInput(location);
+          if (searchTerms.length === 0) {
             setExperiences([]);
             setLoading(false);
             return;
@@ -136,6 +267,7 @@ function SearchResults() {
             'description',
             'city',
             'country',
+            'category',
             'title_en',
             'description_en',
             'category_en',
@@ -147,8 +279,11 @@ function SearchResults() {
             'category_zh',
           ];
 
-          const orQuery = searchFields.map((field) => `${field}.ilike.%${normalizedLocation}%`).join(',');
-          query = query.or(orQuery);
+          const seedTerm = searchTerms[0].replace(/[%_]/g, '');
+          if (seedTerm) {
+            const orQuery = searchFields.map((field) => `${field}.ilike.%${seedTerm}%`).join(',');
+            query = query.or(orQuery);
+          }
         }
 
         if (language !== 'all') {
@@ -157,7 +292,19 @@ function SearchResults() {
 
         const { data, error } = await query;
         if (error) throw error;
-        setExperiences(data || []);
+
+        const searchTerms = tokenizeSearchInput(location);
+        let nextData = data || [];
+
+        if (searchTerms.length > 0) {
+          nextData = nextData.filter((item) => {
+            const haystack = buildSearchHaystack(item);
+            return searchTerms.every((term) => haystack.includes(term));
+          });
+        }
+
+        nextData = nextData.filter((item) => matchesDateRange(item, startDate, endDate));
+        setExperiences(nextData);
       } catch (error) {
         console.error('Search error:', error);
         showToast('검색 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.', 'error');
@@ -170,15 +317,19 @@ function SearchResults() {
   }, [location, language, startDate, endDate, showToast, supabase]);
 
   const filteredExperiences = useMemo(() => {
-    if (selectedTypes.length === 0) return experiences;
+    let nextItems = experiences;
 
-    const selectedTypeConfig = TYPE_OPTIONS.filter((option) => selectedTypes.includes(option.id));
+    if (selectedTypes.length > 0) {
+      const selectedTypeConfig = TYPE_OPTIONS.filter((option) => selectedTypes.includes(option.id));
+      nextItems = nextItems.filter((item) => {
+        const haystack = `${getContent(item, 'title', lang) || ''} ${getContent(item, 'category', lang) || ''} ${item.city || ''}`.toLowerCase();
+        return selectedTypeConfig.some((option) => option.keywords.some((keyword) => haystack.includes(keyword.toLowerCase())));
+      });
+    }
 
-    return experiences.filter((item) => {
-      const haystack = `${getContent(item, 'title', lang) || ''} ${getContent(item, 'category', lang) || ''} ${item.city || ''}`.toLowerCase();
-      return selectedTypeConfig.some((option) => option.keywords.some((keyword) => haystack.includes(keyword.toLowerCase())));
-    });
-  }, [experiences, selectedTypes, lang]);
+    nextItems = nextItems.filter((item) => matchesTimeSelection(item, selectedTimes));
+    return nextItems;
+  }, [experiences, selectedTypes, selectedTimes, lang]);
 
   const mobileSections = useMemo(() => {
     const cityName = location || '도쿄';
@@ -235,7 +386,7 @@ function SearchResults() {
           </button>
         </div>
         <div className="pt-2">
-          <p className="text-[12px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
+          <p className="text-[11px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
           <p className="mt-0.5 text-[11px] text-[#6B6B6B] line-clamp-1">{city} · 6시간</p>
           <p className="mt-0.5 text-[11px] text-[#3E3E3E]">
             1인당 <span className="font-semibold">₩{price}부터</span> · ★ {rating}
