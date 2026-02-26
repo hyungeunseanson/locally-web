@@ -79,15 +79,31 @@ export default function HomePageClient() {
 
       <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">
         <div className="md:hidden h-[24px] w-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
-        <div className="md:hidden px-5 pt-3 pb-1">
-          <Link
-            href="/become-a-host"
-            className="w-full h-[46px] rounded-[13px] border border-[#CFCFCF] bg-transparent flex items-center justify-center text-[10px] font-medium text-[#4B4B4B] active:scale-[0.99] transition-transform"
-          >
-            <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">로컬리 소개</span>
-            <span className="font-normal mx-1">및</span>
-            <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">호스트 지원</span>
-          </Link>
+        <div className="md:hidden px-5 pt-3 pb-2">
+          <div className="relative overflow-hidden rounded-[18px] border border-white/70 bg-[radial-gradient(circle_at_20%_0%,#fff9e8_0%,#f5f7ff_40%,#eef2ff_100%)] p-3 shadow-[0_10px_20px_rgba(16,24,40,0.12),_inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <div className="pointer-events-none absolute -top-6 -right-8 h-20 w-20 rounded-full bg-[radial-gradient(circle,#ffe9b3_0%,rgba(255,233,179,0)_70%)] opacity-80" />
+            <div className="pointer-events-none absolute -bottom-8 -left-6 h-24 w-24 rounded-full bg-[radial-gradient(circle,#cfe3ff_0%,rgba(207,227,255,0)_70%)] opacity-80" />
+            <div className="relative grid grid-cols-2 gap-2">
+              <Link
+                href="/about"
+                className="h-[48px] rounded-[14px] border border-white/80 bg-[linear-gradient(180deg,#ffffff_0%,#f3f6ff_100%)] shadow-[0_6px_12px_rgba(30,41,59,0.12),_inset_0_1px_0_rgba(255,255,255,0.9)] text-[11px] font-semibold text-[#1E293B] transition-transform active:translate-y-[1px]"
+              >
+                <span className="flex h-full items-center justify-center gap-1">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#FFE8B5] text-[10px]">L</span>
+                  로컬리 소개
+                </span>
+              </Link>
+              <Link
+                href="/become-a-host"
+                className="h-[48px] rounded-[14px] border border-white/80 bg-[linear-gradient(180deg,#ffffff_0%,#f0fff7_100%)] shadow-[0_6px_12px_rgba(15,23,42,0.12),_inset_0_1px_0_rgba(255,255,255,0.9)] text-[11px] font-semibold text-[#0F172A] transition-transform active:translate-y-[1px]"
+              >
+                <span className="flex h-full items-center justify-center gap-1">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#C8F2D6] text-[10px]">H</span>
+                  호스트 지원
+                </span>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {activeTab === 'experience' && (
