@@ -96,7 +96,7 @@ function SearchResults() {
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(true);
 
-  const [activeSheet, setActiveSheet] = useState<'type' | 'time' | null>(null);
+  const [activeSheet, setActiveSheet] = useState<'type' | 'time' | 'filter' | null>(null);
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
 
@@ -181,12 +181,13 @@ function SearchResults() {
   }, [experiences, selectedTypes, lang]);
 
   const mobileSections = useMemo(() => {
+    const cityName = location || '도쿄';
     const sectionBase = filteredExperiences;
-    const bucketTitle = `${location || '도쿄'} 버킷리스트`;
 
     return [
-      { id: 'custom', title: '내가 원하는 대로 둘러보는 맞춤 탐방', items: sectionBase.slice(0, 12) },
-      { id: 'bucket', title: bucketTitle, items: [...sectionBase.slice(2), ...sectionBase].slice(0, 12) },
+      { id: 'izakaya', title: `${cityName} 이자카야 투어`, items: sectionBase.slice(0, 12) },
+      { id: 'alley', title: `${cityName} 로컬 골목 체험`, items: [...sectionBase.slice(2), ...sectionBase].slice(0, 12) },
+      { id: 'japanese', title: `${cityName} 일본어 투어`, items: [...sectionBase.slice(5), ...sectionBase].slice(0, 12) },
     ];
   }, [filteredExperiences, location]);
 
@@ -201,9 +202,18 @@ function SearchResults() {
   const clearSheetFilters = () => {
     if (activeSheet === 'time') setSelectedTimes([]);
     if (activeSheet === 'type') setSelectedTypes([]);
+    if (activeSheet === 'filter') {
+      setSelectedTimes([]);
+      setSelectedTypes([]);
+    }
   };
 
-  const hasSheetSelection = activeSheet === 'time' ? selectedTimes.length > 0 : selectedTypes.length > 0;
+  const hasSheetSelection =
+    activeSheet === 'time'
+      ? selectedTimes.length > 0
+      : activeSheet === 'type'
+        ? selectedTypes.length > 0
+        : selectedTypes.length > 0 || selectedTimes.length > 0;
 
   const renderMobileCard = (item: SearchExperience) => {
     const imageUrl =
@@ -228,7 +238,7 @@ function SearchResults() {
           <p className="text-[13px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
           <p className="mt-0.5 text-[11px] text-[#6B6B6B] line-clamp-1">{city} · 6시간</p>
           <p className="mt-0.5 text-[11px] text-[#3E3E3E]">
-            그룹 <span className="font-semibold">₩{price}부터</span> · ★ {rating}
+            1인당 <span className="font-semibold">₩{price}부터</span> · ★ {rating}
           </p>
         </div>
       </Link>
@@ -244,12 +254,12 @@ function SearchResults() {
               <ArrowLeft size={20} />
             </button>
 
-            <div className="flex-1 h-[52px] rounded-full bg-white border border-[#E6E6E6] px-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center">
+            <div className="flex-1 h-[56px] rounded-full bg-white border border-[#E6E6E6] px-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center">
               <div className="text-[12px] font-semibold text-[#202020] leading-tight">{headerTitle}</div>
               {headerSub && <div className="text-[10px] text-[#787878] leading-tight mt-[1px]">{headerSub}</div>}
             </div>
 
-            <button className="w-9 h-9 flex items-center justify-center text-[#222]">
+            <button onClick={() => setActiveSheet('filter')} className="w-9 h-9 flex items-center justify-center text-[#222]">
               <SlidersHorizontal size={18} />
             </button>
           </div>
@@ -320,7 +330,7 @@ function SearchResults() {
             <div className="space-y-8 pb-6">
               {mobileSections.map((section) => (
                 <section key={section.id}>
-                  <h3 className="text-[14px] font-semibold text-[#202020] tracking-[-0.01em] leading-tight mb-3">{section.title}</h3>
+                  <h3 className="text-[17px] font-semibold text-[#202020] tracking-[-0.01em] leading-tight mb-3">{section.title}</h3>
                   <div className="flex gap-3 overflow-x-auto no-scrollbar pr-4">{section.items.map((item) => renderMobileCard(item))}</div>
                 </section>
               ))}
@@ -402,36 +412,40 @@ function SearchResults() {
 
           <div
             className={`absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] shadow-[0_-12px_32px_rgba(0,0,0,0.16)] flex flex-col ${
-              activeSheet === 'time' ? 'h-[48dvh]' : 'h-[60dvh]'
+              activeSheet === 'time' ? 'h-[42dvh]' : activeSheet === 'type' ? 'h-[54dvh]' : 'h-[84dvh]'
             }`}
           >
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
-              <h3 className="text-[22px] font-extrabold text-[#1F1F1F] leading-tight">{activeSheet === 'time' ? '시간대' : '체험 유형'}</h3>
+              <h3 className="text-[20px] font-bold text-[#1F1F1F] leading-tight">
+                {activeSheet === 'time' ? '시간대' : activeSheet === 'type' ? '체험 유형' : '필터'}
+              </h3>
               <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]">
                 <X size={20} />
               </button>
             </div>
 
             <div className="px-6 overflow-y-auto">
-              {activeSheet === 'time' ? (
-                <div className="pt-2 space-y-4">
+              {activeSheet === 'time' && (
+                <div className="pt-1 space-y-3">
                   {TIME_OPTIONS.map((option) => (
                     <button key={option.id} onClick={() => toggleTime(option.id)} className="w-full flex items-center justify-between text-left">
                       <div>
-                        <p className="text-[18px] font-semibold text-[#222] leading-tight">{option.label}</p>
-                        <p className="mt-1 text-[13px] text-[#8A8A8A] leading-tight">{option.desc}</p>
+                        <p className="text-[15px] font-semibold text-[#222] leading-tight">{option.label}</p>
+                        <p className="mt-1 text-[11px] text-[#8A8A8A] leading-tight">{option.desc}</p>
                       </div>
                       <div
-                        className={`w-[28px] h-[28px] rounded-[8px] border-2 flex items-center justify-center ${
+                        className={`w-[24px] h-[24px] rounded-[7px] border-2 flex items-center justify-center ${
                           selectedTimes.includes(option.id) ? 'border-[#222] bg-[#222]' : 'border-[#B8B8B8] bg-white'
                         }`}
                       >
-                        {selectedTimes.includes(option.id) && <div className="w-3 h-3 rounded-[3px] bg-white" />}
+                        {selectedTimes.includes(option.id) && <div className="w-2.5 h-2.5 rounded-[3px] bg-white" />}
                       </div>
                     </button>
                   ))}
                 </div>
-              ) : (
+              )}
+
+              {activeSheet === 'type' && (
                 <div className="pt-2 flex flex-wrap gap-3 pb-3">
                   {TYPE_OPTIONS.map((option) => {
                     const Icon = option.icon;
@@ -451,6 +465,50 @@ function SearchResults() {
                   })}
                 </div>
               )}
+
+              {activeSheet === 'filter' && (
+                <div className="pt-1 pb-4">
+                  <h4 className="text-[15px] font-semibold text-[#1F1F1F] mb-3">체험 유형</h4>
+                  <div className="flex flex-wrap gap-3 pb-5">
+                    {TYPE_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      const selected = selectedTypes.includes(option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => toggleType(option.id)}
+                          className={`h-9 px-3 rounded-full border flex items-center gap-1.5 text-[12px] font-medium ${
+                            selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
+                          }`}
+                        >
+                          <Icon size={13} strokeWidth={1.8} />
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="border-t border-[#ECECEC] my-1" />
+
+                  <h4 className="text-[15px] font-semibold text-[#1F1F1F] mt-5 mb-3">시간대</h4>
+                  <div className="flex flex-wrap gap-3 pb-2">
+                    {TIME_OPTIONS.map((option) => {
+                      const selected = selectedTimes.includes(option.id);
+                      return (
+                        <button
+                          key={`filter-${option.id}`}
+                          onClick={() => toggleTime(option.id)}
+                          className={`h-9 px-4 rounded-full border text-[12px] font-medium ${
+                            selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-auto border-t border-[#EEEEEE] px-5 py-4 flex items-center justify-between" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)' }}>
@@ -465,7 +523,7 @@ function SearchResults() {
                 onClick={() => setActiveSheet(null)}
                 className="h-[44px] px-6 rounded-[10px] bg-[#222429] text-white text-[14px] font-semibold"
               >
-                300개 이상의 결과 보기
+                결과 보기
               </button>
             </div>
           </div>

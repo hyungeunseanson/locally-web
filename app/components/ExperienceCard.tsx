@@ -76,10 +76,10 @@ export default function ExperienceCard({ data }: { data: any }) {
 
         {/* 3열: 가격 */}
         <div className="mt-0.5 md:mt-1">
+          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">1인당 </span>
           <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
-            ₩{Number(data.price).toLocaleString()}
+            ₩{Number(data.price).toLocaleString()}부터
           </span>
-          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal ml-0.5">/ 인</span>
         </div>
       </div>
     </Link>
