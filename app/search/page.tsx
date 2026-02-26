@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, Suspense } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -226,6 +226,7 @@ function SearchResults() {
   const [experiences, setExperiences] = useState<SearchExperience[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(true);
+  const requestSeqRef = useRef(0);
 
   const [activeSheet, setActiveSheet] = useState<'type' | 'time' | 'filter' | null>(null);
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
@@ -245,7 +246,17 @@ function SearchResults() {
     .filter(Boolean)
     .join(' · ');
 
+  const searchSignature = `${location}|${language}|${startDate || ''}|${endDate || ''}`;
+
+  useLayoutEffect(() => {
+    // 쿼리 변경 직후 이전 결과가 한 프레임 노출되는 현상을 방지
+    setLoading(true);
+    setExperiences([]);
+  }, [searchSignature]);
+
   useEffect(() => {
+    const requestId = ++requestSeqRef.current;
+
     const fetchSearchResults = async () => {
       setLoading(true);
       try {
@@ -257,8 +268,10 @@ function SearchResults() {
         if (location) {
           const searchTerms = tokenizeSearchInput(location);
           if (searchTerms.length === 0) {
-            setExperiences([]);
-            setLoading(false);
+            if (requestId === requestSeqRef.current) {
+              setExperiences([]);
+              setLoading(false);
+            }
             return;
           }
 
@@ -304,17 +317,23 @@ function SearchResults() {
         }
 
         nextData = nextData.filter((item) => matchesDateRange(item, startDate, endDate));
-        setExperiences(nextData);
+        if (requestId === requestSeqRef.current) {
+          setExperiences(nextData);
+        }
       } catch (error) {
         console.error('Search error:', error);
-        showToast('검색 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.', 'error');
+        if (requestId === requestSeqRef.current) {
+          showToast('검색 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.', 'error');
+        }
       } finally {
-        setLoading(false);
+        if (requestId === requestSeqRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchSearchResults();
-  }, [location, language, startDate, endDate, showToast, supabase]);
+  }, [location, language, startDate, endDate, showToast, supabase, searchSignature]);
 
   const filteredExperiences = useMemo(() => {
     let nextItems = experiences;
@@ -474,8 +493,8 @@ function SearchResults() {
                   className="absolute top-[24px] left-[60px] w-[98px] h-[70px] object-cover rounded-[12px] rotate-[2deg]"
                 />
               </div>
-              <h3 className="text-[30px] font-extrabold text-[#212121] leading-tight">일치하는 결과 없음</h3>
-              <p className="mt-2 text-[15px] text-[#7A7A7A] leading-snug">날짜나 위치를 변경해 다시 검색해 보세요.</p>
+              <h3 className="text-[24px] font-bold text-[#212121] leading-tight">일치하는 결과 없음</h3>
+              <p className="mt-2 text-[13px] text-[#7A7A7A] leading-snug">날짜나 위치를 변경해 다시 검색해 보세요.</p>
             </div>
           ) : (
             <div className="space-y-8 pb-6">
