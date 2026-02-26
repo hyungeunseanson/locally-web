@@ -253,12 +253,12 @@ export default function HomeHero({
           }`}>
           {/* 체험 탭 */}
           <button onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
-            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[3px]">
+            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[1px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
                 alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-40' : 'opacity-100'}`}
               />
-              <div className="absolute -top-[6px] -right-[10px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[10px] font-semibold px-[7px] py-[2px] rounded-full z-10 border border-white/90 leading-none shadow-[0_3px_8px_rgba(14,72,170,0.45)]">
+              <div className="absolute top-[2px] right-[-6px] bg-[linear-gradient(180deg,#4B5563_0%,#1F2937_100%)] text-white text-[9px] font-semibold px-[6px] py-[2px] rounded-full z-10 border border-white/80 leading-none shadow-[0_2px_6px_rgba(15,23,42,0.35)]">
                 NEW
               </div>
             </div>
@@ -270,12 +270,12 @@ export default function HomeHero({
 
           {/* 서비스 탭 */}
           <button onClick={() => setActiveTab('service')} className="flex flex-col items-center relative">
-            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[3px]">
+            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[1px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
                 alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-40' : 'opacity-100'}`}
               />
-              <div className="absolute -top-[6px] -right-[10px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[10px] font-semibold px-[7px] py-[2px] rounded-full z-10 border border-white/90 leading-none shadow-[0_3px_8px_rgba(14,72,170,0.45)]">
+              <div className="absolute top-[2px] right-[-6px] bg-[linear-gradient(180deg,#4B5563_0%,#1F2937_100%)] text-white text-[9px] font-semibold px-[6px] py-[2px] rounded-full z-10 border border-white/80 leading-none shadow-[0_2px_6px_rgba(15,23,42,0.35)]">
                 NEW
               </div>
             </div>
@@ -346,7 +346,7 @@ export default function HomeHero({
               {/* 아이콘 영역 (54px - 텍스트 대비 약 2.5배 체감 크기) */}
               <div className="relative w-[117px] h-[117px] flex items-center justify-center shrink-0">
                 {/* NEW 배지 (좌측 상단에 딱 맞게) */}
-                <div className="absolute -top-[4px] -left-[4px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[12px] font-semibold px-[8px] py-[3px] rounded-full shadow-[0_4px_10px_rgba(14,72,170,0.45)] z-10 tracking-wide border border-white/90">
+                <div className="absolute top-[6px] right-[-2px] bg-[linear-gradient(180deg,#4B5563_0%,#1F2937_100%)] text-white text-[11px] font-semibold px-[7px] py-[3px] rounded-full shadow-[0_2px_8px_rgba(15,23,42,0.35)] z-10 tracking-wide border border-white/80">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
@@ -373,7 +373,7 @@ export default function HomeHero({
               {/* 아이콘 영역 (54px) */}
               <div className="relative w-[117px] h-[117px] flex items-center justify-center shrink-0">
                 {/* NEW 배지 */}
-                <div className="absolute -top-[4px] -left-[4px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[12px] font-semibold px-[8px] py-[3px] rounded-full shadow-[0_4px_10px_rgba(14,72,170,0.45)] z-10 tracking-wide border border-white/90">
+                <div className="absolute top-[6px] right-[-2px] bg-[linear-gradient(180deg,#4B5563_0%,#1F2937_100%)] text-white text-[11px] font-semibold px-[7px] py-[3px] rounded-full shadow-[0_2px_8px_rgba(15,23,42,0.35)] z-10 tracking-wide border border-white/80">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
