@@ -40,8 +40,18 @@ export default function HostExperienceDetailPage() {
 
   const handleDelete = async () => {
     if(!confirm("정말 이 체험을 삭제하시겠습니까? 복구할 수 없습니다.")) return;
-    
-    const { error } = await supabase.from('experiences').delete().eq('id', experience.id);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('experiences')
+      .delete()
+      .eq('id', experience.id)
+      .eq('host_id', user.id);
     if(error) alert("삭제 실패");
     else {
       alert("삭제되었습니다.");
@@ -51,6 +61,20 @@ export default function HostExperienceDetailPage() {
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center">Loading...</div>;
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
+
+  const previewImage = experience.photos?.[0] || experience.image_url;
+  const locationText = experience.location || experience.meeting_point || [experience.country, experience.city].filter(Boolean).join(' ');
+  const ratingText = typeof experience.rating === 'number' ? experience.rating.toFixed(1) : '-';
+  const statusLabel = experience.status === 'active'
+    ? '공개 중'
+    : experience.status === 'pending'
+      ? '승인 대기'
+      : experience.status === 'revision'
+        ? '수정 요청'
+        : experience.status === 'rejected'
+          ? '반려'
+          : '비공개';
+  const statusColor = experience.status === 'active' ? 'text-green-600' : 'text-slate-500';
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-20 md:pb-0">
@@ -83,8 +107,8 @@ export default function HostExperienceDetailPage() {
 
         {/* 이미지 섹션 */}
         <div className="relative aspect-video rounded-3xl overflow-hidden mb-8 bg-slate-100 border border-slate-200">
-          {experience.image_url ? (
-            <img src={experience.image_url} className="w-full h-full object-cover" alt={experience.title} />
+          {previewImage ? (
+            <img src={previewImage} className="w-full h-full object-cover" alt={experience.title} />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-slate-400">이미지 없음</div>
           )}
@@ -94,8 +118,8 @@ export default function HostExperienceDetailPage() {
           {/* 상세 정보 */}
           <div className="md:col-span-2 space-y-8">
             <div className="flex items-center gap-4 text-sm text-slate-500">
-              <span className="flex items-center gap-1"><MapPin size={16}/> {experience.location || '위치 정보 없음'}</span>
-              <span className="flex items-center gap-1"><Star size={16} className="text-black fill-black"/> 4.8 (호스트 평점)</span>
+              <span className="flex items-center gap-1"><MapPin size={16}/> {locationText || '위치 정보 없음'}</span>
+              <span className="flex items-center gap-1"><Star size={16} className="text-black fill-black"/> {ratingText}</span>
             </div>
 
             <div>
@@ -127,7 +151,7 @@ export default function HostExperienceDetailPage() {
                 </div>
                 <div className="flex justify-between">
                     <span className="text-slate-500">상태</span>
-                    <span className="font-bold text-green-600">공개 중</span>
+                    <span className={`font-bold ${statusColor}`}>{statusLabel}</span>
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { Settings, ChevronDown, ChevronUp, Info, BookOpen, CreditCard } from 'lu
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Skeleton from '@/app/components/ui/Skeleton';
+import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 
 export default function Earnings() {
   const supabase = createClient();
@@ -52,8 +53,7 @@ export default function Earnings() {
             experiences!inner ( host_id )
           `)
           .eq('experiences.host_id', user.id)
-          .neq('status', 'declined')
-          .neq('status', 'cancellation_requested');
+          .in('status', [...BOOKING_CONFIRMED_STATUSES, 'cancelled']);
 
         if (error) throw error;
 

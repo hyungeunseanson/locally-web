@@ -5,7 +5,7 @@ import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal';
 import { Send, ShieldCheck, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 export default function InquiryChat() {
   const {
@@ -25,6 +25,8 @@ export default function InquiryChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const guestIdFromUrl = searchParams.get('guestId');
 
   const [modalUserId, setModalUserId] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export default function InquiryChat() {
   }, [messages]);
 
   const secureUrl = (url: string | null | undefined) => {
-    if (!url) return '/default-avatar.png';
+    if (!url) return '/images/logo.png';
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
   };
@@ -162,7 +164,12 @@ export default function InquiryChat() {
               {/* 뒤로가기 */}
               <button
                 className="md:hidden p-1.5 -ml-0.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
-                onClick={() => clearSelected()}
+                onClick={() => {
+                  clearSelected();
+                  if (guestIdFromUrl) {
+                    router.replace(`${pathname}?tab=inquiries`, { scroll: false });
+                  }
+                }}
               >
                 <ArrowLeft size={18} className="text-gray-700" />
               </button>

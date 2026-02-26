@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -24,6 +24,7 @@ export default function ReservationManager() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<any>(null);
   const [reviewedBookingIds, setReviewedBookingIds] = useState<number[]>([]); // 작성 완료된 예약 ID 목록
+  const hostExperienceIdsRef = useRef<Set<string>>(new Set());
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<any[]>([]);
@@ -76,6 +77,12 @@ export default function ReservationManager() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const { data: hostExperiences } = await supabase
+        .from('experiences')
+        .select('id')
+        .eq('host_id', user.id);
+      hostExperienceIdsRef.current = new Set((hostExperiences || []).map((item: any) => String(item.id)));
+
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -109,7 +116,7 @@ guest:profiles!bookings_user_id_fkey (
     } finally {
       if (!isBackground) setLoading(false);
     }
-  }, [supabase, showToast]);
+  }, [supabase, showToast, t]);
 
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
 
@@ -118,6 +125,9 @@ guest:profiles!bookings_user_id_fkey (
     const channel = supabase.channel('host-dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
         async (payload) => {
+          const changedExperienceId = String((payload.new as any)?.experience_id || (payload.old as any)?.experience_id || '');
+          if (!changedExperienceId || !hostExperienceIdsRef.current.has(changedExperienceId)) return;
+
           fetchReservations(true);
 
           const { data: { user } } = await supabase.auth.getUser();
@@ -147,7 +157,7 @@ guest:profiles!bookings_user_id_fkey (
       ).subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchReservations, supabase, showToast]);
+  }, [fetchReservations, supabase, showToast, t]);
 
   const addToGoogleCalendar = (res: any) => {
     const title = encodeURIComponent(`[Locally] ${res.experiences?.title} - ${res.guest?.full_name}님`);
@@ -197,7 +207,7 @@ guest:profiles!bookings_user_id_fkey (
     }
   };
 
-  const filteredList = reservations.filter(r => {
+  const isReservationInTab = useCallback((r: any, tab: 'upcoming' | 'completed' | 'cancelled') => {
     const isCancelled = r.status === 'cancelled' || r.status === 'declined';
     const isRequesting = r.status === 'cancellation_requested';
 
@@ -208,15 +218,17 @@ guest:profiles!bookings_user_id_fkey (
 
     const isPending = r.status === 'PENDING'; // 🟢 추가
 
-    if (activeTab === 'cancelled') return isCancelled || isRequesting;
+    if (tab === 'cancelled') return isCancelled || isRequesting;
     if (isCancelled) return false;
 
     // 🟢 [수정] PENDING 상태도 '예정된 예약'으로 취급
-    if (activeTab === 'upcoming') return tripDate >= today || isRequesting || isPending;
+    if (tab === 'upcoming') return tripDate >= today || isRequesting || isPending;
 
-    if (activeTab === 'completed') return tripDate < today && !isRequesting && !isPending;
+    if (tab === 'completed') return tripDate < today && !isRequesting && !isPending;
     return true;
-  }).sort((a, b) => {
+  }, []);
+
+  const filteredList = reservations.filter(r => isReservationInTab(r, activeTab)).sort((a, b) => {
     // ✅ [복구] 정렬 로직 (신규 예약 최상단)
     const newA = isNew(a.created_at, a.id);
     const newB = isNew(b.created_at, b.id);
@@ -231,7 +243,7 @@ guest:profiles!bookings_user_id_fkey (
 
   return (
     // ✅ [복구] 높이 고정 (h-[80vh])
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-[80vh] flex flex-col">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] md:min-h-[750px] h-full flex flex-col">
 
       {/* 헤더 */}
       <div className="px-4 py-3 md:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 md:gap-4 bg-white sticky top-0 z-10">
@@ -259,10 +271,7 @@ guest:profiles!bookings_user_id_fkey (
               ? reservations.filter(r => r.status === 'cancellation_requested').length : 0;
 
             const hasNew = reservations.some(r => {
-              const isTabMatch =
-                tab.id === 'upcoming' ? ['PAID', 'confirmed'].includes(r.status) :
-                  tab.id === 'completed' ? r.status === 'completed' :
-                    tab.id === 'cancelled' ? ['cancelled', 'cancellation_requested'].includes(r.status) : true;
+              const isTabMatch = isReservationInTab(r, tab.id as 'upcoming' | 'completed' | 'cancelled');
               return isTabMatch && isNew(r.created_at, r.id);
             });
 

@@ -17,8 +17,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const supabase = createClient();
   const { showToast } = useToast();
 
-  // 🟢 [추가] 실시간 중복 처리 방지를 위한 Ref
-  const lastUpdateRef = useRef<number>(0);
+  // 실시간 이벤트 중복 수신 방지 (메시지 id 단위)
+  const processedEventRef = useRef<Set<string>>(new Set());
 
   const secureUrl = (url: string | null) => {
     if (!url || url === '') return null;
@@ -281,15 +281,16 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     if (!currentUser) return;
 
     const channel = supabase
-      .channel('chat-realtime-updates')
+      .channel(`chat-realtime-updates-${currentUser.id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
-          const now = Date.now();
-          // 0.5초 내 중복 이벤트 무시 (Supabase가 가끔 이벤트를 두 번 보냄)
-          if (now - lastUpdateRef.current < 500) return;
-          lastUpdateRef.current = now;
+          const rawId = (payload.new as any)?.id || (payload.old as any)?.id || 'unknown';
+          const eventKey = `${payload.eventType}:${rawId}`;
+          if (processedEventRef.current.has(eventKey)) return;
+          processedEventRef.current.add(eventKey);
+          setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
 
           const newData = payload.new as any;
           // 내가 보낸 게 아닐 때만 갱신 (나는 이미 낙관적 업데이트 함)

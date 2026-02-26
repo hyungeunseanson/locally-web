@@ -235,7 +235,7 @@ function DashboardContent() {
           )}
         </div>
 
-        {activeTab === 'reservations' && <div className="h-[500px] md:h-[750px]"><ReservationManager /></div>}
+        {activeTab === 'reservations' && <ReservationManager />}
         {activeTab === 'experiences' && <MyExperiences />}
         {activeTab === 'inquiries' && <InquiryChat />}
         {activeTab === 'earnings' && <Earnings />}

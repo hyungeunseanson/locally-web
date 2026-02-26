@@ -15,6 +15,7 @@ export default function HostRegisterPage() {
   const totalSteps = 9;
   const [loading, setLoading] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [existingApplicationStatus, setExistingApplicationStatus] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     targetLanguages: [] as string[],
@@ -47,6 +48,7 @@ export default function HostRegisterPage() {
 
       if (data) {
         setApplicationId(data.id);
+        setExistingApplicationStatus(data.status || null);
         setFormData(prev => ({
           ...prev,
           targetLanguages: Array.isArray(data.languages) ? data.languages : (data.target_language ? [data.target_language] : []),
@@ -150,7 +152,7 @@ export default function HostRegisterPage() {
         account_number: formData.accountNumber,
         account_holder: formData.accountHolder,
         motivation: formData.motivation,
-        status: 'pending'
+        status: applicationId && existingApplicationStatus === 'approved' ? 'approved' : 'pending'
       };
 
       let error;
@@ -165,11 +167,21 @@ export default function HostRegisterPage() {
       if (error) throw error; // If host application fails, stop immediately
 
       // Only update profile if application submission succeeded
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const safeRole = (currentProfile?.role === 'host' || currentProfile?.role === 'admin')
+        ? currentProfile.role
+        : 'host_pending';
+
       const { error: profileError } = await supabase.from('profiles').update({
         languages: formData.targetLanguages,
         bio: formData.selfIntro,
         name: formData.name,
-        role: 'host_pending',
+        role: safeRole,
         avatar_url: profileUrl
       }).eq('id', user.id);
 

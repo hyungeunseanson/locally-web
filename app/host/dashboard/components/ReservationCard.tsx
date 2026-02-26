@@ -6,6 +6,7 @@ import {
   Phone, Mail, XCircle, AlertTriangle, Loader2, CalendarPlus
 } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
 
 interface ReservationCardProps {
   res: any;
@@ -67,7 +68,7 @@ export default function ReservationCard({
     }
 
     // 🟢 [수정] PENDING 제거됨 (확정된 상태만 남김)
-    if (['PAID', 'confirmed', 'completed'].includes(status)) {
+    if (isConfirmedBookingStatus(status)) {
       return isPast
         ? <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_completed')}</span> // 이용 완료
         : <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><CheckCircle2 size={10} /> {t('res_status_paid')}</span>; // 예약 확정
@@ -77,7 +78,7 @@ export default function ReservationCard({
   };
 
   const dDay = getDDay(res.date);
-  const isConfirmed = res.status === 'confirmed' || res.status === 'PAID';
+  const isConfirmed = isConfirmedBookingStatus(res.status);
 
   // 🟢 결제 시간 다국어 포맷팅
   const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
@@ -116,14 +117,19 @@ export default function ReservationCard({
         <div className="flex-1 min-w-0">
           {/* 이름 + 체험명 */}
           <div className="flex items-center gap-1.5 mb-0.5">
-            <div className="w-5 h-5 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-              {res.guest?.avatar_url ? (
-                <img src={secureUrl(res.guest.avatar_url)!} className="w-full h-full object-cover" alt="" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center"><User size={10} className="text-slate-400" /></div>
-              )}
-            </div>
-            <span className="text-[12px] md:text-sm font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
+              className="flex items-center gap-1.5 min-w-0 text-left"
+            >
+              <div className="w-5 h-5 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+                {res.guest?.avatar_url ? (
+                  <img src={secureUrl(res.guest.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center"><User size={10} className="text-slate-400" /></div>
+                )}
+              </div>
+              <span className="text-[12px] md:text-sm font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
+            </button>
             <span className="text-[10px] md:text-xs text-slate-400 shrink-0">{res.guests}명</span>
             {isNew && <span className="bg-blue-500 text-white text-[9px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-bold animate-pulse shrink-0">N</span>}
           </div>
@@ -182,7 +188,7 @@ export default function ReservationCard({
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const isPast = targetDate < today;
-          const isValid = !['cancelled', 'cancellation_requested', 'declined'].includes(res.status);
+          const isValid = !isCancelledBookingStatus(res.status);
 
           return isPast && isValid && (
             <button
@@ -215,6 +221,12 @@ export default function ReservationCard({
               >
                 {isProcessing ? <Loader2 className="animate-spin" size={12} /> : <CheckCircle2 size={12} />}
                 {t('res_approve_btn')}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onCancelQuery(); }}
+                className="mt-2 bg-white border border-orange-200 text-orange-700 px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-orange-100 transition-colors"
+              >
+                취소 사유 문의
               </button>
             </div>
           </div>

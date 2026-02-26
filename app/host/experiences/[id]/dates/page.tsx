@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Check, Clock, Trash2, X } from 'lucide-react
 import Link from 'next/link';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
+import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 
 type TimeSlot = string;
 type AvailabilityMap = Record<string, TimeSlot[]>;
@@ -44,7 +45,7 @@ export default function ManageDatesPage() {
       .from('bookings')
       .select('date, time')
       .eq('experience_id', params.id)
-      .in('status', ['confirmed', 'paid', 'completed']);
+      .in('status', [...BOOKING_CONFIRMED_STATUSES]);
 
     const availMap: AvailabilityMap = {};
     if (slots) {
@@ -145,7 +146,7 @@ export default function ManageDatesPage() {
           .eq('experience_id', params.id)
           .eq('date', item.date)
           .eq('time', item.time)
-          .in('status', ['confirmed', 'paid', 'completed']);
+          .in('status', [...BOOKING_CONFIRMED_STATUSES]);
 
         if (count && count > 0) {
           console.warn(`Skipped deletion for ${item.date} ${item.time} due to active bookings.`);

@@ -26,12 +26,27 @@ export default function EditExperiencePage() {
   // 데이터 불러오기
   useEffect(() => {
     const fetchExp = async () => {
-      const { data, error } = await supabase.from('experiences').select('*').eq('id', params.id).maybeSingle();
-      if (error) {
-        showToast(t('msg_load_fail'), 'error'); // 🟢 번역
-        return;
-      }
-      if (data) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          showToast(t('msg_load_fail'), 'error');
+          router.push('/login');
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('experiences')
+          .select('*')
+          .eq('id', params.id)
+          .eq('host_id', user.id)
+          .maybeSingle();
+
+        if (error || !data) {
+          showToast(t('msg_load_fail'), 'error');
+          router.push('/host/dashboard?tab=experiences');
+          return;
+        }
+
         setFormData({
           ...data,
           // ✅ 기존 데이터 초기화 (Null 방지)
@@ -53,17 +68,21 @@ export default function EditExperiencePage() {
           category_ja: data.category_ja || '',
           category_zh: data.category_zh || '',
         });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchExp();
-  }, [params.id]);
+  }, [params.id, router, showToast, t]);
 
   // 저장하기
   const handleUpdate = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('로그인이 필요합니다.');
+
+      const { data, error } = await supabase
         .from('experiences')
         .update({
           // ✅ 기존 필드
@@ -95,9 +114,12 @@ export default function EditExperiencePage() {
           category_ja: formData.category_ja,
           category_zh: formData.category_zh,
         })
-        .eq('id', params.id);
+        .eq('id', params.id)
+        .eq('host_id', user.id)
+        .select('id')
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error || !data) throw new Error('수정 권한이 없거나 체험을 찾을 수 없습니다.');
       showToast(t('msg_save_success'), 'success'); // 🟢 번역
       router.refresh();
     } catch (e: any) {
@@ -115,11 +137,11 @@ export default function EditExperiencePage() {
     try {
       const file = e.target.files[0];
       const fileName = `experience/${formData.host_id}_${Date.now()}_${Math.random()}`;
-      const { error } = await supabase.storage.from('images').upload(fileName, file);
+      const { error } = await supabase.storage.from('experiences').upload(fileName, file);
 
       if (error) throw error;
 
-      const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+      const { data } = supabase.storage.from('experiences').getPublicUrl(fileName);
       setFormData((prev: any) => ({ ...prev, photos: [...prev.photos, data.publicUrl] }));
 
     } catch (err: any) {

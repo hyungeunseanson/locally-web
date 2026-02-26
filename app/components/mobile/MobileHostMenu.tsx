@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
     Bell, Settings, HelpCircle, Star,
@@ -8,60 +8,74 @@ import {
     CalendarCheck, LayoutList, MessageSquare, CircleDollarSign, User
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
+import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import HostModeTransition from './HostModeTransition';
 
 export default function MobileHostMenu() {
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<Record<string, any> | null>(null);
     const [earnings, setEarnings] = useState<{ month: string; amount: number } | null>(null);
     const [reviewSummary, setReviewSummary] = useState<{ avg: number; count: number }>({ avg: 0, count: 0 });
     const [loading, setLoading] = useState(true);
     const [showTransition, setShowTransition] = useState(false);
 
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
     useEffect(() => {
         const fetchData = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    setLoading(false);
+                    return;
+                }
 
-            const [profileRes, hostRes] = await Promise.all([
-                supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-                supabase.from('host_applications').select('*').eq('user_id', user.id).maybeSingle(),
-            ]);
+                const [profileRes, hostRes] = await Promise.all([
+                    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+                    supabase.from('host_applications').select('*').eq('user_id', user.id).maybeSingle(),
+                ]);
 
-            if (profileRes.data || hostRes.data) {
-                setProfile({
-                    ...(profileRes.data || {}),
-                    avatar_url: hostRes.data?.profile_photo || profileRes.data?.avatar_url,
-                    full_name: profileRes.data?.full_name || hostRes.data?.name,
-                });
+                if (profileRes.data || hostRes.data) {
+                    setProfile({
+                        ...(profileRes.data || {}),
+                        avatar_url: hostRes.data?.profile_photo || profileRes.data?.avatar_url,
+                        full_name: profileRes.data?.full_name || hostRes.data?.name,
+                    });
+                }
+
+                const now = new Date();
+                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+                const { data: bookingData } = await supabase
+                    .from('bookings')
+                    .select('amount, host_payout_amount, created_at, experiences!inner(host_id)')
+                    .eq('experiences.host_id', user.id)
+                    .in('status', [...BOOKING_CONFIRMED_STATUSES])
+                    .gte('created_at', monthStart);
+
+                const totalEarning = (bookingData || []).reduce(
+                    (sum: number, b: { amount: number | null; host_payout_amount: number | null }) =>
+                        sum + (b.host_payout_amount || Math.floor((b.amount || 0) * 0.8)),
+                    0
+                );
+
+                setEarnings({ month: `${now.getMonth() + 1}월 ${now.getFullYear()}`, amount: totalEarning });
+
+                const { data: reviewData } = await supabase
+                    .from('reviews')
+                    .select('rating, experiences!inner(host_id)')
+                    .eq('experiences.host_id', user.id);
+
+                if (reviewData && reviewData.length > 0) {
+                    const avg = reviewData.reduce((s: number, r: { rating: number | null }) => s + (r.rating || 0), 0) / reviewData.length;
+                    setReviewSummary({ avg: Math.round(avg * 10) / 10, count: reviewData.length });
+                } else {
+                    setReviewSummary({ avg: 0, count: 0 });
+                }
+            } finally {
+                setLoading(false);
             }
-
-            const now = new Date();
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-            const { data: bookingData } = await supabase
-                .from('bookings')
-                .select('amount, host_earning')
-                .eq('status', 'confirmed')
-                .gte('created_at', monthStart);
-
-            const totalEarning = (bookingData || []).reduce((sum: number, b: any) =>
-                sum + (b.host_earning || Math.floor((b.amount || 0) * 0.8)), 0);
-
-            setEarnings({ month: `${now.getMonth() + 1}월 ${now.getFullYear()}`, amount: totalEarning });
-
-            const { data: reviewData } = await supabase
-                .from('reviews').select('rating').eq('host_id', user.id);
-
-            if (reviewData && reviewData.length > 0) {
-                const avg = reviewData.reduce((s: number, r: any) => s + (r.rating || 0), 0) / reviewData.length;
-                setReviewSummary({ avg: Math.round(avg * 10) / 10, count: reviewData.length });
-            }
-
-            setLoading(false);
         };
         fetchData();
-    }, []);
+    }, [supabase]);
 
     if (loading) return (
         <div className="min-h-screen bg-white flex items-center justify-center">

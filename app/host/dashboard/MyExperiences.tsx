@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, Edit, Eye, Trash2, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
@@ -20,13 +20,12 @@ export default function MyExperiences() {
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchMyExperiences();
-  }, []);
-
-  const fetchMyExperiences = async () => {
+  const fetchMyExperiences = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const { data } = await supabase
       .from('experiences')
@@ -36,7 +35,11 @@ export default function MyExperiences() {
 
     if (data) setExperiences(data);
     setLoading(false);
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchMyExperiences();
+  }, [fetchMyExperiences]);
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('exp_delete_confirm'))) return; // 🟢 번역
