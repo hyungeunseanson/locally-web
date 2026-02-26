@@ -228,26 +228,24 @@ export default function HomeHero({
       </div>
 
       {/* 📱 모바일: 에어비앤비 홈화면 */}
-      <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+4px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-0'
+      <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+4px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+9px)] pb-0'
         }`} style={{
-          background: '#FAFAFA',
-          boxShadow: '0 3px 8px -1px rgba(0,0,0,0.04), 0 1px 3px -1px rgba(0,0,0,0.03)',
+          background: 'linear-gradient(180deg, #E4E4E4 0%, #ECECEC 48%, #F3F3F3 100%)',
+          boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
         }}>
 
         {/* 검색 캡슐 — 스크림 없이 바로 사용, 배경은 부모에서 상속 */}
-        <div className={`px-4 transition-all duration-300 ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[80px] opacity-100'}`}>
+        <div className={`px-5 transition-all duration-300 ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[80px] opacity-100'}`}>
           <button
             onClick={() => setIsMobileSearchOpen(true)}
-            className="w-full flex items-center justify-center gap-2 bg-white rounded-full px-6 active:scale-[0.98] transition-transform"
+            className="w-full h-[56px] flex items-center justify-center gap-2.5 bg-white rounded-[28px] px-6 active:scale-[0.98] transition-transform"
             style={{
-              paddingTop: 20,
-              paddingBottom: 20,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)',
-              border: '0.5px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              border: '1px solid rgba(0,0,0,0.08)',
             }}
           >
-            <Search size={13} className="text-[#222222] shrink-0" strokeWidth={2.5} />
-            <span className="text-[11.7px] text-[#222222] font-normal">{t('search_placeholder')}</span>
+            <Search size={14} className="text-[#3A3A3A] shrink-0" strokeWidth={2.4} />
+            <span className="text-[14px] text-[#3A3A3A] font-medium tracking-[-0.01em]">{t('home_search_cta')}</span>
           </button>
         </div>
 

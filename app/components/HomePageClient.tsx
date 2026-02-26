@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Ghost } from 'lucide-react';
+import Link from 'next/link';
 import HomeHero from '@/app/components/HomeHero';
 import ExperienceCard from '@/app/components/ExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
@@ -47,7 +48,11 @@ export default function HomePageClient() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#EDEDED] md:bg-white text-slate-900 font-sans relative">
+    <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
+      <div
+        className="md:hidden pointer-events-none absolute inset-x-0 top-0 h-[420px] z-0"
+        style={{ backgroundImage: 'linear-gradient(180deg, #E6E6E6 0px, #EEEEEE 210px, #F3F3F3 420px)' }}
+      />
       <HomeHero
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -72,7 +77,16 @@ export default function HomePageClient() {
         onSearch={applyFilters}
       />
 
-      <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen">
+      <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">
+        <div className="md:hidden px-5 pt-5 pb-1">
+          <Link
+            href="/about"
+            className="w-full h-[48px] rounded-[14px] border border-[#DFDFDF] bg-[#F2F2F2] flex items-center justify-center text-[13px] font-semibold text-[#6E6E6E] underline underline-offset-[2.5px] active:scale-[0.99] transition-transform"
+          >
+            {t('footer_intro')}
+          </Link>
+        </div>
+
         {activeTab === 'experience' && (
           loading ? (
             <>

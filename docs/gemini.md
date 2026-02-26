@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
 **Last Updated:** 2026-02-26  
-**Version:** 3.2.2 (Experience Flow Validation & Host Menu Sync)  
+**Version:** 3.2.3 (Mobile Home Hero Visual Sync)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -90,6 +90,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 새 체험 등록 스텝 검증: Step 1~6 필수 입력 검증을 추가해 누락 시 다음 단계(또는 등록) 진행 차단 + 토스트 피드백 적용
 - 체험 운영 알림 톤 통일: 일정 관리/체험 수정 화면의 브라우저 alert 기반 오류 안내를 가능한 범위에서 토스트 피드백으로 전환
 - Guest 모바일 여행 UX: 지난 여행 카드 전체 클릭 동선 복구(체험 상세 이동) 및 후기 작성 모달 높이/패딩/타이포를 모바일 하단 시트 기준으로 최적화
+- 홈 모바일 상단 시각 동기화: Hero 상단 배경과 본문 시작부 배경을 동일 톤의 그라데이션 계열로 맞추고, 검색 캡슐 크기/테두리/타이포를 레퍼런스 비율로 재조정
+- 홈 모바일 상단 CTA 분리: 상단 검색 캡슐 문구를 `search_placeholder`와 분리한 `home_search_cta` 키로 운영해 모달/데스크탑 검색 문구 회귀를 방지
+- 홈 모바일 탭 하단 요소: 체험/서비스 탭 아래에 `로컬리 소개` 캡슐 버튼을 추가해 상단 블록 레이아웃 밀도를 레퍼런스 흐름에 맞춤
 - Admin: Team Chat 가시성/알림 배지/모바일 디테일 화면 안정화
 - Host: 권한 스코프, 예약/수익 집계 기준, Realtime 범위 검증 정리
 
