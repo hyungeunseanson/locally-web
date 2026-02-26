@@ -174,7 +174,7 @@ function InboxContent() {
 
         {/* 제목 (모바일: 목록 화면에서만, 채팅창 열리면 숨김) */}
         {!selectedInquiry && (
-          <div className="md:hidden px-5 pt-4 pb-2 shrink-0 flex items-center gap-3">
+          <div className="md:hidden px-5 pt-4 pb-2 shrink-0">
             <button
               onClick={handleMobileBack}
               className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
@@ -182,7 +182,7 @@ function InboxContent() {
             >
               <ArrowLeft size={16} />
             </button>
-            <h1 className="text-[20px] font-black tracking-tight">{t('messages')}</h1>
+            <h1 className="text-[20px] font-black tracking-tight mt-2">{t('messages')}</h1>
           </div>
         )}
 
