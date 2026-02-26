@@ -237,9 +237,9 @@ function SearchResults() {
               <ArrowLeft size={20} />
             </button>
 
-            <div className="flex-1 rounded-full bg-white border border-[#E6E6E6] px-4 py-[7px] text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-              <div className="text-[13px] font-semibold text-[#202020] leading-tight">{headerTitle}</div>
-              {headerSub && <div className="text-[11px] text-[#787878] leading-tight mt-[1px]">{headerSub}</div>}
+            <div className="flex-1 h-[52px] rounded-full bg-white border border-[#E6E6E6] px-4 text-center shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center">
+              <div className="text-[12px] font-semibold text-[#202020] leading-tight">{headerTitle}</div>
+              {headerSub && <div className="text-[10px] text-[#787878] leading-tight mt-[1px]">{headerSub}</div>}
             </div>
 
             <button className="w-9 h-9 flex items-center justify-center text-[#222]">
@@ -247,24 +247,24 @@ function SearchResults() {
             </button>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <div className="mt-3 flex items-center justify-center gap-2">
             <button
               onClick={() => setActiveSheet('type')}
-              className={`h-8 px-4 rounded-full border flex items-center gap-1.5 text-[12px] font-medium whitespace-nowrap ${
+              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap ${
                 selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >
               유형
-              <ChevronDown size={13} />
+              <ChevronDown size={12} />
             </button>
             <button
               onClick={() => setActiveSheet('time')}
-              className={`h-8 px-4 rounded-full border flex items-center gap-1.5 text-[12px] font-medium whitespace-nowrap ${
+              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap ${
                 selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >
               시간대
-              <ChevronDown size={13} />
+              <ChevronDown size={12} />
             </button>
           </div>
         </div>
@@ -313,7 +313,7 @@ function SearchResults() {
             <div className="space-y-8 pb-6">
               {mobileSections.map((section) => (
                 <section key={section.id}>
-                  <h3 className="text-[31px] font-extrabold text-[#202020] tracking-[-0.02em] leading-tight mb-3">{section.title}</h3>
+                  <h3 className="text-[14px] font-semibold text-[#202020] tracking-[-0.01em] leading-tight mb-3">{section.title}</h3>
                   <div className="flex gap-3 overflow-x-auto no-scrollbar pr-4">{section.items.map((item) => renderMobileCard(item))}</div>
                 </section>
               ))}
@@ -399,23 +399,23 @@ function SearchResults() {
             }`}
           >
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
-              <h3 className="text-[39px] font-extrabold text-[#1F1F1F] leading-tight">{activeSheet === 'time' ? '시간대' : '체험 유형'}</h3>
+              <h3 className="text-[22px] font-extrabold text-[#1F1F1F] leading-tight">{activeSheet === 'time' ? '시간대' : '체험 유형'}</h3>
               <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]">
-                <X size={22} />
+                <X size={20} />
               </button>
             </div>
 
             <div className="px-6 overflow-y-auto">
               {activeSheet === 'time' ? (
-                <div className="pt-2 space-y-5">
+                <div className="pt-2 space-y-4">
                   {TIME_OPTIONS.map((option) => (
                     <button key={option.id} onClick={() => toggleTime(option.id)} className="w-full flex items-center justify-between text-left">
                       <div>
-                        <p className="text-[24px] font-semibold text-[#222] leading-tight">{option.label}</p>
-                        <p className="mt-1 text-[20px] text-[#8A8A8A] leading-tight">{option.desc}</p>
+                        <p className="text-[18px] font-semibold text-[#222] leading-tight">{option.label}</p>
+                        <p className="mt-1 text-[13px] text-[#8A8A8A] leading-tight">{option.desc}</p>
                       </div>
                       <div
-                        className={`w-8 h-8 rounded-[9px] border-2 flex items-center justify-center ${
+                        className={`w-[28px] h-[28px] rounded-[8px] border-2 flex items-center justify-center ${
                           selectedTimes.includes(option.id) ? 'border-[#222] bg-[#222]' : 'border-[#B8B8B8] bg-white'
                         }`}
                       >
@@ -433,11 +433,11 @@ function SearchResults() {
                       <button
                         key={option.id}
                         onClick={() => toggleType(option.id)}
-                        className={`h-11 px-4 rounded-full border flex items-center gap-2 text-[15px] font-medium ${
+                        className={`h-9 px-3 rounded-full border flex items-center gap-1.5 text-[12px] font-medium ${
                           selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
                         }`}
                       >
-                        <Icon size={15} strokeWidth={1.8} />
+                        <Icon size={13} strokeWidth={1.8} />
                         {option.label}
                       </button>
                     );
@@ -450,13 +450,13 @@ function SearchResults() {
               <button
                 onClick={clearSheetFilters}
                 disabled={!hasSheetSelection}
-                className={`text-[18px] font-semibold ${hasSheetSelection ? 'text-[#333]' : 'text-[#D2D2D2]'}`}
+                className={`text-[14px] font-semibold ${hasSheetSelection ? 'text-[#333]' : 'text-[#D2D2D2]'}`}
               >
                 전체 해제
               </button>
               <button
                 onClick={() => setActiveSheet(null)}
-                className="h-[52px] px-7 rounded-[12px] bg-[#222429] text-white text-[17px] font-semibold"
+                className="h-[44px] px-6 rounded-[10px] bg-[#222429] text-white text-[14px] font-semibold"
               >
                 300개 이상의 결과 보기
               </button>
