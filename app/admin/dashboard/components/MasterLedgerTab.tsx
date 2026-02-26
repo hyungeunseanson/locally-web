@@ -98,10 +98,16 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   const totals = ledgerData.reduce((acc, curr) => {
     if (['cancelled', 'declined', 'cancellation_requested'].includes(curr.status)) return acc;
 
-    acc.totalSales += Number(curr.amount || 0);
-    acc.totalBasePrice += Number(curr.total_experience_price || 0);
-    acc.totalPayout += Number(curr.host_payout_amount || (curr.total_experience_price * 0.8));
-    acc.totalProfit += Number(curr.platform_revenue || (curr.amount - (curr.total_experience_price * 0.8)));
+    // 🟢 이슈6: null/undefined 안전 처리로 NaN 방지
+    const paidAmount = Number(curr.amount) || 0;
+    const basePrice = Number(curr.total_experience_price) || paidAmount;
+    const payout = Number(curr.host_payout_amount) || (basePrice * 0.8);
+    const profit = Number(curr.platform_revenue) || (paidAmount - (basePrice * 0.8));
+
+    acc.totalSales += paidAmount;
+    acc.totalBasePrice += basePrice;
+    acc.totalPayout += payout;
+    acc.totalProfit += profit;
     return acc;
   }, { totalSales: 0, totalBasePrice: 0, totalPayout: 0, totalProfit: 0 });
 
@@ -337,13 +343,15 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                         {Number(b.price_at_booking).toLocaleString()}
                       </td>
                       <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-rose-600 bg-rose-50/30">
-                        {Number(b.host_payout_amount || (b.total_experience_price * 0.8)).toLocaleString()}
+                        {/* 🟢 이슈6: null 안전 처리 */}
+                        {(Number(b.host_payout_amount) || ((Number(b.total_experience_price) || Number(b.amount) || 0) * 0.8)).toLocaleString()}
                       </td>
                       <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-slate-900 bg-slate-100/50">
                         {Number(b.amount).toLocaleString()}
                       </td>
                       <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-blue-600">
-                        {Number(b.platform_revenue || (b.amount - (b.total_experience_price * 0.8))).toLocaleString()}
+                        {/* 🟢 이슈6: null 안전 처리 */}
+                        {(Number(b.platform_revenue) || (Number(b.amount) - ((Number(b.total_experience_price) || Number(b.amount) || 0) * 0.8))).toLocaleString()}
                       </td>
                     </tr>
                   ))

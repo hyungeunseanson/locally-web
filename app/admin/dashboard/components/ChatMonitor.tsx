@@ -147,7 +147,8 @@ export default function ChatMonitor() {
       </div>
 
       {/* 오른쪽 채팅창 (모바일에서는 오버레이처럼 보이거나 교체됨) */}
-      <div className={`flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex absolute inset-0 z-[100] w-[100vw] h-[100vh] fixed top-0 left-0 -ml-4 md:ml-0 md:static md:w-auto md:h-auto md:z-0 md:rounded-2xl' : 'hidden md:flex'}`}>
+      {/* 🟢 이슈5: 데스크탑에서 채팅창이 fullscreen으로 뜨는 문제 수정 — fixed/inset-0/w-[100vw]/h-[100vh]를 모바일 전용으로 제한 */}
+      <div className={`flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-0 z-[100] w-full h-full -ml-0 md:ml-0 md:static md:inset-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
         {selectedInquiry ? (
           <>
             <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 pt-6 md:pt-4">

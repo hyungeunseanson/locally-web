@@ -226,12 +226,13 @@ function InboxContent() {
         </div>
 
         {/* ──────────────── 우측: 채팅창 ──────────────── */}
+        {/* 🟢 이슈8: style={{ height: '100%' }} 제거 — flex-1으로 충분히 높이 결정됨, 인라인 스타일이 오히려 레이아웃 망침 */}
         <div className={`
-          flex-1 flex flex-col
+          flex-1 flex flex-col min-h-0
           md:border md:border-slate-200 md:rounded-2xl md:ml-4
           overflow-hidden
           ${!selectedInquiry ? 'hidden md:flex' : 'flex'}
-        `} style={{ height: '100%' }}>
+        `}>
           {selectedInquiry ? (
             <>
               {/* 채팅 헤더 */}

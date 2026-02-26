@@ -123,20 +123,20 @@ export default function ReservationCard({
                 <div className="w-full h-full flex items-center justify-center"><User size={10} className="text-slate-400" /></div>
               )}
             </div>
-            <span className="text-[12px] font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
-            <span className="text-[10px] text-slate-400 shrink-0">{res.guests}명</span>
+            <span className="text-[12px] md:text-sm font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
+            <span className="text-[10px] md:text-xs text-slate-400 shrink-0">{res.guests}명</span>
             {isNew && <span className="bg-blue-500 text-white text-[9px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-bold animate-pulse shrink-0">N</span>}
           </div>
           {/* 체험명 */}
-          <p className="text-[10px] text-slate-400 truncate">{res.experiences?.title}</p>
+          <p className="text-[10px] md:text-xs text-slate-400 truncate">{res.experiences?.title}</p>
         </div>
 
         {/* 우측: 상태 + 금액 + D-Day */}
         <div className="flex-shrink-0 flex flex-col items-end gap-1">
-          <span className={`text-[10px] font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
+          <span className={`text-[10px] md:text-xs font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
             }`}>{dDay}</span>
           {renderStatusBadge(res.status, res.date)}
-          <p className="text-[12px] font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
+          <p className="text-[12px] md:text-sm font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
         </div>
 
         {/* 메시지 버튼 */}

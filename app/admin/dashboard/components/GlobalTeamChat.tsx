@@ -72,7 +72,12 @@ export default function GlobalTeamChat() {
 
             if (data) {
                 setMessages(data.reverse()); // Reverse to show oldest first at top, newest at bottom
-                if (!isOpen && data.length > 0) {
+                // 🟢 이슈4-A: 메시지 로드 완료 후 isOpen 상태이면 최하단으로 스크롤
+                if (isOpen) {
+                    setTimeout(() => {
+                        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                    }, 200);
+                } else if (data.length > 0) {
                     const lastMsg = data[data.length - 1];
                     const lastViewed = localStorage.getItem('global_chat_last_viewed');
                     if (
@@ -103,9 +108,10 @@ export default function GlobalTeamChat() {
                 if (!isOpen && newMsg.author_id !== currentUser.id) {
                     setHasUnread(true);
                 } else if (isOpen) {
+                    // 🟢 이슈4-A: 실시간 수신 시 150ms 후 스크롤 (DOM 반영 보장)
                     setTimeout(() => {
                         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                    }, 100);
+                    }, 150);
                 }
             })
             .subscribe();
@@ -119,9 +125,14 @@ export default function GlobalTeamChat() {
         if (isOpen) {
             setHasUnread(false);
             localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
+            // 🟢 이슈4-A: 오픈 시 200ms로 증가 (메시지 DOM 렌더링 완료 후 스크롤)
             setTimeout(() => {
                 if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }, 100);
+            }, 200);
+            // 추가: 500ms 후 한 번 더 보장 (이미지/컨텐츠 늦게 렌더링되는 경우)
+            setTimeout(() => {
+                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }, 500);
 
             // 🟢 모바일 버블 오픈 시 Body Scroll Lock (배경화면 오버스크롤 방지)
             if (window.innerWidth < 768) {

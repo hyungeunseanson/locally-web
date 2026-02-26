@@ -319,15 +319,23 @@ export default function TeamTab() {
         <div className="flex bg-slate-100 p-0.5 rounded-lg w-full md:w-auto">
           <button
             onClick={() => setInnerTab('todo')}
-            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all ${innerTab === 'todo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 ${innerTab === 'todo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             Daily Log & Tasks
+            {/* 🟢 이슈2: 탭 N 뱃지 — 새 할일/일지/댓글 있을 때 */}
+            {innerTab !== 'todo' && (todos.some(t => isNew(t.created_at)) || dailyLogs.some(l => isNew(l.created_at)) || comments.filter(c => todos.some(t => t.id === c.task_id)).some(c => isNew(c.created_at))) && (
+              <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
+            )}
           </button>
           <button
             onClick={() => setInnerTab('memo')}
             className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'memo' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <NotebookPen size={11} /> 팀 메모장
+            {/* 🟢 이슈2: 탭 N 뱃지 — 새 메모/메모 댓글 있을 때 */}
+            {innerTab !== 'memo' && (memos.some(m => isNew(m.created_at)) || comments.filter(c => memos.some(m => m.id === c.task_id)).some(c => isNew(c.created_at))) && (
+              <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
+            )}
           </button>
         </div>
       </div>
@@ -451,17 +459,17 @@ export default function TeamTab() {
 
                       {expandedTodo === todo.id && (
                         <div className="ml-5 p-2 bg-white rounded-lg border border-slate-100 shadow-inner space-y-1.5 animate-in slide-in-from-top-2 duration-200">
-                          <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                          <div className="space-y-1.5 max-h-40 md:max-h-48 overflow-y-auto pr-1">
                             {taskComments.length === 0 ? (
-                              <p className="text-[8px] text-slate-400 text-center py-1">댓글이 없습니다.</p>
+                              <p className="text-[10px] text-slate-400 text-center py-1">댓글이 없습니다.</p>
                             ) : (
                               taskComments.map(comment => (
-                                <div key={comment.id} className="text-[8px] bg-slate-50 p-1.5 rounded-md">
-                                  <div className="flex justify-between items-center mb-0.5">
-                                    <span className="font-bold text-slate-700">{comment.author_name}</span>
-                                    <span className="text-[7px] text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
+                                <div key={comment.id} className="text-[10px] md:text-sm bg-slate-50 p-1.5 md:p-2.5 rounded-md">
+                                  <div className="flex justify-between items-center mb-0.5 md:mb-1">
+                                    <span className="font-bold text-slate-700 text-[11px] md:text-sm">{comment.author_name}</span>
+                                    <span className="text-[9px] md:text-xs text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
                                   </div>
-                                  <p className="text-slate-600">{comment.content}</p>
+                                  <p className="text-[10px] md:text-sm text-slate-600">{comment.content}</p>
                                 </div>
                               ))
                             )}
@@ -477,6 +485,7 @@ export default function TeamTab() {
                 })}
               </div>
             </div>
+
           </>
         ) : (
           /* 팀 메모장 탭 */
@@ -516,18 +525,21 @@ export default function TeamTab() {
                       {memos.map(memo => {
                         const memoComments = comments.filter(c => c.task_id === memo.id);
                         return (
-                          <div key={memo.id} className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-auto max-h-[70vh] md:h-[500px] md:max-h-none">
-                            <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100 shrink-0">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-100 flex flex-col items-center justify-center text-[11px] font-bold text-slate-600 border border-slate-200 uppercase">
+                          <div key={memo.id} className="bg-white p-3 md:p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-auto max-h-[70vh] md:h-[500px] md:max-h-none">
+                            <div className="flex justify-between items-start mb-2 md:mb-4 pb-2 md:pb-4 border-b border-slate-100 shrink-0">
+                              <div className="flex items-center gap-2 md:gap-3">
+                                {/* 🟢 이슈4-B: 메모 저자 아바타 모바일 축소 */}
+                                <div className="w-7 h-7 md:w-10 md:h-10 rounded-full bg-slate-100 flex flex-col items-center justify-center text-[9px] md:text-[11px] font-bold text-slate-600 border border-slate-200 uppercase shrink-0">
                                   {memo.author_name.slice(0, 2)}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                  {/* 🟢 이슈4-B: 저자명 모바일 축소 */}
+                                  <p className="text-[11px] md:text-sm font-bold text-slate-900 flex items-center gap-1 md:gap-2">
                                     {memo.author_name}
                                     {isNew(memo.created_at) && <span className="w-4 h-4 bg-rose-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
                                   </p>
-                                  <p className="text-[11px] text-slate-500 font-medium">
+                                  {/* 🟢 이슈4-B: 날짜 모바일 축소 */}
+                                  <p className="text-[9px] md:text-[11px] text-slate-500 font-medium">
                                     {format(new Date(memo.created_at), 'yyyy.MM.dd HH:mm', { locale: ko })}
                                   </p>
                                 </div>
@@ -615,12 +627,12 @@ export default function TeamTab() {
         )}
       </div>
 
-      {/* Discrete Admin Whitelist Manager */}
-      <div className="mt-auto pt-10 pb-2 flex flex-col items-center">
+      {/* Discrete Admin Whitelist Manager — 🟢 이슈3: 우측 정렬 */}
+      <div className="mt-auto pt-10 pb-2 flex flex-col items-end">
         {!showWhitelist ? (
           <button
             onClick={() => setShowWhitelist(true)}
-            className="text-[10px] text-slate-300 hover:text-slate-500 transition-colors flex items-center gap-1"
+            className="text-[10px] text-slate-300 hover:text-slate-500 transition-colors flex items-center gap-1 mr-2"
           >
             <Settings size={10} /> Admin Whitelist
           </button>
@@ -641,15 +653,16 @@ export default function TeamTab() {
               />
               <button onClick={addWhitelistEmail} className="bg-slate-900 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-slate-800 transition-colors">Add</button>
             </div>
-            <div className="max-h-32 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+            <div className="max-h-40 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
               {whitelist.length === 0 ? (
                 <p className="text-[9px] text-slate-400 text-center py-2">No extra admins whitelisted.</p>
               ) : (
                 whitelist.map(item => (
-                  <div key={item.id} className="flex justify-between items-center text-[10px] bg-slate-50 px-2 py-1 rounded group">
+                  <div key={item.id} className="flex justify-between items-center text-[10px] bg-slate-50 px-2 py-1.5 rounded group">
                     <span className="text-slate-600 truncate mr-2 font-medium">{item.email}</span>
-                    <button onClick={() => deleteTask('admin_whitelist', item.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
-                      <Trash2 size={10} />
+                    {/* 🟢 이슈3: 모바일에서도 삭제버튼 항상 표시 */}
+                    <button onClick={() => deleteTask('admin_whitelist', item.id)} className="text-slate-400 hover:text-rose-500 md:opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                      <Trash2 size={11} />
                     </button>
                   </div>
                 ))
@@ -659,26 +672,28 @@ export default function TeamTab() {
         )}
       </div>
 
-      {zoomImage && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
-          onClick={() => setZoomImage(null)}
-        >
-          <button
+      {
+        zoomImage && createPortal(
+          <div
+            className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
             onClick={() => setZoomImage(null)}
-            className="absolute top-6 right-6 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-colors"
           >
-            <X size={24} />
-          </button>
-          <img
-            src={zoomImage}
-            alt="Zoomed"
-            className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          />
-        </div>,
-        document.body
-      )}
-    </div>
+            <button
+              onClick={() => setZoomImage(null)}
+              className="absolute top-6 right-6 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-colors"
+            >
+              <X size={24} />
+            </button>
+            <img
+              src={zoomImage}
+              alt="Zoomed"
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            />
+          </div>,
+          document.body
+        )
+      }
+    </div >
   );
 }
