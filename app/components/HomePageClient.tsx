@@ -78,12 +78,15 @@ export default function HomePageClient() {
       />
 
       <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">
-        <div className="md:hidden px-5 pt-4 pb-1">
+        <div className="md:hidden h-[12px] w-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
+        <div className="md:hidden px-5 pt-3 pb-1">
           <Link
             href="/become-a-host"
-            className="w-full h-[46px] rounded-[13px] border border-white/55 bg-white/28 backdrop-blur-[1px] flex items-center justify-center text-[10px] font-semibold text-[#7B7B7B] underline underline-offset-2 active:scale-[0.99] transition-transform"
+            className="w-full h-[46px] rounded-[13px] border border-[#CFCFCF] bg-transparent flex items-center justify-center text-[10px] font-medium text-[#4B4B4B] active:scale-[0.99] transition-transform"
           >
-            로컬리 소개 및 호스트 지원
+            <span>로컬리 소개 </span>
+            <span className="font-normal">및</span>
+            <span> 호스트 지원</span>
           </Link>
         </div>
 
@@ -165,11 +168,9 @@ export default function HomePageClient() {
 
                   return allSections.map((section, idx) => (
                     <div key={idx}>
-                      {idx > 0 && (
-                        <div className="h-[12px] mx-5 mb-1 rounded-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
-                      )}
+                      {idx > 0 && <div className="h-[12px] w-full mb-1 bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />}
                       <div className="flex items-center justify-between px-5 pt-4 pb-3">
-                        <h2 className="text-[15px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
+                        <h2 className="text-[15px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
                         <SectionArrow />
                       </div>
                       <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
@@ -198,9 +199,9 @@ export default function HomePageClient() {
           <>
             {/* 📱 모바일 서비스 */}
             <div className="md:hidden pb-4">
-              <div className="h-[12px] mx-5 mb-1 rounded-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
+              <div className="h-[12px] w-full mb-1 bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                <h2 className="text-[15px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">{t('home_section_popular_services')}</h2>
+                <h2 className="text-[15px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{t('home_section_popular_services')}</h2>
                 <button
                   className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
                   style={{ border: '0.5px solid #B0B0B0' }}

@@ -231,7 +231,6 @@ export default function HomeHero({
       <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+6px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+9px)] pb-0'
         }`} style={{
           background: 'linear-gradient(180deg, #E4E4E4 0%, #ECECEC 48%, #F3F3F3 100%)',
-          boxShadow: '0 4px 10px -8px rgba(0,0,0,0.22)',
         }}>
 
         {/* 검색 캡슐 — 스크림 없이 바로 사용, 배경은 부모에서 상속 */}
@@ -313,7 +312,6 @@ export default function HomeHero({
           </button>
         </div>
 
-        <div className="h-[10px] bg-gradient-to-b from-black/[0.05] to-transparent opacity-45 pointer-events-none" />
       </div>
 
       {/* 📱 모바일 검색 모달 */}
