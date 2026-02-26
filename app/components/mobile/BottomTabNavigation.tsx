@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
     Search, Heart, MessageSquare, User,
     CalendarCheck, LayoutList, BookOpen, AlignJustify
@@ -13,13 +13,25 @@ import LoginModal from '@/app/components/LoginModal';
 export default function BottomTabNavigation() {
     const pathname = usePathname();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const isHostMode = pathname?.startsWith('/host');
+    const isHostNavPath = pathname?.startsWith('/host/dashboard') || pathname?.startsWith('/host/menu');
+    const activeHostTab = searchParams?.get('tab') || 'reservations';
     const { user } = useAuth();
     const avatarUrl = user?.user_metadata?.avatar_url;
     const [showLogin, setShowLogin] = useState(false);
 
-    // 어드민 경로에서는 하단 탭바 숨김 (GlobalTeamChat이 대신함)
-    if (pathname?.startsWith('/admin')) return null;
+    // 어드민/인증/결제 플로우에서는 하단 탭바 숨김
+    // 호스트 모드에서는 dashboard/menu에서만 노출해 생성/수정 화면과 충돌 방지
+    if (
+        pathname?.startsWith('/admin') ||
+        pathname?.startsWith('/login') ||
+        pathname?.startsWith('/signup') ||
+        pathname?.includes('/payment') ||
+        (isHostMode && !isHostNavPath)
+    ) {
+        return null;
+    }
 
     const handleAuthRequired = (e: React.MouseEvent, href: string) => {
         if (!user) {
@@ -111,6 +123,20 @@ export default function BottomTabNavigation() {
     ];
 
     const tabs = isHostMode ? hostTabs : guestTabs;
+    const isTabActive = (href: string) => {
+        if (href === '/') return pathname === '/';
+
+        if (href.startsWith('/host/dashboard?tab=')) {
+            const tabValue = href.split('tab=')[1];
+            return pathname?.startsWith('/host/dashboard') && activeHostTab === tabValue;
+        }
+
+        if (href === '/host/menu') {
+            return pathname?.startsWith('/host/menu');
+        }
+
+        return pathname?.startsWith(href.split('?')[0]);
+    };
 
     return (
         <>
@@ -119,9 +145,7 @@ export default function BottomTabNavigation() {
                 style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)', paddingTop: '8px' }}
             >
                 {tabs.map((tab, idx) => {
-                    const isActive = tab.href === '/'
-                        ? pathname === '/'
-                        : pathname?.startsWith(tab.href.split('?')[0]);
+                    const isActive = isTabActive(tab.href);
 
                     if (tab.requireAuth && !user) {
                         return (

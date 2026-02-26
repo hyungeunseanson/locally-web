@@ -221,7 +221,10 @@ export default function CreateExperiencePage() {
 
       {/* 푸터 */}
       {step < TOTAL_STEPS && (
-        <footer className="fixed bottom-0 left-0 right-0 h-20 md:h-24 bg-white/90 backdrop-blur-md border-t border-slate-100 flex items-center justify-between px-4 md:px-6 z-50">
+        <footer
+          className="fixed bottom-0 left-0 right-0 h-[88px] md:h-24 bg-white/90 backdrop-blur-md border-t border-slate-100 flex items-center justify-between px-4 md:px-6 z-50"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
+        >
           <button onClick={prevStep} disabled={step === 1} className={`px-4 md:px-6 py-2.5 md:py-3 rounded-full font-bold text-xs md:text-sm transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100 underline decoration-2'}`}>이전</button>
           {step === TOTAL_STEPS - 1 ? (
             <button onClick={handleSubmit} disabled={loading} className="bg-black text-white px-6 md:px-10 py-3 md:py-4 rounded-full font-bold text-sm md:text-base hover:scale-105 transition-transform shadow-xl shadow-slate-300 disabled:opacity-50 flex items-center gap-2">

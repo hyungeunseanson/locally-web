@@ -53,7 +53,7 @@ export default function HostExperienceDetailPage() {
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans pb-20">
+    <div className="min-h-screen bg-white text-slate-900 font-sans pb-20 md:pb-0">
       <SiteHeader />
       
       <main className="max-w-4xl mx-auto px-6 py-8">

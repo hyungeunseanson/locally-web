@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-26
-**Version:** 2.9.0 (Mobile/Desktop Collision Audit & Full Fix)
+**Version:** 2.10.0 (Mobile UX Integrity Patch)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -92,7 +92,7 @@
 
 ## 4. ✅ 개발 현황 및 완료된 기능 (Development Status)
 
-**전체 진행률: 약 92%** (모바일 UI 픽셀퍼펙트 완성)
+**전체 진행률: 약 94%** (모바일/데스크톱 무결성 패치 반영)
 
 ### Phase 1: 기반 구축 (Foundation) - ✅ 완료
 - [x] Supabase Auth & Profile 시스템
@@ -310,6 +310,24 @@
   - **통계 및 로그(`AnalyticsTab`, `AuditLogTab`):** 모바일 여백 최소화 및 리스트 그리드 재배치. 활동 로그(`AuditLog`)의 **타임스탬프를 두 줄(날짜/시간)로 분리**하여 좁은 화면에서의 가독성 200% 상향.
   - **공통 레이아웃 보정:** `UsersTab` 리스트 및 상세 패널 텍스트 밀집도 튜닝. 모바일 전역에서 불필요한 공백을 걷어내고(`Dashboard page.tsx p-2 md:p-6`) 콘텐츠 중심의 UI/UX 완성.
 
+### Phase 4.15: 모바일 UX 무결성 패치 (Nav/Localization/iOS) - ✅ 완료
+
+> **2026-02-26** | 수정 파일: `BottomTabNavigation.tsx`, `ServiceCard.tsx`, `HomePageClient.tsx`, `MobileSearchModal.tsx`, `MainSearchBar.tsx`, `LanguageContext.tsx`, `HomeHero.tsx`, `host/create/page.tsx`, `host/experiences/[id]/page.tsx`, `host/experiences/[id]/edit/page.tsx`
+
+- [x] **호스트 바텀 탭 활성 상태 오작동 해결:**
+  - `BottomTabNavigation`이 `?tab=` 쿼리 기준으로 정확히 활성 탭을 표시하도록 수정하여, `/host/dashboard`에서 모든 탭이 동시에 활성화되던 버그 해결.
+- [x] **바텀 탭 노출 범위 정교화 (충돌 방지):**
+  - `/admin`, 인증 페이지, 결제 플로우, 호스트 생성/수정 등 비내비게이션 화면에서 하단 탭을 자동 숨김 처리하여 주요 CTA 가림 현상 차단.
+- [x] **모바일 ServiceCard 가독성 보정:**
+  - 모바일에서 오버레이 텍스트/가격의 폰트 및 패딩을 축소하고 `md:` 분기 유지로 데스크탑 비주얼 보존.
+- [x] **홈/검색 다국어 무결성 보강:**
+  - `HomePageClient` 언어별 섹션 제목 및 서비스 섹션 타이틀을 `LanguageContext` 기반으로 번역 처리.
+  - `MobileSearchModal`/`MainSearchBar`의 언어 선택, 최근 검색, 추천 여행지 등 핵심 라벨을 다국어 키로 통일.
+- [x] **iOS Safari 안정성 보강:**
+  - 모바일 검색 모달 전체 컨테이너를 `h-[100dvh]`로 보정하고, 호스트 생성 페이지 하단 액션바에 Safe Area 패딩을 추가하여 하단 홈 인디케이터/브라우저 UI 충돌 완화.
+- [x] **데스크탑 여백 회귀 방지:**
+  - `host/experiences/[id]`, `host/experiences/[id]/edit`에 `pb-20 md:pb-0` 적용으로 모바일 여백 유지 + 데스크탑 과다 여백 제거.
+
 ---
 
 ## 5. 🚧 핵심 개발 규칙 (Development Rules)
@@ -329,9 +347,9 @@
     - 코드를 수정하거나 기능을 추가하기 전, 반드시 연관된 컴포넌트, Hook, API 파일의 전체 흐름을 최소 2회 이상 정독하고 꼼꼼히 분석할 것. 섣부른 수정으로 기존 데이터 로직이 꼬이거나 예상치 못한 부작용(Side-effect)이 발생하는 것을 철저히 방지해야 함.
 7. **무결성 유지 원칙 (Zero-Disruption Policy):**
     - 새로운 기능을 덧붙일 때, 기존에 정상 작동하던 기능, 세밀한 UI/UX 디자인(Tailwind 클래스 등), 애니메이션 로직이 단 1%라도 누락되거나 변형되어서는 안 됨. 항상 '보존'을 최우선으로 두고 확장할 것.
-7. **핀셋 수정 (Pinpoint Editing):**
+8. **핀셋 수정 (Pinpoint Editing):**
     - 요구사항을 반영할 때 컴포넌트 전체를 불필요하게 리팩토링하거나 갈아엎지 말 것. 목적을 달성할 수 있는 '최소한의 코드 라인'만 정확하게 찾아내어 수정/추가하는 핀셋 방식을 엄수할 것. (기존 코드는 최대한 건드리지 않음)
-8. **보수적인 상태 관리 및 의존성 수정:**
+9. **보수적인 상태 관리 및 의존성 수정:**
     - 기존에 정의된 useState, useEffect의 의존성 배열(Dependency Array), Props 구조를 건드릴 때는 극도로 신중하게 접근할 것. 구조 변경이 불가피하다면, 변경 전 기존 기능이 완벽히 호환되는지 먼저 검토할 것.
 
 ### 5.2 금지 사항 (DON'Ts)
@@ -425,7 +443,7 @@
 - [ ] **SEO & i18n:** 다국어 지원 아키텍처 개편 (`next-intl` 도입 검토).
 - [ ] **지도 서비스:** 국내(카카오맵) 및 해외(구글맵) 분기 처리 및 지도 기반 검색 구현.
 - [ ] **메시징 고도화:** 현재의 단순 채팅을 넘어선 미디어 전송, 읽음 확인 등이 포함된 실시간 채팅 시스템.
-- [ ] **모바일 추가 최적화:** ServiceCard 폰트 축소, 언어 섹션 제목 번역 처리, iOS Safari sticky 검증.
+- [ ] **모바일 추가 최적화:** 호스트 등록 폼(stepper) 간격 미세 튜닝, iOS Safari 실기기 QA 자동화.
 
 ### Phase 6: 운영 효율화 (Enterprise Admin)
 - [ ] **RBAC 심화:** 슈퍼 관리자, 일반 관리자, 재무 담당자 등으로 권한 세분화.

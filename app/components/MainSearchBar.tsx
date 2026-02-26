@@ -109,7 +109,7 @@ export default function MainSearchBar({
               placeholder={t('add_language')}
               // 🟢 선택된 언어에 따라 번역된 라벨 보여주기
               value={
-                selectedLanguage === 'all' ? t('city_all') :
+                selectedLanguage === 'all' ? t('lang_all') :
                   languages.find(l => l.value === selectedLanguage)?.label || selectedLanguage
               }
               readOnly
@@ -167,7 +167,7 @@ export default function MainSearchBar({
       {/* 언어 팝업 */}
       {activeSearchField === 'language' && (
         <div className="absolute top-[80px] right-0 w-[240px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
-          <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">언어 선택</h4>
+          <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">{t('mobile_language_select')}</h4>
           <div className="grid grid-cols-1 gap-1">
             {languages.map((lang) => (
               <button
@@ -179,7 +179,7 @@ export default function MainSearchBar({
                   setActiveSearchField(null);
                 }}
                 className={`flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left w-full
-                  ${selectedLanguage === lang.label ? 'bg-slate-100 ring-1 ring-slate-200' : ''}`}
+                  ${selectedLanguage === lang.value ? 'bg-slate-100 ring-1 ring-slate-200' : ''}`}
               >
                 <div className="w-8 h-6 flex items-center justify-center overflow-hidden rounded shadow-sm border border-slate-100 bg-white">
                   {lang.icon ? (

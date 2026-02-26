@@ -171,7 +171,7 @@ export default function EditExperiencePage() {
   if (!formData) return <div className="p-10 text-center">{t('msg_load_fail')}</div>; // 🟢 번역
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans pb-20">
+    <div className="min-h-screen bg-white text-slate-900 font-sans pb-20 md:pb-0">
       <SiteHeader />
 
       {/* 상단 고정 헤더 */}

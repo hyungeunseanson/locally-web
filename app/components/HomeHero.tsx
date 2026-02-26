@@ -247,7 +247,7 @@ export default function HomeHero({
             }}
           >
             <Search size={13} className="text-[#222222] shrink-0" strokeWidth={2.5} />
-            <span className="text-[11.7px] text-[#222222] font-normal">검색을 시작해 보세요</span>
+            <span className="text-[11.7px] text-[#222222] font-normal">{t('search_placeholder')}</span>
           </button>
         </div>
 

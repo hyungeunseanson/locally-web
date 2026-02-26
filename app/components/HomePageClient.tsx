@@ -8,8 +8,10 @@ import ServiceCard from '@/app/components/ServiceCard';
 import { LOCALLY_SERVICES } from '@/app/constants';
 import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { ExperienceCardSkeleton } from '@/app/components/skeletons/ExperienceCardSkeleton';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function HomePageClient() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | 'language' | null>(null);
   const [scrollY, setScrollY] = useState(0);
@@ -45,7 +47,7 @@ export default function HomePageClient() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans relative">
+    <div className="min-h-screen bg-[#EDEDED] md:bg-white text-slate-900 font-sans relative">
       <HomeHero
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -129,14 +131,14 @@ export default function HomePageClient() {
 
                   // 언어별 섹션 (사용자 언어에 따라 순서 변경)
                   const langSections: { title: string; data: any[] }[] = [];
-                  if (koreanExp.length > 0) langSections.push({ title: '한국어로 진행되는 체험', data: koreanExp });
-                  if (japaneseExp.length > 0) langSections.push({ title: '日本語の体験', data: japaneseExp });
-                  if (englishExp.length > 0) langSections.push({ title: 'Experiences in English', data: englishExp });
-                  if (chineseExp.length > 0) langSections.push({ title: '中文体验', data: chineseExp });
+                  if (koreanExp.length > 0) langSections.push({ title: t('home_section_lang_ko'), data: koreanExp });
+                  if (japaneseExp.length > 0) langSections.push({ title: t('home_section_lang_ja'), data: japaneseExp });
+                  if (englishExp.length > 0) langSections.push({ title: t('home_section_lang_en'), data: englishExp });
+                  if (chineseExp.length > 0) langSections.push({ title: t('home_section_lang_zh'), data: chineseExp });
 
                   const allSections = [
-                    { title: '인기 체험', data: popular },
-                    { title: '신규 등록된 체험', data: newest },
+                    { title: t('home_section_popular_experiences'), data: popular },
+                    { title: t('home_section_new_experiences'), data: newest },
                     ...langSections,
                   ].filter(s => s.data.length > 0);
 
@@ -180,7 +182,7 @@ export default function HomePageClient() {
             {/* 📱 모바일 서비스 */}
             <div className="md:hidden pb-4">
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                <h2 className="text-[15px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">인기 서비스</h2>
+                <h2 className="text-[15px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">{t('home_section_popular_services')}</h2>
                 <button
                   className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
                   style={{ border: '0.5px solid #B0B0B0' }}
