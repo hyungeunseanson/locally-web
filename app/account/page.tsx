@@ -37,6 +37,7 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isAdminWhitelisted, setIsAdminWhitelisted] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
   // 프로필 카드용 통계
@@ -90,6 +91,17 @@ export default function AccountPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
       setUser(user);
+
+      if (user.email) {
+        const { data: whitelistEntry } = await supabase
+          .from('admin_whitelist')
+          .select('id')
+          .eq('email', user.email)
+          .maybeSingle();
+        setIsAdminWhitelisted(!!whitelistEntry);
+      } else {
+        setIsAdminWhitelisted(false);
+      }
 
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
 
@@ -334,6 +346,7 @@ export default function AccountPage() {
         {/* ── 메뉴 그룹 2: 설정 ── */}
         <div className="px-5">
           <MobileMenuItem icon={<Settings size={17} />} label="계정 관리" href="#" onClick={(e) => { e.preventDefault(); setShowProfileView(true); }} />
+          {isAdminWhitelisted && <MobileMenuItem icon={<Shield size={17} />} label="Admin" href="/admin/dashboard" />}
           <MobileMenuItem icon={<Users size={17} />} label="호스트 되기" href="/become-a-host" />
           <MobileMenuItem icon={<HelpCircle size={17} />} label="도움말 센터" href="/help" />
         </div>

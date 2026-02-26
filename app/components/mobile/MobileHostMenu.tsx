@@ -154,7 +154,7 @@ export default function MobileHostMenu() {
             {/* ── 메뉴 그룹 3 ── */}
             <div className="px-5">
                 <HostMenuItem href="/host/dashboard?tab=profile" icon={<Settings size={17} />} label="프로필 설정" />
-                <HostMenuItem href="/help" icon={<HelpCircle size={17} />} label="도움말 센터" />
+                <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label="도움말 센터" />
             </div>
 
             {/* ── 게스트 모드 전환 플로팅 버튼 ── */}

@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-26
-**Version:** 2.11.0 (Admin Chat Usability Patch)
+**Version:** 2.13.0 (Host Mobile UX & Admin Access Routing Patch)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -344,6 +344,71 @@
   - 전역 마운트 상태는 유지하되, 실제 렌더를 `/admin/dashboard?tab=TEAM`일 때만 노출되도록 제한하여 Team Workspace 컨텍스트 외 노출 차단.
 - [x] **승인관리 탭 모바일 타이포 밀도 보정:**
   - `승인 관리 / 호스트 지원서 / 체험 등록` 헤더 및 버튼 텍스트를 모바일에서 축소(`md:` 분기 유지)하여 버튼 크기 대비 폰트 과대 노출 해소.
+
+### Phase 4.17: 호스트 사이드 무결성 재감사 및 핀셋 패치 (Host Integrity Re-Audit) - ✅ 완료
+
+> **2026-02-26** | 수정 파일: `MobileHostMenu.tsx`, `ReservationManager.tsx`, `ReservationCard.tsx`, `host/dashboard/page.tsx`, `host/dashboard/InquiryChat.tsx`, `host/dashboard/MyExperiences.tsx`, `host/dashboard/Earnings.tsx`, `host/experiences/[id]/dates/page.tsx`, `host/experiences/[id]/edit/page.tsx`, `host/experiences/[id]/page.tsx`, `host/register/page.tsx`, `payment/success/page.tsx`, `useChat.ts`, `constants/bookingStatus.ts`
+> 산출물: `docs/host-side-deep-audit-2026-02-26-reaudit.md`
+
+- [x] **호스트 수익/리뷰 집계 스코프 정합성 복구 (H-01, M-02):**
+  - `MobileHostMenu`의 월 수익 집계를 `bookings -> experiences!inner(host_id)` 기준으로 제한하고 상태 필터를 확정 상태(`PAID/confirmed/completed`)로 통일.
+  - 리뷰 집계를 `reviews.host_id` 직접 참조 방식에서 `reviews -> experiences!inner(host_id)` 기반으로 교체하여 스키마 의존성 리스크 제거.
+  - 비로그인 조기 반환 경로에서 `setLoading(false)`를 보장하여 로딩 고착 제거.
+- [x] **호스트 예약 Realtime 범위 오탐 차단 + 뱃지 정렬 일치화 (H-03, M-04):**
+  - `ReservationManager` 초기 로딩 시 호스트 소유 `experience.id` 집합을 확보하고, `bookings` Realtime payload의 `experience_id`를 교차 검증해 타 호스트 이벤트 수신을 차단.
+  - `hasNew` 계산 로직을 실제 탭 필터 함수와 동일한 기준(`isReservationInTab`)으로 통일해 탭 뱃지와 목록 체감 불일치 해소.
+- [x] **모바일/데스크탑 예약 레이아웃 이중 고정 해소 (H-07):**
+  - `dashboard/page.tsx`의 부모 고정 높이(`h-[500px] md:h-[750px]`)를 제거하고, `ReservationManager` 내부 컨테이너를 `h-full + min-h` 구조로 정리하여 중첩 스크롤 부작용 완화.
+- [x] **문의함 모바일 뒤로가기 루프 복구 + fallback 404 제거 (H-04, M-03):**
+  - `InquiryChat`에서 뒤로가기 시 `clearSelected()` 후 `guestId` 쿼리를 제거(`router.replace(...?tab=inquiries)`)해 자동 재진입 루프 차단.
+  - 아바타 기본 경로를 실제 존재 자산으로 교체해 `/default-avatar.png` 404 반복 요청 제거.
+- [x] **예약 상태값 단일화 및 일정 보호 로직 정정 (H-05):**
+  - `host/experiences/[id]/dates/page.tsx`의 활성 예약 판정에서 소문자 `paid`를 제거하고 확정 상태 집합을 공통 상수(`BOOKING_CONFIRMED_STATUSES`)로 통일.
+  - 공통 상태 상수 모듈(`app/constants/bookingStatus.ts`)을 추가해 예약 상태 매직 문자열 분산 리스크를 축소.
+- [x] **체험 수정 권한 스코프 및 로딩 무한 대기 차단 (H-06, N-01):**
+  - `edit/page.tsx` 조회/수정 쿼리에 `host_id = currentUser.id`를 강제 적용해 소유권 누락 리스크 차단.
+  - 조회 실패 경로에서 `finally` 기반 `setLoading(false)`를 보장해 무한 로딩 고착 해결.
+  - 이미지 업로드 버킷을 생성 플로우와 동일한 `experiences`로 통일하여 운영 경로 일원화.
+- [x] **정산 지표에 미확정 상태 혼입 제거 (M-01):**
+  - `Earnings.tsx` 집계 대상을 `PAID/confirmed/completed/cancelled`로 제한하고, 취소 건은 `host_payout_amount` 존재 시에만 유효 집계하도록 유지.
+- [x] **예약 카드 기능 누락 복구 (M-08):**
+  - `ReservationCard`에서 게스트 아바타/이름 영역을 프로필 모달 트리거로 연결.
+  - 취소요청 카드에 “취소 사유 문의” 액션을 추가해 상위 매니저에서 전달하던 `onCancelQuery` 경로를 실제 동작시킴.
+- [x] **호스트 재지원 시 상태/권한 회귀 방어 (N-03):**
+  - `host/register/page.tsx`에서 기존 신청 상태가 `approved`인 재제출은 `pending`으로 강등하지 않고 `approved` 유지.
+  - `profiles.role` 업데이트 시 기존 `host/admin`는 보존하고, 그 외에만 `host_pending`으로 설정하도록 분기.
+- [x] **레거시 결제 성공 페이지 우회 확정 제거 (N-02):**
+  - `payment/success/page.tsx`에서 클라이언트 직접 `bookings.status = confirmed` 업데이트 로직을 삭제하고, 주문 상태 조회 전용 화면으로 전환.
+  - 결제 확정은 기존 서버 검증 경로(`nicepay-callback`, `confirm-payment`)를 단일 소스로 유지.
+- [x] **채팅 Realtime 중복 억제 로직 개선 (N-04):**
+  - 전역 시간 기반(500ms) 중복 억제 로직을 메시지 ID 기반 이벤트 키(Set) 방식으로 교체해 근접 다중 메시지 유실 가능성을 완화.
+  - 채널명을 `chat-realtime-updates-${currentUser.id}`로 분리해 세션 간 충돌 가능성 축소.
+- [x] **기본 품질 리포트 업데이트:**
+  - 호스트 영역 재감사 문서(`host-side-deep-audit-2026-02-26-reaudit.md`)를 작성하여 기존 진단서와 유효성 비교, 신규 리스크, 우선순위 패치 계획을 아카이빙.
+
+### Phase 4.18: 호스트 모바일 UX/권한 노출 라우팅 패치 (Host Mobile UX & Admin Access) - ✅ 완료
+
+> **2026-02-26** | 수정 파일: `SiteFooter.tsx`, `SiteHeader.tsx`, `account/page.tsx`, `AuditLogTab.tsx`, `BottomTabNavigation.tsx`, `MobileHostMenu.tsx`, `host/dashboard/Earnings.tsx`, `help/page.tsx`, `host/help/page.tsx`, `host/dashboard/page.tsx`, `host/dashboard/InquiryChat.tsx`, `guest/inbox/page.tsx`, `host/dashboard/components/ProfileEditor.tsx`
+
+- [x] **푸터 Admin 링크 제거 (전역 노출 축소):**
+  - `SiteFooter`의 지원 섹션에서 `Admin` 링크를 제거해 공개 푸터를 통한 관리자 경로 노출을 차단.
+- [x] **프로필 메뉴 Admin 조건부 노출 (Whitelist 기준):**
+  - `SiteHeader` 드롭다운과 모바일 `account` 메뉴에서 `admin_whitelist.email` 매칭 사용자에게만 `Admin` 메뉴를 렌더링하도록 분기 적용.
+- [x] **Admin Audit Logs 하단 홈 복귀 CTA 추가:**
+  - `AuditLogTab` 하단 안내영역에 `/` 이동 버튼을 추가해 어드민 콘솔에서 일반 웹 홈으로 즉시 복귀 가능하도록 UX 보완.
+- [x] **호스트 모드 Help 진입 시 게스트 전환 체감 제거:**
+  - `host/help/page.tsx` 라우트 신설 및 `help/page.tsx`의 경로 기반 초기 탭(`host`) 동기화 처리.
+  - 호스트 측 Help 진입 링크(`MobileHostMenu`, `Earnings`, `SiteHeader`)를 `/host/help`로 통일.
+  - `BottomTabNavigation`에 `/host/help`를 호스트 내비게이션 허용 경로로 추가.
+- [x] **모바일 채팅 패널 고정 높이화 (호스트/게스트):**
+  - `InquiryChat`, `guest/inbox`의 모바일 채팅창을 `fixed` 패널로 전환하여 메시지 수와 무관하게 높이를 일정하게 유지.
+  - 하단 입력 바를 `BottomTabNavigation` 위(`safe-area + 탭 높이`)에 고정 배치해 입력창 가림/들쭉날쭉 높이 문제를 해소.
+- [x] **호스트 대시보드 모바일 뒤로가기 추가:**
+  - `host/dashboard/page.tsx`에 모바일 전용 상단 뒤로가기 버튼을 도입해 각 탭에서 하단 메뉴 의존 없이 직관적 복귀 동선을 제공.
+- [x] **호스트 프로필 설정 탭 모바일 타이포/레이아웃 최적화:**
+  - `ProfileEditor`의 `공개 프로필/비공개 정보` 영역에서 모바일 텍스트 크기, 패딩, 섹션 밀도를 축소하고 `md:` 분기 유지로 데스크탑 레이아웃 영향 없이 가독성 개선.
+- [x] **게스트 메시지함 모바일 뒤로가기 안정화:**
+  - 모바일 채팅 화면 뒤로가기 시 `clearSelected + router.replace('/guest/inbox')`로 상태/URL을 정리하여 채팅 선택 상태 잔존 리스크를 축소.
 
 ---
 

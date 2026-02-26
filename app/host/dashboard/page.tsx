@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import {
   List, MessageSquare, DollarSign, Star, Plus,
-  Clock, AlertCircle, XCircle, UserCog, CalendarCheck, ShieldCheck
+  Clock, AlertCircle, XCircle, UserCog, CalendarCheck, ShieldCheck, ArrowLeft
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -35,6 +35,14 @@ function DashboardContent() {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     router.push(`/host/dashboard?tab=${tab}`, { scroll: false });
+  };
+
+  const handleMobileBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/host/menu');
   };
 
   useEffect(() => {
@@ -216,7 +224,25 @@ function DashboardContent() {
 
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-w-0">
-        <div className="flex justify-between items-end mb-4 md:mb-8">
+        <div className="mb-4 md:mb-8">
+          <div className="md:hidden flex items-center justify-between mb-2">
+            <button
+              onClick={handleMobileBack}
+              className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+              aria-label="뒤로가기"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            {activeTab === 'experiences' && (
+              <Link href="/host/create">
+                <button className="bg-slate-900 text-white px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 shadow-md text-xs">
+                  <Plus size={14} /> {t('exp_new')}
+                </button>
+              </Link>
+            )}
+          </div>
+
+          <div className="flex justify-between items-end">
           <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">
             {activeTab === 'reservations' && t('menu_reservation')}
             {activeTab === 'experiences' && t('menu_my_exp')}
@@ -227,12 +253,13 @@ function DashboardContent() {
             {activeTab === 'guidelines' && '호스트 필수 교육'}
           </h1>
           {activeTab === 'experiences' && (
-            <Link href="/host/create">
+            <Link href="/host/create" className="hidden md:block">
               <button className="bg-slate-900 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl font-bold flex items-center gap-1.5 md:gap-2 hover:scale-105 transition-transform shadow-md text-xs md:text-sm">
                 <Plus size={16} className="md:w-[18px] md:h-[18px]" /> {t('exp_new')}
               </button>
             </Link>
           )}
+        </div>
         </div>
 
         {activeTab === 'reservations' && <ReservationManager />}

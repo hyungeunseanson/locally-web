@@ -154,8 +154,11 @@ export default function InquiryChat() {
       <div className={`
         flex-1 flex flex-col min-h-0
         md:border md:border-slate-200 md:rounded-2xl md:ml-0
-        overflow-hidden
-        ${!selectedInquiry ? 'hidden md:flex' : 'flex'}
+        overflow-hidden bg-white
+        ${!selectedInquiry
+          ? 'hidden md:flex'
+          : 'fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+8px)] bottom-[calc(env(safe-area-inset-bottom,0px)+74px)] z-[105] flex md:static md:inset-auto md:bottom-auto md:top-auto md:z-auto'
+        }
       `}>
         {selectedInquiry ? (
           <>

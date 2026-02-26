@@ -45,41 +45,6 @@ export default function SiteFooter() {
       default: return '한국어 (KR)';
     }
   };
-  // 🟢 [추가] 메뉴 데이터 번역 적용
-  const footerSections = [
-    {
-      title: t('footer_support'),
-      links: [
-        { label: t('footer_intro'), href: '/about' },
-        { label: t('footer_notice'), href: '/company/notices' },
-        { label: t('footer_help'), href: '/help' },
-        { label: t('footer_admin'), href: '/admin/dashboard' },
-      ]
-    },
-    {
-      title: t('footer_hosting'),
-      links: [
-        { label: t('footer_become_host'), href: '/become-a-host' },
-        { label: t('footer_community'), href: '/company/community' },
-      ]
-    },
-    {
-      title: t('footer_locally'),
-      links: [
-        { label: t('footer_news'), href: '/company/news' },
-        { label: t('footer_careers'), href: '/company/careers' },
-        { label: t('footer_investors'), href: '/company/investors' },
-        { label: t('footer_partnership'), href: '/company/partnership' },
-      ]
-    },
-    {
-      title: t('footer_social'),
-      links: [
-        { label: 'Instagram', href: 'https://instagram.com' },
-        { label: 'Naver Blog', href: 'https://blog.naver.com' },
-      ]
-    }
-  ];
   return (
     <>
       <footer className="hidden md:block bg-white border-t border-[#DDDDDD] pt-12 pb-8 text-sm text-[#222222] font-sans">
@@ -95,7 +60,6 @@ export default function SiteFooter() {
                 <li><Link href="/about" className="hover:underline">{t('footer_intro')}</Link></li>
                 <li><Link href="/company/notices" className="hover:underline">{t('footer_notice')}</Link></li>
                 <li><Link href="/help" className="hover:underline">{t('footer_help')}</Link></li>
-                <li><Link href="/admin/dashboard" className="hover:underline">{t('footer_admin')}</Link></li>
               </ul>
             </div>
 

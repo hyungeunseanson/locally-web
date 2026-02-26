@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import {
   Search, ChevronDown, ChevronUp, MessageCircle, Mail,
   User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, Globe
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
 export default function HelpCenterPage() {
   const { t } = useLanguage(); // 🟢 추가
+  const pathname = usePathname();
 
   // 🟢 FAQ 데이터 (t 함수 사용을 위해 컴포넌트 내부로 이동)
   const FAQ_DATA = {
@@ -91,13 +92,23 @@ export default function HelpCenterPage() {
       }
     ]
   };
-  const [activeTab, setActiveTab] = useState<'guest' | 'host'>('guest');
+  const [activeTab, setActiveTab] = useState<'guest' | 'host'>(
+    pathname?.startsWith('/host') ? 'host' : 'guest'
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
 
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    if (pathname?.startsWith('/host')) {
+      setActiveTab('host');
+    } else {
+      setActiveTab('guest');
+    }
+  }, [pathname]);
 
   const toggleItem = (catIdx: number, itemIdx: number) => {
     const key = `${catIdx}-${itemIdx}`;

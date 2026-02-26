@@ -20,6 +20,7 @@ function InboxContent() {
     sendMessage,
     startNewChat,
     createInquiry,
+    clearSelected,
     isLoading
   } = useChat('guest');
 
@@ -234,8 +235,11 @@ function InboxContent() {
         <div className={`
           flex-1 flex flex-col min-h-0
           md:border md:border-slate-200 md:rounded-2xl md:ml-4
-          overflow-hidden
-          ${!selectedInquiry ? 'hidden md:flex' : 'flex'}
+          overflow-hidden bg-white
+          ${!selectedInquiry
+            ? 'hidden md:flex'
+            : 'fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+8px)] bottom-[calc(env(safe-area-inset-bottom,0px)+74px)] z-[105] flex md:static md:inset-auto md:bottom-auto md:top-auto md:z-auto'
+          }
         `}>
           {selectedInquiry ? (
             <>
@@ -243,7 +247,11 @@ function InboxContent() {
               <div className="px-3 py-2.5 md:px-4 md:py-3 border-b border-gray-100 flex items-center gap-2.5 bg-white shrink-0">
                 <button
                   className="md:hidden p-1.5 -ml-0.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
-                  onClick={(e) => { e.stopPropagation(); router.push('/guest/inbox'); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearSelected();
+                    router.replace('/guest/inbox', { scroll: false });
+                  }}
                 >
                   <ArrowLeft size={18} className="text-gray-700" />
                 </button>

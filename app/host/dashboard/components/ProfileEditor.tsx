@@ -124,16 +124,16 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
         </button>
       </div>
 
-      <div className="p-4 md:p-8">
+      <div className="p-3.5 md:p-8">
         {activeTab === 'public' && (
-          <div className="space-y-6 md:space-y-8 animate-in fade-in">
+          <div className="space-y-5 md:space-y-8 animate-in fade-in">
             <div className="flex flex-col items-center">
               <label className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-lg cursor-pointer group hover:border-slate-200 transition-all">
                 {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={36} className="md:w-12 md:h-12" /></div>}
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" /></div>
                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
               </label>
-              <span className="text-xs text-slate-400 mt-2">프로필 사진 변경</span>
+              <span className="text-[11px] md:text-xs text-slate-400 mt-2">프로필 사진 변경</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -147,17 +147,17 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">자기소개</label>
-              <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-sm" placeholder="게스트에게 나를 소개해 주세요." />
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase">자기소개</label>
+              <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-[13px] md:text-sm" placeholder="게스트에게 나를 소개해 주세요." />
             </div>
           </div>
         )}
 
         {activeTab === 'private' && (
-          <div className="space-y-8 animate-in fade-in">
+          <div className="space-y-5 md:space-y-8 animate-in fade-in">
             {/* ✅ [수정] 통합된 안내 문구 (요청하신 내용 반영) */}
-            <div className="bg-yellow-50 border border-yellow-100 p-5 rounded-xl flex gap-3 text-yellow-800 text-sm leading-relaxed">
-              <AlertTriangle className="flex-shrink-0 mt-0.5" size={18} />
+            <div className="bg-yellow-50 border border-yellow-100 p-4 md:p-5 rounded-xl flex gap-2.5 md:gap-3 text-yellow-800 text-xs md:text-sm leading-relaxed">
+              <AlertTriangle className="flex-shrink-0 mt-0.5" size={16} />
               <div>
                 <p className="font-bold mb-1">개인 정보 및 정산 정보는 직접 수정할 수 없습니다.</p>
                 <p className="opacity-90">
@@ -167,8 +167,8 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
               </div>
             </div>
 
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-90">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><User size={18} /> 개인 신상 정보</h3>
+            <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-100 opacity-90">
+              <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><User size={16} className="md:w-[18px] md:h-[18px]" /> 개인 신상 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* ✅ [수정] 모든 필드 disabled 처리 */}
                 <InputGroup label="연락처" name="phone" value={formData.phone} disabled={true} />
@@ -180,8 +180,8 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
               </div>
             </div>
 
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 opacity-90">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><CreditCard size={18} /> 정산 계좌 정보</h3>
+            <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-100 opacity-90">
+              <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><CreditCard size={16} className="md:w-[18px] md:h-[18px]" /> 정산 계좌 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <InputGroup label="은행명" name="bank_name" value={formData.bank_name} disabled={true} />
                 <InputGroup label="계좌번호" name="account_number" value={formData.account_number} disabled={true} />
@@ -190,11 +190,11 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5"><FileText size={14} /> 지원 동기 (가입 시 작성)</label>
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5"><FileText size={14} /> 지원 동기 (가입 시 작성)</label>
               <textarea
                 value={formData.motivation || '작성된 내용이 없습니다.'}
                 disabled
-                className="w-full h-32 p-4 border border-slate-200 rounded-xl resize-none text-sm bg-slate-100 text-slate-500 cursor-not-allowed"
+                className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none text-[13px] md:text-sm bg-slate-100 text-slate-500 cursor-not-allowed"
               />
             </div>
           </div>
@@ -202,8 +202,8 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
 
         {/* ✅ [수정] 저장 버튼은 Public 탭에서만 노출 */}
         {activeTab === 'public' && (
-          <div className="flex justify-end pt-8 mt-4 border-t border-slate-100">
-            <button onClick={handleSave} disabled={loading} className="bg-black text-white px-5 py-3 md:px-8 md:py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50 text-sm md:text-base">
+          <div className="flex justify-end pt-6 md:pt-8 mt-4 border-t border-slate-100">
+            <button onClick={handleSave} disabled={loading} className="bg-black text-white px-4 py-2.5 md:px-8 md:py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50 text-xs md:text-base">
               <Save size={18} /> {loading ? '저장 중...' : '변경사항 저장하기'}
             </button>
           </div>
@@ -216,14 +216,14 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
 function InputGroup({ label, name, value, onChange, icon, placeholder, disabled }: any) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">{icon} {label}</label>
+      <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">{icon} {label}</label>
       <input
         type="text"
         name={name}
         value={value || ''}
         onChange={onChange}
         disabled={disabled}
-        className={`w-full p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
+        className={`w-full p-3 md:p-3.5 border border-slate-200 rounded-xl focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-[13px] md:text-sm ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
           }`}
         placeholder={placeholder}
       />

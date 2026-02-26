@@ -166,7 +166,7 @@ export default function Earnings() {
           {showSettings && (
             <div className="absolute right-0 top-12 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <button
-                onClick={() => router.push('/help')}
+                onClick={() => router.push('/host/help')}
                 className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-3 border-b border-slate-50"
               >
                 <BookOpen size={16} className="text-slate-400" /> 호스트 가이드북

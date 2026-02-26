@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, Search, Calendar, User, Info,
-  ChevronDown, ChevronUp, AlertCircle, Clock, ArrowRight, MessageSquare
+  ChevronDown, ChevronUp, AlertCircle, Clock, ArrowRight, MessageSquare, House
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
+import { useRouter } from 'next/navigation';
 
 export default function AuditLogTab() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -13,6 +14,7 @@ export default function AuditLogTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const supabase = createClient();
+  const router = useRouter();
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -228,8 +230,15 @@ export default function AuditLogTab() {
             </tbody>
           </table>
         </div>
-        <div className="bg-slate-50 p-3 md:p-4 border-t border-slate-100 flex justify-center">
+        <div className="bg-slate-50 p-3 md:p-4 border-t border-slate-100 flex flex-col items-center gap-2">
           <p className="text-[9px] md:text-[10px] font-bold text-slate-400">활동 로그는 보안을 위해 수정 및 삭제가 불가능합니다.</p>
+          <button
+            onClick={() => router.push('/')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] md:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <House size={12} />
+            웹사이트 홈으로 이동
+          </button>
         </div>
       </div>
     </div>

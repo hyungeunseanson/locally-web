@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import Link from 'next/link';
-import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell } from 'lucide-react';
+import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -24,9 +24,11 @@ import { useAuth } from '@/app/context/AuthContext'; // 🟢 Auth 훅 사용
 function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAdminWhitelisted, setIsAdminWhitelisted] = useState(false);
 
   // 🟢 [핵심] 로컬 상태 대신 전역 AuthContext 사용 (깜빡임 해결)
   const { user, isHost, applicationStatus, isLoading, signOut } = useAuth();
+  const supabase = useMemo(() => createClient(), []);
 
   const { unreadCount } = useNotification();
   const menuRef = useRef<HTMLElement>(null);
@@ -48,6 +50,35 @@ function SiteHeaderContent() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkAdminWhitelist = async () => {
+      if (!user?.email) {
+        if (!cancelled) setIsAdminWhitelisted(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('admin_whitelist')
+        .select('id')
+        .eq('email', user.email)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        setIsAdminWhitelisted(false);
+        return;
+      }
+      setIsAdminWhitelisted(!!data);
+    };
+
+    checkAdminWhitelist();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, user?.email]);
 
   const handleMainHeaderButtonClick = () => {
     if (pathname?.startsWith('/host')) {
@@ -149,13 +180,18 @@ function SiteHeaderContent() {
                     <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                       <User size={18} /> {t('account')}
                     </Link>
+                    {isAdminWhitelisted && (
+                      <Link href="/admin/dashboard" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                        <ShieldCheck size={18} /> Admin
+                      </Link>
+                    )}
                     <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                       <Settings size={18} /> {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
                     </button>
                   </div>
 
                   <div className="py-2">
-                    <Link href="/help" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                    <Link href={pathname?.startsWith('/host') ? '/host/help' : '/help'} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                       <HelpCircle size={18} /> {t('help')}
                     </Link>
                     <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
