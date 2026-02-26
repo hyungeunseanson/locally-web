@@ -249,7 +249,7 @@ export default function HomeHero({
         </div>
 
         {/* 아이콘 탭 — 에어비앤비 기본 상태 */}
-        <div className={`flex items-center justify-center gap-[52px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 pt-0 pb-0' : 'max-h-[92px] opacity-100 pt-2 pb-1'
+        <div className={`flex items-center justify-center gap-[52px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 pt-0 pb-0' : 'max-h-[94px] opacity-100 pt-2 pb-[3px]'
           }`}>
           {/* 체험 탭 */}
           <button onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
