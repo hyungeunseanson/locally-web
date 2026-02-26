@@ -199,21 +199,12 @@ export default function HomePageClient() {
           <>
             {/* 📱 모바일 서비스 */}
             <div className="md:hidden pb-4">
-              <div className="h-[12px] w-full mb-1 bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                <h2 className="text-[15px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{t('home_section_popular_services')}</h2>
-                <button
-                  className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
-                  style={{ border: '0.5px solid #B0B0B0' }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-                </button>
+                <h2 className="text-[15px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">로컬리 서비스</h2>
               </div>
-              <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
-                {LOCALLY_SERVICES.map((item) => (
-                  <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
-                    <ServiceCard item={item} />
-                  </div>
+              <div className="grid grid-cols-2 gap-3 px-5 pb-5">
+                {LOCALLY_SERVICES.slice(0, 4).map((item) => (
+                  <ServiceCard key={item.id} item={item} />
                 ))}
               </div>
             </div>
