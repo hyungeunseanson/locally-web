@@ -228,14 +228,14 @@ export default function HomeHero({
       </div>
 
       {/* 📱 모바일: 에어비앤비 홈화면 */}
-      <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+4px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+9px)] pb-0'
+      <div className={`md:hidden sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'pt-[calc(env(safe-area-inset-top,0px)+6px)] pb-0' : 'pt-[calc(env(safe-area-inset-top,0px)+9px)] pb-0'
         }`} style={{
           background: 'linear-gradient(180deg, #E4E4E4 0%, #ECECEC 48%, #F3F3F3 100%)',
-          boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
+          boxShadow: '0 4px 10px -8px rgba(0,0,0,0.22)',
         }}>
 
         {/* 검색 캡슐 — 스크림 없이 바로 사용, 배경은 부모에서 상속 */}
-        <div className={`px-5 transition-all duration-300 ${isScrolled ? 'mb-0 max-h-0 opacity-0 overflow-hidden' : 'mb-2 max-h-[80px] opacity-100'}`}>
+        <div className="px-5 mb-2 transition-all duration-300">
           <button
             onClick={() => setIsMobileSearchOpen(true)}
             className="w-full h-[56px] flex items-center justify-center gap-2.5 bg-white rounded-[28px] px-6 active:scale-[0.98] transition-transform"
@@ -245,7 +245,7 @@ export default function HomeHero({
             }}
           >
             <Search size={14} className="text-[#3A3A3A] shrink-0" strokeWidth={2.4} />
-            <span className="text-[14px] text-[#3A3A3A] font-medium tracking-[-0.01em]">{t('home_search_cta')}</span>
+            <span className="text-[13px] text-[#3A3A3A] font-medium tracking-[-0.01em]">{t('home_search_cta')}</span>
           </button>
         </div>
 
@@ -293,25 +293,27 @@ export default function HomeHero({
 
 
         {/* 스크롤 시 텍스트 탭 — 에어비앤비 (전체 너비 분산) */}
-        <div className={`flex items-center justify-evenly transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-[36px] opacity-100' : 'max-h-0 opacity-0'
-          }`} style={{ borderBottom: '1px solid #EBEBEB' }}>
+        <div className={`flex items-center justify-center gap-12 transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-[34px] opacity-100 pb-1' : 'max-h-0 opacity-0'
+          }`}>
           <button
             onClick={() => setActiveTab('experience')}
-            className={`relative py-[8px] text-[13px] tracking-[0.02em] transition-colors active:scale-[0.95] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
+            className={`relative py-[6px] text-[11px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#7E7E7E] font-medium'
               }`}
           >
             {t('cat_exp')}
-            {activeTab === 'experience' && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#222222]" />}
+            {activeTab === 'experience' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[20px] h-[2px] bg-[#222222] rounded-full" />}
           </button>
           <button
             onClick={() => setActiveTab('service')}
-            className={`relative py-[8px] text-[13px] tracking-[0.02em] transition-colors active:scale-[0.95] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
+            className={`relative py-[6px] text-[11px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#7E7E7E] font-medium'
               }`}
           >
             {t('cat_service')}
-            {activeTab === 'service' && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#222222]" />}
+            {activeTab === 'service' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[20px] h-[2px] bg-[#222222] rounded-full" />}
           </button>
         </div>
+
+        <div className="h-[10px] bg-gradient-to-b from-black/[0.05] to-transparent opacity-45 pointer-events-none" />
       </div>
 
       {/* 📱 모바일 검색 모달 */}
