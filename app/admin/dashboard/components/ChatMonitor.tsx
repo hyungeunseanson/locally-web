@@ -11,6 +11,7 @@ export default function ChatMonitor() {
     messages,
     currentUser,
     loadMessages,
+    clearSelected,
     sendMessage,
     refresh,
     isLoading,
@@ -69,9 +70,9 @@ export default function ChatMonitor() {
   const hasWarning = selectedInquiry ? detectWarning(messages) : false;
 
   return (
-    <div className="flex h-full gap-4 md:gap-6 w-full relative">
+    <div className="flex h-[calc(100dvh-190px)] md:h-[calc(100dvh-230px)] lg:h-[calc(100dvh-260px)] gap-4 md:gap-6 w-full relative">
       {/* 왼쪽 목록 패널 */}
-      <div className={`w-full md:w-1/3 bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} h-full`}>
+      <div className={`w-full md:w-[360px] md:min-w-[340px] bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} h-full`}>
         <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex justify-between items-center mb-3 md:mb-4">
             <h3 className="font-bold text-sm md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">
@@ -148,13 +149,13 @@ export default function ChatMonitor() {
 
       {/* 오른쪽 채팅창 (모바일에서는 오버레이처럼 보이거나 교체됨) */}
       {/* 🟢 이슈5: 데스크탑에서 채팅창이 fullscreen으로 뜨는 문제 수정 — fixed/inset-0/w-[100vw]/h-[100vh]를 모바일 전용으로 제한 */}
-      <div className={`flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-0 z-[100] w-full h-full -ml-0 md:ml-0 md:static md:inset-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
+      <div className={`flex-1 bg-white md:rounded-2xl border-l-[0px] md:border-l border-slate-200 md:border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'flex fixed inset-x-0 top-14 bottom-0 z-[100] w-full h-auto -ml-0 md:ml-0 md:static md:inset-auto md:top-auto md:bottom-auto md:w-auto md:h-auto md:z-0 md:flex-1 md:rounded-2xl' : 'hidden md:flex'}`}>
         {selectedInquiry ? (
           <>
-            <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 pt-6 md:pt-4">
+            <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 pt-3 md:pt-4">
               <div className="flex items-center gap-1.5 md:gap-4 min-w-0">
                 <button
-                  onClick={() => loadMessages(null)} // 목록으로 돌아가기
+                  onClick={clearSelected} // 목록으로 돌아가기
                   className="md:hidden p-1.5 -ml-1 text-slate-500 shrink-0 bg-slate-100 rounded-full"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -217,7 +218,7 @@ export default function ChatMonitor() {
               })}
             </div>
 
-            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex gap-1.5 md:gap-2 shrink-0 pb-6 md:pb-4">
+            <div className="p-2 md:p-4 bg-white border-t border-slate-100 flex gap-1.5 md:gap-2 shrink-0 pb-2 md:pb-4">
               <input
                 className="flex-1 border border-slate-200 bg-slate-50 rounded-lg md:rounded-xl px-2.5 md:px-4 py-2 md:py-3 focus:outline-none focus:border-black focus:bg-white transition-all text-[11px] md:text-sm"
                 placeholder={activeTab === 'monitor' ? "관리자 권한 메시지 전송..." : "답변을 입력하세요..."}

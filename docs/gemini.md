@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
 **Last Updated:** 2026-02-26
-**Version:** 2.10.0 (Mobile UX Integrity Patch)
+**Version:** 2.11.0 (Admin Chat Usability Patch)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -92,7 +92,7 @@
 
 ## 4. ✅ 개발 현황 및 완료된 기능 (Development Status)
 
-**전체 진행률: 약 94%** (모바일/데스크톱 무결성 패치 반영)
+**전체 진행률: 약 95%** (어드민 채팅 UX 무결성 패치 반영)
 
 ### Phase 1: 기반 구축 (Foundation) - ✅ 완료
 - [x] Supabase Auth & Profile 시스템
@@ -327,6 +327,23 @@
   - 모바일 검색 모달 전체 컨테이너를 `h-[100dvh]`로 보정하고, 호스트 생성 페이지 하단 액션바에 Safe Area 패딩을 추가하여 하단 홈 인디케이터/브라우저 UI 충돌 완화.
 - [x] **데스크탑 여백 회귀 방지:**
   - `host/experiences/[id]`, `host/experiences/[id]/edit`에 `pb-20 md:pb-0` 적용으로 모바일 여백 유지 + 데스크탑 과다 여백 제거.
+
+### Phase 4.16: 어드민 채팅 사용성/가시성 패치 (Admin Chat Usability) - ✅ 완료
+
+> **2026-02-26** | 수정 파일: `ChatMonitor.tsx`, `GlobalTeamChat.tsx`, `ManagementTab.tsx`
+
+- [x] **메시지 모니터링 채팅창 높이/가시성 개선 (모바일+데스크탑):**
+  - `ChatMonitor` 전체 레이아웃 높이를 뷰포트 기준으로 재조정하여 우측 채팅 입력 영역이 한 화면 안에 안정적으로 노출되도록 보정.
+  - 목록/대화 패널 비율을 조정하여 데스크탑에서 우측 채팅창이 과도하게 커 보이던 문제를 완화.
+- [x] **모바일 뒤로가기 복구 (메시지 모니터링):**
+  - 모바일 채팅 상세 헤더의 뒤로가기 동작을 `clearSelected` 기반으로 교체하여 목록 복귀 실패 이슈 해결.
+- [x] **Team Chat 최신 메시지 우선 가시화:**
+  - `GlobalTeamChat` 초기 로딩 정렬을 오름차순으로 통일하고, 오픈 시 자동 스크롤이 항상 최하단(최신 메시지)으로 이동하도록 로직 보강.
+  - 데스크탑/모바일 스크롤 컨테이너를 분리해 환경별 스크롤 타겟 누락(오래된 메시지부터 보이던 현상) 해결.
+- [x] **Team Chat 노출 범위 제한:**
+  - 전역 마운트 상태는 유지하되, 실제 렌더를 `/admin/dashboard?tab=TEAM`일 때만 노출되도록 제한하여 Team Workspace 컨텍스트 외 노출 차단.
+- [x] **승인관리 탭 모바일 타이포 밀도 보정:**
+  - `승인 관리 / 호스트 지원서 / 체험 등록` 헤더 및 버튼 텍스트를 모바일에서 축소(`md:` 분기 유지)하여 버튼 크기 대비 폰트 과대 노출 해소.
 
 ---
 

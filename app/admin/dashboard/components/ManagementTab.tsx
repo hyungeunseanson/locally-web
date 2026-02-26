@@ -41,20 +41,20 @@ export default function ManagementTab({
 
       {/* 🟢 [추가] 승인 관리 통합 탭 헤더 (서브 탭 전환) */}
       {activeTab === 'APPROVALS' && (
-        <div className="border-b border-slate-200 pb-4 mb-4 flex items-center gap-4 shrink-0">
-          <h2 className="text-lg font-bold text-slate-900 mr-4">승인 관리</h2>
+        <div className="border-b border-slate-200 pb-3 md:pb-4 mb-3 md:mb-4 flex items-center gap-2 md:gap-4 shrink-0">
+          <h2 className="text-[13px] md:text-lg font-bold text-slate-900 mr-1 md:mr-4">승인 관리</h2>
           <div className="flex bg-slate-100 p-1 rounded-lg">
             <button
               onClick={() => { setSubTab('APPS'); setSelectedItem(null); setFilter('ALL'); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${subTab === 'APPS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-bold transition-all ${subTab === 'APPS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <Users size={16} /> 호스트 지원서 ({apps.filter((a: any) => a.status === 'pending').length})
+              <Users size={14} className="md:w-4 md:h-4" /> 호스트 지원서 ({apps.filter((a: any) => a.status === 'pending').length})
             </button>
             <button
               onClick={() => { setSubTab('EXPS'); setSelectedItem(null); setFilter('ALL'); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${subTab === 'EXPS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 rounded-md text-[11px] md:text-sm font-bold transition-all ${subTab === 'EXPS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <MapPin size={16} /> 체험 등록 ({exps.filter((e: any) => e.status === 'pending').length})
+              <MapPin size={14} className="md:w-4 md:h-4" /> 체험 등록 ({exps.filter((e: any) => e.status === 'pending').length})
             </button>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Paperclip, X, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 interface ChatMessage {
     id: string;
@@ -30,13 +31,35 @@ export default function GlobalTeamChat() {
     const [zoomImage, setZoomImage] = useState<string | null>(null);
     const [isClient, setIsClient] = useState(false);
 
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const desktopScrollRef = useRef<HTMLDivElement>(null);
+    const mobileScrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const activeTab = searchParams.get('tab')?.toUpperCase();
+    const isTeamWorkspace = pathname?.startsWith('/admin/dashboard') && activeTab === 'TEAM';
     const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000'; // Global Room ID
+
+    const scrollToBottom = (delay = 0) => {
+        const scroll = () => {
+            if (desktopScrollRef.current) desktopScrollRef.current.scrollTop = desktopScrollRef.current.scrollHeight;
+            if (mobileScrollRef.current) mobileScrollRef.current.scrollTop = mobileScrollRef.current.scrollHeight;
+        };
+
+        if (delay > 0) {
+            setTimeout(scroll, delay);
+            return;
+        }
+        scroll();
+    };
 
     useEffect(() => {
         setIsClient(true);
+        if (!isTeamWorkspace) {
+            setCurrentUser(null);
+            return;
+        }
 
         // Auth & Check Admin Role
         const initChat = async () => {
@@ -57,28 +80,25 @@ export default function GlobalTeamChat() {
         };
 
         initChat();
-    }, []);
+    }, [isTeamWorkspace]);
 
     useEffect(() => {
-        if (!currentUser) return;
+        if (!isTeamWorkspace || !currentUser) return;
 
         const fetchMessages = async () => {
             const { data } = await supabase
                 .from('admin_task_comments')
                 .select('*')
                 .eq('task_id', CHAT_ROOM_ID)
-                .order('created_at', { ascending: false })
+                .order('created_at', { ascending: true })
                 .limit(100);
 
             if (data) {
-                setMessages(data.reverse()); // Reverse to show oldest first at top, newest at bottom
-                // 🟢 이슈4-A: 메시지 로드 완료 후 isOpen 상태이면 최하단으로 스크롤
+                setMessages(data);
                 if (isOpen) {
-                    setTimeout(() => {
-                        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                    }, 200);
+                    scrollToBottom(120);
                 } else if (data.length > 0) {
-                    const lastMsg = data[data.length - 1];
+                    const lastMsg = data[data.length - 1]; // ascending -> newest
                     const lastViewed = localStorage.getItem('global_chat_last_viewed');
                     if (
                         lastMsg.author_id !== currentUser.id &&
@@ -108,10 +128,7 @@ export default function GlobalTeamChat() {
                 if (!isOpen && newMsg.author_id !== currentUser.id) {
                     setHasUnread(true);
                 } else if (isOpen) {
-                    // 🟢 이슈4-A: 실시간 수신 시 150ms 후 스크롤 (DOM 반영 보장)
-                    setTimeout(() => {
-                        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                    }, 150);
+                    scrollToBottom(120);
                 }
             })
             .subscribe();
@@ -119,19 +136,21 @@ export default function GlobalTeamChat() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [currentUser, isOpen]);
+    }, [currentUser, isOpen, isTeamWorkspace]);
 
     useEffect(() => {
+        if (!isTeamWorkspace) {
+            setIsOpen(false);
+            setHasUnread(false);
+            document.body.style.overflow = '';
+            return;
+        }
+
         if (isOpen) {
             setHasUnread(false);
             localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
-            // 🟢 수정: scrollRef가 항상 DOM에 존재하므로 더 왾은 시간에도 스크롤 가능
-            setTimeout(() => {
-                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }, 50);
-            setTimeout(() => {
-                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }, 300);
+            scrollToBottom(50);
+            scrollToBottom(220);
 
             // 🟢 모바일 버블 오픈 시 Body Scroll Lock (배경화면 오버스크롤 방지)
             if (window.innerWidth < 768) {
@@ -144,12 +163,12 @@ export default function GlobalTeamChat() {
         return () => {
             document.body.style.overflow = '';
         };
-    }, [isOpen, messages.length]);
+    }, [isOpen, messages.length, isTeamWorkspace]);
     useEffect(() => {
-        if (isOpen && messages.length > 0) {
+        if (isTeamWorkspace && isOpen && messages.length > 0) {
             localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
         }
-    }, [messages.length]);
+    }, [messages.length, isOpen, isTeamWorkspace]);
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -200,11 +219,8 @@ export default function GlobalTeamChat() {
         const imageToUpload = selectedImage;
         clearSelectedImage();
 
-        // 🟢 sendMessage 후 스크롤: scrollRef가 항상 DOM에 있으므로 즉시 스크롤 가능
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        setTimeout(() => {
-            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }, 150);
+        scrollToBottom();
+        scrollToBottom(120);
 
         try {
             if (imageToUpload) {
@@ -336,7 +352,7 @@ export default function GlobalTeamChat() {
         </div>
     );
 
-    if (!isClient || !currentUser) return null;
+    if (!isClient || !currentUser || !isTeamWorkspace) return null;
 
     return (
         <>
@@ -357,10 +373,10 @@ export default function GlobalTeamChat() {
                 </button>
 
                 {/* 🟢 핵심 수정: {isOpen &&} 조건을 제거하고 항상 렌더, CSS로 visibility 제어
-                     → scrollRef DOM이 항상 존재하여 isOpen 시 즉시 스크롤 가능 */}
+                     → 데스크탑/모바일 스크롤 컨테이너가 항상 존재하여 오픈 시 즉시 최하단 이동 가능 */}
                 <div className={`flex flex-col flex-1 min-h-0 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none h-0 overflow-hidden'}`}>
                     {/* 메시지 목록 */}
-                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
+                    <div ref={desktopScrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
                         {renderMessages()}
                     </div>
                     {/* 입력 영역 */}
@@ -394,7 +410,7 @@ export default function GlobalTeamChat() {
                                 </button>
                             </div>
                             {/* 메시지 목록 */}
-                            <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-2 md:px-3 md:py-2 space-y-2 md:space-y-3 bg-slate-50 min-h-0" style={{ maxHeight: 'calc(65vh - 100px)' }}>
+                            <div ref={mobileScrollRef} className="flex-1 overflow-y-auto px-2 py-2 md:px-3 md:py-2 space-y-2 md:space-y-3 bg-slate-50 min-h-0" style={{ maxHeight: 'calc(65vh - 100px)' }}>
                                 {renderMessages(true)}
                             </div>
                             {/* 입력 */}
@@ -447,4 +463,3 @@ export default function GlobalTeamChat() {
         </>
     );
 }
-
