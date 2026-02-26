@@ -157,7 +157,7 @@ useEffect(() => {
       {/* 🟢 [디자인 수정] 다크 모드 토스트 알림창 */}
       {toast && (
         <div 
-          className="fixed bottom-6 right-6 z-[9999] bg-slate-900/95 backdrop-blur-sm border border-slate-700 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"
+          className="fixed bottom-[80px] md:bottom-6 right-4 md:right-6 z-[9999] bg-slate-900/95 backdrop-blur-sm border border-slate-700 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"
           onClick={() => {
             if (toast.link) router.push(toast.link);
             setToast(null);

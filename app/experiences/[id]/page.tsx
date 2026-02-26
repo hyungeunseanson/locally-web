@@ -88,6 +88,10 @@ export default async function Page({ params }: Props) {
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', experience.host_id).maybeSingle();
     const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle();
     
+    const joinedYear = profile?.created_at
+      ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
+      : null;
+
     hostProfile = {
       id: experience.host_id,
       name: app?.name || profile?.name || profile?.full_name || 'Locally Host',
@@ -96,7 +100,8 @@ export default async function Page({ params }: Props) {
       introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
       job: profile?.job,
       dream_destination: profile?.dream_destination,
-      favorite_song: profile?.favorite_song
+      favorite_song: profile?.favorite_song,
+      joined_year: joinedYear,
     };
   }
 

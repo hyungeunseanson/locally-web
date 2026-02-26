@@ -235,7 +235,7 @@ export default function ManageDatesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans">
+    <div className="min-h-screen bg-white text-slate-900 font-sans pb-20 md:pb-0">
       <SiteHeader />
       <main className="max-w-6xl mx-auto px-3 md:px-6 py-6 md:py-12">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-8">

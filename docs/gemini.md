@@ -1,7 +1,7 @@
 # 📘 Locally-Web Project Bible (GEMINI.md)
 
-**Last Updated:** 2026-02-25
-**Version:** 2.8.0 (Admin Mobile UX Full Polish & Live Data Sync)
+**Last Updated:** 2026-02-26
+**Version:** 2.9.0 (Mobile/Desktop Collision Audit & Full Fix)
 **Role:** Single Source of Truth for Gemini CLI & Developers
 
 ---
@@ -268,6 +268,27 @@
   - `← ArrowLeft` 뒤로가기 + **최근 검색** (최근 도시 2개) + **추천 여행지** (6개, 이모지+설명) 섹션.
   - [x] `autoFocus` 적용으로 즉시 타이핑 가능.
 
+### Phase 4.14: 전역 모바일/데스크탑 충돌 전수 감사 및 수정 (Mobile-Desktop Collision Full Audit) - ✅ 완료
+
+> **2026-02-26** | 수정 파일: `ToastContext.tsx`, `NotificationContext.tsx`, `GoogleTranslate.tsx`, `dates/page.tsx`, `HostProfileModal.tsx`, `ExperienceClient.tsx`, `StickyActionSheet.tsx`, `HomePageClient.tsx`, `BottomTabNavigation.tsx`, `HostProfileSection.tsx`, `ExpMainContent.tsx`, `experiences/[id]/page.tsx`
+
+- [x] **전역 Fixed 요소 BottomTabNavigation 가림 현상 수정:**
+  - `ToastContext`: `fixed bottom-6` → `bottom-[80px] md:bottom-6` (모바일에서 바텀탭에 가려지던 토스트 메시지 수정).
+  - `NotificationContext`: `fixed bottom-6 right-6` → `bottom-[80px] md:bottom-6 right-4 md:right-6` (알림 토스트 동일 수정).
+  - `GoogleTranslate`: `fixed bottom-10 right-10` → `bottom-[80px] md:bottom-10 right-4 md:right-10` (번역 버튼 가림 수정).
+- [x] **pb-20 누락 페이지 보완:** `host/experiences/[id]/dates/page.tsx` 최상위 div에 `pb-20 md:pb-0` 추가 (저장 버튼 BottomTabNavigation 가림 수정).
+- [x] **z-index 충돌 수정:**
+  - `HostProfileModal`: `z-[100]` → `z-[150]` (BottomTabNavigation과 동일 z-index로 인한 가림 해결).
+  - `ExperienceClient` 갤러리 오버레이: `z-[100]` → `z-[150]` (동일 문제 수정).
+  - `StickyActionSheet`: `z-[100]` → `z-[105]`, 내부 padding `calc(env(safe-area-inset-bottom,0px)+72px)` 확장 (BottomTabNavigation 위로 예약 UI 노출).
+- [x] **HomePageClient 이중 하단 여백 수정:** `md:hidden pb-28` → `pb-4` (ClientMainWrapper의 `pb-20`과 중첩되어 발생하던 192px 과다 공백 수정).
+- [x] **BottomTabNavigation 미정의 클래스 제거:** `pb-safe` (Tailwind에 정의되지 않은 무의미 클래스) 제거. Safe Area는 인라인 `style`에서 올바르게 처리되고 있음.
+- [x] **HostProfileModal 더미 데이터 제거 및 실제 데이터 연동:**
+  - `experiences/[id]/page.tsx`: `profile.created_at` 기반 `joined_year` 계산 추가.
+  - `ExpMainContent.tsx` → `HostProfileSection.tsx` props 체인에 `joinedYear` 추가.
+  - `HostProfileModal.tsx`: 하드코딩된 `156`, `4.98`, `7년` → `host.reviewCount`, `host.rating`, `host.joinedYear` props 연동 (값 없을 시 `-` 표시).
+  - `HostProfileSection.tsx`: "경력 7년" 하드코딩 → `joinedYear` prop 기반 동적 표시.
+
 ### Phase 4.13: 어드민 모바일 UX 고도화 및 버그 잔상 제거 (Mobile Admin Polish V4-V5) - ✅ 완료
 
 > **2026-02-25** | 수정 파일: `Sidebar.tsx`, `GlobalTeamChat.tsx`, `TeamTab.tsx`, `layout.tsx`, `ChatMonitor.tsx`, `AuditLogTab.tsx`, `AnalyticsTab.tsx`, `MasterLedgerTab.tsx`, `UsersTab.tsx` (Admin)
@@ -370,7 +391,31 @@
 
 // 패턴 4: 오버레이 (모바일 풀스크린 + 데스크탑 패널)
 <div className="fixed inset-0 z-[100] md:static md:inset-auto md:z-0 md:w-auto md:h-auto">
+
+// 패턴 5: fixed 요소의 모바일 위치 (BottomTabNavigation 높이 회피)
+<div className="fixed bottom-[80px] md:bottom-6 ...">  // 토스트, 알림 등
 ```
+
+#### 📌 Z-Index 표준 레이어 맵 (전체 프로젝트 기준)
+
+| z-index | 컴포넌트 | 비고 |
+|---------|---------|------|
+| `z-[9999]` | HostModeTransition, Toast, SiteFooter 모달 | 최상위 |
+| `z-[9990]` | GlobalTeamChat 슬라이드업 드로어 | 어드민 모바일 |
+| `z-[9989]` | GlobalTeamChat 플로팅 버튼 | 어드민 모바일 |
+| `z-[200]` | MobileSearchModal, MobileProfileView, LoginModal, ReviewModal | 일반 모달 |
+| `z-[210]` | MobileSearchModal 하단 고정 바 | 모달 내부 |
+| `z-[150]` | HostProfileModal, ExperienceClient 갤러리 | 체험 상세 |
+| `z-[105]` | StickyActionSheet | 체험 예약 플로팅 바 |
+| `z-[100]` | BottomTabNavigation, ChatMonitor Detail | 하단 탭 / 어드민 오버레이 |
+| `z-[80]` | 어드민 Sidebar 드로어 | |
+| `z-[70]` | 어드민 Sidebar 딤 배경 | |
+| `z-[60]` | 어드민 모바일 헤더 | |
+| `z-50` | SiteHeader(데스크탑), GlobalTeamChat 데스크탑 패널 | |
+| `z-40` | HomeHero 모바일 sticky 헤더 | |
+| `z-10` | 테이블 sticky 헤더, 모달 내부 헤더 | |
+
+> **규칙:** `BottomTabNavigation = z-[100]`. 그 위에 떠야 하는 모바일 요소는 반드시 `z-[105]` 이상 사용. 단, `md:` 리셋을 반드시 병행할 것.
 
 ---
 

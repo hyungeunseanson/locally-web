@@ -115,7 +115,7 @@ export default function BottomTabNavigation() {
     return (
         <>
             <nav
-                className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-[100] px-2 flex items-center justify-between pb-safe"
+                className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-[100] px-2 flex items-center justify-between"
                 style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)', paddingTop: '8px' }}
             >
                 {tabs.map((tab, idx) => {

@@ -47,12 +47,13 @@ export default function StickyActionSheet({ experience }: { experience: any }) {
 
     return (
         <div
-            className="md:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] px-6"
+            className="md:hidden fixed bottom-0 left-0 right-0 z-[105] bg-white pt-4 px-6"
             style={{
                 boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
                 borderTopLeftRadius: '24px',
                 borderTopRightRadius: '24px',
-                borderTop: '1px solid #f1f5f9'
+                borderTop: '1px solid #f1f5f9',
+                paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 72px)'
             }}
         >
             <div className="flex justify-between items-center max-w-lg mx-auto">

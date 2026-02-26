@@ -7,7 +7,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: any) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
       {/* 배경 오버레이 */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
 
@@ -38,17 +38,20 @@ export default function HostProfileModal({ isOpen, onClose, host }: any) {
 
           <div className="flex justify-around w-full border-y border-slate-100 py-6 mb-8">
              <div className="text-center">
-                <div className="font-black text-lg">156</div>
+                <div className="font-black text-lg">{host.reviewCount ?? '-'}</div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase">후기</div>
              </div>
              <div className="w-[1px] bg-slate-100"></div>
              <div className="text-center">
-                <div className="font-black text-lg flex items-center gap-1">4.98 <Star size={12} fill="black"/></div>
+                <div className="font-black text-lg flex items-center gap-1">
+                  {host.rating ? Number(host.rating).toFixed(2) : '-'}
+                  {host.rating && <Star size={12} fill="black"/>}
+                </div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase">평점</div>
              </div>
              <div className="w-[1px] bg-slate-100"></div>
              <div className="text-center">
-                <div className="font-black text-lg">7년</div>
+                <div className="font-black text-lg">{host.joinedYear ? `${host.joinedYear}년` : '-'}</div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase">경력</div>
              </div>
           </div>

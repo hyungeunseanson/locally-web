@@ -239,7 +239,7 @@ export default function ExperienceClient({
       <StickyActionSheet experience={experience} />
 
       {isGalleryOpen && (
-        <div className="fixed inset-0 z-[100] bg-white animate-in fade-in duration-200 flex flex-col">
+        <div className="fixed inset-0 z-[150] bg-white animate-in fade-in duration-200 flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <button onClick={() => setIsGalleryOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
             <h3 className="font-bold text-lg">사진 모두 보기</h3>

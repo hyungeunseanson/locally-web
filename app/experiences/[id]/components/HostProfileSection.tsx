@@ -13,6 +13,7 @@ interface HostProfileProps {
   favoriteSong?: string;
   languages?: string[];
   intro?: string;
+  joinedYear?: number | null;
 }
 
 export default function HostProfileSection(props: HostProfileProps) {
@@ -47,7 +48,7 @@ export default function HostProfileSection(props: HostProfileProps) {
             <div className="flex-1 space-y-4 text-center md:text-left">
                <div>
                   <h2 className="text-xl font-black mb-1 text-slate-900">{props.name}</h2>
-                  <p className="text-sm text-slate-500 font-medium">슈퍼호스트 · 경력 7년</p>
+                  <p className="text-sm text-slate-500 font-medium">슈퍼호스트{props.joinedYear ? ` · 경력 ${props.joinedYear}년` : ''}</p>
                </div>
                
                {/* 요약 정보 (재미있는 사실 1~2개만 노출) */}

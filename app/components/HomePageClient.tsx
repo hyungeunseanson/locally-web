@@ -114,7 +114,7 @@ export default function HomePageClient() {
           ) : (
             <>
               {/* 📱 모바일: 에어비앤비 다중 섹션 레이아웃 */}
-              <div className="md:hidden pb-28">
+              <div className="md:hidden pb-4">
                 {/* 섹션 렌더 헬퍼 */}
                 {(() => {
                   // 섹션별 체험 분류
@@ -178,7 +178,7 @@ export default function HomePageClient() {
         {activeTab === 'service' && (
           <>
             {/* 📱 모바일 서비스 */}
-            <div className="md:hidden pb-28">
+            <div className="md:hidden pb-4">
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
                 <h2 className="text-[15px] font-extrabold text-[#222222] tracking-[-0.02em] leading-tight">인기 서비스</h2>
                 <button

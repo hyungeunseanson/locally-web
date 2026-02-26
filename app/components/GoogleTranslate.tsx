@@ -36,7 +36,7 @@ const GoogleTranslate = () => {
         strategy="afterInteractive"
       />
       
-      <div className="fixed bottom-10 right-10 z-[9999]">
+      <div className="fixed bottom-[80px] md:bottom-10 right-4 md:right-10 z-[9999]">
         <div className="relative w-[140px] h-[48px] group">
           
           {/* 1. 디자인 레이어: pointer-events-none으로 클릭 방해 원천 차단 */}

@@ -92,6 +92,7 @@ export default function ExpMainContent({
         favoriteSong={hostProfile?.favorite_song || "음악"}
         languages={hostProfile?.languages || []}
         intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."}
+        joinedYear={hostProfile?.joined_year}
       />
 
       {/* 6. 지도 (Location) - 🟢 URL 오류 수정 완료 */}
