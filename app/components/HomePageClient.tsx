@@ -80,14 +80,21 @@ export default function HomePageClient() {
       <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">
         <div className="md:hidden h-[24px] w-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
         <div className="md:hidden px-5 pt-3 pb-1">
-          <Link
-            href="/become-a-host"
-            className="w-full h-[46px] rounded-[13px] border border-[#CFCFCF] bg-transparent flex items-center justify-center text-[10px] font-medium text-[#4B4B4B] active:scale-[0.99] transition-transform"
-          >
-            <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">로컬리 소개</span>
+          <div className="w-full h-[46px] rounded-[13px] border border-[#CFCFCF] bg-transparent flex items-center justify-center text-[10px] font-medium text-[#4B4B4B]">
+            <Link
+              href="/about"
+              className="flex items-center justify-center px-2 h-full active:scale-[0.99] transition-transform"
+            >
+              <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">로컬리 소개</span>
+            </Link>
             <span className="font-normal mx-1">및</span>
-            <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">호스트 지원</span>
-          </Link>
+            <Link
+              href="/become-a-host"
+              className="flex items-center justify-center px-2 h-full active:scale-[0.99] transition-transform"
+            >
+              <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">호스트 지원</span>
+            </Link>
+          </div>
         </div>
 
         {activeTab === 'experience' && (
