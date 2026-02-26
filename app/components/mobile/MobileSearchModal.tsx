@@ -118,7 +118,11 @@ export default function MobileSearchModal({
     // 🔍 검색 확장 모드 (에어비앤비 여행지 검색 화면)
     if (isSearchExpanded) {
         return (
-            <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh]" style={{ background: '#EDEDED' }}>
+            <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh] relative">
+                <div
+                    className="absolute inset-0 -z-10 backdrop-blur-[5px]"
+                    style={{ background: 'rgba(255,255,255,0.12)' }}
+                />
                 {/* 상단 검색바 */}
                 <div className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
                     style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04)', border: '0.5px solid #E0E0E0' }}>
@@ -186,11 +190,11 @@ export default function MobileSearchModal({
 
     return (
         <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh]">
-            {/* 배경: #EDEDED 통일 + 블러 */}
+            {/* 배경: 화면이 보이는 반투명 레이어 + 블러 */}
             <div
                 className="absolute inset-0 -z-10 backdrop-blur-[8px] transition-opacity duration-300"
                 style={{
-                    background: '#EDEDED',
+                    background: 'rgba(255,255,255,0.12)',
                     opacity: isVisible ? 1 : 0,
                 }}
             />
