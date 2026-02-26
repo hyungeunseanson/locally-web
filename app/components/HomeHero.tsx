@@ -253,14 +253,16 @@ export default function HomeHero({
           }`}>
           {/* 체험 탭 */}
           <button onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
-            <div className="w-[52px] h-[52px] flex items-center justify-center relative mb-[6px]">
+            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[3px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
                 alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-40' : 'opacity-100'}`}
               />
-              <div className="absolute -top-1 -right-2 bg-[#0066CC] text-white text-[8px] font-bold px-[5px] py-[1.5px] rounded-full z-10 border-[1.5px] border-white leading-none">NEW</div>
+              <div className="absolute -top-[6px] -right-[10px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[10px] font-semibold px-[7px] py-[2px] rounded-full z-10 border border-white/90 leading-none shadow-[0_3px_8px_rgba(14,72,170,0.45)]">
+                NEW
+              </div>
             </div>
-            <span className={`text-[10px] font-semibold tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222]' : 'text-[#717171]'}`}>
+            <span className={`text-[10px] tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
               {t('cat_exp')}
             </span>
             {activeTab === 'experience' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
@@ -268,14 +270,16 @@ export default function HomeHero({
 
           {/* 서비스 탭 */}
           <button onClick={() => setActiveTab('service')} className="flex flex-col items-center relative">
-            <div className="w-[52px] h-[52px] flex items-center justify-center relative mb-[6px]">
+            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[3px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
                 alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-40' : 'opacity-100'}`}
               />
-              <div className="absolute -top-1 -right-2 bg-[#0066CC] text-white text-[8px] font-bold px-[5px] py-[1.5px] rounded-full z-10 border-[1.5px] border-white leading-none">NEW</div>
+              <div className="absolute -top-[6px] -right-[10px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[10px] font-semibold px-[7px] py-[2px] rounded-full z-10 border border-white/90 leading-none shadow-[0_3px_8px_rgba(14,72,170,0.45)]">
+                NEW
+              </div>
             </div>
-            <span className={`text-[10px] font-semibold tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222]' : 'text-[#717171]'}`}>
+            <span className={`text-[10px] tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
               {t('cat_service')}
             </span>
             {activeTab === 'service' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
@@ -336,13 +340,13 @@ export default function HomeHero({
             {/* 🎈 체험 탭 */}
             <button
               onClick={() => setActiveTab('experience')}
-              className={`group flex items-center gap-2 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${activeTab === 'experience' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+              className={`group flex items-center gap-1 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${activeTab === 'experience' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
                 }`}
             >
               {/* 아이콘 영역 (54px - 텍스트 대비 약 2.5배 체감 크기) */}
-              <div className="relative w-[90px] h-[90px] flex items-center justify-center shrink-0">
+              <div className="relative w-[117px] h-[117px] flex items-center justify-center shrink-0">
                 {/* NEW 배지 (좌측 상단에 딱 맞게) */}
-                <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[10px] font-bold px-1.5 py-[2px] rounded-full shadow-sm z-10 tracking-wide border border-white transform -translate-x-1 translate-y-1">
+                <div className="absolute -top-[4px] -left-[4px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[12px] font-semibold px-[8px] py-[3px] rounded-full shadow-[0_4px_10px_rgba(14,72,170,0.45)] z-10 tracking-wide border border-white/90">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
@@ -354,7 +358,7 @@ export default function HomeHero({
               </div>
 
               {/* 텍스트 (17px, Medium - 부드럽고 큼직하게) */}
-              <span className={`text-[17px] font-medium whitespace-nowrap tracking-tight ${activeTab === 'experience' ? 'text-[#222222]' : 'text-[#717171]'
+              <span className={`text-[17px] whitespace-nowrap tracking-tight ${activeTab === 'experience' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'
                 }`}>
                 {t('cat_exp')}
               </span>
@@ -363,13 +367,13 @@ export default function HomeHero({
             {/* 🛎️ 서비스 탭 */}
             <button
               onClick={() => setActiveTab('service')}
-              className={`group flex items-center gap-2 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${activeTab === 'service' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+              className={`group flex items-center gap-1 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${activeTab === 'service' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
                 }`}
             >
               {/* 아이콘 영역 (54px) */}
-              <div className="relative w-[90px] h-[90px] flex items-center justify-center shrink-0">
+              <div className="relative w-[117px] h-[117px] flex items-center justify-center shrink-0">
                 {/* NEW 배지 */}
-                <div className="absolute top-0 left-0 bg-[#0066CC] text-white text-[10px] font-bold px-1.5 py-[2px] rounded-full shadow-sm z-10 tracking-wide border border-white transform -translate-x-1 translate-y-1">
+                <div className="absolute -top-[4px] -left-[4px] bg-gradient-to-b from-[#7EC8FF] via-[#2F7BFF] to-[#0B47C9] text-white text-[12px] font-semibold px-[8px] py-[3px] rounded-full shadow-[0_4px_10px_rgba(14,72,170,0.45)] z-10 tracking-wide border border-white/90">
                   NEW
                 </div>
                 {/* 고화질 이미지 */}
@@ -381,7 +385,7 @@ export default function HomeHero({
               </div>
 
               {/* 텍스트 (17px, Medium) */}
-              <span className={`text-[17px] font-medium whitespace-nowrap tracking-tight ${activeTab === 'service' ? 'text-[#222222]' : 'text-[#717171]'
+              <span className={`text-[17px] whitespace-nowrap tracking-tight ${activeTab === 'service' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'
                 }`}>
                 {t('cat_service')}
               </span>
