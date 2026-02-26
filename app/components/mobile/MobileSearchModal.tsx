@@ -97,13 +97,13 @@ export default function MobileSearchModal({
 
     const PlaceIcon = ({ type }: { type: string }) => {
         const colors: Record<string, string> = {
-            tokyo: '#EB6969',
-            osaka: '#F19340',
-            seoul: '#6FA8EB',
-            izakaya: '#CFA328',
+            tokyo: '#EE7B7B',
+            osaka: '#F2A15A',
+            seoul: '#7CB0ED',
+            izakaya: '#D5AE3D',
         };
         const stroke = colors[type] || '#6B7280';
-        const sw = 1.78;
+        const sw = 1.0;
         const blurId = `icon-soft-${type}`;
 
         const paths = () => {
@@ -168,10 +168,10 @@ export default function MobileSearchModal({
             <svg width="24" height="24" viewBox="0 0 26 26" fill="none" strokeLinecap="round" strokeLinejoin="round">
                 <defs>
                     <filter id={blurId} x="-30%" y="-30%" width="160%" height="160%">
-                        <feGaussianBlur stdDeviation="0.55" />
+                        <feGaussianBlur stdDeviation="0.4" />
                     </filter>
                 </defs>
-                <g opacity="0.34" filter={`url(#${blurId})`} transform="translate(0 0.65)">
+                <g opacity="0.2" filter={`url(#${blurId})`} transform="translate(0 0.5)">
                     {paths()}
                 </g>
                 <g>{paths()}</g>
@@ -181,10 +181,10 @@ export default function MobileSearchModal({
 
     const PlaceBadge = ({ type }: { type: string }) => {
         const styles: Record<string, { bg: string; border: string }> = {
-            tokyo: { bg: 'linear-gradient(135deg, #FEE4E4 0%, #FCEEEE 100%)', border: '#F5C8C8' },
-            osaka: { bg: 'linear-gradient(135deg, #FFE9D6 0%, #FFF3E6 100%)', border: '#F5CEAA' },
-            seoul: { bg: 'linear-gradient(135deg, #DDEEFF 0%, #EAF4FF 100%)', border: '#C7DDF7' },
-            izakaya: { bg: 'linear-gradient(135deg, #F9F0C9 0%, #FFF7DC 100%)', border: '#EBDCA5' },
+            tokyo: { bg: 'linear-gradient(135deg, #FDF0F0 0%, #FFF8F8 100%)', border: '#F3DFDF' },
+            osaka: { bg: 'linear-gradient(135deg, #FEF3E8 0%, #FFF9F2 100%)', border: '#F4E3D1' },
+            seoul: { bg: 'linear-gradient(135deg, #EEF5FD 0%, #F7FBFF 100%)', border: '#DBE8F6' },
+            izakaya: { bg: 'linear-gradient(135deg, #FCF7E7 0%, #FFFBEF 100%)', border: '#EEE4C4' },
         };
         const style = styles[type] || { bg: '#F3F4F6', border: '#E5E7EB' };
         return (
@@ -196,7 +196,7 @@ export default function MobileSearchModal({
                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.03)',
                 }}
             >
-                <div style={{ filter: 'contrast(112%) saturate(112%)' }}>
+                <div style={{ filter: 'contrast(104%) saturate(98%)' }}>
                     <PlaceIcon type={type} />
                 </div>
             </div>
@@ -513,7 +513,7 @@ export default function MobileSearchModal({
                     style={{
                         borderTop: '1px solid #EBEBEB',
                         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-                        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+                        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
                         boxShadow: '0 -6px 18px rgba(0,0,0,0.08)',
                     }}
                 >
