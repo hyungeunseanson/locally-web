@@ -156,8 +156,13 @@ function InboxContent() {
         role="host"
       />
 
+      {/* 🟢 데스크탑 제목 — main 밖에 위치해 flex-row 내부 첨범 방지 */}
+      <div className="hidden md:block max-w-[1280px] w-full mx-auto px-6 pt-8 pb-0 shrink-0">
+        <h1 className="text-3xl font-black">{t('messages')}</h1>
+      </div>
+
       {/* ── 메인 컨테이너 ── */}
-      <main className="flex-1 max-w-[1280px] w-full mx-auto flex flex-col md:flex-row md:px-6 md:py-8 md:gap-0 overflow-hidden min-h-0">
+      <main className="flex-1 max-w-[1280px] w-full mx-auto flex flex-col md:flex-row md:px-6 md:py-6 md:gap-0 overflow-hidden min-h-0">
 
         {/* 제목 (모바일: 목록 화면에서만, 채팅창 열리면 숨김) */}
         {!selectedInquiry && (
@@ -165,7 +170,6 @@ function InboxContent() {
             <h1 className="text-[20px] font-black tracking-tight">{t('messages')}</h1>
           </div>
         )}
-        <h1 className="hidden md:block text-3xl font-black mb-6 shrink-0">{t('messages')}</h1>
 
         {/* ──────────────── 좌측: 채팅 목록 ──────────────── */}
         <div className={`

@@ -77,7 +77,7 @@ export default function InquiryChat() {
   };
 
   return (
-    <div className="flex gap-0 md:gap-4 h-full min-h-[500px] w-full relative">
+    <div className="flex gap-0 md:gap-4 h-full w-full relative min-h-0">
       <UserProfileModal
         userId={modalUserId || ''}
         isOpen={!!modalUserId}
@@ -150,11 +150,11 @@ export default function InquiryChat() {
 
       {/* ── 우측: 채팅창 ── */}
       <div className={`
-        flex-1 flex flex-col
+        flex-1 flex flex-col min-h-0
         md:border md:border-slate-200 md:rounded-2xl md:ml-0
         overflow-hidden
         ${!selectedInquiry ? 'hidden md:flex' : 'flex'}
-      `} style={{ height: '100%' }}>
+      `}>
         {selectedInquiry ? (
           <>
             {/* 채팅 헤더 */}

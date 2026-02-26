@@ -71,7 +71,7 @@ export default function ChatMonitor() {
   return (
     <div className="flex h-full gap-4 md:gap-6 w-full relative">
       {/* 왼쪽 목록 패널 */}
-      <div className={`w-full md:w-1/3 bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} min-h-[500px]`}>
+      <div className={`w-full md:w-1/3 bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} h-full`}>
         <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex justify-between items-center mb-3 md:mb-4">
             <h3 className="font-bold text-sm md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">

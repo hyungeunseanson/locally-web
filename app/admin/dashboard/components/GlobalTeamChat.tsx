@@ -125,14 +125,13 @@ export default function GlobalTeamChat() {
         if (isOpen) {
             setHasUnread(false);
             localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
-            // 🟢 이슈4-A: 오픈 시 200ms로 증가 (메시지 DOM 렌더링 완료 후 스크롤)
+            // 🟢 수정: scrollRef가 항상 DOM에 존재하므로 더 왾은 시간에도 스크롤 가능
             setTimeout(() => {
                 if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }, 200);
-            // 추가: 500ms 후 한 번 더 보장 (이미지/컨텐츠 늦게 렌더링되는 경우)
+            }, 50);
             setTimeout(() => {
                 if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }, 500);
+            }, 300);
 
             // 🟢 모바일 버블 오픈 시 Body Scroll Lock (배경화면 오버스크롤 방지)
             if (window.innerWidth < 768) {
@@ -201,9 +200,11 @@ export default function GlobalTeamChat() {
         const imageToUpload = selectedImage;
         clearSelectedImage();
 
+        // 🟢 sendMessage 후 스크롤: scrollRef가 항상 DOM에 있으므로 즉시 스크롤 가능
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         setTimeout(() => {
             if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }, 50);
+        }, 150);
 
         try {
             if (imageToUpload) {
@@ -355,16 +356,16 @@ export default function GlobalTeamChat() {
                     {isOpen ? <ChevronDown size={20} className="text-slate-300" /> : <ChevronUp size={20} className="text-slate-300" />}
                 </button>
 
-                {isOpen && (
-                    <>
-                        {/* 메시지 목록 */}
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
-                            {renderMessages()}
-                        </div>
-                        {/* 입력 영역 */}
-                        {renderInput()}
-                    </>
-                )}
+                {/* 🟢 핵심 수정: {isOpen &&} 조건을 제거하고 항상 렌더, CSS로 visibility 제어
+                     → scrollRef DOM이 항상 존재하여 isOpen 시 즉시 스크롤 가능 */}
+                <div className={`flex flex-col flex-1 min-h-0 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none h-0 overflow-hidden'}`}>
+                    {/* 메시지 목록 */}
+                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
+                        {renderMessages()}
+                    </div>
+                    {/* 입력 영역 */}
+                    {renderInput()}
+                </div>
             </div>
 
             {/* ── 모바일: 하단 고정 바 + 슬라이드업 드로어 ── */}
