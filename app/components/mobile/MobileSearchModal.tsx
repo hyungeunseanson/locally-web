@@ -32,7 +32,17 @@ export default function MobileSearchModal({
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
-    const lockScrollYRef = useRef(0);
+    const scrollLockRef = useRef({
+        locked: false,
+        scrollY: 0,
+        bodyOverflow: '',
+        htmlOverflow: '',
+        bodyPosition: '',
+        bodyTop: '',
+        bodyLeft: '',
+        bodyRight: '',
+        bodyWidth: '',
+    });
 
     const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, '').trim();
     const inferPlaceType = (name: string): string => {
@@ -74,44 +84,47 @@ export default function MobileSearchModal({
         if (typeof window === 'undefined') return;
         const body = document.body;
         const html = document.documentElement;
-        const prevBodyOverflow = body.style.overflow;
-        const prevHtmlOverflow = html.style.overflow;
-        const prevBodyPosition = body.style.position;
-        const prevBodyTop = body.style.top;
-        const prevBodyLeft = body.style.left;
-        const prevBodyRight = body.style.right;
-        const prevBodyWidth = body.style.width;
+        const restoreScrollLock = () => {
+            if (!scrollLockRef.current.locked) return;
+            body.style.overflow = scrollLockRef.current.bodyOverflow;
+            html.style.overflow = scrollLockRef.current.htmlOverflow;
+            body.style.position = scrollLockRef.current.bodyPosition;
+            body.style.top = scrollLockRef.current.bodyTop;
+            body.style.left = scrollLockRef.current.bodyLeft;
+            body.style.right = scrollLockRef.current.bodyRight;
+            body.style.width = scrollLockRef.current.bodyWidth;
+            window.scrollTo(0, scrollLockRef.current.scrollY);
+            scrollLockRef.current.locked = false;
+        };
 
-        if (isOpen) {
-            lockScrollYRef.current = window.scrollY;
+        if (isOpen && !scrollLockRef.current.locked) {
+            scrollLockRef.current = {
+                locked: true,
+                scrollY: window.scrollY,
+                bodyOverflow: body.style.overflow,
+                htmlOverflow: html.style.overflow,
+                bodyPosition: body.style.position,
+                bodyTop: body.style.top,
+                bodyLeft: body.style.left,
+                bodyRight: body.style.right,
+                bodyWidth: body.style.width,
+            };
+
             body.style.overflow = 'hidden';
             html.style.overflow = 'hidden';
             body.style.position = 'fixed';
-            body.style.top = `-${lockScrollYRef.current}px`;
+            body.style.top = `-${scrollLockRef.current.scrollY}px`;
             body.style.left = '0';
             body.style.right = '0';
             body.style.width = '100%';
-        } else {
-            body.style.overflow = prevBodyOverflow;
-            html.style.overflow = prevHtmlOverflow;
-            body.style.position = prevBodyPosition;
-            body.style.top = prevBodyTop;
-            body.style.left = prevBodyLeft;
-            body.style.right = prevBodyRight;
-            body.style.width = prevBodyWidth;
+        }
+
+        if (!isOpen) {
+            restoreScrollLock();
         }
 
         return () => {
-            body.style.overflow = prevBodyOverflow;
-            html.style.overflow = prevHtmlOverflow;
-            body.style.position = prevBodyPosition;
-            body.style.top = prevBodyTop;
-            body.style.left = prevBodyLeft;
-            body.style.right = prevBodyRight;
-            body.style.width = prevBodyWidth;
-            if (isOpen) {
-                window.scrollTo(0, lockScrollYRef.current);
-            }
+            if (isOpen) restoreScrollLock();
         };
     }, [isOpen]);
 
