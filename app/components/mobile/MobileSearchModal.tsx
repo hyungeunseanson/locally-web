@@ -32,6 +32,7 @@ export default function MobileSearchModal({
     const [activePanel, setActivePanel] = useState<'location' | 'date' | 'language' | null>('location');
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+    const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
 
     useEffect(() => {
         if (isOpen) {
@@ -41,10 +42,23 @@ export default function MobileSearchModal({
                 setSelectedLanguage('한국어');
             }
             requestAnimationFrame(() => setIsVisible(true));
-    } else {
-        setIsVisible(false);
-    }
-}, [isOpen, selectedLanguage, setSelectedLanguage]);
+        } else {
+            setIsVisible(false);
+        }
+    }, [isOpen, selectedLanguage, setSelectedLanguage]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            const stored = window.localStorage.getItem('locally_recent_searches');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) setRecentSearches(parsed.slice(0, 6));
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
 
     if (!isOpen) return null;
 
@@ -56,67 +70,98 @@ export default function MobileSearchModal({
     ];
 
     const recommendedPlaces = [
-        { id: 'tokyo', name: '도쿄, 일본', desc: '도쿄 타워가 빛나는 곳' },
-        { id: 'osaka', name: '오사카, 일본', desc: '미식과 야경이 살아있는 곳' },
-        { id: 'kyoto', name: '교토, 일본', desc: '고즈넉한 골목이 남아있는 곳' },
-        { id: 'izakaya', name: '이자카야 체험', desc: '현지 밤문화를 맛보는 곳' },
-        { id: 'seoul', name: '서울, 한국', desc: '감성이 스며든 곳' },
+        { id: 'tokyo', name: '도쿄', desc: '도쿄 타워가 빛나는 곳' },
+        { id: 'osaka', name: '오사카', desc: '미식과 야경이 살아있는 곳' },
+        { id: 'izakaya', name: '이자카야', desc: '현지 밤문화를 맛보는 곳' },
+        { id: 'seoul', name: '서울', desc: '감성이 스며든 곳' },
+        { id: 'kyoto', name: '교토', desc: '고즈넉한 골목이 남아있는 곳' },
     ];
 
-    const recentSearches = [
-        { id: 'recent-tokyo', name: '도쿄', desc: '3월 17일~25일 · 게스트 1명' },
-    ];
+    const saveRecentSearch = (name: string) => {
+        if (!name) return;
+        const desc = formatDateRange() || undefined;
+        const next = [{ name, desc }, ...recentSearches.filter(item => item.name !== name)].slice(0, 6);
+        setRecentSearches(next);
+        try {
+            window.localStorage.setItem('locally_recent_searches', JSON.stringify(next));
+        } catch {
+            // ignore
+        }
+    };
+
+    const selectLocation = (name: string, closeExpanded?: boolean) => {
+        setLocationInput(name);
+        saveRecentSearch(name);
+        if (closeExpanded) setIsSearchExpanded(false);
+        setActivePanel('date');
+    };
 
     const PlaceIcon = ({ type }: { type: string }) => (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
             {type === 'tokyo' && (
                 <>
-                    <path d="M12 3v18" />
-                    <path d="M9 9h6" />
-                    <path d="M7.5 12h9" />
-                    <path d="M6 18h12" />
-                    <path d="M10.5 6h3" />
+                    <path d="M12 3v18" stroke="#E15B5B" strokeWidth="1.6" />
+                    <path d="M9 9h6" stroke="#E15B5B" strokeWidth="1.6" />
+                    <path d="M7.5 12h9" stroke="#E15B5B" strokeWidth="1.6" />
+                    <path d="M6 18h12" stroke="#E15B5B" strokeWidth="1.6" />
+                    <path d="M10.5 6h3" stroke="#E15B5B" strokeWidth="1.6" />
                 </>
             )}
             {type === 'osaka' && (
                 <>
-                    <path d="M5 18h14" />
-                    <path d="M6 18v-6h12v6" />
-                    <path d="M7 12l5-4 5 4" />
-                    <path d="M9 9V6h6v3" />
+                    <path d="M5 18h14" stroke="#C47D3C" strokeWidth="1.6" />
+                    <path d="M6 18v-6h12v6" stroke="#C47D3C" strokeWidth="1.6" />
+                    <path d="M7 12l5-4 5 4" stroke="#C47D3C" strokeWidth="1.6" />
+                    <path d="M9 9V6h6v3" stroke="#C47D3C" strokeWidth="1.6" />
                 </>
             )}
             {type === 'kyoto' && (
                 <>
-                    <path d="M4 7h16" />
-                    <path d="M6 7v10" />
-                    <path d="M18 7v10" />
-                    <path d="M8 12h8" />
-                    <path d="M10 17h4" />
+                    <path d="M4 7h16" stroke="#5B7B58" strokeWidth="1.6" />
+                    <path d="M6 7v10" stroke="#5B7B58" strokeWidth="1.6" />
+                    <path d="M18 7v10" stroke="#5B7B58" strokeWidth="1.6" />
+                    <path d="M8 12h8" stroke="#5B7B58" strokeWidth="1.6" />
+                    <path d="M10 17h4" stroke="#5B7B58" strokeWidth="1.6" />
                 </>
             )}
             {type === 'izakaya' && (
                 <>
-                    <path d="M9 4h6" />
-                    <path d="M10 4v2" />
-                    <path d="M14 4v2" />
-                    <rect x="8" y="6" width="8" height="12" rx="3" />
-                    <path d="M9.5 10h5" />
+                    <path d="M9 4h6" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M10 4v2" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M14 4v2" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <rect x="8" y="6" width="8" height="12" rx="3" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M9.5 10h5" stroke="#7C6BE3" strokeWidth="1.6" />
                 </>
             )}
             {type === 'seoul' && (
                 <>
-                    <path d="M6 18h12" />
-                    <path d="M8 18V7h8v11" />
-                    <path d="M10 7V4h4v3" />
-                    <path d="M9 12h6" />
+                    <path d="M6 18h12" stroke="#3C7CC4" strokeWidth="1.6" />
+                    <path d="M8 18V7h8v11" stroke="#3C7CC4" strokeWidth="1.6" />
+                    <path d="M10 7V4h4v3" stroke="#3C7CC4" strokeWidth="1.6" />
+                    <path d="M9 12h6" stroke="#3C7CC4" strokeWidth="1.6" />
                 </>
-            )}
-            {!['tokyo', 'osaka', 'kyoto', 'izakaya', 'seoul'].includes(type) && (
-                <circle cx="12" cy="12" r="8" />
             )}
         </svg>
     );
+
+    const PlaceBadge = ({ type }: { type: string }) => {
+        const styles: Record<string, { bg: string; border: string }> = {
+            tokyo: { bg: 'linear-gradient(135deg, #FFE7E5 0%, #FFF5F0 100%)', border: '#F7C2C2' },
+            osaka: { bg: 'linear-gradient(135deg, #FFE9D4 0%, #FFF6EA 100%)', border: '#F2C49C' },
+            kyoto: { bg: 'linear-gradient(135deg, #E8F4E8 0%, #F4FAF4 100%)', border: '#CFE3D0' },
+            izakaya: { bg: 'linear-gradient(135deg, #EEE9FF 0%, #F7F4FF 100%)', border: '#D8CCFF' },
+            seoul: { bg: 'linear-gradient(135deg, #E7F1FF 0%, #F2F8FF 100%)', border: '#C7DAF7' },
+        };
+        const style = styles[type] || { bg: '#F3F4F6', border: '#E5E7EB' };
+        return (
+            <div
+                className="w-[36px] h-[36px] rounded-[10px] flex items-center justify-center shrink-0"
+                style={{ background: style.bg, border: `1px solid ${style.border}` }}
+            >
+                <PlaceIcon type={type} />
+            </div>
+        );
+    };
 
     const handleClose = () => {
         setIsVisible(false);
@@ -194,23 +239,20 @@ export default function MobileSearchModal({
                 </div>
 
                 {/* 검색 결과 리스트 */}
-                <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
+                <div className="flex-1 overflow-y-auto px-4 pt-4 pb-24">
                     {/* 최근 검색 */}
                     <div className="mb-5">
                         <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">최근 검색</p>
-                        {recentSearches.map((item) => (
+                        {recentSearches.map((item, idx) => (
                             <button
-                                key={item.id}
-                                onClick={() => { setLocationInput(item.name); setIsSearchExpanded(false); setActivePanel('date'); }}
+                                key={`${item.name}-${idx}`}
+                                onClick={() => selectLocation(item.name, true)}
                                 className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
                             >
-                                <div className="w-[44px] h-[44px] rounded-[12px] flex items-center justify-center shrink-0"
-                                    style={{ background: '#F5F7F2', border: '0.5px solid #E0E6DC' }}>
-                                    <PlaceIcon type="kyoto" />
-                                </div>
+                                <PlaceBadge type="tokyo" />
                                 <div>
                                     <span className="text-[13px] font-semibold text-[#222222] block">{item.name}</span>
-                                    <span className="text-[11px] text-[#8B8B8B] font-normal">{item.desc}</span>
+                                    {item.desc && <span className="text-[11px] text-[#8B8B8B] font-normal">{item.desc}</span>}
                                 </div>
                             </button>
                         ))}
@@ -224,13 +266,10 @@ export default function MobileSearchModal({
                             .map((place, idx) => (
                                 <button
                                     key={idx}
-                                    onClick={() => { setLocationInput(place.name.split(',')[0]); setIsSearchExpanded(false); setActivePanel('date'); }}
+                                    onClick={() => selectLocation(place.name, true)}
                                     className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
                                 >
-                                    <div className="w-[44px] h-[44px] rounded-[12px] flex items-center justify-center shrink-0"
-                                        style={{ background: '#F3F4F6', border: '0.5px solid #E5E7EB' }}>
-                                        <PlaceIcon type={place.id} />
-                                    </div>
+                                    <PlaceBadge type={place.id} />
                                     <div>
                                         <span className="text-[13px] font-semibold text-[#222222] block">{place.name}</span>
                                         <span className="text-[11px] text-[#7A7A7A] font-normal">{place.desc}</span>
@@ -247,7 +286,7 @@ export default function MobileSearchModal({
         <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh]">
             {/* 배경: 화면이 보이는 반투명 레이어 + 블러 */}
             <div
-                className="absolute inset-0 -z-10 backdrop-blur-[10px] transition-opacity duration-300"
+                className="absolute inset-0 -z-10 backdrop-blur-[10px] transition-opacity duration-500"
                 style={{
                     background: 'rgba(255,255,255,0.18)',
                     opacity: isVisible ? 1 : 0,
@@ -256,7 +295,7 @@ export default function MobileSearchModal({
 
             {/* 콘텐츠 슬라이드업 */}
             <div
-                className="flex flex-col flex-1 transition-all duration-300 ease-out"
+                className="flex flex-col flex-1 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                 style={{
                     transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
                     opacity: isVisible ? 1 : 0,
@@ -304,11 +343,11 @@ export default function MobileSearchModal({
                 </div>
 
                 {/* 메인 콘텐츠 */}
-                <div className="flex-1 overflow-y-auto px-4 pt-2 pb-28">
+                <div className="flex-1 overflow-y-auto px-4 pt-2 pb-32">
                     {/* 위치 패널 */}
                     {activePanel === 'location' ? (
                         <div
-                            className="bg-white mb-2 overflow-hidden"
+                            className="bg-white mb-2 overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
                             <div className="p-5 pb-4">
@@ -324,21 +363,16 @@ export default function MobileSearchModal({
 
                                 <div className="mt-4">
                                     <p className="text-[9px] font-semibold text-[#7A7A7A] mb-2 tracking-[0.04em]">최근 검색</p>
-                                    {recentSearches.map((item) => (
+                                    {recentSearches.map((item, idx) => (
                                         <button
-                                            key={item.id}
-                                            onClick={() => { setLocationInput(item.name); setActivePanel('date'); }}
+                                            key={`${item.name}-${idx}`}
+                                            onClick={() => selectLocation(item.name)}
                                             className="flex items-center gap-2.5 w-full py-[8px] text-left active:bg-[#F3F3F3] rounded-lg transition-colors"
                                         >
-                                            <div
-                                                className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center shrink-0"
-                                                style={{ background: '#F5F7F2', border: '0.5px solid #E1E7DB' }}
-                                            >
-                                                <PlaceIcon type="kyoto" />
-                                            </div>
+                                            <PlaceBadge type="tokyo" />
                                             <div>
                                                 <span className="text-[12px] font-semibold text-[#222222] block">{item.name}</span>
-                                                <span className="text-[10px] text-[#8B8B8B] font-normal">{item.desc}</span>
+                                                {item.desc && <span className="text-[10px] text-[#8B8B8B] font-normal">{item.desc}</span>}
                                             </div>
                                         </button>
                                     ))}
@@ -349,15 +383,10 @@ export default function MobileSearchModal({
                                     {recommendedPlaces.map((place) => (
                                         <button
                                             key={place.id}
-                                            onClick={() => { setLocationInput(place.name.split(',')[0]); setActivePanel('date'); }}
+                                            onClick={() => selectLocation(place.name)}
                                             className="flex items-center gap-2.5 w-full py-[8px] text-left active:bg-[#F3F3F3] rounded-lg transition-colors"
                                         >
-                                            <div
-                                                className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center shrink-0"
-                                                style={{ background: '#F3F4F6', border: '0.5px solid #E5E7EB' }}
-                                            >
-                                                <PlaceIcon type={place.id} />
-                                            </div>
+                                            <PlaceBadge type={place.id} />
                                             <div>
                                                 <span className="text-[12px] font-semibold text-[#222222] block">{place.name}</span>
                                                 <span className="text-[10px] text-[#7A7A7A] font-normal">{place.desc}</span>
@@ -376,7 +405,7 @@ export default function MobileSearchModal({
                     {/* 날짜 패널 */}
                     {activePanel === 'date' ? (
                         <div
-                            className="bg-white mb-2 overflow-hidden"
+                            className="bg-white mb-2 overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
                             <div className="p-5">
@@ -400,11 +429,11 @@ export default function MobileSearchModal({
                     {/* 언어 패널 */}
                     {activePanel === 'language' ? (
                         <div
-                            className="bg-white mb-2 overflow-hidden"
+                            className="bg-white mb-2 overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
                             <div className="p-5">
-                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">언어를 선택하세요</h3>
+                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">체험 언어를 선택하세요</h3>
                                 <div className="space-y-0.5">
                                     {languages.map((lang) => (
                                         <button
