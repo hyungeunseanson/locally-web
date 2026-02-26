@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Search, X, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import DatePicker from '@/app/components/DatePicker';
+import { createPortal } from 'react-dom';
 
 interface MobileSearchModalProps {
     isOpen: boolean;
@@ -17,7 +18,6 @@ interface MobileSearchModalProps {
     setDateRange: (range: any) => void;
     selectedLanguage: string;
     setSelectedLanguage: (lang: string) => void;
-    onSearch: () => void;
 }
 
 export default function MobileSearchModal({
@@ -25,7 +25,6 @@ export default function MobileSearchModal({
     locationInput, setLocationInput,
     dateRange, setDateRange,
     selectedLanguage, setSelectedLanguage,
-    onSearch,
 }: MobileSearchModalProps) {
     const { t } = useLanguage();
     const router = useRouter();
@@ -33,6 +32,7 @@ export default function MobileSearchModal({
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
+    const lockScrollYRef = useRef(0);
 
     const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, '').trim();
     const inferPlaceType = (name: string): string => {
@@ -72,24 +72,50 @@ export default function MobileSearchModal({
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        const prevBodyOverflow = document.body.style.overflow;
-        const prevHtmlOverflow = document.documentElement.style.overflow;
+        const body = document.body;
+        const html = document.documentElement;
+        const prevBodyOverflow = body.style.overflow;
+        const prevHtmlOverflow = html.style.overflow;
+        const prevBodyPosition = body.style.position;
+        const prevBodyTop = body.style.top;
+        const prevBodyLeft = body.style.left;
+        const prevBodyRight = body.style.right;
+        const prevBodyWidth = body.style.width;
 
         if (isOpen) {
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
+            lockScrollYRef.current = window.scrollY;
+            body.style.overflow = 'hidden';
+            html.style.overflow = 'hidden';
+            body.style.position = 'fixed';
+            body.style.top = `-${lockScrollYRef.current}px`;
+            body.style.left = '0';
+            body.style.right = '0';
+            body.style.width = '100%';
         } else {
-            document.body.style.overflow = prevBodyOverflow;
-            document.documentElement.style.overflow = prevHtmlOverflow;
+            body.style.overflow = prevBodyOverflow;
+            html.style.overflow = prevHtmlOverflow;
+            body.style.position = prevBodyPosition;
+            body.style.top = prevBodyTop;
+            body.style.left = prevBodyLeft;
+            body.style.right = prevBodyRight;
+            body.style.width = prevBodyWidth;
         }
 
         return () => {
-            document.body.style.overflow = prevBodyOverflow;
-            document.documentElement.style.overflow = prevHtmlOverflow;
+            body.style.overflow = prevBodyOverflow;
+            html.style.overflow = prevHtmlOverflow;
+            body.style.position = prevBodyPosition;
+            body.style.top = prevBodyTop;
+            body.style.left = prevBodyLeft;
+            body.style.right = prevBodyRight;
+            body.style.width = prevBodyWidth;
+            if (isOpen) {
+                window.scrollTo(0, lockScrollYRef.current);
+            }
         };
     }, [isOpen]);
 
-    if (!isOpen) return null;
+    if (!isOpen || typeof document === 'undefined') return null;
 
     const languages = [
         { label: '전체', value: 'all', sub: 'All', code: '' },
@@ -254,24 +280,26 @@ export default function MobileSearchModal({
     };
 
     const handleSearch = () => {
-        onSearch();
+        const typed = locationInput.trim();
+        if (typed) {
+            saveRecentSearch(typed);
+        }
         setIsVisible(false);
-        setTimeout(() => {
-            onClose();
-            if (locationInput) {
-                const params = new URLSearchParams({
-                    location: locationInput,
-                    language: selectedLanguage || 'all',
-                });
-                if (dateRange.start) {
-                    params.set('startDate', dateRange.start.toISOString().split('T')[0]);
-                }
-                if (dateRange.end) {
-                    params.set('endDate', dateRange.end.toISOString().split('T')[0]);
-                }
-                router.push(`/search?${params.toString()}`);
-            }
-        }, 250);
+        onClose();
+
+        const params = new URLSearchParams({
+            language: selectedLanguage || 'all',
+        });
+        if (typed) {
+            params.set('location', typed);
+        }
+        if (dateRange.start) {
+            params.set('startDate', dateRange.start.toISOString().split('T')[0]);
+        }
+        if (dateRange.end) {
+            params.set('endDate', dateRange.end.toISOString().split('T')[0]);
+        }
+        router.push(`/search?${params.toString()}`);
     };
 
     const handleClearAll = () => {
@@ -296,7 +324,8 @@ export default function MobileSearchModal({
     const trimmedInput = locationInput.trim();
     const filteredRecommendedPlaces = recommendedPlaces.filter((place) => {
         if (!trimmedInput) return true;
-        return place.name.includes(trimmedInput) || place.desc.includes(trimmedInput);
+        const normalizedInput = normalizeText(trimmedInput);
+        return normalizeText(place.name).includes(normalizedInput) || normalizeText(place.desc).includes(normalizedInput);
     });
     const hasExactRecommendedMatch = !!trimmedInput && filteredRecommendedPlaces.some((place) => normalizeText(place.name) === normalizeText(trimmedInput));
     const showCustomTypedOption = !!trimmedInput && !hasExactRecommendedMatch;
@@ -319,12 +348,8 @@ export default function MobileSearchModal({
 
     // 🔍 검색 확장 모드 (에어비앤비 여행지 검색 화면)
     if (isSearchExpanded) {
-        return (
-            <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh] relative">
-                <div
-                    className="absolute inset-0 -z-10 backdrop-blur-[12px]"
-                    style={{ background: 'rgba(247,247,247,0.82)' }}
-                />
+        const expandedView = (
+            <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh] relative bg-[#F7F7F7]">
                 {/* 상단 검색바 */}
                 <div className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
                     style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 10px rgba(0,0,0,0.05)', border: '0.5px solid #E0E0E0' }}>
@@ -356,7 +381,7 @@ export default function MobileSearchModal({
                 </div>
 
                 {/* 검색 결과 리스트 */}
-                <div className="flex-1 overflow-y-auto px-4 pt-4 pb-24">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-24">
                     {/* 최근 검색 */}
                     <div className="mb-5">
                         <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">최근 검색</p>
@@ -411,9 +436,10 @@ export default function MobileSearchModal({
                 </div>
             </div>
         );
+        return createPortal(expandedView, document.body);
     }
 
-    return (
+    const modalView = (
         <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh]">
             {/* 배경: 화면이 보이는 반투명 레이어 + 블러 */}
             <div
@@ -632,4 +658,5 @@ export default function MobileSearchModal({
             </div>
         </div>
     );
+    return createPortal(modalView, document.body);
 }

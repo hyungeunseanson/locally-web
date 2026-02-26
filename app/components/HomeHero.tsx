@@ -322,7 +322,6 @@ export default function HomeHero({
         setDateRange={setDateRange}
         selectedLanguage={selectedLanguage || 'all'}
         setSelectedLanguage={setSelectedLanguage || (() => { })}
-        onSearch={onSearch}
       />
 
       {/* 🟢 2. 메인 확장 검색바 & 탭 영역 (데스크탑 전용) */}
