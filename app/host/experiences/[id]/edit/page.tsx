@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
 import { ChevronLeft, Save, MapPin, Plus, Trash2, X, Camera, Check, Globe, Loader2, Type, FileText } from 'lucide-react';
 import { CATEGORIES, SUPPORTED_LANGUAGES } from '@/app/host/create/config';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개선
@@ -199,7 +198,13 @@ export default function EditExperiencePage() {
       {/* 상단 고정 헤더 */}
       <div className="sticky top-20 z-40 bg-white border-b border-slate-100 px-3 md:px-6 py-3 md:py-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link href="/host/dashboard" className="p-2 hover:bg-slate-50 rounded-full transition-colors"><ChevronLeft size={20} /></Link>
+          <button
+            onClick={() => router.replace('/host/dashboard?tab=experiences')}
+            className="p-2 hover:bg-slate-50 rounded-full transition-colors"
+            type="button"
+          >
+            <ChevronLeft size={20} />
+          </button>
           <h1 className="text-sm md:text-lg font-black truncate max-w-[150px] md:max-w-md">{formData.title}</h1>
         </div>
         <button onClick={handleUpdate} disabled={saving} className="bg-black text-white px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">

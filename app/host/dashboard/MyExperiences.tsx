@@ -120,23 +120,26 @@ export default function MyExperiences() {
             </div>
 
             {/* 액션 버튼 */}
-            <div className="flex flex-col md:flex-row gap-1.5 md:gap-2 shrink-0">
+            <div className="flex flex-row md:flex-row gap-2 md:gap-2 shrink-0">
               <Link href={`/host/experiences/${exp.id}/dates`}>
-                <button className="px-2.5 py-1.5 md:px-4 md:py-2.5 border rounded-xl text-[11px] md:text-sm font-bold hover:bg-slate-50 flex items-center gap-1 transition-colors">
-                  <Calendar size={13} />
-                  <span className="text-[11px]">{t('exp_schedule')}</span>
+                <button
+                  className="w-9 h-9 md:w-auto md:h-auto md:px-4 md:py-2.5 border rounded-xl text-[11px] md:text-sm font-bold hover:bg-slate-50 flex items-center justify-center md:justify-start gap-1 transition-colors"
+                  title={t('exp_schedule')}
+                >
+                  <Calendar size={15} />
+                  <span className="hidden md:inline text-[11px]">{t('exp_schedule')}</span>
                 </button>
               </Link>
               <Link href={`/host/experiences/${exp.id}/edit`}>
-                <button className={`px-2.5 py-1.5 md:px-4 md:py-2.5 border rounded-xl text-[11px] md:text-sm font-bold flex items-center gap-1 transition-all ${exp.status === 'revision' ? 'bg-black text-white' : 'hover:bg-slate-50'
+                <button className={`w-9 h-9 md:w-auto md:h-auto md:px-4 md:py-2.5 border rounded-xl text-[11px] md:text-sm font-bold flex items-center justify-center md:justify-start gap-1 transition-all ${exp.status === 'revision' ? 'bg-black text-white' : 'hover:bg-slate-50'
                   }`}>
-                  <Edit size={13} />
-                  <span className="text-[11px]">{exp.status === 'revision' ? t('btn_edit_app') : t('exp_edit')}</span>
+                  <Edit size={15} />
+                  <span className="hidden md:inline text-[11px]">{exp.status === 'revision' ? t('btn_edit_app') : t('exp_edit')}</span>
                 </button>
               </Link>
               <button
                 onClick={() => handleDelete(exp.id)}
-                className="p-1.5 md:p-2.5 border rounded-xl text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
+                className="w-9 h-9 md:w-auto md:h-auto md:p-2.5 border rounded-xl text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all flex items-center justify-center"
                 title="삭제"
               >
                 <Trash2 size={15} className="md:hidden" />

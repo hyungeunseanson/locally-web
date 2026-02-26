@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface HostModeTransitionProps {
@@ -9,25 +9,23 @@ interface HostModeTransitionProps {
 }
 
 export default function HostModeTransition({ targetMode, onComplete }: HostModeTransitionProps) {
-    const [phase, setPhase] = useState<'in' | 'out'>('in');
     const router = useRouter();
 
     useEffect(() => {
-        // 2.5초 뒤 페이드아웃 시작
-        const t1 = setTimeout(() => setPhase('out'), 2500);
-
-        // 3.5초 뒤 실제 라우팅 + 완료 콜백
-        const t2 = setTimeout(() => {
+        // 2.5초 뒤 실제 라우팅 (전환 화면은 유지)
+        const t1 = setTimeout(() => {
             if (targetMode === 'host') {
                 router.push('/host/menu');
             } else {
                 router.push('/');
             }
-            onComplete?.();
-        }, 3500);
+        }, 2500);
 
-        return () => { clearTimeout(t1); clearTimeout(t2); };
-    }, []);
+        return () => {
+            clearTimeout(t1);
+            onComplete?.();
+        };
+    }, [onComplete, router, targetMode]);
 
     const imageSrc = targetMode === 'host'
         ? '/images/host-transition.png'
@@ -35,12 +33,8 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
 
     return (
         <div
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white"
-            style={{
-                opacity: phase === 'out' ? 0 : 1,
-                transition: 'opacity 0.5s ease-in-out',
-                pointerEvents: 'none',
-            }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white animate-in fade-in duration-200"
+            style={{ pointerEvents: 'none' }}
         >
             <style>{`
                 @keyframes float-gently {

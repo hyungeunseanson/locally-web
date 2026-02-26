@@ -66,20 +66,20 @@ export default function BecomeHostPage() {
 
       <main>
         {/* 1. 히어로 섹션 */}
-        <section className="max-w-[1440px] mx-auto px-6 py-20 lg:py-32 flex flex-col md:flex-row items-center justify-between gap-16">
-          <div className="flex-1 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <h1 className="text-5xl md:text-7xl font-black leading-[1.1] tracking-tight">
+        <section className="max-w-[1440px] mx-auto px-4 md:px-6 py-14 md:py-20 lg:py-32 flex flex-col md:flex-row items-center justify-between gap-8 md:gap-16">
+          <div className="flex-1 space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h1 className="text-[38px] md:text-7xl font-black leading-[1.1] tracking-tight">
               좋아하는 일을 하며<br/>
               <span className="text-rose-600">수입</span>을 올리세요.
             </h1>
-            <p className="text-xl text-slate-500 font-medium leading-relaxed max-w-lg">
+            <p className="text-base md:text-xl text-slate-500 font-medium leading-relaxed max-w-lg">
               수많은 외국인 게스트의 시선을 사로잡을<br/>
               독특한 로컬리 체험을 만들어 보세요.
             </p>
             <div className="pt-4">
               <button 
                 onClick={handleStartClick}
-                className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
+                className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-7 md:px-10 py-3.5 md:py-5 rounded-2xl font-bold text-base md:text-xl hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
               >
                 {hasApplication ? "내 신청 현황 확인" : "시작하기"}
               </button>
@@ -87,9 +87,9 @@ export default function BecomeHostPage() {
           </div>
           
           <div className="flex-1 flex justify-center md:justify-end relative">
-             <div className="relative w-[340px] h-[680px] bg-black rounded-[60px] border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
+             <div className="relative w-[280px] h-[560px] md:w-[340px] md:h-[680px] bg-black rounded-[50px] md:rounded-[60px] border-[10px] md:border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
-                <div className="w-full h-full bg-white pt-14 pb-8 px-6 flex flex-col justify-between">
+                <div className="w-full h-full bg-white pt-12 md:pt-14 pb-7 md:pb-8 px-5 md:px-6 flex flex-col justify-between">
                    <div>
                       <div className="w-full h-12 rounded-full bg-slate-100 mb-8 flex items-center px-4 text-slate-400 text-sm">검색을 시작해 보세요</div>
                       <h3 className="font-black text-2xl mb-4">내일 서울에서<br/>진행되는 체험</h3>
@@ -119,9 +119,9 @@ export default function BecomeHostPage() {
         </section>
 
         {/* 2. 혜택 섹션 */}
-        <section className="bg-white py-32">
-          <div className="max-w-[1440px] mx-auto px-6">
-            <h2 className="text-4xl md:text-5xl font-black text-center mb-24 leading-tight">
+        <section className="bg-white py-20 md:py-32">
+          <div className="max-w-[1440px] mx-auto px-4 md:px-6">
+            <h2 className="text-2xl md:text-5xl font-black text-center mb-12 md:mb-24 leading-tight">
               어디서도 만나볼 수 없는<br/>독특한 체험을 호스팅하세요
             </h2>
             <div className="grid md:grid-cols-3 gap-x-8 gap-y-16">
@@ -133,9 +133,9 @@ export default function BecomeHostPage() {
         </section>
 
         {/* 3. 모바일 목업 섹션 */}
-        <section className="bg-slate-50 py-32">
-          <div className="max-w-[1440px] mx-auto px-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-20 mb-32">
+        <section className="bg-slate-50 py-20 md:py-32">
+          <div className="max-w-[1440px] mx-auto px-4 md:px-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20 mb-16 md:mb-32">
                <div className="flex-1 order-2 md:order-1 flex justify-center">
                   <div className="relative w-[320px] bg-white rounded-[40px] shadow-2xl p-6 border border-slate-100 transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
                      <div className="flex items-center gap-4 mb-6">
@@ -151,7 +151,7 @@ export default function BecomeHostPage() {
                   <p className="text-xl text-slate-500 leading-relaxed font-medium">앱 내 채팅 기능을 통해 전 세계 게스트와 실시간으로 대화하세요.<br/>개인 연락처 노출 걱정 없이 안전하게 소통할 수 있습니다.</p>
                </div>
             </div>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-20">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
                <div className="flex-1">
                   <h3 className="text-3xl font-black mb-6">투명하고 신속한 정산</h3>
                   <p className="text-xl text-slate-500 leading-relaxed font-medium">체험이 완료되면 다음 달 바로 입금됩니다.<br/>복잡한 절차 없이 수익을 확인하고 관리하세요.</p>
@@ -171,21 +171,21 @@ export default function BecomeHostPage() {
         </section>
 
         {/* 4. FAQ 및 CTA */}
-        <section className="py-32 max-w-4xl mx-auto px-6">
-          <h2 className="text-4xl font-black mb-16 text-center">자주 묻는 질문</h2>
+        <section className="py-20 md:py-32 max-w-4xl mx-auto px-4 md:px-6">
+          <h2 className="text-2xl md:text-4xl font-black mb-10 md:mb-16 text-center">자주 묻는 질문</h2>
           <div className="space-y-6">
             <FAQItem q="외국어를 원어민처럼 잘해야 하나요?" a="아니요! 기본적인 의사소통만 가능하다면 충분합니다. 번역기 앱을 활용해도 괜찮습니다. 중요한 건 언어 실력보다 친절한 마음과 즐거운 분위기입니다."/>
             <FAQItem q="자격증이 필요한가요?" a="전문 가이드 자격증은 필수가 아닙니다. 로컬리는 '현지인 친구' 컨셉의 여행을 지향합니다. 다만, 특정 전문 지식이 필요한 투어라면 관련 내용을 소개에 적어주세요."/>
             <FAQItem q="수수료는 얼마인가요?" a="호스트 수수료는 20%입니다. 설정하신 금액의 80%가 정산됩니다. 게스트에게는 별도의 플랫폼 수수료가 부과됩니다."/>
           </div>
 
-          <div className="mt-32 text-center bg-black rounded-[3rem] p-16 text-white relative overflow-hidden">
+          <div className="mt-16 md:mt-32 text-center bg-black rounded-[2.5rem] md:rounded-[3rem] p-10 md:p-16 text-white relative overflow-hidden">
              <div className="relative z-10">
-                <h2 className="text-4xl md:text-5xl font-black mb-8">지금 바로 시작해보세요</h2>
-                <p className="text-slate-400 text-lg mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
+                <h2 className="text-2xl md:text-5xl font-black mb-6 md:mb-8">지금 바로 시작해보세요</h2>
+                <p className="text-slate-400 text-sm md:text-lg mb-8 md:mb-10">당신의 평범한 하루가 누군가에게는 잊지 못할 추억이 됩니다.</p>
                 <button 
                   onClick={handleStartClick}
-                  className="bg-white text-black px-12 py-5 rounded-2xl font-bold text-xl hover:scale-105 transition-transform flex items-center gap-2 mx-auto"
+                  className="bg-white text-black px-9 md:px-12 py-4 md:py-5 rounded-2xl font-bold text-base md:text-xl hover:scale-105 transition-transform flex items-center gap-2 mx-auto"
                 >
                   {hasApplication ? "내 신청 현황 확인" : "호스트 등록하기"} <ArrowRight size={20}/>
                 </button>

@@ -2,7 +2,8 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const NEWS_ITEMS = [
   {
@@ -32,19 +33,38 @@ const NEWS_ITEMS = [
 ];
 
 export default function NewsPage() {
+  const router = useRouter();
+
+  const handleMobileBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/account');
+  };
+
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
       
-      <main className="max-w-[1040px] mx-auto px-6 py-24">
+      <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-12 md:py-24">
+        <div className="md:hidden mb-6">
+          <button
+            onClick={handleMobileBack}
+            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="뒤로가기"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        </div>
         {/* 헤더 */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-24 border-b border-black pb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 md:mb-24 border-b border-black pb-6 md:pb-8">
           <div>
-            <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-2">
+            <h1 className="text-3xl md:text-8xl font-black tracking-tighter mb-2">
               Newsroom
             </h1>
           </div>
-          <p className="text-right text-[#717171] font-medium mt-4 md:mt-0">
+          <p className="text-left md:text-right text-[#717171] font-medium mt-3 md:mt-0 text-sm md:text-base">
             Press & Media Coverage
           </p>
         </div>
@@ -57,17 +77,17 @@ export default function NewsPage() {
               href="#" 
               className="group py-12 border-b border-[#EBEBEB] hover:border-black transition-colors duration-300 block"
             >
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 md:gap-6">
                 
                 {/* 내용 영역 */}
                 <div className="flex-1 max-w-3xl">
-                  <div className="flex items-center gap-3 mb-3 text-sm font-bold tracking-widest uppercase">
+                  <div className="flex items-center gap-3 mb-2 md:mb-3 text-[11px] md:text-sm font-bold tracking-widest uppercase">
                     <span className="text-black">{item.source}</span>
                     <span className="w-1 h-1 bg-[#DDDDDD] rounded-full"></span>
                     <span className="text-[#999999] font-medium">{item.date}</span>
                   </div>
                   
-                  <h2 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight group-hover:text-[#484848] transition-colors">
+                  <h2 className="text-xl md:text-4xl font-bold leading-tight tracking-tight group-hover:text-[#484848] transition-colors">
                     {item.title}
                   </h2>
                 </div>

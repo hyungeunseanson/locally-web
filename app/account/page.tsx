@@ -40,6 +40,7 @@ export default function AccountPage() {
   const [isAdminWhitelisted, setIsAdminWhitelisted] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
+  const [activeLinkModal, setActiveLinkModal] = useState<null | 'notices' | 'community' | 'news' | 'social'>(null);
   // 프로필 카드용 통계
   const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 0 });
 
@@ -55,7 +56,9 @@ export default function AccountPage() {
     mbti: '',
     kakao_id: '',
     avatar_url: '',
-    languages: [] as string[] // 🟢 [추가] 언어 배열 초기화
+    languages: [] as string[], // 🟢 [추가] 언어 배열 초기화
+    job: '',
+    school: ''
   });
 
   // 국가 리스트 & 국가번호 매핑
@@ -85,6 +88,46 @@ export default function AccountPage() {
   // 🟢 [수정] 진짜 리뷰 데이터 및 모달 상태
   const [guestReviews, setGuestReviews] = useState<any[]>([]);
   const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 선택된 리뷰
+
+  useEffect(() => {
+    document.body.style.overflow = activeLinkModal ? 'hidden' : 'unset';
+  }, [activeLinkModal]);
+
+  const linkModalConfig = {
+    notices: {
+      title: '공지사항',
+      desc: 'Locally의 주요 공지와 업데이트를 확인하세요.',
+      actions: [
+        { label: '공지사항 보기', href: '/company/notices', external: false },
+        { label: '새 창으로 열기', href: '/company/notices', external: true },
+      ]
+    },
+    community: {
+      title: '커뮤니티',
+      desc: '여행자와 호스트의 이야기를 모았습니다.',
+      actions: [
+        { label: '커뮤니티 보기', href: '/company/community', external: false },
+        { label: '새 창으로 열기', href: '/company/community', external: true },
+      ]
+    },
+    news: {
+      title: '뉴스',
+      desc: 'Locally의 언론 보도를 확인하세요.',
+      actions: [
+        { label: '뉴스룸 보기', href: '/company/news', external: false },
+        { label: '새 창으로 열기', href: '/company/news', external: true },
+      ]
+    },
+    social: {
+      title: '소셜 미디어',
+      desc: '원하는 채널을 선택해 연결하세요.',
+      actions: [
+        { label: 'Instagram (KR)', href: 'https://www.instagram.com/locally.official/', external: true },
+        { label: 'Instagram (JP)', href: 'https://www.instagram.com/locally.japan/', external: true },
+        { label: 'Naver Blog', href: 'https://blog.naver.com/locally-travel', external: true },
+      ]
+    }
+  } as const;
 
   useEffect(() => {
     const getProfile = async () => {
@@ -117,7 +160,9 @@ export default function AccountPage() {
           mbti: data.mbti || '',
           kakao_id: data.kakao_id || '',
           avatar_url: data.avatar_url || user.user_metadata?.avatar_url || '',
-          languages: data.languages || [] // 🟢 [추가] DB에서 언어 가져오기
+          languages: data.languages || [], // 🟢 [추가] DB에서 언어 가져오기
+          job: data.job || '',
+          school: data.school || ''
         });
       } else {
         setProfile(prev => ({
@@ -233,6 +278,8 @@ export default function AccountPage() {
       email: profile.email, // 수정된 이메일 저장
       avatar_url: profile.avatar_url,
       languages: profile.languages, // 🟢 [추가] 저장 시 포함
+      job: profile.job,
+      school: profile.school,
       updated_at: new Date().toISOString(),
     };
 
@@ -247,6 +294,17 @@ export default function AccountPage() {
     }
     setSaving(false);
   };
+
+  const handleOpenLink = (href: string, external: boolean) => {
+    if (external) {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    } else {
+      router.push(href);
+    }
+    setActiveLinkModal(null);
+  };
+
+  const activeLinkConfig = activeLinkModal ? linkModalConfig[activeLinkModal] : null;
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center">Loading...</div>;
 
@@ -356,10 +414,10 @@ export default function AccountPage() {
         {/* ── 메뉴 그룹 3: Locally & 커뮤니티 ── */}
         <div className="px-5">
           <MobileMenuItem icon={<FileText size={17} />} label="로컬리 소개" href="/about" />
-          <MobileMenuItem icon={<Bell size={17} />} label="공지사항" href="/company/notices" />
-          <MobileMenuItem icon={<Users size={17} />} label="커뮤니티" href="/company/community" />
-          <MobileMenuItem icon={<BookOpen size={17} />} label="뉴스" href="/company/news" />
-          <MobileMenuItem icon={<Globe size={17} />} label="소셜 미디어" href="/company/partnership" />
+          <MobileMenuItem icon={<Bell size={17} />} label="공지사항" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('notices'); }} />
+          <MobileMenuItem icon={<Users size={17} />} label="커뮤니티" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('community'); }} />
+          <MobileMenuItem icon={<BookOpen size={17} />} label="뉴스" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('news'); }} />
+          <MobileMenuItem icon={<Globe size={17} />} label="소셜 미디어" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('social'); }} />
         </div>
 
         <div className="my-4 mx-5 border-t border-gray-100" />
@@ -685,9 +743,31 @@ export default function AccountPage() {
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors uppercase"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2">{t('profile_job')}</label>
+                  <input
+                    type="text"
+                    value={profile.job}
+                    onChange={e => setProfile({ ...profile, job: e.target.value })}
+                    placeholder={t('profile_job')}
+                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
+                  />
+                </div>
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold mb-2">{t('profile_school')}</label>
+                  <input
+                    type="text"
+                    value={profile.school}
+                    onChange={e => setProfile({ ...profile, school: e.target.value })}
+                    placeholder={t('profile_school')}
+                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
+                  />
+                </div>
                 {/* 🟢 [추가] 구사 가능한 언어 선택 */}
-                <div className="col-span-1 md:col-span-2">
+                <div className="col-span-1 md:col-span-1">
                   <label className="block text-sm font-bold mb-2">{t('label_languages_spoken')}</label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {['English', 'Korean', 'Japanese', 'Chinese', 'Spanish', 'French'].map(lang => (
@@ -748,6 +828,43 @@ export default function AccountPage() {
           </div>
         </div>
       </main>
+
+      {activeLinkConfig && (
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setActiveLinkModal(null)}
+          />
+          <div className="relative w-full md:max-w-md bg-white rounded-t-3xl md:rounded-3xl p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{activeLinkConfig.title}</h3>
+                <p className="text-sm text-slate-500 mt-1">{activeLinkConfig.desc}</p>
+              </div>
+              <button
+                onClick={() => setActiveLinkModal(null)}
+                className="w-8 h-8 rounded-full border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-50"
+                aria-label="닫기"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              {activeLinkConfig.actions.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => handleOpenLink(action.href, action.external)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
+                >
+                  {action.label}
+                  <ChevronRight size={16} className="text-slate-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🟢 [추가] 리뷰 상세 모달 */}
       {selectedReview && (

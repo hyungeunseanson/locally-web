@@ -145,10 +145,29 @@ export default function ReservationCard({
           <p className="text-[12px] md:text-sm font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
         </div>
 
-        {/* 메시지 버튼 */}
+        {/* 모바일: 메시지/캘린더 아이콘 스택 */}
+        <div className="ml-1 shrink-0 flex flex-col gap-1 md:hidden">
+          <button
+            onClick={(e) => { e.stopPropagation(); onMessage(); }}
+            className="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center hover:bg-black transition-colors"
+          >
+            <MessageSquare size={14} />
+          </button>
+          {isConfirmed && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onCalendar(); }}
+              className="w-8 h-8 bg-white border border-slate-200 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-50 transition-colors"
+              aria-label="캘린더"
+            >
+              <CalendarPlus size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* 데스크탑: 메시지 버튼 */}
         <button
           onClick={(e) => { e.stopPropagation(); onMessage(); }}
-          className="ml-1 shrink-0 w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center hover:bg-black transition-colors"
+          className="ml-1 shrink-0 w-8 h-8 bg-slate-900 text-white rounded-lg hidden md:flex items-center justify-center hover:bg-black transition-colors"
         >
           <MessageSquare size={14} />
         </button>
@@ -166,7 +185,7 @@ export default function ReservationCard({
           {isConfirmed && (
             <button
               onClick={(e) => { e.stopPropagation(); onCalendar(); }}
-              className="ml-auto shrink-0 text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+              className="ml-auto shrink-0 text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-lg hidden md:flex items-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
             >
               <CalendarPlus size={11} /> 캘린더
             </button>

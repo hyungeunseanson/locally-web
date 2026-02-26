@@ -5,7 +5,6 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Check, Clock, Trash2, X } from 'lucide-react';
-import Link from 'next/link';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
@@ -18,6 +17,7 @@ export default function ManageDatesPage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
   const supabase = createClient();
   const params = useParams();
+  const router = useRouter();
   const { showToast } = useToast();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -240,9 +240,12 @@ export default function ManageDatesPage() {
       <SiteHeader />
       <main className="max-w-6xl mx-auto px-3 md:px-6 py-6 md:py-12">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-8">
-          <Link href="/host/dashboard" className="flex items-center gap-2 text-slate-500 hover:text-black font-bold text-sm">
+          <button
+            onClick={() => router.replace('/host/dashboard?tab=experiences')}
+            className="flex items-center gap-2 text-slate-500 hover:text-black font-bold text-sm"
+          >
             <ChevronLeft size={16} /> {t('nav_dashboard')} {/* 🟢 번역 */}
-          </Link>
+          </button>
           <div className="flex gap-3">
             <button onClick={() => { setAvailability(initialData); setSelectedDate(null); }} className="px-4 py-2 text-sm font-bold text-slate-400 hover:bg-slate-100 rounded-full">{t('btn_undo')}</button> {/* 🟢 번역 */}
             <button onClick={handleSave} disabled={loading} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
@@ -274,27 +277,30 @@ export default function ManageDatesPage() {
             <div className="sticky top-24 bg-slate-50 border border-slate-200 rounded-2xl md:rounded-3xl p-4 md:p-6 min-h-[300px] md:min-h-[500px]">
               {selectedDate ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                  <div className="flex justify-between items-start mb-6">
-                    <div><h3 className="text-xl font-black text-slate-900 mb-1">{selectedDate}</h3><p className="text-xs font-bold text-slate-500">{t('sched_time_setting')}</p></div> {/* 🟢 번역 */}
+                  <div className="flex justify-between items-start mb-5 md:mb-6">
+                    <div>
+                      <h3 className="text-lg md:text-xl font-black text-slate-900 mb-1">{selectedDate}</h3>
+                      <p className="text-[10px] md:text-xs font-bold text-slate-500">{t('sched_time_setting')}</p>
+                    </div> {/* 🟢 번역 */}
                     <button onClick={() => setSelectedDate(null)} className="p-1 hover:bg-slate-200 rounded-full text-slate-400"><X size={18} /></button>
                   </div>
-                  <div className="space-y-2 mb-8">
+                  <div className="space-y-2 mb-6 md:mb-8">
                     {availability[selectedDate]?.length > 0 ? (
                       availability[selectedDate].map(time => {
                         const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
                         return (
-                          <div key={time} className={`flex justify-between items-center bg-white p-3 px-4 rounded-xl border shadow-sm ${isBooked ? 'border-rose-200 bg-rose-50' : 'border-slate-200'}`}>
+                          <div key={time} className={`flex justify-between items-center bg-white p-2.5 px-3 md:p-3 md:px-4 rounded-xl border shadow-sm ${isBooked ? 'border-rose-200 bg-rose-50' : 'border-slate-200'}`}>
                             <div className="flex items-center gap-3">
                               <Clock size={16} className={isBooked ? "text-rose-400" : "text-slate-400"} />
-                              <span className={`font-bold ${isBooked ? "text-rose-700" : "text-slate-800"}`}>{time}</span>
-                              {isBooked && <span className="text-[10px] font-bold bg-rose-200 text-rose-700 px-1.5 py-0.5 rounded">{t('sched_booked')}</span>} {/* 🟢 번역 */}
+                              <span className={`text-[12px] md:text-sm font-bold ${isBooked ? "text-rose-700" : "text-slate-800"}`}>{time}</span>
+                              {isBooked && <span className="text-[9px] md:text-[10px] font-bold bg-rose-200 text-rose-700 px-1.5 py-0.5 rounded">{t('sched_booked')}</span>} {/* 🟢 번역 */}
                             </div>
                             <button
                               onClick={() => removeTimeSlot(time)}
                               className={`text-slate-300 p-1 rounded-full transition-all ${isBooked ? 'opacity-30 cursor-not-allowed' : 'hover:text-rose-500 hover:bg-rose-50'}`}
                               disabled={isBooked}
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         )
@@ -302,15 +308,15 @@ export default function ManageDatesPage() {
                     ) : <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">{t('sched_add_guide')}</div>} {/* 🟢 번역 */}
                   </div>
                   <div className="border-t border-slate-200 pt-6">
-                    <label className="text-xs font-bold text-slate-500 mb-3 block uppercase">{t('sched_add_label')} (08:00 ~ 21:00)</label> {/* 🟢 번역 */}
-                    <div className="grid grid-cols-3 md:grid-cols-3 gap-1.5 md:gap-2 max-h-48 md:max-h-60 overflow-y-auto custom-scrollbar">
+                    <label className="text-[10px] md:text-xs font-bold text-slate-500 mb-3 block uppercase">{t('sched_add_label')} (08:00 ~ 21:00)</label> {/* 🟢 번역 */}
+                    <div className="grid grid-cols-3 md:grid-cols-3 gap-1.5 md:gap-2 max-h-44 md:max-h-60 overflow-y-auto custom-scrollbar">
                       {timeOptions.map(time => {
                         const isAdded = availability[selectedDate]?.includes(time);
                         const isBooked = (bookingCounts[`${selectedDate}_${time}`] || 0) > 0;
                         return (
                           <button key={time} onClick={() => isAdded ? removeTimeSlot(time) : addTimeSlot(time)}
                             disabled={isBooked}
-                            className={`py-2 text-sm font-bold rounded-lg border transition-all ${isAdded
+                            className={`py-1.5 md:py-2 text-[12px] md:text-sm font-bold rounded-lg border transition-all ${isAdded
                                 ? (isBooked ? 'bg-rose-100 text-rose-400 border-rose-200 cursor-not-allowed' : 'bg-black text-white border-black')
                                 : 'bg-white text-slate-600 border-slate-200 hover:border-black'
                               }`}>

@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import {
     ArrowLeft, Camera, Loader2, User, BriefcaseBusiness,
-    GraduationCap, Globe, ShieldCheck, Star, ChevronRight
+    GraduationCap, Globe, ShieldCheck, Star,
+    Calendar, Phone, Mail, MessageCircle
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -37,6 +38,28 @@ export default function MobileProfileView({
     onBack,
     onProfileUpdate,
 }: MobileProfileViewProps) {
+    const countries = [
+        { code: 'KR', name: '대한민국 (South Korea)' },
+        { code: 'JP', name: '일본 (Japan)' },
+        { code: 'CN', name: '중국 (China)' },
+        { code: 'TW', name: '대만 (Taiwan)' },
+        { code: 'HK', name: '홍콩 (Hong Kong)' },
+        { code: 'SG', name: '싱가포르 (Singapore)' },
+        { code: 'MY', name: '말레이시아 (Malaysia)' },
+        { code: 'PH', name: '필리핀 (Philippines)' },
+        { code: 'IN', name: '인도 (India)' },
+        { code: 'TH', name: '태국 (Thailand)' },
+        { code: 'VN', name: '베트남 (Vietnam)' },
+        { code: 'US', name: '미국 (USA)' },
+        { code: 'CA', name: '캐나다 (Canada)' },
+        { code: 'FR', name: '프랑스 (France)' },
+        { code: 'GB', name: '영국 (UK)' },
+        { code: 'ES', name: '스페인 (Spain)' },
+        { code: 'DE', name: '독일 (Germany)' },
+        { code: 'CH', name: '스위스 (Switzerland)' },
+        { code: 'IT', name: '이탈리아 (Italy)' },
+        { code: 'AU', name: '호주 (Australia)' }
+    ];
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({ ...profile });
     const [saving, setSaving] = useState(false);
@@ -90,6 +113,12 @@ export default function MobileProfileView({
         const updates = {
             id: userId,
             full_name: editData.full_name,
+            nationality: editData.nationality,
+            birth_date: editData.birth_date || null,
+            gender: editData.gender,
+            phone: editData.phone,
+            kakao_id: editData.kakao_id,
+            email: editData.email,
             bio: editData.bio,
             languages: editData.languages,
             job: editData.job,
@@ -198,6 +227,138 @@ export default function MobileProfileView({
 
             {/* 상세 정보 */}
             <div className="mx-5 mt-4 space-y-0">
+                {/* 국적 */}
+                <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
+                    <Globe size={18} className="text-slate-500 shrink-0" />
+                    {isEditing ? (
+                        <select
+                            value={editData.nationality || ''}
+                            onChange={e => setEditData(prev => ({ ...prev, nationality: e.target.value }))}
+                            className="flex-1 text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-400"
+                        >
+                            <option value="">국적 선택</option>
+                            {countries.map(country => (
+                                <option key={country.code} value={country.code}>{country.name}</option>
+                            ))}
+                        </select>
+                    ) : (
+                        <span className="text-[13px] text-slate-700">
+                            국적: <span className="font-medium">
+                                {displayProfile.nationality
+                                    ? countries.find(c => c.code === displayProfile.nationality)?.name?.split(' (')[0] || displayProfile.nationality
+                                    : '미입력'}
+                            </span>
+                        </span>
+                    )}
+                </div>
+
+                {/* 생년월일 */}
+                <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
+                    <Calendar size={18} className="text-slate-500 shrink-0" />
+                    {isEditing ? (
+                        <input
+                            type="date"
+                            value={editData.birth_date || ''}
+                            onChange={e => setEditData(prev => ({ ...prev, birth_date: e.target.value }))}
+                            className="flex-1 text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-400"
+                        />
+                    ) : (
+                        <span className="text-[13px] text-slate-700">
+                            생년월일: <span className="font-medium">{displayProfile.birth_date || '미입력'}</span>
+                        </span>
+                    )}
+                </div>
+
+                {/* 성별 */}
+                <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
+                    <User size={18} className="text-slate-500 shrink-0" />
+                    {isEditing ? (
+                        <select
+                            value={editData.gender || ''}
+                            onChange={e => setEditData(prev => ({ ...prev, gender: e.target.value }))}
+                            className="flex-1 text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-400"
+                        >
+                            <option value="">성별 선택</option>
+                            <option value="Male">남성</option>
+                            <option value="Female">여성</option>
+                            <option value="Other">기타</option>
+                        </select>
+                    ) : (
+                        <span className="text-[13px] text-slate-700">
+                            성별: <span className="font-medium">{displayProfile.gender || '미입력'}</span>
+                        </span>
+                    )}
+                </div>
+
+                {/* 연락처 */}
+                <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
+                    <Phone size={18} className="text-slate-500 shrink-0" />
+                    {isEditing ? (
+                        <input
+                            value={editData.phone || ''}
+                            onChange={e => setEditData(prev => ({ ...prev, phone: e.target.value }))}
+                            placeholder="전화번호 입력"
+                            className="flex-1 text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-400"
+                        />
+                    ) : (
+                        <span className="text-[13px] text-slate-700">
+                            전화번호: <span className="font-medium">{displayProfile.phone || '미입력'}</span>
+                        </span>
+                    )}
+                </div>
+
+                {/* 이메일 */}
+                <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
+                    <Mail size={18} className="text-slate-500 shrink-0" />
+                    {isEditing ? (
+                        <input
+                            type="email"
+                            value={editData.email || ''}
+                            onChange={e => setEditData(prev => ({ ...prev, email: e.target.value }))}
+                            placeholder="이메일 입력"
+                            className="flex-1 text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-400"
+                        />
+                    ) : (
+                        <span className="text-[13px] text-slate-700">
+                            이메일: <span className="font-medium">{displayProfile.email || '미입력'}</span>
+                        </span>
+                    )}
+                </div>
+
+                {/* 카카오 ID */}
+                <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
+                    <MessageCircle size={18} className="text-slate-500 shrink-0" />
+                    {isEditing ? (
+                        <input
+                            value={editData.kakao_id || ''}
+                            onChange={e => setEditData(prev => ({ ...prev, kakao_id: e.target.value }))}
+                            placeholder="카카오 ID 입력"
+                            className="flex-1 text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-400"
+                        />
+                    ) : (
+                        <span className="text-[13px] text-slate-700">
+                            카카오 ID: <span className="font-medium">{displayProfile.kakao_id || '미입력'}</span>
+                        </span>
+                    )}
+                </div>
+
+                {/* MBTI */}
+                <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
+                    <Star size={18} className="text-slate-500 shrink-0" />
+                    {isEditing ? (
+                        <input
+                            value={editData.mbti || ''}
+                            onChange={e => setEditData(prev => ({ ...prev, mbti: e.target.value.toUpperCase() }))}
+                            placeholder="MBTI 입력"
+                            maxLength={4}
+                            className="flex-1 text-[13px] uppercase text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-400"
+                        />
+                    ) : (
+                        <span className="text-[13px] text-slate-700">
+                            MBTI: <span className="font-medium">{displayProfile.mbti || '미입력'}</span>
+                        </span>
+                    )}
+                </div>
                 {/* 직업 */}
                 <div className="flex items-center gap-3 py-3.5 border-b border-slate-100">
                     <BriefcaseBusiness size={18} className="text-slate-500 shrink-0" />
@@ -280,7 +441,7 @@ export default function MobileProfileView({
                 </div>
 
                 {/* 자기소개 */}
-                {isEditing && (
+                {isEditing ? (
                     <div className="py-4">
                         <p className="text-[11px] text-slate-400 font-semibold mb-2">자기소개</p>
                         <textarea
@@ -290,6 +451,13 @@ export default function MobileProfileView({
                             placeholder="자기소개를 입력하세요"
                             className="w-full text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:border-slate-400 resize-none"
                         />
+                    </div>
+                ) : (
+                    <div className="py-4">
+                        <p className="text-[11px] text-slate-400 font-semibold mb-2">자기소개</p>
+                        <div className="w-full text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+                            {displayProfile.bio || '미입력'}
+                        </div>
                     </div>
                 )}
             </div>
