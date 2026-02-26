@@ -152,12 +152,11 @@ export default function EditExperiencePage() {
 
   // 🗑️ 사진 삭제 핸들러 (기존 로직 유지)
   const removePhoto = (indexToRemove: number) => {
-    if (confirm(t('msg_photo_delete_confirm'))) { // 🟢 번역
-      setFormData((prev: any) => ({
-        ...prev,
-        photos: prev.photos.filter((_: string, idx: number) => idx !== indexToRemove)
-      }));
-    }
+    setFormData((prev: any) => ({
+      ...prev,
+      photos: prev.photos.filter((_: string, idx: number) => idx !== indexToRemove)
+    }));
+    showToast('사진이 삭제 목록에 반영되었습니다. 저장 시 최종 적용됩니다.', 'success');
   };
 
   // 진행 언어 토글 (기존 로직 유지)

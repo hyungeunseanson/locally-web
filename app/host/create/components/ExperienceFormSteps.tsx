@@ -33,13 +33,13 @@ export default function ExperienceFormSteps({
     };
 
     return (
-      <div className="w-full space-y-8 md:space-y-12">
+      <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">어떤 체험을 준비하셨나요?</h1>
-          <p className="text-slate-500 text-sm md:text-lg">지역, 카테고리, 그리고 언어를 선택해주세요.</p>
+          <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">어떤 체험을 준비하셨나요?</h1>
+          <p className="text-[13px] md:text-base text-slate-500">지역, 카테고리, 그리고 언어를 선택해주세요.</p>
         </div>
 
-        <div className="space-y-6 md:space-y-8">
+        <div className="space-y-5 md:space-y-6">
           {/* 국가 선택 */}
           <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
             {['Korea', 'Japan'].map(c => (
@@ -60,11 +60,11 @@ export default function ExperienceFormSteps({
           </div>
           
           {isCustomCity && (
-            <input type="text" placeholder="도시 이름 입력 (예: 가마쿠라)" value={formData.city} onChange={(e) => updateData('city', e.target.value)} className="w-full p-4 text-lg font-bold border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"/>
+            <input type="text" placeholder="도시 이름 입력 (예: 가마쿠라)" value={formData.city} onChange={(e) => updateData('city', e.target.value)} className="w-full p-3.5 md:p-4 text-base md:text-lg font-bold border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"/>
           )}
 
           {/* 카테고리 & 언어 */}
-          <div className="space-y-8">
+          <div className="space-y-6 md:space-y-8">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">카테고리</label>
               <div className="flex flex-wrap gap-2.5 md:gap-3">
@@ -98,15 +98,15 @@ export default function ExperienceFormSteps({
   // --- STEP 2: 사진 및 제목 ---
   if (step === 2) {
     return (
-      <div className="w-full space-y-8 md:space-y-12">
+      <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">체험의 첫인상</h1>
-          <p className="text-slate-500 text-sm md:text-lg">매력적인 제목과 멋진 사진을 올려주세요. (최대 10장)</p>
+          <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">체험의 첫인상</h1>
+          <p className="text-[13px] md:text-base text-slate-500">매력적인 제목과 멋진 사진을 올려주세요. (최대 10장)</p>
         </div>
-        <div className="space-y-8 md:space-y-10">
-          <input type="text" placeholder="체험 제목을 입력하세요" value={formData.title} onChange={(e) => updateData('title', e.target.value)} className="w-full py-3.5 md:py-4 text-2xl md:text-3xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300"/>
+        <div className="space-y-6 md:space-y-8">
+          <input type="text" placeholder="체험 제목을 입력하세요" value={formData.title} onChange={(e) => updateData('title', e.target.value)} className="w-full py-3 md:py-3.5 text-xl md:text-2xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300"/>
           
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-slate-50 transition-all">
               <Camera size={24} className="text-slate-400 mb-2"/>
               <span className="text-xs font-bold text-slate-500">사진 추가</span>
@@ -138,14 +138,14 @@ export default function ExperienceFormSteps({
   // --- STEP 3: 장소 및 동선 (🟢 복구 완료) ---
   if (step === 3) {
     return (
-      <div className="w-full space-y-8 md:space-y-10">
+      <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">어디서 만날까요?</h1>
-          <p className="text-slate-500 text-sm md:text-lg">게스트와 만날 장소와 이동 경로를 입력해주세요.</p>
+          <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">어디서 만날까요?</h1>
+          <p className="text-[13px] md:text-base text-slate-500">게스트와 만날 장소와 이동 경로를 입력해주세요.</p>
         </div>
 
         {/* 🟢 만나는 장소 (Meeting Point) 입력 필드 */}
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+        <div className="bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-200">
           <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block flex items-center gap-1">
             <MapPin size={12}/> 만나는 장소 (Meeting Point)
           </label>
@@ -154,21 +154,21 @@ export default function ExperienceFormSteps({
             placeholder="예) 홍대입구역 3번 출구 앞" 
             value={formData.meeting_point || ''} 
             onChange={(e) => updateData('meeting_point', e.target.value)} 
-            className="w-full p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-bold"
+            className="w-full p-3.5 md:p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-bold text-sm md:text-base"
           />
           <p className="text-xs text-slate-400 mt-2">* 정확한 주소나 찾기 쉬운 랜드마크를 입력해주세요.</p>
         </div>
 
         {/* 이동 동선 */}
         <div className="space-y-4">
-          <h3 className="text-lg font-bold">이동 동선</h3>
-          <div className="relative border-l-2 border-slate-100 ml-4 pl-8 space-y-8 py-2">
+          <h3 className="text-base md:text-lg font-bold">이동 동선</h3>
+          <div className="relative border-l-2 border-slate-100 ml-3 md:ml-4 pl-6 md:pl-8 space-y-5 md:space-y-8 py-2">
             {formData.itinerary.map((item: any, idx: number) => (
               <div key={idx} className="relative group animate-in slide-in-from-left-4 fade-in duration-300">
                 <div className={`absolute -left-[41px] top-4 w-6 h-6 rounded-full border-4 border-white shadow-sm flex items-center justify-center z-10 ${idx === 0 ? 'bg-black' : idx === formData.itinerary.length - 1 ? 'bg-slate-900' : 'bg-slate-300'}`}>
                   {idx === 0 && <MapPin size={10} className="text-white"/>}
                 </div>
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 group-hover:border-slate-300 transition-colors relative">
+                <div className="bg-slate-50 p-4 md:p-5 rounded-2xl border border-slate-200 group-hover:border-slate-300 transition-colors relative">
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       {idx === 0 ? 'START' : idx === formData.itinerary.length - 1 ? 'END' : `STOP ${idx}`}
@@ -180,8 +180,8 @@ export default function ExperienceFormSteps({
                     )}
                   </div>
                   <div className="space-y-3">
-                    <input type="text" placeholder="장소 이름" value={item.title} onChange={(e) => updateItineraryItem(idx, 'title', e.target.value)} className="w-full bg-transparent text-lg font-bold outline-none"/>
-                    <textarea placeholder="간단한 설명 (선택)" value={item.description} onChange={(e) => updateItineraryItem(idx, 'description', e.target.value)} className="w-full bg-transparent text-sm text-slate-600 outline-none resize-none h-10"/>
+                    <input type="text" placeholder="장소 이름" value={item.title} onChange={(e) => updateItineraryItem(idx, 'title', e.target.value)} className="w-full bg-transparent text-base md:text-lg font-bold outline-none"/>
+                    <textarea placeholder="간단한 설명 (선택)" value={item.description} onChange={(e) => updateItineraryItem(idx, 'description', e.target.value)} className="w-full bg-transparent text-xs md:text-sm text-slate-600 outline-none resize-none h-12"/>
                   </div>
                 </div>
               </div>
@@ -199,10 +199,10 @@ export default function ExperienceFormSteps({
   // --- STEP 4~7 (기존 유지) ---
   if (step === 4) {
     return (
-      <div className="w-full space-y-8 md:space-y-12">
-        <div className="space-y-2"><h1 className="text-2xl md:text-3xl font-black">디테일을 채워주세요</h1><p className="text-slate-500 text-sm md:text-lg">상세 설명과 제공 사항을 입력하세요.</p></div>
-        <div className="space-y-8">
-          <textarea placeholder="상세 소개글을 입력하세요. (최소 50자 이상)" value={formData.description} onChange={(e) => updateData('description', e.target.value)} className="w-full p-5 h-48 bg-slate-50 rounded-2xl outline-none resize-none text-base border border-slate-200 focus:border-black"/>
+      <div className="w-full space-y-6 md:space-y-8">
+        <div className="space-y-2"><h1 className="text-[22px] md:text-[30px] font-black">디테일을 채워주세요</h1><p className="text-[13px] md:text-base text-slate-500">상세 설명과 제공 사항을 입력하세요.</p></div>
+        <div className="space-y-6">
+          <textarea placeholder="상세 소개글을 입력하세요. (최소 50자 이상)" value={formData.description} onChange={(e) => updateData('description', e.target.value)} className="w-full p-4 md:p-5 h-40 md:h-48 bg-slate-50 rounded-2xl outline-none resize-none text-sm md:text-base border border-slate-200 focus:border-black"/>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div><label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">포함 사항</label><div className="flex gap-2 mb-3"><input type="text" placeholder="예) 음료" value={tempInclusion} onChange={(e)=>setTempInclusion(e.target.value)} className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200" onKeyPress={(e)=>e.key==='Enter'&&addItem('inclusions',tempInclusion,setTempInclusion)}/><button onClick={()=>addItem('inclusions',tempInclusion,setTempInclusion)} className="bg-black text-white p-3 rounded-xl"><Plus size={20}/></button></div><div className="flex flex-wrap gap-2">{formData.inclusions.map((item: string,i: number)=><span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-100">{item}<button onClick={()=>removeItem('inclusions',i)}><X size={12}/></button></span>)}</div></div>
             <div><label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">불포함 사항</label><div className="flex gap-2 mb-3"><input type="text" placeholder="예) 교통비" value={tempExclusion} onChange={(e)=>setTempExclusion(e.target.value)} className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200" onKeyPress={(e)=>e.key==='Enter'&&addItem('exclusions',tempExclusion,setTempExclusion)}/><button onClick={()=>addItem('exclusions',tempExclusion,setTempExclusion)} className="bg-slate-200 text-slate-600 p-3 rounded-xl"><Plus size={20}/></button></div><div className="flex flex-wrap gap-2">{formData.exclusions.map((item: string,i: number)=><span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">{item}<button onClick={()=>removeItem('exclusions',i)}><X size={12}/></button></span>)}</div></div>
@@ -215,10 +215,10 @@ export default function ExperienceFormSteps({
 
   if (step === 5) {
     return (
-      <div className="w-full space-y-8 md:space-y-12">
-        <div className="space-y-2"><h1 className="text-2xl md:text-3xl font-black">기본 규칙 설정</h1><p className="text-slate-500 text-sm md:text-lg">규칙을 설정하세요.</p></div>
-        <div className="space-y-8">
-          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+      <div className="w-full space-y-6 md:space-y-8">
+        <div className="space-y-2"><h1 className="text-[22px] md:text-[30px] font-black">기본 규칙 설정</h1><p className="text-[13px] md:text-base text-slate-500">규칙을 설정하세요.</p></div>
+        <div className="space-y-6">
+          <div className="bg-slate-50 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div><label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">소요 시간</label><div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200"><button onClick={()=>handleCounter('duration','dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><Minus size={14}/></button><span className="font-black flex-1 text-center">{formData.duration}시간</span><button onClick={()=>handleCounter('duration','inc')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><Plus size={14}/></button></div></div>
               <div><label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">최대 인원</label><div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200"><button onClick={()=>handleCounter('maxGuests','dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><Minus size={14}/></button><span className="font-black flex-1 text-center">{formData.maxGuests}명</span><button onClick={()=>handleCounter('maxGuests','inc')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><Plus size={14}/></button></div></div>
@@ -233,10 +233,10 @@ export default function ExperienceFormSteps({
 
   if (step === 6) {
     return (
-      <div className="w-full space-y-8 md:space-y-12">
-        <div className="text-center space-y-2"><h1 className="text-2xl md:text-3xl font-black">요금 설정</h1><p className="text-slate-500 text-sm md:text-lg">가격을 설정하세요.</p></div>
-        <div className="flex flex-col items-center w-full max-w-md mx-auto space-y-8">
-          <div className="w-full"><label className="text-xs font-bold text-slate-400 uppercase mb-2 block text-center">기본 1인당 가격</label><div className="relative w-full max-w-xs mx-auto"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-4xl font-bold text-slate-300">₩</span><input type="number" value={formData.price} onChange={(e) => updateData('price', Number(e.target.value))} className="w-full pl-12 pr-4 py-4 text-5xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent" placeholder="0"/></div></div>
+      <div className="w-full space-y-6 md:space-y-8">
+        <div className="text-center space-y-2"><h1 className="text-[22px] md:text-[30px] font-black">요금 설정</h1><p className="text-[13px] md:text-base text-slate-500">가격을 설정하세요.</p></div>
+        <div className="flex flex-col items-center w-full max-w-md mx-auto space-y-6">
+          <div className="w-full"><label className="text-xs font-bold text-slate-400 uppercase mb-2 block text-center">기본 1인당 가격</label><div className="relative w-full max-w-xs mx-auto"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl md:text-4xl font-bold text-slate-300">₩</span><input type="number" value={formData.price} onChange={(e) => updateData('price', Number(e.target.value))} className="w-full pl-12 pr-4 py-3 md:py-4 text-3xl md:text-5xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent" placeholder="0"/></div></div>
           
           <div className="w-full bg-slate-50 p-6 rounded-2xl border border-slate-200">
             <div className="flex justify-between items-center mb-4">

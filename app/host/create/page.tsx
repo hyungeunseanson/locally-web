@@ -31,8 +31,89 @@ export default function CreateExperiencePage() {
   const [tempInclusion, setTempInclusion] = useState('');
   const [tempExclusion, setTempExclusion] = useState('');
 
+  const validateCurrentStep = (targetStep: number) => {
+    if (targetStep === 1) {
+      if (!formData.city?.trim()) {
+        showToast('도시를 선택하거나 직접 입력해주세요.', 'error');
+        return false;
+      }
+      if (!formData.category?.trim()) {
+        showToast('카테고리를 선택해주세요.', 'error');
+        return false;
+      }
+      if (!formData.languages || formData.languages.length === 0) {
+        showToast('진행 가능한 언어를 1개 이상 선택해주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    if (targetStep === 2) {
+      if (!formData.title?.trim() || formData.title.trim().length < 6) {
+        showToast('체험 제목을 6자 이상 입력해주세요.', 'error');
+        return false;
+      }
+      if (!formData.photos || formData.photos.length === 0) {
+        showToast('대표 사진을 1장 이상 업로드해주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    if (targetStep === 3) {
+      if (!formData.meeting_point?.trim()) {
+        showToast('만나는 장소를 입력해주세요.', 'error');
+        return false;
+      }
+      const hasEmptyItinerary = (formData.itinerary || []).some((item: { title?: string }) => !item.title?.trim());
+      if (hasEmptyItinerary) {
+        showToast('이동 동선의 장소 이름을 모두 입력해주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    if (targetStep === 4) {
+      if (!formData.description?.trim() || formData.description.trim().length < 30) {
+        showToast('상세 설명을 30자 이상 입력해주세요.', 'error');
+        return false;
+      }
+      if (!formData.inclusions || formData.inclusions.length === 0) {
+        showToast('포함 사항을 1개 이상 입력해주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    if (targetStep === 5) {
+      if (!formData.rules?.age_limit?.trim()) {
+        showToast('참가 연령 기준을 입력해주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    if (targetStep === 6) {
+      if (!Number(formData.price) || Number(formData.price) <= 0) {
+        showToast('기본 가격을 올바르게 입력해주세요.', 'error');
+        return false;
+      }
+      if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {
+        showToast('단독 투어 가격을 입력해주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    return true;
+  };
+
   // --- 네비게이션 함수 ---
-  const nextStep = () => { if (step < TOTAL_STEPS) setStep(step + 1); };
+  const nextStep = () => {
+    if (step >= TOTAL_STEPS) return;
+    if (!validateCurrentStep(step)) return;
+    setStep(step + 1);
+  };
   const prevStep = () => { if (step > 1) setStep(step - 1); };
 
   // --- 데이터 업데이트 함수들 ---
@@ -119,6 +200,8 @@ export default function CreateExperiencePage() {
   };
   // 🚀 최종 제출 함수 수정 (파일명 최적화 및 버킷 명칭 확인)
   const handleSubmit = async () => {
+    if (!validateCurrentStep(TOTAL_STEPS - 1)) return;
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -197,7 +280,7 @@ export default function CreateExperiencePage() {
       )}
 
       {/* 메인 컨텐츠 */}
-      <main className="flex-1 flex flex-col items-center pt-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:pt-32 pb-28 md:pb-40 px-4 md:px-6 w-full max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="flex-1 flex flex-col items-center pt-[calc(env(safe-area-inset-top,0px)+4.75rem)] md:pt-24 pb-28 md:pb-36 px-4 md:px-6 w-full max-w-2xl lg:max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <ExperienceFormSteps
           step={step}
           formData={formData}

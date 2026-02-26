@@ -15,7 +15,7 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
         // 2.5초 뒤 실제 라우팅 (전환 화면은 유지)
         const t1 = setTimeout(() => {
             if (targetMode === 'host') {
-                router.push('/host/dashboard?tab=reservations');
+                router.push('/host/menu');
             } else {
                 router.push('/account');
             }

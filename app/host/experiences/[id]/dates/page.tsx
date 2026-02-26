@@ -86,7 +86,7 @@ export default function ManageDatesPage() {
 
     const bookingKey = `${selectedDate}_${time}`;
     if (bookingCounts[bookingKey] > 0) {
-      alert(`${t('sched_delete_error')} (${bookingCounts[bookingKey]})`); // 🟢 번역
+      showToast(`${t('sched_delete_error')} (${bookingCounts[bookingKey]})`, 'error'); // 🟢 번역
       return;
     }
 
@@ -165,7 +165,7 @@ export default function ManageDatesPage() {
 
     } catch (e: any) {
       console.error(e);
-      alert(t('sched_save_error') + e.message); // 🟢 번역
+      showToast(t('sched_save_error') + e.message, 'error'); // 🟢 번역
     } finally {
       setLoading(false);
     }
