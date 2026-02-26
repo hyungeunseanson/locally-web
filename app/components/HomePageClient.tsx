@@ -85,7 +85,7 @@ export default function HomePageClient() {
             className="w-full h-[46px] rounded-[13px] border border-[#CFCFCF] bg-transparent flex items-center justify-center text-[10px] font-medium text-[#4B4B4B] active:scale-[0.99] transition-transform"
           >
             <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">로컬리 소개</span>{' '}
-            <span className="font-normal">및</span>{' '}
+            <span className="font-normal"> 및 </span>{' '}
             <span className="font-semibold underline underline-offset-[2px] decoration-[0.8px]">호스트 지원</span>
           </Link>
         </div>
@@ -93,7 +93,7 @@ export default function HomePageClient() {
         {activeTab === 'experience' && (
           loading ? (
             <>
-              {/* 모바일 스켈레톤 */}
+              {/* 모바일 스켈레톤? */}
               <div className="md:hidden px-5 pb-6">
                 <div className="flex gap-3 overflow-x-auto no-scrollbar">
                   {[1, 2, 3].map((i) => (
