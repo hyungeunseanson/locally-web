@@ -4,9 +4,18 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
-export default function DatePicker({ selectedRange, onChange }: { selectedRange: any, onChange: (range: any) => void }) {
+export default function DatePicker({
+  selectedRange,
+  onChange,
+  variant = 'default',
+}: {
+  selectedRange: any;
+  onChange: (range: any) => void;
+  variant?: 'default' | 'mobile';
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const { t } = useLanguage(); // 🟢 추가
+  const isMobile = variant === 'mobile';
   
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
@@ -40,7 +49,19 @@ export default function DatePicker({ selectedRange, onChange }: { selectedRange:
       const isInRange = selectedRange.start && selectedRange.end && date > selectedRange.start && date < selectedRange.end;
       
       days.push(
-        <button key={d} onClick={() => handleDateClick(d)} className={`h-10 w-10 rounded-full text-sm font-bold flex items-center justify-center transition-all ${isStart || isEnd ? 'bg-black text-white' : ''} ${isInRange ? 'bg-slate-100' : ''} ${!isStart && !isEnd && !isInRange ? 'hover:border border-black' : ''}`}>{d}</button>
+        <button
+          key={d}
+          onClick={() => handleDateClick(d)}
+          className={[
+            'flex items-center justify-center transition-all rounded-full',
+            isMobile ? 'h-9 w-9 text-[12px] font-semibold' : 'h-10 w-10 text-sm font-bold',
+            isStart || isEnd ? 'bg-black text-white' : '',
+            isInRange ? 'bg-slate-100' : '',
+            !isStart && !isEnd && !isInRange ? 'hover:border border-black' : '',
+          ].join(' ')}
+        >
+          {d}
+        </button>
       );
     }
     return days;
@@ -48,20 +69,23 @@ export default function DatePicker({ selectedRange, onChange }: { selectedRange:
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}><ChevronLeft size={20}/></button>
-        <span className="font-bold">
-    {currentDate.getFullYear()}{t('date_year')} {currentDate.getMonth()+1}{t('date_month')}
-  </span>
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}><ChevronRight size={20}/></button>
+      <div className={`flex justify-between items-center ${isMobile ? 'mb-3' : 'mb-4'}`}>
+        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}>
+          <ChevronLeft size={isMobile ? 18 : 20} />
+        </button>
+        <span className={isMobile ? 'text-[13px] font-semibold' : 'font-bold'}>
+          {currentDate.getFullYear()}{t('date_year')} {currentDate.getMonth() + 1}{t('date_month')}
+        </span>
+        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}>
+          <ChevronRight size={isMobile ? 18 : 20} />
+        </button>
       </div>
-      <div className="grid grid-cols-7 ...">
-  {/* 🟢 번역 키 배열로 변경 */}
-  {['day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6'].map(key => (
-    <span key={key}>{t(key)}</span>
-  ))}
-</div>
-      <div className="grid grid-cols-7 gap-y-1 justify-items-center">{renderDays()}</div>
+      <div className={`grid grid-cols-7 text-center ${isMobile ? 'text-[11px] text-[#7A7A7A] mb-2' : 'text-xs text-slate-500 mb-2'}`}>
+        {['day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6'].map(key => (
+          <span key={key}>{t(key)}</span>
+        ))}
+      </div>
+      <div className={`grid grid-cols-7 ${isMobile ? 'gap-y-2' : 'gap-y-1'} justify-items-center`}>{renderDays()}</div>
     </div>
   );
 }
