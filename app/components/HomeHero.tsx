@@ -248,45 +248,37 @@ export default function HomeHero({
           </button>
         </div>
 
-        {/* 아이콘 탭 */}
-        <div className={`flex items-center justify-center gap-[44px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 py-0' : 'max-h-[100px] opacity-100 pt-1 pb-1'
+        {/* 아이콘 탭 — 에어비앤비 기본 상태 */}
+        <div className={`flex items-center justify-center gap-[52px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 pt-0 pb-0' : 'max-h-[100px] opacity-100 pt-3 pb-3'
           }`}>
           {/* 체험 탭 */}
-          <button
-            onClick={() => setActiveTab('experience')}
-            className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200"
-          >
-            <div className="w-[72px] h-[72px] flex items-center justify-center relative mb-[-4px]">
+          <button onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
+            <div className="w-[52px] h-[52px] flex items-center justify-center relative mb-[6px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
-                alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-30' : 'opacity-100'}`}
+                alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-40' : 'opacity-100'}`}
               />
-              <div className="absolute top-[6px] right-[-8px] bg-[#0066CC] text-white text-[7.5px] font-bold px-[4px] py-[1.5px] rounded-[3px] z-10 leading-none tracking-wide">NEW</div>
+              <div className="absolute -top-1 -right-2 bg-[#0066CC] text-white text-[8px] font-bold px-[5px] py-[1.5px] rounded-full z-10 border-[1.5px] border-white leading-none">NEW</div>
             </div>
-            <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
-              }`}>
+            <span className={`text-[10px] font-semibold tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222]' : 'text-[#717171]'}`}>
               {t('cat_exp')}
             </span>
-            {activeTab === 'experience' && <span className="absolute -bottom-[4px] left-1/2 -translate-x-1/2 w-[24px] h-[2px] bg-[#222222] rounded-full" />}
+            {activeTab === 'experience' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
           </button>
 
           {/* 서비스 탭 */}
-          <button
-            onClick={() => setActiveTab('service')}
-            className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200"
-          >
-            <div className="w-[72px] h-[72px] flex items-center justify-center relative mb-[-8px]">
+          <button onClick={() => setActiveTab('service')} className="flex flex-col items-center relative">
+            <div className="w-[52px] h-[52px] flex items-center justify-center relative mb-[6px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
-                alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-30' : 'opacity-100'}`}
+                alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-40' : 'opacity-100'}`}
               />
-              <div className="absolute top-[10px] right-[-8px] bg-[#0066CC] text-white text-[7.5px] font-bold px-[4px] py-[1.5px] rounded-[3px] z-10 leading-none tracking-wide">NEW</div>
+              <div className="absolute -top-1 -right-2 bg-[#0066CC] text-white text-[8px] font-bold px-[5px] py-[1.5px] rounded-full z-10 border-[1.5px] border-white leading-none">NEW</div>
             </div>
-            <span className={`text-[11px] tracking-[0.01em] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'
-              }`}>
+            <span className={`text-[10px] font-semibold tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222]' : 'text-[#717171]'}`}>
               {t('cat_service')}
             </span>
-            {activeTab === 'service' && <span className="absolute -bottom-[4px] left-1/2 -translate-x-1/2 w-[24px] h-[2px] bg-[#222222] rounded-full" />}
+            {activeTab === 'service' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
           </button>
         </div>
 
