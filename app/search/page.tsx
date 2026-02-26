@@ -124,6 +124,13 @@ function SearchResults() {
           .eq('status', 'active');
 
         if (location) {
+          const normalizedLocation = location.replace(/[(),]/g, ' ').trim();
+          if (!normalizedLocation) {
+            setExperiences([]);
+            setLoading(false);
+            return;
+          }
+
           const searchFields = [
             'title',
             'description',
@@ -140,7 +147,7 @@ function SearchResults() {
             'category_zh',
           ];
 
-          const orQuery = searchFields.map((field) => `${field}.ilike.%${location}%`).join(',');
+          const orQuery = searchFields.map((field) => `${field}.ilike.%${normalizedLocation}%`).join(',');
           query = query.or(orQuery);
         }
 
