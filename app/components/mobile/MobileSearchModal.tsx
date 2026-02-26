@@ -34,14 +34,8 @@ export default function MobileSearchModal({
     const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
     const scrollLockRef = useRef({
         locked: false,
-        scrollY: 0,
         bodyOverflow: '',
         htmlOverflow: '',
-        bodyPosition: '',
-        bodyTop: '',
-        bodyLeft: '',
-        bodyRight: '',
-        bodyWidth: '',
     });
 
     const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, '').trim();
@@ -88,35 +82,18 @@ export default function MobileSearchModal({
             if (!scrollLockRef.current.locked) return;
             body.style.overflow = scrollLockRef.current.bodyOverflow;
             html.style.overflow = scrollLockRef.current.htmlOverflow;
-            body.style.position = scrollLockRef.current.bodyPosition;
-            body.style.top = scrollLockRef.current.bodyTop;
-            body.style.left = scrollLockRef.current.bodyLeft;
-            body.style.right = scrollLockRef.current.bodyRight;
-            body.style.width = scrollLockRef.current.bodyWidth;
-            window.scrollTo(0, scrollLockRef.current.scrollY);
             scrollLockRef.current.locked = false;
         };
 
         if (isOpen && !scrollLockRef.current.locked) {
             scrollLockRef.current = {
                 locked: true,
-                scrollY: window.scrollY,
                 bodyOverflow: body.style.overflow,
                 htmlOverflow: html.style.overflow,
-                bodyPosition: body.style.position,
-                bodyTop: body.style.top,
-                bodyLeft: body.style.left,
-                bodyRight: body.style.right,
-                bodyWidth: body.style.width,
             };
 
             body.style.overflow = 'hidden';
             html.style.overflow = 'hidden';
-            body.style.position = 'fixed';
-            body.style.top = `-${scrollLockRef.current.scrollY}px`;
-            body.style.left = '0';
-            body.style.right = '0';
-            body.style.width = '100%';
         }
 
         if (!isOpen) {
@@ -362,7 +339,7 @@ export default function MobileSearchModal({
     // 🔍 검색 확장 모드 (에어비앤비 여행지 검색 화면)
     if (isSearchExpanded) {
         const expandedView = (
-            <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh] relative bg-[#F7F7F7]">
+            <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh] overflow-hidden overscroll-none relative bg-[#F7F7F7]">
                 {/* 상단 검색바 */}
                 <div className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
                     style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 10px rgba(0,0,0,0.05)', border: '0.5px solid #E0E0E0' }}>
@@ -453,7 +430,7 @@ export default function MobileSearchModal({
     }
 
     const modalView = (
-        <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh]">
+        <div className="fixed inset-0 z-[200] flex flex-col h-[100dvh] overflow-hidden overscroll-none">
             {/* 배경: 화면이 보이는 반투명 레이어 + 블러 */}
             <div
                 className="absolute inset-0 -z-10 backdrop-blur-[10px] transition-opacity duration-500"
