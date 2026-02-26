@@ -74,7 +74,6 @@ export default function MobileSearchModal({
         { id: 'osaka', name: '오사카', desc: '미식과 야경이 살아있는 곳' },
         { id: 'izakaya', name: '이자카야', desc: '현지 밤문화를 맛보는 곳' },
         { id: 'seoul', name: '서울', desc: '감성이 스며든 곳' },
-        { id: 'kyoto', name: '교토', desc: '고즈넉한 골목이 남아있는 곳' },
     ];
 
     const saveRecentSearch = (name: string) => {
@@ -101,43 +100,36 @@ export default function MobileSearchModal({
             {type === 'tokyo' && (
                 <>
                     <path d="M12 3v18" stroke="#E15B5B" strokeWidth="1.6" />
-                    <path d="M9 9h6" stroke="#E15B5B" strokeWidth="1.6" />
-                    <path d="M7.5 12h9" stroke="#E15B5B" strokeWidth="1.6" />
+                    <path d="M9.5 7h5" stroke="#E15B5B" strokeWidth="1.6" />
+                    <path d="M8 10h8" stroke="#E15B5B" strokeWidth="1.6" />
+                    <path d="M7 13h10" stroke="#E15B5B" strokeWidth="1.6" />
                     <path d="M6 18h12" stroke="#E15B5B" strokeWidth="1.6" />
-                    <path d="M10.5 6h3" stroke="#E15B5B" strokeWidth="1.6" />
                 </>
             )}
             {type === 'osaka' && (
                 <>
-                    <path d="M5 18h14" stroke="#C47D3C" strokeWidth="1.6" />
-                    <path d="M6 18v-6h12v6" stroke="#C47D3C" strokeWidth="1.6" />
-                    <path d="M7 12l5-4 5 4" stroke="#C47D3C" strokeWidth="1.6" />
-                    <path d="M9 9V6h6v3" stroke="#C47D3C" strokeWidth="1.6" />
-                </>
-            )}
-            {type === 'kyoto' && (
-                <>
-                    <path d="M4 7h16" stroke="#5B7B58" strokeWidth="1.6" />
-                    <path d="M6 7v10" stroke="#5B7B58" strokeWidth="1.6" />
-                    <path d="M18 7v10" stroke="#5B7B58" strokeWidth="1.6" />
-                    <path d="M8 12h8" stroke="#5B7B58" strokeWidth="1.6" />
-                    <path d="M10 17h4" stroke="#5B7B58" strokeWidth="1.6" />
+                    <path d="M4 7h16" stroke="#C47D3C" strokeWidth="1.6" />
+                    <path d="M7 7v10" stroke="#C47D3C" strokeWidth="1.6" />
+                    <path d="M17 7v10" stroke="#C47D3C" strokeWidth="1.6" />
+                    <path d="M9 10h6" stroke="#C47D3C" strokeWidth="1.6" />
+                    <path d="M9 17h6" stroke="#C47D3C" strokeWidth="1.6" />
                 </>
             )}
             {type === 'izakaya' && (
                 <>
-                    <path d="M9 4h6" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <path d="M10 4v2" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <path d="M14 4v2" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <rect x="8" y="6" width="8" height="12" rx="3" stroke="#7C6BE3" strokeWidth="1.6" />
-                    <path d="M9.5 10h5" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M9 5h6" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M10 5v2" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M14 5v2" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <rect x="8" y="7" width="8" height="11" rx="2.5" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M9.5 11h5" stroke="#7C6BE3" strokeWidth="1.6" />
+                    <path d="M9.5 14h5" stroke="#7C6BE3" strokeWidth="1.6" />
                 </>
             )}
             {type === 'seoul' && (
                 <>
                     <path d="M6 18h12" stroke="#3C7CC4" strokeWidth="1.6" />
-                    <path d="M8 18V7h8v11" stroke="#3C7CC4" strokeWidth="1.6" />
-                    <path d="M10 7V4h4v3" stroke="#3C7CC4" strokeWidth="1.6" />
+                    <path d="M8 18V8h8v10" stroke="#3C7CC4" strokeWidth="1.6" />
+                    <path d="M9 8l3-3 3 3" stroke="#3C7CC4" strokeWidth="1.6" />
                     <path d="M9 12h6" stroke="#3C7CC4" strokeWidth="1.6" />
                 </>
             )}
@@ -243,7 +235,7 @@ export default function MobileSearchModal({
                     {/* 최근 검색 */}
                     <div className="mb-5">
                         <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">최근 검색</p>
-                        {recentSearches.map((item, idx) => (
+                        {recentSearches.slice(0, 1).map((item, idx) => (
                             <button
                                 key={`${item.name}-${idx}`}
                                 onClick={() => selectLocation(item.name, true)}
@@ -343,7 +335,7 @@ export default function MobileSearchModal({
                 </div>
 
                 {/* 메인 콘텐츠 */}
-                <div className="flex-1 overflow-y-auto px-4 pt-2 pb-32">
+                <div className="flex-1 overflow-y-auto px-4 pt-2 pb-[120px]">
                     {/* 위치 패널 */}
                     {activePanel === 'location' ? (
                         <div
@@ -363,7 +355,7 @@ export default function MobileSearchModal({
 
                                 <div className="mt-4">
                                     <p className="text-[9px] font-semibold text-[#7A7A7A] mb-2 tracking-[0.04em]">최근 검색</p>
-                                    {recentSearches.map((item, idx) => (
+                                    {recentSearches.slice(0, 1).map((item, idx) => (
                                         <button
                                             key={`${item.name}-${idx}`}
                                             onClick={() => selectLocation(item.name)}
@@ -469,8 +461,13 @@ export default function MobileSearchModal({
 
                 {/* 하단 고정 바 */}
                 <div
-                    className="fixed bottom-0 left-0 right-0 bg-white flex items-center justify-between px-5 py-3 z-[210]"
-                    style={{ borderTop: '1px solid #EBEBEB', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+                    className="fixed left-0 right-0 bg-white flex items-center justify-between px-5 py-3 z-[210]"
+                    style={{
+                        borderTop: '1px solid #EBEBEB',
+                        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+                        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+                        boxShadow: '0 -6px 18px rgba(0,0,0,0.08)',
+                    }}
                 >
                     <button onClick={handleClearAll} className="text-[13px] font-bold text-[#222222] underline underline-offset-[3px]">
                         {t('mobile_clear_all')}
