@@ -78,8 +78,8 @@ export default function HomePageClient() {
       />
 
       <main className="max-w-[1760px] mx-auto px-0 md:px-12 py-0 md:py-8 min-h-screen relative z-[1]">
-        <div className="md:hidden h-[24px] w-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
-        <div className="md:hidden px-5 pt-3 pb-1">
+        <div className="md:hidden h-[12px] w-full bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
+        <div className="md:hidden px-5 pt-[6px] pb-0">
           <div className="w-full h-[46px] rounded-[13px] border border-[#CFCFCF] bg-transparent flex items-center justify-center text-[10px] font-medium text-[#4B4B4B]">
             <Link
               href="/about"
@@ -176,7 +176,7 @@ export default function HomePageClient() {
                   return allSections.map((section, idx) => (
                     <div key={idx}>
                       {idx > 0 && <div className="h-[12px] w-full mb-1 bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />}
-                      <div className="flex items-center justify-between px-5 pt-4 pb-3">
+                      <div className="flex items-center justify-between px-5 pt-[10px] pb-2">
                         <h2 className="text-[17px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{section.title}</h2>
                         <SectionArrow />
                       </div>
@@ -206,7 +206,7 @@ export default function HomePageClient() {
           <>
             {/* 📱 모바일 서비스 */}
             <div className="md:hidden pb-4">
-              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <div className="flex items-center justify-between px-5 pt-3 pb-2">
                 <h2 className="text-[15px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">로컬리 서비스</h2>
               </div>
               <div className="grid grid-cols-2 gap-3 px-5 pb-5">

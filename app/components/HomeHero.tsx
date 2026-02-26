@@ -249,11 +249,11 @@ export default function HomeHero({
         </div>
 
         {/* 아이콘 탭 — 에어비앤비 기본 상태 */}
-        <div className={`flex items-center justify-center gap-[52px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 pt-0 pb-0' : 'max-h-[100px] opacity-100 pt-3 pb-3'
+        <div className={`flex items-center justify-center gap-[52px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 pt-0 pb-0' : 'max-h-[92px] opacity-100 pt-2 pb-1'
           }`}>
           {/* 체험 탭 */}
           <button onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
-            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[1px]">
+            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[-4px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
                 alt="체험" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'experience' ? 'opacity-40' : 'opacity-100'}`}
@@ -262,7 +262,7 @@ export default function HomeHero({
                 NEW
               </div>
             </div>
-            <span className={`text-[10px] tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
+            <span className={`text-[10px] leading-tight tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
               {t('cat_exp')}
             </span>
             {activeTab === 'experience' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
@@ -270,7 +270,7 @@ export default function HomeHero({
 
           {/* 서비스 탭 */}
           <button onClick={() => setActiveTab('service')} className="flex flex-col items-center relative">
-            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[1px]">
+            <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[-4px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
                 alt="서비스" className={`w-full h-full object-contain transition-opacity duration-200 ${activeTab !== 'service' ? 'opacity-40' : 'opacity-100'}`}
@@ -279,7 +279,7 @@ export default function HomeHero({
                 NEW
               </div>
             </div>
-            <span className={`text-[10px] tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
+            <span className={`text-[10px] leading-tight tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
               {t('cat_service')}
             </span>
             {activeTab === 'service' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
