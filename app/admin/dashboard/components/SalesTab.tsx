@@ -9,6 +9,7 @@ import { Range } from 'react-date-range';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
 import { settleHostPayout } from '@/app/actions/admin';
+import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
@@ -70,7 +71,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   // 🟢 [수정] 유효한 매출 데이터 필터링 (완료됨 + 취소됐는데 위약금 있는거)
   const validBookings = bookings.filter(b =>
     filterDate(b.created_at) &&
-    (b.status === 'completed' || (b.status === 'cancelled' && (b.platform_revenue > 0 || b.host_payout_amount > 0)))
+    (isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && (b.platform_revenue > 0 || b.host_payout_amount > 0)))
   );
 
   // 🟢 [수정] 매출/수익 계산 (DB 컬럼 기반)
@@ -93,7 +94,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
 
     // 정산 대상: 완료된 건 + 취소 위약금 건
     const targetBookings = bookings.filter(b =>
-      b.status === 'completed' || (b.status === 'cancelled' && b.host_payout_amount > 0)
+      isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && b.host_payout_amount > 0)
     );
 
     targetBookings.forEach(booking => {
@@ -188,9 +189,9 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
         const gross = b.amount || 0;
         let refundPenaltyAmount = 0; // 취소 위약금 발생액
         let fee = 0; // 플랫폼 수수료
-        let net = b.calculatedPayout || 0; // 호스트 지급액
+        const net = b.calculatedPayout || 0; // 호스트 지급액
 
-        if (b.status === 'cancelled') {
+        if (isCancelledOnlyBookingStatus(b.status)) {
           refundPenaltyAmount = gross; // 취소되었는데 리스트에 들어왔다면 전액 위약금이거나 부분 위약금. 
           fee = gross - net;
         } else {
@@ -413,8 +414,8 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
                                     <td className="px-3 md:px-4 py-2 md:py-3 font-mono text-slate-400">{b.id.split('-').pop()}</td>
                                     <td className="px-3 md:px-4 py-2 md:py-3 font-medium text-slate-700">{b.profiles?.name || 'Unknown'}</td>
                                     <td className="px-3 md:px-4 py-2 md:py-3">
-                                      <span className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold uppercase ${b.status === 'completed' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                                        {b.status === 'completed' ? '완료' : '위약금'}
+                                      <span className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold uppercase ${isCompletedBookingStatus(b.status) ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                        {isCompletedBookingStatus(b.status) ? '완료' : '위약금'}
                                       </span>
                                     </td>
                                     <td className="px-3 md:px-4 py-2 md:py-3 text-right text-slate-500">₩{(b.amount || 0).toLocaleString()}</td>

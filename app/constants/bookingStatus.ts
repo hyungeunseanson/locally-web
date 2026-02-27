@@ -24,3 +24,12 @@ export const isCancelledBookingStatus = (status: string) => {
   const normalized = normalizeBookingStatus(status || '');
   return BOOKING_CANCELLED_STATUSES_LOWER.includes(normalized);
 };
+
+export const isPendingBookingStatus = (status: string) => normalizeBookingStatus(status || '') === 'pending';
+
+export const isCancellationRequestedBookingStatus = (status: string) =>
+  normalizeBookingStatus(status || '') === 'cancellation_requested';
+
+export const isCompletedBookingStatus = (status: string) => normalizeBookingStatus(status || '') === 'completed';
+
+export const isCancelledOnlyBookingStatus = (status: string) => normalizeBookingStatus(status || '') === 'cancelled';

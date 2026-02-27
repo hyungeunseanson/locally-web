@@ -6,7 +6,13 @@ import {
   Phone, Mail, XCircle, AlertTriangle, Loader2, CalendarPlus
 } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
+import {
+  isCancellationRequestedBookingStatus,
+  isCancelledBookingStatus,
+  isCancelledOnlyBookingStatus,
+  isConfirmedBookingStatus,
+  isPendingBookingStatus,
+} from '@/app/constants/bookingStatus';
 
 interface ReservationCardProps {
   res: any;
@@ -51,14 +57,14 @@ export default function ReservationCard({
     today.setHours(0, 0, 0, 0);
     const isPast = targetDate < today;
 
-    if (status === 'cancellation_requested')
+    if (isCancellationRequestedBookingStatus(status))
       return <span className="bg-orange-100 text-orange-700 text-[10px] px-2 py-1 rounded-full font-bold animate-pulse flex items-center gap-1"><AlertTriangle size={10} /> {t('res_status_req')}</span>;
 
-    if (status === 'cancelled')
+    if (isCancelledOnlyBookingStatus(status))
       return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_cancelled')}</span>;
 
     // 🟢 [수정] 입금 대기(PENDING) 상태 별도 처리 (반짝임 효과)
-    if (status === 'PENDING') {
+    if (isPendingBookingStatus(status)) {
       return (
         <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1 animate-pulse">
           <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></div>
@@ -98,9 +104,9 @@ export default function ReservationCard({
       onClick={onCheck}
     >
       {/* 상태 표시 컬러바 */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${res.status === 'cancellation_requested' ? 'bg-orange-400 animate-pulse' :
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${isCancellationRequestedBookingStatus(res.status) ? 'bg-orange-400 animate-pulse' :
         isConfirmed ? 'bg-green-500' :
-          res.status === 'cancelled' ? 'bg-red-400' : 'bg-slate-200'
+          isCancelledOnlyBookingStatus(res.status) ? 'bg-red-400' : 'bg-slate-200'
         }`} />
 
       {/* 핵심: 모바일에서도 한 줄 가로 배치 */}
@@ -226,7 +232,7 @@ export default function ReservationCard({
       </div>
 
       {/* 취소 요청 승인 박스 */}
-      {res.status === 'cancellation_requested' && (
+      {isCancellationRequestedBookingStatus(res.status) && (
         <div className="mx-3 mb-3 bg-orange-50 border border-orange-100 rounded-xl p-3 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-start gap-2">
             <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={16} />
@@ -253,7 +259,7 @@ export default function ReservationCard({
       )}
 
       {/* 취소 완료 사유 박스 */}
-      {res.status === 'cancelled' && (
+      {isCancelledOnlyBookingStatus(res.status) && (
         <div className="mx-3 mb-3 bg-slate-50 border border-slate-100 rounded-xl p-3">
           <div className="text-[11px] text-slate-500">
             <span className="font-bold block mb-0.5 text-slate-700">{t('res_cancel_detail_title')}</span>

@@ -11,6 +11,11 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. import 추가
 import { MessageCircle } from 'lucide-react'; // 아이콘 추가
 import GuestReviewModal from './GuestReviewModal'; // 모달 추가
+import {
+  isCancellationRequestedBookingStatus,
+  isCancelledBookingStatus,
+  isPendingBookingStatus,
+} from '@/app/constants/bookingStatus';
 
 // 컴포넌트
 import ReservationCard from './ReservationCard';
@@ -143,7 +148,7 @@ guest:profiles!bookings_user_id_fkey (
               link_url: '/host/dashboard'
             });
           }
-          else if (payload.eventType === 'UPDATE' && payload.new.status === 'cancellation_requested') {
+          else if (payload.eventType === 'UPDATE' && isCancellationRequestedBookingStatus(payload.new.status)) {
             showToast(t('res_toast_cancel'), 'error'); // 🟢 번역
             await sendNotification({
               recipient_id: user.id,
@@ -208,15 +213,15 @@ guest:profiles!bookings_user_id_fkey (
   };
 
   const isReservationInTab = useCallback((r: any, tab: 'upcoming' | 'completed' | 'cancelled') => {
-    const isCancelled = r.status === 'cancelled' || r.status === 'declined';
-    const isRequesting = r.status === 'cancellation_requested';
+    const isCancelled = isCancelledBookingStatus(r.status) && !isCancellationRequestedBookingStatus(r.status);
+    const isRequesting = isCancellationRequestedBookingStatus(r.status);
 
     const [year, month, day] = r.date.split('-').map(Number);
     const tripDate = new Date(year, month - 1, day);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const isPending = r.status === 'PENDING'; // 🟢 추가
+    const isPending = isPendingBookingStatus(r.status); // 🟢 추가
 
     if (tab === 'cancelled') return isCancelled || isRequesting;
     if (isCancelled) return false;
@@ -234,7 +239,9 @@ guest:profiles!bookings_user_id_fkey (
     const newB = isNew(b.created_at, b.id);
 
     if (newA !== newB) return newA ? -1 : 1;
-    if ((a.status === 'cancellation_requested') !== (b.status === 'cancellation_requested')) return a.status === 'cancellation_requested' ? -1 : 1;
+    if (isCancellationRequestedBookingStatus(a.status) !== isCancellationRequestedBookingStatus(b.status)) {
+      return isCancellationRequestedBookingStatus(a.status) ? -1 : 1;
+    }
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
@@ -268,7 +275,7 @@ guest:profiles!bookings_user_id_fkey (
             { id: 'cancelled', label: 'tab_cancel' }
           ].map(tab => {
             const cancelCount = (tab.id === 'cancelled' || tab.id === 'upcoming')
-              ? reservations.filter(r => r.status === 'cancellation_requested').length : 0;
+              ? reservations.filter(r => isCancellationRequestedBookingStatus(r.status)).length : 0;
 
             const hasNew = reservations.some(r => {
               const isTabMatch = isReservationInTab(r, tab.id as 'upcoming' | 'completed' | 'cancelled');
