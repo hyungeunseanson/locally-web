@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, MessageSquare, Map, Receipt, Lock, Copy } from 'lucide-react';
+import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, MessageSquare, Map, Receipt, Lock, Share2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CancellationModal from './CancellationModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
@@ -51,14 +51,23 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
     window.location.href = url;
   };
 
-  const copyAddress = async () => {
-    const addressText = trip.address || trip.location || '';
-    if (!addressText) return;
+  const shareTrip = async () => {
+    const tripUrl = `${window.location.origin}/experiences/${trip.expId}`;
+    const shareText = `[Locally] ${trip.title}\n${trip.date} ${trip.time}\n${tripUrl}`;
+
     try {
-      await navigator.clipboard.writeText(addressText);
-      alert(`${t('trip_copy_address_done')}\n${addressText}`);
+      if (navigator.share) {
+        await navigator.share({
+          title: `Locally #${trip.orderId || trip.id}`,
+          text: shareText,
+          url: tripUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+      }
+      alert(t('trip_share_done'));
     } catch {
-      alert(addressText);
+      // 공유창 닫힘은 에러로 간주하지 않고 무시
     } finally {
       setIsMenuOpen(false);
     }
@@ -231,8 +240,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
                        <div className="fixed inset-0 z-30" onClick={() => setIsMenuOpen(false)}></div>
                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
                           <button onClick={addToCalendar} className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_add_calendar')}</button> {/* 🟢 교체 */}
-                          <button onClick={copyAddress} className="hidden md:flex w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium items-center gap-2"><Copy className="w-3.5 h-3.5" />{t('trip_copy_address')}</button>
-                          <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_view_again')}</button>   {/* 🟢 교체 */}
+                          <button onClick={shareTrip} className="hidden md:flex w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium items-center gap-2"><Share2 className="w-3.5 h-3.5" />{t('trip_share')}</button>
                           <div className="h-px bg-slate-100 my-1"></div>
                           
                           {!isCancelledBookingStatus(trip.status || '') ? (

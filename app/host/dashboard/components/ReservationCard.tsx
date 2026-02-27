@@ -44,14 +44,13 @@ interface ReservationCardProps {
   onCheck: () => void;
   onMessage: () => void;
   onCalendar: () => void;
-  onCancelQuery: () => void;
   hasReview: boolean; // 🟢 추가
   onReview: () => void; // 🟢 추가
 }
 
 export default function ReservationCard({
   res, isNew, isProcessing,
-  onApproveCancel, onShowProfile, onCheck, onMessage, onCalendar, onCancelQuery,
+  onApproveCancel, onShowProfile, onCheck, onMessage, onCalendar,
   hasReview, onReview // 🟢 추가
 }: ReservationCardProps) {
   const { t, lang } = useLanguage(); // 🟢 2. 훅 사용
@@ -318,12 +317,6 @@ export default function ReservationCard({
               >
                 {isProcessing ? <Loader2 className="animate-spin" size={12} /> : <CheckCircle2 size={12} />}
                 {t('res_approve_btn')}
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onCancelQuery(); }}
-                className="mt-2 bg-white border border-orange-200 text-orange-700 px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-orange-100 transition-colors"
-              >
-                취소 사유 문의
               </button>
             </div>
           </div>

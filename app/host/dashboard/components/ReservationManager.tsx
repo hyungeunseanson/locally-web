@@ -177,12 +177,6 @@ guest:profiles!bookings_user_id_fkey (
     window.location.href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`;
   };
 
-  const handleRequestUserCancel = (res: any) => {
-    if (confirm(`${t('res_cancel_ask')}\n${t('res_cancel_confirm_msg')}`)) { // 🟢 번역
-      router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`);
-    }
-  };
-
   const handleApproveCancel = async (booking: any) => {
     if (!confirm(`${t('res_refund_confirm_prefix')}${booking.guest?.full_name}${t('res_refund_confirm_suffix')}`)) return; // 🟢 번역
     setProcessingId(booking.id);
@@ -346,7 +340,6 @@ guest:profiles!bookings_user_id_fkey (
                 onCheck={() => markAsRead(res.id)}
                 onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
                 onCalendar={() => addToGoogleCalendar(res)}
-                onCancelQuery={() => handleRequestUserCancel(res)}
                 // 🟢 [추가] 후기 관련 Props
                 hasReview={reviewedBookingIds.includes(res.id)}
                 onReview={() => {

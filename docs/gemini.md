@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P0 Desktop Web UX Recovery: Guest Trips + Host Dashboard + Mode Transition)  
-**Version:** 3.2.33 (P0 Desktop Web UX Recovery: Guest Trips + Host Dashboard + Mode Transition)  
+**Last Updated:** 2026-02-27 (P0 Desktop Web UX Recovery v2: Guest Trip Actions + Cancel CTA Simplification + Transition Smoothing)  
+**Version:** 3.2.34 (P0 Desktop Web UX Recovery v2: Guest Trip Actions + Cancel CTA Simplification + Transition Smoothing)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -118,6 +118,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 호스트 문의함 높이 가드(P0): `InquiryChat` 데스크탑 컨테이너를 뷰포트 기준 높이로 제한해 대화 레이아웃이 하단 푸터 영역을 침범하던 현상을 완화
 - 데스크탑 모드 전환 체감 개선(P0): `SiteHeader`에 데스크탑 전용 전환 오버레이를 추가하고, `router.prefetch` 후 짧은 전환 애니메이션 동안 라우트를 준비해 애니메이션 종료 후 추가 로딩 체감을 축소
 - 운영 범위 고정(P0): 위 복구/보정은 `md` 이상 웹 레이아웃에 한정하고 모바일(`md` 미만) 카드 구조/메뉴 동선은 변경하지 않음
+- 게스트 여행 메뉴 재정렬(P0): 데스크탑 `TripCard` 더보기 메뉴를 `캘린더 추가 + 공유하기 + 취소 요청`으로 단순화하고 `체험 다시 보기/주소 복사` 항목은 제거
+- 영수증 모달 액션 정리(P0): 데스크탑 `ReceiptModal`에서 `공유하기`를 제거하고 저장(프린트) 단일 동작만 유지
+- 호스트 취소 승인 CTA 단순화(P0): 취소 요청 카드의 `취소 사유 문의` 버튼을 제거하고 `승인 및 환불` 단일 CTA만 유지
+- 데스크탑 전환 애니메이션 2차 보정(P0): 전환 일러스트/그림자 스케일을 확대하고 전환 유지 시간을 +1초 조정(총 1.65초)해 호스트↔게스트 전환을 더 부드럽게 연결
 - 사용자 화면 번역 키 정합성(P0): `LanguageContext`에 누락 키(`help`, 게스트 프로필 모달/언어 라벨, 체험 수정 탭 키셋 등)를 보강해 `ko/en/ja/zh` 사전 간 누락을 0으로 정렬
 - 번역 연결 보강(P0): `account` 언어 안내문과 `host/experiences/[id]/edit`의 하드코딩 토스트/권한 에러 문구를 `t()` 키로 치환해 언어 전환 시 일관성을 강화
 - 운영 범위 고정(P0): 이번 배치의 번역 정비는 `public/guest/host` 사용자 화면 우선으로 적용하고, Admin 번역 변경은 범위에서 제외
