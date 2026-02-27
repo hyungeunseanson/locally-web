@@ -282,7 +282,7 @@ export default function ExpMainContent({
             className="w-full h-[88dvh] bg-[#f7f7f7] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-end mb-2">
+            <div className="flex justify-end mb-1">
               <button onClick={() => setIsMessageModalOpen(false)} className="p-1.5 text-slate-600">
                 <span className="sr-only">닫기</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -290,8 +290,8 @@ export default function ExpMainContent({
                 </svg>
               </button>
             </div>
-            <h3 className="text-[24px] font-semibold leading-tight mb-2">{hostProfile?.name || '호스트'} 님에게 질문하기</h3>
-            <p className="text-[13px] text-slate-500 leading-snug mb-5">
+            <h3 className="text-[19px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{hostProfile?.name || '호스트'}님에게 질문하기</h3>
+            <p className="text-[11px] text-slate-500 leading-snug mb-4">
               이 체험에 대해 자세히 알아보려면 호스트에게
               <span className="underline underline-offset-2 ml-1">메시지를 보내세요.</span>
             </p>
@@ -299,13 +299,13 @@ export default function ExpMainContent({
               value={inquiryText}
               onChange={(e) => setInquiryText(e.target.value)}
               placeholder="호스트에게 본인을 소개해 보세요."
-              className="w-full h-[130px] rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[14px] text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
+              className="w-full h-[122px] rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[12px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
             />
             <div className="mt-auto">
               <button
                 onClick={handleSubmitMessage}
                 disabled={!inquiryText.trim() || isSubmittingMessage}
-                className={`w-full rounded-2xl py-3 text-[15px] font-medium ${
+                className={`w-full rounded-2xl py-3 text-[13px] font-medium ${
                   !inquiryText.trim() || isSubmittingMessage
                     ? 'bg-slate-300 text-slate-50'
                     : 'bg-[#111827] text-white'

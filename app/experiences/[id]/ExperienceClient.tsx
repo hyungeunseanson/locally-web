@@ -140,9 +140,7 @@ export default function ExperienceClient({
         return false;
       }
       await createInquiry(experience.host_id, experience.id, inquiryText);
-      if (confirm('문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?')) {
-        router.push('/guest/inbox');
-      }
+      showToast('메시지가 발송되었습니다.', 'success');
       setInquiryText('');
       return true;
     } catch (e: unknown) {
