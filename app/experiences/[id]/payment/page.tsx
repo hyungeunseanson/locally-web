@@ -284,122 +284,122 @@ function PaymentContent() {
   const imageUrl = experience?.photos?.[0] || experience?.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center py-10 font-sans px-4">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 md:py-10 font-sans px-3 md:px-4">
       <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="afterInteractive" />
 
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden border border-slate-100">
-        <div className="h-16 border-b border-slate-100 flex items-center px-4 gap-4 bg-white sticky top-0 z-10">
-          <button onClick={() => router.back()} className="p-2 hover:bg-slate-50 rounded-full transition-colors"><ChevronLeft size={24} /></button>
-          <span className="font-black text-lg">결제하기</span>
+      <div className="bg-white w-full max-w-md rounded-2xl md:rounded-3xl shadow-lg md:shadow-xl overflow-hidden border border-slate-100">
+        <div className="h-12 md:h-16 border-b border-slate-100 flex items-center px-3 md:px-4 gap-2.5 md:gap-4 bg-white sticky top-0 z-10">
+          <button onClick={() => router.back()} className="p-1.5 md:p-2 hover:bg-slate-50 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 md:w-6 md:h-6" /></button>
+          <span className="font-black text-[15px] md:text-lg">결제하기</span>
         </div>
 
-        <div className="p-6">
-          <div className="flex gap-5 mb-8">
-            <div className="w-24 h-32 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 shadow-sm border border-slate-100">
+        <div className="p-4 md:p-6">
+          <div className="flex gap-3 md:gap-5 mb-6 md:mb-8">
+            <div className="w-20 h-28 md:w-24 md:h-32 relative rounded-lg md:rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 shadow-sm border border-slate-100">
               <Image src={imageUrl} alt="Experience" fill className="object-cover" sizes="100px" />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
-              <span className="text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">{experience?.location || 'SEOUL'}</span>
-              <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-lg">{experience?.title || '로딩 중...'}</h3>
+              <span className="text-[10px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5 uppercase tracking-wide">{experience?.location || 'SEOUL'}</span>
+              <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-[15px] md:text-lg">{experience?.title || '로딩 중...'}</h3>
             </div>
           </div>
 
-          <h2 className="text-xl font-bold mb-4">예약 정보 확인</h2>
-          <div className="bg-slate-50 p-6 rounded-2xl space-y-4 mb-6 text-sm text-slate-700 border border-slate-100">
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><Calendar size={16} /> 날짜</span><span className="font-bold">{date}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><Clock size={16} /> 시간</span><span className="font-bold">{time}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><Users size={16} /> 인원</span><span className="font-bold">{guests}명</span></div>
-            {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-2"><ShieldCheck size={16} /> 타입</span><span className="font-bold text-rose-500">프라이빗 투어</span></div>}
+          <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">예약 정보 확인</h2>
+          <div className="bg-slate-50 p-4 md:p-6 rounded-xl md:rounded-2xl space-y-3 md:space-y-4 mb-5 md:mb-6 text-[12px] md:text-sm text-slate-700 border border-slate-100">
+            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" /> 날짜</span><span className="font-bold">{date}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Clock className="w-3.5 h-3.5 md:w-4 md:h-4" /> 시간</span><span className="font-bold">{time}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Users className="w-3.5 h-3.5 md:w-4 md:h-4" /> 인원</span><span className="font-bold">{guests}명</span></div>
+            {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> 타입</span><span className="font-bold text-rose-500">프라이빗 투어</span></div>}
           </div>
 
-          <div className="mb-8 space-y-4">
-            <h2 className="text-xl font-bold">예약자 정보</h2>
+          <div className="mb-6 md:mb-8 space-y-3 md:space-y-4">
+            <h2 className="text-[16px] md:text-xl font-bold">예약자 정보</h2>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">이름</label>
-              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors" placeholder="예약자 성함" />
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">이름</label>
+              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder="예약자 성함" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">연락처</label>
-              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-black transition-colors" placeholder="010-0000-0000" />
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">연락처</label>
+              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder="010-0000-0000" />
             </div>
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-xl font-bold mb-4">결제 수단</h2>
-            <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="mb-6 md:mb-8">
+            <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">결제 수단</h2>
+            <div className="grid grid-cols-2 gap-2 md:gap-3 mb-3 md:mb-4">
               <button
                 onClick={() => setPaymentMethod('card')}
-                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'card' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'card' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
-                <CreditCard size={24} />
-                <span className="font-bold text-sm">카드 결제</span>
+                <CreditCard className="w-5 h-5 md:w-6 md:h-6" />
+                <span className="font-bold text-[12px] md:text-sm">카드 결제</span>
               </button>
               <button
                 onClick={() => setPaymentMethod('bank')}
-                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${paymentMethod === 'bank' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'bank' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
-                <div className="flex items-center gap-1"><Users size={24} /><span className="text-[10px] font-bold bg-rose-100 text-rose-600 px-1 rounded">추천</span></div>
-                <span className="font-bold text-sm">무통장 입금</span>
+                <div className="flex items-center gap-1"><Users className="w-5 h-5 md:w-6 md:h-6" /><span className="text-[9px] md:text-[10px] font-bold bg-rose-100 text-rose-600 px-1 rounded">추천</span></div>
+                <span className="font-bold text-[12px] md:text-sm">무통장 입금</span>
               </button>
             </div>
 
             {paymentMethod === 'bank' && (
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
-                <p className="text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
+              <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
+                <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="font-black text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
-                  <span className="text-xs font-bold bg-yellow-300 px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
+                  <span className="font-black text-[16px] md:text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
+                  <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
                 </div>
-                <p className="text-xs text-slate-400">
+                <p className="text-[11px] md:text-xs text-slate-400">
                   * 예약 후 <span className="text-rose-500 font-bold">1시간 이내</span>에 미입금 시 자동 취소됩니다.
                 </p>
               </div>
             )}
           </div>
 
-          <div className="px-2 space-y-2 mb-8 text-sm">
+          <div className="px-1 md:px-2 space-y-1.5 md:space-y-2 mb-6 md:mb-8 text-[12px] md:text-sm">
             <div className="flex justify-between items-center text-slate-600"><span>체험 금액</span><span>₩{hostPrice.toLocaleString()}</span></div>
-            <div className="flex justify-between items-center text-blue-600"><span className="flex items-center gap-1">서비스 수수료 (10%) <Info size={12} /></span><span>+ ₩{guestFee.toLocaleString()}</span></div>
-            <div className="border-t border-slate-100 pt-4 mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
+            <div className="flex justify-between items-center text-blue-600"><span className="flex items-center gap-1">서비스 수수료 (10%) <Info className="w-3 h-3 md:w-3.5 md:h-3.5" /></span><span>+ ₩{guestFee.toLocaleString()}</span></div>
+            <div className="border-t border-slate-100 pt-3 md:pt-4 mt-1.5 md:mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-[24px] md:text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
           </div>
 
-          <div className="mb-6 space-y-3 bg-red-50/50 p-5 rounded-2xl border border-red-100">
-            <h3 className="text-sm font-bold text-red-600 mb-3 flex items-center gap-1.5"><ShieldCheck size={16} /> 게스트 안전 필수 동의</h3>
+          <div className="mb-5 md:mb-6 space-y-2.5 md:space-y-3 bg-red-50/50 p-4 md:p-5 rounded-xl md:rounded-2xl border border-red-100">
+            <h3 className="text-[13px] md:text-sm font-bold text-red-600 mb-2.5 md:mb-3 flex items-center gap-1 md:gap-1.5"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> 게스트 안전 필수 동의</h3>
 
-            <label className="flex items-start gap-3 cursor-pointer hover:bg-white/50 p-2 -ml-2 rounded-xl transition-colors">
-              <div className={`mt-0.5 min-w-[20px] h-5 rounded border flex items-center justify-center transition-colors ${agreeNoOffPlatform ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 size={14} /></div>
+            <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
+              <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeNoOffPlatform ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
-              <div className="text-sm font-medium text-slate-700 leading-snug">
+              <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
                 <span className="text-red-600 font-bold">[필수]</span> 호스트와의 직접 연락 및 플랫폼 외부 결제 유도를 단호히 거부하며, 적발 시 계정 영구 정지 처분에 동의합니다.
               </div>
             </label>
 
-            <label className="flex items-start gap-3 cursor-pointer hover:bg-white/50 p-2 -ml-2 rounded-xl transition-colors">
-              <div className={`mt-0.5 min-w-[20px] h-5 rounded border flex items-center justify-center transition-colors ${agreeSafety ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 size={14} /></div>
+            <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
+              <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeSafety ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeSafety} onChange={() => setAgreeSafety(!agreeSafety)} />
-              <div className="text-sm font-medium text-slate-700 leading-snug">
+              <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
                 <span className="text-red-600 font-bold">[필수]</span> 플랫폼 내 게스트 안전 가이드라인을 숙지하였으며, 상호 존중하는 올바른 호스팅 문화에 기여하겠습니다.
               </div>
             </label>
 
-            <label className="flex items-start gap-3 cursor-pointer hover:bg-white/50 p-2 -ml-2 rounded-xl transition-colors">
-              <div className={`mt-0.5 min-w-[20px] h-5 rounded border flex items-center justify-center transition-colors ${agreeTerms ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 size={14} /></div>
+            <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
+              <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeTerms ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeTerms} onChange={() => setAgreeTerms(!agreeTerms)} />
-              <div className="text-sm font-medium text-slate-700 leading-snug">
+              <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
                 <span className="text-slate-900 font-bold">[필수]</span> 구매 조건, 취소/환불 규정을 모두 확인하였으며 본 플랫폼 서비스 이용 약관에 동의합니다.
               </div>
             </label>
           </div>
 
           {paymentError && (
-            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] md:text-[13px] text-rose-600 leading-relaxed">
+            <div className="mb-4 rounded-lg md:rounded-xl border border-rose-200 bg-rose-50 px-3 md:px-4 py-2.5 md:py-3 text-[12px] md:text-[13px] text-rose-600 leading-relaxed">
               {paymentError}
             </div>
           )}
 
           <button onClick={handlePayment} disabled={isProcessing}
-            className="w-full h-14 rounded-2xl font-bold text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100">
-            {isProcessing ? <Loader2 className="animate-spin" /> : <><CreditCard size={20} /> ₩{finalAmount.toLocaleString()} 결제하기</>}
+            className="w-full h-12 md:h-14 rounded-xl md:rounded-2xl font-bold text-[15px] md:text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 md:gap-2 shadow-md md:shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100">
+            {isProcessing ? <Loader2 className="animate-spin w-[18px] h-[18px] md:w-5 md:h-5" /> : <><CreditCard className="w-[18px] h-[18px] md:w-5 md:h-5" /> ₩{finalAmount.toLocaleString()} 결제하기</>}
           </button>
         </div>
       </div>

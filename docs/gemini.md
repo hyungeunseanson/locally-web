@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27  
-**Version:** 3.2.15 (Experience Detail Stability Hardening v2)  
+**Last Updated:** 2026-02-27 (Mobile Payment Density Optimization)  
+**Version:** 3.2.16 (Experience Detail Stability Hardening v2)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -140,6 +140,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 체험 상세 안정화 v2(문의 인증): `useChat.createInquiry`/`sendMessage`에서 `currentUser` 지연 상태 의존을 제거하고 호출 시점 `auth.getUser()` 기반으로 사용자 식별을 확정해 상세 진입 직후 문의 전송 실패 오탐을 완화
 - 체험 상세 안정화 v2(모바일 에러 UX): 상세 결제 흐름의 `alert`를 제거하고 토스트 + 인라인 에러 블록으로 통일, 실패 시 강제 뒤로가기 없이 현재 화면에서 재시도 가능한 상태로 유지
 - 체험 상세 안정화 v2(타입/접근성): 상세 영역 컴포넌트 `any` 제거 및 optional 타입 보정, `Link` 규칙 준수, 이미지 `alt`/`next/image` 보강, 후기 모달 초소형 텍스트 가독성을 최소 10px 기준으로 상향
+- 결제 플로우 모바일 밀도 최적화: `/experiences/[id]/payment`, `/experiences/[id]/payment/complete`, `/payment/success`의 모바일 타이포/간격을 1단계 축소하고 `md:` 기준 데스크탑 스타일을 보존
 - Admin: Team Chat 가시성/알림 배지/모바일 디테일 화면 안정화
 - Host: 권한 스코프, 예약/수익 집계 기준, Realtime 범위 검증 정리
 
