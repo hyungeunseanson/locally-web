@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P1-6 Payment Complete/Success Pending Status Unification + Flow Regression Check)  
-**Version:** 3.2.24 (P1-6 Payment Complete/Success Pending Status Unification + Flow Regression Check)  
+**Last Updated:** 2026-02-27 (P1-7 Payment Capacity Status Set Unification)  
+**Version:** 3.2.25 (P1-7 Payment Capacity Status Set Unification)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -93,6 +93,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 결제 완료 상태 분기 통일(P1-6): `payment/complete`의 `PENDING` 직접 비교를 `isPendingBookingStatus`로 전환해 입금 대기 UI 분기를 공통 상태 유틸 기준으로 정렬
 - 결제 성공 상태 분기 통일(P1-6): `payment/success`의 `PENDING` 제목/설명 분기를 공통 상태 유틸로 치환해 상태 표기 변형(대소문자)에도 동일 메시지 노출을 보장
 - 결제 플로우 회귀 점검(P1-6): `payment → payment/complete(orderId) → guest/trips|guest/inbox|home` 동선 및 `order_id` 기반 조회 경로를 재검증했고, 빌드 단계는 기존 Google Fonts 네트워크 제약(`Noto Sans KR`) 외 신규 오류 없음 확인
+- 결제 좌석 점검 상태 집합 통일(P1-7): `bookingStatus`에 `BOOKING_PENDING_STATUSES`, `BOOKING_BLOCKING_STATUSES_FOR_CAPACITY`를 추가하고 `payment/page`의 `.in('status', ...)`를 해당 상수로 전환해 `PENDING` 하드코딩을 제거
 - 안정성: 광범위한 `.single()` -> `.maybeSingle()` 전환
 - 모바일 UX: BottomTabNavigation 충돌/가림/z-index/뒤로가기 이슈 정리
 - 모바일 정보/커뮤니티/뉴스/공지 레이아웃 최적화 및 게스트 프로필(모바일/데스크탑) 기준 정렬

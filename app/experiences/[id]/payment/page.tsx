@@ -7,7 +7,7 @@ import Script from 'next/script';
 import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { BOOKING_BLOCKING_STATUSES_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
 type PaymentExperience = {
   title?: string;
@@ -130,7 +130,7 @@ function PaymentContent() {
       .eq('experience_id', experienceId)
       .eq('date', date)
       .eq('time', time)
-      .in('status', ['PENDING', ...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
+      .in('status', [...BOOKING_BLOCKING_STATUSES_FOR_CAPACITY]);
 
     const bookingRows = (bookings || []) as BookingCheckRow[];
     const currentBookedCount = bookingRows.reduce((sum, b) => sum + Number(b.guests || 0), 0);

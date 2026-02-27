@@ -1,6 +1,11 @@
 export const BOOKING_CONFIRMED_STATUSES = ['PAID', 'confirmed', 'completed'] as const;
 export const BOOKING_ACTIVE_STATUS_FOR_CAPACITY = ['PAID', 'confirmed'] as const;
+export const BOOKING_PENDING_STATUSES = ['PENDING', 'pending'] as const;
 export const BOOKING_CANCELLED_STATUSES = ['cancelled', 'declined', 'cancellation_requested'] as const;
+export const BOOKING_BLOCKING_STATUSES_FOR_CAPACITY = [
+  ...BOOKING_PENDING_STATUSES,
+  ...BOOKING_ACTIVE_STATUS_FOR_CAPACITY,
+] as const;
 
 const normalizeBookingStatus = (status: string) => status.toLowerCase();
 
