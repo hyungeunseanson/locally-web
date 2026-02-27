@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P0 Reservation Card Desktop Layout Realignment)  
-**Version:** 3.2.31 (P0 Reservation Card Desktop Layout Realignment)  
+**Last Updated:** 2026-02-27 (P0 Desktop Reservation Card Rollback to Pre-Mobile Baseline)  
+**Version:** 3.2.32 (P0 Desktop Reservation Card Rollback to Pre-Mobile Baseline)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -111,6 +111,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 폰트 검증 런북 고정(P1-10): 폰트 반영 확인 시 `.next` 정리 후 `npx next build --webpack` 기준으로 `@font-face(inter/ibm)` 존재와 `next/font/google|noto_sans_kr|fonts.googleapis` 미존재를 함께 확인
 - 데스크탑 레이아웃 복귀(P0): 호스트 대시보드 `예약 관리/문의함/가이드라인`과 게스트 `메시지/알림`의 `md:` 이상 타이포·간격·배치를 핀셋 복귀해 모바일 밀도값이 데스크탑에 누수된 회귀를 완화
 - 예약 카드 배치 재정렬(P0): 호스트 `예약 관리` 카드에서 데스크탑 액션을 하단 분리행 대신 우측 통합 컬럼으로 재배치해 과도한 빈 공간/어색한 줄바꿈을 완화하고, 모바일 버튼 동선은 유지
+- 예약 카드 데스크탑 원형 복원(P0): 기준 커밋 `d1a622f`를 따라 `md` 이상 레이아웃을 좌측 날짜패널/중앙 상세/우측 액션 3단 구조로 되돌리고, `예약번호(order_id||id)`를 상단 주요 식별자로 재노출
+- 예약 카드 번역 키 보강(P0): 데스크탑 복원 라벨용 `res_order_number`, `res_payment_time`, `res_expected_income`를 `ko/en/ja/zh` 사전에 추가해 하드코딩 텍스트 없이 다국어 일관성 유지
 - 사용자 화면 번역 키 정합성(P0): `LanguageContext`에 누락 키(`help`, 게스트 프로필 모달/언어 라벨, 체험 수정 탭 키셋 등)를 보강해 `ko/en/ja/zh` 사전 간 누락을 0으로 정렬
 - 번역 연결 보강(P0): `account` 언어 안내문과 `host/experiences/[id]/edit`의 하드코딩 토스트/권한 에러 문구를 `t()` 키로 치환해 언어 전환 시 일관성을 강화
 - 운영 범위 고정(P0): 이번 배치의 번역 정비는 `public/guest/host` 사용자 화면 우선으로 적용하고, Admin 번역 변경은 범위에서 제외

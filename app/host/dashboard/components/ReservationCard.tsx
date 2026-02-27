@@ -111,6 +111,7 @@ export default function ReservationCard({
   today.setHours(0, 0, 0, 0);
   const isPast = targetDate < today;
   const canReview = isPast && !isCancelledBookingStatus(res.status);
+  const orderDisplay = String(res.order_id || res.id);
 
   // 🟢 결제 시간 다국어 포맷팅
   const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
@@ -135,14 +136,14 @@ export default function ReservationCard({
           isCancelledOnlyBookingStatus(res.status) ? 'bg-red-400' : 'bg-slate-200'
         }`} />
 
-      {/* 핵심: 모바일에서도 한 줄 가로 배치 */}
-      <div className="flex items-center md:items-start gap-2 md:gap-3.5 pl-3 md:pl-4 pr-2 md:pr-4 py-3 md:py-4">
+      {/* 모바일 레이아웃 (기존 유지) */}
+      <div className="flex md:hidden items-center gap-2 pl-3 pr-2 py-3">
 
         {/* 날짜 미니 박스 */}
-        <div className="flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-lg md:rounded-xl px-2 md:px-2.5 py-1.5 md:py-2 border border-slate-100 min-w-[44px] md:min-w-[58px]">
-          <div className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase">{monthName}</div>
-          <div className="text-base md:text-[22px] font-black text-slate-900 leading-none">{new Date(res.date).getDate()}</div>
-          <div className="text-[9px] md:text-[10px] text-slate-400 mt-0.5">{res.time}</div>
+        <div className="flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-100 min-w-[44px]">
+          <div className="text-[10px] font-bold text-slate-500 uppercase">{monthName}</div>
+          <div className="text-base font-black text-slate-900 leading-none">{new Date(res.date).getDate()}</div>
+          <div className="text-[9px] text-slate-400 mt-0.5">{res.time}</div>
         </div>
 
         {/* 메인 정보 영역 */}
@@ -153,32 +154,32 @@ export default function ReservationCard({
               onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
               className="flex items-center gap-1.5 min-w-0 text-left"
             >
-              <div className="w-5 h-5 md:w-7 md:h-7 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+              <div className="w-5 h-5 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
                 {res.guest?.avatar_url ? (
                   <img src={secureUrl(res.guest.avatar_url)!} className="w-full h-full object-cover" alt="" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><User size={10} className="text-slate-400" /></div>
                 )}
               </div>
-              <span className="text-[12px] md:text-[15px] font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
+              <span className="text-[12px] font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
             </button>
-            <span className="text-[10px] md:text-[12px] text-slate-400 shrink-0">{res.guests}명</span>
+            <span className="text-[10px] text-slate-400 shrink-0">{res.guests}명</span>
             {isNew && <span className="bg-blue-500 text-white text-[9px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-bold animate-pulse shrink-0">N</span>}
           </div>
           {/* 체험명 */}
-          <p className="text-[10px] md:text-[13px] text-slate-400 truncate">{res.experiences?.title}</p>
+          <p className="text-[10px] text-slate-400 truncate">{res.experiences?.title}</p>
         </div>
 
         {/* 우측: 상태 + 금액 + D-Day */}
-        <div className="flex-shrink-0 flex flex-col items-end gap-1 md:hidden">
-          <span className={`text-[10px] md:text-[12px] font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
+        <div className="flex-shrink-0 flex flex-col items-end gap-1">
+          <span className={`text-[10px] font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
             }`}>{dDay}</span>
           {renderStatusBadge(res.status, res.date)}
-          <p className="text-[12px] md:text-[16px] font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
+          <p className="text-[12px] font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
         </div>
 
         {/* 모바일: 메시지/캘린더 아이콘 스택 */}
-        <div className="ml-1 shrink-0 flex flex-col gap-1 md:hidden">
+        <div className="ml-1 shrink-0 flex flex-col gap-1">
           <button
             onClick={(e) => { e.stopPropagation(); onMessage(); }}
             className="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center hover:bg-black transition-colors"
@@ -195,64 +196,130 @@ export default function ReservationCard({
             </button>
           )}
         </div>
-
-        {/* 데스크탑: 상태/액션 통합 컬럼 */}
-        <div className="hidden md:flex ml-2 shrink-0 min-w-[170px] flex-col items-end justify-between gap-2.5">
-          <div className="flex flex-col items-end gap-1">
-            <span className={`text-[12px] font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
-              }`}>{dDay}</span>
-            {renderStatusBadge(res.status, res.date)}
-            <p className="text-[16px] font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => { e.stopPropagation(); onMessage(); }}
-              className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
-            >
-              <MessageSquare size={16} /> {t('res_message_btn')}
-            </button>
-
-            {canReview && (
-              <button
-                onClick={(e) => { e.stopPropagation(); if (!hasReview) onReview(); }}
-                disabled={hasReview}
-                className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasReview
-                  ? 'bg-slate-100 text-slate-400 cursor-default'
-                  : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
-                  }`}
-              >
-                <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"} />
-                {hasReview ? '후기 작성됨' : '게스트 후기'}
-              </button>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* 확정된 예약: 연락처 정보 (접히는 방식 – 항상 표시) */}
-      {isConfirmed && (
-        <div className="border-t border-slate-100 px-3 md:px-4 py-2 md:py-2.5 flex items-center gap-4 md:gap-6 bg-slate-50/50">
-          <div className="flex items-center gap-1 text-[11px] md:text-[13px] text-slate-500 truncate">
-            <Phone size={11} className="shrink-0 text-slate-400" />{res.guest?.phone || '-'}
+      {/* 데스크탑 레이아웃 (d1a622f 구조 복원 + 최신 로직 유지) */}
+      <div className="hidden md:flex gap-6 pl-2 pr-6 py-6">
+        {/* 좌측 날짜 패널 */}
+        <div className="w-32 flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-xl p-4 border border-slate-100">
+          <span className={`text-xs font-bold px-2 py-1 rounded-full mb-2 ${dDay === t('res_card_today')
+            ? 'bg-rose-100 text-rose-600'
+            : isConfirmed
+              ? 'bg-green-100 text-green-700'
+              : 'bg-slate-200 text-slate-600'
+            }`}>
+            {dDay}
+          </span>
+          <div className="text-[30px] font-black text-slate-900 leading-none">{new Date(res.date).getDate()}</div>
+          <div className="text-sm font-bold text-slate-500 uppercase mt-1">{monthName}</div>
+          <div className="mt-2 text-xs font-medium text-slate-400 flex items-center gap-1">
+            <Clock size={12} /> {res.time}
           </div>
-          <div className="flex items-center gap-1 text-[11px] md:text-[13px] text-slate-500 truncate">
-            <Mail size={11} className="shrink-0 text-slate-400" />{res.guest?.email || '-'}
+
+          <div className="mt-2 pt-2 border-t border-slate-200 w-full text-center">
+            <p className="text-[10px] text-slate-400">{t('res_payment_time')}</p>
+            <p className="text-[10px] font-bold text-slate-600">{paymentTime || '-'}</p>
           </div>
+
           {isConfirmed && (
             <button
               onClick={(e) => { e.stopPropagation(); onCalendar(); }}
-              className="ml-auto shrink-0 text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-lg hidden md:flex items-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+              className="mt-3 w-full text-[10px] bg-white border border-slate-200 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
             >
-              <CalendarPlus size={11} /> 캘린더
+              <CalendarPlus size={12} /> {t('res_add_calendar')}
             </button>
           )}
         </div>
-      )}
+
+        {/* 중앙 상세 정보 */}
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-start mb-4 gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-400 mb-1 truncate">{res.experiences?.title || '-'}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide">{t('res_order_number')}</span>
+                <h4 className="text-[18px] font-bold text-slate-900 font-mono">#{orderDisplay}</h4>
+                {isNew && (
+                  <span className="bg-blue-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold animate-pulse">
+                    N
+                  </span>
+                )}
+                {renderStatusBadge(res.status, res.date)}
+              </div>
+            </div>
+
+            <div className="text-right flex-shrink-0">
+              <p className="text-xs text-slate-400 font-bold mb-1">{t('res_expected_income')}</p>
+              <p className="text-xl font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-4 flex flex-col lg:flex-row gap-6">
+            <button
+              onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
+              className="flex items-center gap-4 text-left cursor-pointer group/profile"
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 group-hover/profile:ring-2 ring-slate-900 transition-all shrink-0">
+                {res.guest?.avatar_url ? (
+                  <img src={secureUrl(res.guest.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={20} /></div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-slate-900 group-hover/profile:underline underline-offset-2 decoration-2 truncate max-w-[160px]">
+                    {res.guest?.full_name || '게스트'}
+                  </p>
+                  <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 shrink-0">{t('res_profile_btn')}</span>
+                </div>
+                <p className="text-xs text-slate-500">{res.guests}{t('res_people_count')}</p>
+              </div>
+            </button>
+
+            {isConfirmed && (
+              <div className="flex flex-col justify-center gap-2 text-sm text-slate-600 lg:border-l lg:border-slate-100 lg:pl-6 min-w-0">
+                <div className="flex items-center gap-2 truncate">
+                  <Phone size={14} className="text-slate-400 shrink-0" />
+                  {res.guest?.phone || t('res_phone_none')}
+                </div>
+                <div className="flex items-center gap-2 truncate">
+                  <Mail size={14} className="text-slate-400 shrink-0" />
+                  {res.guest?.email || t('res_email_none')}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 우측 액션 영역 */}
+        <div className="min-w-[140px] flex flex-col gap-2 justify-end border-l border-slate-100 pl-6">
+          <button
+            onClick={(e) => { e.stopPropagation(); onMessage(); }}
+            className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
+          >
+            <MessageSquare size={16} /> {t('res_message_btn')}
+          </button>
+
+          {canReview && (
+            <button
+              onClick={(e) => { e.stopPropagation(); if (!hasReview) onReview(); }}
+              disabled={hasReview}
+              className={`w-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasReview
+                ? 'bg-slate-100 text-slate-400 cursor-default'
+                : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
+                }`}
+            >
+              <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"} />
+              {hasReview ? '후기 작성됨' : '게스트 후기'}
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* 취소 요청 승인 박스 */}
       {isCancellationRequestedBookingStatus(res.status) && (
-        <div className="mx-3 mb-3 bg-orange-50 border border-orange-100 rounded-xl p-3 animate-in fade-in slide-in-from-top-2">
+        <div className="mx-3 md:mx-2 mb-3 md:mb-4 bg-orange-50 border border-orange-100 rounded-xl p-3 md:p-4 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-start gap-2">
             <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={16} />
             <div className="flex-1">
@@ -279,8 +346,8 @@ export default function ReservationCard({
 
       {/* 취소 완료 사유 박스 */}
       {isCancelledOnlyBookingStatus(res.status) && (
-        <div className="mx-3 mb-3 bg-slate-50 border border-slate-100 rounded-xl p-3">
-          <div className="text-[11px] text-slate-500">
+        <div className="mx-3 md:mx-2 mb-3 md:mb-4 bg-slate-50 border border-slate-100 rounded-xl p-3 md:p-4">
+          <div className="text-[11px] md:text-xs text-slate-500">
             <span className="font-bold block mb-0.5 text-slate-700">{t('res_cancel_detail_title')}</span>
             <p className="mb-0.5">{t('res_cancel_reason')}: {res.cancel_reason || '-'}</p>
             <div className="flex gap-3 font-mono text-[10px] text-slate-400">
