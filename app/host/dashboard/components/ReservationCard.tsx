@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   Clock, User, CheckCircle2, MessageSquare,
-  Phone, Mail, XCircle, AlertTriangle, Loader2, CalendarPlus
+  AlertTriangle, Loader2, CalendarPlus
 } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import {
@@ -221,14 +221,6 @@ export default function ReservationCard({
             <p className="text-[10px] font-bold text-slate-600">{paymentTime || '-'}</p>
           </div>
 
-          {isConfirmed && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onCalendar(); }}
-              className="mt-3 w-full text-[10px] bg-white border border-slate-200 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-slate-100 hover:text-blue-600 transition-colors"
-            >
-              <CalendarPlus size={12} /> {t('res_add_calendar')}
-            </button>
-          )}
         </div>
 
         {/* 중앙 상세 정보 */}
@@ -254,7 +246,7 @@ export default function ReservationCard({
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-4 flex flex-col lg:flex-row gap-6">
+          <div className="border-t border-slate-100 pt-4">
             <button
               onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
               className="flex items-center gap-4 text-left cursor-pointer group/profile"
@@ -276,24 +268,18 @@ export default function ReservationCard({
                 <p className="text-xs text-slate-500">{res.guests}{t('res_people_count')}</p>
               </div>
             </button>
-
-            {isConfirmed && (
-              <div className="flex flex-col justify-center gap-2 text-sm text-slate-600 lg:border-l lg:border-slate-100 lg:pl-6 min-w-0">
-                <div className="flex items-center gap-2 truncate">
-                  <Phone size={14} className="text-slate-400 shrink-0" />
-                  {res.guest?.phone || t('res_phone_none')}
-                </div>
-                <div className="flex items-center gap-2 truncate">
-                  <Mail size={14} className="text-slate-400 shrink-0" />
-                  {res.guest?.email || t('res_email_none')}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
         {/* 우측 액션 영역 */}
-        <div className="min-w-[140px] flex flex-col gap-2 justify-end border-l border-slate-100 pl-6">
+        <div className="min-w-[160px] flex flex-col gap-2.5 justify-end border-l border-slate-100 pl-6">
+          <button
+            onClick={(e) => { e.stopPropagation(); onCalendar(); }}
+            className="w-full bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-xl text-sm font-bold hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-sm"
+          >
+            <CalendarPlus size={16} /> {t('res_add_calendar')}
+          </button>
+
           <button
             onClick={(e) => { e.stopPropagation(); onMessage(); }}
             className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"

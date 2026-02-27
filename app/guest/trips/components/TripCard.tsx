@@ -3,16 +3,39 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, MessageSquare, Map, Receipt, Lock } from 'lucide-react';
+import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, MessageSquare, Map, Receipt, Lock, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CancellationModal from './CancellationModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 
+interface GuestTrip {
+  id: number;
+  orderId?: string | number;
+  expId: string | number;
+  hostId: string;
+  title: string;
+  date: string;
+  time: string;
+  location?: string;
+  address?: string;
+  image?: string;
+  photos?: string[];
+  isPrivate?: boolean;
+  status?: string;
+  guests?: number;
+  paymentDate?: string;
+  created_at?: string;
+  amount?: number;
+  totalPrice?: number;
+  total_price?: number;
+  price?: number;
+}
+
 interface TripCardProps {
-  trip: any;
+  trip: GuestTrip;
   onRequestCancel: (id: number, reason: string, hostId: string) => Promise<boolean>;
-  onOpenReceipt: (trip: any) => void;
+  onOpenReceipt: (trip: GuestTrip) => void;
   isProcessing: boolean;
 }
 
@@ -26,6 +49,19 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const [refundInfo, setRefundInfo] = useState({ percent: 0, amount: 0, reason: '' });
   const openExternalLink = (url: string) => {
     window.location.href = url;
+  };
+
+  const copyAddress = async () => {
+    const addressText = trip.address || trip.location || '';
+    if (!addressText) return;
+    try {
+      await navigator.clipboard.writeText(addressText);
+      alert(`${t('trip_copy_address_done')}\n${addressText}`);
+    } catch {
+      alert(addressText);
+    } finally {
+      setIsMenuOpen(false);
+    }
   };
 
   // 사진 슬라이더 상태
@@ -124,8 +160,9 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
 
   const addToCalendar = () => {
     const text = encodeURIComponent(`[Locally] ${trip.title}`);
-    const details = encodeURIComponent(`예약번호: ${trip.orderId}\n장소: ${trip.location}`);
-    const location = encodeURIComponent(trip.location);
+    const safeLocation = trip.location || '';
+    const details = encodeURIComponent(`예약번호: ${trip.orderId}\n장소: ${safeLocation}`);
+    const location = encodeURIComponent(safeLocation);
     const dateStr = trip.date.replace(/-/g, ""); 
     const dates = `${dateStr}/${dateStr}`;
     openExternalLink(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${location}`);
@@ -172,7 +209,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
                 <div className="flex flex-col gap-1">
                    <div className="flex items-center gap-1.5 md:gap-2 text-[10px] text-slate-400">
                    <span className="font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">#{trip.orderId}</span>
-                     <span>{t('paid_label')} {formatPaymentDate(trip.paymentDate || trip.created_at)}</span>
+                     <span>{t('paid_label')} {formatPaymentDate(trip.paymentDate || trip.created_at || '')}</span>
                    </div>
                    
                    <div className="text-[11px] md:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 md:gap-2 mt-0.5 md:mt-1">
@@ -194,6 +231,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
                        <div className="fixed inset-0 z-30" onClick={() => setIsMenuOpen(false)}></div>
                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
                           <button onClick={addToCalendar} className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_add_calendar')}</button> {/* 🟢 교체 */}
+                          <button onClick={copyAddress} className="hidden md:flex w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium items-center gap-2"><Copy className="w-3.5 h-3.5" />{t('trip_copy_address')}</button>
                           <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_view_again')}</button>   {/* 🟢 교체 */}
                           <div className="h-px bg-slate-100 my-1"></div>
                           
@@ -240,7 +278,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
 <MessageSquare className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]"/> {t('messages')} {/* 🟢 교체 */}
 </button>
               <button 
-                onClick={() => openExternalLink(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`)}
+                onClick={() => openExternalLink(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location || '')}`)}
                 className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
               >
 <Map className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]"/> {t('trip_map')} {/* 🟢 교체 */}

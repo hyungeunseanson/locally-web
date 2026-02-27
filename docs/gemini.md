@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P0 Desktop Reservation Card Rollback to Pre-Mobile Baseline)  
-**Version:** 3.2.32 (P0 Desktop Reservation Card Rollback to Pre-Mobile Baseline)  
+**Last Updated:** 2026-02-27 (P0 Desktop Web UX Recovery: Guest Trips + Host Dashboard + Mode Transition)  
+**Version:** 3.2.33 (P0 Desktop Web UX Recovery: Guest Trips + Host Dashboard + Mode Transition)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -113,6 +113,11 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 예약 카드 배치 재정렬(P0): 호스트 `예약 관리` 카드에서 데스크탑 액션을 하단 분리행 대신 우측 통합 컬럼으로 재배치해 과도한 빈 공간/어색한 줄바꿈을 완화하고, 모바일 버튼 동선은 유지
 - 예약 카드 데스크탑 원형 복원(P0): 기준 커밋 `d1a622f`를 따라 `md` 이상 레이아웃을 좌측 날짜패널/중앙 상세/우측 액션 3단 구조로 되돌리고, `예약번호(order_id||id)`를 상단 주요 식별자로 재노출
 - 예약 카드 번역 키 보강(P0): 데스크탑 복원 라벨용 `res_order_number`, `res_payment_time`, `res_expected_income`를 `ko/en/ja/zh` 사전에 추가해 하드코딩 텍스트 없이 다국어 일관성 유지
+- 게스트 나의 여행 누락 복구(P0): 데스크탑 `영수증 모달`에 `공유하기` 버튼을 복원하고, `TripCard` 더보기 메뉴에 `주소 복사`를 재추가해 과거 구현(`c18e704`) 대비 누락된 핵심 액션을 복구
+- 호스트 예약 카드 데스크탑 밀도 보정(P0): 연락처 블록 비노출 정책을 유지하면서 우측 액션 컬럼 상단에 `일정 추가`를 상시 배치해 메시지 영역 상단 공백을 완화
+- 호스트 문의함 높이 가드(P0): `InquiryChat` 데스크탑 컨테이너를 뷰포트 기준 높이로 제한해 대화 레이아웃이 하단 푸터 영역을 침범하던 현상을 완화
+- 데스크탑 모드 전환 체감 개선(P0): `SiteHeader`에 데스크탑 전용 전환 오버레이를 추가하고, `router.prefetch` 후 짧은 전환 애니메이션 동안 라우트를 준비해 애니메이션 종료 후 추가 로딩 체감을 축소
+- 운영 범위 고정(P0): 위 복구/보정은 `md` 이상 웹 레이아웃에 한정하고 모바일(`md` 미만) 카드 구조/메뉴 동선은 변경하지 않음
 - 사용자 화면 번역 키 정합성(P0): `LanguageContext`에 누락 키(`help`, 게스트 프로필 모달/언어 라벨, 체험 수정 탭 키셋 등)를 보강해 `ko/en/ja/zh` 사전 간 누락을 0으로 정렬
 - 번역 연결 보강(P0): `account` 언어 안내문과 `host/experiences/[id]/edit`의 하드코딩 토스트/권한 에러 문구를 `t()` 키로 치환해 언어 전환 시 일관성을 강화
 - 운영 범위 고정(P0): 이번 배치의 번역 정비는 `public/guest/host` 사용자 화면 우선으로 적용하고, Admin 번역 변경은 범위에서 제외

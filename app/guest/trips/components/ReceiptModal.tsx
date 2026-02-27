@@ -1,9 +1,25 @@
 'use client';
 
 import React from 'react';
-import { X, Download, CheckCircle2 } from 'lucide-react';
+import { X, Download, CheckCircle2, Share2 } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext';
 
-export default function ReceiptModal({ trip, onClose }: { trip: any, onClose: () => void }) {
+interface ReceiptTrip {
+  id: number;
+  orderId?: string | number;
+  title: string;
+  date: string;
+  time: string;
+  guests?: number;
+  location?: string;
+  paymentDate?: string;
+  created_at?: string;
+  price?: number;
+  amount?: number;
+}
+
+export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onClose: () => void }) {
+  const { t } = useLanguage();
   if (!trip) return null;
 
   // 🟢 [안전 장치] 데이터가 없으면 빈 문자열 처리 (substring 에러 방지)
@@ -14,6 +30,26 @@ export default function ReceiptModal({ trip, onClose }: { trip: any, onClose: ()
         if (!dateStr) return '-';
         return new Date(dateStr).toLocaleDateString();
     } catch { return '-'; }
+  };
+
+  const orderDisplay = trip.orderId || String(trip.id || '-').slice(0, 15);
+
+  const handleShare = async () => {
+    const shareText = `[Locally] ${trip.title}\n${trip.date} ${trip.time}\n${trip.location || ''}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `Locally #${orderDisplay}`,
+          text: shareText,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+      }
+      alert(t('trip_share_done'));
+    } catch {
+      // 사용자가 공유를 닫은 경우도 여기로 들어올 수 있어 추가 에러 노출 없이 종료
+    }
   };
 
   return (
@@ -32,8 +68,7 @@ export default function ReceiptModal({ trip, onClose }: { trip: any, onClose: ()
           <div className="space-y-3 md:space-y-4">
             <div className="flex justify-between text-[12px] md:text-sm">
               <span className="text-slate-500">주문번호</span>
-              <span className="font-mono font-bold">{trip.orderId || trip.id?.substring(0, 15) || '-'}</span> 
-              {/* 🟢 여기서 trip.id가 없으면 substring 에러 남 -> 옵셔널 체이닝(?.) 사용 */}
+              <span className="font-mono font-bold">{orderDisplay}</span>
             </div>
             <div className="flex justify-between text-[12px] md:text-sm">
               <span className="text-slate-500">상품명</span>
@@ -56,7 +91,16 @@ export default function ReceiptModal({ trip, onClose }: { trip: any, onClose: ()
             <span className="text-[22px] md:text-2xl font-black text-rose-500">₩{Number(trip.price || trip.amount || 0).toLocaleString()}</span>
           </div>
 
-          <button onClick={() => window.print()} className="w-full py-2.5 md:py-3 bg-slate-100 text-slate-600 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm hover:bg-slate-200 flex items-center justify-center gap-1.5 md:gap-2">
+          <div className="hidden md:grid grid-cols-2 gap-2.5">
+            <button onClick={handleShare} className="py-3 bg-black text-white rounded-xl font-bold text-sm hover:bg-slate-800 flex items-center justify-center gap-2">
+              <Share2 className="w-4 h-4" /> {t('trip_share')}
+            </button>
+            <button onClick={() => window.print()} className="py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 flex items-center justify-center gap-2">
+              <Download className="w-4 h-4" /> 영수증 저장하기
+            </button>
+          </div>
+
+          <button onClick={() => window.print()} className="md:hidden w-full py-2.5 bg-slate-100 text-slate-600 rounded-lg font-bold text-[13px] hover:bg-slate-200 flex items-center justify-center gap-1.5">
             <Download className="w-[14px] h-[14px] md:w-4 md:h-4"/> 영수증 저장하기
           </button>
         </div>

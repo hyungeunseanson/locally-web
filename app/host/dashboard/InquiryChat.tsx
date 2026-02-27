@@ -79,7 +79,7 @@ export default function InquiryChat() {
   };
 
   return (
-    <div className="flex gap-0 md:gap-6 h-full w-full relative min-h-0">
+    <div className="flex gap-0 md:gap-6 h-full w-full relative min-h-0 md:h-[min(780px,calc(100vh-220px))]">
       <UserProfileModal
         userId={modalUserId || ''}
         isOpen={!!modalUserId}

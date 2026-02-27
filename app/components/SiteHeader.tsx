@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import Link from 'next/link';
-import { Menu, Globe, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Check, Bell, ShieldCheck } from 'lucide-react';
+import { Menu, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Bell, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
 import dynamic from 'next/dynamic';
 import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만든 파일 불러오기
+import DesktopModeTransition from './DesktopModeTransition';
 
 
 // 🟢 LoginModal 동적 로딩 (SSR false)
@@ -25,6 +26,7 @@ function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdminWhitelisted, setIsAdminWhitelisted] = useState(false);
+  const [desktopTransitionTarget, setDesktopTransitionTarget] = useState<'host' | 'guest' | null>(null);
 
   // 🟢 [핵심] 로컬 상태 대신 전역 AuthContext 사용 (깜빡임 해결)
   const { user, isHost, applicationStatus, isLoading, signOut } = useAuth();
@@ -32,6 +34,7 @@ function SiteHeaderContent() {
 
   const { unreadCount } = useNotification();
   const menuRef = useRef<HTMLElement>(null);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
@@ -50,6 +53,19 @@ function SiteHeaderContent() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    router.prefetch('/account');
+    router.prefetch('/host/dashboard?tab=reservations');
+  }, [router]);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -81,9 +97,23 @@ function SiteHeaderContent() {
     };
   }, [supabase, user?.email]);
 
+  const startDesktopModeTransition = (targetPath: string, targetMode: 'host' | 'guest') => {
+    setIsMenuOpen(false);
+    setDesktopTransitionTarget(targetMode);
+    router.prefetch(targetPath);
+
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+    }
+
+    transitionTimerRef.current = setTimeout(() => {
+      router.push(targetPath);
+    }, 650);
+  };
+
   const handleMainHeaderButtonClick = () => {
     if (pathname?.startsWith('/host')) {
-      router.push('/account');
+      startDesktopModeTransition('/account', 'guest');
     } else {
       router.push('/become-a-host');
     }
@@ -91,12 +121,12 @@ function SiteHeaderContent() {
 
   const handleDropdownMenuClick = () => {
     if (pathname?.startsWith('/host')) {
-      router.push('/account');
+      startDesktopModeTransition('/account', 'guest');
       return;
     }
 
     if (applicationStatus || isHost) {
-      router.push('/host/dashboard?tab=reservations');
+      startDesktopModeTransition('/host/dashboard?tab=reservations', 'host');
     } else {
       router.push('/become-a-host');
     }
@@ -113,6 +143,7 @@ function SiteHeaderContent() {
   return (
     <>
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      {desktopTransitionTarget && <DesktopModeTransition targetMode={desktopTransitionTarget} />}
 
       <header className="hidden md:block sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
