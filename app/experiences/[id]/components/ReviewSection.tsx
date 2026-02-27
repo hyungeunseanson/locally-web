@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Star, X, Reply } from 'lucide-react';
+import { Star, X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 
@@ -42,6 +42,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
   const [reviews, setReviews] = useState<ReviewView[]>([]);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest');
   const [loading, setLoading] = useState(true);
 
   // 🟢 [보안] http 이미지를 https로 강제 변환
@@ -62,6 +63,11 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
   const averageRating = reviews.length > 0 
     ? (reviews.reduce((acc, cur) => acc + cur.rating, 0) / reviews.length).toFixed(2) 
     : "0.0";
+  const sortedReviews = [...reviews].sort((a, b) => {
+    const timeA = new Date(a.created_at).getTime();
+    const timeB = new Date(b.created_at).getTime();
+    return sortOrder === 'latest' ? timeB - timeA : timeA - timeB;
+  });
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -223,74 +229,63 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
 
       {isReviewsExpanded && (
         <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>
-          <div className="bg-white w-full max-w-[760px] h-[74vh] md:h-[82vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-              <h3 className="font-semibold text-[14px] md:text-base flex items-center gap-2">
-                <Star size={15} fill="black"/> {averageRating} (후기 {reviews.length}개)
-              </h3>
-              <button onClick={() => setIsReviewsExpanded(false)} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors"><X size={18}/></button>
+          <div className="w-full max-w-[380px] md:max-w-[760px] h-[86dvh] md:h-[82vh] bg-[#f7f7f7] rounded-[30px] md:rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="px-5 pt-4 pb-2 flex justify-start">
+              <button onClick={() => setIsReviewsExpanded(false)} className="p-1.5 text-slate-600 hover:bg-slate-200 rounded-full transition-colors"><X size={18}/></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
-              <div className="grid grid-cols-1 gap-4">
-                {reviews.map((review) => {
+            <div className="px-5 pb-3">
+              <h3 className="text-[44px] md:text-[38px] font-semibold tracking-[-0.02em] flex items-center gap-1.5">
+                <Star size={32} fill="black" className="mb-1" />
+                {averageRating}
+              </h3>
+              <div className="mt-5 flex items-center justify-between">
+                <p className="text-[34px] md:text-[22px] font-semibold tracking-[-0.01em]">후기 {reviews.length}개</p>
+                <div className="relative">
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value as 'latest' | 'oldest')}
+                    className="appearance-none rounded-full border border-slate-300 bg-white pl-4 pr-8 py-1.5 text-[14px] text-slate-700"
+                  >
+                    <option value="latest">최신순</option>
+                    <option value="oldest">오래된 순</option>
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-[12px]">⌄</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 pb-6">
+              <div className="space-y-0">
+                {sortedReviews.map((review) => {
                   const avatarUrl = secureUrl(review.user?.avatar_url);
 
                   return (
-                    <div key={review.id} className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <article key={review.id} className="border-b border-slate-200 py-5">
                       <div className="flex gap-3">
-                        <div className="w-8 h-8 md:w-9 md:h-9 bg-slate-200 rounded-full overflow-hidden relative shrink-0 border border-slate-100">
+                        <div className="w-10 h-10 bg-slate-200 rounded-full overflow-hidden relative shrink-0 border border-slate-100">
                            {avatarUrl ? (
                              <Image src={avatarUrl} alt="user" fill className="object-cover"/>
                            ) : <div className="w-full h-full bg-slate-300 flex items-center justify-center text-xs text-slate-500">?</div>}
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start mb-1.5">
-                            <div>
-                              <div className="font-semibold text-[12px] md:text-sm text-slate-900">{review.user.name}</div>
-                              <div className="text-[10px] md:text-xs text-slate-500">{formatDate(review.created_at)}</div>
-                            </div>
-                            <div className="flex text-amber-400">
+                          <div>
+                            <div className="font-semibold text-[20px] md:text-[16px] text-slate-900 leading-none">{review.user.name}</div>
+                            <div className="text-[12px] md:text-[11px] text-slate-500 mt-1">게스트</div>
+                            <div className="flex items-center gap-1 text-slate-700 mt-2 mb-2.5">
                               {[...Array(5)].map((_, idx) => (
-                                <Star key={idx} size={11} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-200"}/>
+                                <Star key={idx} size={11} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
                               ))}
+                              <span className="text-[11px] text-slate-500 ml-1">{review.created_at ? `${Math.max(1, Math.floor((Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24)))}일 전` : ''}</span>
                             </div>
+                            <p className="text-[13px] md:text-[13px] text-slate-700 leading-[1.5] whitespace-pre-wrap mb-2">
+                              {review.content}
+                            </p>
                           </div>
-
-                          <p className="text-[12px] md:text-[13px] text-slate-700 leading-relaxed whitespace-pre-wrap mb-3">
-                            {review.content}
-                          </p>
-
-                          {review.photos && review.photos.length > 0 && (
-                            <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
-                              {review.photos.map((photo: string, idx: number) => (
-                                <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 shrink-0">
-                                  <Image src={secureUrl(photo) || photo} alt={`review-img-${idx}`} fill className="object-cover"/>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {review.reply && (
-                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex gap-2.5">
-                               <div className="shrink-0 mt-0.5">
-                                 <Reply size={14} className="text-slate-400 -scale-x-100" />
-                               </div>
-                               <div>
-                                 <div className="flex items-center gap-2 mb-1">
-                                   <span className="text-[11px] md:text-xs font-semibold text-slate-900">호스트의 답글</span>
-                                   <span className="text-[10px] md:text-xs text-slate-400">
-                                     {review.reply_at ? formatDate(review.reply_at) : ''}
-                                   </span>
-                                 </div>
-                                 <p className="text-[11px] md:text-xs text-slate-600 leading-relaxed">{review.reply}</p>
-                               </div>
-                            </div>
-                          )}
                         </div>
                       </div>
-                    </div>
+                    </article>
                   );
                 })}
               </div>

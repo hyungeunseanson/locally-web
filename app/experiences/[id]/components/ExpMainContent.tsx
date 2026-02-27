@@ -46,7 +46,7 @@ type MainContentProps = {
     introduction?: string;
     bio?: string;
   } | null;
-  handleInquiry: () => void;
+  handleInquiry: () => Promise<boolean>;
   inquiryText: string;
   setInquiryText: React.Dispatch<React.SetStateAction<string>>;
   translatedDescription?: string;
@@ -57,7 +57,8 @@ export default function ExpMainContent({
   experience, hostProfile, handleInquiry, inquiryText, setInquiryText, translatedDescription, translatedCategory
 }: MainContentProps) {
   const { showToast } = useToast();
-  const [isInquiryOpen, setIsInquiryOpen] = React.useState(false);
+  const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
+  const [isSubmittingMessage, setIsSubmittingMessage] = React.useState(false);
   const location = experience.meeting_point || experience.location || 'Seoul';
   const itinerary: ItineraryItem[] = Array.isArray(experience.itinerary) ? experience.itinerary : [];
   const photos = Array.isArray(experience.photos) && experience.photos.length > 0
@@ -83,6 +84,22 @@ export default function ExpMainContent({
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(location);
     showToast('주소가 복사되었습니다.', 'success');
+  };
+
+  const openHostMessage = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsMessageModalOpen(true);
+      return;
+    }
+    document.getElementById('inquiry')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const handleSubmitMessage = async () => {
+    if (!inquiryText.trim()) return;
+    setIsSubmittingMessage(true);
+    const success = await handleInquiry();
+    setIsSubmittingMessage(false);
+    if (success) setIsMessageModalOpen(false);
   };
 
   return (
@@ -178,16 +195,11 @@ export default function ExpMainContent({
         intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."}
         joinedYear={hostProfile?.joined_year}
         category={translatedCategory || experience.category || '문화 체험'}
-        onMessageHost={() => {
-          setIsInquiryOpen(true);
-          window.setTimeout(() => {
-            document.getElementById('inquiry')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 0);
-        }}
+        onMessageHost={openHostMessage}
       />
 
       {/* 문의 */}
-      <div id="inquiry" className={`${isInquiryOpen ? 'block' : 'hidden md:block'} pb-2 scroll-mt-24`}>
+      <div id="inquiry" className="hidden md:block pb-2 scroll-mt-24">
         <h3 className="text-[18px] md:text-[20px] font-bold mb-4">호스트에게 문의하기</h3>
         <div className="flex gap-2">
           <input
@@ -263,6 +275,48 @@ export default function ExpMainContent({
           </div>
         </div>
       </div>
+
+      {isMessageModalOpen && (
+        <div className="md:hidden fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end" onClick={() => setIsMessageModalOpen(false)}>
+          <div
+            className="w-full h-[88dvh] bg-[#f7f7f7] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-end mb-2">
+              <button onClick={() => setIsMessageModalOpen(false)} className="p-1.5 text-slate-600">
+                <span className="sr-only">닫기</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <h3 className="text-[24px] font-semibold leading-tight mb-2">{hostProfile?.name || '호스트'} 님에게 질문하기</h3>
+            <p className="text-[13px] text-slate-500 leading-snug mb-5">
+              이 체험에 대해 자세히 알아보려면 호스트에게
+              <span className="underline underline-offset-2 ml-1">메시지를 보내세요.</span>
+            </p>
+            <textarea
+              value={inquiryText}
+              onChange={(e) => setInquiryText(e.target.value)}
+              placeholder="호스트에게 본인을 소개해 보세요."
+              className="w-full h-[130px] rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[14px] text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
+            />
+            <div className="mt-auto">
+              <button
+                onClick={handleSubmitMessage}
+                disabled={!inquiryText.trim() || isSubmittingMessage}
+                className={`w-full rounded-2xl py-3 text-[15px] font-medium ${
+                  !inquiryText.trim() || isSubmittingMessage
+                    ? 'bg-slate-300 text-slate-50'
+                    : 'bg-[#111827] text-white'
+                }`}
+              >
+                {isSubmittingMessage ? '전송 중...' : '메시지 보내기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

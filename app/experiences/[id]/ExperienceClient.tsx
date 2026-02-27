@@ -124,20 +124,31 @@ export default function ExperienceClient({
     setTimeout(() => setIsCopySuccess(false), 3000);
   };
 
-  const handleInquiry = async () => {
-    if (!user) return showToast('로그인이 필요합니다.', 'error');
-    if (!inquiryText.trim()) return showToast('내용을 입력해주세요.', 'error');
+  const handleInquiry = async (): Promise<boolean> => {
+    if (!user) {
+      showToast('로그인이 필요합니다.', 'error');
+      return false;
+    }
+    if (!inquiryText.trim()) {
+      showToast('내용을 입력해주세요.', 'error');
+      return false;
+    }
 
     try {
-      if (!experience?.host_id) return showToast('호스트 정보를 불러올 수 없습니다.', 'error');
+      if (!experience?.host_id) {
+        showToast('호스트 정보를 불러올 수 없습니다.', 'error');
+        return false;
+      }
       await createInquiry(experience.host_id, experience.id, inquiryText);
       if (confirm('문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?')) {
         router.push('/guest/inbox');
       }
       setInquiryText('');
+      return true;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.';
       showToast('문의 전송 실패: ' + message, 'error');
+      return false;
     }
   };
 
@@ -166,13 +177,13 @@ export default function ExperienceClient({
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
 
   return (
-    <div className="min-h-screen bg-[#fafafa] md:bg-white text-slate-900 font-sans pb-0">
+    <div className="min-h-screen bg-white text-slate-900 font-sans pb-0">
       <SiteHeader />
       {isCopySuccess && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400" /> 링크가 복사되었습니다.</div>}
 
       {/* 📱 모바일 전용 상단 헤더 */}
       <div
-        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-[#fafafa]/95 backdrop-blur-sm h-[52px] flex items-center justify-between px-4"
+        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-white/95 backdrop-blur-sm h-[52px] flex items-center justify-between px-4"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -250,7 +261,7 @@ export default function ExperienceClient({
             className="relative w-full aspect-square mb-6 overflow-hidden rounded-[24px] cursor-pointer border border-slate-200"
             onClick={() => setIsGalleryOpen(true)}
           >
-            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-[#fafafa]">
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-white">
               <div className="relative overflow-hidden w-full h-full rounded-tl-[24px]">
                 <Image src={photos[0]} alt="Main" fill className="object-cover" />
               </div>
