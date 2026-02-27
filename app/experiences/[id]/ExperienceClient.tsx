@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft } from 'lucide-react';
+import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Languages, Star } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
@@ -15,10 +15,46 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
 
+type AuthUser = {
+  id?: string;
+} | null;
+
+type ExperienceData = {
+  id: string | number;
+  host_id?: string;
+  title?: string;
+  description?: string;
+  category?: string;
+  meeting_point?: string;
+  location?: string;
+  rating?: number;
+  review_count?: number;
+  price?: number;
+  photos?: string[];
+  image_url?: string;
+  max_guests?: number;
+  duration?: number;
+  [key: string]: unknown;
+};
+
+type HostProfileData = {
+  id?: string;
+  name?: string;
+  avatar_url?: string;
+  languages?: string[];
+  introduction?: string;
+  job?: string;
+  dream_destination?: string;
+  favorite_song?: string;
+  joined_year?: number | null;
+  bio?: string;
+  [key: string]: unknown;
+} | null;
+
 type Props = {
-  initialUser: any;
-  initialExperience: any;
-  initialHostProfile: any;
+  initialUser: AuthUser;
+  initialExperience: ExperienceData;
+  initialHostProfile: HostProfileData;
   initialAvailableDates: string[];
   initialDateToTimeMap: Record<string, string[]>;
   initialRemainingSeatsMap: Record<string, number>;
@@ -55,8 +91,14 @@ export default function ExperienceClient({
 
   // 🟢 [핵심] 제목을 언어에 맞춰서 변환!
   const translatedTitle = getContent(experience, 'title', lang);
+  const translatedDescription = getContent(experience, 'description', lang);
   // 🟢 [핵심] 위치 정보는 아직 번역이 없으므로 한국어 사용 (나중에 location_en 추가 가능)
-  const location = experience.location;
+  const location = experience.meeting_point || experience.location;
+  const category = getContent(experience, 'category', lang) || experience.category || '문화 체험';
+  const compactLocation = location?.split(',')?.[0]?.trim() || 'Locally';
+  const headerLabel = `${compactLocation} · ${category}`;
+  const ratingText = experience.rating > 0 ? experience.rating.toFixed(2) : 'New';
+  const reviewCount = Number(experience.review_count || 0);
 
   // 🟢 체험 상세페이지 진입 시 조회(view) 이벤트 기록
   React.useEffect(() => {
@@ -93,8 +135,9 @@ export default function ExperienceClient({
         router.push('/guest/inbox');
       }
       setInquiryText('');
-    } catch (e: any) {
-      showToast('문의 전송 실패: ' + e.message, 'error');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.';
+      showToast('문의 전송 실패: ' + message, 'error');
     }
   };
 
@@ -123,15 +166,19 @@ export default function ExperienceClient({
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans pb-0">
+    <div className="min-h-screen bg-[#f5f5f5] md:bg-white text-slate-900 font-sans pb-0">
       <SiteHeader />
       {isCopySuccess && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400" /> 링크가 복사되었습니다.</div>}
 
-      {/* 📱 모바일 전용: 에어비앤비 스타일 스티키 헤더 */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm h-12 flex items-center justify-between px-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      {/* 📱 모바일 전용 상단 헤더 */}
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-[#f5f5f5]/95 backdrop-blur-sm h-14 flex items-center justify-between px-4"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={20} className="text-slate-900" />
         </button>
+        <p className="absolute left-1/2 -translate-x-1/2 text-[12px] font-semibold text-slate-500 truncate max-w-[58%]">{headerLabel}</p>
         <div className="flex items-center gap-1">
           <button onClick={handleShare} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <Share size={18} className="text-slate-900" />
@@ -142,15 +189,15 @@ export default function ExperienceClient({
         </div>
       </div>
 
-      <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-14 md:pt-8 pb-8 md:py-8">
+      <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-[66px] md:pt-8 pb-8 md:py-8">
         <section className="hidden md:block mb-6">
-          {/* 🟢 변환된 제목 표시 */}
+          <p className="text-sm font-semibold text-slate-500 mb-2">{headerLabel}</p>
           <h1 className="text-3xl font-black mb-2 tracking-tight">{translatedTitle}</h1>
           <div className="flex justify-between items-end">
             <div className="flex items-center gap-4 text-sm font-medium text-slate-800">
               <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
-                <span className="font-bold">★ {experience.rating > 0 ? experience.rating.toFixed(2) : 'New'}</span>
-                {experience.review_count > 0 && <span className="text-slate-500 underline">후기 {experience.review_count}개</span>}
+                <span className="font-bold">★ {ratingText}</span>
+                {reviewCount > 0 && <span className="text-slate-500 underline">후기 {reviewCount}개</span>}
               </button>
               <span className="text-slate-300">|</span>
               <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700"><MapPin size={14} /> {location}</button>
@@ -197,34 +244,89 @@ export default function ExperienceClient({
           </button>
         </section>
 
-        {/* 모바일 벤토 그리드 사진 (md:hidden) */}
-        <section className="md:hidden relative w-full aspect-square mb-8 overflow-hidden rounded-[24px] cursor-pointer shadow-sm border border-slate-100" onClick={() => setIsGalleryOpen(true)}>
-          <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1.5 bg-slate-100">
-            <div className="relative overflow-hidden w-full h-full">
-              <Image src={photos[0]} alt="Main" fill className="object-cover" />
-            </div>
-            <div className="relative overflow-hidden w-full h-full">
-              <Image src={photos[1] || photos[0]} alt="Sub 1" fill className="object-cover" />
-            </div>
-            <div className="relative overflow-hidden w-full h-full">
-              <Image src={photos[2] || photos[0]} alt="Sub 2" fill className="object-cover" />
-            </div>
-            <div className="relative overflow-hidden w-full h-full">
-              <Image src={photos[3] || photos[0]} alt="Sub 3" fill className="object-cover" />
-              <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm p-2 rounded-full shadow border border-slate-100 z-10 text-slate-800">
-                <Copy size={16} className="rotate-90" />
+        {/* 모바일 상단 소개 블록 */}
+        <section className="md:hidden">
+          <div
+            className="relative w-full aspect-square mb-7 overflow-hidden rounded-[24px] cursor-pointer border border-slate-200"
+            onClick={() => setIsGalleryOpen(true)}
+          >
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-[#f5f5f5]">
+              <div className="relative overflow-hidden w-full h-full rounded-tl-[24px]">
+                <Image src={photos[0]} alt="Main" fill className="object-cover" />
+              </div>
+              <div className="relative overflow-hidden w-full h-full rounded-tr-[24px]">
+                <Image src={photos[1] || photos[0]} alt="Sub 1" fill className="object-cover" />
+              </div>
+              <div className="relative overflow-hidden w-full h-full rounded-bl-[24px]">
+                <Image src={photos[2] || photos[0]} alt="Sub 2" fill className="object-cover" />
+              </div>
+              <div className="relative overflow-hidden w-full h-full rounded-br-[24px]">
+                <Image src={photos[3] || photos[0]} alt="Sub 3" fill className="object-cover" />
               </div>
             </div>
+            <div className="absolute bottom-4 right-4 bg-white p-2.5 rounded-full shadow-[0_3px_10px_rgba(0,0,0,0.15)] border border-slate-200 z-10 text-slate-800">
+              <Copy size={16} className="rotate-90" />
+            </div>
+          </div>
+
+          <div className="text-center px-2">
+            <h1 className="text-[38px] leading-[1.12] font-extrabold tracking-[-0.01em] mb-4">{translatedTitle}</h1>
+            <p className="text-[16px] leading-[1.42] text-slate-600 font-medium mb-5 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
+            <div className="flex items-center justify-center gap-2 text-[18px] font-bold mb-2">
+              <Star size={18} fill="black" className="mb-[1px]" />
+              <span>{ratingText}</span>
+              <span className="text-slate-400">·</span>
+              <button onClick={() => scrollToSection('reviews')} className="underline underline-offset-2">
+                후기 {reviewCount}개
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-[14px] text-slate-500 mb-7">
+              <Languages size={16} />
+              <span>자동 번역됨</span>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-5">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center">
+                {hostProfile?.avatar_url ? (
+                  <img src={hostProfile.avatar_url} className="w-full h-full object-cover" alt="Host" />
+                ) : (
+                  <span className="text-slate-400 text-sm font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[15px] font-bold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
+                <p className="text-[14px] text-slate-500 truncate">{hostProfile?.job || category}</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => scrollToSection('location')}
+              className="mt-5 w-full text-left flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+            >
+              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                <MapPin size={18} className="text-slate-700" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold truncate">{location}</p>
+                <p className="text-[13px] text-slate-500 truncate">{experience.location || compactLocation}</p>
+              </div>
+            </button>
+
+            <div className="mt-6 border-b border-slate-200" />
           </div>
         </section>
 
-        <div className="flex flex-col md:flex-row gap-16 relative">
+        <div className="flex flex-col md:flex-row gap-10 md:gap-16 relative">
           <ExpMainContent
             experience={experience}
             hostProfile={hostProfile}
             handleInquiry={handleInquiry}
             inquiryText={inquiryText}
             setInquiryText={setInquiryText}
+            translatedDescription={translatedDescription}
+            translatedCategory={category}
           />
           <ExpSidebar
             experience={experience}
