@@ -49,22 +49,22 @@ export default function GuestTripsPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-16">
-        <div className="md:hidden mb-3">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-5 md:py-16">
+        <div className="md:hidden mb-2.5">
           <button
             onClick={handleMobileBack}
-            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+            className="h-8 w-8 md:h-9 md:w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
             aria-label="뒤로가기"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft className="w-[14px] h-[14px] md:w-4 md:h-4" />
           </button>
         </div>
 
-        <h1 className="text-[20px] md:text-4xl font-extrabold mb-4 md:mb-12 mt-2 md:mt-0 tracking-tight leading-tight text-slate-900">{t('my_trips')}</h1>
+        <h1 className="text-[18px] md:text-4xl font-extrabold mb-3 md:mb-12 mt-1.5 md:mt-0 tracking-tight leading-tight text-slate-900">{t('my_trips')}</h1>
 
         {errorMsg && (
-          <div className="bg-red-50 text-red-600 p-4 mb-6 md:mb-8 rounded-xl flex items-center gap-3 text-sm font-medium">
-            <AlertCircle size={20} />
+          <div className="bg-red-50 text-red-600 p-3 md:p-4 mb-5 md:mb-8 rounded-lg md:rounded-xl flex items-center gap-2 md:gap-3 text-[13px] md:text-sm font-medium">
+            <AlertCircle className="w-[18px] h-[18px] md:w-5 md:h-5" />
             <span>{t('error_prefix')} {errorMsg}</span>
           </div>
         )}
@@ -72,16 +72,16 @@ export default function GuestTripsPage() {
         {/* 📱 모바일 전용: 스크롤 레이아웃 (예정 위, 지난 여행 아래) */}
         <div className="md:hidden">
           {/* ── 예정된 여행 ── */}
-          <div className="flex flex-col gap-4 mb-8">
+          <div className="flex flex-col gap-3 mb-6">
             {upcomingTrips.length > 0 ? (
               upcomingTrips.map((trip: any) => (
                 <TripCard key={trip.id} trip={trip} onRequestCancel={requestCancel} isProcessing={isProcessing} onOpenReceipt={openReceipt} />
               ))
             ) : (
-              <div className="border border-dashed border-slate-200 rounded-2xl py-12 text-center flex flex-col items-center justify-center bg-slate-50/50">
-                <Ghost className="text-slate-300 mb-3" size={24} />
-                <p className="text-[13px] font-medium text-slate-700 mb-1">{t('trip_empty_title')}</p>
-                <Link href="/" className="text-[12px] text-slate-400 hover:text-black underline underline-offset-4">{t('explore_exp')}</Link>
+              <div className="border border-dashed border-slate-200 rounded-xl md:rounded-2xl py-10 md:py-12 text-center flex flex-col items-center justify-center bg-slate-50/50">
+                <Ghost className="text-slate-300 mb-2.5 md:mb-3 w-5 h-5 md:w-6 md:h-6" />
+                <p className="text-[12px] md:text-[13px] font-medium text-slate-700 mb-1">{t('trip_empty_title')}</p>
+                <Link href="/" className="text-[11px] md:text-[12px] text-slate-400 hover:text-black underline underline-offset-4">{t('explore_exp')}</Link>
               </div>
             )}
           </div>
@@ -89,12 +89,12 @@ export default function GuestTripsPage() {
           {/* ── 지난 여행 ── */}
           {pastTrips.length > 0 && (
             <>
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-1.5 md:gap-2 mb-3">
                 <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{t('trip_past')}</span>
+                <span className="text-[10px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{t('trip_past')}</span>
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2.5 md:space-y-3">
                 {pastTrips.map((trip: any) => (
                   <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
                 ))}

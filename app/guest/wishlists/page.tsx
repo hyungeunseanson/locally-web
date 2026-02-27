@@ -79,30 +79,30 @@ export default function WishlistsPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      <main className="max-w-[1760px] mx-auto px-4 md:px-6 py-6 md:py-12">
-        <div className="md:hidden mb-3">
+      <main className="max-w-[1760px] mx-auto px-4 md:px-6 py-5 md:py-12">
+        <div className="md:hidden mb-2.5">
           <button
             onClick={handleMobileBack}
-            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+            className="h-8 w-8 md:h-9 md:w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
             aria-label="뒤로가기"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft className="w-[14px] h-[14px] md:w-4 md:h-4" />
           </button>
         </div>
 
-        <h1 className="text-[20px] md:text-3xl font-black mb-4 md:mb-8">{t('wishlist')}</h1>
+        <h1 className="text-[18px] md:text-3xl font-black mb-3 md:mb-8">{t('wishlist')}</h1>
         {loading ? (
-          <div className="flex justify-center py-40">
+          <div className="flex justify-center py-28 md:py-40">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
           </div>
         ) : wishlists.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50">
-            <Heart size={48} className="text-slate-300 mb-4" />
-            <h3 className="text-lg font-bold text-slate-900 mb-2">{t('wishlist_empty')}</h3> {/* 🟢 번역 */}
-            <p className="text-slate-500 mb-6">{t('wishlist_desc')}</p> {/* 🟢 번역 */}
+          <div className="flex flex-col items-center justify-center py-14 md:py-20 border-2 border-dashed border-slate-100 rounded-2xl md:rounded-3xl bg-slate-50">
+            <Heart className="w-10 h-10 md:w-12 md:h-12 text-slate-300 mb-3 md:mb-4" />
+            <h3 className="text-[16px] md:text-lg font-bold text-slate-900 mb-1.5 md:mb-2">{t('wishlist_empty')}</h3> {/* 🟢 번역 */}
+            <p className="text-[13px] md:text-base text-slate-500 mb-5 md:mb-6 text-center px-3">{t('wishlist_desc')}</p> {/* 🟢 번역 */}
             <Link href="/">
-              <button className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:scale-105 transition-transform flex items-center gap-2">
-                {t('explore_exp')} <ArrowRight size={18} /> {/* 🟢 번역 */}
+              <button className="bg-black text-white px-5 md:px-6 py-2.5 md:py-3 rounded-lg md:rounded-xl text-[13px] md:text-sm font-bold hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2">
+                {t('explore_exp')} <ArrowRight className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {/* 🟢 번역 */}
               </button>
             </Link>
           </div>
@@ -114,7 +114,7 @@ export default function WishlistsPage() {
 
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
-                  <div className="relative aspect-square overflow-hidden rounded-xl bg-slate-200 mb-2 border border-transparent group-hover:shadow-md transition-shadow">
+                  <div className="relative aspect-square overflow-hidden rounded-lg md:rounded-xl bg-slate-200 mb-1.5 md:mb-2 border border-transparent group-hover:shadow-md transition-shadow">
                     <Image
                       src={imageUrl}
                       alt={exp.title}
@@ -124,24 +124,24 @@ export default function WishlistsPage() {
                     {/* 찜 해제 버튼 */}
                     <button
                       onClick={(e) => handleRemove(e, item.id, exp.id)}
-                      className="absolute top-2 right-2 text-rose-500 hover:scale-110 transition-all z-10"
+                      className="absolute top-1.5 md:top-2 right-1.5 md:right-2 text-rose-500 hover:scale-110 transition-all z-10"
                     >
-                      <Heart size={18} fill="#F43F5E" strokeWidth={2} />
+                      <Heart className="w-4 h-4 md:w-[18px] md:h-[18px]" fill="#F43F5E" strokeWidth={2} />
                     </button>
                   </div>
 
                   <div className="space-y-0.5 px-0.5">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-slate-900 text-[12px] truncate pr-1">{exp.city || exp.location || '서울'} · {exp.category}</h3>
-                      <div className="flex items-center gap-0.5 text-[11px] shrink-0">
-                        <Star size={11} fill={exp.rating > 0 ? "black" : "none"} className={exp.rating > 0 ? "" : "text-slate-300"} />
+                      <h3 className="font-semibold text-slate-900 text-[11px] md:text-[12px] truncate pr-1">{exp.city || exp.location || '서울'} · {exp.category}</h3>
+                      <div className="flex items-center gap-0.5 text-[10px] md:text-[11px] shrink-0">
+                        <Star className={`w-[10px] h-[10px] md:w-[11px] md:h-[11px] ${exp.rating > 0 ? "" : "text-slate-300"}`} fill={exp.rating > 0 ? "black" : "none"} />
                         <span>{exp.rating > 0 ? exp.rating.toFixed(1) : "New"}</span>
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 line-clamp-1">{exp.title}</p>
+                    <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{exp.title}</p>
                     <div className="mt-0.5">
-                      <span className="font-bold text-slate-900 text-[12px]">₩{Number(exp.price).toLocaleString()}</span>
-                      <span className="text-[11px] text-slate-500 font-normal"> {t('per_person')}</span>
+                      <span className="font-bold text-slate-900 text-[11px] md:text-[12px]">₩{Number(exp.price).toLocaleString()}</span>
+                      <span className="text-[10px] md:text-[11px] text-slate-500 font-normal"> {t('per_person')}</span>
                     </div>
                   </div>
                 </Link>

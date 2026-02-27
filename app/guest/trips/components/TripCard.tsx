@@ -131,10 +131,10 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
 
   return (
     <>
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64 relative">
+      <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64 relative">
         
         {/* 왼쪽: 이미지 섹션 */}
-        <div className="w-full md:w-72 h-56 md:h-full relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide">
+        <div className="w-full md:w-72 h-48 md:h-full relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide">
            <Link href={`/experiences/${trip.expId}`} className="block w-full h-full relative">
              <Image 
                src={photos[currentPhotoIndex]} 
@@ -145,35 +145,35 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
            </Link>
 
            {trip.isPrivate && (
-              <div className="absolute top-3 right-3 z-10 bg-black/80 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 backdrop-blur-sm">
-                 <Lock size={10}/> PRIVATE
+              <div className="absolute top-2.5 md:top-3 right-2.5 md:right-3 z-10 bg-black/80 text-white text-[10px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded-full flex items-center gap-1 backdrop-blur-sm">
+                 <Lock className="w-[10px] h-[10px]"/> PRIVATE
               </div>
            )}
 
-           <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm backdrop-blur-md ${color}`}>
+           <div className={`absolute top-2.5 md:top-3 left-2.5 md:left-3 px-2 md:px-2.5 py-0.5 md:py-1 rounded-full text-[11px] md:text-xs font-bold flex items-center gap-1 md:gap-1.5 shadow-sm backdrop-blur-md ${color}`}>
               {icon} {label}
            </div>
 
            {photos.length > 1 && (
              <>
-               <button onClick={prevPhoto} disabled={currentPhotoIndex === 0} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/80 hover:bg-white text-slate-800 disabled:opacity-0 transition-all opacity-0 group-hover/slide:opacity-100 shadow-sm"><ChevronLeft size={16}/></button>
-               <button onClick={nextPhoto} disabled={currentPhotoIndex === photos.length - 1} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/80 hover:bg-white text-slate-800 disabled:opacity-0 transition-all opacity-0 group-hover/slide:opacity-100 shadow-sm"><ChevronRight size={16}/></button>
+               <button onClick={prevPhoto} disabled={currentPhotoIndex === 0} className="absolute left-2 top-1/2 -translate-y-1/2 p-1 md:p-1.5 rounded-full bg-white/80 hover:bg-white text-slate-800 disabled:opacity-0 transition-all opacity-0 group-hover/slide:opacity-100 shadow-sm"><ChevronLeft className="w-[14px] h-[14px] md:w-4 md:h-4"/></button>
+               <button onClick={nextPhoto} disabled={currentPhotoIndex === photos.length - 1} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 md:p-1.5 rounded-full bg-white/80 hover:bg-white text-slate-800 disabled:opacity-0 transition-all opacity-0 group-hover/slide:opacity-100 shadow-sm"><ChevronRight className="w-[14px] h-[14px] md:w-4 md:h-4"/></button>
              </>
            )}
         </div>
 
         {/* 오른쪽: 정보 섹션 */}
-        <div className="flex-1 p-5 md:p-6 flex flex-col justify-between">
+        <div className="flex-1 p-4 md:p-6 flex flex-col justify-between">
            <div>
-             <div className="flex justify-between items-start mb-2">
+             <div className="flex justify-between items-start mb-1.5 md:mb-2">
                 <div className="flex flex-col gap-1">
-                   <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                   <div className="flex items-center gap-1.5 md:gap-2 text-[10px] text-slate-400">
                    <span className="font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">#{trip.orderId}</span>
                      <span>{t('paid_label')} {formatPaymentDate(trip.paymentDate || trip.created_at)}</span>
                    </div>
                    
-                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mt-1">
-                      <MapPin size={12}/> {trip.location || 'SEOUL'}
+                   <div className="text-[11px] md:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 md:gap-2 mt-0.5 md:mt-1">
+                      <MapPin className="w-[11px] h-[11px] md:w-3 md:h-3"/> {trip.location || 'SEOUL'}
                    </div>
                 </div>
                 
@@ -181,23 +181,23 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
                 <div className="relative">
                    <button 
                      onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} 
-                     className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors"
+                     className="p-1.5 md:p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors"
                    >
-                      <MoreHorizontal size={20}/>
+                      <MoreHorizontal className="w-[18px] h-[18px] md:w-5 md:h-5"/>
                    </button>
                    
                    {isMenuOpen && (
                      <>
                        <div className="fixed inset-0 z-30" onClick={() => setIsMenuOpen(false)}></div>
                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 origin-top-right">
-                          <button onClick={addToCalendar} className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_add_calendar')}</button> {/* 🟢 교체 */}
-                          <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_view_again')}</button>   {/* 🟢 교체 */}
+                          <button onClick={addToCalendar} className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_add_calendar')}</button> {/* 🟢 교체 */}
+                          <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_view_again')}</button>   {/* 🟢 교체 */}
                           <div className="h-px bg-slate-100 my-1"></div>
                           
                           {(trip.status !== 'cancelled' && trip.status !== 'cancellation_requested') ? (
                             <button 
                               onClick={handleCancelClick} // 🟢 클릭 시 환불 계산 후 모달 오픈
-                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 text-red-500 font-medium"
+                              className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-red-50 text-red-500 font-medium"
                             >
 {t('trip_cancel_req')} {/* 🟢 교체 */}
 </button>
@@ -212,41 +212,41 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
                 </div>
              </div>
 
-             <Link href={`/experiences/${trip.expId}`} className="block group-hover:text-rose-500 transition-colors mt-2">
-                <h3 className="text-lg md:text-xl font-bold text-slate-900 mb-2 leading-tight line-clamp-2">{trip.title}</h3>
+             <Link href={`/experiences/${trip.expId}`} className="block group-hover:text-rose-500 transition-colors mt-1.5 md:mt-2">
+                <h3 className="text-[15px] md:text-xl font-bold text-slate-900 mb-1.5 md:mb-2 leading-tight line-clamp-2">{trip.title}</h3>
              </Link>
 
-             <div className="flex flex-wrap gap-3 text-sm text-slate-600 mt-2">
-                <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                   <Calendar size={14} className="text-slate-400"/>
+             <div className="flex flex-wrap gap-2 md:gap-3 text-[12px] md:text-sm text-slate-600 mt-1.5 md:mt-2">
+                <div className="flex items-center gap-1.5 bg-slate-50 px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg border border-slate-100">
+                   <Calendar className="w-[13px] h-[13px] md:w-[14px] md:h-[14px] text-slate-400"/>
                    <span className="font-semibold text-slate-900">{trip.date}</span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                   <Clock size={14} className="text-slate-400"/>
+                <div className="flex items-center gap-1.5 bg-slate-50 px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg border border-slate-100">
+                   <Clock className="w-[13px] h-[13px] md:w-[14px] md:h-[14px] text-slate-400"/>
                    <span className="font-semibold text-slate-900">{trip.time}</span>
                 </div>
              </div>
            </div>
 
            {/* 하단 3버튼 */}
-           <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-2">
+           <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 grid grid-cols-3 gap-1.5 md:gap-2">
               <button 
                 onClick={() => router.push(`/guest/inbox?hostId=${trip.hostId}`)} 
-                className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
+                className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
               >
-<MessageSquare size={14}/> {t('messages')} {/* 🟢 교체 */}
+<MessageSquare className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]"/> {t('messages')} {/* 🟢 교체 */}
 </button>
               <button 
                 onClick={() => openExternalLink(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`)}
-                className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
+                className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
               >
-<Map size={14}/> {t('trip_map')} {/* 🟢 교체 */}
+<Map className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]"/> {t('trip_map')} {/* 🟢 교체 */}
 </button>
               <button 
                 onClick={() => onOpenReceipt(trip)}
-                className="py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
+                className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
               >
-<Receipt size={14}/> {t('receipt')} {/* 🟢 교체 */}
+<Receipt className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]"/> {t('receipt')} {/* 🟢 교체 */}
 </button>
            </div>
         </div>

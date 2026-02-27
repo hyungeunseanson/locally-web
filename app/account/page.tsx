@@ -332,35 +332,35 @@ export default function AccountPage() {
 
       <div className="md:hidden pb-28">
         {/* ── 헤더: "프로필" 타이틀 + 알림 벨 ── */}
-        <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-3">
-          <h1 className="text-[22px] font-extrabold tracking-tight text-gray-900">프로필</h1>
-          <a href="/notifications" className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100">
-            <Bell size={17} className="text-gray-600" />
+        <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-2.5">
+          <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">프로필</h1>
+          <a href="/notifications" className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+            <Bell className="w-4 h-4 text-gray-600" />
           </a>
         </div>
 
         {/* ── 프로필 카드 (이미지 3) ── */}
         <button
           onClick={() => setShowProfileView(true)}
-          className="mx-5 mb-5 w-[calc(100%-40px)] bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex items-end gap-5 text-left active:scale-[0.98] transition-transform"
+          className="mx-4 mb-4 w-[calc(100%-32px)] bg-white border border-gray-100 rounded-xl md:rounded-2xl shadow-sm p-4 flex items-end gap-4 text-left active:scale-[0.98] transition-transform"
         >
           {/* 좌측: 아바타 + 인증 배지 + 이름/도시 */}
           <div className="flex flex-col items-center shrink-0">
             <div className="relative mb-2">
-              <div className="w-[72px] h-[72px] rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-md">
+              <div className="w-[64px] h-[64px] rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-md">
                 {profile.avatar_url
                   ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
                   : <div className="w-full h-full flex items-center justify-center">
-                    <User size={28} className="text-gray-400" />
+                    <User className="w-6 h-6 text-gray-400" />
                   </div>
                 }
               </div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF385C] flex items-center justify-center border-2 border-white">
-                <ShieldCheck size={11} className="text-white" strokeWidth={2.5} />
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#FF385C] flex items-center justify-center border-2 border-white">
+                <ShieldCheck className="w-[10px] h-[10px] text-white" strokeWidth={2.5} />
               </div>
             </div>
-            <p className="text-[16px] font-bold text-gray-900 text-center leading-snug">{profile.full_name || '이름 없음'}</p>
-            <p className="text-[9px] text-gray-400 mt-0.5">
+            <p className="text-[14px] font-bold text-gray-900 text-center leading-snug">{profile.full_name || '이름 없음'}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">
               {profile.nationality
                 ? countries.find(c => c.code === profile.nationality)?.name?.split(' (')[0] || profile.nationality
                 : '로컬리 회원'}
@@ -371,62 +371,62 @@ export default function AccountPage() {
           <div className="w-px self-stretch bg-gray-100 mx-1" />
 
           {/* 우측: 통계 3개 */}
-          <div className="flex-1 flex flex-col gap-2">
+          <div className="flex-1 flex flex-col gap-1.5">
             <div>
               <p className="text-[8px] text-gray-400 leading-none mb-0.5">Locally를 통한 여행</p>
-              <p className="text-[13px] font-bold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[10px] font-semibold">회</span></p>
+              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[9px] font-semibold">회</span></p>
             </div>
             <div className="border-t border-gray-100" />
             <div>
               <p className="text-[8px] text-gray-400 leading-none mb-0.5">후기</p>
-              <p className="text-[13px] font-bold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[10px] font-semibold">개</span></p>
+              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[9px] font-semibold">개</span></p>
             </div>
             <div className="border-t border-gray-100" />
             <div>
               <p className="text-[8px] text-gray-400 leading-none mb-0.5">Locally 가입 기간</p>
-              <p className="text-[13px] font-bold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[10px] font-semibold">년</span></p>
+              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[9px] font-semibold">년</span></p>
             </div>
           </div>
         </button>
 
         {/* ── 메뉴 그룹 1: 기본 메뉴 ── */}
-        <div className="px-5">
-          <MobileMenuItem icon={<MessageSquare size={17} />} label="메시지" href="/guest/inbox" />
-          <MobileMenuItem icon={<Smile size={17} />} label="나의 여행" href="/guest/trips" />
-          <MobileMenuItem icon={<Star size={17} />} label="위시리스트" href="/guest/wishlists" />
+        <div className="px-4">
+          <MobileMenuItem icon={<MessageSquare className="w-4 h-4" />} label="메시지" href="/guest/inbox" />
+          <MobileMenuItem icon={<Smile className="w-4 h-4" />} label="나의 여행" href="/guest/trips" />
+          <MobileMenuItem icon={<Star className="w-4 h-4" />} label="위시리스트" href="/guest/wishlists" />
         </div>
 
-        <div className="my-4 mx-5 border-t border-gray-100" />
+        <div className="my-3.5 mx-4 border-t border-gray-100" />
 
         {/* ── 메뉴 그룹 2: 설정 ── */}
-        <div className="px-5">
-          <MobileMenuItem icon={<Settings size={17} />} label="계정 관리" href="#" onClick={(e) => { e.preventDefault(); setShowProfileView(true); }} />
-          {isAdminWhitelisted && <MobileMenuItem icon={<Shield size={17} />} label="Admin" href="/admin/dashboard" />}
-          <MobileMenuItem icon={<Users size={17} />} label="호스트 되기" href="/become-a-host" />
-          <MobileMenuItem icon={<HelpCircle size={17} />} label="도움말 센터" href="/help" />
+        <div className="px-4">
+          <MobileMenuItem icon={<Settings className="w-4 h-4" />} label="계정 관리" href="#" onClick={(e) => { e.preventDefault(); setShowProfileView(true); }} />
+          {isAdminWhitelisted && <MobileMenuItem icon={<Shield className="w-4 h-4" />} label="Admin" href="/admin/dashboard" />}
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="호스트 되기" href="/become-a-host" />
+          <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label="도움말 센터" href="/help" />
         </div>
 
-        <div className="my-4 mx-5 border-t border-gray-100" />
+        <div className="my-3.5 mx-4 border-t border-gray-100" />
 
         {/* ── 메뉴 그룹 3: Locally & 커뮤니티 ── */}
-        <div className="px-5">
-          <MobileMenuItem icon={<FileText size={17} />} label="로컬리 소개" href="/about" />
-          <MobileMenuItem icon={<Bell size={17} />} label="공지사항" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('notices'); }} />
-          <MobileMenuItem icon={<Users size={17} />} label="커뮤니티" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('community'); }} />
-          <MobileMenuItem icon={<BookOpen size={17} />} label="뉴스" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('news'); }} />
-          <MobileMenuItem icon={<Globe size={17} />} label="소셜 미디어" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('social'); }} />
+        <div className="px-4">
+          <MobileMenuItem icon={<FileText className="w-4 h-4" />} label="로컬리 소개" href="/about" />
+          <MobileMenuItem icon={<Bell className="w-4 h-4" />} label="공지사항" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('notices'); }} />
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('community'); }} />
+          <MobileMenuItem icon={<BookOpen className="w-4 h-4" />} label="뉴스" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('news'); }} />
+          <MobileMenuItem icon={<Globe className="w-4 h-4" />} label="소셜 미디어" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('social'); }} />
         </div>
 
-        <div className="my-4 mx-5 border-t border-gray-100" />
+        <div className="my-3.5 mx-4 border-t border-gray-100" />
 
         {/* ── 로그아웃 ── */}
-        <div className="px-5 pb-4">
+        <div className="px-4 pb-4">
           <button
             onClick={async () => {
               await supabase.auth.signOut();
               router.push('/');
             }}
-            className="text-[13px] font-semibold text-gray-500 py-1"
+            className="text-[12px] font-semibold text-gray-500 py-1"
           >
             로그아웃
           </button>
@@ -437,10 +437,10 @@ export default function AccountPage() {
       <div className="md:hidden fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none">
         <button
           onClick={() => setShowHostTransition(true)}
-          className="pointer-events-auto flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-lg text-[13px] font-semibold active:scale-95 transition-transform"
+          className="pointer-events-auto flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2.5 rounded-full shadow-lg text-[12px] font-semibold active:scale-95 transition-transform"
         >
           호스트 모드로 전환
-          <ChevronRight size={15} strokeWidth={2.5} />
+          <ChevronRight className="w-[14px] h-[14px]" strokeWidth={2.5} />
         </button>
       </div>
 
@@ -921,7 +921,7 @@ function MobileMenuItem({
   const inner = (
     <>
       <span className="text-gray-500 shrink-0">{icon}</span>
-      <span className="flex-1 text-[13px] font-medium text-gray-800">{label}</span>
+      <span className="flex-1 text-[12px] font-medium text-gray-800">{label}</span>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
         <path d="M9 18l6-6-6-6" />
       </svg>
@@ -932,7 +932,7 @@ function MobileMenuItem({
     return (
       <button
         onClick={onClick}
-        className="w-full flex items-center gap-3.5 py-3.5 border-b border-gray-100 text-left"
+        className="w-full flex items-center gap-3 py-3 border-b border-gray-100 text-left"
       >
         {inner}
       </button>
@@ -940,7 +940,7 @@ function MobileMenuItem({
   }
 
   return (
-    <Link href={href} className="flex items-center gap-3.5 py-3.5 border-b border-gray-100">
+    <Link href={href} className="flex items-center gap-3 py-3 border-b border-gray-100">
       {inner}
     </Link>
   );
