@@ -95,7 +95,7 @@ function SiteHeaderContent() {
     }
 
     if (applicationStatus || isHost) {
-      router.push('/host/menu');
+      router.push('/host/dashboard?tab=reservations');
     } else {
       router.push('/become-a-host');
     }

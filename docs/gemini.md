@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P1-8 Global Local Font Migration: Inter + IBM Plex Sans KR)  
-**Version:** 3.2.26 (P1-8 Global Local Font Migration: Inter + IBM Plex Sans KR)  
+**Last Updated:** 2026-02-27 (P1-9 Desktop Host Switch Regression Hotfix)  
+**Version:** 3.2.27 (P1-9 Desktop Host Switch Regression Hotfix)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -103,6 +103,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 링크 오픈 정책: 사용자/호스트 주요 화면의 `window.open`/`target="_blank"` 제거, 동일 탭 이동으로 통일 (소셜 미디어 선택 모달 구조는 유지)
 - Host 모바일 폼 동기화: `새 체험 등록` 종료(X) 및 완료 CTA를 `체험 관리 탭`으로 고정하고, 생성/수정 상단 헤더 레이아웃을 일정 수정 화면 패턴과 정렬
 - 모드 전환 목적지 재동기화: 게스트의 “호스트 모드로 전환” 동작은 `/host/menu`로 연결하고, 호스트→게스트는 `/account`로 유지
+- 데스크탑 호스트 전환 회귀 수정(P1-9): `SiteHeader` 드롭다운의 호스트 전환 목적지를 `/host/menu`에서 `/host/dashboard?tab=reservations`로 복원해 데스크탑에서 모바일 메뉴로 이동되던 경로를 차단
+- 모드 전환 경로 가드(P1-9): `/host/menu`는 모바일 메뉴/모바일 뒤로가기 fallback 전용으로 유지하고, 데스크탑 헤더 모드 전환에서는 사용하지 않음
 - 새 체험 등록 UX 보정: 모바일/데스크탑 공통으로 스텝 타이포·간격·입력 영역 밀도를 축소해 한 화면 가독성 우선 레이아웃으로 재정렬
 - 새 체험 등록 스텝 검증: Step 1~6 필수 입력 검증을 추가해 누락 시 다음 단계(또는 등록) 진행 차단 + 토스트 피드백 적용
 - 체험 운영 알림 톤 통일: 일정 관리/체험 수정 화면의 브라우저 alert 기반 오류 안내를 가능한 범위에서 토스트 피드백으로 전환
@@ -230,3 +232,4 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 이 문서는 “현재 유효한 구현 기준”만 유지한다.
 - 중복/과장/과거 상세 로그는 누적하지 않는다.
 - 대규모 변경 시 이 문서에는 결정사항만 요약하고, 상세 이력은 별도 문서 또는 커밋에 남긴다.
+- 모바일 전용 경로(`'/host/menu'` 등)는 데스크탑 전환/네비게이션의 기본 목적지로 사용하지 않는다.
