@@ -401,99 +401,6 @@ export default function MobileSearchModal({
         </button>
     );
 
-    // 🔍 검색 확장 모드 (에어비앤비 여행지 검색 화면)
-    if (isSearchExpanded) {
-        const expandedView = (
-            <div className="fixed inset-0 z-[200] flex h-[100svh] flex-col overflow-hidden overscroll-none relative bg-[#F7F7F7]">
-                {/* 상단 검색바 */}
-                <div className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
-                    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 10px rgba(0,0,0,0.05)', border: '0.5px solid #E0E0E0' }}>
-                    <button onClick={() => setIsSearchExpanded(false)} className="shrink-0">
-                        <ArrowLeft size={18} className="text-[#222222]" strokeWidth={2} />
-                    </button>
-                    <input
-                        ref={expandedInputRef}
-                        type="text"
-                        placeholder="여행지 검색"
-                        value={locationInput}
-                        onChange={(e) => setLocationInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                submitTypedLocation(true);
-                            }
-                        }}
-                        className="flex-1 bg-transparent text-[14px] text-[#222222] outline-none placeholder:text-[#B0B0B0] font-normal"
-                    />
-                    {trimmedInput && (
-                        <button
-                            onClick={() => submitTypedLocation(true)}
-                            className="shrink-0 text-[12px] font-semibold text-[#222222]"
-                        >
-                            선택
-                        </button>
-                    )}
-                </div>
-
-                {/* 검색 결과 리스트 */}
-                <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-24">
-                    {/* 최근 검색 */}
-                    <div className="mb-5">
-                        <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">최근 검색</p>
-                        {recentSearches.slice(0, 1).map((item, idx) => (
-                            <button
-                                key={`${item.name}-${idx}`}
-                                onClick={() => selectLocation(item.name, true)}
-                                className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
-                            >
-                                <PlaceBadge type={inferPlaceType(item.name)} />
-                                <div>
-                                    <span className="text-[13px] font-semibold text-[#222222] block">{item.name}</span>
-                                    {item.desc && <span className="text-[11px] text-[#8B8B8B] font-normal">{item.desc}</span>}
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* 추천 여행지 */}
-                    <div>
-                        <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">추천 여행지</p>
-                        {showCustomTypedOption && (
-                            <button
-                                onClick={() => submitTypedLocation(true)}
-                                className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
-                            >
-                                <PlaceBadge type="custom" />
-                                <div>
-                                    <span className="text-[13px] font-semibold text-[#222222] block">{trimmedInput}</span>
-                                    <span className="text-[11px] text-[#7A7A7A] font-normal">직접 입력한 위치/체험 검색어</span>
-                                </div>
-                            </button>
-                        )}
-                        {filteredRecommendedPlaces
-                            .map((place, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => selectLocation(place.name, true)}
-                                    className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
-                                >
-                                    <PlaceBadge type={place.id} />
-                                    <div>
-                                        <span className="text-[13px] font-semibold text-[#222222] block">{place.name}</span>
-                                        <span className="text-[11px] text-[#7A7A7A] font-normal">{place.desc}</span>
-                                    </div>
-                                </button>
-                            ))}
-                        {filteredRecommendedPlaces.length === 0 && !showCustomTypedOption && (
-                            <div className="px-1 py-2 text-[11px] text-[#8B8B8B]">일치하는 추천 항목이 없어요.</div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-        return createPortal(expandedView, document.body);
-    }
-
     const modalView = (
         <div className="fixed inset-0 z-[200] flex h-[100svh] flex-col overflow-hidden overscroll-none">
             {/* 배경: 화면이 보이는 반투명 레이어 + 블러 */}
@@ -687,6 +594,93 @@ export default function MobileSearchModal({
                     </button>
                 </div>
             </div>
+
+            {isSearchExpanded && (
+                <div className="absolute inset-0 z-[220] flex h-[100svh] flex-col overflow-hidden overscroll-none bg-[#F7F7F7]">
+                    <div
+                        className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
+                        style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 10px rgba(0,0,0,0.05)', border: '0.5px solid #E0E0E0' }}
+                    >
+                        <button onClick={() => setIsSearchExpanded(false)} className="shrink-0">
+                            <ArrowLeft size={18} className="text-[#222222]" strokeWidth={2} />
+                        </button>
+                        <input
+                            ref={expandedInputRef}
+                            autoFocus
+                            type="text"
+                            placeholder="여행지 검색"
+                            value={locationInput}
+                            onChange={(e) => setLocationInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    submitTypedLocation(true);
+                                }
+                            }}
+                            className="flex-1 bg-transparent text-[14px] text-[#222222] outline-none placeholder:text-[#B0B0B0] font-normal"
+                        />
+                        {trimmedInput && (
+                            <button
+                                onClick={() => submitTypedLocation(true)}
+                                className="shrink-0 text-[12px] font-semibold text-[#222222]"
+                            >
+                                선택
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-24">
+                        <div className="mb-5">
+                            <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">최근 검색</p>
+                            {recentSearches.slice(0, 1).map((item, idx) => (
+                                <button
+                                    key={`${item.name}-${idx}`}
+                                    onClick={() => selectLocation(item.name, true)}
+                                    className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
+                                >
+                                    <PlaceBadge type={inferPlaceType(item.name)} />
+                                    <div>
+                                        <span className="text-[13px] font-semibold text-[#222222] block">{item.name}</span>
+                                        {item.desc && <span className="text-[11px] text-[#8B8B8B] font-normal">{item.desc}</span>}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">추천 여행지</p>
+                            {showCustomTypedOption && (
+                                <button
+                                    onClick={() => submitTypedLocation(true)}
+                                    className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
+                                >
+                                    <PlaceBadge type="custom" />
+                                    <div>
+                                        <span className="text-[13px] font-semibold text-[#222222] block">{trimmedInput}</span>
+                                        <span className="text-[11px] text-[#7A7A7A] font-normal">직접 입력한 위치/체험 검색어</span>
+                                    </div>
+                                </button>
+                            )}
+                            {filteredRecommendedPlaces.map((place, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => selectLocation(place.name, true)}
+                                    className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
+                                >
+                                    <PlaceBadge type={place.id} />
+                                    <div>
+                                        <span className="text-[13px] font-semibold text-[#222222] block">{place.name}</span>
+                                        <span className="text-[11px] text-[#7A7A7A] font-normal">{place.desc}</span>
+                                    </div>
+                                </button>
+                            ))}
+                            {filteredRecommendedPlaces.length === 0 && !showCustomTypedOption && (
+                                <div className="px-1 py-2 text-[11px] text-[#8B8B8B]">일치하는 추천 항목이 없어요.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
     return createPortal(modalView, document.body);
