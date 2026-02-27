@@ -30,15 +30,14 @@ export default function MobileSearchModal({
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
-    const expandedInputRef = useRef<HTMLInputElement>(null);
     const scrollLockRef = useRef({
         locked: false,
         bodyOverflow: '',
         htmlOverflow: '',
     });
 
-    const normalizeText = (value: string) => value.toLowerCase().replace(/\s+/g, '').trim();
-    const inferPlaceType = (name: string): string => {
+    const normalizeText = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, '').trim();
+    const inferPlaceType = (name: unknown): string => {
         const value = normalizeText(name);
         if (value.includes('도쿄') || value.includes('tokyo')) return 'tokyo';
         if (value.includes('오사카') || value.includes('osaka')) return 'osaka';
@@ -66,7 +65,21 @@ export default function MobileSearchModal({
             const stored = window.localStorage.getItem('locally_recent_searches');
             if (stored) {
                 const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed)) setRecentSearches(parsed.slice(0, 6));
+                if (Array.isArray(parsed)) {
+                    const normalized = parsed
+                        .map((item: unknown) => {
+                            if (typeof item === 'string') return { name: item.trim() };
+                            if (!item || typeof item !== 'object') return null;
+                            const entry = item as { name?: unknown; desc?: unknown };
+                            const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+                            if (!name) return null;
+                            const desc = typeof entry.desc === 'string' && entry.desc.trim() ? entry.desc.trim() : undefined;
+                            return { name, desc };
+                        })
+                        .filter((item): item is { name: string; desc?: string } => !!item)
+                        .slice(0, 6);
+                    setRecentSearches(normalized);
+                }
             }
         } catch {
             // ignore
@@ -104,31 +117,6 @@ export default function MobileSearchModal({
             if (isOpen) restoreScrollLock();
         };
     }, [isOpen]);
-
-    useEffect(() => {
-        if (!isOpen || !isSearchExpanded) return;
-
-        let raf1 = 0;
-        let raf2 = 0;
-        raf1 = requestAnimationFrame(() => {
-            raf2 = requestAnimationFrame(() => {
-                const input = expandedInputRef.current;
-                if (!input) return;
-                try {
-                    input.focus({ preventScroll: true });
-                } catch {
-                    input.focus();
-                }
-                const caret = input.value.length;
-                input.setSelectionRange(caret, caret);
-            });
-        });
-
-        return () => {
-            cancelAnimationFrame(raf1);
-            cancelAnimationFrame(raf2);
-        };
-    }, [isOpen, isSearchExpanded]);
 
     if (!isOpen || typeof document === 'undefined') return null;
 
@@ -372,7 +360,6 @@ export default function MobileSearchModal({
                         <ArrowLeft size={18} className="text-[#222222]" strokeWidth={2} />
                     </button>
                     <input
-                        ref={expandedInputRef}
                         type="text"
                         placeholder="여행지 검색"
                         value={locationInput}
@@ -384,6 +371,7 @@ export default function MobileSearchModal({
                             }
                         }}
                         className="flex-1 bg-transparent text-[14px] text-[#222222] outline-none placeholder:text-[#B0B0B0] font-normal"
+                        autoFocus
                     />
                     {trimmedInput && (
                         <button
