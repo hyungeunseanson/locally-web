@@ -48,23 +48,21 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
 
     return (
         <div
-            className="md:hidden fixed bottom-0 left-0 right-0 z-[105] bg-[#f5f5f5] pt-2 px-4"
+            className="md:hidden fixed left-0 right-0 z-[105] px-4"
             style={{
-                boxShadow: '0 -2px 12px rgba(0,0,0,0.06)',
-                borderTop: '1px solid #e5e7eb',
-                paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 70px)'
+                bottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 76px)'
             }}
         >
-            <div className="flex justify-between items-center max-w-lg mx-auto px-0.5 py-2">
+            <div className="flex justify-between items-center max-w-sm mx-auto rounded-full border border-slate-200 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] px-3 py-2.5">
                 <div className="flex flex-col">
-                    <span className="text-slate-900 font-bold text-[15px] md:text-[15px] leading-none">
+                    <span className="text-slate-900 font-semibold text-[13px] leading-none">
                         1인당 ₩{Number(experience.price).toLocaleString()} 부터
                     </span>
-                    <span className="text-[#E00B41] font-bold text-[12px] tracking-tight mt-0.5">취소 수수료 없음</span>
+                    <span className="text-[#E00B41] font-semibold text-[10px] tracking-tight mt-0.5">7일 전에 취소하면 수수료 없음</span>
                 </div>
                 <button
                     onClick={handleBookingClick}
-                    className="bg-[#E5006D] text-white min-w-[112px] py-2.5 rounded-full text-[14px] md:text-[14px] font-bold hover:scale-[1.02] transition-transform shadow-[0_4px_10px_rgba(229,0,109,0.3)]"
+                    className="bg-[#E5006D] text-white min-w-[102px] px-4 py-2 rounded-full text-[13px] font-semibold hover:scale-[1.02] transition-transform shadow-[0_4px_10px_rgba(229,0,109,0.3)]"
                 >
                     날짜 표시
                 </button>

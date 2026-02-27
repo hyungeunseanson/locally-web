@@ -63,9 +63,22 @@ export default function ExpMainContent({
   const photos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
-  const languageText = hostProfile?.languages?.length > 0
-    ? `${hostProfile.languages.join(' 및 ')}로 진행되는 체험입니다.`
-    : '영어 및 일본어로 진행되는 체험입니다.';
+  const mapLanguageLabel = (language: string) => {
+    const normalized = language.toLowerCase();
+    if (normalized.includes('english') || normalized.includes('영어')) return '영어';
+    if (normalized.includes('korean') || normalized.includes('한국어')) return '한국어';
+    if (normalized.includes('japanese') || normalized.includes('일본어')) return '일본어';
+    if (normalized.includes('chinese') || normalized.includes('중국어')) return '중국어';
+    return language;
+  };
+  const normalizedLanguages = Array.isArray(hostProfile?.languages)
+    ? hostProfile.languages
+      .map((language) => mapLanguageLabel(String(language)))
+      .filter(Boolean)
+    : [];
+  const languageText = normalizedLanguages.length > 0
+    ? `${Array.from(new Set(normalizedLanguages)).join(' 및 ')}로 진행되는 체험입니다.`
+    : '영어 및 한국어로 진행되는 체험입니다.';
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(location);
@@ -92,7 +105,7 @@ export default function ExpMainContent({
 
       {/* 체험 내용 */}
       <div className="border-b border-slate-200 pb-8 md:pb-10">
-        <h3 className="text-[20px] md:text-[27px] font-bold tracking-[-0.01em] mb-5">체험 내용</h3>
+        <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-5">체험 내용</h3>
         <div className="space-y-4">
           {itinerary.length > 0 ? itinerary.map((item, idx: number) => {
             const imageSrc = item?.image_url || photos[idx % photos.length];
@@ -102,18 +115,18 @@ export default function ExpMainContent({
                   <img src={imageSrc} className="w-full h-full object-cover" alt={item?.title || `itinerary-${idx + 1}`} />
                 </div>
                 <div className="pt-0.5">
-                  <h4 className="text-[14px] md:text-[17px] font-semibold leading-[1.3] mb-1">{item?.title || `코스 ${idx + 1}`}</h4>
-                  <p className="text-[13px] md:text-[14px] leading-[1.35] text-slate-500 whitespace-pre-wrap">{item?.description || ''}</p>
+                  <h4 className="text-[13px] md:text-[17px] font-medium leading-[1.3] mb-1">{item?.title || `코스 ${idx + 1}`}</h4>
+                  <p className="text-[12px] md:text-[14px] leading-[1.35] text-slate-500 whitespace-pre-wrap">{item?.description || ''}</p>
                 </div>
               </div>
             );
           }) : (
-            <p className="text-[13px] md:text-[15px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+            <p className="text-[12px] md:text-[15px] text-slate-600 leading-relaxed whitespace-pre-wrap">
               {translatedDescription || experience.description}
             </p>
           )}
         </div>
-        <p className="text-[14px] md:text-[15px] leading-[1.45] text-slate-700 mt-5">{languageText}</p>
+        <p className="text-[12px] md:text-[15px] leading-[1.45] text-slate-700 mt-5">{languageText}</p>
       </div>
 
       {/* 후기 */}
@@ -121,11 +134,11 @@ export default function ExpMainContent({
 
       {/* 만나는 장소 */}
       <div id="location" className="border-b border-slate-200 pb-8 md:pb-10 scroll-mt-24">
-        <h3 className="text-[20px] md:text-[27px] font-bold tracking-[-0.01em] mb-3">만나는 장소</h3>
-        <p className="text-[13px] md:text-[15px] text-slate-700 font-semibold mb-1">{location}</p>
-        <p className="text-[12px] md:text-[14px] text-slate-500 mb-4">{experience.location || location}</p>
+        <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-3">만나는 장소</h3>
+        <p className="text-[12px] md:text-[15px] text-slate-700 font-medium mb-1">{location}</p>
+        <p className="text-[11px] md:text-[14px] text-slate-500 mb-4">{experience.location || location}</p>
 
-        <div className="w-full h-[320px] md:h-[400px] bg-slate-100 rounded-[20px] md:rounded-[24px] relative overflow-hidden border border-slate-200 shadow-sm">
+        <div className="w-full h-[384px] md:h-[400px] bg-slate-100 rounded-[20px] md:rounded-[24px] relative overflow-hidden border border-slate-200 shadow-sm">
           <iframe
             width="100%"
             height="100%"
@@ -185,18 +198,18 @@ export default function ExpMainContent({
           />
           <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center"><MessageSquare size={18} /></button>
         </div>
-        <p className="text-[12px] text-slate-400 mt-3">안전한 결제를 위해 항상 에어비앤비를 통해 송금하고 호스트와 소통하세요.</p>
+        <p className="text-[11px] text-slate-400 mt-3">안전한 결제를 위해 항상 로컬리를 통해 결제하고 호스트와 소통하세요.</p>
       </div>
 
       {/* 알아두어야 할 사항 */}
       <div className="pt-8 pb-12 border-t border-slate-200">
-        <h3 className="text-[24px] md:text-[30px] font-bold tracking-[-0.01em] mb-5">알아두어야 할 사항</h3>
+        <h3 className="text-[20px] md:text-[30px] font-semibold tracking-[-0.01em] mb-5">알아두어야 할 사항</h3>
         <div className="space-y-5">
           <div className="flex gap-3">
             <Users size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">게스트 필수조건</h4>
-              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">게스트 필수조건</h4>
+              <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
                 {experience.rules?.age_limit || '14세 이상'} 게스트만 참가할 수 있습니다. 최대 인원은 {experience.max_guests || 10}명입니다.
               </p>
             </div>
@@ -205,8 +218,8 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <PersonStanding size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">활동 강도</h4>
-              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">활동 강도</h4>
+              <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
                 신체 활동 강도: {experience.rules?.activity_level || '보통'}, 사전 준비도: {experience.rules?.preparation_level || '초보자'}
               </p>
             </div>
@@ -215,12 +228,12 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <Backpack size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">준비물</h4>
-              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">준비물</h4>
+              <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {experience.supplies || '편한 복장과 개인 물품을 준비해주세요.'}
               </p>
               {experience.inclusions?.length > 0 && (
-                <p className="text-[14px] md:text-[13px] text-slate-500 mt-2">포함 사항: {experience.inclusions.join(', ')}</p>
+                <p className="text-[12px] md:text-[13px] text-slate-500 mt-2">포함 사항: {experience.inclusions.join(', ')}</p>
               )}
             </div>
           </div>
@@ -232,8 +245,8 @@ export default function ExpMainContent({
             <div className="flex gap-3 items-start">
               <MapPin size={22} className="text-slate-700 shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-[15px] md:text-[16px] font-bold mb-1">접근성</h4>
-                <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">주로 평평한 부지이며 도움 필요 시 호스트에게 문의해주세요.</p>
+                <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">접근성</h4>
+                <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">주로 평평한 부지이며 도움 필요 시 호스트에게 문의해주세요.</p>
               </div>
             </div>
             <ChevronRight size={20} className="text-slate-400 shrink-0" />
@@ -242,8 +255,8 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <CalendarX size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">환불 정책</h4>
-              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">환불 정책</h4>
+              <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
                 {experience.rules?.refund_policy || '시작 시간을 기준으로 3일 전까지 취소하면 예약금이 전액 환불됩니다.'}
               </p>
             </div>

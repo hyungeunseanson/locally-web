@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Languages, Star } from 'lucide-react';
+import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Star } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
@@ -272,17 +272,13 @@ export default function ExperienceClient({
           <div className="text-center px-2">
             <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">{translatedTitle}</h1>
             <p className="text-[13px] leading-[1.42] text-slate-500 font-normal mb-4 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
-            <div className="flex items-center justify-center gap-1.5 text-[13px] font-semibold mb-1.5">
-              <Star size={13} fill="black" className="mb-[1px]" />
+            <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium mb-4">
+              <Star size={11} fill="black" className="mb-[1px]" />
               <span>{ratingText}</span>
               <span className="text-slate-300">·</span>
               <button onClick={() => scrollToSection('reviews')} className="underline underline-offset-2">
                 후기 {reviewCount}개
               </button>
-            </div>
-            <div className="flex items-center justify-center gap-1.5 text-[12px] text-slate-500 mb-5">
-              <Languages size={13} />
-              <span>자동 번역됨</span>
             </div>
           </div>
 
@@ -296,20 +292,20 @@ export default function ExperienceClient({
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
+                <p className="text-[13px] font-medium truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
                 <p className="text-[12px] text-slate-500 truncate">{hostProfile?.job || category}</p>
               </div>
             </div>
 
             <button
               onClick={() => scrollToSection('location')}
-              className="mt-4 w-full text-left flex items-center gap-2.5 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              className="mt-4 w-full text-left flex items-center gap-2.5 py-1.5"
             >
-              <div className="w-9 h-9 rounded-[10px] bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
-                <MapPin size={15} className="text-slate-700" />
+              <div className="w-10 h-10 rounded-[12px] bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-[0_1px_5px_rgba(0,0,0,0.08)]">
+                <MapPin size={14} className="text-slate-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold truncate">{location}</p>
+                <p className="text-[13px] font-medium truncate">{location}</p>
                 <p className="text-[12px] text-slate-500 truncate">{experience.location || compactLocation}</p>
               </div>
             </button>
