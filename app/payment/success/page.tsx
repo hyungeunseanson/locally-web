@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
@@ -48,13 +49,13 @@ function SuccessContent() {
           <CheckCircle className="w-8 h-8 md:w-12 md:h-12 text-green-600" />
         </div>
         <h1 className="text-[24px] md:text-3xl font-black mb-2 md:mb-3">
-          {bookingStatus === 'PENDING' ? '입금 대기중' : '예약 상태 확인'}
+          {isPendingBookingStatus(bookingStatus || '') ? '입금 대기중' : '예약 상태 확인'}
         </h1>
         {isSaving ? (
           <p className="text-slate-500 text-[13px] md:text-base mb-7 md:mb-10">처리 중...</p>
         ) : (
           <p className="text-slate-500 text-[13px] md:text-base mb-7 md:mb-10">
-            {bookingStatus === 'PENDING'
+            {isPendingBookingStatus(bookingStatus || '')
               ? '입금 확인 후 자동으로 예약이 확정됩니다.'
               : '결제 검증 상태는 나의 여행에서 확인할 수 있습니다.'}
           </p>

@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P1-5 Status Filter Hardening: Settlement Query + Master Ledger Pending)  
-**Version:** 3.2.23 (P1-5 Status Filter Hardening: Settlement Query + Master Ledger Pending)  
+**Last Updated:** 2026-02-27 (P1-6 Payment Complete/Success Pending Status Unification + Flow Regression Check)  
+**Version:** 3.2.24 (P1-6 Payment Complete/Success Pending Status Unification + Flow Regression Check)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -90,6 +90,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 결제 취소 API 가드 보강(P1-4): `/api/payment/cancel`의 “이미 취소됨” 판정을 공통 상태 유틸로 전환해 대소문자/입력 변형에 대한 방어를 강화
 - Admin 정산 조회 필터 보강(P1-5): `SettlementTab`의 Supabase `.or(...)` 문자열 조건을 축소하고, 조회 후 공통 상태 유틸(`completed/cancelled`) 기반 필터로 전환해 쿼리 표현과 화면 계산의 기준을 일치
 - Admin 장부 Pending 분기 통일(P1-5): `MasterLedgerTab`의 `PENDING` 직접 비교(상태 탭 필터/상세 액션 버튼)를 `isPendingBookingStatus`로 치환해 대소문자 변형 입력에도 동일 동작 유지
+- 결제 완료 상태 분기 통일(P1-6): `payment/complete`의 `PENDING` 직접 비교를 `isPendingBookingStatus`로 전환해 입금 대기 UI 분기를 공통 상태 유틸 기준으로 정렬
+- 결제 성공 상태 분기 통일(P1-6): `payment/success`의 `PENDING` 제목/설명 분기를 공통 상태 유틸로 치환해 상태 표기 변형(대소문자)에도 동일 메시지 노출을 보장
+- 결제 플로우 회귀 점검(P1-6): `payment → payment/complete(orderId) → guest/trips|guest/inbox|home` 동선 및 `order_id` 기반 조회 경로를 재검증했고, 빌드 단계는 기존 Google Fonts 네트워크 제약(`Noto Sans KR`) 외 신규 오류 없음 확인
 - 안정성: 광범위한 `.single()` -> `.maybeSingle()` 전환
 - 모바일 UX: BottomTabNavigation 충돌/가림/z-index/뒤로가기 이슈 정리
 - 모바일 정보/커뮤니티/뉴스/공지 레이아웃 최적화 및 게스트 프로필(모바일/데스크탑) 기준 정렬

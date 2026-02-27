@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, MessageCircle, Clock, AlertCircle } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
+import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 
 type BookingExperience = {
   title?: string;
@@ -120,7 +121,7 @@ function PaymentCompleteContent() {
         
 {/* 1. 성공 메시지 (상태별 분기) */}
 <div className="mb-8 md:mb-10 animate-in zoom-in duration-500">
-          {booking.status === 'PENDING' ? (
+          {isPendingBookingStatus(booking.status || '') ? (
             <>
               <div className="w-16 h-16 md:w-20 md:h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-yellow-600 shadow-sm animate-pulse">
                 <AlertCircle className="w-7 h-7 md:w-10 md:h-10" strokeWidth={3} />
