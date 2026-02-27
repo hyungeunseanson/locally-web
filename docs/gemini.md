@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P0 Desktop Rollback Hardening + User-Facing i18n Gap Closure + Font Verification Rerun)  
-**Version:** 3.2.29 (P0 Desktop Rollback Hardening + User-Facing i18n Gap Closure + Font Verification Rerun)  
+**Last Updated:** 2026-02-27 (P0 Service Card Style Parity with Experience Cards - Desktop/Mobile)  
+**Version:** 3.2.30 (P0 Service Card Style Parity with Experience Cards - Desktop/Mobile)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -127,6 +127,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 홈 모바일 섹션 흐름 마감: 인기/신규/언어/서비스 타이틀 굵기를 완화하고, 섹션 전환 그라데이션 스페이서를 좌우 전체 폭으로 통일해 절단/이중선 인상을 제거
 - 홈 모바일 CTA 텍스트 규격화: `로컬리 소개 및 호스트 지원`에서 `로컬리 소개`/`호스트 지원`만 1단계 강조(굵기+밑줄)하고 `및`은 경량으로 유지, 단어 간 공백을 명시적으로 고정
 - 홈 모바일 서비스 탭 조정: 서비스 화면에서 상단 그라데이션 분리선을 제거하고, `로컬리 서비스` 타이틀로 변경했으며 모바일 서비스 리스트를 2x2 그리드로 고정(스크롤 슬라이드 제거)
+- 서비스 카드 스타일 동기화(P0): `ServiceCard`를 체험 카드와 동일한 카드 쉐도우/호버 리프트/타이포 스케일 구조로 재정렬하고, 모바일/데스크탑 모두 동일 밀도 체계로 맞춤
+- 서비스 탭 배치 동기화(P0): 홈 서비스 탭의 모바일 리스트를 체험 섹션과 같은 가로 스크롤 카드 폭(`42vw`)으로 복귀하고, 데스크탑 서비스 그리드를 체험 탭과 동일 컬럼 체계(`sm~2xl`)로 통일
 - 모바일 검색 모달 배경 보정: 여행지/날짜/언어 선택 모달의 박스 외곽 영역을 단색 회색에서 반투명+블러 레이어로 변경해 뒤 배경이 투영되도록 조정
 - 모바일 검색 모달 리디자인: 배경 반투명도를 높이고, 위치/날짜/언어 패널을 레퍼런스 기준의 카드/타이포로 정렬했으며 추천 여행지 목록(도시+체험)과 4개 언어 선택 UI로 구성
 - 모바일 검색 모달 개선: 패널 전환 애니메이션을 더 부드럽게 조정하고, 컬러 아이콘/추천 리스트를 실제 최근 검색 기반으로 갱신하며 언어 섹션은 `체험 언어` 문구로 고정

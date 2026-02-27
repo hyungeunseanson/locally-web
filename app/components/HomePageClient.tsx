@@ -11,6 +11,12 @@ import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { ExperienceCardSkeleton } from '@/app/components/skeletons/ExperienceCardSkeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
 
+type HomeExperience = {
+  id: number | string;
+  created_at?: string | null;
+  languages?: string[] | null;
+};
+
 export default function HomePageClient() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
@@ -143,18 +149,20 @@ export default function HomePageClient() {
               <div className="md:hidden pb-4">
                 {/* 섹션 렌더 헬퍼 */}
                 {(() => {
+                  const list = filteredExperiences as HomeExperience[];
+
                   // 섹션별 체험 분류
-                  const popular = filteredExperiences.slice(0, 10);
-                  const newest = [...filteredExperiences].sort((a: any, b: any) =>
+                  const popular = list.slice(0, 10);
+                  const newest = [...list].sort((a, b) =>
                     new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
                   ).slice(0, 10);
-                  const koreanExp = filteredExperiences.filter((e: any) => e.languages?.includes('한국어')).slice(0, 10);
-                  const japaneseExp = filteredExperiences.filter((e: any) => e.languages?.includes('일본어')).slice(0, 10);
-                  const englishExp = filteredExperiences.filter((e: any) => e.languages?.includes('영어')).slice(0, 10);
-                  const chineseExp = filteredExperiences.filter((e: any) => e.languages?.includes('중국어')).slice(0, 10);
+                  const koreanExp = list.filter((e) => e.languages?.includes('한국어')).slice(0, 10);
+                  const japaneseExp = list.filter((e) => e.languages?.includes('일본어')).slice(0, 10);
+                  const englishExp = list.filter((e) => e.languages?.includes('영어')).slice(0, 10);
+                  const chineseExp = list.filter((e) => e.languages?.includes('중국어')).slice(0, 10);
 
                   // 언어별 섹션 (사용자 언어에 따라 순서 변경)
-                  const langSections: { title: string; data: any[] }[] = [];
+                  const langSections: { title: string; data: HomeExperience[] }[] = [];
                   if (koreanExp.length > 0) langSections.push({ title: t('home_section_lang_ko'), data: koreanExp });
                   if (japaneseExp.length > 0) langSections.push({ title: t('home_section_lang_ja'), data: japaneseExp });
                   if (englishExp.length > 0) langSections.push({ title: t('home_section_lang_en'), data: englishExp });
@@ -181,7 +189,7 @@ export default function HomePageClient() {
                         <SectionArrow />
                       </div>
                       <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
-                        {section.data.map((item: any) => (
+                        {section.data.map((item) => (
                           <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
                             <ExperienceCard data={item} />
                           </div>
@@ -194,7 +202,7 @@ export default function HomePageClient() {
 
               {/* 🖥️ 데스크탑: 기존 그리드 */}
               <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-                {filteredExperiences.map((item: any) => (
+                {(filteredExperiences as HomeExperience[]).map((item) => (
                   <ExperienceCard key={item.id} data={item} />
                 ))}
               </div>
@@ -207,17 +215,19 @@ export default function HomePageClient() {
             {/* 📱 모바일 서비스 */}
             <div className="md:hidden pb-4">
               <div className="flex items-center justify-between px-5 pt-3 pb-2">
-                <h2 className="text-[15px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">로컬리 서비스</h2>
+                <h2 className="text-[17px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{t('home_section_popular_services')}</h2>
               </div>
-              <div className="grid grid-cols-2 gap-3 px-5 pb-5">
+              <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
                 {LOCALLY_SERVICES.slice(0, 4).map((item) => (
-                  <ServiceCard key={item.id} item={item} />
+                  <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
+                    <ServiceCard item={item} />
+                  </div>
                 ))}
               </div>
             </div>
 
             {/* 🖥️ 데스크탑 서비스 */}
-            <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
+            <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
               {LOCALLY_SERVICES.map((item) => (
                 <ServiceCard key={item.id} item={item} />
               ))}
