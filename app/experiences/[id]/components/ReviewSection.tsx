@@ -207,7 +207,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
           </div>
         </>
       ) : (
-        <div className="text-slate-400 text-[15px] py-6 bg-slate-50 rounded-xl text-center border border-dashed border-slate-200">
+        <div className="text-slate-400 text-[12px] py-5 bg-slate-50 rounded-xl text-center border border-dashed border-slate-200">
           아직 작성된 후기가 없습니다. {hostName} 체험의 첫 후기를 남겨보세요.
         </div>
       )}

@@ -23,7 +23,7 @@ export default function HostProfileSection(props: HostProfileProps) {
 
   return (
     <>
-      <div className="py-8 border-t border-slate-200">
+      <div className="py-8">
         <h3 className="text-[20px] md:text-[27px] font-semibold tracking-[-0.01em] mb-5">자기소개</h3>
 
         <button

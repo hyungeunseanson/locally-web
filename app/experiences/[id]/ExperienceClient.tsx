@@ -166,13 +166,13 @@ export default function ExperienceClient({
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] md:bg-white text-slate-900 font-sans pb-0">
+    <div className="min-h-screen bg-[#fafafa] md:bg-white text-slate-900 font-sans pb-0">
       <SiteHeader />
       {isCopySuccess && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400" /> 링크가 복사되었습니다.</div>}
 
       {/* 📱 모바일 전용 상단 헤더 */}
       <div
-        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-[#f5f5f5]/95 backdrop-blur-sm h-[52px] flex items-center justify-between px-4"
+        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-[#fafafa]/95 backdrop-blur-sm h-[52px] flex items-center justify-between px-4"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -250,7 +250,7 @@ export default function ExperienceClient({
             className="relative w-full aspect-square mb-6 overflow-hidden rounded-[24px] cursor-pointer border border-slate-200"
             onClick={() => setIsGalleryOpen(true)}
           >
-            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-[#f5f5f5]">
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-[#fafafa]">
               <div className="relative overflow-hidden w-full h-full rounded-tl-[24px]">
                 <Image src={photos[0]} alt="Main" fill className="object-cover" />
               </div>

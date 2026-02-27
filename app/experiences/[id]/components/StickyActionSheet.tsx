@@ -55,10 +55,14 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
         >
             <div className="flex justify-between items-center max-w-sm mx-auto rounded-full border border-slate-200 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] px-3 py-2.5">
                 <div className="flex flex-col">
-                    <span className="text-slate-900 font-semibold text-[13px] leading-none">
-                        1인당 ₩{Number(experience.price).toLocaleString()} 부터
+                    <span className="leading-none">
+                        <span className="text-[10px] text-slate-500 font-medium mr-1.5">1인당</span>
+                        <span className="text-slate-900 font-semibold text-[15px]">
+                            <span className="underline decoration-slate-700 underline-offset-[2px]">₩{Number(experience.price).toLocaleString()}</span>
+                            <span className="ml-1">부터</span>
+                        </span>
                     </span>
-                    <span className="text-[#E00B41] font-semibold text-[10px] tracking-tight mt-0.5">7일 전에 취소하면 수수료 없음</span>
+                    <span className="text-[#E00B41] font-medium text-[10px] tracking-tight mt-0.5">7일 전 취소 시 수수료 없음</span>
                 </div>
                 <button
                     onClick={handleBookingClick}
