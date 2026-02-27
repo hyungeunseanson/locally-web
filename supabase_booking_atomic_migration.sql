@@ -43,6 +43,8 @@ declare
   v_has_private_booking boolean;
   v_slot_key text;
   v_new_order_id text;
+  v_booking_date date;
+  v_booking_time_text text;
 begin
   if p_user_id is null
      or coalesce(trim(p_experience_id), '') = ''
@@ -52,6 +54,13 @@ begin
      or coalesce(trim(p_customer_phone), '') = '' then
     raise exception 'BOOKING_BAD_REQUEST:Missing required fields' using errcode = 'P0001';
   end if;
+
+  begin
+    v_booking_date := p_date::date;
+    v_booking_time_text := to_char(p_time::time, 'HH24:MI');
+  exception when others then
+    raise exception 'BOOKING_BAD_REQUEST:Invalid date/time format' using errcode = 'P0001';
+  end;
 
   select
     e.id,
@@ -76,7 +85,7 @@ begin
   end if;
 
   v_guest_count := greatest(coalesce(p_guests, 0), 1);
-  v_slot_key := format('%s|%s|%s', v_experience_id::text, p_date, p_time);
+  v_slot_key := format('%s|%s|%s', v_experience_id::text, v_booking_date::text, v_booking_time_text);
 
   -- 슬롯 잠금 (같은 체험/날짜/시간 동시 요청 직렬화)
   perform pg_advisory_xact_lock(hashtext(v_slot_key)::bigint);
@@ -89,8 +98,8 @@ begin
     v_has_private_booking
   from public.bookings b
   where b.experience_id = v_experience_id
-    and b.date::text = p_date
-    and b.time::text = p_time
+    and b.date = v_booking_date
+    and b.time = v_booking_time_text
     and lower(b.status::text) in ('pending', 'paid', 'confirmed');
 
   if v_has_private_booking
@@ -143,8 +152,8 @@ begin
     v_host_price,
     'PENDING',
     v_guest_count,
-    p_date,
-    p_time,
+    v_booking_date,
+    v_booking_time_text,
     case when p_is_private then 'private' else 'group' end,
     p_customer_name,
     p_customer_phone,
