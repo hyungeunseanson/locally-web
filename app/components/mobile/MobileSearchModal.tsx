@@ -30,9 +30,16 @@ export default function MobileSearchModal({
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
+    const expandedInputRef = useRef<HTMLInputElement>(null);
     const scrollLockRef = useRef({
         locked: false,
+        scrollY: 0,
         bodyOverflow: '',
+        bodyPosition: '',
+        bodyTop: '',
+        bodyLeft: '',
+        bodyRight: '',
+        bodyWidth: '',
         bodyOverscrollBehavior: '',
         htmlOverflow: '',
         htmlOverscrollBehavior: '',
@@ -96,21 +103,39 @@ export default function MobileSearchModal({
         const restoreScrollLock = () => {
             if (!scrollLockRef.current.locked) return;
             body.style.overflow = scrollLockRef.current.bodyOverflow;
+            body.style.position = scrollLockRef.current.bodyPosition;
+            body.style.top = scrollLockRef.current.bodyTop;
+            body.style.left = scrollLockRef.current.bodyLeft;
+            body.style.right = scrollLockRef.current.bodyRight;
+            body.style.width = scrollLockRef.current.bodyWidth;
             body.style.overscrollBehavior = scrollLockRef.current.bodyOverscrollBehavior;
             html.style.overflow = scrollLockRef.current.htmlOverflow;
             html.style.overscrollBehavior = scrollLockRef.current.htmlOverscrollBehavior;
+            window.scrollTo(0, scrollLockRef.current.scrollY);
             scrollLockRef.current.locked = false;
         };
 
         if (isOpen && !scrollLockRef.current.locked) {
+            const scrollY = window.scrollY || window.pageYOffset || 0;
             scrollLockRef.current = {
                 locked: true,
+                scrollY,
                 bodyOverflow: body.style.overflow,
+                bodyPosition: body.style.position,
+                bodyTop: body.style.top,
+                bodyLeft: body.style.left,
+                bodyRight: body.style.right,
+                bodyWidth: body.style.width,
                 bodyOverscrollBehavior: body.style.overscrollBehavior,
                 htmlOverflow: html.style.overflow,
                 htmlOverscrollBehavior: html.style.overscrollBehavior,
             };
 
+            body.style.position = 'fixed';
+            body.style.top = `-${scrollY}px`;
+            body.style.left = '0';
+            body.style.right = '0';
+            body.style.width = '100%';
             body.style.overflow = 'hidden';
             body.style.overscrollBehavior = 'none';
             html.style.overflow = 'hidden';
@@ -125,6 +150,25 @@ export default function MobileSearchModal({
             if (isOpen) restoreScrollLock();
         };
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || !isSearchExpanded) return;
+
+        let rafId = 0;
+        rafId = requestAnimationFrame(() => {
+            const input = expandedInputRef.current;
+            if (!input) return;
+            try {
+                input.focus({ preventScroll: true });
+            } catch {
+                input.focus();
+            }
+        });
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [isOpen, isSearchExpanded]);
 
     if (!isOpen || typeof document === 'undefined') return null;
 
@@ -360,7 +404,7 @@ export default function MobileSearchModal({
     // 🔍 검색 확장 모드 (에어비앤비 여행지 검색 화면)
     if (isSearchExpanded) {
         const expandedView = (
-            <div className="fixed inset-0 z-[200] flex flex-col overflow-hidden overscroll-none relative bg-[#F7F7F7]">
+            <div className="fixed inset-0 z-[200] flex h-[100svh] flex-col overflow-hidden overscroll-none relative bg-[#F7F7F7]">
                 {/* 상단 검색바 */}
                 <div className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
                     style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 10px rgba(0,0,0,0.05)', border: '0.5px solid #E0E0E0' }}>
@@ -368,6 +412,7 @@ export default function MobileSearchModal({
                         <ArrowLeft size={18} className="text-[#222222]" strokeWidth={2} />
                     </button>
                     <input
+                        ref={expandedInputRef}
                         type="text"
                         placeholder="여행지 검색"
                         value={locationInput}
@@ -450,7 +495,7 @@ export default function MobileSearchModal({
     }
 
     const modalView = (
-        <div className="fixed inset-0 z-[200] flex flex-col overflow-hidden overscroll-none">
+        <div className="fixed inset-0 z-[200] flex h-[100svh] flex-col overflow-hidden overscroll-none">
             {/* 배경: 화면이 보이는 반투명 레이어 + 블러 */}
             <div
                 className="absolute inset-0 -z-10 backdrop-blur-[10px] transition-opacity duration-500"
