@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_KR } from "next/font/google"; // 🟢 폰트 변경
+import localFont from "next/font/local";
 import "./globals.css";
 import { Suspense } from "react";
 import { LanguageProvider } from '@/app/context/LanguageContext';
@@ -15,10 +15,27 @@ import { AuthProvider } from '@/app/context/AuthContext';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { createClient } from '@/app/utils/supabase/server';
 
-const notoSansKr = Noto_Sans_KR({
-  subsets: ["latin"],
-  weight: ['100', '300', '400', '500', '700', '900'],
-  variable: '--font-noto-sans',
+const inter = localFont({
+  src: [
+    { path: "./fonts/Inter/Inter_18pt-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Bold.ttf", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+const ibmPlexSansKr = localFont({
+  src: [
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Light.ttf", weight: "300", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-kr/IBMPlexSansKR-Bold.ttf", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  variable: "--font-ibm-plex-sans-kr",
 });
 
 export const metadata: Metadata = {
@@ -92,7 +109,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning={true}>
-      <body className={`${notoSansKr.className} ${notoSansKr.variable} font-sans`}>
+      <body className={`${inter.variable} ${ibmPlexSansKr.variable} font-sans`}>
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}

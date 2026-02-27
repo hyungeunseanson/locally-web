@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  /* 🟢 Tailwind의 font-sans를 Noto Sans KR 변수로 매핑 */
-  --font-sans: var(--font-noto-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  /* Tailwind font-sans: Inter(영문 우선) + IBM Plex Sans KR(한글 fallback) */
+  --font-sans: var(--font-inter), var(--font-ibm-plex-sans-kr), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
   --color-primary: #FF385C;
   --color-primary-hover: #D90B3E;
