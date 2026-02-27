@@ -48,25 +48,23 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
 
     return (
         <div
-            className="md:hidden fixed bottom-0 left-0 right-0 z-[105] bg-[#f5f5f5] pt-3 px-4"
+            className="md:hidden fixed bottom-0 left-0 right-0 z-[105] bg-[#f5f5f5] pt-2 px-4"
             style={{
-                boxShadow: '0 -6px 24px rgba(0,0,0,0.08)',
-                borderTopLeftRadius: '26px',
-                borderTopRightRadius: '26px',
-                borderTop: '1px solid #e2e8f0',
-                paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 72px)'
+                boxShadow: '0 -2px 12px rgba(0,0,0,0.06)',
+                borderTop: '1px solid #e5e7eb',
+                paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 70px)'
             }}
         >
-            <div className="flex justify-between items-center max-w-lg mx-auto bg-white rounded-[22px] border border-slate-200 px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+            <div className="flex justify-between items-center max-w-lg mx-auto px-0.5 py-2">
                 <div className="flex flex-col">
-                    <span className="text-[#E00B41] font-extrabold text-[12px] tracking-tight mb-0.5">취소 수수료 없음</span>
-                    <span className="text-slate-900 font-bold text-[18px] md:text-[15px] leading-none">
+                    <span className="text-slate-900 font-bold text-[15px] md:text-[15px] leading-none">
                         1인당 ₩{Number(experience.price).toLocaleString()} 부터
                     </span>
+                    <span className="text-[#E00B41] font-bold text-[12px] tracking-tight mt-0.5">취소 수수료 없음</span>
                 </div>
                 <button
                     onClick={handleBookingClick}
-                    className="bg-[#E30063] text-white px-7 py-3 rounded-full text-[15px] md:text-[14px] font-bold hover:scale-[1.02] transition-transform shadow-md"
+                    className="bg-[#E5006D] text-white min-w-[112px] py-2.5 rounded-full text-[14px] md:text-[14px] font-bold hover:scale-[1.02] transition-transform shadow-[0_4px_10px_rgba(229,0,109,0.3)]"
                 >
                     날짜 표시
                 </button>

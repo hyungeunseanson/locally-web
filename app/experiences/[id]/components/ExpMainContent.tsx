@@ -73,7 +73,7 @@ export default function ExpMainContent({
   };
 
   return (
-    <div className="flex-1 space-y-10 md:space-y-14">
+    <div className="flex-1 space-y-8 md:space-y-14">
 
       {/* 데스크탑 호스트 요약 */}
       <div className="hidden md:flex border-b border-slate-200 pb-8 justify-between items-center">
@@ -92,28 +92,28 @@ export default function ExpMainContent({
 
       {/* 체험 내용 */}
       <div className="border-b border-slate-200 pb-8 md:pb-10">
-        <h3 className="text-[30px] md:text-[27px] font-black tracking-[-0.01em] mb-7">체험 내용</h3>
-        <div className="space-y-5">
+        <h3 className="text-[20px] md:text-[27px] font-bold tracking-[-0.01em] mb-5">체험 내용</h3>
+        <div className="space-y-4">
           {itinerary.length > 0 ? itinerary.map((item, idx: number) => {
             const imageSrc = item?.image_url || photos[idx % photos.length];
             return (
-              <div key={`${item?.title || 'step'}-${idx}`} className="flex items-start gap-4 md:gap-5">
-                <div className="w-[86px] h-[86px] md:w-[100px] md:h-[100px] rounded-[20px] overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+              <div key={`${item?.title || 'step'}-${idx}`} className="flex items-start gap-3 md:gap-5">
+                <div className="w-[72px] h-[72px] md:w-[100px] md:h-[100px] rounded-[14px] md:rounded-[20px] overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
                   <img src={imageSrc} className="w-full h-full object-cover" alt={item?.title || `itinerary-${idx + 1}`} />
                 </div>
-                <div className="pt-1">
-                  <h4 className="text-[18px] md:text-[17px] font-bold leading-[1.25] mb-1.5">{item?.title || `코스 ${idx + 1}`}</h4>
-                  <p className="text-[15px] md:text-[14px] leading-[1.4] text-slate-600 whitespace-pre-wrap">{item?.description || ''}</p>
+                <div className="pt-0.5">
+                  <h4 className="text-[14px] md:text-[17px] font-semibold leading-[1.3] mb-1">{item?.title || `코스 ${idx + 1}`}</h4>
+                  <p className="text-[13px] md:text-[14px] leading-[1.35] text-slate-500 whitespace-pre-wrap">{item?.description || ''}</p>
                 </div>
               </div>
             );
           }) : (
-            <p className="text-[15px] md:text-[15px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+            <p className="text-[13px] md:text-[15px] text-slate-600 leading-relaxed whitespace-pre-wrap">
               {translatedDescription || experience.description}
             </p>
           )}
         </div>
-        <p className="text-[16px] md:text-[15px] leading-[1.45] text-slate-700 mt-7">{languageText}</p>
+        <p className="text-[14px] md:text-[15px] leading-[1.45] text-slate-700 mt-5">{languageText}</p>
       </div>
 
       {/* 후기 */}
@@ -121,11 +121,11 @@ export default function ExpMainContent({
 
       {/* 만나는 장소 */}
       <div id="location" className="border-b border-slate-200 pb-8 md:pb-10 scroll-mt-24">
-        <h3 className="text-[30px] md:text-[27px] font-black tracking-[-0.01em] mb-4">만나는 장소</h3>
-        <p className="text-[16px] md:text-[15px] text-slate-700 font-semibold mb-1">{location}</p>
-        <p className="text-[16px] md:text-[14px] text-slate-500 mb-5">{experience.location || location}</p>
+        <h3 className="text-[20px] md:text-[27px] font-bold tracking-[-0.01em] mb-3">만나는 장소</h3>
+        <p className="text-[13px] md:text-[15px] text-slate-700 font-semibold mb-1">{location}</p>
+        <p className="text-[12px] md:text-[14px] text-slate-500 mb-4">{experience.location || location}</p>
 
-        <div className="w-full h-[420px] md:h-[400px] bg-slate-100 rounded-[24px] relative overflow-hidden border border-slate-200 shadow-sm">
+        <div className="w-full h-[320px] md:h-[400px] bg-slate-100 rounded-[20px] md:rounded-[24px] relative overflow-hidden border border-slate-200 shadow-sm">
           <iframe
             width="100%"
             height="100%"
@@ -139,9 +139,9 @@ export default function ExpMainContent({
           <Link
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
             rel="noreferrer"
-            className="absolute top-4 right-4 bg-white/95 p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:scale-105 transition-transform"
+            className="absolute top-4 right-4 bg-white/95 p-2 rounded-full shadow-md border border-slate-200 text-slate-700 hover:scale-105 transition-transform"
           >
-            <ExternalLink size={16} />
+            <ExternalLink size={14} />
           </Link>
 
           <button
@@ -175,13 +175,13 @@ export default function ExpMainContent({
 
       {/* 문의 */}
       <div id="inquiry" className={`${isInquiryOpen ? 'block' : 'hidden md:block'} pb-2 scroll-mt-24`}>
-        <h3 className="text-[20px] md:text-[20px] font-bold mb-4">호스트에게 문의하기</h3>
+        <h3 className="text-[18px] md:text-[20px] font-bold mb-4">호스트에게 문의하기</h3>
         <div className="flex gap-2">
           <input
             value={inquiryText}
             onChange={e => setInquiryText(e.target.value)}
             placeholder="호스트에게 메시지 보내기..."
-            className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors text-[14px] md:text-[14px]"
+            className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors text-[13px] md:text-[14px]"
           />
           <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center"><MessageSquare size={18} /></button>
         </div>
@@ -190,13 +190,13 @@ export default function ExpMainContent({
 
       {/* 알아두어야 할 사항 */}
       <div className="pt-8 pb-12 border-t border-slate-200">
-        <h3 className="text-[34px] md:text-[30px] font-black tracking-[-0.01em] mb-6">알아두어야 할 사항</h3>
-        <div className="rounded-[26px] bg-[#f7f7f7] border border-slate-200 px-5 py-6 space-y-6">
+        <h3 className="text-[24px] md:text-[30px] font-bold tracking-[-0.01em] mb-5">알아두어야 할 사항</h3>
+        <div className="space-y-5">
           <div className="flex gap-3">
             <Users size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[17px] md:text-[16px] font-bold mb-1">게스트 필수조건</h4>
-              <p className="text-[14px] md:text-[14px] text-slate-600 leading-relaxed">
+              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">게스트 필수조건</h4>
+              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">
                 {experience.rules?.age_limit || '14세 이상'} 게스트만 참가할 수 있습니다. 최대 인원은 {experience.max_guests || 10}명입니다.
               </p>
             </div>
@@ -205,8 +205,8 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <PersonStanding size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[17px] md:text-[16px] font-bold mb-1">활동 강도</h4>
-              <p className="text-[14px] md:text-[14px] text-slate-600 leading-relaxed">
+              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">활동 강도</h4>
+              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">
                 신체 활동 강도: {experience.rules?.activity_level || '보통'}, 사전 준비도: {experience.rules?.preparation_level || '초보자'}
               </p>
             </div>
@@ -215,8 +215,8 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <Backpack size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[17px] md:text-[16px] font-bold mb-1">준비물</h4>
-              <p className="text-[14px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">준비물</h4>
+              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {experience.supplies || '편한 복장과 개인 물품을 준비해주세요.'}
               </p>
               {experience.inclusions?.length > 0 && (
@@ -232,8 +232,8 @@ export default function ExpMainContent({
             <div className="flex gap-3 items-start">
               <MapPin size={22} className="text-slate-700 shrink-0 mt-0.5" />
               <div>
-                <h4 className="text-[17px] md:text-[16px] font-bold mb-1">접근성</h4>
-                <p className="text-[14px] md:text-[14px] text-slate-600 leading-relaxed">주로 평평한 부지이며 도움 필요 시 호스트에게 문의해주세요.</p>
+                <h4 className="text-[15px] md:text-[16px] font-bold mb-1">접근성</h4>
+                <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">주로 평평한 부지이며 도움 필요 시 호스트에게 문의해주세요.</p>
               </div>
             </div>
             <ChevronRight size={20} className="text-slate-400 shrink-0" />
@@ -242,8 +242,8 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <CalendarX size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[17px] md:text-[16px] font-bold mb-1">환불 정책</h4>
-              <p className="text-[14px] md:text-[14px] text-slate-600 leading-relaxed">
+              <h4 className="text-[15px] md:text-[16px] font-bold mb-1">환불 정책</h4>
+              <p className="text-[13px] md:text-[14px] text-slate-600 leading-relaxed">
                 {experience.rules?.refund_policy || '시작 시간을 기준으로 3일 전까지 취소하면 예약금이 전액 환불됩니다.'}
               </p>
             </div>

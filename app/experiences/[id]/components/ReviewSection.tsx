@@ -134,20 +134,20 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
 
   return (
     <div id="reviews" className="border-b border-slate-200 pb-8 md:pb-10 scroll-mt-24">
-      <h3 className="text-[30px] md:text-[28px] font-black tracking-[-0.01em] mb-6 flex items-center gap-2">
-        <Star size={22} fill="black"/> {averageRating} · 후기 {reviews.length}개
+      <h3 className="text-[20px] md:text-[28px] font-bold tracking-[-0.01em] mb-5 flex items-center gap-1.5">
+        <Star size={16} fill="black"/> {averageRating} · 후기 {reviews.length}개
       </h3>
       
       {reviews.length > 0 ? (
         <>
           <div className="md:hidden -mx-1 overflow-x-auto pb-2">
-            <div className="flex gap-4 px-1 min-w-max">
+            <div className="flex gap-3 px-1 min-w-max">
               {reviews.slice(0, 4).map((review) => {
                 const avatarUrl = secureUrl(review.user?.avatar_url);
                 return (
-                  <article key={review.id} className="w-[320px] border-r border-slate-200 pr-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-12 h-12 bg-slate-200 rounded-full overflow-hidden relative shrink-0">
+                  <article key={review.id} className="w-[250px] border-r border-slate-200 pr-3">
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-9 h-9 bg-slate-200 rounded-full overflow-hidden relative shrink-0">
                         {avatarUrl ? (
                           <Image src={avatarUrl} alt="user" fill className="object-cover"/>
                         ) : (
@@ -155,24 +155,24 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         )}
                       </div>
                       <div>
-                        <div className="font-bold text-[15px] text-slate-900">{review.user.name}</div>
-                        <div className="text-[13px] text-slate-500">{formatDate(review.created_at)}</div>
+                        <div className="font-semibold text-[13px] text-slate-900">{review.user.name}</div>
+                        <div className="text-[11px] text-slate-500">{formatDate(review.created_at)}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 text-slate-700 mb-2">
+                    <div className="flex items-center gap-1 text-slate-700 mb-1.5">
                       {[...Array(5)].map((_, idx) => (
-                        <Star key={idx} size={14} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
+                        <Star key={idx} size={11} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
                       ))}
-                      <span className="text-[13px] ml-1">{review.rating}.0</span>
+                      <span className="text-[11px] ml-1">{review.rating}.0</span>
                     </div>
-                    <p className="text-[14px] text-slate-700 leading-[1.45] line-clamp-4 mb-2">{review.content}</p>
+                    <p className="text-[12px] text-slate-700 leading-[1.4] line-clamp-4 mb-1.5">{review.content}</p>
                     {review.reply && (
-                      <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 mt-3">
-                        <div className="text-[12px] font-bold text-slate-800 mb-1">호스트 답글</div>
-                        <p className="text-[12px] text-slate-600 line-clamp-2">{review.reply}</p>
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2">
+                        <div className="text-[11px] font-bold text-slate-800 mb-1">호스트 답글</div>
+                        <p className="text-[11px] text-slate-600 line-clamp-2">{review.reply}</p>
                       </div>
                     )}
-                    <button onClick={() => setIsReviewsExpanded(true)} className="text-[14px] font-bold underline underline-offset-2 mt-2">
+                    <button onClick={() => setIsReviewsExpanded(true)} className="text-[12px] font-semibold underline underline-offset-2 mt-2">
                       더 보기
                     </button>
                   </article>
@@ -212,11 +212,11 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       )}
       
       {reviews.length > 0 && (
-        <button onClick={() => setIsReviewsExpanded(true)} className="mt-6 w-full rounded-2xl bg-[#ececec] py-3 text-[15px] md:text-[15px] font-bold text-slate-700 hover:bg-[#e5e5e5] transition-colors">
+        <button onClick={() => setIsReviewsExpanded(true)} className="mt-5 w-full rounded-2xl bg-[#ececec] py-3 text-[14px] md:text-[15px] font-semibold text-slate-700 hover:bg-[#e5e5e5] transition-colors">
           모든 후기 보기
         </button>
       )}
-      <p className="text-center text-[13px] text-slate-400 mt-3 underline underline-offset-2">후기 운영 방식 알아보기</p>
+      <p className="text-center text-[11px] text-slate-400 mt-3 underline underline-offset-2">후기 운영 방식 알아보기</p>
 
       {isReviewsExpanded && (
         <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>

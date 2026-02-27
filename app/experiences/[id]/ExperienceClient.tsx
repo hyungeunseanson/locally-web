@@ -172,24 +172,24 @@ export default function ExperienceClient({
 
       {/* 📱 모바일 전용 상단 헤더 */}
       <div
-        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-[#f5f5f5]/95 backdrop-blur-sm h-14 flex items-center justify-between px-4"
+        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-[#f5f5f5]/95 backdrop-blur-sm h-[52px] flex items-center justify-between px-4"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
-          <ArrowLeft size={20} className="text-slate-900" />
+          <ArrowLeft size={18} className="text-slate-900" />
         </button>
-        <p className="absolute left-1/2 -translate-x-1/2 text-[12px] font-semibold text-slate-500 truncate max-w-[58%]">{headerLabel}</p>
+        <p className="absolute left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500 truncate max-w-[58%]">{headerLabel}</p>
         <div className="flex items-center gap-1">
           <button onClick={handleShare} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <Share size={18} className="text-slate-900" />
+            <Share size={16} className="text-slate-900" />
           </button>
           <button onClick={toggleWishlist} disabled={isSaveLoading} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <Heart size={18} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
+            <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
           </button>
         </div>
       </div>
 
-      <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-[66px] md:pt-8 pb-8 md:py-8">
+      <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-[58px] md:pt-8 pb-8 md:py-8">
         <section className="hidden md:block mb-6">
           <p className="text-sm font-semibold text-slate-500 mb-2">{headerLabel}</p>
           <h1 className="text-3xl font-black mb-2 tracking-tight">{translatedTitle}</h1>
@@ -247,7 +247,7 @@ export default function ExperienceClient({
         {/* 모바일 상단 소개 블록 */}
         <section className="md:hidden">
           <div
-            className="relative w-full aspect-square mb-7 overflow-hidden rounded-[24px] cursor-pointer border border-slate-200"
+            className="relative w-full aspect-square mb-6 overflow-hidden rounded-[24px] cursor-pointer border border-slate-200"
             onClick={() => setIsGalleryOpen(true)}
           >
             <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[5px] bg-[#f5f5f5]">
@@ -270,51 +270,51 @@ export default function ExperienceClient({
           </div>
 
           <div className="text-center px-2">
-            <h1 className="text-[38px] leading-[1.12] font-extrabold tracking-[-0.01em] mb-4">{translatedTitle}</h1>
-            <p className="text-[16px] leading-[1.42] text-slate-600 font-medium mb-5 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
-            <div className="flex items-center justify-center gap-2 text-[18px] font-bold mb-2">
-              <Star size={18} fill="black" className="mb-[1px]" />
+            <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">{translatedTitle}</h1>
+            <p className="text-[13px] leading-[1.42] text-slate-500 font-normal mb-4 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
+            <div className="flex items-center justify-center gap-1.5 text-[13px] font-semibold mb-1.5">
+              <Star size={13} fill="black" className="mb-[1px]" />
               <span>{ratingText}</span>
-              <span className="text-slate-400">·</span>
+              <span className="text-slate-300">·</span>
               <button onClick={() => scrollToSection('reviews')} className="underline underline-offset-2">
                 후기 {reviewCount}개
               </button>
             </div>
-            <div className="flex items-center justify-center gap-2 text-[14px] text-slate-500 mb-7">
-              <Languages size={16} />
+            <div className="flex items-center justify-center gap-1.5 text-[12px] text-slate-500 mb-5">
+              <Languages size={13} />
               <span>자동 번역됨</span>
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-5">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center">
+          <div className="border-t border-slate-200 pt-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center">
                 {hostProfile?.avatar_url ? (
                   <img src={hostProfile.avatar_url} className="w-full h-full object-cover" alt="Host" />
                 ) : (
-                  <span className="text-slate-400 text-sm font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
+                  <span className="text-slate-400 text-xs font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-[15px] font-bold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
-                <p className="text-[14px] text-slate-500 truncate">{hostProfile?.job || category}</p>
+                <p className="text-[13px] font-semibold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
+                <p className="text-[12px] text-slate-500 truncate">{hostProfile?.job || category}</p>
               </div>
             </div>
 
             <button
               onClick={() => scrollToSection('location')}
-              className="mt-5 w-full text-left flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+              className="mt-4 w-full text-left flex items-center gap-2.5 rounded-[14px] border border-slate-200 bg-white px-3 py-2.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
             >
-              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                <MapPin size={18} className="text-slate-700" />
+              <div className="w-9 h-9 rounded-[10px] bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
+                <MapPin size={15} className="text-slate-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[14px] font-bold truncate">{location}</p>
-                <p className="text-[13px] text-slate-500 truncate">{experience.location || compactLocation}</p>
+                <p className="text-[13px] font-semibold truncate">{location}</p>
+                <p className="text-[12px] text-slate-500 truncate">{experience.location || compactLocation}</p>
               </div>
             </button>
 
-            <div className="mt-6 border-b border-slate-200" />
+            <div className="mt-5 border-b border-slate-200" />
           </div>
         </section>
 
