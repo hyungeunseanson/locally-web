@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal';
-import { Send, ShieldCheck, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
+import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 

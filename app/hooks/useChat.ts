@@ -1,17 +1,92 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { User } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { sendNotification } from '@/app/utils/notification';
 import { sanitizeText } from '@/app/utils/sanitize';
 import { compressImage, sanitizeFileName } from '@/app/utils/image';
 
+type ProfileRow = {
+  id: string;
+  full_name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+};
+
+type HostApplicationRow = {
+  user_id: string;
+  name?: string | null;
+  profile_photo?: string | null;
+};
+
+type InquiryExperience = {
+  id: number | string;
+  title?: string | null;
+  photos?: string[] | null;
+  image_url?: string | null;
+  host_id?: string | null;
+};
+
+type InquiryRow = {
+  id: number | string;
+  user_id: string;
+  host_id: string;
+  experience_id?: string | number | null;
+  type?: string;
+  content?: string;
+  updated_at?: string | null;
+  experiences?: InquiryExperience | null;
+};
+
+type InquiryListItem = InquiryRow & {
+  experience_id: string | number;
+  unread_count: number;
+  guest?: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+    email?: string | null;
+  };
+  host?: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+  };
+  experiences?: (InquiryExperience & { image_url?: string | null }) | null;
+};
+
+type InquiryMessageRow = {
+  id: number;
+  inquiry_id: number | string;
+  sender_id: string;
+  content: string;
+  image_url?: string | null;
+  type?: string;
+  is_read?: boolean;
+  created_at: string;
+};
+
+type InquiryMessageView = InquiryMessageRow & {
+  sender: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+  };
+};
+
+type RealtimeMessagePayload = {
+  id?: number;
+  sender_id?: string;
+  inquiry_id?: number | string;
+};
+
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
-  const [inquiries, setInquiries] = useState<any[]>([]);
-  const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [inquiries, setInquiries] = useState<InquiryListItem[]>([]);
+  const [selectedInquiry, setSelectedInquiry] = useState<InquiryListItem | null>(null);
+  const [messages, setMessages] = useState<InquiryMessageView[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const supabase = createClient();
@@ -20,24 +95,33 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   // 실시간 이벤트 중복 수신 방지 (메시지 id 단위)
   const processedEventRef = useRef<Set<string>>(new Set());
 
-  const secureUrl = (url: string | null) => {
+  const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
   };
 
+  const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && (!currentUser || currentUser.id !== user.id)) {
+      setCurrentUser(user);
+    }
+    return user;
+  }, [supabase, currentUser]);
+
   const fetchInquiries = useCallback(async (showLoading = true) => {
-    // 🟢 [수정] 불필요한 로딩 상태 변경 방지 (깜빡임 해결)
     if (showLoading && inquiries.length === 0) setIsLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setIsLoading(false); return; }
-      if (!currentUser) setCurrentUser(user); // 유저 정보 한 번만 세팅
+      const user = await getAuthenticatedUser();
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
 
       let query = supabase
         .from('inquiries')
-        .select(`*, experiences (id, title, photos, image_url, host_id)`)
+        .select('*, experiences (id, title, photos, image_url, host_id)')
         .order('updated_at', { ascending: false });
 
       if (role === 'guest') query = query.eq('user_id', user.id);
@@ -46,10 +130,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       const { data: inquiriesData, error } = await query;
       if (error) throw error;
 
-      if (inquiriesData && inquiriesData.length > 0) {
-        const inquiryIds = inquiriesData.map(i => i.id);
-        const hostIds = Array.from(new Set(inquiriesData.map(item => item.host_id).filter(Boolean)));
-        const guestIds = Array.from(new Set(inquiriesData.map(item => item.user_id).filter(Boolean)));
+      const inquiryRows = (inquiriesData || []) as InquiryRow[];
+      if (inquiryRows.length > 0) {
+        const inquiryIds = inquiryRows.map((i) => i.id);
+        const hostIds = Array.from(new Set(inquiryRows.map((item) => item.host_id).filter(Boolean))) as string[];
+        const guestIds = Array.from(new Set(inquiryRows.map((item) => item.user_id).filter(Boolean))) as string[];
 
         const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', hostIds),
@@ -62,16 +147,22 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
             .neq('sender_id', user.id)
         ]);
 
-        const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
-        const appsMap = new Map(appsRes.data?.map(a => [a.user_id, a]));
-        const guestMap = new Map(guestProfilesRes.data?.map(g => [g.id, g]));
+        const hostProfiles = (profilesRes.data || []) as ProfileRow[];
+        const hostApps = (appsRes.data || []) as HostApplicationRow[];
+        const guestProfiles = (guestProfilesRes.data || []) as ProfileRow[];
+        const unreadRows = (unreadRes.data || []) as Array<{ inquiry_id: number | string }>;
 
-        const unreadCounts: Record<number, number> = {};
-        unreadRes.data?.forEach((msg: any) => {
-          unreadCounts[msg.inquiry_id] = (unreadCounts[msg.inquiry_id] || 0) + 1;
+        const profilesMap = new Map(hostProfiles.map((p) => [p.id, p]));
+        const appsMap = new Map(hostApps.map((a) => [a.user_id, a]));
+        const guestMap = new Map(guestProfiles.map((g) => [g.id, g]));
+
+        const unreadCounts: Record<string, number> = {};
+        unreadRows.forEach((msg) => {
+          const key = String(msg.inquiry_id);
+          unreadCounts[key] = (unreadCounts[key] || 0) + 1;
         });
 
-        const safeData = inquiriesData.map(item => {
+        const safeData: InquiryListItem[] = inquiryRows.map((item) => {
           const hostApp = appsMap.get(item.host_id);
           const hostProfile = profilesMap.get(item.host_id);
           const hostName = hostApp?.name || hostProfile?.full_name || '호스트';
@@ -83,99 +174,119 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
           return {
             ...item,
-            unread_count: unreadCounts[item.id] || 0,
+            experience_id: item.experience_id ?? '',
+            unread_count: unreadCounts[String(item.id)] || 0,
             guest: {
               id: item.user_id,
               name: guestName,
-              avatar_url: secureUrl(guestAvatar),
+              avatar_url: secureUrl(guestAvatar ?? null),
               email: guestProfile?.email
             },
             host: {
               id: item.host_id,
               name: hostName,
-              avatar_url: secureUrl(hostAvatar)
+              avatar_url: secureUrl(hostAvatar ?? null)
             },
-            experiences: item.experiences ? {
-              ...item.experiences,
-              image_url: secureUrl(item.experiences.image_url || item.experiences.photos?.[0])
-            } : null
+            experiences: item.experiences
+              ? {
+                ...item.experiences,
+                image_url: secureUrl(item.experiences.image_url || item.experiences.photos?.[0] || null)
+              }
+              : null
           };
         });
+
         setInquiries(safeData);
       } else {
         setInquiries([]);
       }
-    } catch (err: any) { console.error(err); }
-    finally { setIsLoading(false); }
-  }, [supabase, role, currentUser]); // 의존성 최적화
+    } catch (err: unknown) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase, role, inquiries.length, getAuthenticatedUser]);
 
-  const markAsRead = async (inquiryId: number) => {
+  const markAsRead = useCallback(async (inquiryId: number | string) => {
     if (!currentUser) return;
-    setInquiries(prev => prev.map(inq =>
+    setInquiries((prev) => prev.map((inq) =>
       inq.id === inquiryId ? { ...inq, unread_count: 0 } : inq
     ));
+
     await supabase
       .from('inquiry_messages')
       .update({ is_read: true })
       .eq('inquiry_id', inquiryId)
       .neq('sender_id', currentUser.id);
-  };
+  }, [currentUser, supabase]);
 
-  const loadMessages = async (inquiryId: number) => {
+  const loadMessages = useCallback(async (inquiryId: number | string) => {
     try {
       const { data, error } = await supabase
         .from('inquiry_messages')
-        .select(`*`)
+        .select('*')
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
       if (data) {
-        const senderIds = Array.from(new Set(data.map(m => m.sender_id)));
+        const rawMessages = data as InquiryMessageRow[];
+        const senderIds = Array.from(new Set(rawMessages.map((m) => m.sender_id)));
         const [proRes, appRes] = await Promise.all([
           supabase.from('profiles').select('*').in('id', senderIds),
           supabase.from('host_applications').select('*').in('user_id', senderIds)
         ]);
 
-        const profileMap = new Map(proRes.data?.map(p => [p.id, p]));
-        const appMap = new Map(appRes.data?.map(a => [a.user_id, a]));
+        const profileRows = (proRes.data || []) as ProfileRow[];
+        const appRows = (appRes.data || []) as HostApplicationRow[];
+        const profileMap = new Map(profileRows.map((p) => [p.id, p]));
+        const appMap = new Map(appRows.map((a) => [a.user_id, a]));
 
-        const safeMessages = data.map(msg => {
-          const p = profileMap.get(msg.sender_id);
-          const a = appMap.get(msg.sender_id);
-          const name = a?.name || p?.full_name || '알 수 없음';
-          const avatar = a?.profile_photo || p?.avatar_url;
+        const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => {
+          const profile = profileMap.get(msg.sender_id);
+          const app = appMap.get(msg.sender_id);
+          const name = app?.name || profile?.full_name || '알 수 없음';
+          const avatar = app?.profile_photo || profile?.avatar_url;
 
           return {
             ...msg,
+            created_at: msg.created_at || new Date().toISOString(),
             sender: {
               id: msg.sender_id,
-              name: name,
-              avatar_url: secureUrl(avatar)
+              name,
+              avatar_url: secureUrl(avatar ?? null)
             }
           };
         });
+
         setMessages(safeMessages);
       }
 
-      const selected = inquiries.find(i => i.id === inquiryId);
+      const selected = inquiries.find((i) => String(i.id) === String(inquiryId));
       if (selected) {
         setSelectedInquiry(selected);
         markAsRead(inquiryId);
       }
-    } catch (err: any) { console.error(err); }
-  };
+    } catch (err: unknown) {
+      console.error(err);
+    }
+  }, [supabase, inquiries, markAsRead]);
 
-  const sendMessage = async (inquiryId: number, content: string, file?: File) => {
+  const sendMessage = async (inquiryId: number | string, content: string, file?: File, senderId?: string) => {
     const cleanContent = sanitizeText(content);
     if (!cleanContent.trim() && !file) return;
-    if (!currentUser) return;
 
-    let imageUrl = null;
+    const fallbackUser = senderId ? null : await getAuthenticatedUser();
+    const actorId = senderId || currentUser?.id || fallbackUser?.id;
+    if (!actorId) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+
+    let imageUrl: string | null = null;
     let type = 'text';
 
-    // 📸 이미지 업로드 처리
     if (file) {
       try {
         const compressed = await compressImage(file);
@@ -197,20 +308,19 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
     const displayContent = cleanContent || (type === 'image' ? '📷 사진을 보냈습니다.' : '');
 
-    // UI 낙관적 업데이트
-    setInquiries(prev => prev.map(inq =>
+    setInquiries((prev) => prev.map((inq) =>
       inq.id === inquiryId
         ? { ...inq, content: displayContent, updated_at: new Date().toISOString() }
         : inq
-    ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
+    ).sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime()));
 
     try {
       const { error } = await supabase.from('inquiry_messages').insert([{
         inquiry_id: inquiryId,
-        sender_id: currentUser.id,
+        sender_id: actorId,
         content: cleanContent,
         image_url: imageUrl,
-        type: type,
+        type,
         is_read: false
       }]);
 
@@ -223,38 +333,60 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       await loadMessages(inquiryId);
 
-      // 알림 발송
-      const currentInquiry = inquiries.find(i => i.id === inquiryId);
+      const currentInquiry = inquiries.find((i) => i.id === inquiryId);
       if (currentInquiry) {
-        const recipientId = currentUser.id === currentInquiry.host_id
+        const recipientId = actorId === currentInquiry.host_id
           ? currentInquiry.user_id
           : currentInquiry.host_id;
 
-        const targetLink = currentUser.id === currentInquiry.host_id
+        const targetLink = actorId === currentInquiry.host_id
           ? '/guest/inbox'
           : '/host/dashboard?tab=inquiries';
 
-        const senderName = currentUser.user_metadata?.full_name || '상대방';
+        const senderName =
+          ((currentUser?.user_metadata as { full_name?: string } | undefined)?.full_name) ||
+          ((fallbackUser?.user_metadata as { full_name?: string } | undefined)?.full_name) ||
+          '상대방';
+
+        const numericInquiryId = typeof inquiryId === 'number' ? inquiryId : Number(inquiryId);
 
         await sendNotification({
           recipient_id: recipientId,
-          senderId: currentUser.id,
+          senderId: actorId,
           type: 'new_message',
           title: `💬 ${senderName}님의 새 메시지`,
           message: displayContent,
           link: targetLink,
-          inquiry_id: inquiryId
+          inquiry_id: Number.isFinite(numericInquiryId) ? numericInquiryId : undefined
         });
       }
 
-    } catch (err: any) { showToast("메시지 전송 실패: " + err.message, 'error'); }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
+      showToast('메시지 전송 실패: ' + message, 'error');
+    }
   };
 
-  const createInquiry = async (hostId: string, experienceId: string, content: string) => {
-    if (!currentUser) throw new Error('로그인 필요');
-    const { data, error } = await supabase.from('inquiries').insert([{ user_id: currentUser.id, host_id: hostId, experience_id: experienceId, content, type: 'general' }]).select().maybeSingle();
+  const createInquiry = async (hostId: string, experienceId: string | number, content: string) => {
+    const authUser = await getAuthenticatedUser();
+    if (!authUser) throw new Error('로그인 필요');
+
+    const { data, error } = await supabase
+      .from('inquiries')
+      .insert([{
+        user_id: authUser.id,
+        host_id: hostId,
+        experience_id: String(experienceId),
+        content,
+        type: 'general'
+      }])
+      .select()
+      .maybeSingle();
+
     if (error) throw error;
-    await sendMessage(data.id, content);
+    if (!data) throw new Error('문의방 생성에 실패했습니다.');
+
+    await sendMessage(data.id as number | string, content, undefined, authUser.id);
     return data;
   };
 
@@ -264,8 +396,11 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       id: 'new',
       type: 'general',
       host_id: hostData.id,
+      user_id: currentUser?.id || '',
       experience_id: expData.id,
+      unread_count: 0,
       host: {
+        id: hostData.id,
         name: hostData.name,
         avatar_url: secureUrl(hostData.avatarUrl || null)
       },
@@ -276,7 +411,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
-  // 🟢 [핵심 수정] 실시간 리스트 업데이트 강화 (채널 하나로 통합 관리)
   useEffect(() => {
     if (!currentUser) return;
 
@@ -286,17 +420,17 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
-          const rawId = (payload.new as any)?.id || (payload.old as any)?.id || 'unknown';
+          const newPayload = payload.new as RealtimeMessagePayload | null;
+          const oldPayload = payload.old as RealtimeMessagePayload | null;
+          const rawId = newPayload?.id || oldPayload?.id || 'unknown';
           const eventKey = `${payload.eventType}:${rawId}`;
           if (processedEventRef.current.has(eventKey)) return;
           processedEventRef.current.add(eventKey);
           setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
 
-          const newData = payload.new as any;
-          // 내가 보낸 게 아닐 때만 갱신 (나는 이미 낙관적 업데이트 함)
-          if (newData && newData.sender_id !== currentUser.id) {
+          if (newPayload && newPayload.sender_id !== currentUser.id) {
             fetchInquiries(false);
-            if (selectedInquiry && newData.inquiry_id === selectedInquiry.id) {
+            if (selectedInquiry && String(newPayload.inquiry_id) === String(selectedInquiry.id)) {
               loadMessages(selectedInquiry.id);
             }
           }
@@ -304,17 +438,32 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'inquiries' }, // 🟢 추가: 채팅방 메타데이터 변경 감지
-        () => fetchInquiries(false) // 목록 순서 변경 등 반영
+        { event: 'UPDATE', schema: 'public', table: 'inquiries' },
+        () => fetchInquiries(false)
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, fetchInquiries, selectedInquiry, currentUser]); // loadMessages는 의존성에서 제외 (무한루프 방지)
+  }, [supabase, fetchInquiries, selectedInquiry, currentUser, loadMessages]);
 
-  const clearSelected = () => { setSelectedInquiry(null); setMessages([]); };
+  const clearSelected = () => {
+    setSelectedInquiry(null);
+    setMessages([]);
+  };
 
-  return { inquiries, selectedInquiry, messages, currentUser, isLoading, loadMessages, sendMessage, createInquiry, startNewChat, clearSelected, refresh: fetchInquiries };
+  return {
+    inquiries,
+    selectedInquiry,
+    messages,
+    currentUser,
+    isLoading,
+    loadMessages,
+    sendMessage,
+    createInquiry,
+    startNewChat,
+    clearSelected,
+    refresh: fetchInquiries
+  };
 }

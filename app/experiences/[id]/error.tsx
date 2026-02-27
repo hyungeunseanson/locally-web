@@ -1,6 +1,7 @@
 'use client' // 클라이언트 컴포넌트 필수
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 
 export default function Error({
   error,
@@ -31,9 +32,9 @@ export default function Error({
       >
         다시 시도하기
       </button>
-      <a href="/" className="mt-4 text-sm text-gray-500 underline">
+      <Link href="/" className="mt-4 text-sm text-gray-500 underline">
         홈으로 돌아가기
-      </a>
+      </Link>
     </div>
   )
 }

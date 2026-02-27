@@ -31,7 +31,6 @@ function InboxContent() {
 
   // 🟢 프로필 모달 상태
   const [modalUserId, setModalUserId] = useState<string | null>(null);
-  const [modalRole, setModalRole] = useState<'host' | 'guest'>('host');
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,7 +57,8 @@ function InboxContent() {
     return url;
   };
 
-  const formatTime = (dateString: string) => {
+  const formatTime = (dateString?: string) => {
+    if (!dateString) return '';
     // 🟢 언어별 시간 포맷 적용
     const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
     return new Date(dateString).toLocaleTimeString(localeMap[lang] || 'ko-KR', { hour: '2-digit', minute: '2-digit' });
@@ -95,7 +95,7 @@ function InboxContent() {
     setIsUrlProcessed(true);
   }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
 
-  const handleSelectInquiry = (inqId: number) => {
+  const handleSelectInquiry = (inqId: number | string) => {
     loadMessages(inqId);
     if (hostId || expId) router.replace('/guest/inbox');
   };
@@ -128,7 +128,11 @@ function InboxContent() {
     }
   };
 
-  const getDisplayHost = (inqOrSelected: any) => {
+  const getDisplayHost = (inqOrSelected: {
+    id?: string | number;
+    host_id?: string;
+    host?: { id: string; name: string; avatar_url: string | null };
+  } | null | undefined) => {
     if (inqOrSelected?.host) {
       return {
         name: inqOrSelected.host.name,
@@ -148,7 +152,6 @@ function InboxContent() {
   const handleProfileClick = (id: string | null) => {
     if (id) {
       setModalUserId(id);
-      setModalRole('host');
     }
   };
 
