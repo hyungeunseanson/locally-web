@@ -2,8 +2,23 @@
 
 import React from 'react';
 import ReservationCard from './ReservationCard';
+import { ExperienceDetail } from '../types';
 
-export default function ExpSidebar({ experience, availableDates, dateToTimeMap, remainingSeatsMap, handleReserve }: any) {
+type ExpSidebarProps = {
+  experience: ExperienceDetail;
+  availableDates: string[];
+  dateToTimeMap: Record<string, string[]>;
+  remainingSeatsMap: Record<string, number>;
+  handleReserve: (date: string, time: string, guests: number, isPrivate: boolean) => void;
+};
+
+export default function ExpSidebar({
+  experience,
+  availableDates,
+  dateToTimeMap,
+  remainingSeatsMap,
+  handleReserve
+}: ExpSidebarProps) {
   return (
     <div id="reservation-card" className="w-full md:w-[380px] scroll-mt-24">
       <ReservationCard

@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { User } from 'lucide-react';
 import HostProfileModal from './HostProfileModal';
 
 interface HostProfileProps {
-  hostId: string;
+  hostId?: string;
   name: string;
   avatarUrl?: string;
   job?: string;
@@ -31,9 +32,9 @@ export default function HostProfileSection(props: HostProfileProps) {
           onClick={() => setIsModalOpen(true)}
           className="w-full bg-[#f4f4f4] rounded-[22px] border border-slate-200 p-7 text-center shadow-[0_4px_14px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_18px_rgba(0,0,0,0.08)] transition-shadow"
         >
-          <div className="w-[96px] h-[96px] rounded-full overflow-hidden bg-slate-200 border border-slate-200 mx-auto mb-4 flex items-center justify-center">
+          <div className="relative w-[96px] h-[96px] rounded-full overflow-hidden bg-slate-200 border border-slate-200 mx-auto mb-4 flex items-center justify-center">
             {props.avatarUrl ? (
-              <img src={props.avatarUrl} className="w-full h-full object-cover" alt={props.name} />
+              <Image src={props.avatarUrl} className="object-cover" alt={props.name} fill />
             ) : (
               <User className="text-slate-300 w-12 h-12" />
             )}
@@ -66,6 +67,7 @@ export default function HostProfileSection(props: HostProfileProps) {
           ...props,
           reviewCount: 0,
           rating: null,
+          onContactHost: props.onMessageHost,
         }}
       />
     </>

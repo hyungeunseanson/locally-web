@@ -14,47 +14,16 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
+import { ExperienceDetail, HostProfileDetail } from './types';
 
 type AuthUser = {
   id?: string;
 } | null;
 
-type ExperienceData = {
-  id: string | number;
-  host_id?: string;
-  title?: string;
-  description?: string;
-  category?: string;
-  meeting_point?: string;
-  location?: string;
-  rating?: number;
-  review_count?: number;
-  price?: number;
-  photos?: string[];
-  image_url?: string;
-  max_guests?: number;
-  duration?: number;
-  [key: string]: unknown;
-};
-
-type HostProfileData = {
-  id?: string;
-  name?: string;
-  avatar_url?: string;
-  languages?: string[];
-  introduction?: string;
-  job?: string;
-  dream_destination?: string;
-  favorite_song?: string;
-  joined_year?: number | null;
-  bio?: string;
-  [key: string]: unknown;
-} | null;
-
 type Props = {
   initialUser: AuthUser;
-  initialExperience: ExperienceData;
-  initialHostProfile: HostProfileData;
+  initialExperience: ExperienceDetail;
+  initialHostProfile: HostProfileDetail;
   initialAvailableDates: string[];
   initialDateToTimeMap: Record<string, string[]>;
   initialRemainingSeatsMap: Record<string, number>;
@@ -97,7 +66,8 @@ export default function ExperienceClient({
   const category = getContent(experience, 'category', lang) || experience.category || '문화 체험';
   const compactLocation = location?.split(',')?.[0]?.trim() || 'Locally';
   const headerLabel = `${compactLocation} · ${category}`;
-  const ratingText = experience.rating > 0 ? experience.rating.toFixed(2) : 'New';
+  const ratingValue = Number(experience.rating || 0);
+  const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : 'New';
   const reviewCount = Number(experience.review_count || 0);
 
   // 🟢 체험 상세페이지 진입 시 조회(view) 이벤트 기록
@@ -139,7 +109,7 @@ export default function ExperienceClient({
         showToast('호스트 정보를 불러올 수 없습니다.', 'error');
         return false;
       }
-      await createInquiry(experience.host_id, experience.id, inquiryText);
+      await createInquiry(experience.host_id, String(experience.id), inquiryText);
       showToast('메시지가 발송되었습니다.', 'success');
       setInquiryText('');
       return true;
@@ -165,7 +135,7 @@ export default function ExperienceClient({
     });
 
     const typeParam = isPrivate ? '&type=private' : '';
-    router.push(`/experiences/${params.id}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
+    router.push(`/experiences/${experienceId}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
 
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
@@ -295,7 +265,9 @@ export default function ExperienceClient({
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center">
                 {hostProfile?.avatar_url ? (
-                  <img src={hostProfile.avatar_url} className="w-full h-full object-cover" alt="Host" />
+                  <div className="relative w-full h-full">
+                    <Image src={hostProfile.avatar_url} fill className="object-cover" alt="Host avatar" />
+                  </div>
                 ) : (
                   <span className="text-slate-400 text-xs font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
                 )}

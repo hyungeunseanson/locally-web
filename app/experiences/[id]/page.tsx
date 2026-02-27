@@ -4,6 +4,7 @@ import ExperienceClient from './ExperienceClient';
 import { notFound } from 'next/navigation';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { getContent } from '@/app/utils/contentHelper';
+import { ExperienceDetail, HostProfileDetail } from './types';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -76,14 +77,14 @@ export default async function Page({ params }: Props) {
     supabase.auth.getUser()
   ]);
 
-  const experience = expResult.data;
+  const experience = expResult.data as ExperienceDetail | null;
 
   if (!experience) {
     return notFound();
   }
 
   // 2. 호스트 프로필 데이터 가져오기
-  let hostProfile = null;
+  let hostProfile: HostProfileDetail = null;
   if (experience.host_id) {
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', experience.host_id).maybeSingle();
     const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle();
@@ -109,18 +110,21 @@ export default async function Page({ params }: Props) {
   const availableDates: string[] = [];
   const dateToTimeMap: Record<string, string[]> = {};
   const remainingSeatsMap: Record<string, number> = {};
-  const maxGuests = experience.max_guests || 10;
+  const maxGuests = Number(experience.max_guests || 10);
 
   if (datesResult.data) {
-    datesResult.data.forEach((d: any) => {
-      const availTime = d.start_time.substring(0, 5);
+    const availabilityRows = datesResult.data as Array<{ date: string; start_time: string }>;
+    const bookingRows = (bookingsResult.data || []) as Array<{ date: string; time: string; guests: number | null }>;
+
+    availabilityRows.forEach((d) => {
+      const availTime = String(d.start_time).substring(0, 5);
       
-      const currentBooked = bookingsResult.data
-        ?.filter((b: any) => {
-          const bookingTime = b.time.substring(0, 5);
+      const currentBooked = bookingRows
+        .filter((b) => {
+          const bookingTime = String(b.time).substring(0, 5);
           return b.date === d.date && bookingTime === availTime;
         })
-        .reduce((sum: number, b: any) => sum + (b.guests || 0), 0) || 0;
+        .reduce((sum: number, b) => sum + Number(b.guests || 0), 0);
 
       const remaining = maxGuests - currentBooked;
       const key = `${d.date}_${availTime}`;

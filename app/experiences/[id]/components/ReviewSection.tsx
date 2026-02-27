@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 
 interface ReviewSectionProps {
-  experienceId: number;
+  experienceId: number | string;
   hostName: string;
 }
 
@@ -272,12 +272,12 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         <div className="flex-1 min-w-0">
                           <div>
                             <div className="font-medium text-[11px] md:text-[11px] text-slate-900 leading-none">{review.user.name}</div>
-                            <div className="text-[8px] md:text-[8px] text-slate-500 mt-1">게스트</div>
+                            <div className="text-[10px] md:text-[10px] text-slate-500 mt-1">게스트</div>
                             <div className="flex items-center gap-1 text-slate-700 mt-2 mb-2">
                               {[...Array(5)].map((_, idx) => (
-                                <Star key={idx} size={8} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
+                                <Star key={idx} size={10} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
                               ))}
-                              <span className="text-[8px] text-slate-500 ml-1">{review.created_at ? `${Math.max(1, Math.floor((Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24)))}일 전` : ''}</span>
+                              <span className="text-[10px] text-slate-500 ml-1">{review.created_at ? `${Math.max(1, Math.floor((Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24)))}일 전` : ''}</span>
                             </div>
                             <p className="text-[10px] md:text-[10px] font-normal text-slate-700 leading-[1.45] whitespace-pre-wrap mb-1.5">
                               {review.content}

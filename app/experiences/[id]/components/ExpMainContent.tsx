@@ -3,49 +3,15 @@
 import React from 'react';
 import { MapPin, MessageSquare, Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import ReviewSection from './ReviewSection';
 import HostProfileSection from './HostProfileSection';
 import { useToast } from '@/app/context/ToastContext';
-
-type ItineraryItem = {
-  title?: string;
-  description?: string;
-  image_url?: string;
-};
+import { ExperienceDetail, ExperienceItineraryItem, HostProfileDetail } from '../types';
 
 type MainContentProps = {
-  experience: {
-    id: number | string;
-    host_id?: string;
-    photos?: string[];
-    image_url?: string;
-    meeting_point?: string;
-    location?: string;
-    max_guests?: number;
-    duration?: number;
-    supplies?: string;
-    inclusions?: string[];
-    rules?: {
-      age_limit?: string;
-      activity_level?: string;
-      preparation_level?: string;
-      refund_policy?: string;
-    };
-    itinerary?: ItineraryItem[];
-    category?: string;
-    description?: string;
-  };
-  hostProfile: {
-    name?: string;
-    avatar_url?: string;
-    languages?: string[];
-    job?: string;
-    dream_destination?: string;
-    favorite_song?: string;
-    joined_year?: number | null;
-    introduction?: string;
-    bio?: string;
-  } | null;
+  experience: ExperienceDetail;
+  hostProfile: HostProfileDetail;
   handleInquiry: () => Promise<boolean>;
   inquiryText: string;
   setInquiryText: React.Dispatch<React.SetStateAction<string>>;
@@ -59,8 +25,8 @@ export default function ExpMainContent({
   const { showToast } = useToast();
   const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
   const [isSubmittingMessage, setIsSubmittingMessage] = React.useState(false);
-  const location = experience.meeting_point || experience.location || 'Seoul';
-  const itinerary: ItineraryItem[] = Array.isArray(experience.itinerary) ? experience.itinerary : [];
+  const location = (experience.meeting_point || experience.location || 'Seoul') as string;
+  const itinerary: ExperienceItineraryItem[] = Array.isArray(experience.itinerary) ? experience.itinerary : [];
   const photos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
@@ -113,7 +79,7 @@ export default function ExpMainContent({
         </div>
         <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center relative">
           {hostProfile?.avatar_url ? (
-            <img src={hostProfile.avatar_url} className="w-full h-full object-cover" alt="Host" />
+            <Image src={hostProfile.avatar_url} alt="Host avatar" fill className="object-cover" />
           ) : (
             <span className="text-slate-400 text-base font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
           )}
@@ -129,7 +95,9 @@ export default function ExpMainContent({
             return (
               <div key={`${item?.title || 'step'}-${idx}`} className="flex items-start gap-3 md:gap-5">
                 <div className="w-[72px] h-[72px] md:w-[100px] md:h-[100px] rounded-[14px] md:rounded-[20px] overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
-                  <img src={imageSrc} className="w-full h-full object-cover" alt={item?.title || `itinerary-${idx + 1}`} />
+                  <div className="relative w-full h-full">
+                    <Image src={imageSrc} fill className="object-cover" alt={item?.title || `itinerary-${idx + 1}`} />
+                  </div>
                 </div>
                 <div className="pt-0.5">
                   <h4 className="text-[13px] md:text-[17px] font-medium leading-[1.3] mb-1">{item?.title || `코스 ${idx + 1}`}</h4>
@@ -147,7 +115,7 @@ export default function ExpMainContent({
       </div>
 
       {/* 후기 */}
-      <ReviewSection experienceId={experience.id} hostName={hostProfile?.name || 'Locally'} />
+      <ReviewSection experienceId={String(experience.id)} hostName={hostProfile?.name || 'Locally'} />
 
       {/* 만나는 장소 */}
       <div id="location" className="border-b border-slate-200 pb-8 md:pb-10 scroll-mt-24">
@@ -244,7 +212,7 @@ export default function ExpMainContent({
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {experience.supplies || '편한 복장과 개인 물품을 준비해주세요.'}
               </p>
-              {experience.inclusions?.length > 0 && (
+              {Array.isArray(experience.inclusions) && experience.inclusions.length > 0 && (
                 <p className="text-[12px] md:text-[13px] text-slate-500 mt-2">포함 사항: {experience.inclusions.join(', ')}</p>
               )}
             </div>

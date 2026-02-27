@@ -1,25 +1,62 @@
 'use client';
 
 import React, { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { useSearchParams, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, Download, MessageCircle, Clock, CreditCard, AlertCircle } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, MessageCircle, Clock, AlertCircle } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 
+type BookingExperience = {
+  title?: string;
+  location?: string;
+  duration?: number;
+  photos?: string[] | null;
+  image_url?: string | null;
+};
+
+type BookingData = {
+  status?: string;
+  date: string;
+  time: string;
+  order_id?: string;
+  experiences?: BookingExperience | null;
+};
+
 function PaymentCompleteContent() {
-  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const supabase = createClient();
   const { showToast } = useToast();
 
   const orderId = searchParams.get('orderId');
-  const [booking, setBooking] = useState<any>(null);
+  const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 🎉 폭죽 효과 함수
+  const fireConfetti = () => {
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+    const random = (min: number, max: number) => Math.random() * (max - min) + min;
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        return;
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+      confetti({ ...defaults, particleCount, origin: { x: random(0.1, 0.3), y: Math.random() - 0.2 } });
+      confetti({ ...defaults, particleCount, origin: { x: random(0.7, 0.9), y: Math.random() - 0.2 } });
+    }, 250);
+  };
 
   // 1. 예약 정보 조회
   useEffect(() => {
@@ -43,41 +80,23 @@ function PaymentCompleteContent() {
       setLoading(false);
     };
     fetchBooking();
-  }, [orderId, supabase]);
-
-  // 🎉 폭죽 효과 함수
-  const fireConfetti = () => {
-    const duration = 3 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
-    const random = (min: number, max: number) => Math.random() * (max - min) + min;
-
-    const interval: any = setInterval(function() {
-      const timeLeft = animationEnd - Date.now();
-
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
-
-      const particleCount = 50 * (timeLeft / duration);
-      confetti({ ...defaults, particleCount, origin: { x: random(0.1, 0.3), y: Math.random() - 0.2 } });
-      confetti({ ...defaults, particleCount, origin: { x: random(0.7, 0.9), y: Math.random() - 0.2 } });
-    }, 250);
-  };
+  }, [orderId, supabase, showToast]);
 
   // 📅 구글 캘린더 링크 생성
   const handleAddToCalendar = () => {
     if (!booking) return;
     const { date, time, experiences } = booking;
+    const title = experiences?.title || 'Locally 체험';
+    const location = experiences?.location || '';
+    const durationHours = experiences?.duration || 2;
     
     // 날짜/시간 포맷팅 (YYYYMMDDTHHMMSSZ)
     const startTime = `${date.replace(/-/g, '')}T${time.replace(/:/g, '')}00`;
-    const endDate = new Date(new Date(`${date}T${time}`).getTime() + (experiences.duration || 2) * 60 * 60 * 1000);
+    const endDate = new Date(new Date(`${date}T${time}`).getTime() + durationHours * 60 * 60 * 1000);
     const endTime = endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'; // 대략적인 종료 시간 (2시간 후로 가정)
 
-    const details = `Locally 체험 예약: ${experiences.title}\n위치: ${experiences.location}`;
-    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(experiences.title)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(experiences.location)}`;
+    const details = `Locally 체험 예약: ${title}${location ? `\n위치: ${location}` : ''}`;
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
     
     window.location.href = url;
   };
@@ -91,6 +110,7 @@ function PaymentCompleteContent() {
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center">로딩 중...</div>;
   if (!booking) return <div className="min-h-screen bg-white flex items-center justify-center">예약 정보를 불러올 수 없습니다.</div>;
+  const bookingImage = booking.experiences?.photos?.[0] || booking.experiences?.image_url || '/images/logo.png';
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -134,7 +154,7 @@ function PaymentCompleteContent() {
           <div className="flex flex-col md:flex-row gap-6 items-start">
              {/* 이미지 */}
              <div className="w-full md:w-32 h-32 bg-slate-200 rounded-2xl relative overflow-hidden shrink-0 shadow-inner">
-                <Image src={booking.experiences?.photos?.[0] || booking.experiences?.image_url} alt="Exp" fill className="object-cover" />
+                <Image src={bookingImage} alt={booking.experiences?.title || '체험 이미지'} fill className="object-cover" />
              </div>
              
              {/* 텍스트 정보 */}
@@ -186,7 +206,7 @@ function PaymentCompleteContent() {
            <MessageCircle className="shrink-0 mt-0.5" size={18}/>
            <div className="text-left">
               <p className="font-bold mb-1">호스트에게 메시지를 보내보세요!</p>
-              <p className="text-blue-600/80">궁금한 점이 있거나, 미리 알리고 싶은 내용이 있다면 '메시지함'에서 호스트와 대화할 수 있습니다.</p>
+              <p className="text-blue-600/80">궁금한 점이 있거나, 미리 알리고 싶은 내용이 있다면 메시지함에서 호스트와 대화할 수 있습니다.</p>
               <Link href="/guest/inbox" className="inline-block mt-3 text-xs font-bold bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg transition-colors">
                  메시지 보내러 가기 →
               </Link>
