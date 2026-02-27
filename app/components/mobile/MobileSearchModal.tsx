@@ -126,48 +126,6 @@ export default function MobileSearchModal({
         };
     }, [isOpen]);
 
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        if (!isOpen || !isSearchExpanded) return;
-
-        const ua = navigator.userAgent;
-        const isIOS =
-            /iPad|iPhone|iPod/i.test(ua) ||
-            (ua.includes('Mac') && 'ontouchend' in document);
-        if (!isIOS) return;
-
-        const anchorY = window.scrollY || window.pageYOffset || 0;
-        let rafId = 0;
-        const viewport = window.visualViewport;
-
-        const enforceWindowAnchor = () => {
-            const currentY = window.scrollY || window.pageYOffset || 0;
-            if (Math.abs(currentY - anchorY) > 1) {
-                window.scrollTo(0, anchorY);
-            }
-        };
-
-        const queueEnforceWindowAnchor = () => {
-            if (rafId) return;
-            rafId = window.requestAnimationFrame(() => {
-                rafId = 0;
-                enforceWindowAnchor();
-            });
-        };
-
-        window.addEventListener('scroll', queueEnforceWindowAnchor, { passive: true });
-        viewport?.addEventListener('resize', queueEnforceWindowAnchor);
-        viewport?.addEventListener('scroll', queueEnforceWindowAnchor);
-        queueEnforceWindowAnchor();
-
-        return () => {
-            if (rafId) cancelAnimationFrame(rafId);
-            window.removeEventListener('scroll', queueEnforceWindowAnchor);
-            viewport?.removeEventListener('resize', queueEnforceWindowAnchor);
-            viewport?.removeEventListener('scroll', queueEnforceWindowAnchor);
-        };
-    }, [isOpen, isSearchExpanded]);
-
     if (!isOpen || typeof document === 'undefined') return null;
 
     const languages = [
@@ -402,7 +360,7 @@ export default function MobileSearchModal({
     // 🔍 검색 확장 모드 (에어비앤비 여행지 검색 화면)
     if (isSearchExpanded) {
         const expandedView = (
-            <div className="fixed inset-0 z-[200] flex flex-col h-[100svh] overflow-hidden overscroll-none relative bg-[#F7F7F7]">
+            <div className="fixed inset-0 z-[200] flex flex-col overflow-hidden overscroll-none relative bg-[#F7F7F7]">
                 {/* 상단 검색바 */}
                 <div className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
                     style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 10px rgba(0,0,0,0.05)', border: '0.5px solid #E0E0E0' }}>
@@ -421,7 +379,6 @@ export default function MobileSearchModal({
                             }
                         }}
                         className="flex-1 bg-transparent text-[14px] text-[#222222] outline-none placeholder:text-[#B0B0B0] font-normal"
-                        autoFocus
                     />
                     {trimmedInput && (
                         <button
@@ -493,7 +450,7 @@ export default function MobileSearchModal({
     }
 
     const modalView = (
-        <div className="fixed inset-0 z-[200] flex flex-col h-[100svh] overflow-hidden overscroll-none">
+        <div className="fixed inset-0 z-[200] flex flex-col overflow-hidden overscroll-none">
             {/* 배경: 화면이 보이는 반투명 레이어 + 블러 */}
             <div
                 className="absolute inset-0 -z-10 backdrop-blur-[10px] transition-opacity duration-500"

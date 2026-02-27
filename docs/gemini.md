@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
 **Last Updated:** 2026-02-27  
-**Version:** 3.2.11 (iOS Keyboard Scroll Anchor Guard for Mobile Search)  
+**Version:** 3.2.12 (Mobile Search Expanded View Stability Rollback)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -114,6 +114,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 모바일 검색 모달 먹통 회귀 수정: `body fixed(top)` 스크롤 락이 iOS Safari에서 `fixed + portal` 모달 레이어와 충돌해 홈 화면 고정/터치 불가 상태를 유발하던 문제를 제거하고, 스크롤 락을 `body/html overflow` 기반으로 단순화해 여행지 검색 진입 시 모달 상호작용이 끊기지 않도록 안정화
 - 모바일 여행지 검색 확장 경로 안정화: 확장 입력 포커스 로직에서 브라우저별 예외 가능성이 있는 커서 강제 제어(`setSelectionRange`)를 제거하고 입력 `autoFocus`로 단순화했으며, `locally_recent_searches`의 레거시 데이터(문자열/비정상 객체)를 렌더 전 정규화해 확장 화면 진입 시 런타임 오류로 인한 화면 먹통을 방지
 - iOS 키보드 스크롤 점프 차단: 모바일 상세검색의 `여행지 검색` 확장 상태에서 iOS(Safari/Chrome) 전용 윈도우 스크롤 앵커 가드를 추가해 키보드 오픈 시 홈 최하단으로 배경 문서가 이동되는 현상을 방지하고, 모달 루트 높이를 `100dvh`에서 `100svh`로 전환해 키보드 노출 중 동적 뷰포트 흔들림을 완화
+- 모바일 확장 검색 회귀 교정: iOS 전용 `window.scrollTo` 앵커 강제 가드가 확장 화면을 즉시 붕괴시키는 회귀를 유발해 해당 가드를 제거하고, 확장/모달 루트는 `fixed + inset`만으로 높이를 계산하도록 단순화했으며 확장 진입 시 자동 키보드 오픈(`autoFocus`)을 해제해 홈 배경 강제 스크롤/레이어 이탈 위험을 낮춤
 - 모바일 검색 결과 화면 리디자인: 상단 캡슐 헤더/유형·시간대 필터 칩/수평 카드 섹션/하단 시트(시간대·체험유형) 구조를 레퍼런스 기반으로 정렬하고 검색 결과 없음 상태를 별도 일러스트 카드형으로 맞춤
 - 모바일 검색 결과 타이포 재보정: 섹션 타이틀/필터 칩/하단 시트 타이포를 축소해 레퍼런스 대비(작고 조밀한 인상)로 정렬
 - 검색어 안정화 가드: 모바일 검색 결과 API 호출 전 `location` 필터 문자열에서 PostgREST 문법 충돌 문자를 정리해 `Bad Request` 발생 가능성을 완화
