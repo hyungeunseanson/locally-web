@@ -1,5 +1,6 @@
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
+import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
 export async function GET() {
   const supabase = await createClient();
@@ -33,7 +34,7 @@ export async function GET() {
       // 🟢 [M-2] 클라이언트 측 조회 API에서는 무거운 DB 덮어쓰기(Side-effect)를 제거합니다.
       // 단순히 날짜가 지났으면 클라이언트 화면에만 'completed'로 가공해서 내려주고,
       // 실제 DB 업데이트는 매 시간 도는 Cron Job 서버가 전담하여 서버 부하와 Vercel 타임아웃을 방지합니다.
-      if (expDate < now && (status === 'PAID' || status === 'confirmed')) {
+      if (expDate < now && BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(status)) {
         status = 'completed';
       }
 

@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { getContent } from '@/app/utils/contentHelper';
 import { ExperienceDetail, HostProfileDetail } from './types';
+import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -73,7 +74,11 @@ export default async function Page({ params }: Props) {
   const [expResult, datesResult, bookingsResult, userResult] = await Promise.all([
     supabase.from('experiences').select('*').eq('id', id).maybeSingle(),
     supabase.from('experience_availability').select('date, start_time').eq('experience_id', id).eq('is_booked', false),
-    supabase.from('bookings').select('date, time, guests').eq('experience_id', id).in('status', ['PAID', 'confirmed']),
+    supabase
+      .from('bookings')
+      .select('date, time, guests')
+      .eq('experience_id', id)
+      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]),
     supabase.auth.getUser()
   ]);
 

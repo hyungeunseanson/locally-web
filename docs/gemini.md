@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P0 Consistency Hardening: Booking Status + Guest Trips API + Admin Auth Source)  
-**Version:** 3.2.18 (P0 Consistency Hardening: Booking Status + Guest Trips API + Admin Auth Source)  
+**Last Updated:** 2026-02-27 (P1 Status Constant Alignment + Admin Whitelist Query Tightening)  
+**Version:** 3.2.19 (P1 Status Constant Alignment + Admin Whitelist Query Tightening)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -148,6 +148,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - P0 정합성(API): `/api/guest/trips` 응답에서 `hostId` 사용 경로와 실제 select 컬럼(`experiences.host_id`)을 일치시켜 누락 가능성을 제거
 - P0 정합성(Admin 권한): 관리자 판정 기본 소스를 `profiles.role + admin_whitelist`로 재정렬하고 `users.role` 조회는 레거시 fallback 경로로 제한
 - P0 정합성(타입): `Booking.status` 유니온을 운영 중 상태 집합(`PENDING/PAID/confirmed/completed/cancelled/cancellation_requested/declined`)과 동기화
+- P1 정합성(상태 상수): 체험 상세 SSR 잔여석 조회, 결제 페이지 사전 좌석 점검, 게스트 여행 자동 완료 가공, 입금 콜백의 중복/좌석 검증 쿼리에 `BOOKING_ACTIVE_STATUS_FOR_CAPACITY`를 적용해 예약 상태 비교 기준을 통일
+- P1 정합성(Cron): 완료 스케줄러(`complete-trips`)의 대상 상태를 상수 기반으로 정렬하고 오류 처리 타입을 `unknown` 기반으로 보강
+- P1 정합성(Admin 조회 최소화): Global Team Chat의 `admin_whitelist` 조회를 `select('*')`에서 `select('id')`로 축소해 권한 판정 목적에 필요한 최소 데이터만 읽도록 정리
 
 비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 별도 커밋 이력/문서에서 확인한다.
 

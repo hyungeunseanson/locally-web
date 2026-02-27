@@ -73,7 +73,7 @@ export default function GlobalTeamChat() {
 
             const [profileData, whitelistData] = await Promise.all([
                 supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-                supabase.from('admin_whitelist').select('*').eq('email', user.email || '').maybeSingle()
+                supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
             ]);
 
             let isAdmin = profileData.data?.role === 'admin' || !!whitelistData.data;

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
 export async function GET(request: Request) {
     // [M-2] Auto Complete Scheduler
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
         const { data: pastBookings, error } = await supabase
             .from('bookings')
             .select('id, date, time')
-            .in('status', ['PAID', 'confirmed']);
+            .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
         if (error) throw error;
         if (!pastBookings || pastBookings.length === 0) {
@@ -46,8 +47,9 @@ export async function GET(request: Request) {
         console.log(`[CRON] Auto-completed ${idsToComplete.length} past bookings.`);
 
         return NextResponse.json({ success: true, count: idsToComplete.length, ids: idsToComplete });
-    } catch (err: any) {
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Internal Server Error';
         console.error('[CRON Complete] Error:', err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

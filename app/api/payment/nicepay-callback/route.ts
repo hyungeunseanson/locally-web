@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
 function verifySignature(signData: string, ediDate: string, amount: string, mid: string, key: string): boolean {
   try {
@@ -75,7 +76,7 @@ const { data: originalBooking } = await supabase
 if (!originalBooking) throw new Error('예약 정보를 찾을 수 없습니다.');
 
 // 2. 이미 처리된 건인지 확인 (중복 방지)
-if (['PAID', 'confirmed'].includes(originalBooking.status)) {
+if (BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(originalBooking.status)) {
 return NextResponse.json({ success: true, message: 'Already processed' });
 }
 
@@ -98,7 +99,7 @@ const { data: existingBookings } = await supabase
 .eq('experience_id', originalBooking.experience_id)
 .eq('date', originalBooking.date)
 .eq('time', originalBooking.time)
-.in('status', ['PAID', 'confirmed']);
+.in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
 const currentBookedCount = existingBookings?.reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
 const hasPrivateBooking = existingBookings?.some(b => b.type === 'private');
@@ -198,8 +199,9 @@ console.log(`✅ [INFO] 금액 및 좌석 검증 완벽 통과 (DB: ${expectedAm
       throw new Error(`PG사 응답코드 실패: ${resCode}`);
     }
 
-  } catch (err: any) {
-    console.error('🔥 [DEBUG] 시스템 에러:', err.message);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    console.error('🔥 [DEBUG] 시스템 에러:', message);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
