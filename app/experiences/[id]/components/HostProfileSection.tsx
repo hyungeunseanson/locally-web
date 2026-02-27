@@ -51,7 +51,7 @@ export default function HostProfileSection(props: HostProfileProps) {
           onClick={props.onMessageHost}
           className="mt-5 w-full rounded-xl bg-[#ececec] px-4 py-2.5 text-[12px] md:text-[14px] font-medium text-slate-700 hover:bg-[#e5e5e5] transition-colors"
         >
-          {props.name} 님에게 메시지 보내기
+          {props.name}님에게 메시지 보내기
         </button>
 
         <p className="text-[10px] text-slate-400 text-center mt-3">

@@ -53,8 +53,8 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
                 bottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 76px)'
             }}
         >
-            <div className="flex justify-between items-center max-w-sm mx-auto rounded-full border border-slate-200 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] px-3 py-2.5">
-                <div className="flex flex-col">
+            <div className="flex justify-between items-center max-w-sm mx-auto rounded-full border border-slate-200 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] px-4 py-[11px]">
+                <div className="flex flex-col pl-1">
                     <span className="leading-none">
                         <span className="text-[10px] text-slate-500 font-medium mr-1.5">1인당</span>
                         <span className="text-slate-900 font-semibold text-[15px]">
@@ -62,7 +62,7 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
                             <span className="ml-1">부터</span>
                         </span>
                     </span>
-                    <span className="text-[#E00B41] font-medium text-[10px] tracking-tight mt-0.5">7일 전 취소 시 수수료 없음</span>
+                    <span className="text-[#E00B41] font-medium text-[10px] tracking-tight mt-[3px]">7일 전 취소 시 수수료 없음</span>
                 </div>
                 <button
                     onClick={handleBookingClick}
