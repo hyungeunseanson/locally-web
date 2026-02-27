@@ -20,6 +20,7 @@ import {
   BOOKING_LEDGER_VISIBLE_STATUSES_UPPER,
   isCancelledBookingStatus,
   isConfirmedBookingStatus,
+  isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
@@ -93,7 +94,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     } else if (statusFilter === 'PAID') {
       statusMatch = BOOKING_CONFIRMED_STATUSES_UPPER.includes(status);
     } else if (statusFilter === 'PENDING') {
-      statusMatch = status === 'PENDING';
+      statusMatch = isPendingBookingStatus(status);
     } else if (statusFilter === 'CANCELLED') {
       statusMatch = BOOKING_CANCELLED_STATUSES_UPPER.includes(status);
     }
@@ -454,7 +455,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
             {/* 관리자 액션 */}
             <div className="pt-1 md:pt-2">
-              {selectedBooking.status === 'PENDING' && (
+              {isPendingBookingStatus(selectedBooking.status) && (
                 <button
                   onClick={() => handleConfirmPayment(selectedBooking.id)}
                   disabled={isProcessing}

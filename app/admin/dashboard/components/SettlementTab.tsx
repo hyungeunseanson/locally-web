@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { DollarSign, CheckCircle, User, ChevronDown, ChevronUp, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
-import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
+import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 
 export default function SettlementTab() {
   const supabase = createClient();
@@ -27,7 +27,7 @@ export default function SettlementTab() {
         profiles!bookings_user_id_fkey ( name, email )
       `)
       .eq('payout_status', 'pending') // 미지급 건만
-      .or('status.eq.completed,and(status.eq.cancelled,host_payout_amount.gt.0)')
+      .in('status', ['completed', 'COMPLETED', 'cancelled', 'CANCELLED'])
       .order('date', { ascending: false });
 
     if (error) {
@@ -39,8 +39,12 @@ export default function SettlementTab() {
     // 🟢 [수정] 타입 오류 해결을 위해 any[]로 캐스팅
     const safeBookings = (bookings || []) as any[];
 
+    const settlementTargetBookings = safeBookings.filter((b: any) =>
+      isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && Number(b.host_payout_amount) > 0)
+    );
+
     // 2. 호스트 정보 가져오기 (계좌 포함)
-const hostIds = Array.from(new Set(safeBookings.map(b => b.experiences?.host_id).filter(Boolean)));
+    const hostIds = Array.from(new Set(settlementTargetBookings.map(b => b.experiences?.host_id).filter(Boolean)));
     const hostsMap = new Map();
     
     if (hostIds.length > 0) {
@@ -55,7 +59,7 @@ const hostIds = Array.from(new Set(safeBookings.map(b => b.experiences?.host_id)
 
     // 3. 호스트별 그룹화 & 금액 계산 (여기가 핵심 🔥)
     const grouped = new Map();
-    bookings?.forEach((b: any) => {
+    settlementTargetBookings.forEach((b: any) => {
        const hostId = b.experiences?.host_id;
        if (!hostId) return;
 
