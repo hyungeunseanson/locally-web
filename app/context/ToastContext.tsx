@@ -41,19 +41,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-center gap-3 p-4 rounded-xl shadow-lg border animate-in slide-in-from-bottom-5 fade-in duration-300 ${
+            className={`pointer-events-auto flex items-center gap-3 p-3.5 rounded-2xl shadow-[0_14px_30px_rgba(15,23,42,0.35)] border backdrop-blur-md animate-in slide-in-from-bottom-3 fade-in duration-500 ${
               toast.type === 'success' 
-                ? 'bg-white border-green-100 text-slate-800' 
-                : 'bg-white border-red-100 text-slate-800'
+                ? 'bg-slate-900/92 border-slate-700 text-slate-100' 
+                : 'bg-[#2b1720]/92 border-[#6a2a3d] text-slate-100'
             }`}
           >
             {toast.type === 'success' ? (
-              <CheckCircle2 className="text-green-500 shrink-0" size={20} />
+              <CheckCircle2 className="text-emerald-300 shrink-0" size={18} />
             ) : (
-              <AlertCircle className="text-red-500 shrink-0" size={20} />
+              <AlertCircle className="text-rose-300 shrink-0" size={18} />
             )}
-            <p className="text-sm font-bold flex-1">{toast.message}</p>
-            <button onClick={() => removeToast(toast.id)} className="text-slate-400 hover:text-slate-600">
+            <p className="text-[13px] font-medium tracking-[-0.005em] flex-1">{toast.message}</p>
+            <button onClick={() => removeToast(toast.id)} className="text-slate-400 hover:text-slate-200 transition-colors">
               <X size={16} />
             </button>
           </div>

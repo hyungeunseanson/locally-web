@@ -229,28 +229,28 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
 
       {isReviewsExpanded && (
         <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>
-          <div className="w-full max-w-[380px] md:max-w-[760px] h-[86dvh] md:h-[82vh] bg-[#f7f7f7] rounded-[30px] md:rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-[380px] md:max-w-[760px] h-[86dvh] md:h-[82vh] bg-[#fcfcfc] rounded-[30px] md:rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="px-5 pt-4 pb-2 flex justify-start">
               <button onClick={() => setIsReviewsExpanded(false)} className="p-1.5 text-slate-600 hover:bg-slate-200 rounded-full transition-colors"><X size={18}/></button>
             </div>
 
             <div className="px-5 pb-2">
-              <h3 className="text-[30px] md:text-[28px] font-medium tracking-[-0.02em] flex items-center gap-1.5">
-                <Star size={22} fill="black" className="mb-0.5" />
+              <h3 className="text-[24px] md:text-[22px] font-semibold tracking-[-0.02em] flex items-center gap-1.5">
+                <Star size={18} fill="black" className="mb-0.5" />
                 {averageRating}
               </h3>
               <div className="mt-3 flex items-center justify-between">
-                <p className="text-[18px] md:text-[17px] font-medium tracking-[-0.01em]">후기 {reviews.length}개</p>
+                <p className="text-[14px] md:text-[14px] font-medium tracking-[-0.01em]">후기 {reviews.length}개</p>
                 <div className="relative">
                   <select
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value as 'latest' | 'oldest')}
-                    className="appearance-none rounded-full border border-slate-300 bg-white pl-4 pr-8 py-1.5 text-[12px] font-normal text-slate-700"
+                    className="appearance-none rounded-full border border-slate-300 bg-white pl-3.5 pr-7 py-1.5 text-[10px] font-normal text-slate-700"
                   >
                     <option value="latest">최신순</option>
                     <option value="oldest">오래된 순</option>
                   </select>
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-[12px]">⌄</span>
+                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[10px]">⌄</span>
                 </div>
               </div>
             </div>
@@ -271,15 +271,15 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
 
                         <div className="flex-1 min-w-0">
                           <div>
-                            <div className="font-medium text-[13px] md:text-[13px] text-slate-900 leading-none">{review.user.name}</div>
-                            <div className="text-[10px] md:text-[10px] text-slate-500 mt-1">게스트</div>
+                            <div className="font-medium text-[11px] md:text-[11px] text-slate-900 leading-none">{review.user.name}</div>
+                            <div className="text-[8px] md:text-[8px] text-slate-500 mt-1">게스트</div>
                             <div className="flex items-center gap-1 text-slate-700 mt-2 mb-2">
                               {[...Array(5)].map((_, idx) => (
-                                <Star key={idx} size={10} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
+                                <Star key={idx} size={8} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
                               ))}
-                              <span className="text-[10px] text-slate-500 ml-1">{review.created_at ? `${Math.max(1, Math.floor((Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24)))}일 전` : ''}</span>
+                              <span className="text-[8px] text-slate-500 ml-1">{review.created_at ? `${Math.max(1, Math.floor((Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24)))}일 전` : ''}</span>
                             </div>
-                            <p className="text-[12px] md:text-[12px] font-normal text-slate-700 leading-[1.45] whitespace-pre-wrap mb-1.5">
+                            <p className="text-[10px] md:text-[10px] font-normal text-slate-700 leading-[1.45] whitespace-pre-wrap mb-1.5">
                               {review.content}
                             </p>
                           </div>

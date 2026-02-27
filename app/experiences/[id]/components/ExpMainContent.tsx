@@ -279,7 +279,7 @@ export default function ExpMainContent({
       {isMessageModalOpen && (
         <div className="md:hidden fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end" onClick={() => setIsMessageModalOpen(false)}>
           <div
-            className="w-full h-[88dvh] bg-[#f7f7f7] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col"
+            className="w-full h-[88dvh] bg-[#fcfcfc] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-end mb-1">
