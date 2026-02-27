@@ -314,8 +314,6 @@ export default function HomeHero({
       <MobileSearchModal
         isOpen={isMobileSearchOpen}
         onClose={() => setIsMobileSearchOpen(false)}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
         locationInput={locationInput}
         setLocationInput={setLocationInput}
         dateRange={dateRange}

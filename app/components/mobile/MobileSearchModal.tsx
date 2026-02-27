@@ -10,8 +10,6 @@ import { createPortal } from 'react-dom';
 interface MobileSearchModalProps {
     isOpen: boolean;
     onClose: () => void;
-    activeTab: 'experience' | 'service';
-    setActiveTab: (tab: 'experience' | 'service') => void;
     locationInput: string;
     setLocationInput: (val: string) => void;
     dateRange: { start: Date | null; end: Date | null };
@@ -21,7 +19,7 @@ interface MobileSearchModalProps {
 }
 
 export default function MobileSearchModal({
-    isOpen, onClose, activeTab, setActiveTab,
+    isOpen, onClose,
     locationInput, setLocationInput,
     dateRange, setDateRange,
     selectedLanguage, setSelectedLanguage,
@@ -32,9 +30,16 @@ export default function MobileSearchModal({
     const [isVisible, setIsVisible] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [recentSearches, setRecentSearches] = useState<{ name: string; desc?: string }[]>([]);
+    const expandedInputRef = useRef<HTMLInputElement>(null);
     const scrollLockRef = useRef({
         locked: false,
+        scrollY: 0,
         bodyOverflow: '',
+        bodyPosition: '',
+        bodyTop: '',
+        bodyLeft: '',
+        bodyRight: '',
+        bodyWidth: '',
         htmlOverflow: '',
     });
 
@@ -78,20 +83,40 @@ export default function MobileSearchModal({
         if (typeof window === 'undefined') return;
         const body = document.body;
         const html = document.documentElement;
+
         const restoreScrollLock = () => {
             if (!scrollLockRef.current.locked) return;
+            const { scrollY } = scrollLockRef.current;
             body.style.overflow = scrollLockRef.current.bodyOverflow;
+            body.style.position = scrollLockRef.current.bodyPosition;
+            body.style.top = scrollLockRef.current.bodyTop;
+            body.style.left = scrollLockRef.current.bodyLeft;
+            body.style.right = scrollLockRef.current.bodyRight;
+            body.style.width = scrollLockRef.current.bodyWidth;
             html.style.overflow = scrollLockRef.current.htmlOverflow;
             scrollLockRef.current.locked = false;
+            window.scrollTo(0, scrollY);
         };
 
         if (isOpen && !scrollLockRef.current.locked) {
+            const scrollY = window.scrollY || window.pageYOffset || 0;
             scrollLockRef.current = {
                 locked: true,
+                scrollY,
                 bodyOverflow: body.style.overflow,
+                bodyPosition: body.style.position,
+                bodyTop: body.style.top,
+                bodyLeft: body.style.left,
+                bodyRight: body.style.right,
+                bodyWidth: body.style.width,
                 htmlOverflow: html.style.overflow,
             };
 
+            body.style.position = 'fixed';
+            body.style.top = `-${scrollY}px`;
+            body.style.left = '0';
+            body.style.right = '0';
+            body.style.width = '100%';
             body.style.overflow = 'hidden';
             html.style.overflow = 'hidden';
         }
@@ -104,6 +129,31 @@ export default function MobileSearchModal({
             if (isOpen) restoreScrollLock();
         };
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || !isSearchExpanded) return;
+
+        let raf1 = 0;
+        let raf2 = 0;
+        raf1 = requestAnimationFrame(() => {
+            raf2 = requestAnimationFrame(() => {
+                const input = expandedInputRef.current;
+                if (!input) return;
+                try {
+                    input.focus({ preventScroll: true });
+                } catch {
+                    input.focus();
+                }
+                const caret = input.value.length;
+                input.setSelectionRange(caret, caret);
+            });
+        });
+
+        return () => {
+            cancelAnimationFrame(raf1);
+            cancelAnimationFrame(raf2);
+        };
+    }, [isOpen, isSearchExpanded]);
 
     if (!isOpen || typeof document === 'undefined') return null;
 
@@ -347,6 +397,7 @@ export default function MobileSearchModal({
                         <ArrowLeft size={18} className="text-[#222222]" strokeWidth={2} />
                     </button>
                     <input
+                        ref={expandedInputRef}
                         type="text"
                         placeholder="여행지 검색"
                         value={locationInput}
@@ -358,7 +409,6 @@ export default function MobileSearchModal({
                             }
                         }}
                         className="flex-1 bg-transparent text-[14px] text-[#222222] outline-none placeholder:text-[#B0B0B0] font-normal"
-                        autoFocus
                     />
                     {trimmedInput && (
                         <button
@@ -448,49 +498,8 @@ export default function MobileSearchModal({
                     opacity: isVisible ? 1 : 0,
                 }}
             >
-                {/* 상단: 아이콘 탭 중앙정렬 + X */}
-                <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+10px)] pb-2">
-                    <div className="flex-1 flex items-center justify-center gap-[36px]">
-                        {/* 체험 */}
-                        <button onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200">
-                            <div className="w-[36px] h-[36px] flex items-center justify-center relative mb-0">
-                                <img
-                                    src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
-                                    alt="체험" className={`w-full h-full object-contain transition-opacity ${activeTab !== 'experience' ? 'opacity-30' : 'opacity-100'}`}
-                                />
-                            </div>
-                            <span className={`text-[9px] tracking-[0.01em] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'}`}>
-                                {t('cat_exp')}
-                            </span>
-                            {activeTab === 'experience' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[14px] h-[2px] bg-[#222222] rounded-full" />}
-                        </button>
-                        {/* 서비스 */}
-                        <button onClick={() => setActiveTab('service')} className="flex flex-col items-center relative active:scale-[0.90] transition-transform duration-200">
-                            <div className="w-[36px] h-[36px] flex items-center justify-center relative mb-0">
-                                <img
-                                    src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
-                                    alt="서비스" className={`w-full h-full object-contain transition-opacity ${activeTab !== 'service' ? 'opacity-30' : 'opacity-100'}`}
-                                />
-                            </div>
-                            <span className={`text-[9px] tracking-[0.01em] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#717171] font-normal'}`}>
-                                {t('cat_service')}
-                            </span>
-                            {activeTab === 'service' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[14px] h-[2px] bg-[#222222] rounded-full" />}
-                        </button>
-                    </div>
-
-                    {/* X 닫기 */}
-                    <button
-                        onClick={handleClose}
-                        className="w-[30px] h-[30px] rounded-full flex items-center justify-center bg-white shrink-0 active:scale-[0.9] transition-transform ml-2"
-                        style={{ border: '1px solid #CFCFCF', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
-                    >
-                        <X size={12} className="text-[#222222]" strokeWidth={3} />
-                    </button>
-                </div>
-
                 {/* 메인 콘텐츠 */}
-                <div className="flex-1 overflow-y-auto px-4 pt-2 pb-[120px]">
+                <div className="flex-1 overflow-y-auto px-4 pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-4">
                     {/* 위치 패널 */}
                     {activePanel === 'location' ? (
                         <div
@@ -498,7 +507,16 @@ export default function MobileSearchModal({
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
                             <div className="p-5 pb-4">
-                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">위치</h3>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-[16px] font-extrabold text-[#222222] tracking-[-0.02em]">위치</h3>
+                                    <button
+                                        onClick={handleClose}
+                                        className="w-[30px] h-[30px] rounded-full flex items-center justify-center bg-white shrink-0 active:scale-[0.9] transition-transform"
+                                        style={{ border: '1px solid #CFCFCF', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                                    >
+                                        <X size={12} className="text-[#222222]" strokeWidth={3} />
+                                    </button>
+                                </div>
                                 <button
                                     onClick={() => setIsSearchExpanded(true)}
                                     className="flex items-center gap-2.5 bg-white rounded-[10px] px-3.5 py-[11px] w-full text-left"
@@ -544,8 +562,17 @@ export default function MobileSearchModal({
                             </div>
                         </div>
                     ) : (
-                        <div className="mb-2">
-                    <CollapsedPanel label="위치" value={locationInput} placeholder="여행지 추가" panelKey="location" />
+                        <div className="mb-2 flex items-center gap-2.5">
+                            <div className="flex-1">
+                                <CollapsedPanel label="위치" value={locationInput} placeholder="여행지 추가" panelKey="location" />
+                            </div>
+                            <button
+                                onClick={handleClose}
+                                className="w-[30px] h-[30px] rounded-full flex items-center justify-center bg-white shrink-0 active:scale-[0.9] transition-transform"
+                                style={{ border: '1px solid #CFCFCF', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                            >
+                                <X size={12} className="text-[#222222]" strokeWidth={3} />
+                            </button>
                         </div>
                     )}
 
@@ -625,11 +652,10 @@ export default function MobileSearchModal({
 
                 {/* 하단 고정 바 */}
                 <div
-                    className="fixed left-0 right-0 bg-white flex items-center justify-between px-5 py-3 z-[210]"
+                    className="sticky bottom-0 left-0 right-0 bg-white flex items-center justify-between px-5 py-3 z-[210]"
                     style={{
                         borderTop: '1px solid #EBEBEB',
                         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-                        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 30px)',
                         boxShadow: '0 -6px 18px rgba(0,0,0,0.08)',
                     }}
                 >
