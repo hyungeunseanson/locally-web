@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (Guest/Public Mobile Density 1.5 Optimization)  
-**Version:** 3.2.17 (Guest/Public Mobile Density 1.5 Optimization)  
+**Last Updated:** 2026-02-27 (P0 Consistency Hardening: Booking Status + Guest Trips API + Admin Auth Source)  
+**Version:** 3.2.18 (P0 Consistency Hardening: Booking Status + Guest Trips API + Admin Auth Source)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -144,6 +144,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 게스트+공개 페이지 모바일 1.5단계 타이포·간격 축소 및 데스크탑 보존형 반응형 정렬 완료
 - Admin: Team Chat 가시성/알림 배지/모바일 디테일 화면 안정화
 - Host: 권한 스코프, 예약/수익 집계 기준, Realtime 범위 검증 정리
+- P0 정합성(예약 상태): 게스트 계정/모바일 프로필의 여행 횟수 집계를 하드코딩 `confirmed`에서 `BOOKING_CONFIRMED_STATUSES` 기반으로 통일
+- P0 정합성(API): `/api/guest/trips` 응답에서 `hostId` 사용 경로와 실제 select 컬럼(`experiences.host_id`)을 일치시켜 누락 가능성을 제거
+- P0 정합성(Admin 권한): 관리자 판정 기본 소스를 `profiles.role + admin_whitelist`로 재정렬하고 `users.role` 조회는 레거시 fallback 경로로 제한
+- P0 정합성(타입): `Booking.status` 유니온을 운영 중 상태 집합(`PENDING/PAID/confirmed/completed/cancelled/cancellation_requested/declined`)과 동기화
 
 비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 별도 커밋 이력/문서에서 확인한다.
 

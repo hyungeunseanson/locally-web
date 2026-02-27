@@ -25,19 +25,17 @@ async function getAdminClient() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  let isAdmin = false;
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  if (profile?.role === 'admin') isAdmin = true;
+  const [profile, whitelist] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+    supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
+  ]);
 
+  let isAdmin = profile.data?.role === 'admin' || !!whitelist.data;
+
+  // 레거시 호환: users.role 이관 전 데이터 보조 확인
   if (!isAdmin) {
     const { data: userView } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-    if (userView?.role === 'admin') isAdmin = true;
-  }
-
-  // 🟢 [추가] 화이트리스트 이메일 확인
-  if (!isAdmin) {
-    const { data: whitelist } = await supabase.from('admin_whitelist').select('id').eq('email', user.email).maybeSingle();
-    if (whitelist) isAdmin = true;
+    isAdmin = userView?.role === 'admin';
   }
 
   if (!isAdmin) throw new Error('Forbidden: Admin access required');
@@ -61,9 +59,9 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
       const { data } = await supabaseAdmin.from('host_applications').select('name').eq('id', id).maybeSingle();
       if (data) targetTitle = data.name;
     }
-  } catch (e) { }
+  } catch { }
 
-  const updateData: any = { status };
+  const updateData: { status: string; admin_comment?: string } = { status };
   if (comment) updateData.admin_comment = comment;
 
   const { error } = await supabaseAdmin.from(table).update(updateData).eq('id', id);
@@ -108,7 +106,7 @@ export async function deleteAdminItem(table: string, id: string) {
       const { data } = await supabaseAdmin.from('experiences').select('title').eq('id', id).maybeSingle();
       if (data) targetInfo = data.title;
     }
-  } catch (e) { }
+  } catch { }
 
   if (table === 'profiles' || table === 'users') {
     await supabaseAdmin.auth.admin.deleteUser(id);

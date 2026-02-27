@@ -14,7 +14,7 @@ export async function GET() {
       .from('bookings')
       .select(`
         *,
-        experiences (id, title, image_url, location),
+        experiences (id, host_id, title, image_url, location),
         reviews (id)
       `)
       .eq('user_id', user.id)
@@ -57,7 +57,8 @@ export async function GET() {
 
     return NextResponse.json({ trips: updatedTrips });
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

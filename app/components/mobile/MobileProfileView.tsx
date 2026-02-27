@@ -8,27 +8,40 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
+
+type GuestReview = {
+    id: string | number;
+    content: string;
+    created_at: string;
+    host?: {
+        full_name?: string | null;
+        avatar_url?: string | null;
+    } | null;
+};
+
+type MobileProfileData = {
+    full_name: string;
+    email: string;
+    nationality: string;
+    birth_date: string;
+    gender: string;
+    bio: string;
+    phone: string;
+    mbti: string;
+    kakao_id: string;
+    avatar_url: string;
+    languages: string[];
+    job?: string;
+    school?: string;
+};
 
 interface MobileProfileViewProps {
-    profile: {
-        full_name: string;
-        email: string;
-        nationality: string;
-        birth_date: string;
-        gender: string;
-        bio: string;
-        phone: string;
-        mbti: string;
-        kakao_id: string;
-        avatar_url: string;
-        languages: string[];
-        job?: string;
-        school?: string;
-    };
+    profile: MobileProfileData;
     userId: string;
-    guestReviews: any[];
+    guestReviews: GuestReview[];
     onBack: () => void;
-    onProfileUpdate: (updatedProfile: any) => void;
+    onProfileUpdate: (updatedProfile: MobileProfileData) => void;
 }
 
 export default function MobileProfileView({
@@ -73,7 +86,11 @@ export default function MobileProfileView({
         if (!userId) return;
         const fetchStats = async () => {
             const [{ count: tripCount }, { count: reviewCount }] = await Promise.all([
-                supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'confirmed'),
+                supabase
+                    .from('bookings')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', userId)
+                    .in('status', [...BOOKING_CONFIRMED_STATUSES]),
                 supabase.from('guest_reviews').select('*', { count: 'exact', head: true }).eq('guest_id', userId),
             ]);
             const { data: userData } = await supabase.auth.getUser();
@@ -101,8 +118,9 @@ export default function MobileProfileView({
             setEditData(prev => ({ ...prev, avatar_url: publicUrl }));
             await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId);
             showToast('프로필 사진이 변경되었습니다.', 'success');
-        } catch (err: any) {
-            showToast('사진 업로드 실패: ' + err.message, 'error');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : '알 수 없는 오류';
+            showToast('사진 업로드 실패: ' + message, 'error');
         } finally {
             setUploading(false);
         }
@@ -470,7 +488,7 @@ export default function MobileProfileView({
                         <p className="text-[11px] text-slate-400 text-center py-5">아직 후기가 없습니다.</p>
                     ) : (
                         <div className="space-y-3">
-                            {guestReviews.slice(0, 5).map((review: any) => (
+                            {guestReviews.slice(0, 5).map((review) => (
                                 <div key={review.id} className="flex gap-2.5">
                                     <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden shrink-0">
                                         {review.host?.avatar_url

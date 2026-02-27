@@ -42,7 +42,7 @@ export interface Booking {
   experience_id: number;
   amount: number;
   total_price: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'PAID';
+  status: 'PENDING' | 'PAID' | 'confirmed' | 'completed' | 'cancelled' | 'cancellation_requested' | 'declined';
   guests: number;
   date: string;
   time: string;

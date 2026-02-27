@@ -10,6 +10,19 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import MobileProfileView from '@/app/components/mobile/MobileProfileView';
 import HostModeTransition from '@/app/components/mobile/HostModeTransition';
+import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+
+type GuestReview = {
+  id: string | number;
+  rating: number;
+  content: string;
+  created_at: string;
+  host?: {
+    full_name?: string | null;
+    avatar_url?: string | null;
+  } | null;
+};
 
 export default function AccountPage() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
@@ -36,7 +49,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isAdminWhitelisted, setIsAdminWhitelisted] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
@@ -86,8 +99,8 @@ export default function AccountPage() {
   ];
 
   // 🟢 [수정] 진짜 리뷰 데이터 및 모달 상태
-  const [guestReviews, setGuestReviews] = useState<any[]>([]);
-  const [selectedReview, setSelectedReview] = useState<any>(null); // 모달용 선택된 리뷰
+  const [guestReviews, setGuestReviews] = useState<GuestReview[]>([]);
+  const [selectedReview, setSelectedReview] = useState<GuestReview | null>(null); // 모달용 선택된 리뷰
 
   useEffect(() => {
     document.body.style.overflow = activeLinkModal ? 'hidden' : 'unset';
@@ -187,7 +200,7 @@ export default function AccountPage() {
         .from('bookings')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('status', 'confirmed');
+        .in('status', [...BOOKING_CONFIRMED_STATUSES]);
 
       const { count: reviewCount } = await supabase
         .from('guest_reviews')
@@ -240,6 +253,7 @@ export default function AccountPage() {
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
+    if (!user) return;
     setUploading(true);
     const file = event.target.files[0];
     const fileExt = file.name.split('.').pop();
@@ -253,14 +267,16 @@ export default function AccountPage() {
       setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
       alert(t('profile_photo_change_done')); // 🟢 번역
-    } catch (error: any) {
-      alert(t('profile_photo_fail') + ' ' + error.message); // 🟢 번역
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '알 수 없는 오류';
+      alert(t('profile_photo_fail') + ' ' + message); // 🟢 번역
     } finally {
       setUploading(false);
     }
   };
 
   const handleSave = async () => {
+    if (!user) return;
     setSaving(true);
     const updates = {
       id: user.id,
@@ -280,7 +296,7 @@ export default function AccountPage() {
       updated_at: new Date().toISOString(),
     };
 
-    let { error } = await supabase.from('profiles').upsert(updates);
+    const { error } = await supabase.from('profiles').upsert(updates);
 
     if (error) {
       console.error('Save error:', error);
@@ -495,7 +511,7 @@ export default function AccountPage() {
 
               {profile.bio && (
                 <div className="text-sm text-slate-600 leading-relaxed mb-6 bg-slate-50 p-4 rounded-xl text-left">
-                  "{profile.bio}"
+                  &quot;{profile.bio}&quot;
                 </div>
               )}
 
@@ -532,7 +548,7 @@ export default function AccountPage() {
                           <span className="font-bold">{review.rating}</span>
                         </div>
                       </div>
-                      <p className="text-slate-600 leading-snug line-clamp-2">"{review.content}"</p>
+                      <p className="text-slate-600 leading-snug line-clamp-2">&quot;{review.content}&quot;</p>
                       <p className="text-slate-400 text-xs mt-2 text-right">
                         {new Date(review.created_at).toLocaleDateString()}
                       </p>

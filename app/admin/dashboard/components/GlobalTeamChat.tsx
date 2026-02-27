@@ -20,8 +20,13 @@ interface ChatMessage {
     };
 }
 
+interface CurrentAdminUser {
+    id: string;
+    name: string;
+}
+
 export default function GlobalTeamChat() {
-    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [currentUser, setCurrentUser] = useState<CurrentAdminUser | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -66,12 +71,18 @@ export default function GlobalTeamChat() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const [userData, whitelistData] = await Promise.all([
-                supabase.from('users').select('*').eq('id', user.id).maybeSingle(),
-                supabase.from('admin_whitelist').select('*').eq('email', user.email!).maybeSingle()
+            const [profileData, whitelistData] = await Promise.all([
+                supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+                supabase.from('admin_whitelist').select('*').eq('email', user.email || '').maybeSingle()
             ]);
 
-            if (userData.data?.role === 'admin' || whitelistData.data) {
+            let isAdmin = profileData.data?.role === 'admin' || !!whitelistData.data;
+            if (!isAdmin) {
+                const { data: legacyUser } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+                isAdmin = legacyUser?.role === 'admin';
+            }
+
+            if (isAdmin) {
                 setCurrentUser({
                     id: user.id,
                     name: user.email?.split('@')[0] || 'Admin'
@@ -258,6 +269,7 @@ export default function GlobalTeamChat() {
 
     // ── 메시지 목록 렌더러 ──
     const renderMessages = (isMobile = false) => {
+        const meId = currentUser?.id;
         if (messages.length === 0) {
             return (
                 <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
@@ -270,7 +282,7 @@ export default function GlobalTeamChat() {
             );
         }
         return messages.map((msg, idx) => {
-            const isMe = msg.author_id === currentUser.id;
+            const isMe = Boolean(meId) && msg.author_id === meId;
             const showAuthorInfo = idx === 0 || messages[idx - 1].author_id !== msg.author_id;
             const maxW = isMobile ? 'max-w-[75vw]' : 'max-w-[240px]';
             return (
