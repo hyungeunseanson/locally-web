@@ -2,6 +2,24 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
+type BookingRequestBody = {
+    experienceId?: string | number;
+    date?: string;
+    time?: string;
+    guests?: number | string;
+    isPrivate?: boolean;
+    customerName?: string;
+    customerPhone?: string;
+    paymentMethod?: 'card' | 'bank';
+};
+
+type AtomicBookingResult = {
+    new_order_id: string;
+    final_amount: number;
+    host_id: string | null;
+    experience_title: string | null;
+};
+
 export async function POST(request: Request) {
     try {
         // 1. 세션 확인 (호출자 인증)
@@ -12,14 +30,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
+        const body = (await request.json()) as BookingRequestBody;
         const {
             experienceId, date, time, guests, isPrivate,
             customerName, customerPhone, paymentMethod
         } = body;
+        const guestCount = Number(guests);
+        const normalizedExperienceId = experienceId != null ? String(experienceId) : '';
 
         // 파라미터 유효성 검사
-        if (!experienceId || !date || !time || !guests || !customerName || !customerPhone) {
+        if (!normalizedExperienceId || !date || !time || !customerName || !customerPhone || !Number.isFinite(guestCount) || guestCount < 1) {
             return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -28,81 +48,50 @@ export async function POST(request: Request) {
         const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
         const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-        // 3. 체험 정보(가격, 정원 등) DB에서 서버 사이드 조회 (조작 방지)
-        const { data: experience, error: expError } = await supabaseAdmin
-            .from('experiences')
-            .select('id, title, host_id, price, private_price, max_guests')
-            .eq('id', experienceId)
-            .maybeSingle(); // 🟢 docs/gemini.md Rule 1. 안전한 단일 조회
+        // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 검증 + 삽입)
+        const { data: bookingData, error: bookingError } = await supabaseAdmin
+            .rpc('create_booking_atomic', {
+                p_user_id: user.id,
+                p_experience_id: normalizedExperienceId,
+                p_date: date,
+                p_time: time,
+                p_guests: guestCount,
+                p_is_private: Boolean(isPrivate),
+                p_customer_name: customerName,
+                p_customer_phone: customerPhone
+            })
+            .maybeSingle<AtomicBookingResult>();
 
-        if (expError || !experience) {
-            return NextResponse.json({ success: false, error: 'Experience not found' }, { status: 404 });
-        }
-
-        // 4. 가격 계산 (서버 주도)
-        const guestCount = Number(guests);
-        const expPrice = Number(experience.price);
-        const hostPrice = isPrivate ? Number(experience.private_price) : expPrice * guestCount;
-        const guestFee = Math.floor(hostPrice * 0.1); // 수수료 10%
-        const finalAmount = hostPrice + guestFee; // 🟢 결제할 찐 금액
-
-        // 5. 초과 예약 검증 (서버 주도)
-        const { data: existingBookings } = await supabaseAdmin
-            .from('bookings')
-            .select('guests, type')
-            .eq('experience_id', experienceId)
-            .eq('date', date)
-            .eq('time', time)
-            .in('status', ['PAID', 'confirmed']);
-
-        const currentBookedCount = existingBookings?.reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
-        const hasPrivateBooking = existingBookings?.some(b => b.type === 'private');
-        const maxGuests = experience.max_guests || 10;
-
-        if (
-            hasPrivateBooking ||
-            (isPrivate && currentBookedCount > 0) ||
-            (!isPrivate && (currentBookedCount + guestCount > maxGuests))
-        ) {
-            return NextResponse.json({ success: false, error: '해당 시간대에 남은 좌석이 부족합니다.' }, { status: 409 });
-        }
-
-        // 6. 트랜잭션: 중복 가능성 차단을 위해 랜덤 오더 ID 생성 및 예약 삽입
-        const newOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-        const { error: bookingError } = await supabaseAdmin.from('bookings').insert([
-            {
-                id: newOrderId,
-                order_id: newOrderId,
-                user_id: user.id, // 인증된 유저의 ID
-                experience_id: experienceId,
-                amount: finalAmount,
-                total_price: hostPrice,
-                status: 'PENDING',
-                guests: guestCount,
-                date: date,
-                time: time,
-                type: isPrivate ? 'private' : 'group',
-                contact_name: customerName,
-                contact_phone: customerPhone,
-                message: '', // 초기화
-                created_at: new Date().toISOString()
+        if (bookingError || !bookingData) {
+            const errorMessage = bookingError?.message || '예약 처리 중 오류가 발생했습니다.';
+            if (errorMessage.includes('BOOKING_CONFLICT')) {
+                return NextResponse.json({ success: false, error: '해당 시간대에 남은 좌석이 부족합니다.' }, { status: 409 });
             }
-        ]);
+            if (errorMessage.includes('BOOKING_NOT_FOUND')) {
+                return NextResponse.json({ success: false, error: '체험 정보를 찾을 수 없습니다.' }, { status: 404 });
+            }
+            if (errorMessage.includes('BOOKING_BAD_REQUEST')) {
+                return NextResponse.json({ success: false, error: '필수 입력값이 올바르지 않습니다.' }, { status: 400 });
+            }
+            throw new Error(errorMessage);
+        }
 
-        if (bookingError) throw bookingError;
+        const newOrderId = bookingData.new_order_id;
+        const finalAmount = Number(bookingData.final_amount);
+        const hostId = bookingData.host_id;
+        const experienceTitle = bookingData.experience_title || 'Locally 체험';
 
         // 7. 호스트 알림 발송 (클라이언트 인젝션 완벽 차단)
         // - 에러가 나더라도 예약 진행을 막지 않도록 비동기로 별도 에러 로깅만 처리
-        if (experience.host_id) {
+        if (hostId) {
             const isPending = paymentMethod === 'bank';
             const notiTitle = isPending ? '⏳ 새로운 예약 (입금 대기)' : '🎉 새로운 예약 (결제 진행중)';
             const notiMsg = isPending
-                ? `'${experience.title}'에 무통장 입금 대기 중인 예약이 접수되었습니다.`
-                : `'${experience.title}'에 새로운 결제가 진행되고 있습니다!`;
+                ? `'${experienceTitle}'에 무통장 입금 대기 중인 예약이 접수되었습니다.`
+                : `'${experienceTitle}'에 새로운 결제가 진행되고 있습니다!`;
 
             supabaseAdmin.from('notifications').insert({
-                user_id: experience.host_id,
+                user_id: hostId,
                 type: 'new_booking',
                 title: notiTitle,
                 message: notiMsg,
@@ -116,7 +105,7 @@ export async function POST(request: Request) {
         // 8. 성공 시 생성된 OrderId 및 검증된 최종 금액 반환
         return NextResponse.json({ success: true, newOrderId, finalAmount });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Booking Transaction Error:', error);
         return NextResponse.json({ success: false, error: '예약 처리 중 서버 오류가 발생했습니다.' }, { status: 500 });
     }
