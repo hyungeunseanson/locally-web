@@ -106,6 +106,11 @@ export default function ReservationCard({
 
   const dDay = getDDay(res.date);
   const isConfirmed = isConfirmedBookingStatus(res.status);
+  const targetDate = new Date(res.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isPast = targetDate < today;
+  const canReview = isPast && !isCancelledBookingStatus(res.status);
 
   // 🟢 결제 시간 다국어 포맷팅
   const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
@@ -165,7 +170,7 @@ export default function ReservationCard({
         </div>
 
         {/* 우측: 상태 + 금액 + D-Day */}
-        <div className="flex-shrink-0 flex flex-col items-end gap-1">
+        <div className="flex-shrink-0 flex flex-col items-end gap-1 md:hidden">
           <span className={`text-[10px] md:text-[12px] font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
             }`}>{dDay}</span>
           {renderStatusBadge(res.status, res.date)}
@@ -191,13 +196,38 @@ export default function ReservationCard({
           )}
         </div>
 
-        {/* 데스크탑: 메시지 버튼 */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onMessage(); }}
-          className="ml-1 shrink-0 w-8 h-8 md:w-9 md:h-9 bg-slate-900 text-white rounded-lg hidden md:flex items-center justify-center hover:bg-black transition-colors"
-        >
-          <MessageSquare size={14} />
-        </button>
+        {/* 데스크탑: 상태/액션 통합 컬럼 */}
+        <div className="hidden md:flex ml-2 shrink-0 min-w-[170px] flex-col items-end justify-between gap-2.5">
+          <div className="flex flex-col items-end gap-1">
+            <span className={`text-[12px] font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
+              }`}>{dDay}</span>
+            {renderStatusBadge(res.status, res.date)}
+            <p className="text-[16px] font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); onMessage(); }}
+              className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
+              <MessageSquare size={16} /> {t('res_message_btn')}
+            </button>
+
+            {canReview && (
+              <button
+                onClick={(e) => { e.stopPropagation(); if (!hasReview) onReview(); }}
+                disabled={hasReview}
+                className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasReview
+                  ? 'bg-slate-100 text-slate-400 cursor-default'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
+                  }`}
+              >
+                <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"} />
+                {hasReview ? '후기 작성됨' : '게스트 후기'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* 확정된 예약: 연락처 정보 (접히는 방식 – 항상 표시) */}
@@ -219,38 +249,6 @@ export default function ReservationCard({
           )}
         </div>
       )}
-
-      {/* 액션 버튼 (후기 – 모바일 숨김, 데스크탑만) */}
-      <div className="hidden md:flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 bg-white/90">
-        <button
-          onClick={(e) => { e.stopPropagation(); onMessage(); }}
-          className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
-        >
-          <MessageSquare size={16} /> {t('res_message_btn')}
-        </button>
-
-        {(() => {
-          const targetDate = new Date(res.date);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const isPast = targetDate < today;
-          const isValid = !isCancelledBookingStatus(res.status);
-
-          return isPast && isValid && (
-            <button
-              onClick={(e) => { e.stopPropagation(); if (!hasReview) onReview(); }}
-              disabled={hasReview}
-              className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasReview
-                ? 'bg-slate-100 text-slate-400 cursor-default'
-                : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
-                }`}
-            >
-              <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"} />
-              {hasReview ? '후기 작성됨' : '게스트 후기'}
-            </button>
-          );
-        })()}
-      </div>
 
       {/* 취소 요청 승인 박스 */}
       {isCancellationRequestedBookingStatus(res.status) && (
