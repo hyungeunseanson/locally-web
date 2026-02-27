@@ -15,7 +15,28 @@ import {
 } from '@/app/constants/bookingStatus';
 
 interface ReservationCardProps {
-  res: any;
+  res: {
+    id: number | string;
+    order_id?: number | string | null;
+    status: string;
+    date: string;
+    time: string;
+    guests: number;
+    amount?: number | null;
+    created_at?: string | null;
+    cancel_reason?: string | null;
+    refund_amount?: number | null;
+    host_payout_amount?: number | null;
+    guest?: {
+      full_name?: string | null;
+      avatar_url?: string | null;
+      phone?: string | null;
+      email?: string | null;
+    } | null;
+    experiences?: {
+      title?: string | null;
+    } | null;
+  };
   isNew: boolean;
   isProcessing: boolean;
   onApproveCancel: () => void;
@@ -98,7 +119,7 @@ export default function ReservationCard({
 
   return (
     <div
-      className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer
+      className={`bg-white rounded-xl md:rounded-2xl border shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer
         ${isNew ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-200'}
       `}
       onClick={onCheck}
@@ -110,13 +131,13 @@ export default function ReservationCard({
         }`} />
 
       {/* 핵심: 모바일에서도 한 줄 가로 배치 */}
-      <div className="flex items-center gap-2 pl-3 pr-2 py-3">
+      <div className="flex items-center md:items-start gap-2 md:gap-3.5 pl-3 md:pl-4 pr-2 md:pr-4 py-3 md:py-4">
 
         {/* 날짜 미니 박스 */}
-        <div className="flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-100 min-w-[44px]">
-          <div className="text-[10px] font-bold text-slate-500 uppercase">{monthName}</div>
-          <div className="text-base font-black text-slate-900 leading-none">{new Date(res.date).getDate()}</div>
-          <div className="text-[9px] text-slate-400 mt-0.5">{res.time}</div>
+        <div className="flex-shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-lg md:rounded-xl px-2 md:px-2.5 py-1.5 md:py-2 border border-slate-100 min-w-[44px] md:min-w-[58px]">
+          <div className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase">{monthName}</div>
+          <div className="text-base md:text-[22px] font-black text-slate-900 leading-none">{new Date(res.date).getDate()}</div>
+          <div className="text-[9px] md:text-[10px] text-slate-400 mt-0.5">{res.time}</div>
         </div>
 
         {/* 메인 정보 영역 */}
@@ -127,28 +148,28 @@ export default function ReservationCard({
               onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
               className="flex items-center gap-1.5 min-w-0 text-left"
             >
-              <div className="w-5 h-5 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+              <div className="w-5 h-5 md:w-7 md:h-7 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
                 {res.guest?.avatar_url ? (
                   <img src={secureUrl(res.guest.avatar_url)!} className="w-full h-full object-cover" alt="" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><User size={10} className="text-slate-400" /></div>
                 )}
               </div>
-              <span className="text-[12px] md:text-sm font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
+              <span className="text-[12px] md:text-[15px] font-bold text-slate-900 truncate">{res.guest?.full_name || '게스트'}</span>
             </button>
-            <span className="text-[10px] md:text-xs text-slate-400 shrink-0">{res.guests}명</span>
+            <span className="text-[10px] md:text-[12px] text-slate-400 shrink-0">{res.guests}명</span>
             {isNew && <span className="bg-blue-500 text-white text-[9px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-bold animate-pulse shrink-0">N</span>}
           </div>
           {/* 체험명 */}
-          <p className="text-[10px] md:text-xs text-slate-400 truncate">{res.experiences?.title}</p>
+          <p className="text-[10px] md:text-[13px] text-slate-400 truncate">{res.experiences?.title}</p>
         </div>
 
         {/* 우측: 상태 + 금액 + D-Day */}
         <div className="flex-shrink-0 flex flex-col items-end gap-1">
-          <span className={`text-[10px] md:text-xs font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
+          <span className={`text-[10px] md:text-[12px] font-black ${dDay === t('res_card_today') ? 'text-rose-600' : isConfirmed ? 'text-green-600' : 'text-slate-400'
             }`}>{dDay}</span>
           {renderStatusBadge(res.status, res.date)}
-          <p className="text-[12px] md:text-sm font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
+          <p className="text-[12px] md:text-[16px] font-black text-slate-900">₩{res.amount?.toLocaleString()}</p>
         </div>
 
         {/* 모바일: 메시지/캘린더 아이콘 스택 */}
@@ -173,7 +194,7 @@ export default function ReservationCard({
         {/* 데스크탑: 메시지 버튼 */}
         <button
           onClick={(e) => { e.stopPropagation(); onMessage(); }}
-          className="ml-1 shrink-0 w-8 h-8 bg-slate-900 text-white rounded-lg hidden md:flex items-center justify-center hover:bg-black transition-colors"
+          className="ml-1 shrink-0 w-8 h-8 md:w-9 md:h-9 bg-slate-900 text-white rounded-lg hidden md:flex items-center justify-center hover:bg-black transition-colors"
         >
           <MessageSquare size={14} />
         </button>
@@ -181,11 +202,11 @@ export default function ReservationCard({
 
       {/* 확정된 예약: 연락처 정보 (접히는 방식 – 항상 표시) */}
       {isConfirmed && (
-        <div className="border-t border-slate-100 px-3 py-2 flex items-center gap-4 bg-slate-50/50">
-          <div className="flex items-center gap-1 text-[11px] text-slate-500 truncate">
+        <div className="border-t border-slate-100 px-3 md:px-4 py-2 md:py-2.5 flex items-center gap-4 md:gap-6 bg-slate-50/50">
+          <div className="flex items-center gap-1 text-[11px] md:text-[13px] text-slate-500 truncate">
             <Phone size={11} className="shrink-0 text-slate-400" />{res.guest?.phone || '-'}
           </div>
-          <div className="flex items-center gap-1 text-[11px] text-slate-500 truncate">
+          <div className="flex items-center gap-1 text-[11px] md:text-[13px] text-slate-500 truncate">
             <Mail size={11} className="shrink-0 text-slate-400" />{res.guest?.email || '-'}
           </div>
           {isConfirmed && (
@@ -200,10 +221,10 @@ export default function ReservationCard({
       )}
 
       {/* 액션 버튼 (후기 – 모바일 숨김, 데스크탑만) */}
-      <div className="hidden md:flex flex-col gap-2 justify-end border-l border-slate-100 pt-0 pl-6 min-w-[100px]">
+      <div className="hidden md:flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 bg-white/90">
         <button
           onClick={(e) => { e.stopPropagation(); onMessage(); }}
-          className="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
+          className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
           <MessageSquare size={16} /> {t('res_message_btn')}
         </button>
@@ -219,7 +240,7 @@ export default function ReservationCard({
             <button
               onClick={(e) => { e.stopPropagation(); if (!hasReview) onReview(); }}
               disabled={hasReview}
-              className={`w-full px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasReview
+              className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasReview
                 ? 'bg-slate-100 text-slate-400 cursor-default'
                 : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 hover:text-slate-900'
                 }`}

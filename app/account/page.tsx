@@ -806,7 +806,7 @@ export default function AccountPage() {
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-slate-400">호스트에게 내가 할 수 있는 언어를 알려주세요.</p>
+                  <p className="text-xs text-slate-400">{t('help_languages_spoken')}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-2">{t('label_email')}</label> {/* 🟢 번역 */}

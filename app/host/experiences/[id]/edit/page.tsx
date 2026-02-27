@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
@@ -79,7 +80,7 @@ export default function EditExperiencePage() {
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요합니다.');
+      if (!user) throw new Error(t('login_required'));
 
       const { data, error } = await supabase
         .from('experiences')
@@ -118,7 +119,7 @@ export default function EditExperiencePage() {
         .select('id')
         .maybeSingle();
 
-      if (error || !data) throw new Error('수정 권한이 없거나 체험을 찾을 수 없습니다.');
+      if (error || !data) throw new Error(t('msg_edit_permission_fail'));
       showToast(t('msg_save_success'), 'success'); // 🟢 번역
       router.refresh();
     } catch (e: any) {
@@ -156,7 +157,7 @@ export default function EditExperiencePage() {
       ...prev,
       photos: prev.photos.filter((_: string, idx: number) => idx !== indexToRemove)
     }));
-    showToast('사진이 삭제 목록에 반영되었습니다. 저장 시 최종 적용됩니다.', 'success');
+    showToast(t('msg_photo_delete_success'), 'success');
   };
 
   // 진행 언어 토글 (기존 로직 유지)

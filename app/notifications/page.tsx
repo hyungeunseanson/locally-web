@@ -13,12 +13,22 @@ import Skeleton from '@/app/components/ui/Skeleton';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 
+type NotificationItem = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  created_at: string;
+  is_read: boolean;
+  link?: string | null;
+};
+
 export default function NotificationsPage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook (lang은 날짜 포맷용)
   const { showToast } = useToast();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [localNotifications, setLocalNotifications] = useState<any[]>([]);
+  const [localNotifications, setLocalNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // 🟢 [추가] 펼쳐진 알림 ID 목록 (아코디언 기능용)
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
@@ -31,6 +41,7 @@ export default function NotificationsPage() {
   // 🟢 [정석] Context(DB) 데이터와 동기화
   // 더 이상 booking 테이블을 직접 조회하지 않습니다.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalNotifications(notifications);
     setIsLoading(false);
   }, [notifications]);
@@ -48,7 +59,7 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleNotificationClick = async (noti: any) => {
+  const handleNotificationClick = async (noti: NotificationItem) => {
     // 1. 읽음 처리 (화면 즉시 반영)
     if (!noti.is_read) {
       await markAsRead(noti.id);
@@ -95,7 +106,7 @@ export default function NotificationsPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
 
-      <main className="max-w-2xl mx-auto px-4 md:px-6 py-6 md:py-12">
+      <main className="max-w-2xl md:max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-12">
         <div className="md:hidden mb-3">
           <button
             onClick={handleMobileBack}
@@ -106,9 +117,9 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 md:mb-6 gap-3">
           <div>
-            <h1 className="text-[18px] md:text-2xl font-black mb-1 flex items-center gap-2">
+            <h1 className="text-[18px] md:text-[30px] font-black mb-1 md:mb-1.5 flex items-center gap-2">
               {t('noti_title')}
               {unreadCount > 0 && (
                 <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
@@ -116,19 +127,19 @@ export default function NotificationsPage() {
                 </span>
               )}
             </h1>
-            <p className="text-[11px] text-slate-500">{t('noti_desc')}</p>
+            <p className="text-[11px] md:text-[13px] text-slate-500">{t('noti_desc')}</p>
           </div>
 
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 md:gap-2">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[11px] md:text-[13px] font-bold transition-colors ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
             >
               {t('noti_filter_all')}
             </button>
             <button
               onClick={() => setFilter('unread')}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${filter === 'unread' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[11px] md:text-[13px] font-bold transition-colors ${filter === 'unread' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
             >
               {t('noti_filter_unread')}
             </button>
@@ -139,7 +150,7 @@ export default function NotificationsPage() {
           <button
             onClick={markAllAsRead}
             disabled={unreadCount === 0}
-            className="text-[11px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="text-[11px] md:text-[13px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Check size={12} /> {t('noti_mark_all_read')}
           </button>
@@ -160,7 +171,7 @@ export default function NotificationsPage() {
             filteredList.map((noti) => (
               <div
                 key={noti.id}
-                className={`relative group rounded-xl px-4 py-3 border transition-all cursor-pointer ${!noti.is_read
+                className={`relative group rounded-xl px-4 md:px-5 py-3 md:py-3.5 border transition-all cursor-pointer ${!noti.is_read
                     ? 'bg-blue-50/40 border-blue-100'
                     : 'bg-white border-slate-100 hover:border-slate-200'
                   }`}
@@ -174,15 +185,15 @@ export default function NotificationsPage() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                      <h3 className={`font-semibold text-[12px] mb-0.5 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
+                      <h3 className={`font-semibold text-[12px] md:text-[14px] mb-0.5 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
                         {noti.title}
                         {!noti.is_read && <span className="ml-1.5 w-1.5 h-1.5 inline-block bg-rose-500 rounded-full align-middle"></span>}
                       </h3>
-                      <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                      <span className="text-[10px] md:text-[11px] text-slate-400 shrink-0 ml-2">
                         {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')}
                       </span>
                     </div>
-                    <p className={`text-[11px] leading-relaxed whitespace-pre-wrap transition-all duration-300 ${expandedIds.includes(noti.id) ? '' : 'line-clamp-2'
+                    <p className={`text-[11px] md:text-[13px] leading-relaxed whitespace-pre-wrap transition-all duration-300 ${expandedIds.includes(noti.id) ? '' : 'line-clamp-2'
                       } ${!noti.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
                       {noti.message}
                     </p>

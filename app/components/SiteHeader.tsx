@@ -42,8 +42,9 @@ function SiteHeaderContent() {
   };
 
   useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setIsMenuOpen(false);
       }
     }

@@ -169,7 +169,7 @@ function InboxContent() {
 
       {/* 🟢 데스크탑 제목 — main 밖에 위치해 flex-row 내부 첨범 방지 */}
       <div className="hidden md:block max-w-[1280px] w-full mx-auto px-6 pt-8 pb-0 shrink-0">
-        <h1 className="text-3xl font-black">{t('messages')}</h1>
+        <h1 className="text-[34px] font-black">{t('messages')}</h1>
       </div>
 
       {/* ── 메인 컨테이너 ── */}
@@ -191,13 +191,13 @@ function InboxContent() {
 
         {/* ──────────────── 좌측: 채팅 목록 ──────────────── */}
         <div className={`
-          w-full md:w-[320px] lg:w-[380px] md:border md:border-slate-200 md:rounded-2xl
+          w-full md:w-[340px] lg:w-[420px] md:border md:border-slate-200 md:rounded-2xl
           flex flex-col overflow-hidden shrink-0
           ${selectedInquiry ? 'hidden md:flex' : 'flex flex-1'}
         `}>
           {/* 목록 헤더 (데스크탑만) */}
-          <div className="hidden md:flex items-center px-4 py-3 border-b border-slate-100 bg-white shrink-0">
-            <span className="font-bold text-slate-800">{t('msg_list')}</span>
+          <div className="hidden md:flex items-center px-5 py-4 border-b border-slate-100 bg-white shrink-0">
+            <span className="font-bold text-[16px] text-slate-800">{t('msg_list')}</span>
           </div>
 
           {/* 목록 스크롤 */}
@@ -214,7 +214,7 @@ function InboxContent() {
                 <div
                   key={inq.id}
                   onClick={() => handleSelectInquiry(inq.id)}
-                  className={`relative px-3.5 md:px-4 py-3 md:py-3.5 cursor-pointer flex gap-2.5 md:gap-3 items-center border-b border-gray-100 last:border-b-0 transition-colors active:bg-gray-50 ${selectedInquiry?.id === inq.id ? 'bg-gray-50' : 'bg-white'}`}
+                  className={`relative px-3.5 md:px-5 py-3 md:py-4 cursor-pointer flex gap-2.5 md:gap-3.5 items-center border-b border-gray-100 last:border-b-0 transition-colors active:bg-gray-50 ${selectedInquiry?.id === inq.id ? 'bg-gray-50' : 'bg-white'}`}
                 >
                   {/* 아바타 */}
                   <div className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative ${inq.type === 'admin' ? 'bg-black text-white' : 'bg-gray-100'}`}>
@@ -226,20 +226,20 @@ function InboxContent() {
                   {/* 텍스트 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline mb-0.5">
-                      <span className={`text-[13px] md:text-[14px] truncate pr-2 ${inq.unread_count > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
+                      <span className={`text-[13px] md:text-[15px] truncate pr-2 ${inq.unread_count > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
                         {inq.type === 'admin' ? t('admin_name') : display.name}
                       </span>
-                      <span className="text-[10px] text-gray-400 shrink-0">{lastTime}</span>
+                      <span className="text-[10px] md:text-[11px] text-gray-400 shrink-0">{lastTime}</span>
                     </div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[11px] md:text-[12px] text-gray-500 truncate flex-1">{inq.content}</span>
+                      <span className="text-[11px] md:text-[13px] text-gray-500 truncate flex-1">{inq.content}</span>
                       {inq.unread_count > 0 && (
                         <span className="shrink-0 w-[18px] h-[18px] md:w-5 md:h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                           {inq.unread_count > 9 ? '9+' : inq.unread_count}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-gray-400 truncate block">{inq.experiences?.title}</span>
+                    <span className="text-[10px] md:text-[11px] text-gray-400 truncate block">{inq.experiences?.title}</span>
                   </div>
                 </div>
               );
@@ -261,7 +261,7 @@ function InboxContent() {
           {selectedInquiry ? (
             <>
               {/* 채팅 헤더 */}
-              <div className="px-2.5 md:px-4 py-2 md:py-3 border-b border-gray-100 flex items-center gap-2 md:gap-2.5 bg-white shrink-0">
+              <div className="px-2.5 md:px-5 py-2 md:py-3.5 border-b border-gray-100 flex items-center gap-2 md:gap-3 bg-white shrink-0">
                 <button
                   className="md:hidden p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
                   onClick={(e) => {
@@ -280,16 +280,16 @@ function InboxContent() {
                     <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill className="object-cover" />
                   </div>
                   <div className="min-w-0">
-                    <div className="font-bold text-[13px] md:text-[14px] leading-tight truncate">
+                    <div className="font-bold text-[13px] md:text-[15px] leading-tight truncate">
                       {selectedInquiry.type === 'admin' ? t('admin_chat_title') : currentHostDisplay.name}
                     </div>
-                    <div className="text-[10px] md:text-[11px] text-gray-500 truncate">{selectedInquiry.experiences?.title}</div>
+                    <div className="text-[10px] md:text-[12px] text-gray-500 truncate">{selectedInquiry.experiences?.title}</div>
                   </div>
                 </div>
               </div>
 
               {/* 메시지 영역 */}
-              <div className="flex-1 overflow-y-auto px-2.5 md:px-3 py-2.5 md:py-3 space-y-2.5 md:space-y-3 bg-gray-50" ref={scrollRef}>
+              <div className="flex-1 overflow-y-auto px-2.5 md:px-5 py-2.5 md:py-4 space-y-2.5 md:space-y-4 bg-gray-50" ref={scrollRef}>
                 {messages.map((msg) => {
                   const isMe = String(msg.sender_id) === String(currentUser?.id);
                   return (
@@ -310,20 +310,20 @@ function InboxContent() {
 
                       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[72%]`}>
                         {!isMe && (
-                          <span className="text-[10px] text-gray-500 mb-0.5 ml-0.5 cursor-pointer" onClick={() => handleProfileClick(msg.sender_id)}>
-                            {msg.sender?.name || currentHostDisplay.name}
-                          </span>
-                        )}
+                        <span className="text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 cursor-pointer" onClick={() => handleProfileClick(msg.sender_id)}>
+                          {msg.sender?.name || currentHostDisplay.name}
+                        </span>
+                      )}
 
                         <div className="flex items-end gap-1.5">
                           {isMe && (
                             <div className="flex flex-col items-end shrink-0">
-                              <span className="text-[9px] font-bold text-blue-500">{msg.is_read ? '' : '1'}</span>
-                              <span className="text-[9px] text-gray-400" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
+                              <span className="text-[9px] md:text-[10px] font-bold text-blue-500">{msg.is_read ? '' : '1'}</span>
+                              <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
                             </div>
                           )}
 
-                          <div className={`px-2.5 md:px-3 py-1.5 md:py-2 rounded-2xl text-[12px] md:text-[13px] leading-[1.45] md:leading-relaxed shadow-sm break-words ${isMe ? 'bg-black text-white rounded-tr-sm' : 'bg-white border border-gray-200 rounded-tl-sm'}`}>
+                          <div className={`px-2.5 md:px-4 py-1.5 md:py-2.5 rounded-2xl text-[12px] md:text-[14px] leading-[1.45] md:leading-relaxed shadow-sm break-words ${isMe ? 'bg-black text-white rounded-tr-sm' : 'bg-white border border-gray-200 rounded-tl-sm'}`}>
                             {msg.type === 'image' && msg.image_url && (
                               <div className="mb-1 rounded-lg overflow-hidden">
                                 <a href={msg.image_url} rel="noopener noreferrer">
@@ -335,7 +335,7 @@ function InboxContent() {
                           </div>
 
                           {!isMe && (
-                            <span className="text-[9px] text-gray-400 mb-0.5 shrink-0" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
+                            <span className="text-[9px] md:text-[10px] text-gray-400 mb-0.5 shrink-0" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
                           )}
                         </div>
                       </div>
@@ -345,18 +345,18 @@ function InboxContent() {
               </div>
 
               {/* 입력 바 */}
-              <div className="px-2.5 md:px-3 py-2 bg-white border-t border-gray-100 flex items-center gap-1.5 md:gap-2 shrink-0">
+              <div className="px-2.5 md:px-5 py-2 md:py-3 bg-white border-t border-gray-100 flex items-center gap-1.5 md:gap-3 shrink-0">
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isSending || selectedInquiry.id === 'new'}
-                  className="h-8 w-8 md:h-9 md:w-9 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors shrink-0 disabled:opacity-30"
+                  className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors shrink-0 disabled:opacity-30"
                 >
                   <ImagePlus className="w-[14px] h-[14px] md:w-4 md:h-4" />
                 </button>
 
                 <input
-                  className="flex-1 h-9 md:h-10 border border-gray-200 rounded-full px-3.5 md:px-4 text-[12px] md:text-[13px] focus:outline-none focus:border-gray-400 transition-colors bg-gray-50 disabled:cursor-not-allowed"
+                  className="flex-1 h-9 md:h-11 border border-gray-200 rounded-full px-3.5 md:px-5 text-[12px] md:text-[14px] focus:outline-none focus:border-gray-400 transition-colors bg-gray-50 disabled:cursor-not-allowed"
                   placeholder={t('msg_placeholder')}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
@@ -369,7 +369,7 @@ function InboxContent() {
                 <button
                   onClick={() => handleSend()}
                   disabled={(!inputText.trim()) || isSending}
-                  className="h-8 w-8 md:h-9 md:w-9 flex items-center justify-center bg-black text-white rounded-full hover:scale-105 transition-transform disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed shrink-0"
+                  className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center bg-black text-white rounded-full hover:scale-105 transition-transform disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed shrink-0"
                 >
                   {isSending ? <Loader2 className="animate-spin w-[14px] h-[14px] md:w-[15px] md:h-[15px]" /> : <Send className="w-[14px] h-[14px] md:w-[15px] md:h-[15px]" />}
                 </button>
@@ -378,7 +378,7 @@ function InboxContent() {
           ) : (
             <div className="flex-1 hidden md:flex items-center justify-center text-slate-400 flex-col gap-2">
               <div className="p-4 bg-slate-50 rounded-full"><User size={28} className="text-slate-300" /></div>
-              <p className="text-sm">{t('msg_select_chat')}</p>
+              <p className="text-sm md:text-base">{t('msg_select_chat')}</p>
             </div>
           )}
         </div>
