@@ -3,6 +3,7 @@ import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { toZonedTime } from 'date-fns-tz';
+import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 
 const TAX_RATE = 1.1;
 const COMMISSION_RATE = 0.2;
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    if (booking.status === 'cancelled') return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
+    if (isCancelledOnlyBookingStatus(booking.status)) return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
 
     // 2. 환불액 및 정산액 계산
     let refundRate = 0;

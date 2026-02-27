@@ -5,7 +5,7 @@ import { Settings, ChevronDown, ChevronUp, Info, BookOpen, CreditCard } from 'lu
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Skeleton from '@/app/components/ui/Skeleton';
-import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
+import { BOOKING_CONFIRMED_STATUSES, isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 
 export default function Earnings() {
   const supabase = createClient();
@@ -53,7 +53,7 @@ export default function Earnings() {
             experiences!inner ( host_id )
           `)
           .eq('experiences.host_id', user.id)
-          .in('status', [...BOOKING_CONFIRMED_STATUSES, 'cancelled']);
+          .in('status', [...BOOKING_CONFIRMED_STATUSES, 'cancelled', 'CANCELLED']);
 
         if (error) throw error;
 
@@ -67,7 +67,7 @@ export default function Earnings() {
 
         bookings?.forEach((b: any) => {
           // [H-1] Skip cancelled bookings with no payout
-          if (b.status === 'cancelled' && (!b.host_payout_amount || b.host_payout_amount <= 0)) {
+          if (isCancelledOnlyBookingStatus(b.status) && (!b.host_payout_amount || b.host_payout_amount <= 0)) {
             return;
           }
 
@@ -77,7 +77,7 @@ export default function Earnings() {
           let itemExchange = 0;
           let itemNet = 0;
 
-          if (b.status === 'cancelled') {
+          if (isCancelledOnlyBookingStatus(b.status)) {
             // For cancelled bookings with payout, the payout is the final net amount.
             // We treat it as 0 fees for display since they were deducted at source (backend).
             itemNet = b.host_payout_amount || 0;

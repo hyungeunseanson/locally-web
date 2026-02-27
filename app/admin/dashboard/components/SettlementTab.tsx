@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { DollarSign, CheckCircle, User, ChevronDown, ChevronUp, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
+import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 
 export default function SettlementTab() {
   const supabase = createClient();
@@ -40,7 +41,7 @@ export default function SettlementTab() {
 
     // 2. 호스트 정보 가져오기 (계좌 포함)
 const hostIds = Array.from(new Set(safeBookings.map(b => b.experiences?.host_id).filter(Boolean)));
-    let hostsMap = new Map();
+    const hostsMap = new Map();
     
     if (hostIds.length > 0) {
        const { data: hosts } = await supabase.from('profiles').select('id, name, email').in('id', hostIds);
@@ -196,7 +197,7 @@ const hostIds = Array.from(new Set(safeBookings.map(b => b.experiences?.host_id)
                           <td className="py-3 pl-2 font-mono text-slate-500 text-xs">{item.date}</td>
                           <td className="py-3 font-medium text-slate-700">{item.experiences?.title}</td>
                           <td className="py-3">
-                             {item.status === 'cancelled' ? (
+                             {isCancelledOnlyBookingStatus(item.status) ? (
                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded">
                                      취소 위약금
                                  </span>

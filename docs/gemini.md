@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P1-3 Status Hardening: Sales + Host Reservation Manager/Card)  
-**Version:** 3.2.21 (P1-3 Status Hardening: Sales + Host Reservation Manager/Card)  
+**Last Updated:** 2026-02-27 (P1-4 Status Hardening: Settlement + Host Earnings + Cancel API Guard)  
+**Version:** 3.2.22 (P1-4 Status Hardening: Settlement + Host Earnings + Cancel API Guard)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -85,6 +85,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 예약 상태 유틸 확장(P1-3): `bookingStatus`에 `pending / cancellation_requested / completed / cancelled` 전용 판정 유틸을 추가해 화면 컴포넌트에서 직접 문자열 비교를 축소
 - Admin 매출 탭 정합성(P1-3): `SalesTab`의 유효 매출/정산 대상/CSV 위약금/상태 뱃지 분기를 공통 상태 유틸로 정렬해 대소문자 변형 입력에도 동일 계산을 유지
 - Host 예약 관리 정합성(P1-3): `ReservationManager`, `ReservationCard`의 취소요청/취소완료/입금대기 분기를 공통 상태 유틸로 통일해 탭 분류·정렬·실시간 알림 조건의 일관성을 강화
+- Admin 정산 실행 정합성(P1-4): `SettlementTab`의 상세 유형(취소 위약금/여행 완료) 분기를 공통 취소 상태 유틸로 통일해 상태 문자열 비교 중복을 축소
+- Host 수익 계산 정합성(P1-4): `Earnings`의 취소 예약 제외/포함 판단을 공통 유틸 기반으로 정렬하고 조회 status 목록에 `CANCELLED` 변형을 보강
+- 결제 취소 API 가드 보강(P1-4): `/api/payment/cancel`의 “이미 취소됨” 판정을 공통 상태 유틸로 전환해 대소문자/입력 변형에 대한 방어를 강화
 - 안정성: 광범위한 `.single()` -> `.maybeSingle()` 전환
 - 모바일 UX: BottomTabNavigation 충돌/가림/z-index/뒤로가기 이슈 정리
 - 모바일 정보/커뮤니티/뉴스/공지 레이아웃 최적화 및 게스트 프로필(모바일/데스크탑) 기준 정렬
