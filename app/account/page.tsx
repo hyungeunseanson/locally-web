@@ -10,6 +10,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import MobileProfileView from '@/app/components/mobile/MobileProfileView';
 import HostModeTransition from '@/app/components/mobile/HostModeTransition';
+import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -350,9 +351,12 @@ export default function AccountPage() {
         {/* ── 헤더: "프로필" 타이틀 + 알림 벨 ── */}
         <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-2.5">
           <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">프로필</h1>
-          <a href="/notifications" className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
-            <Bell className="w-4 h-4 text-gray-600" />
-          </a>
+          <div className="flex items-center gap-2">
+            <MobileLanguageSwitcher />
+            <a href="/notifications" className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+              <Bell className="w-4 h-4 text-gray-600" />
+            </a>
+          </div>
         </div>
 
         {/* ── 프로필 카드 (이미지 3) ── */}

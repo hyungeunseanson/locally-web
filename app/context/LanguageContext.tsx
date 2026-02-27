@@ -3,6 +3,34 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type Locale = 'ko' | 'en' | 'ja' | 'zh';
+const SUPPORTED_LOCALES: Locale[] = ['ko', 'en', 'ja', 'zh'];
+const APP_LANG_KEY = 'app_lang';
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+const isSupportedLocale = (value: string): value is Locale => {
+  return SUPPORTED_LOCALES.includes(value as Locale);
+};
+
+const detectLocaleFromNavigator = (): Locale => {
+  if (typeof navigator === 'undefined') return 'ko';
+
+  const candidates = [...(navigator.languages || []), navigator.language].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const normalized = candidate.toLowerCase();
+    if (normalized.startsWith('ko')) return 'ko';
+    if (normalized.startsWith('en')) return 'en';
+    if (normalized.startsWith('ja')) return 'ja';
+    if (normalized.startsWith('zh')) return 'zh';
+  }
+
+  return 'ko';
+};
+
+const persistLocale = (locale: Locale) => {
+  localStorage.setItem(APP_LANG_KEY, locale);
+  document.cookie = `${APP_LANG_KEY}=${locale}; path=/; max-age=${ONE_YEAR_SECONDS}; samesite=lax`;
+};
 
 const dictionary: Record<Locale, Record<string, string>> = {
   ko: {
@@ -1804,28 +1832,44 @@ noti_delete: "通知を削除",
   }
 };
 
-const LanguageContext = createContext<any>(null);
+type LanguageContextValue = {
+  lang: Locale;
+  setLang: (newLang: Locale) => void;
+  t: (key: string) => string;
+};
+
+const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Locale>('ko');
 
   useEffect(() => {
-    // 1. URL 기반 언어 감지 (최우선)
     const path = window.location.pathname;
-    const pathLang = path.split('/')[1] as Locale; // /en/..., /ja/...
-    if (['ko', 'en', 'ja', 'zh'].includes(pathLang)) {
-      setLang(pathLang);
-      localStorage.setItem('app_lang', pathLang);
+    const pathLang = (path.split('/')[1] || '').toLowerCase();
+    let resolved: Locale = 'ko';
+
+    // 1) URL 언어 프리픽스가 있으면 최우선 사용
+    if (isSupportedLocale(pathLang)) {
+      resolved = pathLang;
     } else {
-      // 2. URL에 언어 정보가 없으면 localStorage 확인 (기존 로직)
-      const saved = localStorage.getItem('app_lang') as Locale;
-      if (saved && dictionary[saved]) setLang(saved);
+      // 2) 저장된 사용자 선택값(localStorage)이 있으면 유지
+      const saved = (localStorage.getItem(APP_LANG_KEY) || '').toLowerCase();
+      if (isSupportedLocale(saved) && dictionary[saved]) {
+        resolved = saved;
+      } else {
+        // 3) 첫 방문(저장값 없음)만 브라우저 언어로 1회 추론
+        resolved = detectLocaleFromNavigator();
+      }
     }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLang(resolved);
+    persistLocale(resolved);
   }, []);
 
   const changeLang = (newLang: Locale) => {
     setLang(newLang);
-    localStorage.setItem('app_lang', newLang);
+    persistLocale(newLang);
   };
 
   const t = (key: string) => {
@@ -1839,4 +1883,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const useLanguage = () => useContext(LanguageContext);
+export const useLanguage = () => {
+  const context = useContext(LanguageContext);
+  if (!context) {
+    throw new Error('useLanguage must be used within LanguageProvider');
+  }
+  return context;
+};

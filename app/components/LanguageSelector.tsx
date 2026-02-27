@@ -5,6 +5,8 @@ import { Globe, Check } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
+type Locale = 'ko' | 'en' | 'ja' | 'zh';
+
 export default function LanguageSelector() {
   const { lang, setLang } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -13,7 +15,7 @@ export default function LanguageSelector() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const languages = [
+  const languages: Array<{ label: string; value: Locale }> = [
     { label: '한국어', value: 'ko' },
     { label: 'English', value: 'en' },
     { label: '中文', value: 'zh' },
@@ -22,16 +24,17 @@ export default function LanguageSelector() {
 
   // 외부 클릭 시 닫기
   useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setIsOpen(false);
       }
-    }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLanguageChange = (newLang: string) => {
+  const handleLanguageChange = (newLang: Locale) => {
     setLang(newLang);
     setIsOpen(false);
 

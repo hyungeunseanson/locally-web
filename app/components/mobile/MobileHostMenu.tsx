@@ -10,9 +10,16 @@ import {
 import { createClient } from '@/app/utils/supabase/client';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import HostModeTransition from './HostModeTransition';
+import MobileLanguageSwitcher from './MobileLanguageSwitcher';
+
+type MobileHostProfile = {
+    avatar_url?: string | null;
+    full_name?: string | null;
+    [key: string]: unknown;
+};
 
 export default function MobileHostMenu() {
-    const [profile, setProfile] = useState<Record<string, any> | null>(null);
+    const [profile, setProfile] = useState<MobileHostProfile | null>(null);
     const [earnings, setEarnings] = useState<{ month: string; amount: number } | null>(null);
     const [reviewSummary, setReviewSummary] = useState<{ avg: number; count: number }>({ avg: 0, count: 0 });
     const [loading, setLoading] = useState(true);
@@ -93,6 +100,7 @@ export default function MobileHostMenu() {
             <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-4">
                 <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">메뉴</h1>
                 <div className="flex items-center gap-2">
+                    <MobileLanguageSwitcher />
                     <Link href="/host/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full bg-gray-100">
                         <Bell size={17} className="text-gray-600" />
                     </Link>

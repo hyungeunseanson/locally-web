@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P1-9 Desktop Host Switch Regression Hotfix)  
-**Version:** 3.2.27 (P1-9 Desktop Host Switch Regression Hotfix)  
+**Last Updated:** 2026-02-27 (P1-10 Mobile Language Entry + First-Visit Auto Detection + Font Verification Hardening)  
+**Version:** 3.2.28 (P1-10 Mobile Language Entry + First-Visit Auto Detection + Font Verification Hardening)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -105,6 +105,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 모드 전환 목적지 재동기화: 게스트의 “호스트 모드로 전환” 동작은 `/host/menu`로 연결하고, 호스트→게스트는 `/account`로 유지
 - 데스크탑 호스트 전환 회귀 수정(P1-9): `SiteHeader` 드롭다운의 호스트 전환 목적지를 `/host/menu`에서 `/host/dashboard?tab=reservations`로 복원해 데스크탑에서 모바일 메뉴로 이동되던 경로를 차단
 - 모드 전환 경로 가드(P1-9): `/host/menu`는 모바일 메뉴/모바일 뒤로가기 fallback 전용으로 유지하고, 데스크탑 헤더 모드 전환에서는 사용하지 않음
+- 모바일 언어 전환 진입점 확장(P1-10): 모바일 전용 언어 스위처를 `홈 상단 검색 영역`, `게스트 계정 헤더`, `호스트 메뉴 헤더`에 추가해 데스크탑 레이아웃 영향 없이 즉시 전환 경로를 확보
+- 언어 자동 감지 안전화(P1-10): 초기 언어 선택 우선순위를 `URL 프리픽스 > localStorage(app_lang) > navigator 언어(최초 1회)`로 고정하고, 최초 추론 결과를 저장해 재방문 시 자동 덮어쓰기를 방지
+- 서버 로케일 동기화 보강(P1-10): `getCurrentLocale`에서 `app_lang` 쿠키 우선 + `Accept-Language` fallback을 적용해 메타데이터/서버 렌더의 언어 기본값이 클라이언트 선택 흐름과 어긋나지 않도록 보강
+- 폰트 검증 런북 고정(P1-10): 폰트 반영 확인 시 `.next` 정리 후 `npx next build --webpack` 기준으로 `@font-face(inter/ibm)` 존재와 `next/font/google|noto_sans_kr|fonts.googleapis` 미존재를 함께 확인
 - 새 체험 등록 UX 보정: 모바일/데스크탑 공통으로 스텝 타이포·간격·입력 영역 밀도를 축소해 한 화면 가독성 우선 레이아웃으로 재정렬
 - 새 체험 등록 스텝 검증: Step 1~6 필수 입력 검증을 추가해 누락 시 다음 단계(또는 등록) 진행 차단 + 토스트 피드백 적용
 - 체험 운영 알림 톤 통일: 일정 관리/체험 수정 화면의 브라우저 alert 기반 오류 안내를 가능한 범위에서 토스트 피드백으로 전환
@@ -233,3 +237,4 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 중복/과장/과거 상세 로그는 누적하지 않는다.
 - 대규모 변경 시 이 문서에는 결정사항만 요약하고, 상세 이력은 별도 문서 또는 커밋에 남긴다.
 - 모바일 전용 경로(`'/host/menu'` 등)는 데스크탑 전환/네비게이션의 기본 목적지로 사용하지 않는다.
+- 폰트 검증은 개발 캐시(`.next/dev`) 단독 결과를 기준으로 판단하지 않고, `.next` 정리 후 `webpack build` 산출물로 최종 확인한다.

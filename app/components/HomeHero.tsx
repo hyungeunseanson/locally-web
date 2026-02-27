@@ -5,10 +5,14 @@ import { Search } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import MainSearchBar from '@/app/components/MainSearchBar';
 import MobileSearchModal from '@/app/components/mobile/MobileSearchModal';
+import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
 import { CATEGORIES } from '@/app/constants';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 interface HomeHeroProps {
+  dateRange: { start: Date | null; end: Date | null };
+  setDateRange: (range: { start: Date | null; end: Date | null }) => void;
+
   activeTab: 'experience' | 'service';
   setActiveTab: (tab: 'experience' | 'service') => void;
   selectedCategory: string;
@@ -21,8 +25,6 @@ interface HomeHeroProps {
 
   locationInput: string;
   setLocationInput: (val: string) => void;
-  dateRange: { start: Date | null, end: Date | null };
-  setDateRange: (range: any) => void;
   searchRef: React.RefObject<HTMLDivElement | null>;
   onSearch: () => void;
 
@@ -234,10 +236,10 @@ export default function HomeHero({
         }}>
 
         {/* 검색 캡슐 — 스크림 없이 바로 사용, 배경은 부모에서 상속 */}
-        <div className="px-5 mb-2 transition-all duration-300">
+        <div className="px-5 mb-2 transition-all duration-300 flex items-center gap-2.5">
           <button
             onClick={() => setIsMobileSearchOpen(true)}
-            className="w-full h-[56px] flex items-center justify-center gap-2.5 bg-white rounded-[28px] px-6 active:scale-[0.98] transition-transform"
+            className="flex-1 h-[56px] flex items-center justify-center gap-2.5 bg-white rounded-[28px] px-6 active:scale-[0.98] transition-transform"
             style={{
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
               border: '1px solid rgba(0,0,0,0.08)',
@@ -246,6 +248,7 @@ export default function HomeHero({
             <Search size={14} className="text-[#3A3A3A] shrink-0" strokeWidth={2.4} />
             <span className="text-[13px] text-[#3A3A3A] font-medium tracking-[-0.01em]">{t('home_search_cta')}</span>
           </button>
+          <MobileLanguageSwitcher buttonClassName="w-11 h-11 bg-white/95 shadow-sm" />
         </div>
 
         {/* 아이콘 탭 — 에어비앤비 기본 상태 */}
