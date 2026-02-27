@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P1 Status Constant Alignment + Admin Whitelist Query Tightening)  
-**Version:** 3.2.19 (P1 Status Constant Alignment + Admin Whitelist Query Tightening)  
+**Last Updated:** 2026-02-27 (P1-2 Booking Status Hardening: Admin Ledger/Analytics + Guest Trips)  
+**Version:** 3.2.20 (P1-2 Booking Status Hardening: Admin Ledger/Analytics + Guest Trips)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -79,6 +79,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 - 결제/보안: NicePay 서명 검증, 결제 확정/취소 API 권한 검증 반영
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합
+- 예약 상태 단일화(P1-2): `bookingStatus` 공통 상수에 대소문자 무관 판정(`isConfirmedBookingStatus`, `isCancelledBookingStatus`)과 Admin 장부용 상태 파생 상수(`*_UPPER`)를 추가해 화면/집계/필터 기준을 일치
+- Admin 장부/분석 정합성(P1-2): `MasterLedgerTab`, `AnalyticsTab`의 하드코딩 상태 배열 비교를 공통 상수 기반으로 전환해 상태값 표기 혼합(`PAID`/`confirmed`)에도 동일 집계 결과를 유지
+- Guest Trips 분류 안정화(P1-2): `useGuestTrips`, `TripCard`의 취소/완료 분기를 공통 취소 상태 집합 기준으로 통일해 `declined`/대소문자 변형 상태 누락 위험 제거
 - 안정성: 광범위한 `.single()` -> `.maybeSingle()` 전환
 - 모바일 UX: BottomTabNavigation 충돌/가림/z-index/뒤로가기 이슈 정리
 - 모바일 정보/커뮤니티/뉴스/공지 레이아웃 최적화 및 게스트 프로필(모바일/데스크탑) 기준 정렬

@@ -7,6 +7,7 @@ import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, Chev
 import { useRouter } from 'next/navigation';
 import CancellationModal from './CancellationModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
+import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 
 interface TripCardProps {
   trip: any;
@@ -97,13 +98,15 @@ const calculateRefundFront = () => {
 
 // 상태 뱃지 로직
 const getStatusInfo = () => {
+  const normalizedStatus = (trip.status || '').toLowerCase();
+
   // 🟢 [추가] 입금 대기 상태
-  if (trip.status === 'PENDING') {
+  if (normalizedStatus === 'pending') {
     return { label: '입금 확인 중', color: 'bg-yellow-100 text-yellow-700 animate-pulse', icon: <Receipt size={12}/> };
   }
 
-  if (trip.status === 'cancellation_requested') return { label: '취소 요청중', color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12}/> };
-  if (trip.status === 'cancelled') return { label: '취소됨', color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12}/> };
+  if (normalizedStatus === 'cancellation_requested') return { label: '취소 요청중', color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12}/> };
+  if (isCancelledBookingStatus(normalizedStatus)) return { label: '취소됨', color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12}/> };
   
   const today = new Date();
     const tripDate = new Date(trip.date);
@@ -194,7 +197,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
                           <button onClick={() => router.push(`/experiences/${trip.expId}`)} className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium">{t('trip_view_again')}</button>   {/* 🟢 교체 */}
                           <div className="h-px bg-slate-100 my-1"></div>
                           
-                          {(trip.status !== 'cancelled' && trip.status !== 'cancellation_requested') ? (
+                          {!isCancelledBookingStatus(trip.status || '') ? (
                             <button 
                               onClick={handleCancelClick} // 🟢 클릭 시 환불 계산 후 모달 오픈
                               className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-red-50 text-red-500 font-medium"
@@ -203,7 +206,7 @@ if (diffDays > 0 && diffDays <= 7) return { label: `${diffDays} ${t('trip_start_
 </button>
                           ) : (
                             <button disabled className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed">
-                              {trip.status === 'cancelled' ? '취소 완료됨' : '취소 요청중'}
+                              {(trip.status || '').toLowerCase() === 'cancellation_requested' ? '취소 요청중' : '취소 완료됨'}
                             </button>
                           )}
                        </div>

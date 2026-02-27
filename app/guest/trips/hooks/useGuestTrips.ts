@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/context/ToastContext';
 import { fetchGuestTrips, cancelGuestTrip } from '@/app/utils/api/trips';
+import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 
 export function useGuestTrips() {
   const { showToast } = useToast();
@@ -44,13 +45,15 @@ export function useGuestTrips() {
     }
   };
 
+  const isCompletedStatus = (status: string) => (status || '').toLowerCase() === 'completed';
+
   // 🟢 4. 데이터 분류 (기존 로직 유지)
   const upcomingTrips = trips.filter((t: any) => 
-    t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'cancellation_requested'
+    !isCompletedStatus(t.status) && !isCancelledBookingStatus(t.status || '')
   );
   
   const pastTrips = trips.filter((t: any) => 
-    t.status === 'completed' || t.status === 'cancelled' || t.status === 'cancellation_requested'
+    isCompletedStatus(t.status) || isCancelledBookingStatus(t.status || '')
   );
 
   return {

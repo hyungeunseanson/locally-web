@@ -9,6 +9,7 @@ import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { Range } from 'react-date-range';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
@@ -151,7 +152,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         }
 
         // 완료된 건 (매출 발생)
-        if (['confirmed', 'PAID', 'completed'].includes(b.status)) {
+        if (isConfirmedBookingStatus(b.status || '')) {
           completedCount++;
           const amount = Number(b.amount || 0);
           gmv += amount;
@@ -178,9 +179,9 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         }
 
         // 취소된 건 (사유 분석)
-        if (['cancelled', 'declined', 'cancellation_requested'].includes(b.status)) {
+        if (isCancelledBookingStatus(b.status || '')) {
           cancelledCount++;
-          if (b.status === 'cancelled') userCancel++; else hostCancel++;
+          if ((b.status || '').toLowerCase() === 'cancelled') userCancel++; else hostCancel++;
 
           // 호스트 취소율 반영
           if (exp?.host_id && hostStats[exp.host_id]) {
@@ -328,7 +329,10 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       const hostSources: Record<string, number> = {};
       const hostLangs: Record<string, number> = {};
       const hostNats: Record<string, number> = {};
-      let applied = 0, approved = 0, activeHosts = new Set(), bookedHosts = new Set();
+      let applied = 0;
+      let approved = 0;
+      const activeHosts = new Set<string>();
+      const bookedHosts = new Set<string>();
 
       apps?.forEach((a: any) => {
         if (!a.created_at || !isWithinDateRange(a.created_at)) return;
@@ -412,7 +416,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       });
       // 기간 내 예약을 1건이라도 받은 호스트
       bookings?.forEach((b: any) => {
-        if (b.created_at && isWithinDateRange(b.created_at) && ['confirmed', 'PAID', 'completed'].includes(b.status)) {
+        if (b.created_at && isWithinDateRange(b.created_at) && isConfirmedBookingStatus(b.status || '')) {
           const exp = exps?.find(e => e.id === b.experience_id);
           if (exp?.host_id) bookedHosts.add(exp.host_id);
         }

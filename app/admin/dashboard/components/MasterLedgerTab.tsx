@@ -14,6 +14,13 @@ import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css'; // main style file
 import 'react-date-range/dist/theme/default.css'; // theme css file
 import { Range } from 'react-date-range';
+import {
+  BOOKING_CANCELLED_STATUSES_UPPER,
+  BOOKING_CONFIRMED_STATUSES_UPPER,
+  BOOKING_LEDGER_VISIBLE_STATUSES_UPPER,
+  isCancelledBookingStatus,
+  isConfirmedBookingStatus,
+} from '@/app/constants/bookingStatus';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
@@ -82,13 +89,13 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
     if (statusFilter === 'ALL') {
       // 전체 보기: 입금대기, 결제완료, 취소됨 모두 포함
-      statusMatch = ['PENDING', 'PAID', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'DECLINED', 'CANCELLATION_REQUESTED'].includes(status);
+      statusMatch = BOOKING_LEDGER_VISIBLE_STATUSES_UPPER.includes(status);
     } else if (statusFilter === 'PAID') {
-      statusMatch = ['PAID', 'CONFIRMED', 'COMPLETED'].includes(status);
+      statusMatch = BOOKING_CONFIRMED_STATUSES_UPPER.includes(status);
     } else if (statusFilter === 'PENDING') {
       statusMatch = status === 'PENDING';
     } else if (statusFilter === 'CANCELLED') {
-      statusMatch = ['CANCELLED', 'DECLINED', 'CANCELLATION_REQUESTED'].includes(status);
+      statusMatch = BOOKING_CANCELLED_STATUSES_UPPER.includes(status);
     }
 
     return startMatch && endMatch && searchMatch && statusMatch;
@@ -96,7 +103,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
   // 2. 통합 합계 계산 (KPI) - 취소된 건은 제외
   const totals = ledgerData.reduce((acc, curr) => {
-    if (['cancelled', 'declined', 'cancellation_requested'].includes(curr.status)) return acc;
+    if (isCancelledBookingStatus(curr.status)) return acc;
 
     // 🟢 이슈6: null/undefined 안전 처리로 NaN 방지
     const paidAmount = Number(curr.amount) || 0;
@@ -182,9 +189,9 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
   const renderStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
-    if (['paid', 'confirmed', 'completed'].includes(s)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">확정</span>;
+    if (isConfirmedBookingStatus(status)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">확정</span>;
     if (s === 'pending') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 animate-pulse">입금 대기</span>;
-    if (['cancelled', 'declined', 'cancellation_requested'].includes(s)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">취소됨</span>;
+    if (isCancelledBookingStatus(status)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">취소됨</span>;
     return <span className="text-xs text-slate-500">{status}</span>;
   };
 
@@ -369,7 +376,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <div className="flex-1 pr-2">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-1.5">
                 <div className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
-                  ['paid', 'confirmed', 'completed'].includes(selectedBooking.status.toLowerCase()) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                  isConfirmedBookingStatus(selectedBooking.status) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                   }`}>
                   {selectedBooking.status}
                 </div>
@@ -462,7 +469,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 </button>
               )}
 
-              {['confirmed', 'paid', 'completed'].includes(selectedBooking.status.toLowerCase()) && (
+              {isConfirmedBookingStatus(selectedBooking.status) && (
                 <button
                   onClick={() => handleForceCancel(selectedBooking.id)}
                   disabled={isProcessing}
