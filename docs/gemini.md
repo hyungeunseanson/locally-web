@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
 **Last Updated:** 2026-02-27  
-**Version:** 3.2.8 (Mobile Search Modal Safe-Area & Scroll Lock Stabilization)  
+**Version:** 3.2.9 (Mobile Search Modal Freeze Fix on iOS)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -111,6 +111,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 모바일 상세검색 구조 보정: 모달 내부 `체험/서비스` 상단 탭을 제거하고 닫기(X)를 `위치` 박스 우측으로 이동했으며, 위치/날짜/언어 패널 시작점을 상향 정렬해 하단 CTA와 함께 전체 수직 밀도를 재정렬
 - 모바일 검색 모달 하단 고정 안정화: `fixed + 하드코딩 bottom offset` 구조를 제거하고 모달 내부 하단 바(`sticky`) + `safe-area` 패딩으로 재설계해 iPhone 주소창 가림/겹침 이슈를 완화
 - 모바일 키보드 점프 대응: `여행지 검색` 확장 입력의 `autoFocus`를 제거하고 `preventScroll` 포커스 + `body position: fixed/top` 기반 스크롤 락 복원으로 iOS 키보드 오픈 시 홈 하단 점프 현상을 방지
+- 모바일 검색 모달 먹통 회귀 수정: `body fixed(top)` 스크롤 락이 iOS Safari에서 `fixed + portal` 모달 레이어와 충돌해 홈 화면 고정/터치 불가 상태를 유발하던 문제를 제거하고, 스크롤 락을 `body/html overflow` 기반으로 단순화해 여행지 검색 진입 시 모달 상호작용이 끊기지 않도록 안정화
 - 모바일 검색 결과 화면 리디자인: 상단 캡슐 헤더/유형·시간대 필터 칩/수평 카드 섹션/하단 시트(시간대·체험유형) 구조를 레퍼런스 기반으로 정렬하고 검색 결과 없음 상태를 별도 일러스트 카드형으로 맞춤
 - 모바일 검색 결과 타이포 재보정: 섹션 타이틀/필터 칩/하단 시트 타이포를 축소해 레퍼런스 대비(작고 조밀한 인상)로 정렬
 - 검색어 안정화 가드: 모바일 검색 결과 API 호출 전 `location` 필터 문자열에서 PostgREST 문법 충돌 문자를 정리해 `Bad Request` 발생 가능성을 완화

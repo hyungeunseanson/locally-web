@@ -33,13 +33,7 @@ export default function MobileSearchModal({
     const expandedInputRef = useRef<HTMLInputElement>(null);
     const scrollLockRef = useRef({
         locked: false,
-        scrollY: 0,
         bodyOverflow: '',
-        bodyPosition: '',
-        bodyTop: '',
-        bodyLeft: '',
-        bodyRight: '',
-        bodyWidth: '',
         htmlOverflow: '',
     });
 
@@ -86,37 +80,18 @@ export default function MobileSearchModal({
 
         const restoreScrollLock = () => {
             if (!scrollLockRef.current.locked) return;
-            const { scrollY } = scrollLockRef.current;
             body.style.overflow = scrollLockRef.current.bodyOverflow;
-            body.style.position = scrollLockRef.current.bodyPosition;
-            body.style.top = scrollLockRef.current.bodyTop;
-            body.style.left = scrollLockRef.current.bodyLeft;
-            body.style.right = scrollLockRef.current.bodyRight;
-            body.style.width = scrollLockRef.current.bodyWidth;
             html.style.overflow = scrollLockRef.current.htmlOverflow;
             scrollLockRef.current.locked = false;
-            window.scrollTo(0, scrollY);
         };
 
         if (isOpen && !scrollLockRef.current.locked) {
-            const scrollY = window.scrollY || window.pageYOffset || 0;
             scrollLockRef.current = {
                 locked: true,
-                scrollY,
                 bodyOverflow: body.style.overflow,
-                bodyPosition: body.style.position,
-                bodyTop: body.style.top,
-                bodyLeft: body.style.left,
-                bodyRight: body.style.right,
-                bodyWidth: body.style.width,
                 htmlOverflow: html.style.overflow,
             };
 
-            body.style.position = 'fixed';
-            body.style.top = `-${scrollY}px`;
-            body.style.left = '0';
-            body.style.right = '0';
-            body.style.width = '100%';
             body.style.overflow = 'hidden';
             html.style.overflow = 'hidden';
         }
