@@ -30,16 +30,16 @@ function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
 function FAQItem({ question, answer }: { question: string, answer: string }) {
   const [isOpen, setIsOpen] = useState(false);
   return (
-    <div className="border-b border-gray-100 py-6 cursor-pointer group" onClick={() => setIsOpen(!isOpen)}>
+    <div className="border-b border-gray-100 py-5 md:py-6 cursor-pointer group" onClick={() => setIsOpen(!isOpen)}>
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-[#222222] group-hover:text-rose-600 transition-colors pr-8">{question}</h3>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0 ${isOpen ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}>
+        <h3 className="text-[16px] md:text-lg font-medium text-[#222222] group-hover:text-rose-600 transition-colors pr-8">{question}</h3>
+        <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center transition-all shrink-0 ${isOpen ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}>
            <ChevronDown size={16} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
         </div>
       </div>
       <div className={`grid transition-all duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100 mt-4' : 'grid-rows-[0fr] opacity-0'}`}>
         <div className="overflow-hidden">
-          <p className="text-[#717171] leading-relaxed">{answer}</p>
+          <p className="text-[14px] md:text-base text-[#717171] leading-relaxed">{answer}</p>
         </div>
       </div>
     </div>
@@ -52,31 +52,31 @@ export default function AboutPage() {
       <SiteHeader />
 
       {/* 1. HERO SECTION: 여백 조정 & 타이포그래피 강조 */}
-      <section className="relative pt-16 md:pt-24 pb-10 md:pb-16 px-4 md:px-6 max-w-[1440px] mx-auto overflow-hidden">
-        <div className="flex flex-col lg:flex-row items-center gap-8 md:gap-12 lg:gap-20">
+      <section className="relative pt-12 md:pt-24 pb-8 md:pb-16 px-4 md:px-6 max-w-[1440px] mx-auto overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-center gap-6 md:gap-12 lg:gap-20">
           
           {/* Left: 텍스트 */}
           <div className="flex-1 text-left lg:text-left z-10 lg:pl-10">
-            <h1 className="text-[38px] md:text-7xl lg:text-8xl font-[900] tracking-tighter leading-[1.0] mb-5 md:mb-6 text-[#222222]">
+            <h1 className="text-[32px] md:text-7xl lg:text-8xl font-[900] tracking-tighter leading-[1.0] mb-4 md:mb-6 text-[#222222]">
               여행은 <br/>
               <span className="text-rose-600">살아보는 거야.</span>
             </h1>
-            <p className="text-lg md:text-2xl text-[#222222] font-serif italic mb-6 md:mb-8">
-              "Travel like a local with locals"
+            <p className="text-[16px] md:text-2xl text-[#222222] font-serif italic mb-5 md:mb-8">
+              &quot;Travel like a local with locals&quot;
             </p>
-            <p className="text-sm md:text-lg text-[#717171] font-medium leading-relaxed max-w-lg mx-0 mb-8 md:mb-10">
+            <p className="text-[13px] md:text-lg text-[#717171] font-medium leading-relaxed max-w-lg mx-0 mb-7 md:mb-10">
               유명한 관광지가 아닌, 현지인의 일상 속으로.<br/>
               전 세계의 이웃들이 당신을 기다립니다.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-start">
               <Link href="/">
-                <button className="bg-rose-600 hover:bg-rose-700 text-white px-7 md:px-10 py-3 md:py-4 rounded-full font-bold text-base md:text-lg transition-all shadow-xl hover:shadow-rose-200 hover:-translate-y-1">
+                <button className="bg-rose-600 hover:bg-rose-700 text-white px-6 md:px-10 py-2.5 md:py-4 rounded-full font-bold text-[14px] md:text-lg transition-all shadow-xl hover:shadow-rose-200 hover:-translate-y-1">
                   여행 둘러보기
                 </button>
               </Link>
               <Link href="/become-a-host">
-                <button className="bg-white text-[#222222] border border-gray-200 hover:border-black px-7 md:px-10 py-3 md:py-4 rounded-full font-bold text-base md:text-lg transition-all hover:-translate-y-1">
+                <button className="bg-white text-[#222222] border border-gray-200 hover:border-black px-6 md:px-10 py-2.5 md:py-4 rounded-full font-bold text-[14px] md:text-lg transition-all hover:-translate-y-1">
                   호스트 되기
                 </button>
               </Link>
@@ -85,7 +85,7 @@ export default function AboutPage() {
 
           {/* Right: iPhone Mockup (요청하신 스타일) */}
           <div className="flex-1 flex justify-center lg:justify-end relative">
-             <div className="relative w-[280px] h-[560px] md:w-[340px] md:h-[680px] bg-black rounded-[50px] md:rounded-[60px] border-[10px] md:border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5 transform hover:scale-[1.01] transition-transform duration-500">
+             <div className="relative w-[260px] h-[520px] md:w-[340px] md:h-[680px] bg-black rounded-[44px] md:rounded-[60px] border-[9px] md:border-[12px] border-slate-900 shadow-2xl overflow-hidden ring-1 ring-slate-900/5 transform hover:scale-[1.01] transition-transform duration-500">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-3xl z-20"></div>
                 <div className="w-full h-full bg-white pt-12 md:pt-14 pb-7 md:pb-8 px-5 md:px-6 flex flex-col justify-between">
                    <div>
@@ -98,7 +98,7 @@ export default function AboutPage() {
                         </div>
                       </div>
                       
-                      <h3 className="font-black text-2xl mb-6 leading-tight">내일 도쿄에서<br/>진행되는 체험</h3>
+                      <h3 className="font-black text-[20px] md:text-2xl mb-5 md:mb-6 leading-tight">내일 도쿄에서<br/>진행되는 체험</h3>
                       
                       <div className="space-y-5">
                          {/* Card Item */}
@@ -143,10 +143,10 @@ export default function AboutPage() {
       </section>
 
       {/* 2. STATS: 깔끔한 신뢰도 */}
-      <section className="py-14 md:py-20 bg-[#F7F7F7]">
+      <section className="py-12 md:py-20 bg-[#F7F7F7]">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
           <div className="text-center mb-10 md:mb-16">
-            <h2 className="text-xl md:text-2xl font-bold mb-2 tracking-tight">가장 사랑받는 로컬 커뮤니티</h2>
+            <h2 className="text-[18px] md:text-2xl font-bold mb-2 tracking-tight">가장 사랑받는 로컬 커뮤니티</h2>
             <p className="text-[#717171] text-xs md:text-sm">전 세계 여행자와 호스트가 만들어가는 따뜻한 연결</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
@@ -157,7 +157,7 @@ export default function AboutPage() {
               { label: 'Avg Rating', value: 4.9, suffix: '' },
             ].map((stat, i) => (
               <div key={i} className="text-center p-4 md:p-6 bg-white rounded-[24px] shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="text-3xl md:text-4xl font-black text-[#222222] mb-1">
+                <div className="text-[26px] md:text-4xl font-black text-[#222222] mb-1">
                   <AirbnbCounter end={stat.value} suffix={stat.suffix} />
                 </div>
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</div>
@@ -168,13 +168,13 @@ export default function AboutPage() {
       </section>
 
       {/* 3. LISTING: 진짜 로컬리 체험 (리얼 데이터 반영) */}
-      <section className="py-20 md:py-32 px-4 md:px-6 max-w-[1600px] mx-auto">
+      <section className="py-14 md:py-32 px-4 md:px-6 max-w-[1600px] mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-end mb-8 md:mb-12 gap-4">
           <div>
-            <h2 className="text-3xl md:text-4xl font-[900] text-[#222222] mb-3 tracking-tight">
+            <h2 className="text-[27px] md:text-4xl font-[900] text-[#222222] mb-2 md:mb-3 tracking-tight">
               당신의 취향을 발견하세요
             </h2>
-            <p className="text-lg text-[#717171]">가이드북에는 없는, 오직 로컬리에서만 가능한 경험들.</p>
+            <p className="text-[15px] md:text-lg text-[#717171]">가이드북에는 없는, 오직 로컬리에서만 가능한 경험들.</p>
           </div>
           <Link href="/" className="text-sm font-bold border-b-2 border-black pb-1 hover:text-rose-600 hover:border-rose-600 transition-colors">
             모든 체험 보기
@@ -182,7 +182,7 @@ export default function AboutPage() {
         </div>
 
         {/* Real Listing Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-8 md:gap-y-10">
           {[
             { 
                title: "미쿠의 도쿄 기치조지 투어", 
@@ -246,10 +246,10 @@ export default function AboutPage() {
                      </div>
                   )}
                </div>
-               <h3 className="font-bold text-[#222222] text-[15px] mb-1 leading-snug group-hover:underline">{item.title}</h3>
-               <div className="text-sm text-[#717171] mb-1">Host {item.host}</div>
+               <h3 className="font-bold text-[#222222] text-[14px] md:text-[15px] mb-1 leading-snug group-hover:underline">{item.title}</h3>
+               <div className="text-[13px] md:text-sm text-[#717171] mb-1">Host {item.host}</div>
                <div className="flex items-center gap-1 mt-1">
-                  <span className="font-bold text-sm text-[#222222]">{item.price}</span>
+                  <span className="font-bold text-[13px] md:text-sm text-[#222222]">{item.price}</span>
                   <span className="text-xs text-[#717171]">/ 인</span>
                </div>
                <div className="flex items-center gap-1 mt-1 text-xs">
@@ -263,12 +263,12 @@ export default function AboutPage() {
       </section>
 
       {/* 4. FEATURES: 게스트 소통 & 맞춤 예약 (고객용 내용으로 수정) */}
-      <section className="bg-slate-50 py-16 md:py-24 my-6 md:my-10">
+      <section className="bg-slate-50 py-12 md:py-24 my-5 md:my-10">
           <div className="max-w-[1280px] mx-auto px-4 md:px-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-16 mb-16 md:mb-24">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-10 md:gap-16 mb-14 md:mb-24">
                {/* UI Mockup 1: 채팅 */}
                <div className="flex-1 order-2 md:order-1 flex justify-center">
-                  <div className="relative w-[320px] bg-white rounded-[40px] shadow-xl p-6 border border-slate-100 transform rotate-[-1deg] hover:rotate-0 transition-transform duration-500">
+                  <div className="relative w-[292px] md:w-[320px] bg-white rounded-[34px] md:rounded-[40px] shadow-xl p-5 md:p-6 border border-slate-100 transform rotate-[-1deg] hover:rotate-0 transition-transform duration-500">
                      <div className="flex items-center gap-4 mb-6">
                         <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden border border-slate-100"><img src="https://i.pravatar.cc/150?u=host33" className="w-full h-full object-cover"/></div>
                         <div><div className="font-bold text-sm">Kana 호스트</div><div className="text-xs text-green-600 font-bold">● 온라인</div></div>
@@ -286,29 +286,29 @@ export default function AboutPage() {
                   <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-6 text-rose-500">
                      <MessageCircle size={28} />
                   </div>
-                  <h3 className="text-4xl font-[900] mb-4 leading-tight">여행 전부터 시작되는<br/>현지인과의 소통</h3>
-                  <p className="text-lg text-slate-500 leading-relaxed">
+                  <h3 className="text-[30px] md:text-4xl font-[900] mb-3 md:mb-4 leading-tight">여행 전부터 시작되는<br/>현지인과의 소통</h3>
+                  <p className="text-[15px] md:text-lg text-slate-500 leading-relaxed">
                      예약 전에도, 후에도 궁금한 점은 언제든 물어보세요.<br/>
                      맛집 추천부터 복장 팁까지, 호스트가 친절하게 알려드립니다.
                   </p>
                </div>
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-16">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-12 md:gap-16">
                {/* Text 2 */}
                <div className="flex-1">
                   <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-6 text-rose-500">
                      <CheckCircle2 size={28} />
                   </div>
-                  <h3 className="text-4xl font-[900] mb-4 leading-tight">복잡한 계획 없이<br/>떠나는 자유로움</h3>
-                  <p className="text-lg text-slate-500 leading-relaxed">
+                  <h3 className="text-[30px] md:text-4xl font-[900] mb-3 md:mb-4 leading-tight">복잡한 계획 없이<br/>떠나는 자유로움</h3>
+                  <p className="text-[15px] md:text-lg text-slate-500 leading-relaxed">
                      일일이 검색하고 예약할 필요 없습니다.<br/>
                      현지 호스트가 검증한 최적의 코스로 편안하게 즐기세요.
                   </p>
                </div>
                {/* UI Mockup 2: 예약 확정 */}
                <div className="flex-1 flex justify-center">
-                  <div className="relative w-[320px] bg-white rounded-[40px] shadow-xl p-8 border border-slate-100 transform rotate-[1deg] hover:rotate-0 transition-transform duration-500">
+                  <div className="relative w-[292px] md:w-[320px] bg-white rounded-[34px] md:rounded-[40px] shadow-xl p-6 md:p-8 border border-slate-100 transform rotate-[1deg] hover:rotate-0 transition-transform duration-500">
                      <div className="text-center mb-6">
                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
                            <CheckCircle2 size={32} />
@@ -328,28 +328,28 @@ export default function AboutPage() {
       </section>
 
       {/* 5. TRUST: 미니멀 & 클린 (촌스러움 제거) */}
-      <section className="py-16 md:py-24 px-4 md:px-6 bg-white">
+      <section className="py-12 md:py-24 px-4 md:px-6 bg-white">
         <div className="max-w-4xl mx-auto text-center">
            <div className="flex justify-center items-center gap-2 mb-4">
               <ShieldCheck size={32} className="text-rose-600"/>
-              <span className="text-2xl font-black italic tracking-tighter">Locally Cover</span>
+              <span className="text-[22px] md:text-2xl font-black italic tracking-tighter">Locally Cover</span>
            </div>
-           <h2 className="text-2xl md:text-3xl font-[900] mb-10 md:mb-12">안전한 여행을 위한 약속</h2>
+           <h2 className="text-[20px] md:text-3xl font-[900] mb-8 md:mb-12">안전한 여행을 위한 약속</h2>
            
            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-              <div className="p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition">
+              <div className="p-5 md:p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition">
                  <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-900"><Users size={20}/></div>
-                 <h4 className="font-bold text-lg mb-2">신원 인증</h4>
+                 <h4 className="font-bold text-[16px] md:text-lg mb-2">신원 인증</h4>
                  <p className="text-sm text-slate-500">모든 호스트와 게스트는 엄격한 신원 확인 절차를 거칩니다.</p>
               </div>
-              <div className="p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition">
+              <div className="p-5 md:p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition">
                  <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-900"><ShieldCheck size={20}/></div>
-                 <h4 className="font-bold text-lg mb-2">안전 결제</h4>
+                 <h4 className="font-bold text-[16px] md:text-lg mb-2">안전 결제</h4>
                  <p className="text-sm text-slate-500">체험이 완료될 때까지 결제 대금은 안전하게 보호됩니다.</p>
               </div>
-              <div className="p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition">
+              <div className="p-5 md:p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition">
                  <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-900"><Heart size={20}/></div>
-                 <h4 className="font-bold text-lg mb-2">24시간 지원</h4>
+                 <h4 className="font-bold text-[16px] md:text-lg mb-2">24시간 지원</h4>
                  <p className="text-sm text-slate-500">여행 중 문제가 생기면 언제든 글로벌 지원팀이 도와드립니다.</p>
               </div>
            </div>
@@ -357,8 +357,8 @@ export default function AboutPage() {
       </section>
 
       {/* 6. FAQ: 내용 보강 */}
-      <section className="py-16 md:py-24 px-4 md:px-6 max-w-3xl mx-auto border-t border-gray-100">
-        <h2 className="text-2xl md:text-3xl font-[900] mb-10 md:mb-12">자주 묻는 질문</h2>
+      <section className="py-12 md:py-24 px-4 md:px-6 max-w-3xl mx-auto border-t border-gray-100">
+        <h2 className="text-[20px] md:text-3xl font-[900] mb-8 md:mb-12">자주 묻는 질문</h2>
         <div className="space-y-2">
           <FAQItem 
             question="Locally는 어떤 서비스인가요?" 
@@ -384,19 +384,19 @@ export default function AboutPage() {
       </section>
 
       {/* 7. FOOTER CTA */}
-      <section className="py-20 md:py-32 px-4 md:px-6 bg-[#222222] text-white text-center">
+      <section className="py-16 md:py-32 px-4 md:px-6 bg-[#222222] text-white text-center">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-6xl font-[900] mb-8 md:mb-10 tracking-tight leading-tight">
+          <h2 className="text-[30px] md:text-6xl font-[900] mb-6 md:mb-10 tracking-tight leading-tight">
             지금 바로 Locally와<br/>함께하세요.
           </h2>
           <div className="flex flex-col sm:flex-row justify-center gap-4 md:gap-6">
              <Link href="/">
-               <button className="bg-rose-600 hover:bg-rose-700 text-white px-9 md:px-12 py-4 md:py-5 rounded-full font-bold text-base md:text-xl transition-all shadow-xl hover:shadow-rose-900/50 hover:scale-105">
+               <button className="bg-rose-600 hover:bg-rose-700 text-white px-7 md:px-12 py-3 md:py-5 rounded-full font-bold text-[14px] md:text-xl transition-all shadow-xl hover:shadow-rose-900/50 hover:scale-105">
                  여행 시작하기
                </button>
              </Link>
              <Link href="/become-a-host">
-               <button className="bg-transparent border-2 border-white/20 text-white hover:bg-white hover:text-black px-9 md:px-12 py-4 md:py-5 rounded-full font-bold text-base md:text-xl transition-all hover:scale-105">
+               <button className="bg-transparent border-2 border-white/20 text-white hover:bg-white hover:text-black px-7 md:px-12 py-3 md:py-5 rounded-full font-bold text-[14px] md:text-xl transition-all hover:scale-105">
                  호스트 되기
                </button>
              </Link>

@@ -180,9 +180,10 @@ export default function HelpCenterPage() {
       if (confirm("문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?")) {
         router.push('/guest/inbox');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("문의 접수 실패:", e);
-      showToast("문의 접수 실패: " + e.message, 'error');
+      const message = e instanceof Error ? e.message : '알 수 없는 오류';
+      showToast("문의 접수 실패: " + message, 'error');
     }
   };
 
@@ -190,8 +191,8 @@ export default function HelpCenterPage() {
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white">
       <SiteHeader />
 
-      <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-12 md:py-24">
-        <div className="md:hidden mb-6">
+      <main className="max-w-[1040px] mx-auto px-4 md:px-6 py-9 md:py-24">
+        <div className="md:hidden mb-4">
           <button
             onClick={handleMobileBack}
             className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
@@ -202,8 +203,8 @@ export default function HelpCenterPage() {
         </div>
 
         {/* 헤더 섹션 (뉴스룸 스타일) */}
-        <div className="text-center mb-12 md:mb-24">
-          <h1 className="text-4xl md:text-6xl lg:text-8xl font-black tracking-tighter mb-4 md:mb-8">
+        <div className="text-center mb-10 md:mb-24">
+          <h1 className="text-[32px] md:text-6xl lg:text-8xl font-black tracking-tighter leading-tight mb-3 md:mb-8">
             {t('help_title')}
           </h1>
           <div className="relative max-w-2xl mx-auto group">
@@ -212,16 +213,16 @@ export default function HelpCenterPage() {
               placeholder={t('help_search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-12 md:h-16 pl-4 md:pl-6 pr-12 md:pr-14 bg-white border-b-2 border-gray-300 rounded-none text-lg md:text-2xl font-bold placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors"
+              className="w-full h-11 md:h-16 pl-3.5 md:pl-6 pr-11 md:pr-14 bg-white border-b-2 border-gray-300 rounded-none text-[15px] md:text-2xl font-bold placeholder:text-gray-300 focus:outline-none focus:border-black transition-colors"
             />
             <button className="absolute right-0 top-1/2 -translate-y-1/2 p-2">
-              <Search size={28} className="text-gray-400 group-focus-within:text-black transition-colors" />
+              <Search className="w-6 h-6 md:w-7 md:h-7 text-gray-400 group-focus-within:text-black transition-colors" />
             </button>
           </div>
         </div>
 
         {/* 탭 전환 버튼 */}
-        <div className="flex justify-center mb-10 md:mb-20">
+        <div className="flex justify-center mb-8 md:mb-20">
           <div className="flex gap-4 md:gap-8 border-b border-gray-200 pb-1">
             <button
               onClick={() => setActiveTab('guest')}
@@ -241,13 +242,13 @@ export default function HelpCenterPage() {
         </div>
 
         {/* FAQ 리스트 */}
-        <div className="space-y-12 md:space-y-20">
+        <div className="space-y-9 md:space-y-20">
           {filteredData.map((category, catIdx) => (
             <div key={catIdx}>
               {/* 카테고리 제목 */}
-              <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-8 border-b border-black pb-3 md:pb-4">
+              <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-8 border-b border-black pb-2.5 md:pb-4">
                 <span className="p-1.5 md:p-2 border border-black rounded-full">{category.icon}</span>
-                <h2 className="text-lg md:text-2xl font-bold tracking-tight">{category.category}</h2>
+                <h2 className="text-[16px] md:text-2xl font-bold tracking-tight">{category.category}</h2>
               </div>
 
               {/* 질문 목록 */}
@@ -258,17 +259,17 @@ export default function HelpCenterPage() {
                     <div key={itemIdx} className="border-b border-gray-200">
                       <button
                         onClick={() => toggleItem(catIdx, itemIdx)}
-                        className="w-full py-6 flex justify-between items-start text-left group hover:bg-gray-50 transition-colors px-4 -mx-4 rounded-lg"
+                        className="w-full py-4 md:py-6 flex justify-between items-start text-left group hover:bg-gray-50 transition-colors px-4 -mx-4 rounded-lg"
                       >
-                        <span className="text-sm md:text-lg font-medium text-[#222222] pr-6 md:pr-8 group-hover:underline decoration-2 underline-offset-4">{item.q}</span>
+                        <span className="text-[13px] md:text-lg font-medium text-[#222222] pr-6 md:pr-8 group-hover:underline decoration-2 underline-offset-4">{item.q}</span>
                         <div className="pt-1 text-gray-400 group-hover:text-black transition-colors">
                           {isOpen ? <ChevronUp size={20} strokeWidth={2.5} /> : <ChevronDown size={20} strokeWidth={2.5} />}
                         </div>
                       </button>
 
                       {/* 답변 내용 */}
-                      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100 pb-8' : 'max-h-0 opacity-0'}`}>
-                        <div className="px-4 text-base text-[#484848] leading-relaxed max-w-3xl font-light">
+                      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100 pb-6 md:pb-8' : 'max-h-0 opacity-0'}`}>
+                        <div className="px-4 text-[14px] md:text-base text-[#484848] leading-relaxed max-w-3xl font-light">
                           {item.a}
                         </div>
                       </div>
@@ -281,21 +282,21 @@ export default function HelpCenterPage() {
         </div>
 
         {/* 하단 지원 섹션 */}
-        <div className="mt-32 bg-[#F7F7F7] p-12 md:p-16 text-center rounded-2xl">
-          <h3 className="text-xl md:text-3xl font-black mb-3 md:mb-4 tracking-tight">{t('help_bottom_title')}</h3>
-          <p className="text-[#717171] mb-10 max-w-md mx-auto font-medium">
+        <div className="mt-20 md:mt-32 bg-[#F7F7F7] p-7 md:p-16 text-center rounded-2xl">
+          <h3 className="text-[18px] md:text-3xl font-black mb-2.5 md:mb-4 tracking-tight">{t('help_bottom_title')}</h3>
+          <p className="text-[#717171] text-[13px] md:text-base mb-7 md:mb-10 max-w-md mx-auto font-medium">
             {t('help_bottom_desc')}
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-6">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 md:gap-6">
             <button
               onClick={handleAdminSupport}
-              className="bg-black text-white px-8 py-4 font-bold uppercase tracking-widest hover:bg-[#333] transition-colors flex items-center justify-center gap-3 shadow-lg"
+              className="bg-black text-white px-6 md:px-8 py-3 md:py-4 text-[12px] md:text-[13px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors flex items-center justify-center gap-2 md:gap-3 shadow-lg"
             >
               <MessageCircle size={18} /> {t('btn_chat_support')}
             </button>
             <a
               href="mailto:help@locally.com"
-              className="bg-white border-2 border-black text-black px-8 py-4 font-bold uppercase tracking-widest hover:bg-gray-50 transition-colors flex items-center justify-center gap-3"
+              className="bg-white border-2 border-black text-black px-6 md:px-8 py-3 md:py-4 text-[12px] md:text-[13px] font-bold uppercase tracking-widest hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 md:gap-3"
             >
               <Mail size={18} /> {t('btn_email_us')}
             </a>
