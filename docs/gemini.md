@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P0 Desktop Web UX Recovery v2: Guest Trip Actions + Cancel CTA Simplification + Transition Smoothing)  
-**Version:** 3.2.34 (P0 Desktop Web UX Recovery v2: Guest Trip Actions + Cancel CTA Simplification + Transition Smoothing)  
+**Last Updated:** 2026-02-27 (P0 Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Version:** 3.2.35 (P0 Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -192,6 +192,12 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - P1 정합성(상태 상수): 체험 상세 SSR 잔여석 조회, 결제 페이지 사전 좌석 점검, 게스트 여행 자동 완료 가공, 입금 콜백의 중복/좌석 검증 쿼리에 `BOOKING_ACTIVE_STATUS_FOR_CAPACITY`를 적용해 예약 상태 비교 기준을 통일
 - P1 정합성(Cron): 완료 스케줄러(`complete-trips`)의 대상 상태를 상수 기반으로 정렬하고 오류 처리 타입을 `unknown` 기반으로 보강
 - P1 정합성(Admin 조회 최소화): Global Team Chat의 `admin_whitelist` 조회를 `select('*')`에서 `select('id')`로 축소해 권한 판정 목적에 필요한 최소 데이터만 읽도록 정리
+- 데스크탑 홈 검색바 닫힘 안정화(P0): `MainSearchBar` 루트 기준 `mousedown` 외부 클릭 + `Escape` 키로 위치/날짜/언어 드롭다운을 닫도록 고정하고, 기존 검색 실행 로직은 유지
+- 검색 라벨 분리(P0): 홈 검색바 언어 라벨을 `label_progress_language`로 분리해 `언어` 대신 `진행 언어`를 노출하되 기존 `label_language` 사용처는 그대로 유지
+- 위시리스트 즉시 공유(P0): `guest/wishlists` 카드 오버레이에 공유 버튼을 추가하고 `navigator.share` 우선, 미지원 브라우저는 클립보드 복사 fallback으로 통일
+- 프로필 저장 400 차단(P0): 게스트 `account`와 호스트 `ProfileEditor`에서 `profiles.upsert`를 제거하고 `profiles` 현재 행 기준 컬럼 필터 후 `update`만 전송하도록 변경
+- 카테고리 표준 집합 동기화(P0): 호스트 등록 카테고리를 11개(기존 7 + 건축/공연·경기/랜드마크/원데이 클래스)로 확장하고 모바일 검색 `체험 유형`도 동일 집합으로 정렬
+- 카테고리 UI 정합화(P0): 호스트 체험 등록 Step1 카테고리를 모바일 `체험 유형`과 동일한 아이콘 칩 스타일로 재구성해 등록/검색 선택 기준과 시각 표현을 일치
 
 비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 별도 커밋 이력/문서에서 확인한다.
 

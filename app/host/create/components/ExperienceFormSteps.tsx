@@ -1,9 +1,81 @@
 'use client';
 
 import React from 'react';
-import { Camera, MapPin, CheckCircle2, Plus, Minus, Trash2, X, Lock, Check } from 'lucide-react';
+import {
+  Camera,
+  MapPin,
+  CheckCircle2,
+  Plus,
+  Minus,
+  Trash2,
+  X,
+  Lock,
+  Check,
+  Utensils,
+  Coffee,
+  TreePine,
+  ShoppingBag,
+  Landmark,
+  Dumbbell,
+  MoonStar,
+  Building2,
+  Ticket,
+  Flag,
+  Palette,
+} from 'lucide-react';
 import Link from 'next/link';
 import { MAJOR_CITIES, CATEGORIES, SUPPORTED_LANGUAGES } from '../config';
+
+type ItineraryItem = {
+  title: string;
+  description: string;
+  type: 'meet' | 'spot' | 'end';
+};
+
+interface ExperienceFormData {
+  country: string;
+  city: string;
+  category: string;
+  languages: string[];
+  title: string;
+  photos: string[];
+  itinerary: ItineraryItem[];
+  description: string;
+  inclusions: string[];
+  exclusions: string[];
+  supplies: string;
+  price: number;
+  duration: number;
+  maxGuests: number;
+  meeting_point?: string;
+  is_private_enabled?: boolean;
+  private_price?: number;
+  rules: {
+    age_limit: string;
+    activity_level: string;
+    refund_policy: string;
+  };
+}
+
+interface ExperienceFormStepsProps {
+  step: number;
+  formData: ExperienceFormData;
+  updateData: (key: string, value: unknown) => void;
+  handleCounter: (key: 'duration' | 'maxGuests', type: 'inc' | 'dec') => void;
+  handlePhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  addItem: (field: 'inclusions' | 'exclusions', value: string, setter: React.Dispatch<React.SetStateAction<string>>) => void;
+  removeItem: (field: 'inclusions' | 'exclusions', index: number) => void;
+  addItineraryItem: () => void;
+  removeItineraryItem: (index: number) => void;
+  updateItineraryItem: (index: number, key: 'title' | 'description' | 'type', value: string) => void;
+  isCustomCity: boolean;
+  setIsCustomCity: React.Dispatch<React.SetStateAction<boolean>>;
+  tempInclusion: string;
+  setTempInclusion: React.Dispatch<React.SetStateAction<string>>;
+  tempExclusion: string;
+  setTempExclusion: React.Dispatch<React.SetStateAction<string>>;
+  handleRemoveImage?: (index: number) => void;
+}
 
 export default function ExperienceFormSteps({
   step,
@@ -23,7 +95,20 @@ export default function ExperienceFormSteps({
   tempExclusion,
   handleRemoveImage, // 🟢 부모에서 전달받은 함수
   setTempExclusion
-}: any) {
+}: ExperienceFormStepsProps) {
+  const categoryIconMap: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
+    '맛집 탐방': Utensils,
+    '카페/디저트': Coffee,
+    '산책/힐링': TreePine,
+    '쇼핑': ShoppingBag,
+    '문화 체험': Landmark,
+    '액티비티': Dumbbell,
+    '나이트라이프': MoonStar,
+    '건축': Building2,
+    '공연/경기': Ticket,
+    '랜드마크': Flag,
+    '원데이 클래스': Palette,
+  };
 
   // --- STEP 1: 기본 정보 ---
   if (step === 1) {
@@ -68,11 +153,21 @@ export default function ExperienceFormSteps({
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">카테고리</label>
               <div className="flex flex-wrap gap-2.5 md:gap-3">
-                {CATEGORIES.map((cat: string) => (
-                  <button key={cat} onClick={() => updateData('category', cat)} className={`px-4 md:px-5 py-2.5 md:py-3 rounded-full text-xs md:text-sm font-bold border transition-all ${formData.category === cat ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-600 hover:border-black'}`}>
-                    {cat}
-                  </button>
-                ))}
+                {CATEGORIES.map((cat: string) => {
+                  const Icon = categoryIconMap[cat] || MapPin;
+                  const isSelected = formData.category === cat;
+
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => updateData('category', cat)}
+                      className={`h-10 md:h-11 px-3.5 md:px-4 rounded-full border flex items-center gap-1.5 md:gap-2 text-[12px] md:text-sm font-semibold transition-all ${isSelected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545] hover:border-[#222]'}`}
+                    >
+                      <Icon size={14} strokeWidth={1.9} />
+                      <span>{cat}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -118,7 +213,7 @@ export default function ExperienceFormSteps({
                 <img src={url} className="w-full h-full object-cover" alt={`preview ${idx}`}/>
                 <button type="button" 
                   onClick={() => {
-                    const newPhotos = formData.photos.filter((_: any, i: number) => i !== idx);
+                    const newPhotos = formData.photos.filter((_: string, i: number) => i !== idx);
                     updateData('photos', newPhotos);
                     // 🟢 실제 파일도 삭제 (부모 함수 호출)
                     if (handleRemoveImage) handleRemoveImage(idx);
@@ -163,7 +258,7 @@ export default function ExperienceFormSteps({
         <div className="space-y-4">
           <h3 className="text-base md:text-lg font-bold">이동 동선</h3>
           <div className="relative border-l-2 border-slate-100 ml-3 md:ml-4 pl-6 md:pl-8 space-y-5 md:space-y-8 py-2">
-            {formData.itinerary.map((item: any, idx: number) => (
+            {formData.itinerary.map((item: ItineraryItem, idx: number) => (
               <div key={idx} className="relative group animate-in slide-in-from-left-4 fade-in duration-300">
                 <div className={`absolute -left-[41px] top-4 w-6 h-6 rounded-full border-4 border-white shadow-sm flex items-center justify-center z-10 ${idx === 0 ? 'bg-black' : idx === formData.itinerary.length - 1 ? 'bg-slate-900' : 'bg-slate-300'}`}>
                   {idx === 0 && <MapPin size={10} className="text-white"/>}

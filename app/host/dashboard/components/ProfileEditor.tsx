@@ -5,7 +5,41 @@ import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, Credi
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 
-export default function ProfileEditor({ profile, onUpdate }: any) {
+interface HostProfile {
+  name?: string;
+  full_name?: string;
+  job?: string;
+  dream_destination?: string;
+  favorite_song?: string;
+  languages?: string[] | string;
+  introduction?: string;
+  bio?: string;
+  phone?: string;
+  dob?: string;
+  host_nationality?: string;
+  bank_name?: string;
+  account_number?: string;
+  account_holder?: string;
+  motivation?: string;
+  avatar_url?: string | null;
+}
+
+interface ProfileEditorProps {
+  profile?: HostProfile | null;
+  onUpdate?: () => void;
+}
+
+interface InputGroupProps {
+  label: string;
+  name: string;
+  value?: string;
+  onChange?: React.ChangeEventHandler<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
+  icon?: React.ReactNode;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps) {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'public' | 'private'>('public');
 
@@ -33,7 +67,7 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
   useEffect(() => {
     if (profile) {
       setFormData({
-        name: profile.name || '',
+        name: profile.full_name || profile.name || '',
         job: profile.job || '',
         dream_destination: profile.dream_destination || '',
         favorite_song: profile.favorite_song || '',
@@ -68,8 +102,9 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
       const { data } = supabase.storage.from('images').getPublicUrl(fileName);
       setAvatarUrl(data.publicUrl);
       showToast('사진이 업로드되었습니다.', 'success');
-    } catch (err: any) {
-      showToast('사진 업로드 실패: ' + err.message, 'error');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '알 수 없는 오류';
+      showToast('사진 업로드 실패: ' + message, 'error');
     } finally {
       setUploading(false);
     }
@@ -79,10 +114,10 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const updates = {
-        id: user.id,
+      const updates: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
-        // 공개 정보만 업데이트 (비공개 정보는 UI에서 막힘 + 로직에서도 제외 가능하지만 안전하게 유지)
+        // 스키마 호환을 위해 full_name/name, introduction/bio를 병행 후보로 준비 후 실제 컬럼만 필터링
+        full_name: formData.name,
         name: formData.name,
         job: formData.job,
         dream_destination: formData.dream_destination,
@@ -93,7 +128,29 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
         avatar_url: avatarUrl,
       };
 
-      const { error } = await supabase.from('profiles').upsert(updates);
+      const { data: existingProfile, error: loadError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (loadError || !existingProfile) {
+        showToast('저장 중 오류가 발생했습니다.', 'error');
+        console.error(loadError);
+        setLoading(false);
+        return;
+      }
+
+      const allowedColumns = new Set(Object.keys(existingProfile));
+      const filteredUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+      );
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(filteredUpdates)
+        .eq('id', user.id);
+
       if (!error) {
         showToast('정보가 성공적으로 저장되었습니다!', 'success');
         if (onUpdate) onUpdate();
@@ -213,7 +270,7 @@ export default function ProfileEditor({ profile, onUpdate }: any) {
   );
 }
 
-function InputGroup({ label, name, value, onChange, icon, placeholder, disabled }: any) {
+function InputGroup({ label, name, value, onChange, icon, placeholder, disabled }: InputGroupProps) {
   return (
     <div>
       <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">{icon} {label}</label>

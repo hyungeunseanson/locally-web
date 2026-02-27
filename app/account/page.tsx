@@ -279,8 +279,7 @@ export default function AccountPage() {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    const updates = {
-      id: user.id,
+    const updates: Record<string, unknown> = {
       full_name: profile.full_name,
       nationality: profile.nationality,
       birth_date: profile.birth_date || null,
@@ -297,7 +296,28 @@ export default function AccountPage() {
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('profiles').upsert(updates);
+    const { data: existingProfile, error: loadError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (loadError || !existingProfile) {
+      console.error('Profile load error:', loadError);
+      showToast(t('profile_save_fail'), 'error');
+      setSaving(false);
+      return;
+    }
+
+    const allowedColumns = new Set(Object.keys(existingProfile));
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+    );
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(filteredUpdates)
+      .eq('id', user.id);
 
     if (error) {
       console.error('Save error:', error);

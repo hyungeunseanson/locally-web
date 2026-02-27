@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Heart, Star, MapPin, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Heart, Star, Share2, ArrowRight, ArrowLeft } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -10,12 +10,59 @@ import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
+interface WishlistExperience {
+  id: number;
+  title: string;
+  city?: string | null;
+  location?: string | null;
+  category?: string | null;
+  rating?: number | null;
+  price?: number | string | null;
+  image_url?: string | null;
+  photos?: string[] | null;
+}
+
+interface WishlistItem {
+  id: number;
+  created_at: string | undefined;
+  experiences: WishlistExperience | null;
+}
+
+const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
+  return rows
+    .map((row) => {
+      const item = row as { id: number; created_at?: string; experiences?: unknown };
+      const rawExperience = Array.isArray(item.experiences) ? item.experiences[0] : item.experiences;
+      if (!rawExperience || typeof rawExperience !== 'object') return null;
+
+      const exp = rawExperience as Partial<WishlistExperience>;
+      if (typeof exp.id !== 'number' || typeof exp.title !== 'string') return null;
+
+      return {
+        id: Number(item.id),
+        created_at: item.created_at,
+        experiences: {
+          id: exp.id,
+          title: exp.title,
+          city: exp.city ?? null,
+          location: exp.location ?? null,
+          category: exp.category ?? null,
+          rating: exp.rating ?? null,
+          price: exp.price ?? null,
+          image_url: exp.image_url ?? null,
+          photos: exp.photos ?? null,
+        },
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+};
+
 export default function WishlistsPage() {
   const { t } = useLanguage(); // 🟢 추가
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast();
-  const [wishlists, setWishlists] = useState<any[]>([]);
+  const [wishlists, setWishlists] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const handleMobileBack = () => {
@@ -46,17 +93,16 @@ export default function WishlistsPage() {
         console.error('위시리스트 로딩 실패:', error);
         showToast('위시리스트를 불러오는 중 오류가 발생했어요.', 'error');
       } else {
-        // 체험 정보가 있는 것만 필터링
-        setWishlists(data?.filter(item => item.experiences) || []);
+        setWishlists(normalizeWishlistRows((data ?? []) as unknown[]));
       }
       setLoading(false);
     };
 
     fetchWishlists();
-  }, [router, supabase]);
+  }, [router, showToast, supabase]);
 
   // 🟢 [추가] 찜 해제 기능 (화면에서 바로 사라지게)
-  const handleRemove = async (e: React.MouseEvent, wishlistId: number, expId: number) => {
+  const handleRemove = async (e: React.MouseEvent, wishlistId: number) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -70,8 +116,34 @@ export default function WishlistsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: reData } = await supabase.from('wishlists').select('id, created_at, experiences (*)').eq('user_id', user.id).order('created_at', { ascending: false });
-        setWishlists(reData?.filter(item => item.experiences) || []);
+        setWishlists(normalizeWishlistRows((reData ?? []) as unknown[]));
       }
+    }
+  };
+
+  const handleShare = async (e: React.MouseEvent, exp: WishlistExperience) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const tripUrl = `${window.location.origin}/experiences/${exp.id}`;
+    const shareText = `[Locally] ${exp.title}\n${tripUrl}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: exp.title,
+          text: shareText,
+          url: tripUrl,
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareText);
+      } else {
+        throw new Error('share-unavailable');
+      }
+      showToast(t('trip_share_done'), 'success');
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      showToast(t('trip_share_fail'), 'error');
     }
   };
 
@@ -108,9 +180,12 @@ export default function WishlistsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2.5 sm:gap-x-6 sm:gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {wishlists.map((item: any) => {
+            {wishlists.map((item) => {
               const exp = item.experiences;
+              if (!exp) return null;
               const imageUrl = exp.photos && exp.photos.length > 0 ? exp.photos[0] : (exp.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
+              const ratingValue = Number(exp.rating ?? 0);
+              const hasRating = Number.isFinite(ratingValue) && ratingValue > 0;
 
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
@@ -121,9 +196,16 @@ export default function WishlistsPage() {
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
+                    <button
+                      onClick={(e) => handleShare(e, exp)}
+                      className="absolute top-1.5 md:top-2 left-1.5 md:left-2 text-white bg-black/35 hover:bg-black/45 backdrop-blur-sm rounded-full p-1.5 md:p-[7px] transition-all z-10"
+                      aria-label={t('trip_share')}
+                    >
+                      <Share2 className="w-3.5 h-3.5 md:w-4 md:h-4" strokeWidth={2.3} />
+                    </button>
                     {/* 찜 해제 버튼 */}
                     <button
-                      onClick={(e) => handleRemove(e, item.id, exp.id)}
+                      onClick={(e) => handleRemove(e, item.id)}
                       className="absolute top-1.5 md:top-2 right-1.5 md:right-2 text-rose-500 hover:scale-110 transition-all z-10"
                     >
                       <Heart className="w-4 h-4 md:w-[18px] md:h-[18px]" fill="#F43F5E" strokeWidth={2} />
@@ -134,8 +216,8 @@ export default function WishlistsPage() {
                     <div className="flex justify-between items-start">
                       <h3 className="font-semibold text-slate-900 text-[11px] md:text-[12px] truncate pr-1">{exp.city || exp.location || '서울'} · {exp.category}</h3>
                       <div className="flex items-center gap-0.5 text-[10px] md:text-[11px] shrink-0">
-                        <Star className={`w-[10px] h-[10px] md:w-[11px] md:h-[11px] ${exp.rating > 0 ? "" : "text-slate-300"}`} fill={exp.rating > 0 ? "black" : "none"} />
-                        <span>{exp.rating > 0 ? exp.rating.toFixed(1) : "New"}</span>
+                        <Star className={`w-[10px] h-[10px] md:w-[11px] md:h-[11px] ${hasRating ? "" : "text-slate-300"}`} fill={hasRating ? "black" : "none"} />
+                        <span>{hasRating ? ratingValue.toFixed(1) : "New"}</span>
                       </div>
                     </div>
                     <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{exp.title}</p>

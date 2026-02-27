@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Search, MapPin, Globe } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { Search, MapPin } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { CATEGORIES } from '@/app/constants';
 import DatePicker from './DatePicker';
@@ -12,7 +12,7 @@ interface MainSearchBarProps {
   locationInput: string;
   setLocationInput: (val: string) => void;
   dateRange: { start: Date | null, end: Date | null };
-  setDateRange: (range: any) => void;
+  setDateRange: (range: { start: Date | null; end: Date | null }) => void;
   selectedLanguage: string;
   setSelectedLanguage: (lang: string) => void;
   onCategorySelect?: (id: string) => void;
@@ -29,6 +29,31 @@ export default function MainSearchBar({
   onSearch
 }: MainSearchBarProps) {
   const { t } = useLanguage(); // 🟢 추가
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!activeSearchField) return;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setActiveSearchField(null);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveSearchField(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeSearchField, setActiveSearchField]);
 
   const formatDateRange = () => {
     if (dateRange.start && dateRange.end) {
@@ -55,6 +80,7 @@ export default function MainSearchBar({
 
   return (
     <div
+      ref={rootRef}
       className={`relative w-full max-w-[850px] h-[66px] transition-all duration-300 ease-in-out ${isVisible ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 -translate-y-4 scale-95 pointer-events-none'}`}
     >
       <div className={`absolute inset-0 flex items-center bg-white border ${activeSearchField ? 'border-transparent bg-slate-100/50' : 'border-slate-200'} rounded-full shadow-[var(--shadow-card)] transition-all duration-500`}>
@@ -102,7 +128,7 @@ export default function MainSearchBar({
             ${activeSearchField === 'language' ? 'bg-white shadow-[var(--shadow-floating)]' : 'hover:bg-slate-100/80'}`}
           onClick={() => setActiveSearchField('language')}
         >
-          <label className="text-[11px] font-bold text-slate-800">{t('label_language')}</label>
+          <label className="text-[11px] font-bold text-slate-800">{t('label_progress_language')}</label>
           <div className="flex justify-between items-center w-full">
             <input
               type="text"
