@@ -100,7 +100,7 @@ export default async function Page({ params }: Props) {
 
     hostProfile = {
       id: experience.host_id,
-      name: app?.name || profile?.name || profile?.full_name || 'Locally Host',
+      name: app?.name || profile?.full_name || 'Locally Host',
       avatar_url: app?.profile_photo || profile?.avatar_url || null,
       languages: (profile?.languages?.length > 0) ? profile.languages : (app?.languages || []),
       language_level: app?.language_level ?? null,

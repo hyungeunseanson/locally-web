@@ -48,12 +48,16 @@ export default function SettlementTab() {
     const hostsMap = new Map();
     
     if (hostIds.length > 0) {
-       const { data: hosts } = await supabase.from('profiles').select('id, name, email').in('id', hostIds);
+       const { data: hosts } = await supabase.from('profiles').select('id, full_name, email').in('id', hostIds);
        const { data: apps } = await supabase.from('host_applications').select('user_id, bank_name, account_number, account_holder').in('user_id', hostIds);
 
        hosts?.forEach(h => {
          const app = apps?.find(a => a.user_id === h.id);
-         hostsMap.set(h.id, { ...h, bank: app || {} });
+         hostsMap.set(h.id, {
+           ...h,
+           name: h.full_name || h.email || 'Host',
+           bank: app || {}
+         });
        });
     }
 

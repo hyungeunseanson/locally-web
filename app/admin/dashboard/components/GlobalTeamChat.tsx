@@ -71,16 +71,12 @@ export default function GlobalTeamChat() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const [profileData, whitelistData] = await Promise.all([
-                supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+            const [userData, whitelistData] = await Promise.all([
+                supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
                 supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
             ]);
 
-            let isAdmin = profileData.data?.role === 'admin' || !!whitelistData.data;
-            if (!isAdmin) {
-                const { data: legacyUser } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-                isAdmin = legacyUser?.role === 'admin';
-            }
+            const isAdmin = userData.data?.role === 'admin' || !!whitelistData.data;
 
             if (isAdmin) {
                 setCurrentUser({

@@ -6,7 +6,6 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 
 interface HostProfile {
-  name?: string;
   full_name?: string;
   job?: string;
   dream_destination?: string;
@@ -67,7 +66,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
   useEffect(() => {
     if (profile) {
       setFormData({
-        name: profile.full_name || profile.name || '',
+        name: profile.full_name || '',
         job: profile.job || '',
         dream_destination: profile.dream_destination || '',
         favorite_song: profile.favorite_song || '',
@@ -116,9 +115,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
     if (user) {
       const updates: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
-        // 스키마 호환을 위해 full_name/name, introduction/bio를 병행 후보로 준비 후 실제 컬럼만 필터링
         full_name: formData.name,
-        name: formData.name,
         job: formData.job,
         dream_destination: formData.dream_destination,
         favorite_song: formData.favorite_song,
@@ -134,22 +131,33 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         .eq('id', user.id)
         .maybeSingle();
 
-      if (loadError || !existingProfile) {
+      if (loadError) {
         showToast('저장 중 오류가 발생했습니다.', 'error');
         console.error(loadError);
         setLoading(false);
         return;
       }
 
-      const allowedColumns = new Set(Object.keys(existingProfile));
-      const filteredUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-      );
+      let error: { message: string } | null = null;
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(filteredUpdates)
-        .eq('id', user.id);
+      if (!existingProfile) {
+        const insertRes = await supabase.from('profiles').upsert({
+          id: user.id,
+          ...updates,
+        });
+        error = insertRes.error;
+      } else {
+        const allowedColumns = new Set(Object.keys(existingProfile));
+        const filteredUpdates = Object.fromEntries(
+          Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+        );
+
+        const updateRes = await supabase
+          .from('profiles')
+          .update(filteredUpdates)
+          .eq('id', user.id);
+        error = updateRes.error;
+      }
 
       if (!error) {
         showToast('정보가 성공적으로 저장되었습니다!', 'success');

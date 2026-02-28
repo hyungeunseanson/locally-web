@@ -36,12 +36,12 @@ export async function POST(request: Request) {
     }
 
     // 관리자 권한 확인 (Role or Whitelist)
-    const [userProfile, whitelistEntry] = await Promise.all([
-      supabaseAuth.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+    const [userEntry, whitelistEntry] = await Promise.all([
+      supabaseAuth.from('users').select('role').eq('id', user.id).maybeSingle(),
       supabaseAuth.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
     ]);
 
-    const isAdmin = (userProfile.data?.role === 'admin') || !!whitelistEntry.data;
+    const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
 
     if (!isAdmin) {
       console.error(`🚨 [Security Warning] Unauthorized Access Attempt by ${user.email}`);

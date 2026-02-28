@@ -57,11 +57,11 @@ export async function POST(request: Request) {
     if (error || !booking) return NextResponse.json({ error: '예약 없음' }, { status: 404 });
 
     // [보안 패치] 관리자인지 확인 (관리자는 모든 예약 취소 가능)
-    const [userProfile, whitelistEntry] = await Promise.all([
-      supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+    const [userEntry, whitelistEntry] = await Promise.all([
+      supabaseAdmin.from('users').select('role').eq('id', user.id).maybeSingle(),
       supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
     ]);
-    const isAdmin = (userProfile.data?.role === 'admin') || !!whitelistEntry.data;
+    const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
 
     // [C-3] Ownership Verification
     if (!isAdmin && booking.user_id !== user.id && booking.experiences?.host_id !== user.id) {

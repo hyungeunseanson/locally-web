@@ -140,10 +140,38 @@ export default function MobileProfileView({
             bio: editData.bio,
             languages: editData.languages,
             job: editData.job,
-            school: editData.school,
             updated_at: new Date().toISOString(),
         };
-        const { error } = await supabase.from('profiles').upsert(updates);
+        const { data: existingProfile, error: loadError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (loadError) {
+            showToast('저장 실패: 프로필을 불러오지 못했습니다.', 'error');
+            setSaving(false);
+            return;
+        }
+
+        let error: { message: string } | null = null;
+
+        if (!existingProfile) {
+            const insertRes = await supabase.from('profiles').upsert(updates);
+            error = insertRes.error;
+        } else {
+            const allowedColumns = new Set(Object.keys(existingProfile));
+            const filteredUpdates = Object.fromEntries(
+                Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+            );
+
+            const updateRes = await supabase
+                .from('profiles')
+                .update(filteredUpdates)
+                .eq('id', userId);
+            error = updateRes.error;
+        }
+
         if (error) {
             showToast('저장 실패: ' + error.message, 'error');
         } else {

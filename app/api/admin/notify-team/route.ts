@@ -28,13 +28,23 @@ export async function POST(request: Request) {
 
         console.log(`🚀 [Admin Notify API] 팀 협업 알림 발송 준비: ${title}`);
 
-        // 1. 수신 대상자 수집 (관리자 Role + Whitelist)
-        const [profilesData, whitelistData] = await Promise.all([
-            supabaseAdmin.from('profiles').select('email').eq('role', 'admin'),
+        // 1. 수신 대상자 수집 (users.role + Whitelist)
+        const [adminUsersData, whitelistData] = await Promise.all([
+            supabaseAdmin.from('users').select('id').eq('role', 'admin'),
             supabaseAdmin.from('admin_whitelist').select('email')
         ]);
 
-        const adminEmails = (profilesData.data || []).map(p => p.email).filter(Boolean);
+        const adminIds = (adminUsersData.data || []).map(userRow => userRow.id);
+        let adminEmails: string[] = [];
+
+        if (adminIds.length > 0) {
+            const { data: adminProfiles } = await supabaseAdmin
+                .from('profiles')
+                .select('email')
+                .in('id', adminIds);
+            adminEmails = (adminProfiles || []).map(profile => profile.email).filter(Boolean);
+        }
+
         const whitelistEmails = (whitelistData.data || []).map(w => w.email).filter(Boolean);
 
         // 중복 제거 및 현재 액션을 취한 당사자(user.email)는 발송 제외

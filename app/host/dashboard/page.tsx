@@ -76,7 +76,7 @@ function DashboardContent() {
       // 정보 병합 (프로필 > 지원서)
       const mergedProfile = {
         ...profileData,
-        name: profileData?.name || hostData?.name,
+        name: profileData?.full_name || hostData?.name,
         avatar_url: hostData?.profile_photo || profileData?.avatar_url,
         introduction: profileData?.introduction || profileData?.bio || hostData?.self_intro,
         languages: (profileData?.languages && profileData.languages.length > 0) ? profileData.languages : (hostData?.languages || []),

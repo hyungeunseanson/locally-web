@@ -29,12 +29,12 @@ export async function POST(request: Request) {
     }
 
     // 🚨 [보안 패치] 관리자 권한 확인 (Role or Whitelist)
-    const [userProfile, whitelistEntry] = await Promise.all([
-      supabaseAdmin.from('profiles').select('role').eq('id', adminUser.id).maybeSingle(),
+    const [userEntry, whitelistEntry] = await Promise.all([
+      supabaseAdmin.from('users').select('role').eq('id', adminUser.id).maybeSingle(),
       supabaseAdmin.from('admin_whitelist').select('id').eq('email', adminUser.email || '').maybeSingle()
     ]);
 
-    const isAdmin = (userProfile.data?.role === 'admin') || !!whitelistEntry.data;
+    const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
 
     if (!isAdmin) {
       console.error(`🚨 [Security Warning] Unauthorized Delete Attempt by ${adminUser.email}`);

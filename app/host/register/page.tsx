@@ -166,22 +166,10 @@ export default function HostRegisterPage() {
 
       if (error) throw error; // If host application fails, stop immediately
 
-      // Only update profile if application submission succeeded
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const safeRole = (currentProfile?.role === 'host' || currentProfile?.role === 'admin')
-        ? currentProfile.role
-        : 'host_pending';
-
       const { error: profileError } = await supabase.from('profiles').update({
         languages: formData.targetLanguages,
         bio: formData.selfIntro,
-        name: formData.name,
-        role: safeRole,
+        full_name: formData.name,
         avatar_url: profileUrl
       }).eq('id', user.id);
 

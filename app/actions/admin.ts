@@ -25,18 +25,12 @@ async function getAdminClient() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  const [profile, whitelist] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+  const [userEntry, whitelist] = await Promise.all([
+    supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
     supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
   ]);
 
-  let isAdmin = profile.data?.role === 'admin' || !!whitelist.data;
-
-  // 레거시 호환: users.role 이관 전 데이터 보조 확인
-  if (!isAdmin) {
-    const { data: userView } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
-    isAdmin = userView?.role === 'admin';
-  }
+  const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
 
   if (!isAdmin) throw new Error('Forbidden: Admin access required');
 
@@ -70,7 +64,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   if (table === 'host_applications' && status === 'approved') {
     const { data: app } = await supabaseAdmin.from('host_applications').select('user_id').eq('id', id).maybeSingle();
     if (app) {
-      await supabaseAdmin.from('profiles').update({ role: 'host' }).eq('id', app.user_id);
+      await supabaseAdmin.from('users').update({ role: 'host' }).eq('id', app.user_id);
     }
   }
 

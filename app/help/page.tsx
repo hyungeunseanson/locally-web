@@ -144,10 +144,24 @@ export default function HelpCenterPage() {
     if (!content) return;
 
     try {
+      const { data: whitelistEntries, error: whitelistError } = await supabase
+        .from('admin_whitelist')
+        .select('email');
+
+      if (whitelistError) throw whitelistError;
+
+      const adminEmails = (whitelistEntries || [])
+        .map((entry) => entry.email)
+        .filter(Boolean);
+
+      if (adminEmails.length === 0) {
+        throw new Error("현재 상담 가능한 관리자가 없습니다.");
+      }
+
       const { data: admins, error: adminError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('is_admin', true);
+        .in('email', adminEmails);
 
       if (adminError) throw adminError;
       if (!admins || admins.length === 0) {

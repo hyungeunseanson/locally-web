@@ -292,7 +292,6 @@ export default function AccountPage() {
       avatar_url: profile.avatar_url,
       languages: profile.languages, // 🟢 [추가] 저장 시 포함
       job: profile.job,
-      school: profile.school,
       updated_at: new Date().toISOString(),
     };
 
@@ -302,22 +301,33 @@ export default function AccountPage() {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (loadError || !existingProfile) {
+    if (loadError) {
       console.error('Profile load error:', loadError);
       showToast(t('profile_save_fail'), 'error');
       setSaving(false);
       return;
     }
 
-    const allowedColumns = new Set(Object.keys(existingProfile));
-    const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-    );
+    let error: { message: string } | null = null;
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(filteredUpdates)
-      .eq('id', user.id);
+    if (!existingProfile) {
+      const insertRes = await supabase.from('profiles').upsert({
+        id: user.id,
+        ...updates,
+      });
+      error = insertRes.error;
+    } else {
+      const allowedColumns = new Set(Object.keys(existingProfile));
+      const filteredUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+      );
+
+      const updateRes = await supabase
+        .from('profiles')
+        .update(filteredUpdates)
+        .eq('id', user.id);
+      error = updateRes.error;
+    }
 
     if (error) {
       console.error('Save error:', error);

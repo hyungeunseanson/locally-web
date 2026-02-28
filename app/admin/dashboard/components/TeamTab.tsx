@@ -51,7 +51,7 @@ export default function TeamTab() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      setCurrentUser({ id: user.id, name: profile?.name || profile?.full_name || user.email?.split('@')[0] });
+      setCurrentUser({ id: user.id, name: profile?.full_name || user.email?.split('@')[0] });
     }
   };
 

@@ -193,7 +193,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - Host: 권한 스코프, 예약/수익 집계 기준, Realtime 범위 검증 정리
 - P0 정합성(예약 상태): 게스트 계정/모바일 프로필의 여행 횟수 집계를 하드코딩 `confirmed`에서 `BOOKING_CONFIRMED_STATUSES` 기반으로 통일
 - P0 정합성(API): `/api/guest/trips` 응답에서 `hostId` 사용 경로와 실제 select 컬럼(`experiences.host_id`)을 일치시켜 누락 가능성을 제거
-- P0 정합성(Admin 권한): 관리자 판정 기본 소스를 `profiles.role + admin_whitelist`로 재정렬하고 `users.role` 조회는 레거시 fallback 경로로 제한
+- P0 정합성(Admin 권한): 관리자 판정 기본 소스를 `users.role + admin_whitelist`로 통일하고, 화이트리스트 자동 승급/호스트 승인 반영도 `users.role` 갱신 기준으로 정리
 - P0 정합성(타입): `Booking.status` 유니온을 운영 중 상태 집합(`PENDING/PAID/confirmed/completed/cancelled/cancellation_requested/declined`)과 동기화
 - P1 정합성(상태 상수): 체험 상세 SSR 잔여석 조회, 결제 페이지 사전 좌석 점검, 게스트 여행 자동 완료 가공, 입금 콜백의 중복/좌석 검증 쿼리에 `BOOKING_ACTIVE_STATUS_FOR_CAPACITY`를 적용해 예약 상태 비교 기준을 통일
 - P1 정합성(Cron): 완료 스케줄러(`complete-trips`)의 대상 상태를 상수 기반으로 정렬하고 오류 처리 타입을 `unknown` 기반으로 보강
@@ -201,7 +201,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 데스크탑 홈 검색바 닫힘 안정화(P0): `MainSearchBar` 루트 기준 `mousedown` 외부 클릭 + `Escape` 키로 위치/날짜/언어 드롭다운을 닫도록 고정하고, 기존 검색 실행 로직은 유지
 - 검색 라벨 분리(P0): 홈 검색바 언어 라벨을 `label_progress_language`로 분리해 `언어` 대신 `진행 언어`를 노출하되 기존 `label_language` 사용처는 그대로 유지
 - 위시리스트 즉시 공유(P0): `guest/wishlists` 카드 오버레이에 공유 버튼을 추가하고 `navigator.share` 우선, 미지원 브라우저는 클립보드 복사 fallback으로 통일
-- 프로필 저장 400 차단(P0): 게스트 `account`와 호스트 `ProfileEditor`에서 `profiles.upsert`를 제거하고 `profiles` 현재 행 기준 컬럼 필터 후 `update`만 전송하도록 변경
+- 프로필 저장 400 차단(P0): 게스트 `account`와 호스트 `ProfileEditor`의 기본 저장 경로를 `profiles` 현재 행 기준 컬럼 필터 `update`로 정리하고, 게스트 `account`는 행 미존재 시 유효 컬럼만 `upsert`하는 fallback을 추가
+- 프로필 스키마 정합성 400 차단(P0): 실DB `profiles`에 없는 `role/name/is_admin/school` 직접 쿼리를 런타임 경로에서 제거하고, 관리자/팀 알림은 `users.role` 및 `admin_whitelist` 기반으로 재배선했으며 모바일 프로필 저장은 실컬럼 필터 `update`, 행 미존재 시 유효 컬럼만 `upsert`하는 fallback으로 고정
+- 빌드 반영 주의(P0): 위 스키마 정합성 수정 전 생성된 `.next` 산출물에는 기존 `profiles.role`, `is_admin`, `profiles.school` 요청 코드가 그대로 남아 있으므로, 반영 확인 전에는 `.next` 정리 후 dev 서버 또는 프로덕션 빌드를 새로 생성해야 한다
 - 카테고리 표준 집합 동기화(P0): 호스트 등록 카테고리를 11개(기존 7 + 건축/공연·경기/랜드마크/원데이 클래스)로 확장하고 모바일 검색 `체험 유형`도 동일 집합으로 정렬
 - 카테고리 UI 정합화(P0): 호스트 체험 등록 Step1 카테고리를 모바일 `체험 유형`과 동일한 아이콘 칩 스타일로 재구성해 등록/검색 선택 기준과 시각 표현을 일치
 - 인증 세션 식별 고정(P0): 브라우저 Supabase 클라이언트를 싱글턴으로 고정하고, 로그인 직후 프로필 동기화를 액세스 토큰 기준 서버 경로로 재배선했으며, `layout/AuthContext/login/become-a-host`의 사용자 판정을 `getSession()`에서 `getUser()`로 전환해 캐시/쿠키 레이스로 다른 계정이 재주입될 가능성을 축소
