@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import {
   List, MessageSquare, DollarSign, Star, Plus,
   Clock, AlertCircle, XCircle, UserCog, CalendarCheck, ShieldCheck, ArrowLeft
@@ -48,7 +48,7 @@ function DashboardContent() {
   const [profile, setProfile] = useState<HostDashboardProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -65,14 +65,7 @@ function DashboardContent() {
     router.push('/host/menu');
   };
 
-  useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab) setActiveTab(tab);
-
-    fetchData();
-  }, [searchParams]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
@@ -119,7 +112,14 @@ function DashboardContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, supabase]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+
+    void fetchData();
+  }, [fetchData, searchParams]);
 
   if (loading) {
     return (

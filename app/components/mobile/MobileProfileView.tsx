@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     ArrowLeft, Camera, Loader2, User, BriefcaseBusiness,
     GraduationCap, Globe, ShieldCheck, Star,
@@ -80,7 +80,7 @@ export default function MobileProfileView({
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 1 });
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const { showToast } = useToast();
     const completion = getProfileCompletion(isEditing ? editData : profile, 'guest');
     const missingLabels = completion.missingFields
@@ -109,7 +109,7 @@ export default function MobileProfileView({
             });
         };
         fetchStats();
-    }, [userId]);
+    }, [guestReviews.length, supabase, userId]);
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;

@@ -11,11 +11,17 @@ import { createClient } from '@/app/utils/supabase/client';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import HostModeTransition from './HostModeTransition';
 import MobileLanguageSwitcher from './MobileLanguageSwitcher';
+import { getProfileCompletion } from '@/app/utils/profile';
 
 type MobileHostProfile = {
     avatar_url?: string | null;
     full_name?: string | null;
-    [key: string]: unknown;
+    bio?: string | null;
+    introduction?: string | null;
+    languages?: string[] | null;
+    job?: string | null;
+    phone?: string | null;
+    host_nationality?: string | null;
 };
 
 export default function MobileHostMenu() {
@@ -26,6 +32,7 @@ export default function MobileHostMenu() {
     const [showTransition, setShowTransition] = useState(false);
 
     const supabase = useMemo(() => createClient(), []);
+    const profileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -46,6 +53,14 @@ export default function MobileHostMenu() {
                         ...(profileRes.data || {}),
                         avatar_url: hostRes.data?.profile_photo || profileRes.data?.avatar_url,
                         full_name: profileRes.data?.full_name || hostRes.data?.name,
+                        bio: profileRes.data?.bio || hostRes.data?.self_intro || null,
+                        introduction: profileRes.data?.introduction || hostRes.data?.self_intro || null,
+                        languages: (profileRes.data?.languages && profileRes.data.languages.length > 0)
+                            ? profileRes.data.languages
+                            : (hostRes.data?.languages || []),
+                        job: profileRes.data?.job || null,
+                        phone: profileRes.data?.phone || hostRes.data?.phone || null,
+                        host_nationality: profileRes.data?.host_nationality || hostRes.data?.host_nationality || null,
                     });
                 }
 
@@ -161,7 +176,12 @@ export default function MobileHostMenu() {
 
             {/* ── 메뉴 그룹 3 ── */}
             <div className="px-5">
-                <HostMenuItem href="/host/dashboard?tab=profile" icon={<Settings size={17} />} label="프로필 설정" />
+                <HostMenuItem
+                    href="/host/dashboard?tab=profile"
+                    icon={<Settings size={17} />}
+                    label="프로필 설정"
+                    badge={profileCompletion && profileCompletion.percent < 100 ? `${profileCompletion.percent}%` : null}
+                />
                 <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label="도움말 센터" />
             </div>
 
@@ -179,11 +199,26 @@ export default function MobileHostMenu() {
     );
 }
 
-function HostMenuItem({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function HostMenuItem({
+    href,
+    icon,
+    label,
+    badge,
+}: {
+    href: string;
+    icon: React.ReactNode;
+    label: string;
+    badge?: string | null;
+}) {
     return (
         <Link href={href} className="flex items-center gap-3.5 py-3.5 border-b border-gray-100">
             <span className="text-gray-500 shrink-0">{icon}</span>
             <span className="flex-1 text-[13px] font-medium text-gray-800">{label}</span>
+            {badge ? (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                    {badge}
+                </span>
+            ) : null}
             <ChevronRight size={15} className="text-gray-300" />
         </Link>
     );

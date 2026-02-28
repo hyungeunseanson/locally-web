@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-28 (P0 Profile Consistency/Completion Nudge + Experience Host Modal Fact Guard + Profile Save Seed Guard + Reservation/Inquiry Profile Mapping Sync)  
-**Version:** 3.2.39 (P0 Profile Consistency/Completion Nudge + Experience Host Modal Fact Guard + Profile Save Seed Guard + Reservation/Inquiry Profile Mapping Sync)  
+**Last Updated:** 2026-02-28 (P0 Profile Consistency/Completion Nudge Follow-up + Mobile Host Menu Completion Badge + Profile Hook Stability Cleanup)  
+**Version:** 3.2.40 (P0 Profile Consistency/Completion Nudge Follow-up + Mobile Host Menu Completion Badge + Profile Hook Stability Cleanup)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -207,6 +207,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 게스트 프로필 저장/유도 정합화(P0): 데스크탑 `account`와 모바일 `MobileProfileView` 모두 `school`, `mbti`, `languages` 저장 경로를 일치시켰고, 두 화면 모두 프로필 완성도 카드/잔여 항목 배지/핵심 필드 안내문을 추가해 비강제형 입력 유도를 고정
 - 호스트 프로필 공개 편집 정합화(P0): `ProfileEditor`의 `구사 언어`를 쉼표 문자열에서 공통 선택 칩으로 전환하고, 공개 프로필 완성도 카드와 언어/자기소개 안내문을 추가했으며, 데스크탑 호스트 대시보드 `프로필` 탭에는 미완성 시 퍼센트 배지를 유지
 - 호스트/게스트 프로필 모달 소스 정리(P0): `UserProfileModal`, `GuestProfileModal`, `ReservationManager`, 체험 상세 호스트 모달은 `profiles.bio / nationality / languages`와 `host_applications.self_intro / host_nationality` 우선순위를 일치시켜 잘못된 필드 참조와 기본값 추측 노출을 줄였고, 체험 상세 호스트 모달의 가짜 `슈퍼호스트/검증/0개 후기` 표시는 제거
+- 프로필 화면 후속 안정화(P0): `account`, `MobileProfileView`, `host/dashboard`는 Supabase 클라이언트를 메모이즈하고 프로필/통계 조회 effect 의존성을 정리해 불필요한 lint 경고(미사용 import, 누락 dependency, 미사용 포맷 함수)를 줄였으며, 현재 남은 경고는 `img` 최적화 권고만 유지
+- 모바일 호스트 메뉴 완성도 유도(P0): `MobileHostMenu`가 `profiles + host_applications`를 병합한 공개 프로필 요약으로 완성도를 계산하고, `프로필 설정` 메뉴에 미완성 시 퍼센트 배지를 표시해 모바일 진입점에서도 프로필 입력 유도를 유지
 - 빌드 반영 주의(P0): 위 스키마 정합성 수정 전 생성된 `.next` 산출물에는 기존 `profiles.role`, `is_admin`, `profiles.school` 요청 코드가 그대로 남아 있으므로, 반영 확인 전에는 `.next` 정리 후 dev 서버 또는 프로덕션 빌드를 새로 생성해야 한다
 - Admin 삭제 인증 복원(P0): `/api/admin/delete`는 `Authorization` 헤더 토큰 파싱 대신 `@/app/utils/supabase/server`의 쿠키 기반 서버 클라이언트로 `auth.getUser()`를 복원하도록 수정했고, 권한 체크 직전 `auth user / users 조회 / whitelist 조회 / final isAdmin` 로그를 추가해 401·403 원인을 서버 로그에서 직접 추적할 수 있게 했다
 - 관리자 문의 분류 정합성(P0): `inquiries.type`의 레거시 `admin`과 현행 `admin_support`를 공통 헬퍼로 함께 관리자 1:1 문의로 판정하도록 통일했고, Admin `ChatMonitor`와 게스트 메시지함의 표시/뱃지/상대명 분기를 모두 같은 기준으로 맞췄으며, `ChatMonitor`의 `host.full_name` 오참조를 `host.name`으로 수정해 `호스트: 알수없음` 오표시를 제거했다

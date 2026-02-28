@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Mail, Phone, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Gift, Globe, MessageSquare } from 'lucide-react';
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -29,7 +29,7 @@ type GuestReview = {
 
 export default function AccountPage() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   // 🟢 [추가] 커스텀 달력 상태
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date()); // 달력에서 보고 있는 날짜
@@ -226,15 +226,7 @@ export default function AccountPage() {
       setLoading(false);
     };
     getProfile();
-  }, []);
-
-  // 📞 전화번호 자동 포맷팅 함수
-  const formatPhoneNumber = (value: string) => {
-    const numbers = value.replace(/[^0-9]/g, ''); // 숫자만 남김
-    if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
-  };
+  }, [router, supabase]);
 
   // 📞 전화번호 입력 핸들러
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -544,7 +536,7 @@ export default function AccountPage() {
               <div className="relative w-32 h-32 mx-auto mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                 <div className="w-32 h-32 bg-slate-200 rounded-full overflow-hidden border border-slate-100 shadow-inner relative">
                   {profile.avatar_url ? (
-                    <img src={profile.avatar_url} className="w-full h-full object-cover" />
+                    <img src={profile.avatar_url} className="w-full h-full object-cover" alt="게스트 프로필 사진" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={48} /></div>
                   )}
@@ -605,7 +597,7 @@ export default function AccountPage() {
                           {/* 호스트 아바타 (있으면 표시) */}
                           <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden relative">
                             {review.host?.avatar_url ? (
-                              <img src={review.host.avatar_url} className="w-full h-full object-cover" />
+                              <img src={review.host.avatar_url} className="w-full h-full object-cover" alt="후기 작성 호스트 사진" />
                             ) : <User size={14} className="text-slate-400 m-auto mt-1" />}
                           </div>
                           <span className="font-bold text-slate-900 group-hover:underline">
@@ -989,7 +981,7 @@ export default function AccountPage() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative">
                   {selectedReview.host?.avatar_url ? (
-                    <img src={selectedReview.host.avatar_url} className="w-full h-full object-cover" />
+                    <img src={selectedReview.host.avatar_url} className="w-full h-full object-cover" alt="선택한 후기 호스트 사진" />
                   ) : <User size={24} className="text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />}
                 </div>
                 <div>
