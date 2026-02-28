@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { recordAuditLog } from '@/app/utils/supabase/admin';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 
 export async function POST(request: Request) {
   try {
@@ -11,18 +11,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing table or id' }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabaseAuth = await createServerClient();
+    const supabaseAdmin = createAdminClient();
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error('Server Config Error: Missing Supabase keys');
-      return NextResponse.json({ error: 'Server Configuration Error' }, { status: 500 });
+    const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser();
+
+    console.log('[AdminDelete] auth user:', adminUser);
+    console.log('[AdminDelete] auth user id:', adminUser?.id ?? null);
+    console.log('[AdminDelete] auth user email:', adminUser?.email ?? null);
+    if (authError) {
+      console.log('[AdminDelete] auth error:', {
+        message: authError.message,
+        status: authError.status,
+        code: authError.code,
+      });
     }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-
-    const authHeader = request.headers.get('Authorization');
-    const { data: { user: adminUser }, error: authError } = await supabaseAdmin.auth.getUser(authHeader?.split('Bearer ')[1]);
 
     if (authError || !adminUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -34,7 +37,28 @@ export async function POST(request: Request) {
       supabaseAdmin.from('admin_whitelist').select('id').eq('email', adminUser.email || '').maybeSingle()
     ]);
 
+    console.log('[AdminDelete] users query result:', {
+      data: userEntry.data,
+      error: userEntry.error ? {
+        message: userEntry.error.message,
+        code: userEntry.error.code,
+        details: userEntry.error.details,
+        hint: userEntry.error.hint,
+      } : null,
+    });
+    console.log('[AdminDelete] whitelist query result:', {
+      data: whitelistEntry.data,
+      error: whitelistEntry.error ? {
+        message: whitelistEntry.error.message,
+        code: whitelistEntry.error.code,
+        details: whitelistEntry.error.details,
+        hint: whitelistEntry.error.hint,
+      } : null,
+    });
+
     const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
+
+    console.log('[AdminDelete] final isAdmin:', isAdmin);
 
     if (!isAdmin) {
       console.error(`🚨 [Security Warning] Unauthorized Delete Attempt by ${adminUser.email}`);
@@ -96,9 +120,10 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true });
 
-      } catch (cascadeError: any) {
+      } catch (cascadeError: unknown) {
         console.error('Cascade delete error:', cascadeError);
-        return NextResponse.json({ error: `삭제 처리 중 오류: ${cascadeError.message}` }, { status: 500 });
+        const message = cascadeError instanceof Error ? cascadeError.message : '알 수 없는 오류';
+        return NextResponse.json({ error: `삭제 처리 중 오류: ${message}` }, { status: 500 });
       }
     }
 
@@ -127,8 +152,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('API Handler Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : '알 수 없는 오류';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

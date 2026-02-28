@@ -204,6 +204,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 프로필 저장 400 차단(P0): 게스트 `account`와 호스트 `ProfileEditor`의 기본 저장 경로를 `profiles` 현재 행 기준 컬럼 필터 `update`로 정리하고, 게스트 `account`는 행 미존재 시 유효 컬럼만 `upsert`하는 fallback을 추가
 - 프로필 스키마 정합성 400 차단(P0): 실DB `profiles`에 없는 `role/name/is_admin/school` 직접 쿼리를 런타임 경로에서 제거하고, 관리자/팀 알림은 `users.role` 및 `admin_whitelist` 기반으로 재배선했으며 모바일 프로필 저장은 실컬럼 필터 `update`, 행 미존재 시 유효 컬럼만 `upsert`하는 fallback으로 고정
 - 빌드 반영 주의(P0): 위 스키마 정합성 수정 전 생성된 `.next` 산출물에는 기존 `profiles.role`, `is_admin`, `profiles.school` 요청 코드가 그대로 남아 있으므로, 반영 확인 전에는 `.next` 정리 후 dev 서버 또는 프로덕션 빌드를 새로 생성해야 한다
+- Admin 삭제 인증 복원(P0): `/api/admin/delete`는 `Authorization` 헤더 토큰 파싱 대신 `@/app/utils/supabase/server`의 쿠키 기반 서버 클라이언트로 `auth.getUser()`를 복원하도록 수정했고, 권한 체크 직전 `auth user / users 조회 / whitelist 조회 / final isAdmin` 로그를 추가해 401·403 원인을 서버 로그에서 직접 추적할 수 있게 했다
 - 카테고리 표준 집합 동기화(P0): 호스트 등록 카테고리를 11개(기존 7 + 건축/공연·경기/랜드마크/원데이 클래스)로 확장하고 모바일 검색 `체험 유형`도 동일 집합으로 정렬
 - 카테고리 UI 정합화(P0): 호스트 체험 등록 Step1 카테고리를 모바일 `체험 유형`과 동일한 아이콘 칩 스타일로 재구성해 등록/검색 선택 기준과 시각 표현을 일치
 - 인증 세션 식별 고정(P0): 브라우저 Supabase 클라이언트를 싱글턴으로 고정하고, 로그인 직후 프로필 동기화를 액세스 토큰 기준 서버 경로로 재배선했으며, `layout/AuthContext/login/become-a-host`의 사용자 판정을 `getSession()`에서 `getUser()`로 전환해 캐시/쿠키 레이스로 다른 계정이 재주입될 가능성을 축소
