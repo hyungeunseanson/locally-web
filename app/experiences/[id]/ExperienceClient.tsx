@@ -61,11 +61,11 @@ export default function ExperienceClient({
   // 🟢 [핵심] 제목을 언어에 맞춰서 변환!
   const translatedTitle = getContent(experience, 'title', lang);
   const translatedDescription = getContent(experience, 'description', lang);
-  // 🟢 [핵심] 위치 정보는 아직 번역이 없으므로 한국어 사용 (나중에 location_en 추가 가능)
-  const location = experience.meeting_point || experience.location;
   const category = getContent(experience, 'category', lang) || experience.category || '문화 체험';
-  const compactLocation = location?.split(',')?.[0]?.trim() || 'Locally';
+  const meetingPoint = experience.meeting_point || experience.location || 'Locally';
+  const compactLocation = experience.city?.trim() || meetingPoint?.split(',')?.[0]?.trim() || 'Locally';
   const headerLabel = `${compactLocation} · ${category}`;
+  const addressLine = experience.location || experience.city || compactLocation;
   const ratingValue = Number(experience.rating || 0);
   const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : 'New';
   const reviewCount = Number(experience.review_count || 0);
@@ -169,28 +169,6 @@ export default function ExperienceClient({
       </div>
 
       <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-[58px] md:pt-8 pb-8 md:py-8">
-        <section className="hidden md:block mb-6">
-          <p className="text-sm font-semibold text-slate-500 mb-2">{headerLabel}</p>
-          <h1 className="text-3xl font-black mb-2 tracking-tight">{translatedTitle}</h1>
-          <div className="flex justify-between items-end">
-            <div className="flex items-center gap-4 text-sm font-medium text-slate-800">
-              <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
-                <span className="font-bold">★ {ratingText}</span>
-                {reviewCount > 0 && <span className="text-slate-500 underline">후기 {reviewCount}개</span>}
-              </button>
-              <span className="text-slate-300">|</span>
-              <button onClick={() => scrollToSection('location')} className="flex items-center gap-1 hover:underline underline-offset-4 font-bold text-slate-700"><MapPin size={14} /> {location}</button>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1"><Share size={16} /> 공유하기</button>
-              <button onClick={toggleWishlist} disabled={isSaveLoading} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
-                <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
-                {isSaved ? '저장됨' : '저장'}
-              </button>
-            </div>
-          </div>
-        </section>
-
         {/* 데스크탑 사진 그리드 */}
         <section className="hidden md:block relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
           {photos.length === 1 && (
@@ -221,6 +199,60 @@ export default function ExperienceClient({
           >
             <Grid size={16} /> 사진 모두 보기
           </button>
+        </section>
+
+        <section className="hidden md:block mb-12">
+          <div className="max-w-3xl">
+            <h1 className="text-[40px] leading-[1.15] font-black tracking-tight text-slate-900">{translatedTitle}</h1>
+            <p className="mt-4 text-[16px] leading-[1.65] text-slate-500 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm font-medium text-slate-800">
+              <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
+                <span className="font-bold">★ {ratingText}</span>
+                {reviewCount > 0 && <span className="text-slate-500 underline">후기 {reviewCount}개</span>}
+              </button>
+              <span className="text-slate-300">·</span>
+              <span className="text-slate-500">{headerLabel}</span>
+            </div>
+
+            <div className="mt-5 flex gap-2">
+              <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
+                <Share size={16} /> 공유하기
+              </button>
+              <button onClick={toggleWishlist} disabled={isSaveLoading} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
+                <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
+                {isSaved ? '저장됨' : '저장'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-slate-200 pt-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200 border border-slate-200 flex items-center justify-center">
+                {hostProfile?.avatar_url ? (
+                  <div className="relative w-full h-full">
+                    <Image src={hostProfile.avatar_url} fill className="object-cover" alt="Host avatar" />
+                  </div>
+                ) : (
+                  <span className="text-slate-400 text-sm font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[18px] font-semibold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
+                <p className="text-[15px] text-slate-500 truncate">{hostProfile?.job || category}</p>
+              </div>
+            </div>
+
+            <button onClick={() => scrollToSection('location')} className="mt-5 flex items-center gap-3 text-left">
+              <div className="w-12 h-12 rounded-[14px] bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-[0_1px_5px_rgba(0,0,0,0.08)]">
+                <MapPin size={16} className="text-slate-700" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[18px] font-semibold truncate">{meetingPoint}</p>
+                <p className="text-[15px] text-slate-500 truncate">{addressLine}</p>
+              </div>
+            </button>
+          </div>
         </section>
 
         {/* 모바일 상단 소개 블록 */}
@@ -286,8 +318,8 @@ export default function ExperienceClient({
                 <MapPin size={14} className="text-slate-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-medium truncate">{location}</p>
-                <p className="text-[12px] text-slate-500 truncate">{experience.location || compactLocation}</p>
+                <p className="text-[13px] font-medium truncate">{meetingPoint}</p>
+                <p className="text-[12px] text-slate-500 truncate">{addressLine}</p>
               </div>
             </button>
 

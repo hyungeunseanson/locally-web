@@ -16,7 +16,9 @@ export type ExperienceDetail = {
   host_id?: string;
   title?: string;
   description?: string;
+  city?: string;
   category?: string;
+  languages?: string[];
   meeting_point?: string;
   location?: string;
   rating?: number;

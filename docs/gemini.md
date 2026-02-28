@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-28 (P0 Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
-**Version:** 3.2.36 (P0 Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Last Updated:** 2026-02-28 (P0 Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Version:** 3.2.37 (P0 Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -177,6 +177,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 체험 상세 모달 정합화: 후기 전체보기 모달을 레퍼런스 기반 시트 구조(상단 X, 대형 평점, `최신순/오래된 순` 정렬)로 재설계하고 검색 아이콘/번역 라인을 제외했으며, 모바일 `~님에게 메시지 보내기` CTA는 하단 문의 영역 노출 대신 전용 메시지 모달(질문 입력 + 전송 버튼)을 열도록 전환
 - 체험 상세 모달 타이포 재축소: 후기 전체보기/메시지 보내기 모달의 제목·본문·메타 타이포 굵기와 크기를 한 단계 더 축소하고, 문의 전송 완료 흐름은 브라우저 확인창 없이 `메시지가 발송되었습니다.` 토스트만 노출하도록 단순화
 - 체험 상세 3차 미세보정: 후기 전체보기 모달 텍스트를 추가 축소(약 20%)하고 평점 숫자 가중치를 상향했으며, 후기/메시지 모달 배경을 화이트 톤으로 조정하고 전역 토스트를 다크 톤 + 부드러운 등장 모션으로 재디자인
+- 호스트 체험 등록/수정 동기화(P0): 대표 사진은 `photos` 최대 5장으로 고정하고, 생성·수정 화면 모두 `meeting_point=만나는 장소명`, `location=정확한 주소`, `itinerary[].image_url=동선별 사진 1장` 구조로 정렬했으며 `불포함 사항` 입력은 제거
+- 체험 상세 상단 정보 재정렬(P0): `/experiences/[id]` 상단 라벨을 `city · category` 기준으로 전환하고, 데스크탑 사진 아래 요약 블록을 모바일 정보 계층(제목/소개/평점/도시·카테고리/호스트/만나는 장소) 기준으로 재구성해 중복 헤더를 제거
+- 체험 상세 정보 기준 통일(P0): 언어 안내는 `experience.languages` 우선으로 표기하고 팁형 아이콘 안내행으로 정리했으며, 만나는 장소는 `meeting_point` 1행 + `location` 2행으로 분리, 데스크탑 별도 `호스트에게 문의하기` 입력 박스와 `접근성` 섹션은 제거하고 환불 정책은 `표준 정책 (7일 전 무료 취소)` 고정 문구로 통일
 - 체험 상세 안정화 v2(예약 원자화): `create_booking_atomic` DB 함수 + 슬롯 advisory lock + 활성 프라이빗 부분 유니크 인덱스를 추가하고, `POST /api/bookings` 내부를 `select→insert`에서 RPC 단일 경로로 전환해 동시 요청 시 좌석 검증/삽입을 원자적으로 보장
 - 체험 상세 안정화 v2(문의 인증): `useChat.createInquiry`/`sendMessage`에서 `currentUser` 지연 상태 의존을 제거하고 호출 시점 `auth.getUser()` 기반으로 사용자 식별을 확정해 상세 진입 직후 문의 전송 실패 오탐을 완화
 - 체험 상세 안정화 v2(모바일 에러 UX): 상세 결제 흐름의 `alert`를 제거하고 토스트 + 인라인 에러 블록으로 통일, 실패 시 강제 뒤로가기 없이 현재 화면에서 재시도 가능한 상태로 유지

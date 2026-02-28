@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MapPin, MessageSquare, Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, ChevronRight } from 'lucide-react';
+import { Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, Lightbulb } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ReviewSection from './ReviewSection';
@@ -22,10 +22,14 @@ type MainContentProps = {
 export default function ExpMainContent({
   experience, hostProfile, handleInquiry, inquiryText, setInquiryText, translatedDescription, translatedCategory
 }: MainContentProps) {
+  const fixedRefundPolicy = '표준 정책 (7일 전 무료 취소)';
   const { showToast } = useToast();
   const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
   const [isSubmittingMessage, setIsSubmittingMessage] = React.useState(false);
-  const location = (experience.meeting_point || experience.location || 'Seoul') as string;
+  const meetingPoint = (experience.meeting_point || '').trim();
+  const addressLine = (experience.location || '').trim();
+  const mapQuery = addressLine || meetingPoint || String(experience.city || 'Seoul');
+  const copyTarget = addressLine || meetingPoint || mapQuery;
   const itinerary: ExperienceItineraryItem[] = Array.isArray(experience.itinerary) ? experience.itinerary : [];
   const photos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
@@ -38,8 +42,13 @@ export default function ExpMainContent({
     if (normalized.includes('chinese') || normalized.includes('중국어')) return '중국어';
     return language;
   };
-  const normalizedLanguages = Array.isArray(hostProfile?.languages)
-    ? hostProfile.languages
+  const rawLanguages = Array.isArray(experience.languages) && experience.languages.length > 0
+    ? experience.languages
+    : Array.isArray(hostProfile?.languages)
+      ? hostProfile.languages
+      : [];
+  const normalizedLanguages = rawLanguages.length > 0
+    ? rawLanguages
       .map((language) => mapLanguageLabel(String(language)))
       .filter(Boolean)
     : [];
@@ -48,16 +57,14 @@ export default function ExpMainContent({
     : '영어 및 한국어로 진행되는 체험입니다.';
 
   const handleCopyAddress = () => {
-    navigator.clipboard.writeText(location);
+    navigator.clipboard.writeText(copyTarget);
     showToast('주소가 복사되었습니다.', 'success');
   };
 
   const openHostMessage = () => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsMessageModalOpen(true);
-      return;
     }
-    document.getElementById('inquiry')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const handleSubmitMessage = async () => {
@@ -70,22 +77,6 @@ export default function ExpMainContent({
 
   return (
     <div className="flex-1 space-y-8 md:space-y-14">
-
-      {/* 데스크탑 호스트 요약 */}
-      <div className="hidden md:flex border-b border-slate-200 pb-8 justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold mb-1">호스트: {hostProfile?.name || 'Locally Host'}님</h2>
-          <p className="text-slate-500 text-base">최대 {experience.max_guests}명 · {experience.duration || 2}시간 · {hostProfile?.languages?.join('/') || '한국어/영어'}</p>
-        </div>
-        <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center relative">
-          {hostProfile?.avatar_url ? (
-            <Image src={hostProfile.avatar_url} alt="Host avatar" fill className="object-cover" />
-          ) : (
-            <span className="text-slate-400 text-base font-bold">{(hostProfile?.name || 'H').slice(0, 1)}</span>
-          )}
-        </div>
-      </div>
-
       {/* 체험 내용 */}
       <div className="border-b border-slate-200 pb-8 md:pb-10">
         <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-5">체험 내용</h3>
@@ -111,7 +102,10 @@ export default function ExpMainContent({
             </p>
           )}
         </div>
-        <p className="text-[12px] md:text-[15px] leading-[1.45] text-slate-700 mt-5">{languageText}</p>
+        <div className="mt-5 flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50/80 px-4 py-3 text-amber-900">
+          <Lightbulb size={16} className="mt-0.5 shrink-0" />
+          <p className="text-[12px] md:text-[15px] leading-[1.45]">{languageText}</p>
+        </div>
       </div>
 
       {/* 후기 */}
@@ -120,8 +114,12 @@ export default function ExpMainContent({
       {/* 만나는 장소 */}
       <div id="location" className="border-b border-slate-200 pb-8 md:pb-10 scroll-mt-24">
         <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-3">만나는 장소</h3>
-        <p className="text-[12px] md:text-[15px] text-slate-700 font-medium mb-1">{location}</p>
-        <p className="text-[11px] md:text-[14px] text-slate-500 mb-4">{experience.location || location}</p>
+        {meetingPoint ? (
+          <p className="text-[12px] md:text-[15px] text-slate-700 font-medium mb-1">{meetingPoint}</p>
+        ) : null}
+        {addressLine ? (
+          <p className="text-[11px] md:text-[14px] text-slate-500 mb-4">{addressLine}</p>
+        ) : null}
 
         <div className="w-full h-[384px] md:h-[400px] bg-slate-100 rounded-[20px] md:rounded-[24px] relative overflow-hidden border border-slate-200 shadow-sm">
           <iframe
@@ -130,12 +128,12 @@ export default function ExpMainContent({
             style={{ border: 0 }}
             loading="lazy"
             allowFullScreen
-            src={`https://maps.google.com/maps?q=${encodeURIComponent(location)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+            src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
             className="grayscale-[5%]"
           ></iframe>
 
           <Link
-            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`}
             rel="noreferrer"
             className="absolute top-4 right-4 bg-white/95 p-2 rounded-full shadow-md border border-slate-200 text-slate-700 hover:scale-105 transition-transform"
           >
@@ -165,21 +163,6 @@ export default function ExpMainContent({
         category={translatedCategory || experience.category || '문화 체험'}
         onMessageHost={openHostMessage}
       />
-
-      {/* 문의 */}
-      <div id="inquiry" className="hidden md:block pb-2 scroll-mt-24">
-        <h3 className="text-[18px] md:text-[20px] font-bold mb-4">호스트에게 문의하기</h3>
-        <div className="flex gap-2">
-          <input
-            value={inquiryText}
-            onChange={e => setInquiryText(e.target.value)}
-            placeholder="호스트에게 메시지 보내기..."
-            className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors text-[13px] md:text-[14px]"
-          />
-          <button onClick={handleInquiry} className="bg-black text-white px-6 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center"><MessageSquare size={18} /></button>
-        </div>
-        <p className="text-[11px] text-slate-400 mt-3">안전한 결제를 위해 항상 로컬리를 통해 결제하고 호스트와 소통하세요.</p>
-      </div>
 
       {/* 알아두어야 할 사항 */}
       <div className="pt-8 pb-12 border-t border-slate-200">
@@ -218,26 +201,12 @@ export default function ExpMainContent({
             </div>
           </div>
 
-          <button
-            onClick={() => document.getElementById('inquiry')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-            className="w-full flex items-center justify-between text-left gap-3"
-          >
-            <div className="flex gap-3 items-start">
-              <MapPin size={22} className="text-slate-700 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">접근성</h4>
-                <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">주로 평평한 부지이며 도움 필요 시 호스트에게 문의해주세요.</p>
-              </div>
-            </div>
-            <ChevronRight size={20} className="text-slate-400 shrink-0" />
-          </button>
-
           <div className="flex gap-3">
             <CalendarX size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
               <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">환불 정책</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
-                {experience.rules?.refund_policy || '시작 시간을 기준으로 3일 전까지 취소하면 예약금이 전액 환불됩니다.'}
+                {fixedRefundPolicy}
               </p>
             </div>
           </div>

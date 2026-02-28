@@ -22,6 +22,9 @@ export const SUPPORTED_LANGUAGES = [
   '한국어', '영어', '일본어', '중국어'
 ];
 
+export const MAX_EXPERIENCE_PHOTOS = 5;
+export const FIXED_REFUND_POLICY = '표준 정책 (7일 전 무료 취소)';
+
 export const TOTAL_STEPS = 7;
 
 export const INITIAL_FORM_DATA = {
@@ -35,10 +38,11 @@ export const INITIAL_FORM_DATA = {
 
   title: '', 
   photos: [] as string[], 
+  location: '',
   
   itinerary: [
-    { title: '만남', description: '', type: 'meet' }
-  ] as { title: string; description: string; type: 'meet'|'spot'|'end' }[],
+    { title: '만남', description: '', type: 'meet', image_url: '' }
+  ] as { title: string; description: string; type: 'meet'|'spot'|'end'; image_url?: string }[],
 
   description: '', 
   
@@ -48,11 +52,11 @@ export const INITIAL_FORM_DATA = {
   
   duration: 3, 
   maxGuests: 4,
-  meetingPoint: '', 
+  meeting_point: '',
   rules: {
     age_limit: '',
     activity_level: '보통',
-    refund_policy: '표준 정책 (5일 전 무료 취소)'
+    refund_policy: FIXED_REFUND_POLICY
   },
   
   price: 50000,

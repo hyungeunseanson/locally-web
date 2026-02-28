@@ -6,9 +6,21 @@ import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 알림 기능 사용
-import { TOTAL_STEPS, INITIAL_FORM_DATA } from './config';
+import {
+  TOTAL_STEPS,
+  INITIAL_FORM_DATA,
+  MAX_EXPERIENCE_PHOTOS,
+  FIXED_REFUND_POLICY,
+} from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps';
 import { validateImage, sanitizeFileName, compressImage } from '@/app/utils/image';
+
+type ItineraryItem = {
+  title: string;
+  description: string;
+  type: 'meet' | 'spot' | 'end';
+  image_url?: string;
+};
 
 export default function CreateExperiencePage() {
   const supabase = createClient();
@@ -20,7 +32,6 @@ export default function CreateExperiencePage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     ...INITIAL_FORM_DATA,
-    meeting_point: '', // 추가
     is_private_enabled: false,
     private_price: 0,
   });
@@ -28,8 +39,10 @@ export default function CreateExperiencePage() {
   // UI용 임시 상태
   const [isCustomCity, setIsCustomCity] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [itineraryImageFiles, setItineraryImageFiles] = useState<(File | null)[]>(
+    INITIAL_FORM_DATA.itinerary.map(() => null)
+  );
   const [tempInclusion, setTempInclusion] = useState('');
-  const [tempExclusion, setTempExclusion] = useState('');
 
   const validateCurrentStep = (targetStep: number) => {
     if (targetStep === 1) {
@@ -53,8 +66,12 @@ export default function CreateExperiencePage() {
         showToast('체험 제목을 6자 이상 입력해주세요.', 'error');
         return false;
       }
-      if (!formData.photos || formData.photos.length === 0) {
+      if (!formData.photos || formData.photos.length < 1) {
         showToast('대표 사진을 1장 이상 업로드해주세요.', 'error');
+        return false;
+      }
+      if (formData.photos.length > MAX_EXPERIENCE_PHOTOS) {
+        showToast(`대표 사진은 최대 ${MAX_EXPERIENCE_PHOTOS}장까지 업로드 가능합니다.`, 'error');
         return false;
       }
       return true;
@@ -62,7 +79,11 @@ export default function CreateExperiencePage() {
 
     if (targetStep === 3) {
       if (!formData.meeting_point?.trim()) {
-        showToast('만나는 장소를 입력해주세요.', 'error');
+        showToast('만나는 장소 이름을 입력해주세요.', 'error');
+        return false;
+      }
+      if (!formData.location?.trim()) {
+        showToast('정확한 주소를 입력해주세요.', 'error');
         return false;
       }
       const hasEmptyItinerary = (formData.itinerary || []).some((item: { title?: string }) => !item.title?.trim());
@@ -117,7 +138,7 @@ export default function CreateExperiencePage() {
   const prevStep = () => { if (step > 1) setStep(step - 1); };
 
   // --- 데이터 업데이트 함수들 ---
-  const updateData = (key: string, value: any) => {
+  const updateData = (key: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
@@ -127,28 +148,37 @@ export default function CreateExperiencePage() {
     updateData(key, type === 'inc' ? currentVal + 1 : currentVal - 1);
   };
 
-  const addItem = (field: 'inclusions' | 'exclusions', value: string, setter: any) => {
+  const addItem = (
+    field: 'inclusions',
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
     if (!value.trim()) return;
     updateData(field, [...formData[field], value]);
     setter('');
   };
 
-  const removeItem = (field: 'inclusions' | 'exclusions', index: number) => {
+  const removeItem = (field: 'inclusions', index: number) => {
     updateData(field, formData[field].filter((_, i) => i !== index));
   };
 
   // 📍 동선(루트) 관리
   const addItineraryItem = () => {
-    updateData('itinerary', [...formData.itinerary, { title: '', description: '', type: 'spot' }]);
+    updateData('itinerary', [
+      ...formData.itinerary,
+      { title: '', description: '', type: 'spot', image_url: '' },
+    ]);
+    setItineraryImageFiles((prev) => [...prev, null]);
   };
 
   const removeItineraryItem = (index: number) => {
     if (formData.itinerary.length <= 1) return;
     updateData('itinerary', formData.itinerary.filter((_, i) => i !== index));
+    setItineraryImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const updateItineraryItem = (index: number, key: string, value: string) => {
-    const newItinerary = [...formData.itinerary];
+    const newItinerary = [...(formData.itinerary as ItineraryItem[])];
     newItinerary[index] = { ...newItinerary[index], [key]: value };
     updateData('itinerary', newItinerary);
   };
@@ -159,45 +189,104 @@ export default function CreateExperiencePage() {
     updateData('photos', newPhotos);
   };
 
-  // 📸 사진 업로드 핸들러 수정
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
+  const buildPreviewFiles = async (files: File[]) => {
+    const previewUrls: string[] = [];
+    const processedFiles: File[] = [];
 
-      // 최대 장수 제한 (10장으로 상향)
-      if (formData.photos.length + files.length > 10) {
-        showToast('사진은 최대 10장까지 업로드 가능합니다.', 'error');
-        return;
+    for (const file of files) {
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        showToast(validation.message || '이미지 형식이 올바르지 않습니다.', 'error');
+        continue;
       }
 
-      const newUrls: string[] = [];
-      const newFiles: File[] = [];
-
-      for (const file of files) {
-        const validation = validateImage(file);
-        if (!validation.valid) {
-          showToast(validation.message || '이미지 형식이 올바르지 않습니다.', 'error');
-          continue;
-        }
-
-        try {
-          // ✅ 이미지 압축 및 리사이징 적용 (최대 1MB, 1280px)
-          const compressedFile = await compressImage(file);
-          const url = URL.createObjectURL(compressedFile);
-          newUrls.push(url);
-          newFiles.push(compressedFile);
-        } catch (err) {
-          console.error('Compression error:', err);
-          showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
-        }
-      }
-
-      if (newUrls.length > 0) {
-        updateData('photos', [...formData.photos, ...newUrls]);
-        setImageFiles(prev => [...prev, ...newFiles]);
+      try {
+        const compressedFile = await compressImage(file);
+        previewUrls.push(URL.createObjectURL(compressedFile));
+        processedFiles.push(compressedFile);
+      } catch (err) {
+        console.error('Compression error:', err);
+        showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
       }
     }
+
+    return { previewUrls, processedFiles };
   };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+
+    const files = Array.from(e.target.files);
+
+    if (formData.photos.length + files.length > MAX_EXPERIENCE_PHOTOS) {
+      showToast(`대표 사진은 최대 ${MAX_EXPERIENCE_PHOTOS}장까지 업로드 가능합니다.`, 'error');
+      return;
+    }
+
+    const { previewUrls, processedFiles } = await buildPreviewFiles(files);
+
+    if (previewUrls.length > 0) {
+      updateData('photos', [...formData.photos, ...previewUrls]);
+      setImageFiles((prev) => [...prev, ...processedFiles]);
+    }
+
+    e.target.value = '';
+  };
+
+  const handleItineraryImageUpload = async (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const { previewUrls, processedFiles } = await buildPreviewFiles([e.target.files[0]]);
+    if (previewUrls.length === 0 || processedFiles.length === 0) return;
+
+    const newItinerary = [...(formData.itinerary as ItineraryItem[])];
+    newItinerary[index] = {
+      ...newItinerary[index],
+      image_url: previewUrls[0],
+    };
+    updateData('itinerary', newItinerary);
+
+    setItineraryImageFiles((prev) => {
+      const next = [...prev];
+      next[index] = processedFiles[0];
+      return next;
+    });
+
+    e.target.value = '';
+  };
+
+  const handleRemoveItineraryImage = (index: number) => {
+    const newItinerary = [...(formData.itinerary as ItineraryItem[])];
+    newItinerary[index] = {
+      ...newItinerary[index],
+      image_url: '',
+    };
+    updateData('itinerary', newItinerary);
+
+    setItineraryImageFiles((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+  };
+
+  const uploadImageToStorage = async (userId: string, file: File, folder: 'hero' | 'itinerary') => {
+    const safeName = sanitizeFileName(file.name);
+    const fileName = `experience/${userId}/${folder}/${Date.now()}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage.from('experiences').upload(fileName, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from('experiences').getPublicUrl(fileName);
+    return data.publicUrl;
+  };
+
   // 🚀 최종 제출 함수 수정 (파일명 최적화 및 버킷 명칭 확인)
   const handleSubmit = async () => {
     if (!validateCurrentStep(TOTAL_STEPS - 1)) return;
@@ -207,24 +296,29 @@ export default function CreateExperiencePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요합니다.');
 
-      const photoUrls = [];
+      const photoUrls: string[] = [];
       for (const file of imageFiles) {
-        // ✅ [추가] 파일명 최적화 (유저ID_타임스탬프_안전한파일명)
-        const safeName = sanitizeFileName(file.name);
-        const fileName = `experience/${user.id}/${Date.now()}_${safeName}`;
-
-        // SQL에서 설정한 버킷 이름 'experiences' 또는 'images' 중 실제 사용하시는 것으로 맞춰주세요.
-        const { error: uploadError } = await supabase.storage.from('experiences').upload(fileName, file);
-
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          showToast('사진 업로드에 실패했어요. 용량·형식을 확인해주세요.', 'error');
-          continue;
-        }
-
-        const { data } = supabase.storage.from('experiences').getPublicUrl(fileName);
-        photoUrls.push(data.publicUrl);
+        const publicUrl = await uploadImageToStorage(user.id, file, 'hero');
+        photoUrls.push(publicUrl);
       }
+
+      const itineraryWithPhotos = await Promise.all(
+        (formData.itinerary as ItineraryItem[]).map(async (item, index) => {
+          const itineraryFile = itineraryImageFiles[index];
+          let imageUrl = '';
+
+          if (itineraryFile) {
+            imageUrl = await uploadImageToStorage(user.id, itineraryFile, 'itinerary');
+          } else if (item.image_url && !item.image_url.startsWith('blob:')) {
+            imageUrl = item.image_url;
+          }
+
+          return {
+            ...item,
+            image_url: imageUrl,
+          };
+        })
+      );
 
       const { error } = await supabase.from('experiences').insert([
         {
@@ -237,15 +331,19 @@ export default function CreateExperiencePage() {
           duration: formData.duration,
           max_guests: formData.maxGuests,
           description: formData.description,
-          itinerary: formData.itinerary,
-          spots: formData.itinerary.map(i => i.title).join(' -> '),
-          meeting_point: formData.meeting_point || formData.itinerary[0]?.title || '',
+          itinerary: itineraryWithPhotos,
+          spots: itineraryWithPhotos.map((i) => i.title).join(' -> '),
+          meeting_point: formData.meeting_point || itineraryWithPhotos[0]?.title || '',
+          location: formData.location,
           photos: photoUrls,
           price: formData.price,
           inclusions: formData.inclusions,
-          exclusions: formData.exclusions,
+          exclusions: [],
           supplies: formData.supplies,
-          rules: formData.rules,
+          rules: {
+            ...formData.rules,
+            refund_policy: FIXED_REFUND_POLICY,
+          },
           status: 'pending',
           is_private_enabled: formData.is_private_enabled,
           private_price: formData.private_price
@@ -258,9 +356,10 @@ export default function CreateExperiencePage() {
       showToast('체험이 성공적으로 등록되었습니다! 🎉', 'success');
       router.push('/host/dashboard?tab=experiences'); // 내 체험 관리 탭으로 이동
 
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
       console.error(error);
-      showToast('등록 실패: ' + error.message, 'error'); // 🟢 에러도 토스트로 표시
+      showToast('등록 실패: ' + message, 'error'); // 🟢 에러도 토스트로 표시
     } finally {
       setLoading(false);
     }
@@ -293,12 +392,12 @@ export default function CreateExperiencePage() {
           addItineraryItem={addItineraryItem}
           removeItineraryItem={removeItineraryItem}
           updateItineraryItem={updateItineraryItem}
+          handleItineraryImageUpload={handleItineraryImageUpload}
+          handleRemoveItineraryImage={handleRemoveItineraryImage}
           isCustomCity={isCustomCity}
           setIsCustomCity={setIsCustomCity}
           tempInclusion={tempInclusion}
           setTempInclusion={setTempInclusion}
-          tempExclusion={tempExclusion}
-          setTempExclusion={setTempExclusion}
         />
       </main>
 
