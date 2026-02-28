@@ -31,7 +31,7 @@ export default function ExpMainContent({
   const mapQuery = addressLine || meetingPoint || String(experience.city || 'Seoul');
   const copyTarget = addressLine || meetingPoint || mapQuery;
   const itinerary: ExperienceItineraryItem[] = Array.isArray(experience.itinerary) ? experience.itinerary : [];
-  const photos = Array.isArray(experience.photos) && experience.photos.length > 0
+  const heroPhotos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
   const mapLanguageLabel = (language: string) => {
@@ -62,9 +62,7 @@ export default function ExpMainContent({
   };
 
   const openHostMessage = () => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setIsMessageModalOpen(true);
-    }
+    setIsMessageModalOpen(true);
   };
 
   const handleSubmitMessage = async () => {
@@ -82,17 +80,17 @@ export default function ExpMainContent({
         <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-5">체험 내용</h3>
         <div className="space-y-4">
           {itinerary.length > 0 ? itinerary.map((item, idx: number) => {
-            const imageSrc = item?.image_url || photos[idx % photos.length];
+            const imageSrc = item?.image_url || heroPhotos[idx % heroPhotos.length];
             return (
-              <div key={`${item?.title || 'step'}-${idx}`} className="flex items-start gap-3 md:gap-5">
+              <div key={`${item?.title || 'step'}-${idx}`} className="flex items-center gap-3 md:gap-5">
                 <div className="w-[72px] h-[72px] md:w-[100px] md:h-[100px] rounded-[14px] md:rounded-[20px] overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
                   <div className="relative w-full h-full">
                     <Image src={imageSrc} fill className="object-cover" alt={item?.title || `itinerary-${idx + 1}`} />
                   </div>
                 </div>
-                <div className="pt-0.5">
-                  <h4 className="text-[13px] md:text-[17px] font-medium leading-[1.3] mb-1">{item?.title || `코스 ${idx + 1}`}</h4>
-                  <p className="text-[12px] md:text-[14px] leading-[1.35] text-slate-500 whitespace-pre-wrap">{item?.description || ''}</p>
+                <div className="min-h-[72px] md:min-h-[100px] flex-1 flex flex-col justify-center overflow-hidden">
+                  <h4 className="text-[12px] md:text-[15px] font-medium leading-[1.3] mb-1">{item?.title || `코스 ${idx + 1}`}</h4>
+                  <p className="text-[11px] md:text-[13px] leading-[1.45] text-slate-500 whitespace-pre-wrap line-clamp-4">{item?.description || ''}</p>
                 </div>
               </div>
             );
@@ -158,6 +156,7 @@ export default function ExpMainContent({
         dreamDestination={hostProfile?.dream_destination || "여행"}
         favoriteSong={hostProfile?.favorite_song || "음악"}
         languages={hostProfile?.languages || []}
+        languageLevel={hostProfile?.language_level}
         intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."}
         joinedYear={hostProfile?.joined_year}
         category={translatedCategory || experience.category || '문화 체험'}
@@ -214,9 +213,9 @@ export default function ExpMainContent({
       </div>
 
       {isMessageModalOpen && (
-        <div className="md:hidden fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end" onClick={() => setIsMessageModalOpen(false)}>
+        <div className="fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end md:items-center md:justify-center md:p-4" onClick={() => setIsMessageModalOpen(false)}>
           <div
-            className="w-full h-[88dvh] bg-[#fcfcfc] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col"
+            className="w-full h-[88dvh] bg-[#fcfcfc] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col md:h-auto md:max-h-[78dvh] md:max-w-[560px] md:rounded-[28px] md:px-7 md:pt-6 md:pb-6 md:shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-end mb-1">
@@ -227,8 +226,8 @@ export default function ExpMainContent({
                 </svg>
               </button>
             </div>
-            <h3 className="text-[19px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{hostProfile?.name || '호스트'}님에게 질문하기</h3>
-            <p className="text-[11px] text-slate-500 leading-snug mb-4">
+            <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{hostProfile?.name || '호스트'}님에게 질문하기</h3>
+            <p className="text-[11px] md:text-[13px] text-slate-500 leading-snug md:leading-relaxed mb-4 md:mb-5">
               이 체험에 대해 자세히 알아보려면 호스트에게
               <span className="underline underline-offset-2 ml-1">메시지를 보내세요.</span>
             </p>
@@ -236,13 +235,13 @@ export default function ExpMainContent({
               value={inquiryText}
               onChange={(e) => setInquiryText(e.target.value)}
               placeholder="호스트에게 본인을 소개해 보세요."
-              className="w-full h-[122px] rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[12px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
+              className="w-full h-[122px] md:h-[170px] rounded-2xl border border-slate-300 bg-white px-4 py-3 md:px-5 md:py-4 text-[12px] md:text-[14px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
             />
-            <div className="mt-auto">
+            <div className="mt-auto md:mt-5">
               <button
                 onClick={handleSubmitMessage}
                 disabled={!inquiryText.trim() || isSubmittingMessage}
-                className={`w-full rounded-2xl py-3 text-[13px] font-medium ${
+                className={`w-full rounded-2xl py-3 md:py-3.5 text-[13px] md:text-[15px] font-medium ${
                   !inquiryText.trim() || isSubmittingMessage
                     ? 'bg-slate-300 text-slate-50'
                     : 'bg-[#111827] text-white'

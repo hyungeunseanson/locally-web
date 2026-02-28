@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Star } from 'lucide-react';
+import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Star, Globe } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
@@ -66,6 +66,31 @@ export default function ExperienceClient({
   const compactLocation = experience.city?.trim() || meetingPoint?.split(',')?.[0]?.trim() || 'Locally';
   const headerLabel = `${compactLocation} · ${category}`;
   const addressLine = experience.location || experience.city || compactLocation;
+  const hostJob = hostProfile?.job?.trim() || '로컬리 호스트';
+  const formatLanguageLevel = (level?: number | null) => {
+    switch (level) {
+      case 1:
+        return 'Lv.1 기초 단계';
+      case 2:
+        return 'Lv.2 초급 회화';
+      case 3:
+        return 'Lv.3 일상 회화';
+      case 4:
+        return 'Lv.4 비즈니스 회화';
+      case 5:
+        return 'Lv.5 원어민 수준';
+      default:
+        return '';
+    }
+  };
+  const hostLanguages = Array.isArray(hostProfile?.languages)
+    ? Array.from(new Set(hostProfile.languages.map((language) => String(language).trim()).filter(Boolean)))
+    : [];
+  const hostLanguageLevel = formatLanguageLevel(hostProfile?.language_level);
+  const hostLanguageSummary = [
+    hostLanguages.length > 0 ? hostLanguages.join(', ') : '',
+    hostLanguageLevel
+  ].filter(Boolean).join(' · ');
   const ratingValue = Number(experience.rating || 0);
   const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : 'New';
   const reviewCount = Number(experience.review_count || 0);
@@ -140,9 +165,15 @@ export default function ExperienceClient({
 
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
 
-  const photos = experience.photos && experience.photos.length > 0
+  const heroPhotos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
+  const itineraryPhotos = Array.isArray(experience.itinerary)
+    ? experience.itinerary
+      .map((item) => String(item?.image_url || '').trim())
+      .filter(Boolean)
+    : [];
+  const photos = Array.from(new Set([...heroPhotos, ...itineraryPhotos]));
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-0">
@@ -203,7 +234,18 @@ export default function ExperienceClient({
 
         <section className="hidden md:block mb-12">
           <div className="max-w-3xl">
-            <h1 className="text-[40px] leading-[1.15] font-black tracking-tight text-slate-900">{translatedTitle}</h1>
+            <div className="flex items-start justify-between gap-6">
+              <h1 className="text-[40px] leading-[1.15] font-black tracking-tight text-slate-900">{translatedTitle}</h1>
+              <div className="flex shrink-0 gap-2 pt-1">
+                <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
+                  <Share size={16} /> 공유하기
+                </button>
+                <button onClick={toggleWishlist} disabled={isSaveLoading} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
+                  <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
+                  {isSaved ? '저장됨' : '저장'}
+                </button>
+              </div>
+            </div>
             <p className="mt-4 text-[16px] leading-[1.65] text-slate-500 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
 
             <div className="mt-5 flex flex-wrap items-center gap-3 text-sm font-medium text-slate-800">
@@ -211,19 +253,8 @@ export default function ExperienceClient({
                 <span className="font-bold">★ {ratingText}</span>
                 {reviewCount > 0 && <span className="text-slate-500 underline">후기 {reviewCount}개</span>}
               </button>
-              <span className="text-slate-300">·</span>
-              <span className="text-slate-500">{headerLabel}</span>
             </div>
-
-            <div className="mt-5 flex gap-2">
-              <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
-                <Share size={16} /> 공유하기
-              </button>
-              <button onClick={toggleWishlist} disabled={isSaveLoading} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
-                <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
-                {isSaved ? '저장됨' : '저장'}
-              </button>
-            </div>
+            <p className="mt-3 text-[15px] text-slate-500">{headerLabel}</p>
           </div>
 
           <div className="mt-8 border-t border-slate-200 pt-6">
@@ -239,7 +270,13 @@ export default function ExperienceClient({
               </div>
               <div className="min-w-0">
                 <p className="text-[18px] font-semibold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
-                <p className="text-[15px] text-slate-500 truncate">{hostProfile?.job || category}</p>
+                <p className="text-[15px] text-slate-500 truncate">{hostJob}</p>
+                {hostLanguageSummary && (
+                  <p className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 truncate">
+                    <Globe size={13} className="shrink-0" />
+                    <span className="truncate">{hostLanguageSummary}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -306,7 +343,13 @@ export default function ExperienceClient({
               </div>
               <div className="min-w-0">
                 <p className="text-[13px] font-medium truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
-                <p className="text-[12px] text-slate-500 truncate">{hostProfile?.job || category}</p>
+                <p className="text-[12px] text-slate-500 truncate">{hostJob}</p>
+                {hostLanguageSummary && (
+                  <p className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400 truncate">
+                    <Globe size={10} className="shrink-0" />
+                    <span className="truncate">{hostLanguageSummary}</span>
+                  </p>
+                )}
               </div>
             </div>
 

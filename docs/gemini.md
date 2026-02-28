@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-28 (P0 Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
-**Version:** 3.2.37 (P0 Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Last Updated:** 2026-02-28 (P0 Experience Detail Gallery/Host Meta/Inquiry Modal Sync + Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Version:** 3.2.38 (P0 Experience Detail Gallery/Host Meta/Inquiry Modal Sync + Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -180,6 +180,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 호스트 체험 등록/수정 동기화(P0): 대표 사진은 `photos` 최대 5장으로 고정하고, 생성·수정 화면 모두 `meeting_point=만나는 장소명`, `location=정확한 주소`, `itinerary[].image_url=동선별 사진 1장` 구조로 정렬했으며 `불포함 사항` 입력은 제거
 - 체험 상세 상단 정보 재정렬(P0): `/experiences/[id]` 상단 라벨을 `city · category` 기준으로 전환하고, 데스크탑 사진 아래 요약 블록을 모바일 정보 계층(제목/소개/평점/도시·카테고리/호스트/만나는 장소) 기준으로 재구성해 중복 헤더를 제거
 - 체험 상세 정보 기준 통일(P0): 언어 안내는 `experience.languages` 우선으로 표기하고 팁형 아이콘 안내행으로 정리했으며, 만나는 장소는 `meeting_point` 1행 + `location` 2행으로 분리, 데스크탑 별도 `호스트에게 문의하기` 입력 박스와 `접근성` 섹션은 제거하고 환불 정책은 `표준 정책 (7일 전 무료 취소)` 고정 문구로 통일
+- 체험 상세 갤러리 확장(P0): 상세 상단 대표 갤러리와 `사진 모두 보기`는 `photos`뿐 아니라 `itinerary[].image_url`도 합쳐서 노출해 동선별 사진이 상단 사진 세트에 함께 포함되도록 정렬
+- 체험 상세 호스트 메타 보강(P0): 데스크탑 요약 블록의 `공유하기/저장`을 제목 우측으로 이동하고, 평점/후기 아래에 `지역 · 카테고리`를 분리 배치했으며, 호스트 보조 텍스트는 카테고리 fallback 대신 `직업` 우선으로 고정하고 `구사 언어 + 언어 숙련도(Lv.1~5)`를 얇은 보조 라인으로 추가
+- 체험 상세 문의/동선 UI 후속(P0): 동선 카드 텍스트는 사진 높이 안에서 중앙 정렬되도록 밀도를 줄였고, 데스크탑 `~님에게 메시지 보내기` 버튼도 모바일과 동일한 메시지 모달을 열도록 통합
 - 체험 상세 안정화 v2(예약 원자화): `create_booking_atomic` DB 함수 + 슬롯 advisory lock + 활성 프라이빗 부분 유니크 인덱스를 추가하고, `POST /api/bookings` 내부를 `select→insert`에서 RPC 단일 경로로 전환해 동시 요청 시 좌석 검증/삽입을 원자적으로 보장
 - 체험 상세 안정화 v2(문의 인증): `useChat.createInquiry`/`sendMessage`에서 `currentUser` 지연 상태 의존을 제거하고 호출 시점 `auth.getUser()` 기반으로 사용자 식별을 확정해 상세 진입 직후 문의 전송 실패 오탐을 완화
 - 체험 상세 안정화 v2(모바일 에러 UX): 상세 결제 흐름의 `alert`를 제거하고 토스트 + 인라인 에러 블록으로 통일, 실패 시 강제 뒤로가기 없이 현재 화면에서 재시도 가능한 상태로 유지

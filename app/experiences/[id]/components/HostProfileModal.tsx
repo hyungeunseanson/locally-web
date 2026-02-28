@@ -14,6 +14,7 @@ type HostModalData = {
   dreamDestination?: string;
   favoriteSong?: string;
   languages?: string[];
+  languageLevel?: number | null;
   intro?: string;
   onContactHost?: () => void;
 };
@@ -26,6 +27,22 @@ type HostProfileModalProps = {
 
 export default function HostProfileModal({ isOpen, onClose, host }: HostProfileModalProps) {
   if (!isOpen) return null;
+  const languageLevelLabel = (() => {
+    switch (host.languageLevel) {
+      case 1:
+        return 'Lv.1 기초 단계';
+      case 2:
+        return 'Lv.2 초급 회화';
+      case 3:
+        return 'Lv.3 일상 회화';
+      case 4:
+        return 'Lv.4 비즈니스 회화';
+      case 5:
+        return 'Lv.5 원어민 수준';
+      default:
+        return '';
+    }
+  })();
 
   const handleContactHost = () => {
     onClose();
@@ -131,7 +148,10 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
               {!!host.languages?.length && (
                 <div className="flex items-start gap-3">
                   <MessageCircle className="text-slate-400 mt-0.5" size={18} />
-                  <div className="text-[13px] md:text-sm">구사 언어: <span className="font-bold text-slate-900">{host.languages.join(', ')}</span></div>
+                  <div className="text-[13px] md:text-sm">
+                    구사 언어: <span className="font-bold text-slate-900">{host.languages.join(', ')}</span>
+                    {languageLevelLabel ? <span className="text-slate-500 font-medium"> · {languageLevelLabel}</span> : null}
+                  </div>
                 </div>
               )}
             </div>

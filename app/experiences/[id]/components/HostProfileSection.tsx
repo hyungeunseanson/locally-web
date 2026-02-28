@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { User } from 'lucide-react';
+import { User, Globe } from 'lucide-react';
 import HostProfileModal from './HostProfileModal';
 
 interface HostProfileProps {
@@ -13,6 +13,7 @@ interface HostProfileProps {
   dreamDestination?: string;
   favoriteSong?: string;
   languages?: string[];
+  languageLevel?: number | null;
   intro?: string;
   joinedYear?: number | null;
   category?: string;
@@ -21,6 +22,28 @@ interface HostProfileProps {
 
 export default function HostProfileSection(props: HostProfileProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const languageLevelLabel = (() => {
+    switch (props.languageLevel) {
+      case 1:
+        return 'Lv.1 기초 단계';
+      case 2:
+        return 'Lv.2 초급 회화';
+      case 3:
+        return 'Lv.3 일상 회화';
+      case 4:
+        return 'Lv.4 비즈니스 회화';
+      case 5:
+        return 'Lv.5 원어민 수준';
+      default:
+        return '';
+    }
+  })();
+  const languageLine = [
+    Array.isArray(props.languages) && props.languages.length > 0
+      ? Array.from(new Set(props.languages.map((language) => String(language).trim()).filter(Boolean))).join(', ')
+      : '',
+    languageLevelLabel
+  ].filter(Boolean).join(' · ');
 
   return (
     <>
@@ -40,7 +63,13 @@ export default function HostProfileSection(props: HostProfileProps) {
             )}
           </div>
           <h4 className="text-[18px] md:text-[34px] font-semibold leading-none mb-1.5 md:mb-2">{props.name}</h4>
-          <p className="text-[11px] md:text-[14px] text-slate-500 font-normal">{props.job || props.category || '로컬리 호스트'}</p>
+          <p className="text-[11px] md:text-[14px] text-slate-500 font-normal">{props.job || '로컬리 호스트'}</p>
+          {languageLine && (
+            <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[10px] md:text-[12px] text-slate-500 border border-slate-200">
+              <Globe size={12} className="shrink-0 md:w-[13px] md:h-[13px]" />
+              <span className="truncate">{languageLine}</span>
+            </div>
+          )}
         </button>
 
         <p className="text-[11px] md:text-[15px] leading-[1.45] md:leading-[1.5] text-slate-700 mt-4 md:mt-5 whitespace-pre-wrap">

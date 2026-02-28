@@ -42,6 +42,7 @@ export type HostProfileDetail = {
   name?: string;
   avatar_url?: string;
   languages?: string[];
+  language_level?: number | null;
   introduction?: string;
   job?: string;
   dream_destination?: string;
