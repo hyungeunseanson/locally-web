@@ -3,20 +3,58 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat';
+import { isAdminSupportInquiry } from '@/app/utils/inquiry';
+
+type MonitorGuest = {
+  full_name?: string | null;
+  name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  phone?: string | null;
+};
+
+type MonitorInquiry = {
+  id: number | string;
+  type?: string | null;
+  guest?: MonitorGuest;
+  host?: { name?: string | null; avatar_url?: string | null };
+  experiences?: { title?: string | null } | null;
+  user_id: string;
+  updated_at?: string | null;
+  content?: string | null;
+};
+
+type MonitorMessage = {
+  id: number | string;
+  sender_id: string;
+  content: string;
+  sender?: { name?: string | null };
+};
+
+type AdminChatState = {
+  inquiries: MonitorInquiry[];
+  selectedInquiry: MonitorInquiry | null;
+  messages: MonitorMessage[];
+  loadMessages: (inquiryId: number | string) => void;
+  clearSelected: () => void;
+  sendMessage: (inquiryId: number | string, content: string) => void;
+  refresh: () => void;
+  isLoading: boolean;
+  error?: string;
+};
 
 export default function ChatMonitor() {
   const {
     inquiries,
     selectedInquiry,
     messages,
-    currentUser,
     loadMessages,
     clearSelected,
     sendMessage,
     refresh,
     isLoading,
     error
-  } = useChat('admin') as unknown as any;
+  } = useChat('admin') as unknown as AdminChatState;
 
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
   const [replyText, setReplyText] = useState('');
@@ -33,20 +71,20 @@ export default function ChatMonitor() {
     }
   };
 
-  const getGuestName = (guest: any) => {
+  const getGuestName = (guest?: MonitorGuest) => {
     if (!guest) return '알 수 없는 사용자';
     return guest.full_name || guest.name || guest.email || '익명 고객';
   };
 
-  const filteredInquiries = (inquiries || []).filter((inq: any) => {
-    if (activeTab === 'monitor') return inq.type !== 'admin';
-    return inq.type === 'admin';
+  const filteredInquiries = (inquiries || []).filter((inq) => {
+    if (activeTab === 'monitor') return !isAdminSupportInquiry(inq.type);
+    return isAdminSupportInquiry(inq.type);
   });
 
   // --- Keyword Detection Logic ---
   const RESTRICTED_KEYWORDS = ['전화번호', '번호', '연락처', '010', '카톡', '계좌', '입금', '송금', '오픈채팅'];
 
-  const detectWarning = (msgs: any[]) => {
+  const detectWarning = (msgs: MonitorMessage[]) => {
     if (activeTab === 'admin') return false; // Only warn in monitor mode
     return msgs.some(m => RESTRICTED_KEYWORDS.some(k => m.content?.includes(k)));
   };
@@ -67,6 +105,7 @@ export default function ChatMonitor() {
     });
   };
 
+  const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
   const hasWarning = selectedInquiry ? detectWarning(messages) : false;
 
   return (
@@ -120,7 +159,7 @@ export default function ChatMonitor() {
               <button onClick={refresh} className="text-[10px] md:text-xs text-blue-600 underline mt-1 md:mt-2">새로고침</button>
             </div>
           ) : (
-            filteredInquiries.map((inq: any) => (
+            filteredInquiries.map((inq) => (
               <div
                 key={inq.id}
                 onClick={() => loadMessages(inq.id)}
@@ -171,7 +210,7 @@ export default function ChatMonitor() {
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <div className="font-bold text-xs md:text-lg text-slate-900 flex items-center gap-1 md:gap-2 truncate">
                     <span className="truncate">{getGuestName(selectedInquiry.guest)}</span>
-                    {selectedInquiry.type === 'admin' ? (
+                    {selectedIsAdminSupport ? (
                       <span className="text-[7px] md:text-[10px] bg-green-100 text-green-700 px-1 md:px-2 py-0.5 rounded-full font-bold border border-green-200 shrink-0">1:1 문의</span>
                     ) : (
                       <span className="text-[7px] md:text-[10px] bg-blue-100 text-blue-700 px-1 md:px-2 py-0.5 rounded-full font-bold border border-blue-200 shrink-0">일반 유저</span>
@@ -181,10 +220,10 @@ export default function ChatMonitor() {
                     {selectedInquiry.guest?.email || '이메일 정보 없음'} {selectedInquiry.guest?.phone ? ` | ${selectedInquiry.guest.phone}` : ''}
                   </div>
                   <div className="text-[8px] md:text-[11px] text-slate-400 flex items-center gap-1 mt-0 md:mt-0.5 truncate leading-none">
-                    {selectedInquiry.type === 'admin' ? (
+                    {selectedIsAdminSupport ? (
                       <span className="text-emerald-600 font-medium whitespace-nowrap">💬 관리자 직통 상담 중</span>
                     ) : (
-                      <span className="truncate">호스트: <span className="font-bold text-slate-700 bg-slate-100 px-1 py-0 md:px-1.5 md:py-0.5 rounded">{selectedInquiry.host?.full_name || '알수없음'}</span> 님과의 대화 모니터링</span>
+                      <span className="truncate">호스트: <span className="font-bold text-slate-700 bg-slate-100 px-1 py-0 md:px-1.5 md:py-0.5 rounded">{selectedInquiry.host?.name || '알수없음'}</span> 님과의 대화 모니터링</span>
                     )}
                   </div>
                 </div>
@@ -201,14 +240,14 @@ export default function ChatMonitor() {
                 </div>
               )}
 
-              {messages.map((msg: any) => {
+              {messages.map((msg) => {
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest;
 
                 return (
                   <div key={msg.id} className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}>
                     <span className="text-[9px] md:text-[10px] text-slate-400 mb-0.5 md:mb-1 px-1">
-                      {msg.sender?.full_name || '알 수 없음'}
+                      {msg.sender?.name || '알 수 없음'}
                     </span>
                     <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed ${alignRight ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
                       {renderMessageContent(msg.content)}

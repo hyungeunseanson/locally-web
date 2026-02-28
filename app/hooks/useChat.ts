@@ -7,6 +7,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { sendNotification } from '@/app/utils/notification';
 import { sanitizeText } from '@/app/utils/sanitize';
 import { compressImage, sanitizeFileName } from '@/app/utils/image';
+import { InquiryType, isAdminSupportInquiry } from '@/app/utils/inquiry';
 
 type ProfileRow = {
   id: string;
@@ -32,9 +33,9 @@ type InquiryExperience = {
 type InquiryRow = {
   id: number | string;
   user_id: string;
-  host_id: string;
+  host_id: string | null;
   experience_id?: string | number | null;
-  type?: string;
+  type?: InquiryType | string | null;
   content?: string;
   updated_at?: string | null;
   experiences?: InquiryExperience | null;
@@ -50,7 +51,7 @@ type InquiryListItem = InquiryRow & {
     email?: string | null;
   };
   host?: {
-    id: string;
+    id: string | null;
     name: string;
     avatar_url: string | null;
   };
@@ -335,13 +336,15 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       const currentInquiry = inquiries.find((i) => i.id === inquiryId);
       if (currentInquiry) {
-        const recipientId = actorId === currentInquiry.host_id
-          ? currentInquiry.user_id
-          : currentInquiry.host_id;
+        const isAdminInquiry = isAdminSupportInquiry(currentInquiry.type);
+        const actorIsHost = !!currentInquiry.host_id && actorId === currentInquiry.host_id;
+        const recipientId = isAdminInquiry
+          ? (role === 'admin' ? currentInquiry.user_id : currentInquiry.host_id)
+          : (actorIsHost ? currentInquiry.user_id : currentInquiry.host_id);
 
-        const targetLink = actorId === currentInquiry.host_id
-          ? '/guest/inbox'
-          : '/host/dashboard?tab=inquiries';
+        const targetLink = isAdminInquiry
+          ? (role === 'admin' ? '/guest/inbox' : '/host/dashboard?tab=inquiries')
+          : (actorIsHost ? '/guest/inbox' : '/host/dashboard?tab=inquiries');
 
         const senderName =
           ((currentUser?.user_metadata as { full_name?: string } | undefined)?.full_name) ||
@@ -350,15 +353,17 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
         const numericInquiryId = typeof inquiryId === 'number' ? inquiryId : Number(inquiryId);
 
-        await sendNotification({
-          recipient_id: recipientId,
-          senderId: actorId,
-          type: 'new_message',
-          title: `💬 ${senderName}님의 새 메시지`,
-          message: displayContent,
-          link: targetLink,
-          inquiry_id: Number.isFinite(numericInquiryId) ? numericInquiryId : undefined
-        });
+        if (recipientId) {
+          await sendNotification({
+            recipient_id: recipientId,
+            senderId: actorId,
+            type: 'new_message',
+            title: `💬 ${senderName}님의 새 메시지`,
+            message: displayContent,
+            link: targetLink,
+            inquiry_id: Number.isFinite(numericInquiryId) ? numericInquiryId : undefined
+          });
+        }
       }
 
     } catch (err: unknown) {
