@@ -12,6 +12,8 @@ import MobileProfileView from '@/app/components/mobile/MobileProfileView';
 import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
+import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
+import { getProfileCompletion, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 type GuestReview = {
@@ -74,6 +76,10 @@ export default function AccountPage() {
     job: '',
     school: ''
   });
+  const profileCompletion = getProfileCompletion(profile, 'guest');
+  const profileMissingLabels = profileCompletion.missingFields
+    .slice(0, 5)
+    .map((field) => PROFILE_COMPLETION_FIELD_LABELS[field]);
 
   // 국가 리스트 & 국가번호 매핑
   const countries = [
@@ -292,6 +298,7 @@ export default function AccountPage() {
       avatar_url: profile.avatar_url,
       languages: profile.languages, // 🟢 [추가] 저장 시 포함
       job: profile.job,
+      school: profile.school,
       updated_at: new Date().toISOString(),
     };
 
@@ -311,11 +318,34 @@ export default function AccountPage() {
     let error: { message: string } | null = null;
 
     if (!existingProfile) {
-      const insertRes = await supabase.from('profiles').upsert({
+      const seedRes = await supabase.from('profiles').upsert({
         id: user.id,
-        ...updates,
+        updated_at: updates.updated_at,
       });
-      error = insertRes.error;
+      if (seedRes.error) {
+        error = seedRes.error;
+      } else {
+        const { data: seededProfile, error: seedLoadError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (seedLoadError || !seededProfile) {
+          error = { message: seedLoadError?.message || '프로필 시드 생성 후 조회에 실패했습니다.' };
+        } else {
+          const allowedColumns = new Set(Object.keys(seededProfile));
+          const filteredUpdates = Object.fromEntries(
+            Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+          );
+
+          const updateRes = await supabase
+            .from('profiles')
+            .update(filteredUpdates)
+            .eq('id', user.id);
+          error = updateRes.error;
+        }
+      }
     } else {
       const allowedColumns = new Set(Object.keys(existingProfile));
       const filteredUpdates = Object.fromEntries(
@@ -392,8 +422,13 @@ export default function AccountPage() {
         {/* ── 프로필 카드 (이미지 3) ── */}
         <button
           onClick={() => setShowProfileView(true)}
-          className="mx-4 mb-4 w-[calc(100%-32px)] bg-white border border-gray-100 rounded-xl md:rounded-2xl shadow-sm p-4 flex items-end gap-4 text-left active:scale-[0.98] transition-transform"
+          className="relative mx-4 mb-4 w-[calc(100%-32px)] bg-white border border-gray-100 rounded-xl md:rounded-2xl shadow-sm p-4 flex items-end gap-4 text-left active:scale-[0.98] transition-transform"
         >
+          {profileCompletion.percent < 100 && (
+            <span className="absolute right-4 top-4 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
+              {profileCompletion.percent}% 완료
+            </span>
+          )}
           {/* 좌측: 아바타 + 인증 배지 + 이름/도시 */}
           <div className="flex flex-col items-center shrink-0">
             <div className="relative mb-2">
@@ -596,6 +631,34 @@ export default function AccountPage() {
           {/* 오른쪽: 정보 수정 폼 */}
           <div className="flex-1 max-w-2xl">
             <div className="space-y-8 bg-white">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">프로필 완성도</p>
+                    <p className="mt-1 text-2xl font-black text-slate-900">{profileCompletion.percent}%</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {profileCompletion.missingFields.length === 0
+                        ? '게스트 공개 프로필이 모두 채워졌습니다.'
+                        : `${profileCompletion.missingFields.length}개 항목이 비어 있습니다. 예약 전 신뢰 형성과 대화 연결에 도움이 되는 정보입니다.`}
+                    </p>
+                  </div>
+                  {profileMissingLabels.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {profileMissingLabels.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  비어 있어도 저장은 가능하지만, 호스트가 예약 요청 전 먼저 확인하는 핵심 정보들입니다.
+                </p>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -789,6 +852,7 @@ export default function AccountPage() {
                     maxLength={4}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors uppercase"
                   />
+                  <p className="text-xs text-slate-400 mt-1">성향을 빠르게 파악할 수 있는 보조 정보입니다.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-2">{t('profile_job')}</label>
@@ -799,6 +863,7 @@ export default function AccountPage() {
                     placeholder={t('profile_job')}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
+                  <p className="text-xs text-slate-400 mt-1">호스트와 대화가 자연스럽게 이어지는 공통 화제를 만들어 줍니다.</p>
                 </div>
               </div>
 
@@ -812,13 +877,15 @@ export default function AccountPage() {
                     placeholder={t('profile_school')}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
+                  <p className="text-xs text-slate-400 mt-1">학생이거나 학교 정보가 있다면 신뢰 형성에 도움이 됩니다.</p>
                 </div>
                 {/* 🟢 [추가] 구사 가능한 언어 선택 */}
                 <div className="col-span-1 md:col-span-1">
                   <label className="block text-sm font-bold mb-2">{t('label_languages_spoken')}</label>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    {['English', 'Korean', 'Japanese', 'Chinese', 'Spanish', 'French'].map(lang => (
+                    {PROFILE_LANGUAGE_OPTIONS.map(lang => (
                       <button
+                        type="button"
                         key={lang}
                         onClick={() => {
                           const current = profile.languages || [];
@@ -859,6 +926,7 @@ export default function AccountPage() {
                   placeholder={t('ph_bio')}
                   className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors resize-none"
                 />
+                <p className="text-xs text-slate-400 mt-1">호스트가 예약 전 가장 먼저 보는 핵심 소개입니다. 여행 스타일과 기대를 짧게 적어두세요.</p>
               </div>
 
               <div className="pt-6 border-t border-slate-100 flex justify-end">

@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-28 (P0 Experience Detail Gallery/Host Meta/Inquiry Modal Sync + Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
-**Version:** 3.2.38 (P0 Experience Detail Gallery/Host Meta/Inquiry Modal Sync + Host Experience Create/Detail Sync + Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Last Updated:** 2026-02-28 (P0 Profile Consistency/Completion Nudge + Experience Host Modal Fact Guard + Profile Save Seed Guard + Reservation/Inquiry Profile Mapping Sync)  
+**Version:** 3.2.39 (P0 Profile Consistency/Completion Nudge + Experience Host Modal Fact Guard + Profile Save Seed Guard + Reservation/Inquiry Profile Mapping Sync)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -203,6 +203,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 위시리스트 즉시 공유(P0): `guest/wishlists` 카드 오버레이에 공유 버튼을 추가하고 `navigator.share` 우선, 미지원 브라우저는 클립보드 복사 fallback으로 통일
 - 프로필 저장 400 차단(P0): 게스트 `account`와 호스트 `ProfileEditor`의 기본 저장 경로를 `profiles` 현재 행 기준 컬럼 필터 `update`로 정리하고, 게스트 `account`는 행 미존재 시 유효 컬럼만 `upsert`하는 fallback을 추가
 - 프로필 스키마 정합성 400 차단(P0): 실DB `profiles`에 없는 `role/name/is_admin/school` 직접 쿼리를 런타임 경로에서 제거하고, 관리자/팀 알림은 `users.role` 및 `admin_whitelist` 기반으로 재배선했으며 모바일 프로필 저장은 실컬럼 필터 `update`, 행 미존재 시 유효 컬럼만 `upsert`하는 fallback으로 고정
+- 프로필 저장 시드 가드 보강(P0): 게스트 `account`, 모바일 `MobileProfileView`, 호스트 `ProfileEditor`는 `profiles` 행이 비어 있을 때 전체 payload 직접 `upsert` 대신 `id + updated_at` 최소 시드 생성 후 실제 컬럼 기준 필터 `update`로 재진입해 컬럼 차이(`school`, 레거시 필드)로 인한 최초 저장 400 위험을 줄임
+- 게스트 프로필 저장/유도 정합화(P0): 데스크탑 `account`와 모바일 `MobileProfileView` 모두 `school`, `mbti`, `languages` 저장 경로를 일치시켰고, 두 화면 모두 프로필 완성도 카드/잔여 항목 배지/핵심 필드 안내문을 추가해 비강제형 입력 유도를 고정
+- 호스트 프로필 공개 편집 정합화(P0): `ProfileEditor`의 `구사 언어`를 쉼표 문자열에서 공통 선택 칩으로 전환하고, 공개 프로필 완성도 카드와 언어/자기소개 안내문을 추가했으며, 데스크탑 호스트 대시보드 `프로필` 탭에는 미완성 시 퍼센트 배지를 유지
+- 호스트/게스트 프로필 모달 소스 정리(P0): `UserProfileModal`, `GuestProfileModal`, `ReservationManager`, 체험 상세 호스트 모달은 `profiles.bio / nationality / languages`와 `host_applications.self_intro / host_nationality` 우선순위를 일치시켜 잘못된 필드 참조와 기본값 추측 노출을 줄였고, 체험 상세 호스트 모달의 가짜 `슈퍼호스트/검증/0개 후기` 표시는 제거
 - 빌드 반영 주의(P0): 위 스키마 정합성 수정 전 생성된 `.next` 산출물에는 기존 `profiles.role`, `is_admin`, `profiles.school` 요청 코드가 그대로 남아 있으므로, 반영 확인 전에는 `.next` 정리 후 dev 서버 또는 프로덕션 빌드를 새로 생성해야 한다
 - Admin 삭제 인증 복원(P0): `/api/admin/delete`는 `Authorization` 헤더 토큰 파싱 대신 `@/app/utils/supabase/server`의 쿠키 기반 서버 클라이언트로 `auth.getUser()`를 복원하도록 수정했고, 권한 체크 직전 `auth user / users 조회 / whitelist 조회 / final isAdmin` 로그를 추가해 401·403 원인을 서버 로그에서 직접 추적할 수 있게 했다
 - 관리자 문의 분류 정합성(P0): `inquiries.type`의 레거시 `admin`과 현행 `admin_support`를 공통 헬퍼로 함께 관리자 1:1 문의로 판정하도록 통일했고, Admin `ChatMonitor`와 게스트 메시지함의 표시/뱃지/상대명 분기를 모두 같은 기준으로 맞췄으며, `ChatMonitor`의 `host.full_name` 오참조를 `host.name`으로 수정해 `호스트: 알수없음` 오표시를 제거했다

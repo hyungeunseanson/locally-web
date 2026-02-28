@@ -9,6 +9,8 @@ import {
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
+import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
+import { getProfileCompletion, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 
 type GuestReview = {
     id: string | number;
@@ -80,6 +82,10 @@ export default function MobileProfileView({
     const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 1 });
     const supabase = createClient();
     const { showToast } = useToast();
+    const completion = getProfileCompletion(isEditing ? editData : profile, 'guest');
+    const missingLabels = completion.missingFields
+        .slice(0, 4)
+        .map((field) => PROFILE_COMPLETION_FIELD_LABELS[field]);
 
     // 통계 데이터 fetch
     useEffect(() => {
@@ -138,8 +144,10 @@ export default function MobileProfileView({
             kakao_id: editData.kakao_id,
             email: editData.email,
             bio: editData.bio,
+            mbti: editData.mbti,
             languages: editData.languages,
             job: editData.job,
+            school: editData.school,
             updated_at: new Date().toISOString(),
         };
         const { data: existingProfile, error: loadError } = await supabase
@@ -157,8 +165,35 @@ export default function MobileProfileView({
         let error: { message: string } | null = null;
 
         if (!existingProfile) {
-            const insertRes = await supabase.from('profiles').upsert(updates);
-            error = insertRes.error;
+            const seedRes = await supabase.from('profiles').upsert({
+                id: userId,
+                updated_at: updates.updated_at,
+            });
+
+            if (seedRes.error) {
+                error = seedRes.error;
+            } else {
+                const { data: seededProfile, error: seedLoadError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                if (seedLoadError || !seededProfile) {
+                    error = { message: seedLoadError?.message || '프로필 시드 생성 후 조회에 실패했습니다.' };
+                } else {
+                    const allowedColumns = new Set(Object.keys(seededProfile));
+                    const filteredUpdates = Object.fromEntries(
+                        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+                    );
+
+                    const updateRes = await supabase
+                        .from('profiles')
+                        .update(filteredUpdates)
+                        .eq('id', userId);
+                    error = updateRes.error;
+                }
+            }
         } else {
             const allowedColumns = new Set(Object.keys(existingProfile));
             const filteredUpdates = Object.fromEntries(
@@ -268,6 +303,34 @@ export default function MobileProfileView({
                         <p className="text-[10px] text-gray-400 leading-none">Locally 가입 기간</p>
                         <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[11px] font-semibold">년</span></p>
                     </div>
+                </div>
+            </div>
+
+            <div className="mx-4 mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">프로필 완성도</p>
+                            <p className="mt-1 text-[20px] font-black text-slate-900">{completion.percent}%</p>
+                        </div>
+                        {missingLabels.length > 0 && (
+                            <div className="flex flex-wrap justify-end gap-1.5">
+                                {missingLabels.map((label) => (
+                                    <span
+                                        key={label}
+                                        className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700"
+                                    >
+                                        {label}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-slate-600">
+                        {completion.missingFields.length === 0
+                            ? '공개 프로필이 모두 채워졌습니다.'
+                            : `${completion.missingFields.length}개 항목이 비어 있습니다. 호스트가 예약 전 먼저 보는 정보입니다.`}
+                    </p>
                 </div>
             </div>
 
@@ -392,13 +455,16 @@ export default function MobileProfileView({
                 <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
                     <Star className="w-4 h-4 text-slate-500 shrink-0" />
                     {isEditing ? (
-                        <input
-                            value={editData.mbti || ''}
-                            onChange={e => setEditData(prev => ({ ...prev, mbti: e.target.value.toUpperCase() }))}
-                            placeholder="MBTI 입력"
-                            maxLength={4}
-                            className="flex-1 text-[12px] uppercase text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
-                        />
+                        <div className="flex-1">
+                            <input
+                                value={editData.mbti || ''}
+                                onChange={e => setEditData(prev => ({ ...prev, mbti: e.target.value.toUpperCase() }))}
+                                placeholder="MBTI 입력"
+                                maxLength={4}
+                                className="w-full text-[12px] uppercase text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
+                            />
+                            <p className="mt-1 text-[10px] text-slate-400">성향을 빠르게 보여주는 보조 정보</p>
+                        </div>
                     ) : (
                         <span className="text-[12px] text-slate-700">
                             MBTI: <span className="font-medium">{displayProfile.mbti || '미입력'}</span>
@@ -409,12 +475,15 @@ export default function MobileProfileView({
                 <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
                     <BriefcaseBusiness className="w-4 h-4 text-slate-500 shrink-0" />
                     {isEditing ? (
-                        <input
-                            value={editData.job || ''}
-                            onChange={e => setEditData(prev => ({ ...prev, job: e.target.value }))}
-                            placeholder="직업/직장 입력"
-                            className="flex-1 text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
-                        />
+                        <div className="flex-1">
+                            <input
+                                value={editData.job || ''}
+                                onChange={e => setEditData(prev => ({ ...prev, job: e.target.value }))}
+                                placeholder="직업/직장 입력"
+                                className="w-full text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
+                            />
+                            <p className="mt-1 text-[10px] text-slate-400">대화 연결 포인트를 만드는 정보</p>
+                        </div>
                     ) : (
                         <span className="text-[12px] text-slate-700">
                             직업/직장: <span className="font-medium">{displayProfile.job || '미입력'}</span>
@@ -426,12 +495,15 @@ export default function MobileProfileView({
                 <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
                     <GraduationCap className="w-4 h-4 text-slate-500 shrink-0" />
                     {isEditing ? (
-                        <input
-                            value={editData.school || ''}
-                            onChange={e => setEditData(prev => ({ ...prev, school: e.target.value }))}
-                            placeholder="출신 학교 입력"
-                            className="flex-1 text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
-                        />
+                        <div className="flex-1">
+                            <input
+                                value={editData.school || ''}
+                                onChange={e => setEditData(prev => ({ ...prev, school: e.target.value }))}
+                                placeholder="출신 학교 입력"
+                                className="w-full text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
+                            />
+                            <p className="mt-1 text-[10px] text-slate-400">학생/학교 정보가 있다면 신뢰 형성에 도움</p>
+                        </div>
                     ) : (
                         <span className="text-[12px] text-slate-700">
                             출신 학교: <span className="font-medium">{displayProfile.school || '미입력'}</span>
@@ -445,9 +517,10 @@ export default function MobileProfileView({
                     <div className="flex-1">
                         {isEditing ? (
                             <div className="flex flex-wrap gap-1.5">
-                                {['English', 'Korean', 'Japanese', 'Chinese', 'French', 'Spanish'].map(lang => (
+                                {PROFILE_LANGUAGE_OPTIONS.map(lang => (
                                     <button
                                         key={lang}
+                                        type="button"
                                         onClick={() => {
                                             const current = editData.languages || [];
                                             setEditData(prev => ({
@@ -497,6 +570,7 @@ export default function MobileProfileView({
                             placeholder="자기소개를 입력하세요"
                             className="w-full text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl px-2.5 py-2 outline-none focus:border-slate-400 resize-none"
                         />
+                        <p className="mt-1 text-[10px] text-slate-400">호스트가 예약 전에 가장 먼저 읽는 핵심 소개입니다.</p>
                     </div>
                 ) : (
                     <div className="py-3.5">

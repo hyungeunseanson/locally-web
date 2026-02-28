@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { X, MapPin, Calendar, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
+import { X, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { formatGenderLabel, formatProfileLanguages, normalizeLanguageList } from '@/app/utils/profile';
 
 interface UserProfileModalProps {
   userId: string;
@@ -12,83 +13,93 @@ interface UserProfileModalProps {
   role: 'host' | 'guest'; 
 }
 
+interface UserProfileModalState {
+  created_at?: string | null;
+  display_name?: string | null;
+  display_avatar?: string | null;
+  display_bio?: string | null;
+  location?: string | null;
+  mbti?: string | null;
+  languages?: string[];
+  gender?: string | null;
+}
+
 export default function UserProfileModal({ userId, isOpen, onClose, role }: UserProfileModalProps) {
-  const [displayProfile, setDisplayProfile] = useState<any>(null);
+  const [displayProfile, setDisplayProfile] = useState<UserProfileModalState | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  async function fetchProfile() {
-    setLoading(true);
-    
-    // 1. 기본 계정 정보
-    const { data: baseProfile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+  useEffect(() => {
+    if (!isOpen || !userId) return;
 
-    if (!baseProfile) {
-        setLoading(false);
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      setLoading(true);
+
+      const { data: baseProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!baseProfile) {
+        if (!cancelled) {
+          setDisplayProfile(null);
+          setLoading(false);
+        }
         return;
-    }
+      }
 
-    let finalData = { ...baseProfile };
+      let finalData: UserProfileModalState = {
+        created_at: baseProfile.created_at,
+      };
 
-    // 2. 호스트 역할일 때 (호스트 신청서 조회)
-    if (role === 'host') {
-      // 🟢 [디버깅] 호스트 데이터를 가져옵니다.
-      const { data: hostData, error } = await supabase
-        .from('host_applications')
-        .select('*') // 모든 컬럼을 가져와서 확인 (컬럼명 실수 방지)
-        .eq('user_id', userId)
-        .maybeSingle(); // .maybeSingle() 대신 사용 (에러 방지)
-      
-      // 🟢 콘솔에서 이 로그를 꼭 확인해보세요!
-      console.log('🔍 호스트 데이터 조회 결과:', { hostData, error });
+      if (role === 'host') {
+        const { data: hostData } = await supabase
+          .from('host_applications')
+          .select('name, profile_photo, self_intro, host_nationality')
+          .eq('user_id', userId)
+          .maybeSingle();
 
-      if (hostData) {
         finalData = {
           ...finalData,
-          display_name: hostData.name || baseProfile.full_name,
-          // 🟢 DB에 저장된 컬럼명이 profile_photo 인지 확인하세요!
-          display_avatar: hostData.profile_photo || hostData.avatar_url || baseProfile.avatar_url,
-          display_bio: hostData.introduction || baseProfile.introduction,
-          mbti: hostData.mbti,
-          languages: hostData.languages,
-          gender: hostData.gender || baseProfile.gender
+          display_name: hostData?.name || baseProfile.full_name,
+          display_avatar: hostData?.profile_photo || baseProfile.avatar_url,
+          display_bio: hostData?.self_intro || baseProfile.bio || baseProfile.introduction,
+          location: hostData?.host_nationality || baseProfile.nationality,
+          mbti: baseProfile.mbti,
+          languages: normalizeLanguageList(baseProfile.languages),
+          gender: baseProfile.gender,
         };
       } else {
-        // 호스트 데이터가 없거나 권한이 막힌 경우
-        console.warn('⚠️ 호스트 데이터를 찾을 수 없거나 권한이 없습니다.');
-        finalData.display_name = baseProfile.full_name;
-        finalData.display_avatar = baseProfile.avatar_url;
-        finalData.display_bio = baseProfile.introduction;
+        finalData = {
+          ...finalData,
+          display_name: baseProfile.full_name,
+          display_avatar: baseProfile.avatar_url,
+          display_bio: baseProfile.bio || baseProfile.introduction,
+          location: baseProfile.nationality,
+          mbti: baseProfile.mbti,
+          languages: normalizeLanguageList(baseProfile.languages),
+          gender: baseProfile.gender,
+        };
       }
-    } else {
-      // 3. 게스트일 때
-      finalData = {
-        ...finalData,
-        display_name: baseProfile.full_name,
-        display_avatar: baseProfile.avatar_url,
-        display_bio: baseProfile.introduction || baseProfile.bio,
-        mbti: baseProfile.mbti,
-        languages: baseProfile.languages,
-        gender: baseProfile.gender
-      };
-    }
 
-    setDisplayProfile(finalData);
-    setLoading(false);
-  }
+      if (!cancelled) {
+        setDisplayProfile(finalData);
+        setLoading(false);
+      }
+    };
 
-  useEffect(() => {
-    if (isOpen && userId) {
-      fetchProfile();
-    }
-  }, [isOpen, userId, role]);
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, role, supabase, userId]);
 
   const secureUrl = (url: string | null | undefined) => {
-    if (!url || url === '') return "/default-avatar.png";
+    if (!url || url === '') return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
   };
@@ -98,12 +109,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
     const date = new Date(dateString);
     return `${String(date.getFullYear()).slice(2)}.${String(date.getMonth() + 1).padStart(2, '0')} 가입`;
   };
-
-  const formatLanguages = (value: unknown) => {
-    if (Array.isArray(value)) return value.join(', ') || '한국어';
-    if (typeof value === 'string') return value || '한국어';
-    return '한국어';
-  };
+  const displayAvatarUrl = secureUrl(displayProfile?.display_avatar);
 
   if (!isOpen) return null;
 
@@ -125,12 +131,18 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           <>
             <div className="pt-8 md:pt-10 pb-4 md:pb-6 px-4 md:px-6 flex flex-col items-center bg-slate-50 border-b border-slate-100">
                <div className="w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-white bg-slate-200 overflow-hidden shadow-lg relative mb-3 md:mb-4">
-                 <Image 
-                   src={secureUrl(displayProfile?.display_avatar)} 
-                   alt="profile" 
-                   fill 
-                   className="object-cover"
-                 />
+                 {displayAvatarUrl ? (
+                   <Image
+                     src={displayAvatarUrl}
+                     alt="profile"
+                     fill
+                     className="object-cover"
+                   />
+                 ) : (
+                   <div className="flex h-full w-full items-center justify-center text-slate-300">
+                     <User size={28} className="md:h-9 md:w-9" />
+                   </div>
+                 )}
                </div>
 
                <h2 className="text-lg md:text-xl font-bold text-slate-900 mb-1">
@@ -153,7 +165,9 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Globe size={14} className="md:w-4 md:h-4" /></div>
                    <div className="min-w-0">
                      <div className="text-[10px] text-slate-400 font-bold uppercase">Location</div>
-                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">{displayProfile?.location || displayProfile?.nationality || "비공개"}</div>
+                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
+                       {displayProfile?.location || (role === 'host' ? '비공개' : '미입력')}
+                     </div>
                    </div>
                  </div>
 
@@ -171,7 +185,9 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0"><Languages size={14} className="md:w-4 md:h-4" /></div>
                    <div className="min-w-0">
                      <div className="text-[10px] text-slate-400 font-bold uppercase">Language</div>
-                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">{formatLanguages(displayProfile?.languages)}</div>
+                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
+                       {formatProfileLanguages(displayProfile?.languages, role === 'host' ? '비공개' : '미입력')}
+                     </div>
                    </div>
                  </div>
 
@@ -180,7 +196,9 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0"><User size={14} className="md:w-4 md:h-4" /></div>
                    <div className="min-w-0">
                      <div className="text-[10px] text-slate-400 font-bold uppercase">Gender</div>
-                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">{displayProfile?.gender || "비공개"}</div>
+                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
+                       {formatGenderLabel(displayProfile?.gender)}
+                     </div>
                    </div>
                  </div>
                </div>

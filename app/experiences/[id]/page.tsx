@@ -103,7 +103,7 @@ export default async function Page({ params }: Props) {
       name: app?.name || profile?.full_name || 'Locally Host',
       avatar_url: app?.profile_photo || profile?.avatar_url || null,
       languages: (profile?.languages?.length > 0) ? profile.languages : (app?.languages || []),
-      introduction: profile?.introduction || profile?.bio || app?.self_intro || '안녕하세요! 로컬리 호스트입니다.',
+      introduction: app?.self_intro || profile?.bio || profile?.introduction || '안녕하세요! 로컬리 호스트입니다.',
       job: profile?.job,
       dream_destination: profile?.dream_destination,
       favorite_song: profile?.favorite_song,

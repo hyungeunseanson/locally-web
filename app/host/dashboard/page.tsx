@@ -19,13 +19,33 @@ import Earnings from './Earnings';
 import HostReviews from './HostReviews';
 import ProfileEditor from './components/ProfileEditor';
 import GuidelinesTab from './components/GuidelinesTab'; // 🟢 필수 교육 및 가이드라인 탭
+import { getProfileCompletion } from '@/app/utils/profile';
+
+interface HostStatusSummary {
+  status?: string | null;
+  admin_comment?: string | null;
+}
+
+interface HostDashboardProfile {
+  avatar_url?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+  introduction?: string | null;
+  bio?: string | null;
+  languages?: string[] | null;
+  host_nationality?: string | null;
+  phone?: string | null;
+  job?: string | null;
+  dream_destination?: string | null;
+  favorite_song?: string | null;
+}
 
 // 실제 대시보드 로직
 function DashboardContent() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const [activeTab, setActiveTab] = useState('reservations');
-  const [hostStatus, setHostStatus] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [hostStatus, setHostStatus] = useState<HostStatusSummary | null>(null);
+  const [profile, setProfile] = useState<HostDashboardProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const supabase = createClient();
@@ -108,6 +128,8 @@ function DashboardContent() {
       </div>
     );
   }
+
+  const hostProfileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
 
   // 1. 신청 내역 없음
   if (!hostStatus) {
@@ -217,6 +239,11 @@ function DashboardContent() {
           <div className="pt-4 mt-4 border-t border-slate-100">
             <button onClick={() => handleTabChange('profile')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
               <UserCog size={20} /> {t('menu_profile')}
+              {hostProfileCompletion && hostProfileCompletion.percent < 100 && (
+                <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                  {hostProfileCompletion.percent}%
+                </span>
+              )}
             </button>
           </div>
         </div>

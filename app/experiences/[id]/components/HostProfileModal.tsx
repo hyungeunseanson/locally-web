@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { X, Star, ShieldCheck, CheckCircle2, Briefcase, Globe, Music, MessageCircle } from 'lucide-react';
+import { X, Star, Briefcase, Globe, Music, MessageCircle, User } from 'lucide-react';
 
 type HostModalData = {
   name: string;
@@ -27,6 +27,10 @@ type HostProfileModalProps = {
 
 export default function HostProfileModal({ isOpen, onClose, host }: HostProfileModalProps) {
   if (!isOpen) return null;
+  const hasStats = host.reviewCount != null || host.rating != null || host.joinedYear != null;
+  const hasInterestingFacts = Boolean(
+    host.job || host.dreamDestination || host.favoriteSong || (host.languages && host.languages.length > 0)
+  );
   const languageLevelLabel = (() => {
     switch (host.languageLevel) {
       case 1:
@@ -69,93 +73,97 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
           <div className="flex flex-col items-center w-full text-center mb-5 md:mb-8">
             <div className="relative mb-3 md:mb-4">
               <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden shadow-lg border-4 border-white">
-                <Image
-                  src={host.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde'}
-                  className="object-cover"
-                  fill
-                  alt={`${host.name} 프로필`}
-                />
-              </div>
-              <div className="absolute bottom-1 right-1 bg-rose-500 text-white p-1 md:p-1.5 rounded-full shadow-md border-2 border-white">
-                <ShieldCheck size={14} className="md:w-[18px] md:h-[18px] text-rose-500" fill="white" />
+                {host.avatarUrl ? (
+                  <Image
+                    src={host.avatarUrl}
+                    className="object-cover"
+                    fill
+                    alt={`${host.name} 프로필`}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300">
+                    <User className="h-10 w-10 md:h-12 md:w-12" />
+                  </div>
+                )}
               </div>
             </div>
             <h2 className="text-[22px] md:text-3xl font-black text-slate-900 mb-1">{host.name}</h2>
             <div className="flex items-center gap-2 text-[12px] md:text-sm font-bold text-slate-500">
-              <span>슈퍼호스트</span>
+              <span>{host.joinedYear ? `${host.joinedYear}년부터 활동` : 'Locally 호스트'}</span>
             </div>
           </div>
 
-          <div className="flex justify-around w-full border-y border-slate-100 py-4 md:py-6 mb-5 md:mb-8">
-            <div className="text-center">
-              <div className="font-black text-[16px] md:text-lg">{host.reviewCount ?? '-'}</div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase">후기</div>
+          {hasStats && (
+            <div className="flex justify-around w-full border-y border-slate-100 py-4 md:py-6 mb-5 md:mb-8">
+              {host.reviewCount != null && (
+                <div className="text-center">
+                  <div className="font-black text-[16px] md:text-lg">{host.reviewCount}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">후기</div>
+                </div>
+              )}
+              {host.reviewCount != null && (host.rating != null || host.joinedYear != null) && (
+                <div className="w-[1px] bg-slate-100"></div>
+              )}
+              {host.rating != null && (
+                <div className="text-center">
+                  <div className="font-black text-[16px] md:text-lg flex items-center gap-1">
+                    {host.rating ? Number(host.rating).toFixed(2) : '-'}
+                    {host.rating ? <Star size={12} fill="black" /> : null}
+                  </div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">평점</div>
+                </div>
+              )}
+              {host.rating != null && host.joinedYear != null && (
+                <div className="w-[1px] bg-slate-100"></div>
+              )}
+              {host.joinedYear != null && (
+                <div className="text-center">
+                  <div className="font-black text-[16px] md:text-lg">{host.joinedYear ? `${host.joinedYear}년` : '-'}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">경력</div>
+                </div>
+              )}
             </div>
-            <div className="w-[1px] bg-slate-100"></div>
-            <div className="text-center">
-              <div className="font-black text-[16px] md:text-lg flex items-center gap-1">
-                {host.rating ? Number(host.rating).toFixed(2) : '-'}
-                {host.rating && <Star size={12} fill="black" />}
-              </div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase">평점</div>
-            </div>
-            <div className="w-[1px] bg-slate-100"></div>
-            <div className="text-center">
-              <div className="font-black text-[16px] md:text-lg">{host.joinedYear ? `${host.joinedYear}년` : '-'}</div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase">경력</div>
-            </div>
-          </div>
-
-          <div className="w-full space-y-3 md:space-y-4">
-            <h3 className="font-bold text-[15px] md:text-lg text-slate-900 mb-1.5 md:mb-2">{host.name}님 확인 정보</h3>
-            <div className="flex items-center gap-2.5 md:gap-3 text-[13px] md:text-base text-slate-600">
-              <CheckCircle2 size={16} className="md:w-5 md:h-5 text-slate-900" /> <span>신분증</span>
-            </div>
-            <div className="flex items-center gap-2.5 md:gap-3 text-[13px] md:text-base text-slate-600">
-              <CheckCircle2 size={16} className="md:w-5 md:h-5 text-slate-900" /> <span>이메일 주소</span>
-            </div>
-            <div className="flex items-center gap-2.5 md:gap-3 text-[13px] md:text-base text-slate-600">
-              <CheckCircle2 size={16} className="md:w-5 md:h-5 text-slate-900" /> <span>전화번호</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* 🟢 오른쪽: 상세 소개 (스크롤 영역) */}
         <div className="flex-1 p-5 md:p-12 overflow-y-auto bg-white">
           <h3 className="text-[20px] md:text-2xl font-bold mb-6 md:mb-8">호스트 소개</h3>
 
-          <div className="bg-slate-50 p-4 md:p-6 rounded-xl md:rounded-2xl mb-6 md:mb-8">
-            <h4 className="font-bold text-[14px] md:text-base mb-3 md:mb-4 text-slate-900 flex items-center gap-2">👀 {host.name}님에 대한 재미있는 사실</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 md:gap-y-4 gap-x-4 md:gap-x-8">
-              {host.job && (
-                <div className="flex items-start gap-3">
-                  <Briefcase className="text-slate-400 mt-0.5" size={18} />
-                  <div className="text-[13px] md:text-sm">직업: <span className="font-bold text-slate-900">{host.job}</span></div>
-                </div>
-              )}
-              {host.dreamDestination && (
-                <div className="flex items-start gap-3">
-                  <Globe className="text-slate-400 mt-0.5" size={18} />
-                  <div className="text-[13px] md:text-sm">여행하고 싶은 곳: <span className="font-bold text-slate-900">{host.dreamDestination}</span></div>
-                </div>
-              )}
-              {host.favoriteSong && (
-                <div className="flex items-start gap-3">
-                  <Music className="text-slate-400 mt-0.5" size={18} />
-                  <div className="text-[13px] md:text-sm">최애 노래: <span className="font-bold text-slate-900">{host.favoriteSong}</span></div>
-                </div>
-              )}
-              {!!host.languages?.length && (
-                <div className="flex items-start gap-3">
-                  <MessageCircle className="text-slate-400 mt-0.5" size={18} />
-                  <div className="text-[13px] md:text-sm">
-                    구사 언어: <span className="font-bold text-slate-900">{host.languages.join(', ')}</span>
-                    {languageLevelLabel ? <span className="text-slate-500 font-medium"> · {languageLevelLabel}</span> : null}
+          {hasInterestingFacts && (
+            <div className="bg-slate-50 p-4 md:p-6 rounded-xl md:rounded-2xl mb-6 md:mb-8">
+              <h4 className="font-bold text-[14px] md:text-base mb-3 md:mb-4 text-slate-900 flex items-center gap-2">👀 {host.name}님에 대한 재미있는 사실</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 md:gap-y-4 gap-x-4 md:gap-x-8">
+                {host.job && (
+                  <div className="flex items-start gap-3">
+                    <Briefcase className="text-slate-400 mt-0.5" size={18} />
+                    <div className="text-[13px] md:text-sm">직업: <span className="font-bold text-slate-900">{host.job}</span></div>
                   </div>
-                </div>
-              )}
+                )}
+                {host.dreamDestination && (
+                  <div className="flex items-start gap-3">
+                    <Globe className="text-slate-400 mt-0.5" size={18} />
+                    <div className="text-[13px] md:text-sm">여행하고 싶은 곳: <span className="font-bold text-slate-900">{host.dreamDestination}</span></div>
+                  </div>
+                )}
+                {host.favoriteSong && (
+                  <div className="flex items-start gap-3">
+                    <Music className="text-slate-400 mt-0.5" size={18} />
+                    <div className="text-[13px] md:text-sm">최애 노래: <span className="font-bold text-slate-900">{host.favoriteSong}</span></div>
+                  </div>
+                )}
+                {!!host.languages?.length && (
+                  <div className="flex items-start gap-3">
+                    <MessageCircle className="text-slate-400 mt-0.5" size={18} />
+                    <div className="text-[13px] md:text-sm">
+                      구사 언어: <span className="font-bold text-slate-900">{host.languages.join(', ')}</span>
+                      {languageLevelLabel ? <span className="text-slate-500 font-medium"> · {languageLevelLabel}</span> : null}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-3 md:space-y-4">
             <h4 className="font-bold text-[15px] md:text-lg">소개</h4>

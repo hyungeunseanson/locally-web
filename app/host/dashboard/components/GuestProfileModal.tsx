@@ -4,16 +4,41 @@ import React, { useEffect, useState } from 'react';
 import { User, X, Star, Globe, Smile, MessageCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { formatGenderLabel, normalizeLanguageList } from '@/app/utils/profile';
+
+interface GuestModalProfile {
+  id: string | number;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  nationality?: string | null;
+  gender?: string | null;
+  mbti?: string | null;
+  languages?: string[] | string | null;
+  introduction?: string | null;
+  bio?: string | null;
+  created_at?: string | null;
+}
+
+interface GuestReview {
+  id: string | number;
+  rating?: number | null;
+  content?: string | null;
+  created_at: string;
+  host?: {
+    full_name?: string | null;
+    avatar_url?: string | null;
+  } | null;
+}
 
 interface Props {
-  guest: any;
+  guest: GuestModalProfile | null;
   onClose: () => void;
 }
 
 export default function GuestProfileModal({ guest, onClose }: Props) {
   const { t } = useLanguage();
   const supabase = createClient();
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<GuestReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
   // 🟢 게스트가 받은 후기 불러오기
@@ -39,7 +64,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
   if (!guest) return null;
 
   // 언어 배열 처리
-  const languages = Array.isArray(guest.languages) ? guest.languages : [];
+  const languages = normalizeLanguageList(guest.languages);
   const joinedAt = guest.created_at ? new Date(guest.created_at).toLocaleDateString() : '-';
 
   return (
@@ -83,10 +108,9 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
           <div className="mb-4 md:mb-6">
             <h2 className="text-lg md:text-2xl font-black text-slate-900 flex items-center gap-2">
               {guest.full_name}
-              {guest.host_nationality && (
+              {guest.nationality && (
                 <span className="text-sm md:text-lg bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                  {/* 국적 코드를 이모지로 변환하는 로직이 있다면 좋음, 일단 텍스트 */}
-                  {guest.host_nationality}
+                  {guest.nationality}
                 </span>
               )}
             </h2>
@@ -97,7 +121,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
             {/* 성별 */}
             {guest.gender && (
               <span className="inline-flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100">
-                {guest.gender === 'Male' ? '🙋‍♂️ Male' : guest.gender === 'Female' ? '🙋‍♀️ Female' : '🙋 Other'}
+                {formatGenderLabel(guest.gender, '미입력')}
               </span>
             )}
             
@@ -114,13 +138,18 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
                 <Globe size={12}/> {t(`lang_${lang}`) || lang}
               </span>
             ))}
+            {languages.length === 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                <Globe size={12}/> 미입력
+              </span>
+            )}
           </div>
 
           {/* 소개글 */}
           <div className="bg-slate-50 p-4 md:p-5 rounded-xl md:rounded-2xl mb-6 md:mb-8 border border-slate-100">
             <h3 className="text-[11px] md:text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Introduction</h3>
             <p className="text-[12px] md:text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-              {guest.introduction || t('guest_modal_intro_empty')}
+              {guest.introduction || guest.bio || t('guest_modal_intro_empty')}
             </p>
           </div>
 
@@ -148,7 +177,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
                         <div className="flex items-center gap-2">
                            <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
                               {review.host?.avatar_url ? (
-                                <img src={review.host.avatar_url} className="w-full h-full object-cover"/>
+                                <img src={review.host.avatar_url} className="w-full h-full object-cover" alt="호스트 리뷰 작성자 사진" />
                               ) : <User size={14} className="text-slate-400 m-auto mt-1"/>}
                            </div>
                            <span className="text-[12px] md:text-sm font-bold text-slate-900">

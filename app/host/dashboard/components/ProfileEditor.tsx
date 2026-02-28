@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
+import { getProfileCompletion, normalizeLanguageList, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 
 interface HostProfile {
   full_name?: string;
@@ -38,16 +40,32 @@ interface InputGroupProps {
   disabled?: boolean;
 }
 
+interface HostProfileFormData {
+  name: string;
+  job: string;
+  dream_destination: string;
+  favorite_song: string;
+  languages: string[];
+  introduction: string;
+  phone: string;
+  dob: string;
+  host_nationality: string;
+  bank_name: string;
+  account_number: string;
+  account_holder: string;
+  motivation: string;
+}
+
 export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps) {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'public' | 'private'>('public');
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<HostProfileFormData>({
     name: '',
     job: '',
     dream_destination: '',
     favorite_song: '',
-    languages: '',
+    languages: [] as string[],
     introduction: '',
     phone: '',
     dob: '',
@@ -70,7 +88,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         job: profile.job || '',
         dream_destination: profile.dream_destination || '',
         favorite_song: profile.favorite_song || '',
-        languages: Array.isArray(profile.languages) ? profile.languages.join(', ') : (profile.languages || ''),
+        languages: normalizeLanguageList(profile.languages),
         introduction: profile.introduction || profile.bio || '',
         phone: profile.phone || '',
         dob: profile.dob || '',
@@ -85,7 +103,21 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
   }, [profile]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value } as HostProfileFormData));
+  };
+
+  const handleLanguageToggle = (language: string) => {
+    setFormData((prev) => {
+      const nextLanguages = prev.languages.includes(language)
+        ? prev.languages.filter((item) => item !== language)
+        : [...prev.languages, language];
+
+      return {
+        ...prev,
+        languages: nextLanguages,
+      };
+    });
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,7 +151,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         job: formData.job,
         dream_destination: formData.dream_destination,
         favorite_song: formData.favorite_song,
-        languages: formData.languages.split(',').map((s: string) => s.trim()).filter(Boolean),
+        languages: formData.languages,
         introduction: formData.introduction,
         bio: formData.introduction,
         avatar_url: avatarUrl,
@@ -141,11 +173,34 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
       let error: { message: string } | null = null;
 
       if (!existingProfile) {
-        const insertRes = await supabase.from('profiles').upsert({
+        const seedRes = await supabase.from('profiles').upsert({
           id: user.id,
-          ...updates,
+          updated_at: updates.updated_at,
         });
-        error = insertRes.error;
+        if (seedRes.error) {
+          error = seedRes.error;
+        } else {
+          const { data: seededProfile, error: seedLoadError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (seedLoadError || !seededProfile) {
+            error = { message: seedLoadError?.message || '프로필 시드 생성 후 조회에 실패했습니다.' };
+          } else {
+            const allowedColumns = new Set(Object.keys(seededProfile));
+            const filteredUpdates = Object.fromEntries(
+              Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+            );
+
+            const updateRes = await supabase
+              .from('profiles')
+              .update(filteredUpdates)
+              .eq('id', user.id);
+            error = updateRes.error;
+          }
+        }
       } else {
         const allowedColumns = new Set(Object.keys(existingProfile));
         const filteredUpdates = Object.fromEntries(
@@ -169,6 +224,22 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
     }
     setLoading(false);
   };
+
+  const completion = getProfileCompletion(
+    {
+      avatar_url: avatarUrl,
+      full_name: formData.name,
+      bio: formData.introduction,
+      languages: formData.languages,
+      host_nationality: formData.host_nationality,
+      phone: formData.phone,
+      job: formData.job,
+    },
+    'host'
+  );
+  const missingLabels = completion.missingFields
+    .slice(0, 4)
+    .map((field) => PROFILE_COMPLETION_FIELD_LABELS[field]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -194,11 +265,40 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
           <div className="space-y-5 md:space-y-8 animate-in fade-in">
             <div className="flex flex-col items-center">
               <label className="relative w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-lg cursor-pointer group hover:border-slate-200 transition-all">
-                {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={36} className="md:w-12 md:h-12" /></div>}
+                {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="호스트 프로필 사진" /> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={36} className="md:w-12 md:h-12" /></div>}
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" /></div>
                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
               </label>
               <span className="text-[11px] md:text-xs text-slate-400 mt-2">프로필 사진 변경</span>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 md:px-5 md:py-5">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[11px] md:text-xs font-bold uppercase tracking-[0.18em] text-slate-400">프로필 완성도</p>
+                  <p className="mt-1 text-lg md:text-xl font-black text-slate-900">{completion.percent}%</p>
+                  <p className="mt-1 text-[12px] md:text-sm text-slate-600">
+                    {completion.missingFields.length === 0
+                      ? '공개 프로필 필수 항목이 모두 채워졌습니다.'
+                      : `${completion.missingFields.length}개 항목이 비어 있습니다. 노출 품질과 신뢰도에 영향을 줍니다.`}
+                  </p>
+                </div>
+                {missingLabels.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {missingLabels.map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] md:text-xs font-bold text-amber-700"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p className="mt-3 text-[11px] md:text-xs text-slate-500">
+                비어 있어도 저장은 가능하지만, 게스트가 예약 전 호스트를 판단할 때 필요한 정보는 계속 노출됩니다.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -207,13 +307,41 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
               <InputGroup label="꿈의 여행지" name="dream_destination" value={formData.dream_destination} onChange={handleChange} icon={<Globe size={16} />} placeholder="예: 아이슬란드 오로라 여행" />
               <InputGroup label="최애 노래" name="favorite_song" value={formData.favorite_song} onChange={handleChange} icon={<Music size={16} />} placeholder="예: Bohemian Rhapsody" />
               <div className="md:col-span-2">
-                <InputGroup label="구사 언어 (쉼표로 구분)" name="languages" value={formData.languages} onChange={handleChange} icon={<MessageCircle size={16} />} placeholder="예: 한국어, 영어" />
+                <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">
+                  <MessageCircle size={16} /> 구사 언어
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {PROFILE_LANGUAGE_OPTIONS.map((language) => {
+                    const isSelected = formData.languages.includes(language);
+
+                    return (
+                      <button
+                        key={language}
+                        type="button"
+                        onClick={() => handleLanguageToggle(language)}
+                        className={`rounded-full border px-3 py-1.5 text-[11px] md:text-xs font-bold transition-colors ${
+                          isSelected
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
+                        }`}
+                      >
+                        {language}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[11px] md:text-xs text-slate-400">
+                  게스트가 바로 소통 가능 여부를 판단하는 항목입니다. 최소 1개 이상 선택해 두는 것이 좋습니다.
+                </p>
               </div>
             </div>
 
             <div>
               <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase">자기소개</label>
               <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-[13px] md:text-sm" placeholder="게스트에게 나를 소개해 주세요." />
+              <p className="mt-2 text-[11px] md:text-xs text-slate-400">
+                예약 전 신뢰 형성에 가장 크게 영향을 주는 영역입니다. 실제 진행 스타일과 분위기를 간단히 적어두세요.
+              </p>
             </div>
           </div>
         )}

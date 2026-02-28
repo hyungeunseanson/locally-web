@@ -9,7 +9,6 @@ import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. import 추가
-import { MessageCircle } from 'lucide-react'; // 아이콘 추가
 import GuestReviewModal from './GuestReviewModal'; // 모달 추가
 import {
   isCancellationRequestedBookingStatus,
@@ -21,18 +20,71 @@ import {
 import ReservationCard from './ReservationCard';
 import GuestProfileModal from './GuestProfileModal';
 
+type ReservationGuest = {
+  id: string | number;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  kakao_id?: string | null;
+  introduction?: string | null;
+  bio?: string | null;
+  job?: string | null;
+  school?: string | null;
+  languages?: string[] | string | null;
+  nationality?: string | null;
+  gender?: string | null;
+  mbti?: string | null;
+  created_at?: string | null;
+};
+
+type ReservationExperience = {
+  id: string | number;
+  title?: string | null;
+  photos?: string[] | null;
+};
+
+type ReservationRecord = {
+  id: number;
+  order_id?: string | number | null;
+  user_id: string;
+  experience_id?: string | number | null;
+  created_at: string;
+  date: string;
+  time?: string | null;
+  guests?: number | null;
+  status: string;
+  guest?: ReservationGuest | null;
+  experiences?: ReservationExperience | null;
+};
+
+type HostExperienceRef = {
+  id: string | number;
+};
+
+type BookingRealtimePayload = {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE' | string;
+  new: {
+    status?: string;
+    experience_id?: string | number | null;
+  };
+  old: {
+    experience_id?: string | number | null;
+  };
+};
+
 export default function ReservationManager() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [selectedBookingForReview, setSelectedBookingForReview] = useState<any>(null);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<ReservationRecord | null>(null);
   const [reviewedBookingIds, setReviewedBookingIds] = useState<number[]>([]); // 작성 완료된 예약 ID 목록
   const hostExperienceIdsRef = useRef<Set<string>>(new Set());
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
-  const [reservations, setReservations] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<ReservationRecord[]>([]);
 
   // ✅ [복구] 읽음 처리 상태 & 마운트 상태
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
@@ -40,7 +92,7 @@ export default function ReservationManager() {
 
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
-  const [selectedGuest, setSelectedGuest] = useState<any>(null);
+  const [selectedGuest, setSelectedGuest] = useState<ReservationGuest | null>(null);
 
   // ✅ [복구] 에러 메시지 상태
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -86,7 +138,8 @@ export default function ReservationManager() {
         .from('experiences')
         .select('id')
         .eq('host_id', user.id);
-      hostExperienceIdsRef.current = new Set((hostExperiences || []).map((item: any) => String(item.id)));
+      const hostExperienceRows = (hostExperiences as HostExperienceRef[] | null) || [];
+      hostExperienceIdsRef.current = new Set(hostExperienceRows.map((item) => String(item.id)));
 
       const { data, error } = await supabase
         .from('bookings')
@@ -95,7 +148,7 @@ export default function ReservationManager() {
           experiences!inner ( id, title, photos ), 
 guest:profiles!bookings_user_id_fkey ( 
             id, full_name, avatar_url, email, phone, 
-            kakao_id, introduction, job, languages, host_nationality,
+            kakao_id, introduction, bio, job, school, languages, nationality,
             gender, mbti 
           )
         `)
@@ -130,7 +183,8 @@ guest:profiles!bookings_user_id_fkey (
     const channel = supabase.channel('host-dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
         async (payload) => {
-          const changedExperienceId = String((payload.new as any)?.experience_id || (payload.old as any)?.experience_id || '');
+          const eventPayload = payload as BookingRealtimePayload;
+          const changedExperienceId = String(eventPayload.new?.experience_id || eventPayload.old?.experience_id || '');
           if (!changedExperienceId || !hostExperienceIdsRef.current.has(changedExperienceId)) return;
 
           fetchReservations(true);
@@ -138,7 +192,7 @@ guest:profiles!bookings_user_id_fkey (
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
 
-          if (payload.eventType === 'INSERT') {
+          if (eventPayload.eventType === 'INSERT') {
             showToast(t('res_toast_new'), 'success'); // 🟢 번역
             await sendNotification({
               recipient_id: user.id,
@@ -148,7 +202,7 @@ guest:profiles!bookings_user_id_fkey (
               link_url: '/host/dashboard'
             });
           }
-          else if (payload.eventType === 'UPDATE' && isCancellationRequestedBookingStatus(payload.new.status)) {
+          else if (eventPayload.eventType === 'UPDATE' && isCancellationRequestedBookingStatus(eventPayload.new.status)) {
             showToast(t('res_toast_cancel'), 'error'); // 🟢 번역
             await sendNotification({
               recipient_id: user.id,
@@ -164,7 +218,7 @@ guest:profiles!bookings_user_id_fkey (
     return () => { supabase.removeChannel(channel); };
   }, [fetchReservations, supabase, showToast, t]);
 
-  const addToGoogleCalendar = (res: any) => {
+  const addToGoogleCalendar = (res: ReservationRecord) => {
     const title = encodeURIComponent(`[Locally] ${res.experiences?.title} - ${res.guest?.full_name}님`);
     const details = encodeURIComponent(`예약 번호: #${String(res.order_id || res.id)}\n게스트: ${res.guest?.full_name} (${res.guests}명)\n연락처: ${res.guest?.phone || '없음'}`);
 
@@ -177,7 +231,7 @@ guest:profiles!bookings_user_id_fkey (
     window.location.href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`;
   };
 
-  const handleApproveCancel = async (booking: any) => {
+  const handleApproveCancel = async (booking: ReservationRecord) => {
     if (!confirm(`${t('res_refund_confirm_prefix')}${booking.guest?.full_name}${t('res_refund_confirm_suffix')}`)) return; // 🟢 번역
     setProcessingId(booking.id);
 
@@ -199,14 +253,15 @@ guest:profiles!bookings_user_id_fkey (
 
       showToast(t('res_toast_approved'), 'success'); // 🟢 번역
       fetchReservations(true);
-    } catch (err: any) {
-      showToast(err.message, 'error');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '환불 처리 중 오류가 발생했습니다.';
+      showToast(message, 'error');
     } finally {
       setProcessingId(null);
     }
   };
 
-  const isReservationInTab = useCallback((r: any, tab: 'upcoming' | 'completed' | 'cancelled') => {
+  const isReservationInTab = useCallback((r: ReservationRecord, tab: 'upcoming' | 'completed' | 'cancelled') => {
     const isCancelled = isCancelledBookingStatus(r.status) && !isCancellationRequestedBookingStatus(r.status);
     const isRequesting = isCancellationRequestedBookingStatus(r.status);
 
@@ -279,7 +334,7 @@ guest:profiles!bookings_user_id_fkey (
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as 'upcoming' | 'completed' | 'cancelled')}
                 className={`relative px-3 py-1.5 text-[11px] md:text-sm font-bold rounded-lg transition-all flex items-center gap-1 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
                   }`}
               >

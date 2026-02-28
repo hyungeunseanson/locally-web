@@ -74,8 +74,6 @@ export default function HostProfileSection(props: HostProfileProps) {
         onClose={() => setIsModalOpen(false)}
         host={{
           ...props,
-          reviewCount: 0,
-          rating: null,
           onContactHost: props.onMessageHost,
         }}
       />
