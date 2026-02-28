@@ -44,7 +44,6 @@ const COMPLETION_FIELDS: Record<
     { key: 'nationality', required: true, getValue: (profile) => profile.nationality },
     { key: 'phone', required: true, getValue: (profile) => profile.phone },
     { key: 'job', required: false, getValue: (profile) => profile.job },
-    { key: 'school', required: false, getValue: (profile) => profile.school },
     { key: 'mbti', required: false, getValue: (profile) => profile.mbti },
   ],
   host: [
@@ -87,8 +86,33 @@ export function normalizeLanguageList(value: unknown): string[] {
   return [];
 }
 
+const PROFILE_LANGUAGE_ALIASES: Record<string, string> = {
+  english: 'English',
+  영어: 'English',
+  korean: 'Korean',
+  한국어: 'Korean',
+  japanese: 'Japanese',
+  일본어: 'Japanese',
+  '日本語': 'Japanese',
+  chinese: 'Chinese',
+  중국어: 'Chinese',
+  '中文': 'Chinese',
+  spanish: 'Spanish',
+  스페인어: 'Spanish',
+  'español': 'Spanish',
+  french: 'French',
+  프랑스어: 'French',
+  'français': 'French',
+};
+
+export function normalizeProfileLanguageValue(value: string): string {
+  const trimmed = value.trim();
+  const alias = PROFILE_LANGUAGE_ALIASES[trimmed.toLowerCase()];
+  return alias || trimmed;
+}
+
 export function formatProfileLanguages(value: unknown, emptyLabel = '미입력'): string {
-  const languages = normalizeLanguageList(value);
+  const languages = normalizeLanguageList(value).map((language) => normalizeProfileLanguageValue(language));
   return languages.length > 0 ? languages.join(', ') : emptyLabel;
 }
 

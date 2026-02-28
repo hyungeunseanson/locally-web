@@ -156,6 +156,8 @@ export default function ExpMainContent({
         hostId={experience.host_id}
         name={hostProfile?.name || 'Locally Host'}
         avatarUrl={hostProfile?.avatar_url}
+        reviewCount={hostProfile?.review_count}
+        rating={hostProfile?.rating}
         job={hostProfile?.job || "로컬리 호스트"}
         dreamDestination={hostProfile?.dream_destination || "여행"}
         favoriteSong={hostProfile?.favorite_song || "음악"}

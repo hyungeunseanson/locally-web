@@ -9,6 +9,8 @@ interface HostProfileProps {
   hostId?: string;
   name: string;
   avatarUrl?: string;
+  reviewCount?: number;
+  rating?: number | null;
   job?: string;
   dreamDestination?: string;
   favoriteSong?: string;
@@ -74,6 +76,8 @@ export default function HostProfileSection(props: HostProfileProps) {
         onClose={() => setIsModalOpen(false)}
         host={{
           ...props,
+          reviewCount: props.reviewCount,
+          rating: props.rating,
           onContactHost: props.onMessageHost,
         }}
       />

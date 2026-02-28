@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
     ArrowLeft, Camera, Loader2, User, BriefcaseBusiness,
-    GraduationCap, Globe, ShieldCheck, Star,
+    Globe, ShieldCheck, Star,
     Calendar, Phone, Mail, MessageCircle
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
@@ -147,7 +147,6 @@ export default function MobileProfileView({
             mbti: editData.mbti,
             languages: editData.languages,
             job: editData.job,
-            school: editData.school,
             updated_at: new Date().toISOString(),
         };
         const { data: existingProfile, error: loadError } = await supabase
@@ -487,26 +486,6 @@ export default function MobileProfileView({
                     ) : (
                         <span className="text-[12px] text-slate-700">
                             직업/직장: <span className="font-medium">{displayProfile.job || '미입력'}</span>
-                        </span>
-                    )}
-                </div>
-
-                {/* 출신 학교 */}
-                <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
-                    <GraduationCap className="w-4 h-4 text-slate-500 shrink-0" />
-                    {isEditing ? (
-                        <div className="flex-1">
-                            <input
-                                value={editData.school || ''}
-                                onChange={e => setEditData(prev => ({ ...prev, school: e.target.value }))}
-                                placeholder="출신 학교 입력"
-                                className="w-full text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
-                            />
-                            <p className="mt-1 text-[10px] text-slate-400">학생/학교 정보가 있다면 신뢰 형성에 도움</p>
-                        </div>
-                    ) : (
-                        <span className="text-[12px] text-slate-700">
-                            출신 학교: <span className="font-medium">{displayProfile.school || '미입력'}</span>
                         </span>
                     )}
                 </div>

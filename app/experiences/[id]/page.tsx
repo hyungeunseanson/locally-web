@@ -91,11 +91,21 @@ export default async function Page({ params }: Props) {
   // 2. 호스트 프로필 데이터 가져오기
   let hostProfile: HostProfileDetail = null;
   if (experience.host_id) {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', experience.host_id).maybeSingle();
-    const { data: app } = await supabase.from('host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle();
+    const [{ data: profile }, { data: app }, { data: reviewRows }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', experience.host_id).maybeSingle(),
+      supabase.from('host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle(),
+      supabase
+        .from('reviews')
+        .select('rating, experiences!inner(host_id)')
+        .eq('experiences.host_id', experience.host_id),
+    ]);
     
     const joinedYear = profile?.created_at
       ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
+      : null;
+    const hostReviewCount = reviewRows?.length || 0;
+    const hostAverageRating = hostReviewCount > 0
+      ? Number((reviewRows.reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
       : null;
 
     hostProfile = {
@@ -108,6 +118,8 @@ export default async function Page({ params }: Props) {
       dream_destination: profile?.dream_destination,
       favorite_song: profile?.favorite_song,
       joined_year: joinedYear,
+      review_count: hostReviewCount,
+      rating: hostAverageRating,
     };
   }
 

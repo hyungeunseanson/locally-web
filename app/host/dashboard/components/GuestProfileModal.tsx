@@ -4,13 +4,15 @@ import React, { useEffect, useState } from 'react';
 import { User, X, Star, Globe, Smile, MessageCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { formatGenderLabel, normalizeLanguageList } from '@/app/utils/profile';
+import { formatGenderLabel, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 
 interface GuestModalProfile {
   id: string | number;
   full_name?: string | null;
   avatar_url?: string | null;
   nationality?: string | null;
+  job?: string | null;
+  school?: string | null;
   gender?: string | null;
   mbti?: string | null;
   languages?: string[] | string | null;
@@ -65,7 +67,13 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
   // 언어 배열 처리
   const languages = normalizeLanguageList(guest.languages);
-  const joinedAt = guest.created_at ? new Date(guest.created_at).toLocaleDateString() : '-';
+  const joinedAt = guest.created_at
+    ? new Date(guest.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
+    : '가입일 정보 없음';
+  const infoRows = [
+    guest.job ? { label: '직업', value: guest.job } : null,
+    guest.school ? { label: '학교', value: guest.school } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
 
   return (
     <div className="fixed inset-0 z-[160] flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
@@ -135,7 +143,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
             {/* 언어 */}
             {languages.map((lang: string) => (
               <span key={lang} className="inline-flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                <Globe size={12}/> {t(`lang_${lang}`) || lang}
+                <Globe size={12}/> {t(`lang_${normalizeProfileLanguageValue(lang)}`)}
               </span>
             ))}
             {languages.length === 0 && (
@@ -144,6 +152,20 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
               </span>
             )}
           </div>
+
+          {infoRows.length > 0 && (
+            <div className="bg-white border border-slate-100 rounded-xl md:rounded-2xl mb-6 md:mb-8 overflow-hidden">
+              {infoRows.map((item, index) => (
+                <div
+                  key={item.label}
+                  className={`flex items-center justify-between gap-4 px-4 py-3 ${index < infoRows.length - 1 ? 'border-b border-slate-100' : ''}`}
+                >
+                  <span className="text-[11px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">{item.label}</span>
+                  <span className="text-[12px] md:text-sm font-semibold text-slate-700 text-right">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* 소개글 */}
           <div className="bg-slate-50 p-4 md:p-5 rounded-xl md:rounded-2xl mb-6 md:mb-8 border border-slate-100">

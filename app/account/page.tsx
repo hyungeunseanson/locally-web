@@ -13,7 +13,7 @@ import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
-import { getProfileCompletion, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
+import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 type GuestReview = {
@@ -177,7 +177,7 @@ export default function AccountPage() {
           mbti: data.mbti || '',
           kakao_id: data.kakao_id || '',
           avatar_url: data.avatar_url || user.user_metadata?.avatar_url || '',
-          languages: data.languages || [], // 🟢 [추가] DB에서 언어 가져오기
+          languages: normalizeLanguageList(data.languages).map((language) => normalizeProfileLanguageValue(language)),
           job: data.job || '',
           school: data.school || ''
         });
@@ -290,7 +290,6 @@ export default function AccountPage() {
       avatar_url: profile.avatar_url,
       languages: profile.languages, // 🟢 [추가] 저장 시 포함
       job: profile.job,
-      school: profile.school,
       updated_at: new Date().toISOString(),
     };
 
@@ -861,18 +860,6 @@ export default function AccountPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold mb-2">{t('profile_school')}</label>
-                  <input
-                    type="text"
-                    value={profile.school}
-                    onChange={e => setProfile({ ...profile, school: e.target.value })}
-                    placeholder={t('profile_school')}
-                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
-                  />
-                  <p className="text-xs text-slate-400 mt-1">학생이거나 학교 정보가 있다면 신뢰 형성에 도움이 됩니다.</p>
-                </div>
-                {/* 🟢 [추가] 구사 가능한 언어 선택 */}
-                <div className="col-span-1 md:col-span-1">
                   <label className="block text-sm font-bold mb-2">{t('label_languages_spoken')}</label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {PROFILE_LANGUAGE_OPTIONS.map(lang => (

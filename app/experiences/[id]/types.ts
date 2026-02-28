@@ -51,6 +51,8 @@ export type HostProfileDetail = {
   dream_destination?: string;
   favorite_song?: string;
   joined_year?: number | null;
+  review_count?: number;
+  rating?: number | null;
   bio?: string;
   [key: string]: unknown;
 } | null;

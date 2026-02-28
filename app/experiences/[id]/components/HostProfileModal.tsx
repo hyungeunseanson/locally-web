@@ -27,7 +27,7 @@ type HostProfileModalProps = {
 
 export default function HostProfileModal({ isOpen, onClose, host }: HostProfileModalProps) {
   if (!isOpen) return null;
-  const hasStats = host.reviewCount != null || host.rating != null || host.joinedYear != null;
+  const hasStats = host.reviewCount !== undefined || host.rating !== undefined;
   const hasInterestingFacts = Boolean(
     host.job || host.dreamDestination || host.favoriteSong || (host.languages && host.languages.length > 0)
   );
@@ -95,31 +95,22 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
 
           {hasStats && (
             <div className="flex justify-around w-full border-y border-slate-100 py-4 md:py-6 mb-5 md:mb-8">
-              {host.reviewCount != null && (
+              {host.reviewCount !== undefined && (
                 <div className="text-center">
                   <div className="font-black text-[16px] md:text-lg">{host.reviewCount}</div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">후기</div>
                 </div>
               )}
-              {host.reviewCount != null && (host.rating != null || host.joinedYear != null) && (
+              {host.reviewCount !== undefined && host.rating !== undefined && (
                 <div className="w-[1px] bg-slate-100"></div>
               )}
-              {host.rating != null && (
+              {host.rating !== undefined && (
                 <div className="text-center">
                   <div className="font-black text-[16px] md:text-lg flex items-center gap-1">
-                    {host.rating ? Number(host.rating).toFixed(2) : '-'}
-                    {host.rating ? <Star size={12} fill="black" /> : null}
+                    {host.rating != null ? Number(host.rating).toFixed(2) : '-'}
+                    {host.rating != null ? <Star size={12} fill="black" /> : null}
                   </div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">평점</div>
-                </div>
-              )}
-              {host.rating != null && host.joinedYear != null && (
-                <div className="w-[1px] bg-slate-100"></div>
-              )}
-              {host.joinedYear != null && (
-                <div className="text-center">
-                  <div className="font-black text-[16px] md:text-lg">{host.joinedYear ? `${host.joinedYear}년` : '-'}</div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">경력</div>
                 </div>
               )}
             </div>
