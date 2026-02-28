@@ -91,6 +91,7 @@ export default function ExperienceClient({
     hostLanguages.length > 0 ? hostLanguages.join(', ') : '',
     hostLanguageLevel
   ].filter(Boolean).join(' · ');
+  const desktopHostMeta = [hostJob, hostLanguageSummary].filter(Boolean).join('  |  ');
   const ratingValue = Number(experience.rating || 0);
   const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : 'New';
   const reviewCount = Number(experience.review_count || 0);
@@ -270,12 +271,8 @@ export default function ExperienceClient({
               </div>
               <div className="min-w-0">
                 <p className="text-[18px] font-semibold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
-                <p className="text-[15px] text-slate-500 truncate">{hostJob}</p>
-                {hostLanguageSummary && (
-                  <p className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-400 truncate">
-                    <Globe size={13} className="shrink-0" />
-                    <span className="truncate">{hostLanguageSummary}</span>
-                  </p>
+                {desktopHostMeta && (
+                  <p className="mt-1 text-[14px] text-slate-500 truncate">{desktopHostMeta}</p>
                 )}
               </div>
             </div>
@@ -380,13 +377,15 @@ export default function ExperienceClient({
             translatedDescription={translatedDescription}
             translatedCategory={category}
           />
-          <ExpSidebar
-            experience={experience}
-            availableDates={availableDates}
-            dateToTimeMap={dateToTimeMap}
-            remainingSeatsMap={remainingSeatsMap}
-            handleReserve={handleReserve}
-          />
+          <div className="md:-mt-[220px] md:self-start">
+            <ExpSidebar
+              experience={experience}
+              availableDates={availableDates}
+              dateToTimeMap={dateToTimeMap}
+              remainingSeatsMap={remainingSeatsMap}
+              handleReserve={handleReserve}
+            />
+          </div>
         </div>
       </main>
 

@@ -86,7 +86,7 @@ export default function ReservationCard({
   const totalPrice = basePrice + optionPrice;
 
   return (
-    <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-5 md:p-6 bg-white">
+    <div className="sticky top-28 md:top-20 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-5 md:p-6 bg-white">
       <div className="flex justify-between items-end mb-5">
         <div>
           <span className="text-xl md:text-2xl font-semibold">₩{isPrivate ? privatePrice.toLocaleString() : price.toLocaleString()}</span> 
