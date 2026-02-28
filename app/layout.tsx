@@ -14,6 +14,7 @@ import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { createClient } from '@/app/utils/supabase/server';
+import type { User } from '@supabase/supabase-js';
 
 const inter = localFont({
   src: [
@@ -86,10 +87,12 @@ export default async function RootLayout({
 
   // 🟢 [M-3] 서버 사이드에서 세션 가져오기 (FOUC 방지)
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // 프로필 이미지까지 가져와서 주입하면 완벽합니다.
-  let initialUser = session?.user || null;
+  let initialUser = user || null;
   if (initialUser) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -103,7 +106,7 @@ export default async function RootLayout({
           ...initialUser.user_metadata,
           avatar_url: profile.avatar_url
         }
-      } as any;
+      } as User;
     }
   }
 

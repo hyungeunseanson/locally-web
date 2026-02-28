@@ -1,12 +1,34 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { X, ChevronDown, MessageCircle } from 'lucide-react'; // MessageCircle 추가
+import React, { useState } from 'react';
+import { X, ChevronDown } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 번역 훅
 import { syncProfile } from '@/app/actions/auth'; // 🟢 서버 액션 도입
+
+type Gender = 'Male' | 'Female' | '';
+
+interface InputItemProps {
+  type: string;
+  label: string;
+  value: string;
+  setValue: React.Dispatch<React.SetStateAction<string>>;
+  isFirst: boolean;
+  focusKey: string;
+  currentFocus: string | null;
+  setFocus: React.Dispatch<React.SetStateAction<string | null>>;
+  autoComplete: string;
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return '로그인 처리 중 오류가 발생했습니다.';
+}
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -24,7 +46,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState('');
-  const [gender, setGender] = useState<'Male' | 'Female' | ''>('');
+  const [gender, setGender] = useState<Gender>('');
 
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -33,15 +55,23 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const supabase = createClient();
   const { showToast } = useToast();
 
-  const ensureProfileExists = async () => {
+  const ensureProfileExists = async (accessToken?: string) => {
     // [M-1] Security & Reliability Patch:
     // 클라이언트에서 불안정하게 DB Insert 하던 로직을 지우고, 
     // 백엔드 환경에서 100% 보장되는 Server Action 호출로 대체
-    const res = await syncProfile();
+    const res = await syncProfile(accessToken);
     if (!res.success) {
       console.error('Failed to sync profile:', res.error);
       // Even if it fails, maybe auth worked, but log it at least.
     }
+  };
+
+  const getCurrentAccessToken = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    return session?.access_token;
   };
 
   const handleAuth = async (e?: React.FormEvent) => {
@@ -79,9 +109,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
         if (data.user && data.session) {
           showToast('회원가입이 완료되었습니다!', 'success');
-          await ensureProfileExists();
-          onClose();
-          if (onLoginSuccess) onLoginSuccess();
+          await ensureProfileExists(data.session.access_token);
+          if (onLoginSuccess) {
+            onLoginSuccess();
+          } else {
+            onClose();
+          }
           router.refresh();
         } else {
           showToast('가입 인증 메일을 보냈습니다! 이메일을 확인해주세요.', 'success');
@@ -89,7 +122,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         }
 
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
@@ -101,18 +134,27 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           throw error;
         }
 
-        await ensureProfileExists();
+        await ensureProfileExists(data.session?.access_token || await getCurrentAccessToken());
 
         showToast('환영합니다! 로그인 되었습니다.', 'success');
-        onClose();
-        if (onLoginSuccess) onLoginSuccess();
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        } else {
+          onClose();
+        }
         router.refresh();
       }
-    } catch (error: any) {
-      if (error.message?.includes('rate limit') || error.status === 429) {
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      const errorStatus =
+        typeof error === 'object' && error !== null && 'status' in error
+          ? (error as { status?: number }).status
+          : undefined;
+
+      if (errorMessage.includes('rate limit') || errorStatus === 429) {
         showToast('너무 많은 가입 요청이 감지되었습니다. 잠시 후 다시 시도하거나 소셜 로그인을 이용해주세요.', 'error');
       } else {
-        showToast(error.message, 'error');
+        showToast(errorMessage, 'error');
       }
     } finally {
       setLoading(false);
@@ -209,7 +251,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                       <select
                         className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none peer bg-transparent z-10 relative cursor-pointer"
                         value={gender}
-                        onChange={(e) => setGender(e.target.value as any)}
+                        onChange={(e) => setGender(e.target.value as Gender)}
                         onFocus={() => setIsFocused('GENDER')}
                         onBlur={() => setIsFocused(null)}
                         autoComplete="sex"
@@ -271,7 +313,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   );
 }
 
-function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete }: any) {
+function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFocus, setFocus, autoComplete }: InputItemProps) {
   const isFocused = currentFocus === focusKey;
 
   return (

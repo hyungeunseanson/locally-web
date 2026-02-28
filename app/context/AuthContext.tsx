@@ -1,6 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
 
@@ -15,6 +22,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_LOCAL_STORAGE_KEYS = [
+  'admin_active_tab',
+  'global_chat_last_viewed',
+  'host_checked_reservations',
+  'last_active_update',
+  'last_viewed_team',
+  'locally_recent_searches',
+  'viewed_booking_ids',
+] as const;
+
 export function AuthProvider({
   children,
   initialUser = null
@@ -26,40 +43,9 @@ export function AuthProvider({
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!initialUser); // 🟢 만약 initialUser가 있으면 로딩 없이 즉시 렌더링
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const loadUser = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('avatar_url')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        const updatedUser = {
-          ...session.user,
-          user_metadata: {
-            ...session.user.user_metadata,
-            avatar_url: profile?.avatar_url || session.user.user_metadata.avatar_url
-          }
-        };
-        setUser(updatedUser as User);
-        await checkHostStatus(session.user.id);
-      } else {
-        setUser(null);
-        setIsHost(false);
-        setApplicationStatus(null);
-      }
-    } catch (error) {
-      console.error('Auth Load Error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const checkHostStatus = async (userId: string) => {
+  const checkHostStatus = useCallback(async (userId: string) => {
     const { data: app } = await supabase
       .from('host_applications')
       .select('status')
@@ -70,25 +56,68 @@ export function AuthProvider({
 
     if (app) setApplicationStatus(app.status);
 
-    const { count } = await supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('host_id', userId);
+    const { count } = await supabase
+      .from('experiences')
+      .select('*', { count: 'exact', head: true })
+      .eq('host_id', userId);
 
     if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
       setIsHost(true);
     } else {
       setIsHost(false);
     }
-  };
+  }, [supabase]);
+
+  const loadUser = useCallback(async () => {
+    try {
+      const {
+        data: { user: authUser },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error) {
+        throw error;
+      }
+
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', authUser.id)
+          .maybeSingle();
+
+        const updatedUser = {
+          ...authUser,
+          user_metadata: {
+            ...authUser.user_metadata,
+            avatar_url: profile?.avatar_url || authUser.user_metadata.avatar_url
+          }
+        };
+        setUser(updatedUser as User);
+        await checkHostStatus(authUser.id);
+      } else {
+        setUser(null);
+        setIsHost(false);
+        setApplicationStatus(null);
+      }
+    } catch (error) {
+      console.error('Auth Load Error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [checkHostStatus, supabase]);
 
   const signOut = async () => {
     try {
       setUser(null);
       setIsHost(false);
       setApplicationStatus(null);
-      await supabase.auth.signOut();
-      localStorage.clear();
-      window.location.href = '/';
+      await supabase.auth.signOut({ scope: 'local' });
     } catch (error) {
-      window.location.href = '/';
+      console.error('Sign out failed:', error);
+    } finally {
+      AUTH_LOCAL_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+      window.location.assign('/');
     }
   };
 
@@ -111,7 +140,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, [checkHostStatus, initialUser, loadUser, supabase]);
 
   return (
     <AuthContext.Provider value={{ user, isHost, applicationStatus, isLoading, refreshAuth: loadUser, signOut }}>

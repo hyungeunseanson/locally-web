@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-27 (P0 Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
-**Version:** 3.2.35 (P0 Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Last Updated:** 2026-02-28 (P0 Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
+**Version:** 3.2.36 (P0 Auth Session Identity Hardening + Desktop Search Close + Profile Save 400 Hardening + Category Sync + Wishlist Share)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -198,6 +198,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 프로필 저장 400 차단(P0): 게스트 `account`와 호스트 `ProfileEditor`에서 `profiles.upsert`를 제거하고 `profiles` 현재 행 기준 컬럼 필터 후 `update`만 전송하도록 변경
 - 카테고리 표준 집합 동기화(P0): 호스트 등록 카테고리를 11개(기존 7 + 건축/공연·경기/랜드마크/원데이 클래스)로 확장하고 모바일 검색 `체험 유형`도 동일 집합으로 정렬
 - 카테고리 UI 정합화(P0): 호스트 체험 등록 Step1 카테고리를 모바일 `체험 유형`과 동일한 아이콘 칩 스타일로 재구성해 등록/검색 선택 기준과 시각 표현을 일치
+- 인증 세션 식별 고정(P0): 브라우저 Supabase 클라이언트를 싱글턴으로 고정하고, 로그인 직후 프로필 동기화를 액세스 토큰 기준 서버 경로로 재배선했으며, `layout/AuthContext/login/become-a-host`의 사용자 판정을 `getSession()`에서 `getUser()`로 전환해 캐시/쿠키 레이스로 다른 계정이 재주입될 가능성을 축소
+- 로그아웃 로컬 안정화(P0): `AuthContext` 로그아웃을 `signOut({ scope: 'local' })` + 앱 전용 localStorage 키만 선별 정리하는 방식으로 변경해 전체 저장소 초기화로 인한 세션/설정 교란 위험을 줄임
+- OAuth 프로필 동기화 보강(P0): `/auth/callback`에서 코드 교환 직후 동일 요청 컨텍스트로 프로필 동기화를 실행해 소셜 로그인 직후 `profiles` 누락과 세션 식별 불일치 가능성을 완화
 
 비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 별도 커밋 이력/문서에서 확인한다.
 

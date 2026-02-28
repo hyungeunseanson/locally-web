@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  Globe, DollarSign, Calendar, ChevronDown, ChevronUp, 
-  ArrowRight, ShieldCheck, Heart, MessageCircle
+  Globe, Calendar, ChevronDown, ChevronUp, 
+  ArrowRight, Heart
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
@@ -19,13 +18,15 @@ export default function BecomeHostPage() {
 
   useEffect(() => {
     const checkStatus = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
       const { data } = await supabase
         .from('host_applications')
         .select('id')
-        .eq('user_id', session.user.id)
+        .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
       
@@ -34,12 +35,14 @@ export default function BecomeHostPage() {
       }
     };
     checkStatus();
-  }, []);
+  }, [supabase]);
 
   const handleStartClick = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     
-    if (!session) {
+    if (!user) {
       setIsLoginModalOpen(true);
       return;
     }
@@ -47,7 +50,7 @@ export default function BecomeHostPage() {
     const { data } = await supabase
       .from('host_applications')
       .select('status')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .limit(1)
       .maybeSingle();
 
@@ -95,7 +98,7 @@ export default function BecomeHostPage() {
                       <h3 className="font-black text-[20px] md:text-2xl mb-4">내일 서울에서<br/>진행되는 체험</h3>
                       <div className="space-y-4">
                          <div className="aspect-[4/3] rounded-2xl bg-slate-200 overflow-hidden relative">
-                            <img src="https://images.unsplash.com/photo-1551632811-561732d1e306" className="w-full h-full object-cover"/>
+                            <img src="https://images.unsplash.com/photo-1551632811-561732d1e306" className="w-full h-full object-cover" alt="" />
                             <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold">오전 10시</div>
                          </div>
                          <div className="flex justify-between items-start">
@@ -139,7 +142,7 @@ export default function BecomeHostPage() {
                <div className="flex-1 order-2 md:order-1 flex justify-center">
                   <div className="relative w-[292px] md:w-[320px] bg-white rounded-[34px] md:rounded-[40px] shadow-2xl p-5 md:p-6 border border-slate-100 transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
                      <div className="flex items-center gap-4 mb-6">
-                        <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden"><img src="https://i.pravatar.cc/150?u=a042581f4e29026024d" className="w-full h-full object-cover"/></div>
+                        <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden"><img src="https://i.pravatar.cc/150?u=a042581f4e29026024d" className="w-full h-full object-cover" alt="" /></div>
                         <div><div className="font-bold text-sm">Alexi 님</div><div className="text-xs text-slate-500">예약 완료 · 5월 22일</div></div>
                      </div>
                      <div className="bg-slate-100 p-4 rounded-2xl rounded-tl-none text-sm text-slate-600 mb-4">안녕하세요! 이번 주말 투어 정말 기대돼요. 혹시 채식 메뉴 추천도 가능할까요? 🥗</div>

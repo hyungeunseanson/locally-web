@@ -15,30 +15,30 @@ import { createClient } from '@/app/utils/supabase/client';
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mounted, setMounted] = useState(false);
   const [checking, setChecking] = useState(true);
 
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('next') || '/';
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
     const supabase = createClient();
     
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        router.replace(returnUrl); 
-      } else {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          router.replace(returnUrl);
+          return;
+        }
+      } finally {
         setChecking(false);
       }
     };
     
     checkSession();
-  }, [mounted, returnUrl, router]);
+  }, [returnUrl, router]);
 
   const handleClose = () => {
     router.push(returnUrl || '/');
@@ -48,7 +48,7 @@ function LoginPageContent() {
     router.push(returnUrl || '/');
   };
 
-  if (!mounted || checking) {
+  if (checking) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black" />

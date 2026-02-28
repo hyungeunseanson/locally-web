@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server'; // 🟢 만들어둔 유틸리티 사용
+import { syncProfileWithSupabaseClient } from '@/app/utils/auth/syncProfile';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -15,6 +16,11 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
+      const syncResult = await syncProfileWithSupabaseClient(supabase);
+      if (!syncResult.success) {
+        console.error('[AUTH] OAuth profile sync failed:', syncResult.error);
+      }
+
       // 성공 시 원래 가려던 페이지로 이동
       const forwardedHost = request.headers.get('x-forwarded-host'); // 로드 밸런서 고려
       const isLocalEnv = process.env.NODE_ENV === 'development';
