@@ -20,7 +20,7 @@ export default function ExpSidebar({
   handleReserve
 }: ExpSidebarProps) {
   return (
-    <div id="reservation-card" className="w-full md:w-[380px] scroll-mt-24">
+    <div id="reservation-card" className="w-full md:w-[380px] scroll-mt-24 md:-mt-[150px]">
       <ReservationCard
         price={Number(experience.price)}
         // ✅ 프라이빗 정보 전달 (중요)

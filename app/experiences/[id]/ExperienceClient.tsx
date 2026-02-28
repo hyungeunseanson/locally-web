@@ -377,15 +377,13 @@ export default function ExperienceClient({
             translatedDescription={translatedDescription}
             translatedCategory={category}
           />
-          <div className="md:-mt-[220px] md:self-start">
-            <ExpSidebar
-              experience={experience}
-              availableDates={availableDates}
-              dateToTimeMap={dateToTimeMap}
-              remainingSeatsMap={remainingSeatsMap}
-              handleReserve={handleReserve}
-            />
-          </div>
+          <ExpSidebar
+            experience={experience}
+            availableDates={availableDates}
+            dateToTimeMap={dateToTimeMap}
+            remainingSeatsMap={remainingSeatsMap}
+            handleReserve={handleReserve}
+          />
         </div>
       </main>
 
