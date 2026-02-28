@@ -148,7 +148,7 @@ export default function ReservationManager() {
           experiences!inner ( id, title, photos ), 
 guest:profiles!bookings_user_id_fkey ( 
             id, full_name, avatar_url, email, phone, 
-            kakao_id, introduction, bio, job, school, languages, nationality,
+            kakao_id, introduction, bio, job, languages, nationality,
             gender, mbti 
           )
         `)
