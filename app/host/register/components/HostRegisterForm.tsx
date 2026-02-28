@@ -3,21 +3,128 @@
 import React from 'react';
 import Link from 'next/link';
 import {
-  X, Camera, Check, ChevronRight, CreditCard, CheckCircle2,
-  Instagram, Lock, User, Building, ShieldCheck
+  X,
+  Camera,
+  Check,
+  ChevronRight,
+  CreditCard,
+  CheckCircle2,
+  Instagram,
+  Lock,
+  User,
+  Building,
+  ShieldCheck,
 } from 'lucide-react';
+import { type LanguageLevel, type LanguageLevelEntry } from '@/app/utils/languageLevels';
+
+type HostRegisterFormData = {
+  languageLevels: LanguageLevelEntry[];
+  languageCert: string;
+  name: string;
+  phone: string;
+  dob: string;
+  email: string;
+  instagram: string;
+  source: string;
+  profilePhoto: string | null;
+  selfIntro: string;
+  idCardFile: string | null;
+  hostNationality: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  motivation: string;
+  agreeTerms: boolean;
+  educationCompleted: boolean;
+  agreeSafetyPolicy: boolean;
+};
 
 interface HostRegisterFormProps {
   step: number;
   totalSteps: number;
-  formData: any;
-  updateData: (key: string, value: any) => void;
+  formData: HostRegisterFormData;
+  updateData: <K extends keyof HostRegisterFormData>(key: K, value: HostRegisterFormData[K]) => void;
   toggleLanguage: (lang: string) => void;
+  updateLanguageLevel: (lang: string, level: LanguageLevel) => void;
   handlePhotoUpload: (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'profile' | 'idCard') => void;
   prevStep: () => void;
   nextStep: () => void;
   handleSubmit: () => void;
   loading: boolean;
+}
+
+const LANGUAGE_OPTIONS = [
+  { label: '한국어', code: 'Korean', flag: '🇰🇷' },
+  { label: '영어', code: 'English', flag: '🇺🇸' },
+  { label: '일본어', code: 'Japanese', flag: '🇯🇵' },
+  { label: '중국어', code: 'Chinese', flag: '🇨🇳' },
+];
+
+function LanguageLevelSelector({
+  entries,
+  toggleLanguage,
+  updateLanguageLevel,
+}: {
+  entries: LanguageLevelEntry[];
+  toggleLanguage: (lang: string) => void;
+  updateLanguageLevel: (lang: string, level: LanguageLevel) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {LANGUAGE_OPTIONS.map((lang) => {
+        const current = entries.find((entry) => entry.language === lang.label);
+        const isSelected = Boolean(current);
+
+        return (
+          <div
+            key={lang.label}
+            className={`rounded-2xl border p-4 transition-all ${isSelected ? 'border-black bg-slate-50 shadow-sm' : 'border-slate-200 bg-white'}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => toggleLanguage(lang.label)}
+                className="flex items-center gap-3 text-left"
+              >
+                <div className="text-3xl">{lang.flag}</div>
+                <div>
+                  <div className="font-bold text-base text-slate-900">{lang.label}</div>
+                  <div className="text-xs text-slate-400 font-medium">{lang.code}</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleLanguage(lang.label)}
+                className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'border-black bg-black text-white' : 'border-slate-300 text-transparent'}`}
+              >
+                <Check size={14} strokeWidth={3} />
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-5 gap-1.5">
+              {[1, 2, 3, 4, 5].map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  disabled={!isSelected}
+                  onClick={() => updateLanguageLevel(lang.label, level as LanguageLevel)}
+                  className={`h-10 rounded-xl border text-[11px] font-bold transition-all ${
+                    !isSelected
+                      ? 'border-slate-200 bg-slate-100 text-slate-300 cursor-not-allowed'
+                      : current?.level === level
+                        ? 'border-black bg-black text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
+                  }`}
+                >
+                  Lv.{level}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function HostRegisterForm({
@@ -26,16 +133,15 @@ export default function HostRegisterForm({
   formData,
   updateData,
   toggleLanguage,
+  updateLanguageLevel,
   handlePhotoUpload,
   prevStep,
   nextStep,
   handleSubmit,
-  loading
+  loading,
 }: HostRegisterFormProps) {
-
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
-      {/* 1. 상단 진행바 */}
       {step < totalSteps + 1 && (
         <header className="h-16 px-6 flex items-center justify-between border-b border-slate-100 sticky top-0 bg-white z-50">
           <div className="flex items-center gap-4">
@@ -49,14 +155,11 @@ export default function HostRegisterForm({
               </div>
             </div>
           </div>
-          <button className="text-xs font-bold text-slate-400 hover:text-black underline decoration-1 underline-offset-2">나가기</button>
+          <div className="w-10" />
         </header>
       )}
 
-      {/* 2. 메인 컨텐츠 */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-        {/* STEP 1: 국적 선택 */}
         {step === 1 && (
           <div className="w-full space-y-8 text-center">
             <div>
@@ -65,11 +168,19 @@ export default function HostRegisterForm({
               <p className="text-sm text-slate-500">신분증 확인 및 정산 통화 기준이 됩니다.</p>
             </div>
             <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-              <button onClick={() => updateData('hostNationality', 'Korea')} className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.hostNationality === 'Korea' ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}>
+              <button
+                type="button"
+                onClick={() => updateData('hostNationality', 'Korea')}
+                className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.hostNationality === 'Korea' ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}
+              >
                 <div className="text-4xl mb-2">🇰🇷</div>
                 <div className="font-bold text-lg">한국인</div>
               </button>
-              <button onClick={() => updateData('hostNationality', 'Japan')} className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.hostNationality === 'Japan' ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}>
+              <button
+                type="button"
+                onClick={() => updateData('hostNationality', 'Japan')}
+                className={`p-6 rounded-2xl border-2 transition-all hover:scale-105 hover:shadow-md ${formData.hostNationality === 'Japan' ? 'border-black bg-slate-50 ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}
+              >
                 <div className="text-4xl mb-2">🇯🇵</div>
                 <div className="font-bold text-lg">일본인</div>
               </button>
@@ -77,80 +188,35 @@ export default function HostRegisterForm({
           </div>
         )}
 
-        {/* 🟢 STEP 2: 구사 언어 (다중 선택 UI 적용) */}
         {step === 2 && (
-          <div className="w-full space-y-8 text-center">
-            <div>
-              <span className="bg-indigo-50 text-indigo-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 2. 구사 언어</span>
+          <div className="w-full space-y-8">
+            <div className="text-center">
+              <span className="bg-blue-50 text-blue-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 2. 구사 언어 및 레벨</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">어떤 언어로 소통이<br />가능하신가요?</h1>
-              <p className="text-sm text-slate-500">호스트님이 구사할 수 있는 언어를 <strong>모두</strong> 선택해 주세요.</p>
+              <p className="text-sm text-slate-500">선택한 각 언어의 레벨을 함께 설정해 주세요.</p>
             </div>
-            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-              {[
-                { label: '일본어', code: 'Japanese', flag: '🇯🇵' },
-                { label: '미국/영어권', code: 'English', flag: '🇺🇸' },
-                { label: '중국어', code: 'Chinese', flag: '🇨🇳' },
-                { label: '한국어', code: 'Korean', flag: '🇰🇷' }
-              ].map((lang) => {
-                const isSelected = formData.targetLanguages.includes(lang.label);
-                return (
-                  <button
-                    key={lang.label}
-                    onClick={() => toggleLanguage(lang.label)}
-                    className={`p-6 rounded-2xl border-2 transition-all relative
-                      ${isSelected ? 'border-black bg-slate-50 shadow-md ring-1 ring-black' : 'border-slate-100 hover:border-slate-300'}`}
-                  >
-                    {isSelected && (
-                      <div className="absolute top-3 right-3 bg-black text-white w-6 h-6 rounded-full flex items-center justify-center animate-in zoom-in-50">
-                        <Check size={14} strokeWidth={3} />
-                      </div>
-                    )}
-                    <div className="text-4xl mb-2">{lang.flag}</div>
-                    <div className="font-bold text-lg mb-1">{lang.label}</div>
-                    <div className="text-xs text-slate-400 font-medium">{lang.code}</div>
-                  </button>
-                );
-              })}
+            <LanguageLevelSelector
+              entries={formData.languageLevels}
+              toggleLanguage={toggleLanguage}
+              updateLanguageLevel={updateLanguageLevel}
+            />
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <label className="font-bold block mb-1.5 text-xs ml-1 text-slate-500">어학 자격증 (선택사항)</label>
+              <input
+                type="text"
+                placeholder="예) JLPT N1, TOEIC 900"
+                value={formData.languageCert}
+                onChange={(e) => updateData('languageCert', e.target.value)}
+                className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-black transition-all text-sm"
+              />
             </div>
           </div>
         )}
 
-        {/* Step 3: 언어 능력 */}
         {step === 3 && (
           <div className="w-full space-y-8">
             <div className="text-center">
-              <span className="bg-blue-50 text-blue-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 3. 언어 능력</span>
-              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">주력 언어를<br />얼마나 유창하게 하시나요?</h1>
-              <p className="text-sm text-slate-500">게스트와의 원활한 소통을 위해 정확히 선택해 주세요.</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex justify-between items-center mb-6 px-1">
-                <span className="text-2xl">🌱</span><span className="text-2xl">🌿</span><span className="text-2xl">🌳</span><span className="text-2xl">🗣️</span><span className="text-2xl">👑</span>
-              </div>
-              <input type="range" min="1" max="5" step="1" value={formData.languageLevel} onChange={(e) => updateData('languageLevel', Number(e.target.value))} className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-black mb-6" />
-              <div className="text-center bg-slate-50 p-5 rounded-xl">
-                <h3 className="text-lg font-bold mb-1 text-slate-900">{formData.languageLevel === 1 && "Lv.1 기초 단계"}{formData.languageLevel === 2 && "Lv.2 초급 회화"}{formData.languageLevel === 3 && "Lv.3 일상 회화"}{formData.languageLevel === 4 && "Lv.4 비즈니스 회화"}{formData.languageLevel === 5 && "Lv.5 원어민 수준"}</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  {formData.languageLevel === 1 && "간단한 인사말 정도만 가능하며, 번역기 사용이 필수입니다."}
-                  {formData.languageLevel === 2 && "단어 위주의 소통이 가능하며, 대화 시 번역기의 도움이 일부 필요합니다."}
-                  {formData.languageLevel === 3 && "일상적인 주제로 큰 어려움 없이 대화를 나눌 수 있습니다."}
-                  {formData.languageLevel === 4 && "복잡한 내용이나 전문적인 주제도 자연스럽게 설명할 수 있습니다."}
-                  {formData.languageLevel === 5 && "현지인 수준의 자연스러운 억양과 표현을 구사합니다."}
-                </p>
-              </div>
-              <div className="mt-6">
-                <label className="font-bold block mb-1.5 text-xs ml-1 text-slate-500">어학 자격증 (선택사항)</label>
-                <input type="text" placeholder="예) JLPT N1, TOEIC 900" value={formData.languageCert} onChange={(e) => updateData('languageCert', e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-black transition-all text-sm" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: 기본 정보 */}
-        {step === 4 && (
-          <div className="w-full space-y-8">
-            <div className="text-center">
-              <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 4. 기본 정보</span>
+              <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 3. 기본 정보</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">호스트님의<br />연락처를 알려주세요</h1>
             </div>
             <div className="space-y-4">
@@ -186,16 +252,15 @@ export default function HostRegisterForm({
           </div>
         )}
 
-        {/* Step 5: 프로필 설정 */}
-        {step === 5 && (
+        {step === 4 && (
           <div className="w-full space-y-8 text-center">
             <div>
-              <span className="bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 5. 프로필 설정</span>
+              <span className="bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 4. 프로필 설정</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">게스트에게 보여질<br />모습을 꾸며보세요</h1>
             </div>
             <div className="flex flex-col items-center gap-6">
               <label className="w-32 h-32 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-black overflow-hidden relative bg-slate-50">
-                {formData.profilePhoto ? <img src={formData.profilePhoto} className="w-full h-full object-cover" /> : <Camera size={24} className="text-slate-400" />}
+                {formData.profilePhoto ? <img src={formData.profilePhoto} className="w-full h-full object-cover" alt="프로필 미리보기" /> : <Camera size={24} className="text-slate-400" />}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(e, 'profile')} />
               </label>
               <div className="w-full text-left">
@@ -206,11 +271,10 @@ export default function HostRegisterForm({
           </div>
         )}
 
-        {/* Step 6: 신분 인증 */}
-        {step === 6 && (
+        {step === 5 && (
           <div className="w-full space-y-8">
             <div className="text-center">
-              <span className="bg-purple-50 text-purple-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 6. 신뢰 인증</span>
+              <span className="bg-purple-50 text-purple-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 5. 신뢰 인증</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">인증된 호스트<br />배지를 받아보세요</h1>
               <p className="text-sm text-slate-500">신분증을 제출하면 프로필에 <span className="text-blue-600 font-bold"><ShieldCheck size={14} className="inline" /> 인증 배지</span>가 표시됩니다.</p>
             </div>
@@ -218,8 +282,8 @@ export default function HostRegisterForm({
               <input type="file" accept="image/*" className="hidden" id="id-upload" onChange={(e) => handlePhotoUpload(e, 'idCard')} />
               {formData.idCardFile ? (
                 <div className="relative h-40 w-full flex flex-col items-center justify-center">
-                  <img src={formData.idCardFile} className="h-full object-contain rounded-lg shadow-sm" />
-                  <button onClick={(e) => { e.preventDefault(); updateData('idCardFile', null); }} className="absolute top-0 right-0 bg-black text-white p-1.5 rounded-full hover:scale-110 transition-transform"><X size={14} /></button>
+                  <img src={formData.idCardFile} className="h-full object-contain rounded-lg shadow-sm" alt="신분증 미리보기" />
+                  <button type="button" onClick={(e) => { e.preventDefault(); updateData('idCardFile', null); }} className="absolute top-0 right-0 bg-black text-white p-1.5 rounded-full hover:scale-110 transition-transform"><X size={14} /></button>
                   <p className="text-green-600 font-bold mt-4 flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-full text-sm"><CheckCircle2 size={16} /> 업로드 완료</p>
                 </div>
               ) : (
@@ -237,11 +301,10 @@ export default function HostRegisterForm({
           </div>
         )}
 
-        {/* Step 7: 정산 계좌 */}
-        {step === 7 && (
+        {step === 6 && (
           <div className="w-full space-y-8 text-center">
             <div>
-              <span className="bg-green-50 text-green-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 7. 정산 계좌</span>
+              <span className="bg-green-50 text-green-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 6. 정산 계좌</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">수익을 지급받을<br />계좌를 알려주세요</h1>
               <p className="text-sm text-slate-500">본인 명의의 계좌만 등록 가능합니다.</p>
             </div>
@@ -262,11 +325,10 @@ export default function HostRegisterForm({
           </div>
         )}
 
-        {/* Step 8: 신청 사유 */}
-        {step === 8 && (
+        {step === 7 && (
           <div className="w-full space-y-8 text-center">
             <div>
-              <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 8. 신청 사유</span>
+              <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">Step 7. 신청 사유</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">마지막 질문입니다!</h1>
               <p className="text-sm text-slate-500">로컬리 호스트가 되고 싶은 이유를 적어주세요.</p>
             </div>
@@ -285,11 +347,10 @@ export default function HostRegisterForm({
           </div>
         )}
 
-        {/* 🟢 Step 9: 필수 교육 수료 및 서약 */}
-        {step === 9 && (
+        {step === 8 && (
           <div className="w-full space-y-8 animate-in slide-in-from-right-8 fade-in duration-500">
             <div className="text-center">
-              <span className="bg-red-50 text-red-600 font-bold px-2.5 py-1 rounded-full text-[10px] animate-pulse">Step 9. 필수 교육 숙지</span>
+              <span className="bg-red-50 text-red-600 font-bold px-2.5 py-1 rounded-full text-[10px] animate-pulse">Step 8. 필수 교육 숙지</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">안전하고 올바른<br />호스팅을 위한 서약</h1>
               <p className="text-sm text-slate-500">제출하기 전 아래 안전 가이드라인을 반드시 정독해 주세요.</p>
             </div>
@@ -312,6 +373,27 @@ export default function HostRegisterForm({
               <div>
                 <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><User size={16} className="text-blue-500" /> 3. 게스트 상호 안전 매뉴얼</h3>
                 <p className="leading-relaxed text-xs">활동 중 발생할 수 있는 사고를 대비하여 게스트에게 적절한 안전 장비와 가이드라인을 제공할 책임이 있습니다. 상호 존중 없는 부적절한 차별은 허용되지 않습니다.</p>
+              </div>
+
+              <div className="h-px bg-slate-200 w-full"></div>
+
+              <div>
+                <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><CreditCard size={16} className="text-red-500" /> 4. 예약 확정 후 무단 취소 및 노쇼 금지</h3>
+                <p className="leading-relaxed text-xs">호스트는 예약이 확정된 체험에 대해 정당한 사유 없이 일방적으로 취소하거나, 약속된 시간과 장소에 나타나지 않는 행위를 해서는 안 됩니다. 호스트의 무단 취소 및 노쇼는 게스트의 여행 일정에 보상 불가한 큰 피해를 줄 수 있으며, 적발 시 정산 보류, 계정 정지 등의 조치가 이루어질 수 있습니다.</p>
+              </div>
+
+              <div className="h-px bg-slate-200 w-full"></div>
+
+              <div>
+                <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><CheckCircle2 size={16} className="text-blue-500" /> 5. 예약 후 응답 및 일정 안내 의무</h3>
+                <p className="leading-relaxed text-xs">호스트는 예약 확정 후 게스트의 문의, 일정 확인, 집합 장소 안내 등에 성실히 응답해야 합니다. 체험 진행에 필요한 핵심 안내를 누락하거나 장시간 응답하지 않아 게스트에게 혼선을 주는 경우, 서비스 품질 저하로 간주되어 운영상 불이익이 발생할 수 있습니다.</p>
+              </div>
+
+              <div className="h-px bg-slate-200 w-full"></div>
+
+              <div>
+                <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><User size={16} className="text-blue-500" /> 6. 체험 내용의 성실 이행 의무</h3>
+                <p className="leading-relaxed text-xs">호스트는 등록한 체험 설명, 진행 시간, 포함 사항 등의 내용을 실제와 최대한 일치하도록 운영해야 합니다. 고의로 과장된 설명을 등록하거나, 현장에서 사전 안내 없이 체험 내용을 축소·변경하는 행위는 신뢰 위반으로 간주됩니다.</p>
               </div>
             </div>
 
@@ -338,22 +420,16 @@ export default function HostRegisterForm({
             </div>
           </div>
         )}
-
       </main>
 
-      {/* 3. 하단 네비게이션 */}
-      <footer className="h-20 px-6 border-t border-slate-100 flex items-center justify-between sticky bottom-0 bg-white z-50">
-        <button onClick={prevStep} disabled={step === 1} className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100'}`}>
-          이전
-        </button>
-        {step < totalSteps ? (
-          <button onClick={nextStep} disabled={!formData.hostNationality && step === 1} className="bg-black text-white px-8 py-3 rounded-full font-bold text-sm hover:scale-105 transition-transform flex items-center gap-2 shadow-lg disabled:opacity-50 disabled:hover:scale-100">
-            다음 <ChevronRight size={16} />
+      <footer className="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between">
+        <button onClick={prevStep} disabled={step === 1} className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100 underline decoration-2'}`}>이전</button>
+        {step === totalSteps ? (
+          <button onClick={handleSubmit} disabled={loading} className="bg-black text-white px-6 py-3 rounded-full font-bold text-sm hover:scale-105 transition-transform shadow-xl shadow-slate-300 disabled:opacity-50 flex items-center gap-2">
+            {loading ? '신청 중...' : '신청 완료하기'}
           </button>
         ) : (
-          <button onClick={handleSubmit} disabled={loading} className="bg-black text-white px-10 py-3 rounded-full font-bold text-sm hover:scale-105 transition-transform shadow-lg disabled:opacity-50">
-            {loading ? '제출 중...' : '제출하기'}
-          </button>
+          <button onClick={nextStep} className="bg-black text-white px-6 py-3 rounded-full font-bold text-sm hover:scale-105 transition-transform flex items-center gap-2 shadow-xl shadow-slate-300">다음 <ChevronRight size={16} /></button>
         )}
       </footer>
     </div>

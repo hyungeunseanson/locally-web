@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, Save, MapPin, Plus, Trash2, X, Camera, Check, Globe, Loader2, Type, FileText } from 'lucide-react';
+import { ChevronLeft, Save, MapPin, Plus, Trash2, X, Camera, Check, Globe, Loader2, Type, FileText, Lock } from 'lucide-react';
 import {
   CATEGORIES,
   SUPPORTED_LANGUAGES,
@@ -15,6 +15,7 @@ import {
 import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개선
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 import { compressImage, sanitizeFileName, validateImage } from '@/app/utils/image';
+import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 
 export default function EditExperiencePage() {
   const { t } = useLanguage(); // 🟢 2. Hook
@@ -54,13 +55,16 @@ export default function EditExperiencePage() {
           return;
         }
 
+        const normalizedLanguageLevels = normalizeLanguageLevels(data.language_levels, data.languages || [], 3);
+
         setFormData({
           ...data,
           // ✅ 기존 데이터 초기화 (Null 방지)
           photos: data.photos || [],
-          languages: data.languages || [],
+          languages: getLanguageNames(normalizedLanguageLevels),
+          language_levels: normalizedLanguageLevels,
           inclusions: data.inclusions || [],
-          exclusions: [],
+          exclusions: data.exclusions || [],
           location: data.location || '',
           itinerary: (data.itinerary || []).map((item: any) => ({
             ...item,
@@ -116,6 +120,15 @@ export default function EditExperiencePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error(t('login_required'));
 
+      if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {
+        throw new Error('단독 투어 가격을 입력해주세요.');
+      }
+
+      const cleanedInclusions = (formData.inclusions || []).map((item: string) => item.trim()).filter(Boolean);
+      const cleanedExclusions = (formData.exclusions || []).map((item: string) => item.trim()).filter(Boolean);
+      const normalizedLanguageLevels = normalizeLanguageLevels(formData.language_levels, formData.languages || [], 3);
+      const languageNames = getLanguageNames(normalizedLanguageLevels);
+
       const { data, error } = await supabase
         .from('experiences')
         .update({
@@ -125,11 +138,12 @@ export default function EditExperiencePage() {
           country: formData.country,
           city: formData.city,
           category: formData.category,
-          languages: formData.languages,
+          languages: languageNames,
+          language_levels: normalizedLanguageLevels,
           description: formData.description,
           photos: formData.photos,
-          inclusions: formData.inclusions,
-          exclusions: [],
+          inclusions: cleanedInclusions,
+          exclusions: cleanedExclusions,
           itinerary: formData.itinerary,
           supplies: formData.supplies,
           rules: {
@@ -140,6 +154,8 @@ export default function EditExperiencePage() {
           location: formData.location,
           max_guests: formData.max_guests,
           duration: formData.duration,
+          is_private_enabled: Boolean(formData.is_private_enabled),
+          private_price: formData.is_private_enabled ? Number(formData.private_price || 0) : 0,
 
           // 🟢 [추가됨] 다국어 필드 업데이트
           title_en: formData.title_en,
@@ -232,14 +248,18 @@ export default function EditExperiencePage() {
     showToast('동선 사진이 삭제되었습니다.', 'success');
   };
 
-  // 진행 언어 토글 (기존 로직 유지)
+  // 진행 언어 토글/레벨 편집
   const toggleLanguage = (lang: string) => {
-    const current = formData.languages || [];
-    if (current.includes(lang)) {
-      setFormData({ ...formData, languages: current.filter((l: string) => l !== lang) });
-    } else {
-      setFormData({ ...formData, languages: [...current, lang] });
-    }
+    const current = Array.isArray(formData.language_levels) ? formData.language_levels : [];
+    const nextLevels = current.some((entry: any) => entry.language === lang)
+      ? current.filter((entry: any) => entry.language !== lang)
+      : [...current, { language: lang, level: 3 }];
+    setFormData({ ...formData, language_levels: nextLevels, languages: getLanguageNames(nextLevels) });
+  };
+  const updateLanguageLevel = (lang: string, level: number) => {
+    const current = Array.isArray(formData.language_levels) ? formData.language_levels : [];
+    const nextLevels = current.map((entry: any) => (entry.language === lang ? { ...entry, level } : entry));
+    setFormData({ ...formData, language_levels: nextLevels, languages: getLanguageNames(nextLevels) });
   };
 
   // 배열 항목 수정 (포함/불포함)
@@ -364,15 +384,40 @@ export default function EditExperiencePage() {
               </div>
             </div>
 
-            {/* 진행 언어 선택 (기존 기능 복구) */}
+            {/* 진행 언어 선택 */}
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-3">{t('label_languages')}</label>
-              <div className="flex flex-wrap gap-2">
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <button key={lang} onClick={() => toggleLanguage(lang)} className={`px-4 py-2 rounded-full text-sm font-bold border flex items-center gap-2 transition-all ${formData.languages.includes(lang) ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-600 hover:border-black'}`}>
-                    {lang} {formData.languages.includes(lang) && <Check size={14} />}
-                  </button>
-                ))}
+              <div className="space-y-3">
+                {SUPPORTED_LANGUAGES.map((lang) => {
+                  const current = (formData.language_levels || []).find((entry: any) => entry.language === lang);
+                  const selected = Boolean(current);
+
+                  return (
+                    <div key={lang} className={`rounded-2xl border p-4 ${selected ? 'border-black bg-slate-50' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <button type="button" onClick={() => toggleLanguage(lang)} className="font-bold text-sm text-slate-900">
+                          {lang}
+                        </button>
+                        <button type="button" onClick={() => toggleLanguage(lang)} className={`w-7 h-7 rounded-full border flex items-center justify-center ${selected ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}>
+                          <Check size={14} strokeWidth={3} />
+                        </button>
+                      </div>
+                      <div className="mt-3 grid grid-cols-5 gap-1.5">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            disabled={!selected}
+                            onClick={() => updateLanguageLevel(lang, level)}
+                            className={`h-9 rounded-xl border text-[11px] font-bold ${!selected ? 'border-slate-200 bg-slate-100 text-slate-300 cursor-not-allowed' : current?.level === level ? 'border-black bg-black text-white' : 'border-slate-200 bg-white text-slate-600'}`}
+                          >
+                            Lv.{level}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -406,6 +451,37 @@ export default function EditExperiencePage() {
                 <label className="block text-xs font-bold text-slate-500 mb-2">{t('label_max_guests')}</label>
                 <input type="number" className="w-full p-4 bg-white border border-slate-200 rounded-xl font-bold focus:border-black outline-none" value={formData.max_guests} onChange={(e) => setFormData({ ...formData, max_guests: e.target.value })} />
               </div>
+            </div>
+            <div className="w-full bg-slate-50 p-5 rounded-2xl border border-slate-200">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <Lock size={18} className="text-slate-900" />
+                  <span className="font-bold text-slate-900">단독 투어 옵션</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={Boolean(formData.is_private_enabled)}
+                    onChange={(e) => setFormData({ ...formData, is_private_enabled: e.target.checked })}
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
+                </label>
+              </div>
+              {formData.is_private_enabled && (
+                <div className="pt-2 border-t border-slate-200">
+                  <label className="block text-xs font-bold text-slate-500 mb-2">단독 투어 금액</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₩</span>
+                    <input
+                      type="number"
+                      className="w-full p-4 pl-10 bg-white border border-slate-200 rounded-xl font-bold focus:border-black outline-none"
+                      value={formData.private_price || 0}
+                      onChange={(e) => setFormData({ ...formData, private_price: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <div>
@@ -465,6 +541,19 @@ export default function EditExperiencePage() {
                   </div>
                 ))}
                 <button onClick={() => addArrayItem('inclusions')} className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2 hover:underline"><Plus size={12} /> {t('btn_add_item')}</button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-2">불포함 사항</label>
+              <div className="space-y-2">
+                {formData.exclusions.map((item: string, i: number) => (
+                  <div key={i} className="flex gap-2">
+                    <input className="flex-1 p-2 bg-white border rounded-lg text-sm" value={item} onChange={(e) => handleArrayChange('exclusions', i, e.target.value)} />
+                    <button onClick={() => removeArrayItem('exclusions', i)} className="text-slate-400 hover:text-red-500"><X size={16} /></button>
+                  </div>
+                ))}
+                <button onClick={() => addArrayItem('exclusions')} className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2 hover:underline"><Plus size={12} /> {t('btn_add_item')}</button>
               </div>
             </div>
 

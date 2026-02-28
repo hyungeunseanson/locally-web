@@ -1,13 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, Lightbulb } from 'lucide-react';
+import { Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, Lightbulb, CheckCircle2, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ReviewSection from './ReviewSection';
 import HostProfileSection from './HostProfileSection';
 import { useToast } from '@/app/context/ToastContext';
 import { ExperienceDetail, ExperienceItineraryItem, HostProfileDetail } from '../types';
+import { formatLanguageLevelSummary, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 
 type MainContentProps = {
   experience: ExperienceDetail;
@@ -47,12 +48,15 @@ export default function ExpMainContent({
     : Array.isArray(hostProfile?.languages)
       ? hostProfile.languages
       : [];
+  const experienceLanguageLevels = normalizeLanguageLevels(experience.language_levels, experience.languages, 3);
   const normalizedLanguages = rawLanguages.length > 0
     ? rawLanguages
       .map((language) => mapLanguageLabel(String(language)))
       .filter(Boolean)
     : [];
-  const languageText = normalizedLanguages.length > 0
+  const languageText = experienceLanguageLevels.length > 0
+    ? `${formatLanguageLevelSummary(experienceLanguageLevels)}로 진행되는 체험입니다.`
+    : normalizedLanguages.length > 0
     ? `${Array.from(new Set(normalizedLanguages)).join(' 및 ')}로 진행되는 체험입니다.`
     : '영어 및 한국어로 진행되는 체험입니다.';
 
@@ -156,7 +160,6 @@ export default function ExpMainContent({
         dreamDestination={hostProfile?.dream_destination || "여행"}
         favoriteSong={hostProfile?.favorite_song || "음악"}
         languages={hostProfile?.languages || []}
-        languageLevel={hostProfile?.language_level}
         intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."}
         joinedYear={hostProfile?.joined_year}
         category={translatedCategory || experience.category || '문화 체험'}
@@ -182,7 +185,31 @@ export default function ExpMainContent({
             <div>
               <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">활동 강도</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
-                신체 활동 강도: {experience.rules?.activity_level || '보통'}, 사전 준비도: {experience.rules?.preparation_level || '초보자'}
+                신체 활동 강도: {experience.rules?.activity_level || '보통'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <CheckCircle2 size={22} className="text-slate-700 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">포함 사항</h4>
+              <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+                {Array.isArray(experience.inclusions) && experience.inclusions.length > 0
+                  ? experience.inclusions.join(', ')
+                  : '현장 안내를 참고해주세요.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <X size={22} className="text-slate-700 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">불포함 사항</h4>
+              <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+                {Array.isArray(experience.exclusions) && experience.exclusions.length > 0
+                  ? experience.exclusions.join(', ')
+                  : '별도 구매가 필요한 항목은 현장에서 안내됩니다.'}
               </p>
             </div>
           </div>
@@ -194,9 +221,6 @@ export default function ExpMainContent({
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {experience.supplies || '편한 복장과 개인 물품을 준비해주세요.'}
               </p>
-              {Array.isArray(experience.inclusions) && experience.inclusions.length > 0 && (
-                <p className="text-[12px] md:text-[13px] text-slate-500 mt-2">포함 사항: {experience.inclusions.join(', ')}</p>
-              )}
             </div>
           </div>
 

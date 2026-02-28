@@ -13,7 +13,6 @@ interface HostProfileProps {
   dreamDestination?: string;
   favoriteSong?: string;
   languages?: string[];
-  languageLevel?: number | null;
   intro?: string;
   joinedYear?: number | null;
   category?: string;
@@ -22,28 +21,9 @@ interface HostProfileProps {
 
 export default function HostProfileSection(props: HostProfileProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const languageLevelLabel = (() => {
-    switch (props.languageLevel) {
-      case 1:
-        return 'Lv.1 기초 단계';
-      case 2:
-        return 'Lv.2 초급 회화';
-      case 3:
-        return 'Lv.3 일상 회화';
-      case 4:
-        return 'Lv.4 비즈니스 회화';
-      case 5:
-        return 'Lv.5 원어민 수준';
-      default:
-        return '';
-    }
-  })();
-  const languageLine = [
-    Array.isArray(props.languages) && props.languages.length > 0
-      ? Array.from(new Set(props.languages.map((language) => String(language).trim()).filter(Boolean))).join(', ')
-      : '',
-    languageLevelLabel
-  ].filter(Boolean).join(' · ');
+  const languageLine = Array.isArray(props.languages) && props.languages.length > 0
+    ? Array.from(new Set(props.languages.map((language) => String(language).trim()).filter(Boolean))).join(', ')
+    : '';
 
   return (
     <>

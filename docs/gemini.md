@@ -275,3 +275,17 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 대규모 변경 시 이 문서에는 결정사항만 요약하고, 상세 이력은 별도 문서 또는 커밋에 남긴다.
 - 모바일 전용 경로(`'/host/menu'` 등)는 데스크탑 전환/네비게이션의 기본 목적지로 사용하지 않는다.
 - 폰트 검증은 개발 캐시(`.next/dev`) 단독 결과를 기준으로 판단하지 않고, `.next` 정리 후 `webpack build` 산출물로 최종 확인한다.
+
+---
+
+## 9. 현재 연결 점검 메모
+
+- 호스트 지원서의 `email`은 `host_applications.email` 전용 필드다. 관리자 검토용으로는 보이지만, 실제 로그인 계정 이메일(`auth`/`profiles.email`)과 동기화되지 않는다.
+- 호스트 지원서 언어는 `host_applications.language_levels`(JSON) + `languages`(문자열 배열) 이중 구조로 저장한다. 관리자 상세에서는 `언어 + Lv.n`으로 보여주고, 리스트 요약은 `languages` 기준으로 표시한다.
+- 호스트 지원서의 `language_cert`는 입력/저장을 유지하며, 관리자 상세에서만 텍스트로 노출한다.
+- 호스트 지원서 상태의 `idCardType`은 로컬 상태만 존재하고, 렌더/저장/조회 경로가 없다.
+- 체험 등록의 `spots`는 생성 시 저장되지만 현재 런타임 읽기 경로가 없다.
+- 체험 언어는 `experiences.language_levels`(JSON) + `languages`(문자열 배열) 이중 구조로 저장한다. 공개 상세는 기존 Lightbulb 언어 안내 위치에서 `한국어 Lv.5 · 영어 Lv.4` 형식의 한 줄 요약을 우선 노출한다.
+- 체험의 `exclusions`는 생성/수정 화면 모두에서 직접 입력 가능하며, 상세 화면에서는 `포함 사항 / 불포함 사항 / 준비물`을 분리 노출한다.
+- 체험의 `is_private_enabled` / `private_price`는 생성뿐 아니라 호스트 대시보드의 체험 수정 화면에서도 실제 편집/저장 가능해야 한다.
+- 체험 상세 UI는 `rules.preparation_level`을 더 이상 표기하지 않고, `활동 강도`는 `rules.activity_level`만 노출한다.

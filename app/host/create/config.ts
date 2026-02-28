@@ -1,3 +1,5 @@
+import { LanguageLevelEntry } from '@/app/utils/languageLevels';
+
 export const MAJOR_CITIES = {
   Korea: ['서울', '부산', '제주', '인천', '경기', '강원', '경주', '전주', '여수', '기타'],
   Japan: ['도쿄', '오사카', '시즈오카', '교토', '후쿠오카', '삿포로', '오키나와', '나고야', '고베', '기타'],
@@ -25,7 +27,7 @@ export const SUPPORTED_LANGUAGES = [
 export const MAX_EXPERIENCE_PHOTOS = 5;
 export const FIXED_REFUND_POLICY = '표준 정책 (7일 전 무료 취소)';
 
-export const TOTAL_STEPS = 7;
+export const TOTAL_STEPS = 8;
 
 export const INITIAL_FORM_DATA = {
   country: 'Korea', 
@@ -33,8 +35,8 @@ export const INITIAL_FORM_DATA = {
   subCity: '',   
   category: '', 
   
-  // ✅ 언어 데이터 추가
   languages: [] as string[],
+  language_levels: [] as LanguageLevelEntry[],
 
   title: '', 
   photos: [] as string[], 

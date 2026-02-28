@@ -31,6 +31,7 @@ import {
   MAX_EXPERIENCE_PHOTOS,
   FIXED_REFUND_POLICY,
 } from '../config';
+import { type LanguageLevel, type LanguageLevelEntry } from '@/app/utils/languageLevels';
 
 type ItineraryItem = {
   title: string;
@@ -44,6 +45,7 @@ interface ExperienceFormData {
   city: string;
   category: string;
   languages: string[];
+  language_levels: LanguageLevelEntry[];
   title: string;
   photos: string[];
   location: string;
@@ -73,8 +75,8 @@ interface ExperienceFormStepsProps {
   handlePhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleItineraryImageUpload: (index: number, e: React.ChangeEvent<HTMLInputElement>) => void;
   handleRemoveItineraryImage: (index: number) => void;
-  addItem: (field: 'inclusions', value: string, setter: React.Dispatch<React.SetStateAction<string>>) => void;
-  removeItem: (field: 'inclusions', index: number) => void;
+  addItem: (field: 'inclusions' | 'exclusions', value: string, setter: React.Dispatch<React.SetStateAction<string>>) => void;
+  removeItem: (field: 'inclusions' | 'exclusions', index: number) => void;
   addItineraryItem: () => void;
   removeItineraryItem: (index: number) => void;
   updateItineraryItem: (index: number, key: 'title' | 'description' | 'type', value: string) => void;
@@ -82,7 +84,79 @@ interface ExperienceFormStepsProps {
   setIsCustomCity: React.Dispatch<React.SetStateAction<boolean>>;
   tempInclusion: string;
   setTempInclusion: React.Dispatch<React.SetStateAction<string>>;
+  tempExclusion: string;
+  setTempExclusion: React.Dispatch<React.SetStateAction<string>>;
   handleRemoveImage?: (index: number) => void;
+}
+
+const LEVELS: LanguageLevel[] = [1, 2, 3, 4, 5];
+
+function LanguageLevelSelector({
+  entries,
+  updateData,
+}: {
+  entries: LanguageLevelEntry[];
+  updateData: (key: string, value: unknown) => void;
+}) {
+  const toggleLanguage = (language: string) => {
+    const exists = entries.some((entry) => entry.language === language);
+    const nextEntries = exists
+      ? entries.filter((entry) => entry.language !== language)
+      : [...entries, { language, level: 3 }];
+    updateData('language_levels', nextEntries);
+  };
+
+  const updateLevel = (language: string, level: LanguageLevel) => {
+    updateData(
+      'language_levels',
+      entries.map((entry) => (entry.language === language ? { ...entry, level } : entry))
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {SUPPORTED_LANGUAGES.map((language) => {
+        const current = entries.find((entry) => entry.language === language);
+        const selected = Boolean(current);
+
+        return (
+          <div key={language} className={`rounded-2xl border p-4 ${selected ? 'border-black bg-slate-50' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" onClick={() => toggleLanguage(language)} className="text-left font-bold text-sm md:text-base">
+                {language}
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleLanguage(language)}
+                className={`w-7 h-7 rounded-full border flex items-center justify-center ${selected ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}
+              >
+                <Check size={14} strokeWidth={3} />
+              </button>
+            </div>
+            <div className="mt-4 grid grid-cols-5 gap-1.5">
+              {LEVELS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  disabled={!selected}
+                  onClick={() => updateLevel(language, level)}
+                  className={`h-10 rounded-xl border text-[11px] font-bold ${
+                    !selected
+                      ? 'border-slate-200 bg-slate-100 text-slate-300 cursor-not-allowed'
+                      : current?.level === level
+                        ? 'border-black bg-black text-white'
+                        : 'border-slate-200 bg-white text-slate-600'
+                  }`}
+                >
+                  Lv.{level}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function ExperienceFormSteps({
@@ -102,6 +176,8 @@ export default function ExperienceFormSteps({
   setIsCustomCity,
   tempInclusion,
   setTempInclusion,
+  tempExclusion,
+  setTempExclusion,
   handleRemoveImage,
 }: ExperienceFormStepsProps) {
   const categoryIconMap: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
@@ -119,16 +195,11 @@ export default function ExperienceFormSteps({
   };
 
   if (step === 1) {
-    const toggleLanguage = (lang: string) => {
-      const current = formData.languages || [];
-      updateData('languages', current.includes(lang) ? current.filter((l: string) => l !== lang) : [...current, lang]);
-    };
-
     return (
       <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
           <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">어떤 체험을 준비하셨나요?</h1>
-          <p className="text-[13px] md:text-base text-slate-500">지역, 카테고리, 그리고 언어를 선택해주세요.</p>
+          <p className="text-[13px] md:text-base text-slate-500">지역과 카테고리를 먼저 선택해주세요.</p>
         </div>
 
         <div className="space-y-5 md:space-y-6">
@@ -136,6 +207,7 @@ export default function ExperienceFormSteps({
             {['Korea', 'Japan'].map((country) => (
               <button
                 key={country}
+                type="button"
                 onClick={() => updateData('country', country)}
                 className={`px-4 md:px-6 py-2 rounded-lg text-xs md:text-sm font-bold transition-all ${formData.country === country ? 'bg-white shadow-sm text-black' : 'text-slate-400'}`}
               >
@@ -148,6 +220,7 @@ export default function ExperienceFormSteps({
             {MAJOR_CITIES[formData.country as 'Korea' | 'Japan'].map((city: string) => (
               <button
                 key={city}
+                type="button"
                 onClick={() => {
                   setIsCustomCity(city === '기타');
                   updateData('city', city === '기타' ? '' : city);
@@ -169,44 +242,25 @@ export default function ExperienceFormSteps({
             />
           )}
 
-          <div className="space-y-6 md:space-y-8">
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">카테고리</label>
-              <div className="flex flex-wrap gap-2.5 md:gap-3">
-                {CATEGORIES.map((category: string) => {
-                  const Icon = categoryIconMap[category] || MapPin;
-                  const isSelected = formData.category === category;
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">카테고리</label>
+            <div className="flex flex-wrap gap-2.5 md:gap-3">
+              {CATEGORIES.map((category: string) => {
+                const Icon = categoryIconMap[category] || MapPin;
+                const isSelected = formData.category === category;
 
-                  return (
-                    <button
-                      key={category}
-                      onClick={() => updateData('category', category)}
-                      className={`h-10 md:h-11 px-3.5 md:px-4 rounded-full border flex items-center gap-1.5 md:gap-2 text-[12px] md:text-sm font-semibold transition-all ${isSelected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545] hover:border-[#222]'}`}
-                    >
-                      <Icon size={14} strokeWidth={1.9} />
-                      <span>{category}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">진행 가능한 언어</label>
-              <div className="flex flex-wrap gap-2.5 md:gap-3">
-                {SUPPORTED_LANGUAGES.map((lang: string) => {
-                  const isSelected = (formData.languages || []).includes(lang);
-                  return (
-                    <button
-                      key={lang}
-                      onClick={() => toggleLanguage(lang)}
-                      className={`px-4 md:px-5 py-2.5 md:py-3 rounded-full text-xs md:text-sm font-bold border transition-all flex items-center gap-2 ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'}`}
-                    >
-                      {lang} {isSelected && <Check size={14} />}
-                    </button>
-                  );
-                })}
-              </div>
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => updateData('category', category)}
+                    className={`h-10 md:h-11 px-3.5 md:px-4 rounded-full border flex items-center gap-1.5 md:gap-2 text-[12px] md:text-sm font-semibold transition-all ${isSelected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545] hover:border-[#222]'}`}
+                  >
+                    <Icon size={14} strokeWidth={1.9} />
+                    <span>{category}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -215,6 +269,18 @@ export default function ExperienceFormSteps({
   }
 
   if (step === 2) {
+    return (
+      <div className="w-full space-y-6 md:space-y-8">
+        <div className="space-y-2">
+          <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">진행 가능한 언어</h1>
+          <p className="text-[13px] md:text-base text-slate-500">이 체험을 어떤 언어로 진행할 수 있나요?</p>
+        </div>
+        <LanguageLevelSelector entries={formData.language_levels || []} updateData={updateData} />
+      </div>
+    );
+  }
+
+  if (step === 3) {
     return (
       <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
@@ -269,7 +335,7 @@ export default function ExperienceFormSteps({
     );
   }
 
-  if (step === 3) {
+  if (step === 4) {
     return (
       <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
@@ -312,7 +378,7 @@ export default function ExperienceFormSteps({
                       {idx === 0 ? 'START' : idx === formData.itinerary.length - 1 ? 'END' : `STOP ${idx}`}
                     </span>
                     {formData.itinerary.length > 1 && (
-                      <button onClick={() => removeItineraryItem(idx)} className="text-slate-300 hover:text-rose-500">
+                      <button type="button" onClick={() => removeItineraryItem(idx)} className="text-slate-300 hover:text-rose-500">
                         <Trash2 size={16} />
                       </button>
                     )}
@@ -341,18 +407,9 @@ export default function ExperienceFormSteps({
                           <div className="absolute top-2 right-2 flex gap-2">
                             <label className="bg-white/90 text-slate-700 px-3 py-1.5 rounded-full text-[11px] font-bold cursor-pointer">
                               교체
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => handleItineraryImageUpload(idx, e)}
-                              />
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleItineraryImageUpload(idx, e)} />
                             </label>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItineraryImage(idx)}
-                              className="bg-black/70 text-white p-1.5 rounded-full hover:bg-rose-500 transition-colors"
-                            >
+                            <button type="button" onClick={() => handleRemoveItineraryImage(idx)} className="bg-black/70 text-white p-1.5 rounded-full hover:bg-rose-500 transition-colors">
                               <X size={12} />
                             </button>
                           </div>
@@ -361,12 +418,7 @@ export default function ExperienceFormSteps({
                         <label className="flex items-center justify-center gap-2 h-20 rounded-2xl border-2 border-dashed border-slate-300 text-slate-500 text-xs font-bold cursor-pointer hover:border-black hover:text-black transition-colors">
                           <Camera size={16} />
                           장소 사진 추가
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleItineraryImageUpload(idx, e)}
-                          />
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleItineraryImageUpload(idx, e)} />
                         </label>
                       )}
                     </div>
@@ -375,7 +427,7 @@ export default function ExperienceFormSteps({
               </div>
             ))}
 
-            <button onClick={addItineraryItem} className="flex items-center gap-3 text-slate-500 hover:text-black font-bold text-sm pl-1">
+            <button type="button" onClick={addItineraryItem} className="flex items-center gap-3 text-slate-500 hover:text-black font-bold text-sm pl-1">
               <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
                 <Plus size={16} />
               </div>
@@ -387,7 +439,7 @@ export default function ExperienceFormSteps({
     );
   }
 
-  if (step === 4) {
+  if (step === 5) {
     return (
       <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
@@ -419,7 +471,7 @@ export default function ExperienceFormSteps({
                 }}
                 className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200"
               />
-              <button onClick={() => addItem('inclusions', tempInclusion, setTempInclusion)} className="bg-black text-white p-3 rounded-xl">
+              <button type="button" onClick={() => addItem('inclusions', tempInclusion, setTempInclusion)} className="bg-black text-white p-3 rounded-xl">
                 <Plus size={20} />
               </button>
             </div>
@@ -427,7 +479,39 @@ export default function ExperienceFormSteps({
               {formData.inclusions.map((item: string, i: number) => (
                 <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-100">
                   {item}
-                  <button onClick={() => removeItem('inclusions', i)}>
+                  <button type="button" onClick={() => removeItem('inclusions', i)}>
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">불포함 사항</label>
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                placeholder="예) 개인 교통비"
+                value={tempExclusion}
+                onChange={(e) => setTempExclusion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addItem('exclusions', tempExclusion, setTempExclusion);
+                  }
+                }}
+                className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none border border-slate-200"
+              />
+              <button type="button" onClick={() => addItem('exclusions', tempExclusion, setTempExclusion)} className="bg-black text-white p-3 rounded-xl">
+                <Plus size={20} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {formData.exclusions.map((item: string, i: number) => (
+                <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
+                  {item}
+                  <button type="button" onClick={() => removeItem('exclusions', i)}>
                     <X size={12} />
                   </button>
                 </span>
@@ -449,7 +533,7 @@ export default function ExperienceFormSteps({
     );
   }
 
-  if (step === 5) {
+  if (step === 6) {
     return (
       <div className="w-full space-y-6 md:space-y-8">
         <div className="space-y-2">
@@ -463,11 +547,11 @@ export default function ExperienceFormSteps({
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">소요 시간</label>
                 <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200">
-                  <button onClick={() => handleCounter('duration', 'dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                  <button type="button" onClick={() => handleCounter('duration', 'dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
                     <Minus size={14} />
                   </button>
                   <span className="font-black flex-1 text-center">{formData.duration}시간</span>
-                  <button onClick={() => handleCounter('duration', 'inc')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                  <button type="button" onClick={() => handleCounter('duration', 'inc')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
                     <Plus size={14} />
                   </button>
                 </div>
@@ -476,11 +560,11 @@ export default function ExperienceFormSteps({
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">최대 인원</label>
                 <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-200">
-                  <button onClick={() => handleCounter('maxGuests', 'dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                  <button type="button" onClick={() => handleCounter('maxGuests', 'dec')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
                     <Minus size={14} />
                   </button>
                   <span className="font-black flex-1 text-center">{formData.maxGuests}명</span>
-                  <button onClick={() => handleCounter('maxGuests', 'inc')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                  <button type="button" onClick={() => handleCounter('maxGuests', 'inc')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
                     <Plus size={14} />
                   </button>
                 </div>
@@ -522,7 +606,7 @@ export default function ExperienceFormSteps({
     );
   }
 
-  if (step === 6) {
+  if (step === 7) {
     return (
       <div className="w-full space-y-6 md:space-y-8">
         <div className="text-center space-y-2">
@@ -582,7 +666,7 @@ export default function ExperienceFormSteps({
     );
   }
 
-  if (step === 7) {
+  if (step === 8) {
     return (
       <div className="w-full text-center space-y-8 animate-in zoom-in-95 duration-500 py-10">
         <div className="w-32 h-32 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-green-200">

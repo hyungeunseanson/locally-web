@@ -1,3 +1,5 @@
+import { LanguageLevelEntry } from '@/app/utils/languageLevels';
+
 export type ExperienceItineraryItem = {
   title?: string;
   description?: string;
@@ -19,6 +21,7 @@ export type ExperienceDetail = {
   city?: string;
   category?: string;
   languages?: string[];
+  language_levels?: LanguageLevelEntry[];
   meeting_point?: string;
   location?: string;
   rating?: number;
@@ -32,6 +35,7 @@ export type ExperienceDetail = {
   duration?: number;
   supplies?: string;
   inclusions?: string[];
+  exclusions?: string[];
   itinerary?: ExperienceItineraryItem[];
   rules?: ExperienceRules;
   [key: string]: unknown;
@@ -42,7 +46,6 @@ export type HostProfileDetail = {
   name?: string;
   avatar_url?: string;
   languages?: string[];
-  language_level?: number | null;
   introduction?: string;
   job?: string;
   dream_destination?: string;

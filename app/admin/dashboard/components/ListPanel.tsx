@@ -2,10 +2,21 @@
 
 import React from 'react';
 import { Search, ChevronRight, User } from 'lucide-react';
+import { getLanguageNames } from '@/app/utils/languageLevels';
 
 export default function ListPanel({
   activeTab, filter, setFilter, listItems, selectedItem, setSelectedItem
 }: any) {
+  const getAppLanguageSummary = (item: any) => {
+    if (Array.isArray(item.languages) && item.languages.length > 0) {
+      return item.languages.join(', ');
+    }
+    const levelNames = getLanguageNames(Array.isArray(item.language_levels) ? item.language_levels : []);
+    if (levelNames.length > 0) {
+      return levelNames.join(', ');
+    }
+    return item.target_language || '-';
+  };
 
   return (
     <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-sm min-w-[320px]">
@@ -79,7 +90,7 @@ export default function ListPanel({
                 </div>
                 <div className="flex justify-between text-[9px] md:text-[10px] text-slate-500">
                   <span className="truncate pr-1">
-                    {activeTab === 'APPS' ? `${item.host_nationality} / ${item.target_language}`
+                    {activeTab === 'APPS' ? `${item.host_nationality} / ${getAppLanguageSummary(item)}`
                       : activeTab === 'EXPS' ? `₩${item.price?.toLocaleString()}`
                         : item.email}
                   </span>

@@ -14,6 +14,7 @@ import {
 } from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps';
 import { validateImage, sanitizeFileName, compressImage } from '@/app/utils/image';
+import { getLanguageNames } from '@/app/utils/languageLevels';
 
 type ItineraryItem = {
   title: string;
@@ -43,6 +44,7 @@ export default function CreateExperiencePage() {
     INITIAL_FORM_DATA.itinerary.map(() => null)
   );
   const [tempInclusion, setTempInclusion] = useState('');
+  const [tempExclusion, setTempExclusion] = useState('');
 
   const validateCurrentStep = (targetStep: number) => {
     if (targetStep === 1) {
@@ -54,14 +56,22 @@ export default function CreateExperiencePage() {
         showToast('카테고리를 선택해주세요.', 'error');
         return false;
       }
-      if (!formData.languages || formData.languages.length === 0) {
+      return true;
+    }
+
+    if (targetStep === 2) {
+      if (!formData.language_levels || formData.language_levels.length === 0) {
         showToast('진행 가능한 언어를 1개 이상 선택해주세요.', 'error');
+        return false;
+      }
+      if (formData.language_levels.some((entry: { level?: number }) => !entry?.level || entry.level < 1 || entry.level > 5)) {
+        showToast('선택한 각 언어의 레벨을 설정해주세요.', 'error');
         return false;
       }
       return true;
     }
 
-    if (targetStep === 2) {
+    if (targetStep === 3) {
       if (!formData.title?.trim() || formData.title.trim().length < 6) {
         showToast('체험 제목을 6자 이상 입력해주세요.', 'error');
         return false;
@@ -77,7 +87,7 @@ export default function CreateExperiencePage() {
       return true;
     }
 
-    if (targetStep === 3) {
+    if (targetStep === 4) {
       if (!formData.meeting_point?.trim()) {
         showToast('만나는 장소 이름을 입력해주세요.', 'error');
         return false;
@@ -94,7 +104,7 @@ export default function CreateExperiencePage() {
       return true;
     }
 
-    if (targetStep === 4) {
+    if (targetStep === 5) {
       if (!formData.description?.trim() || formData.description.trim().length < 30) {
         showToast('상세 설명을 30자 이상 입력해주세요.', 'error');
         return false;
@@ -106,7 +116,7 @@ export default function CreateExperiencePage() {
       return true;
     }
 
-    if (targetStep === 5) {
+    if (targetStep === 6) {
       if (!formData.rules?.age_limit?.trim()) {
         showToast('참가 연령 기준을 입력해주세요.', 'error');
         return false;
@@ -114,7 +124,7 @@ export default function CreateExperiencePage() {
       return true;
     }
 
-    if (targetStep === 6) {
+    if (targetStep === 7) {
       if (!Number(formData.price) || Number(formData.price) <= 0) {
         showToast('기본 가격을 올바르게 입력해주세요.', 'error');
         return false;
@@ -149,7 +159,7 @@ export default function CreateExperiencePage() {
   };
 
   const addItem = (
-    field: 'inclusions',
+    field: 'inclusions' | 'exclusions',
     value: string,
     setter: React.Dispatch<React.SetStateAction<string>>
   ) => {
@@ -158,7 +168,7 @@ export default function CreateExperiencePage() {
     setter('');
   };
 
-  const removeItem = (field: 'inclusions', index: number) => {
+  const removeItem = (field: 'inclusions' | 'exclusions', index: number) => {
     updateData(field, formData[field].filter((_, i) => i !== index));
   };
 
@@ -320,6 +330,9 @@ export default function CreateExperiencePage() {
         })
       );
 
+      const languageNames = getLanguageNames(formData.language_levels || []);
+      const cleanedExclusions = (formData.exclusions || []).map((item: string) => item.trim()).filter(Boolean);
+
       const { error } = await supabase.from('experiences').insert([
         {
           host_id: user.id,
@@ -327,7 +340,8 @@ export default function CreateExperiencePage() {
           city: formData.city,
           title: formData.title,
           category: formData.category,
-          languages: formData.languages,
+          languages: languageNames,
+          language_levels: formData.language_levels,
           duration: formData.duration,
           max_guests: formData.maxGuests,
           description: formData.description,
@@ -338,7 +352,7 @@ export default function CreateExperiencePage() {
           photos: photoUrls,
           price: formData.price,
           inclusions: formData.inclusions,
-          exclusions: [],
+          exclusions: cleanedExclusions,
           supplies: formData.supplies,
           rules: {
             ...formData.rules,
@@ -398,6 +412,8 @@ export default function CreateExperiencePage() {
           setIsCustomCity={setIsCustomCity}
           tempInclusion={tempInclusion}
           setTempInclusion={setTempInclusion}
+          tempExclusion={tempExclusion}
+          setTempExclusion={setTempExclusion}
         />
       </main>
 

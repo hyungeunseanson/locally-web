@@ -8,10 +8,17 @@ import {
   CreditCard, FileText, Camera, Shield, Download, AlertTriangle, Check, X
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
+import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 
 export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem, updateStatus, deleteItem }: any) {
   const supabase = createClient();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const applicationLanguageLevels = normalizeLanguageLevels(
+    selectedItem?.language_levels,
+    selectedItem?.languages,
+    3
+  );
+  const applicationLanguageNames = getLanguageNames(applicationLanguageLevels);
 
   // 🟢 [추가됨] 신분증 보안 URL 발급 로직
   // 'verification-docs' 버킷에 있는 파일은 그냥 <img> 태그로 못 봅니다. (403 에러)
@@ -180,8 +187,14 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100">
               <div className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1.5"><MessageCircle size={12} /> 언어</div>
               <div className="flex flex-wrap gap-1.5">
-                {Array.isArray(selectedItem.languages) && selectedItem.languages.length > 0
-                  ? selectedItem.languages.map((l: string) => <span key={l} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">{l}</span>)
+                {applicationLanguageLevels.length > 0
+                  ? applicationLanguageLevels.map((entry) => (
+                    <span key={`${entry.language}-${entry.level}`} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">
+                      {entry.language} · Lv.{entry.level}
+                    </span>
+                  ))
+                  : applicationLanguageNames.length > 0
+                    ? applicationLanguageNames.map((l: string) => <span key={l} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">{l}</span>)
                   : <span className="text-xs md:text-sm font-bold text-slate-900">{selectedItem.target_language || '-'}</span>}
               </div>
             </div>
@@ -190,6 +203,14 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             <div className="grid grid-cols-2 gap-2 md:gap-3">
               <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">Instagram</div><div className="font-bold text-xs md:text-sm">{selectedItem.instagram || '-'}</div></div>
               <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100"><div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">가입 경로</div><div className="font-bold text-xs md:text-sm">{selectedItem.source || '-'}</div></div>
+            </div>
+
+            <div className="bg-slate-50 p-3 md:p-4 rounded-xl text-[11px] md:text-xs leading-relaxed text-slate-700 border border-slate-100">
+              <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5">어학 자격증 (선택사항)</div>
+              <div className="font-bold text-slate-900">{selectedItem.language_cert || '-'}</div>
+              {applicationLanguageLevels.length > 0 && (
+                <div className="mt-2 text-slate-500">언어 레벨 요약: {formatLanguageLevelSummary(applicationLanguageLevels)}</div>
+              )}
             </div>
 
             <div><h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5 md:mb-2">자기소개</h4><div className="bg-slate-50 p-3 md:p-4 rounded-xl text-[11px] md:text-xs leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.self_intro}</div></div>

@@ -1,4 +1,5 @@
 import { Profile } from './index';
+import { LanguageLevelEntry } from '@/app/utils/languageLevels';
 
 export type AdminTaskType = 'DAILY_LOG' | 'TODO' | 'MEMO';
 export type AdminTaskStatus = 'Done' | 'Progress';
@@ -57,6 +58,9 @@ export interface HostApplication {
   name: string;
   email: string;
   status: 'pending' | 'approved' | 'rejected' | 'revision';
+  languages?: string[];
+  language_levels?: LanguageLevelEntry[];
+  language_cert?: string | null;
   content: any;
 }
 

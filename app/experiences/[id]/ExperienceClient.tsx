@@ -67,30 +67,10 @@ export default function ExperienceClient({
   const headerLabel = `${compactLocation} · ${category}`;
   const addressLine = experience.location || experience.city || compactLocation;
   const hostJob = hostProfile?.job?.trim() || '로컬리 호스트';
-  const formatLanguageLevel = (level?: number | null) => {
-    switch (level) {
-      case 1:
-        return 'Lv.1 기초 단계';
-      case 2:
-        return 'Lv.2 초급 회화';
-      case 3:
-        return 'Lv.3 일상 회화';
-      case 4:
-        return 'Lv.4 비즈니스 회화';
-      case 5:
-        return 'Lv.5 원어민 수준';
-      default:
-        return '';
-    }
-  };
   const hostLanguages = Array.isArray(hostProfile?.languages)
     ? Array.from(new Set(hostProfile.languages.map((language) => String(language).trim()).filter(Boolean)))
     : [];
-  const hostLanguageLevel = formatLanguageLevel(hostProfile?.language_level);
-  const hostLanguageSummary = [
-    hostLanguages.length > 0 ? hostLanguages.join(', ') : '',
-    hostLanguageLevel
-  ].filter(Boolean).join(' · ');
+  const hostLanguageSummary = hostLanguages.length > 0 ? hostLanguages.join(', ') : '';
   const desktopHostMeta = [hostJob, hostLanguageSummary].filter(Boolean).join('  |  ');
   const ratingValue = Number(experience.rating || 0);
   const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : 'New';
