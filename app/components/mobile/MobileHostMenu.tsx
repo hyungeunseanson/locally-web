@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
     Bell, Settings, HelpCircle, Star,
     ChevronRight, BookOpen, CornerUpRight, Loader2,
-    CalendarCheck, LayoutList, MessageSquare, CircleDollarSign, User
+    CalendarCheck, LayoutList, MessageSquare, CircleDollarSign, User, Briefcase
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
@@ -161,6 +161,7 @@ export default function MobileHostMenu() {
                 <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label="예약 관리" />
                 <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label="내 체험 관리" />
                 <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label="문의함" />
+                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label="서비스 매칭" />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />

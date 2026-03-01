@@ -208,9 +208,13 @@ export default function HomePageClient() {
                 <h2 className="text-[17px] font-semibold text-[#222222] tracking-[-0.02em] leading-tight">{t('home_section_popular_services')}</h2>
               </div>
               <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
-                {LOCALLY_SERVICES.slice(0, 4).map((item) => (
+                {LOCALLY_SERVICES.map((item) => (
                   <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
-                    <ServiceCard item={item} />
+                    {item.id === 5 ? (
+                      <Link href="/services/request"><ServiceCard item={item} /></Link>
+                    ) : (
+                      <ServiceCard item={item} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -219,7 +223,11 @@ export default function HomePageClient() {
             {/* 🖥️ 데스크탑 서비스 */}
             <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
               {LOCALLY_SERVICES.map((item) => (
-                <ServiceCard key={item.id} item={item} />
+                item.id === 5 ? (
+                  <Link key={item.id} href="/services/request"><ServiceCard item={item} /></Link>
+                ) : (
+                  <ServiceCard key={item.id} item={item} />
+                )
               ))}
             </div>
           </>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import {
   List, MessageSquare, DollarSign, Star, Plus,
-  Clock, AlertCircle, XCircle, UserCog, CalendarCheck, ShieldCheck, ArrowLeft
+  Clock, AlertCircle, XCircle, UserCog, CalendarCheck, ShieldCheck, ArrowLeft, Briefcase
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -19,6 +19,7 @@ import Earnings from './Earnings';
 import HostReviews from './HostReviews';
 import ProfileEditor from './components/ProfileEditor';
 import GuidelinesTab from './components/GuidelinesTab'; // 🟢 필수 교육 및 가이드라인 탭
+import ServiceJobsTab from './components/ServiceJobsTab';
 import { getProfileCompletion } from '@/app/utils/profile';
 
 interface HostStatusSummary {
@@ -224,6 +225,10 @@ function DashboardContent() {
             <MessageSquare size={20} /> {t('menu_inquiry')}
           </button>
 
+          <button onClick={() => handleTabChange('service-jobs')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'service-jobs' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+            <Briefcase size={20} /> 서비스 매칭
+          </button>
+
           <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
             <DollarSign size={20} /> {t('menu_earnings')}
           </button>
@@ -274,6 +279,7 @@ function DashboardContent() {
             {activeTab === 'reservations' && t('menu_reservation')}
             {activeTab === 'experiences' && t('menu_my_exp')}
             {activeTab === 'inquiries' && t('menu_inquiry')}
+            {activeTab === 'service-jobs' && '서비스 매칭'}
             {activeTab === 'earnings' && t('menu_earnings')}
             {activeTab === 'reviews' && t('menu_reviews')}
             {activeTab === 'profile' && t('menu_profile')}
@@ -292,6 +298,7 @@ function DashboardContent() {
         {activeTab === 'reservations' && <ReservationManager />}
         {activeTab === 'experiences' && <MyExperiences />}
         {activeTab === 'inquiries' && <InquiryChat />}
+        {activeTab === 'service-jobs' && <ServiceJobsTab />}
         {activeTab === 'earnings' && <Earnings />}
         {activeTab === 'reviews' && <HostReviews />}
         {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}

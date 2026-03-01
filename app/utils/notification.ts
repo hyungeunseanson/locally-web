@@ -1,14 +1,21 @@
 // app/utils/notification.ts
-export type NotificationType = 
-  | 'booking_request' 
-  | 'booking_confirmed' 
-  | 'booking_cancelled' 
+export type NotificationType =
+  | 'booking_request'
+  | 'booking_confirmed'
+  | 'booking_cancelled'
   | 'booking_cancel_request'
   | 'cancellation_requested'
   | 'cancellation_approved'
-  | 'new_booking' 
-  | 'new_message' 
-  | 'admin_alert';
+  | 'new_booking'
+  | 'new_message'
+  | 'admin_alert'
+  // [서비스 매칭 시스템]
+  | 'service_request_new'       // 호스트에게: 내 지역 새 의뢰 등록
+  | 'service_application_new'   // 고객에게: 새 지원자 등록
+  | 'service_host_selected'     // 호스트에게: 고객에게 선택됨
+  | 'service_host_rejected'     // 호스트에게: 다른 호스트 선택됨 (미선택)
+  | 'service_payment_confirmed' // 양측: 결제 확정 → 매칭 완료
+  | 'service_cancelled';        // 양측: 서비스 취소
 
   interface SendNotificationParams {
     recipient_id?: string;

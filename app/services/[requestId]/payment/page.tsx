@@ -1,0 +1,282 @@
+'use client';
+
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { ChevronLeft, CreditCard, Loader2, Clock, Users, ShieldCheck } from 'lucide-react';
+import Script from 'next/script';
+import { createClient } from '@/app/utils/supabase/client';
+import { useToast } from '@/app/context/ToastContext';
+import type { ServiceRequest } from '@/app/types/service';
+
+type ImpRequestData = {
+  pg: string;
+  pay_method: 'card';
+  merchant_uid: string;
+  name: string;
+  amount: number;
+  buyer_email?: string;
+  buyer_name: string;
+  buyer_tel: string;
+  m_redirect_url: string;
+};
+
+type ImpResponse = {
+  success?: boolean;
+  code?: string;
+  status?: string;
+  imp_uid?: string;
+  error_msg?: string;
+};
+
+declare global {
+  interface Window {
+    IMP?: {
+      init: (merchantCode: string) => void;
+      request_pay: (data: ImpRequestData, callback: (rsp: ImpResponse) => void) => void;
+    };
+  }
+}
+
+function ServicePaymentContent() {
+  const router = useRouter();
+  const params = useParams<{ requestId: string }>();
+  const searchParams = useSearchParams();
+  const supabase = useMemo(() => createClient(), []);
+  const { showToast } = useToast();
+
+  const applicationId = searchParams.get('applicationId') ?? '';
+  const requestId = params.requestId;
+
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [request, setRequest] = useState<ServiceRequest | null>(null);
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+
+  const fetchData = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { router.push('/login'); return; }
+
+    const { data: req } = await supabase
+      .from('service_requests')
+      .select('*')
+      .eq('id', requestId)
+      .maybeSingle();
+
+    if (!req) return;
+    setRequest(req as ServiceRequest);
+
+    // 연락처 자동 완성
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.full_name) setContactName(profile.full_name);
+    if (profile?.phone) setContactPhone(profile.phone);
+  }, [requestId, router, supabase]);
+
+  useEffect(() => { void fetchData(); }, [fetchData]);
+
+  const handlePayment = async () => {
+    setPaymentError('');
+
+    if (!contactName.trim() || !contactPhone.trim()) {
+      showToast('이름과 연락처를 입력해주세요.', 'error');
+      return;
+    }
+    if (!agreeTerms) {
+      showToast('이용 약관에 동의해주세요.', 'error');
+      return;
+    }
+    if (!request || !applicationId) {
+      showToast('결제 정보가 올바르지 않습니다.', 'error');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // 1. 원자적 예약 생성
+      const bookingRes = await fetch('/api/services/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          request_id: requestId,
+          application_id: applicationId,
+          contact_name: contactName.trim(),
+          contact_phone: contactPhone.trim(),
+        }),
+      });
+      const bookingData = await bookingRes.json();
+
+      if (!bookingRes.ok || !bookingData.success) {
+        setPaymentError(bookingData.error || '예약 생성에 실패했습니다.');
+        return;
+      }
+
+      const { newOrderId, finalAmount } = bookingData;
+
+      // 2. NicePay 결제 요청
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!window.IMP) {
+        setPaymentError('결제 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+        return;
+      }
+
+      window.IMP.init('imp44607000');
+      window.IMP.request_pay(
+        {
+          pg: 'nice_v2',
+          pay_method: 'card',
+          merchant_uid: newOrderId,
+          name: request.title,
+          amount: finalAmount,
+          buyer_email: user?.email,
+          buyer_name: contactName.trim(),
+          buyer_tel: contactPhone.trim(),
+          m_redirect_url: `${window.location.origin}/services/${requestId}/payment/complete`,
+        },
+        async (rsp: ImpResponse) => {
+          if (!rsp.success) {
+            setPaymentError(rsp.error_msg || '결제가 취소되었습니다.');
+            setIsProcessing(false);
+            return;
+          }
+
+          // 3. 서버 검증 (서비스 전용 callback 엔드포인트)
+          const callbackRes = await fetch('/api/services/payment/nicepay-callback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              merchant_uid: newOrderId,
+              imp_uid: rsp.imp_uid,
+              paid_amount: finalAmount,
+              orderId: newOrderId,
+              amount: finalAmount,
+              resCode: '0000',
+              signData: '',
+              ediDate: '',
+            }),
+          });
+
+          if (!callbackRes.ok) {
+            setPaymentError('결제 검증에 실패했습니다. 고객센터에 문의해주세요.');
+            setIsProcessing(false);
+            return;
+          }
+
+          router.push(`/services/${requestId}/payment/complete?orderId=${newOrderId}`);
+        }
+      );
+    } catch {
+      setPaymentError('결제 처리 중 오류가 발생했습니다.');
+      setIsProcessing(false);
+    }
+  };
+
+  if (!request) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 size={28} className="animate-spin text-slate-300" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="lazyOnload" />
+      <div className="max-w-lg mx-auto px-4 py-6 md:py-10 pb-28 md:pb-12">
+        {/* 헤더 */}
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50">
+            <ChevronLeft size={18} />
+          </button>
+          <h1 className="text-[18px] md:text-xl font-black">결제하기</h1>
+        </div>
+
+        {/* 서비스 요약 */}
+        <div className="bg-slate-50 rounded-2xl p-4 md:p-5 mb-5">
+          <h2 className="font-bold text-[14px] md:text-[15px] mb-2 line-clamp-2">{request.title}</h2>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] md:text-[13px] text-slate-500">
+            <span className="flex items-center gap-1"><Clock size={11} />{request.duration_hours}시간</span>
+            <span className="flex items-center gap-1"><Users size={11} />{request.guest_count}명</span>
+            <span>{request.service_date} {request.start_time}</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+            <span className="text-[12px] md:text-sm text-slate-500">결제 금액</span>
+            <span className="font-black text-[18px] md:text-xl text-slate-900">₩{request.total_customer_price.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* 예약자 정보 */}
+        <div className="mb-5">
+          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">예약자 정보</h3>
+          <div className="space-y-3">
+            <input
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="이름 *"
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
+            <input
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder="연락처 * (예: 010-1234-5678)"
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
+          </div>
+        </div>
+
+        {/* 약관 동의 */}
+        <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
+          <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 accent-slate-900" />
+          <span className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
+            서비스 이용약관 및 개인정보 처리방침에 동의합니다. 결제 확정 후 7일 전까지는 수수료 없이 취소 가능합니다.
+          </span>
+        </label>
+
+        {/* 안전 결제 안내 */}
+        <div className="flex items-center gap-2 text-[10px] md:text-xs text-slate-400 mb-5">
+          <ShieldCheck size={13} className="text-emerald-500 shrink-0" />
+          NicePay 안전 결제 시스템으로 보호됩니다.
+        </div>
+
+        {/* 에러 */}
+        {paymentError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-[12px] md:text-sm rounded-xl px-4 py-3 mb-4">
+            {paymentError}
+          </div>
+        )}
+
+        {/* 결제 버튼 */}
+        <button
+          onClick={handlePayment}
+          disabled={isProcessing}
+          className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
+        >
+          {isProcessing ? (
+            <><Loader2 size={18} className="animate-spin" /> 처리 중...</>
+          ) : (
+            <><CreditCard size={18} /> ₩{request.total_customer_price.toLocaleString()} 결제하기</>
+          )}
+        </button>
+      </div>
+    </>
+  );
+}
+
+export default function ServicePaymentPage() {
+  return (
+    <div className="min-h-screen bg-white text-slate-900 font-sans">
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-slate-300" />
+        </div>
+      }>
+        <ServicePaymentContent />
+      </Suspense>
+    </div>
+  );
+}
