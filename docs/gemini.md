@@ -556,3 +556,9 @@ service_bookings: PENDING → PAID → confirmed → completed
 - **구현 내용:**
   - `next/navigation`의 `useSearchParams` 도입 및 전체 폼 컴포넌트를 `<Suspense>`로 래핑
   - Intro 페이지에서 전달된 `date`, `startTime`, `duration`, `guests` 쿼리 파라미터를 읽어 리액트 `useState`의 초기값으로 자동 매핑 (사용자 정보 연속성 확보)
+
+### 15.4 [Hotfix] 폼 UI 모던화 및 30분 단위 선택 (v3.7.1)
+- **변경 파일:** `app/services/intro/page.tsx`, `app/services/request/page.tsx`
+- **구현 내용:**
+  - **날짜 선택 UI 개선:** 네이티브 `input type="date"` 대신 Experience 상세 페이지(`ReservationCard.tsx`)에 쓰이는 **커스텀 달력(캘린더) UI** 로직을 Intro 폼 사이드바에 완전히 이식하여 네이티브 모달의 투박함을 제거.
+  - **시간 선택 30분 단위 개편:** 분 단위 입력을 강제하는 네이티브 `input type="time"` 대신, 오전 8시부터 오후 8시까지 **30분 간격(08:00, 08:30 ...)** 으로 선택할 수 있는 직관적인 `<select>` 형태로 Intro와 Request 양쪽 폼 모두 변경.

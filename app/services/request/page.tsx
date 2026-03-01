@@ -16,6 +16,12 @@ function ServiceRequestForm() {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
+  const TIME_OPTIONS = Array.from({ length: 25 }, (_, i) => {
+    const hour = Math.floor(i / 2) + 8;
+    const min = i % 2 === 0 ? '00' : '30';
+    return `${String(hour).padStart(2, '0')}:${min}`;
+  });
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [city, setCity] = useState('');
@@ -140,17 +146,19 @@ function ServiceRequestForm() {
                 value={serviceDate}
                 onChange={(e) => setServiceDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full border border-slate-200 rounded-xl px-3 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
               />
             </div>
             <div>
               <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">시작 시간 *</label>
-              <input
-                type="time"
+              <select
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              >
+                <option value="">시작 시간을 선택하세요</option>
+                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
           </div>
 
@@ -196,8 +204,8 @@ function ServiceRequestForm() {
                   type="button"
                   onClick={() => toggleLanguage(lang)}
                   className={`px-3 py-1.5 rounded-full text-[12px] md:text-sm font-medium border transition-colors ${languages.includes(lang)
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
                     }`}
                 >
                   {lang}

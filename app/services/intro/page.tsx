@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-    ChevronLeft, Share, Heart, MapPin, Star, Globe,
+    ChevronLeft, ChevronRight, Share, Heart, MapPin, Star, Globe,
     Check, X, Grid, Copy, ArrowLeft,
     Clock, Users, Globe2, Sparkles, AlertCircle
 } from 'lucide-react';
@@ -42,6 +42,46 @@ export default function ServiceIntroAirbnbStylePage() {
     const [time, setTime] = useState('');
     const [duration, setDuration] = useState(4);
     const [guests, setGuests] = useState(1);
+
+    // 달력 상태
+    const [currentDate, setCurrentDate] = useState(new Date());
+
+    const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+    const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
+
+    const renderCalendar = () => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const daysCount = getDaysInMonth(year, month);
+        const startBlank = getFirstDay(year, month);
+        const days = [];
+        for (let i = 0; i < startBlank; i++) days.push(<div key={`empty-${i}`} />);
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        for (let d = 1; d <= daysCount; d++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const isPast = dateStr < todayStr;
+            const isSelected = date === dateStr;
+            days.push(
+                <button
+                    key={d}
+                    disabled={isPast}
+                    onClick={() => setDate(dateStr)}
+                    className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected ? 'bg-black text-white' : ''} ${!isSelected && !isPast ? 'hover:bg-slate-100 hover:border-black border border-transparent' : ''} ${isPast ? 'text-slate-300 decoration-slate-300 line-through cursor-not-allowed' : ''}`}
+                >
+                    {d}
+                </button>
+            );
+        }
+        return days;
+    };
+
+    // 30분 단위 시작 시간 옵션 (오전 8시 ~ 오후 8시)
+    const TIME_OPTIONS = Array.from({ length: 25 }, (_, i) => {
+        const hour = Math.floor(i / 2) + 8;
+        const min = i % 2 === 0 ? '00' : '30';
+        return `${String(hour).padStart(2, '0')}:${min}`;
+    });
 
     // 모바일 예약 바 스크롤 감지 (기존 sticky action sheet 효과)
     const [isMobileBarVisible, setIsMobileBarVisible] = useState(true);
@@ -295,81 +335,93 @@ export default function ServiceIntroAirbnbStylePage() {
 
                     </div>
 
-                    {/* ────── 데스크탑 우측 스티키 폼 ────── */}
+                    {/* ────── 데스크탑 우측 스티키 폼 (ReservationCard 복제 완벽 동기화) ────── */}
                     <aside className="hidden md:block w-[320px] lg:w-[380px] shrink-0">
-                        <div className="sticky top-28 bg-white border border-slate-200 rounded-2xl p-6 shadow-[0_6px_24px_rgba(0,0,0,0.06)]">
-                            {/* 요금 섹션 */}
-                            <div className="mb-6 flex items-baseline gap-1">
-                                <span className="text-[22px] font-bold">₩35,000</span>
-                                <span className="text-slate-500 font-medium">/ 1시간</span>
+                        <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-5 md:p-6 bg-white">
+                            <div className="flex justify-between items-end mb-5">
+                                <div>
+                                    <span className="text-xl md:text-2xl font-semibold">₩35,000</span>
+                                    <span className="text-slate-500 text-xs md:text-sm"> / 1시간</span>
+                                </div>
                             </div>
 
-                            {/* 입력 폼 라우팅용 */}
-                            <div className="border border-slate-300 rounded-xl overflow-hidden mb-4">
+                            <div className="border border-slate-300 rounded-xl mb-4 overflow-hidden">
+                                {/* 카스텀 달력 UI */}
+                                <div className="p-3.5 md:p-4 border-b border-slate-200 bg-white">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}><ChevronLeft size={16} /></button>
+                                        <span className="font-semibold text-xs md:text-sm">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
+                                        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}><ChevronRight size={16} /></button>
+                                    </div>
+                                    <div className="grid grid-cols-7 text-center mb-2">
+                                        {['일', '월', '화', '수', '목', '금', '토'].map(d => <span key={d} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{d}</span>)}
+                                    </div>
+                                    <div className="grid grid-cols-7 gap-y-1 justify-items-center">
+                                        {renderCalendar()}
+                                    </div>
+                                </div>
+
+                                {/* 시작 시간 및 이용 시간 */}
                                 <div className="flex border-b border-slate-300">
                                     <div className="flex-1 p-3 border-r border-slate-300">
-                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">날짜</label>
-                                        <input
-                                            type="date"
-                                            value={date}
-                                            onChange={(e) => setDate(e.target.value)}
-                                            min={new Date().toISOString().split('T')[0]}
-                                            className="w-full text-sm outline-none text-slate-900 bg-transparent"
-                                        />
-                                    </div>
-                                    <div className="flex-1 p-3">
                                         <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">시작 시간</label>
-                                        <input
-                                            type="time"
+                                        <select
                                             value={time}
                                             onChange={(e) => setTime(e.target.value)}
-                                            className="w-full text-sm outline-none text-slate-900 bg-transparent"
-                                        />
+                                            className="w-full text-[13px] md:text-sm outline-none cursor-pointer bg-transparent font-semibold py-1"
+                                        >
+                                            <option value="">선택</option>
+                                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex-1 p-3 bg-white">
+                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">이용 시간 (최소 4시간)</label>
+                                        <select
+                                            value={duration}
+                                            onChange={(e) => setDuration(Number(e.target.value))}
+                                            className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
+                                        >
+                                            {DURATION_OPTIONS.map(h => <option key={h} value={h}>{h}시간</option>)}
+                                        </select>
                                     </div>
                                 </div>
-                                <div className="p-3 border-b border-slate-300">
-                                    <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">이용 시간 (최소 4시간)</label>
-                                    <select
-                                        value={duration}
-                                        onChange={(e) => setDuration(Number(e.target.value))}
-                                        className="w-full text-sm outline-none cursor-pointer bg-transparent"
-                                    >
-                                        {DURATION_OPTIONS.map(h => <option key={h} value={h}>{h}시간</option>)}
-                                    </select>
-                                </div>
-                                <div className="p-3">
+
+                                {/* 인원 */}
+                                <div className="p-3 bg-white flex flex-col justify-center">
                                     <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">인원 (최대 4명 기준가)</label>
                                     <select
                                         value={guests}
                                         onChange={(e) => setGuests(Number(e.target.value))}
-                                        className="w-full text-sm outline-none cursor-pointer bg-transparent"
+                                        className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
                                     >
-                                        {GUEST_OPTIONS.map(g => <option key={g} value={g}>게스트 {g}명</option>)}
+                                        {GUEST_OPTIONS.map(g => <option key={g} value={String(g)}>게스트 {g}명</option>)}
                                     </select>
                                 </div>
                             </div>
 
-                            {/* 금액 상세 */}
-                            <div className="flex justify-between items-center text-slate-600 mb-2">
-                                <span className="underline">₩35,000 x {duration}시간</span>
-                                <span>₩{totalPrice.toLocaleString()}</span>
+                            <button
+                                onClick={handleReserve}
+                                className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4"
+                            >
+                                의뢰 등록하기 (조건 확정)
+                            </button>
+                            <p className="text-center text-slate-500 text-xs mb-3">예약 확정 전에는 요금이 청구되지 않습니다.</p>
+
+                            <div className="space-y-2 pt-4 border-t border-slate-100 text-[12px] md:text-sm">
+                                <div className="flex justify-between text-slate-600">
+                                    <span className="underline">₩35,000 x {duration}시간</span>
+                                    <span>₩{totalPrice.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600">
+                                    <span className="underline">로컬리 서비스 수수료</span>
+                                    <span>₩0</span>
+                                </div>
                             </div>
-                            <div className="flex justify-between items-center text-slate-600 border-b border-slate-200 pb-4 mb-4">
-                                <span className="underline">로컬리 서비스 수수료</span>
-                                <span>₩0</span>
-                            </div>
-                            <div className="flex justify-between items-center font-bold text-[16px] mb-6">
+
+                            <div className="flex justify-between font-semibold pt-4 border-t border-slate-100 mt-4 text-base md:text-lg">
                                 <span>총 합계</span>
                                 <span>₩{totalPrice.toLocaleString()}</span>
                             </div>
-
-                            <button
-                                onClick={handleReserve}
-                                className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-rose-500 text-white rounded-xl font-bold text-[16px] hover:scale-[1.02] transition-transform shadow-md"
-                            >
-                                의뢰 등록하기 (후보지 확인)
-                            </button>
-                            <p className="text-center text-slate-500 text-xs mt-3">예약 확정 전에는 요금이 청구되지 않습니다.</p>
                         </div>
                     </aside>
 
