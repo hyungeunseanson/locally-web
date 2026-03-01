@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-01 (v3.9.0 Admin 맞춤 의뢰 관리 통합)
-**Version:** 3.9.0 (Admin Service Matching Management)
+**Last Updated:** 2026-03-01 (v3.9.1 무통장 입금 결제 수단 추가)
+**Version:** 3.9.1 (Virtual Account Payment for Service Requests)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -227,6 +227,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 로그아웃 로컬 안정화(P0): `AuthContext` 로그아웃을 `signOut({ scope: 'local' })` + 앱 전용 localStorage 키만 선별 정리하는 방식으로 변경해 전체 저장소 초기화로 인한 세션/설정 교란 위험을 줄임
 - OAuth 프로필 동기화 보강(P0): `/auth/callback`에서 코드 교환 직후 동일 요청 컨텍스트로 프로필 동기화를 실행해 소셜 로그인 직후 `profiles` 누락과 세션 식별 불일치 가능성을 완화
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 기존 체험(`bookings`) 탭·`useAdminData.ts`는 전혀 변경하지 않음.
+- 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. complete 페이지에 `method=bank` 분기 추가(입금 대기 중 UI + 계좌번호 재표시). 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리. 카드 결제 기존 플로우 미변경.
 
 비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 별도 커밋 이력/문서에서 확인한다.
 
@@ -608,6 +609,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 
 ### 16.4 결제 플로우 (v2 에스크로)
 
+**카드 결제 플로우:**
 ```
 1. 고객: /services/request → 폼 작성
 2. POST /api/services/requests
@@ -616,7 +618,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
    → 반환: { requestId, orderId, amount }
 3. 프론트: /services/${requestId}/payment 리다이렉트
 4. 결제 페이지: DB에서 PENDING 예약 조회 (request_id + customer_id)
-5. IMP.request_pay() → NicePay 결제
+5. [카드] IMP.request_pay() → NicePay 결제
 6. POST /api/services/payment/nicepay-callback
    → service_bookings.status = PAID
    → service_requests.status = open
@@ -628,6 +630,21 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
    → service_bookings.host_id, application_id 채워넣기
 10. 매칭 확정 — 별도 결제 불필요
 ```
+
+**무통장 입금 플로우 (v3.9.1 추가):**
+```
+1~4. 동일
+5. [무통장] IMP 호출 없이 계좌 정보 안내 박스 표시
+   → 관리자가 입금 확인 후 수동으로 PAID 전환 (또는 자동화 예정)
+6. /payment/complete?orderId=...&method=bank 리다이렉트
+   → "입금 대기 중" UI + 계좌번호 재표시
+   → service_bookings는 PENDING 유지 (입금 미확인 상태)
+7. 1시간 미입금 시 자동 취소 (배치 처리 예정)
+```
+
+**결제 수단 환경 변수:**
+- `NEXT_PUBLIC_BANK_ACCOUNT`: 무통장 입금 계좌번호
+- `NEXT_PUBLIC_BANK_NAME`: 은행명 (기본: 카카오뱅크)
 
 ### 16.5 취소/환불 로직
 
