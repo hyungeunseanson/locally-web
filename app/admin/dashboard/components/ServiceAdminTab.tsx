@@ -146,7 +146,32 @@ function ForceCancelModal({
 
 // ── 서브탭 1: 전체 의뢰 목록 ────────────────────────────────────────────────
 function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[]; onRefresh: () => void }) {
+  const { showToast } = useToast();
   const [cancelTarget, setCancelTarget] = useState<AdminServiceBooking | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleConfirmPayment = async (orderId: string) => {
+    if (!confirm('입금이 확인되었습니까? 의뢰를 공개하고 호스트 모집을 시작합니다.')) return;
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/admin/service-confirm-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || '처리 실패', 'error');
+        return;
+      }
+      showToast('입금 확인 완료. 의뢰가 공개되었습니다.', 'success');
+      onRefresh();
+    } catch {
+      showToast('서버 오류가 발생했습니다.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="space-y-3 md:space-y-4">
@@ -167,6 +192,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                 <th className="px-4 py-3">의뢰 내용</th>
                 <th className="px-4 py-3">고객</th>
                 <th className="px-4 py-3">결제액</th>
+                <th className="px-4 py-3">결제수단</th>
                 <th className="px-4 py-3">의뢰 상태</th>
                 <th className="px-4 py-3">결제 상태</th>
                 <th className="px-4 py-3">정산</th>
@@ -189,6 +215,13 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                   </td>
                   <td className="px-4 py-3 font-bold text-[11px] md:text-sm text-slate-900">₩{b.amount.toLocaleString()}</td>
                   <td className="px-4 py-3">
+                    {b.payment_method === 'bank' ? (
+                      <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">🏛️ 무통장</span>
+                    ) : (
+                      <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">💳 카드</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
                       {REQUEST_STATUS_LABELS[b.service_request?.status ?? ''] ?? (b.service_request?.status ?? '-')}
                     </span>
@@ -206,18 +239,29 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                     {b.status === 'cancelled' || b.service_request?.status === 'completed' ? (
                       <span className="text-[10px] md:text-xs text-slate-300 font-medium">불가</span>
                     ) : (
-                      <button
-                        onClick={() => setCancelTarget(b)}
-                        className="px-2 py-1 md:px-3 md:py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition-colors"
-                      >
-                        강제 취소
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {b.status === 'PENDING' && b.payment_method === 'bank' && (
+                          <button
+                            onClick={() => handleConfirmPayment(b.order_id)}
+                            disabled={isProcessing}
+                            className="px-2 py-1 md:px-3 md:py-1.5 bg-blue-600 text-white border border-blue-700 rounded-lg text-[10px] md:text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-60"
+                          >
+                            💰 입금 확인
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setCancelTarget(b)}
+                          className="px-2 py-1 md:px-3 md:py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition-colors"
+                        >
+                          강제 취소
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-[11px] md:text-sm text-slate-400">
+                  <td colSpan={10} className="px-4 py-10 text-center text-[11px] md:text-sm text-slate-400">
                     등록된 맞춤 의뢰가 없습니다.
                   </td>
                 </tr>

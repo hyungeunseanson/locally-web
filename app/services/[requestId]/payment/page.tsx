@@ -121,8 +121,18 @@ function ServicePaymentContent() {
 
     setIsProcessing(true);
     try {
-      // 무통장 입금: IMP 호출 없이 바로 완료 페이지로 이동
+      // 무통장 입금: IMP 호출 없이 결제수단 저장 후 완료 페이지로 이동
       if (paymentMethod === 'bank') {
+        const markRes = await fetch('/api/services/payment/mark-bank', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: pendingBooking.order_id }),
+        });
+        if (!markRes.ok) {
+          setPaymentError('결제 수단 저장에 실패했습니다. 다시 시도해 주세요.');
+          setIsProcessing(false);
+          return;
+        }
         router.push(`/services/${requestId}/payment/complete?orderId=${pendingBooking.order_id}&method=bank`);
         return;
       }

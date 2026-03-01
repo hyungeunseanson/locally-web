@@ -76,6 +76,7 @@ export interface AdminServiceBooking {
   status: string;
   payout_status: string | null;
   tid: string | null;
+  payment_method: string | null;
   cancel_reason: string | null;
   refund_amount: number | null;
   created_at: string;

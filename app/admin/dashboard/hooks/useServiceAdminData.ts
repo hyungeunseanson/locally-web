@@ -97,7 +97,7 @@ export function useServiceAdminData() {
       const { data: rawBookings, error } = await supabase
         .from('service_bookings')
         .select(
-          'id, order_id, request_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, tid, cancel_reason, refund_amount, created_at'
+          'id, order_id, request_id, customer_id, host_id, amount, host_payout_amount, platform_revenue, status, payout_status, tid, payment_method, cancel_reason, refund_amount, created_at'
         )
         .order('created_at', { ascending: false })
         .limit(ITEMS_PER_PAGE);
