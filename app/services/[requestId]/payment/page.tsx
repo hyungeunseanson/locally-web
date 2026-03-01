@@ -1,8 +1,8 @@
 'use client';
 
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
-import { ChevronLeft, CreditCard, Loader2, Clock, Users, ShieldCheck } from 'lucide-react';
+import { useRouter, useParams } from 'next/navigation';
+import { ChevronLeft, CreditCard, Loader2, Clock, Users, ShieldCheck, Lock } from 'lucide-react';
 import Script from 'next/script';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -37,18 +37,23 @@ declare global {
   }
 }
 
+type PendingBooking = {
+  order_id: string;
+  amount: number;
+  status: string;
+};
+
 function ServicePaymentContent() {
   const router = useRouter();
   const params = useParams<{ requestId: string }>();
-  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
-  const applicationId = searchParams.get('applicationId') ?? '';
   const requestId = params.requestId;
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [request, setRequest] = useState<ServiceRequest | null>(null);
+  const [pendingBooking, setPendingBooking] = useState<PendingBooking | null>(null);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -58,14 +63,31 @@ function ServicePaymentContent() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/login'); return; }
 
+    // 의뢰 정보 조회
     const { data: req } = await supabase
       .from('service_requests')
       .select('*')
       .eq('id', requestId)
       .maybeSingle();
 
-    if (!req) return;
+    if (!req) { router.push('/services/my'); return; }
     setRequest(req as ServiceRequest);
+
+    // v2 에스크로: 사전 생성된 PENDING 예약 조회
+    const { data: booking } = await supabase
+      .from('service_bookings')
+      .select('order_id, amount, status')
+      .eq('request_id', requestId)
+      .eq('customer_id', user.id)
+      .eq('status', 'PENDING')
+      .maybeSingle();
+
+    if (!booking) {
+      // 이미 결제 완료 혹은 취소된 경우
+      router.push(`/services/${requestId}`);
+      return;
+    }
+    setPendingBooking(booking as PendingBooking);
 
     // 연락처 자동 완성
     const { data: profile } = await supabase
@@ -91,48 +113,31 @@ function ServicePaymentContent() {
       showToast('이용 약관에 동의해주세요.', 'error');
       return;
     }
-    if (!request || !applicationId) {
+    if (!request || !pendingBooking) {
       showToast('결제 정보가 올바르지 않습니다.', 'error');
       return;
     }
 
     setIsProcessing(true);
     try {
-      // 1. 원자적 예약 생성
-      const bookingRes = await fetch('/api/services/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          request_id: requestId,
-          application_id: applicationId,
-          contact_name: contactName.trim(),
-          contact_phone: contactPhone.trim(),
-        }),
-      });
-      const bookingData = await bookingRes.json();
-
-      if (!bookingRes.ok || !bookingData.success) {
-        setPaymentError(bookingData.error || '예약 생성에 실패했습니다.');
-        return;
-      }
-
-      const { newOrderId, finalAmount } = bookingData;
-
-      // 2. NicePay 결제 요청
       const { data: { user } } = await supabase.auth.getUser();
       if (!window.IMP) {
         setPaymentError('결제 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+        setIsProcessing(false);
         return;
       }
+
+      // v2 에스크로: 사전 생성된 orderId 사용 (새 예약 생성 불필요)
+      const { order_id: orderId, amount } = pendingBooking;
 
       window.IMP.init('imp44607000');
       window.IMP.request_pay(
         {
           pg: 'nice_v2',
           pay_method: 'card',
-          merchant_uid: newOrderId,
+          merchant_uid: orderId,
           name: request.title,
-          amount: finalAmount,
+          amount,
           buyer_email: user?.email,
           buyer_name: contactName.trim(),
           buyer_tel: contactPhone.trim(),
@@ -145,16 +150,16 @@ function ServicePaymentContent() {
             return;
           }
 
-          // 3. 서버 검증 (서비스 전용 callback 엔드포인트)
+          // 서버 검증 (서비스 전용 callback 엔드포인트)
           const callbackRes = await fetch('/api/services/payment/nicepay-callback', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              merchant_uid: newOrderId,
+              merchant_uid: orderId,
               imp_uid: rsp.imp_uid,
-              paid_amount: finalAmount,
-              orderId: newOrderId,
-              amount: finalAmount,
+              paid_amount: amount,
+              orderId,
+              amount,
               resCode: '0000',
               signData: '',
               ediDate: '',
@@ -167,7 +172,7 @@ function ServicePaymentContent() {
             return;
           }
 
-          router.push(`/services/${requestId}/payment/complete?orderId=${newOrderId}`);
+          router.push(`/services/${requestId}/payment/complete?orderId=${orderId}`);
         }
       );
     } catch {
@@ -176,7 +181,7 @@ function ServicePaymentContent() {
     }
   };
 
-  if (!request) {
+  if (!request || !pendingBooking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />
@@ -194,6 +199,17 @@ function ServicePaymentContent() {
             <ChevronLeft size={18} />
           </button>
           <h1 className="text-[18px] md:text-xl font-black">결제하기</h1>
+        </div>
+
+        {/* 에스크로 안내 */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 mb-5 flex items-start gap-3">
+          <Lock size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[12px] md:text-[13px] font-bold text-amber-800 mb-0.5">에스크로 선결제 방식</p>
+            <p className="text-[11px] md:text-[12px] text-amber-700 leading-relaxed">
+              결제금액은 안전하게 보관되며, 호스트를 선택하지 않으면 전액 환불됩니다.
+            </p>
+          </div>
         </div>
 
         {/* 서비스 요약 */}
@@ -233,7 +249,7 @@ function ServicePaymentContent() {
         <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
           <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 accent-slate-900" />
           <span className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
-            서비스 이용약관 및 개인정보 처리방침에 동의합니다. 결제 확정 후 7일 전까지는 수수료 없이 취소 가능합니다.
+            서비스 이용약관 및 개인정보 처리방침에 동의합니다. 호스트 미선택 시 전액 환불됩니다.
           </span>
         </label>
 

@@ -8,16 +8,17 @@ import type { ServiceRequestStatus, ServiceApplicationStatus, ServiceBookingStat
 // -----------------------------------------------------------------------------
 // service_requests 상태 집합
 // -----------------------------------------------------------------------------
+export const SERVICE_REQUEST_PENDING_PAYMENT_STATUSES = ['pending_payment'] as const; // v2: 에스크로 결제 대기
 export const SERVICE_REQUEST_OPEN_STATUSES = ['open'] as const;
 export const SERVICE_REQUEST_ACTIVE_STATUSES = ['matched', 'paid', 'confirmed'] as const;
 export const SERVICE_REQUEST_COMPLETED_STATUSES = ['completed'] as const;
 export const SERVICE_REQUEST_CLOSED_STATUSES = ['cancelled', 'expired'] as const;
 
-// 호스트 잡보드에서 표시할 의뢰 상태 (open만)
+// 호스트 잡보드에서 표시할 의뢰 상태 (open만 — pending_payment는 절대 노출 금지)
 export const SERVICE_REQUEST_VISIBLE_STATUSES = [...SERVICE_REQUEST_OPEN_STATUSES] as const;
 
-// 결제 가능 상태 (matched만)
-export const SERVICE_REQUEST_PAYABLE_STATUS = 'matched' as const;
+// v2 에스크로: 결제는 의뢰 등록 직후, 호스트 선택은 별도 단계
+export const SERVICE_REQUEST_PAYABLE_STATUS = 'pending_payment' as const;
 
 // -----------------------------------------------------------------------------
 // service_applications 상태 집합
@@ -39,6 +40,7 @@ export const SERVICE_BOOKING_CANCELLED_STATUSES = ['cancelled', 'cancellation_re
 // -----------------------------------------------------------------------------
 
 // service_requests
+export const isPendingPaymentServiceRequest = (status: string) => status === 'pending_payment'; // v2 에스크로
 export const isOpenServiceRequest = (status: string) => status === 'open';
 export const isMatchedServiceRequest = (status: string) => status === 'matched';
 export const isPaidServiceRequest = (status: string) => status === 'paid';
@@ -70,6 +72,7 @@ export const isCancellationRequestedServiceBooking = (status: string) =>
 // -----------------------------------------------------------------------------
 export const getServiceRequestStatusLabel = (status: ServiceRequestStatus): string => {
   const labels: Record<ServiceRequestStatus, string> = {
+    pending_payment: '결제 대기',  // v2 에스크로
     open: '모집 중',
     matched: '호스트 선택됨',
     paid: '결제 완료',

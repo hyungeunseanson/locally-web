@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-01 (역경매 서비스 매칭 시스템 전체 구현)
-**Version:** 3.3.0 (Service Matching System — Reverse Auction)  
+**Last Updated:** 2026-03-01 (v3.8.0 에스크로 선결제 시스템 전면 개편)
+**Version:** 3.8.0 (Escrow Pre-Payment — 노쇼 방지)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -321,14 +321,15 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 | `service_applications` | 호스트 지원. UNIQUE(request_id, host_id) |
 | `service_bookings` | 결제/정산. `SVC-` 접두사 주문번호. service_role 전용 쓰기 |
 
-**마이그레이션 파일:** `supabase_service_matching_migration.sql` (RPC `create_service_booking_atomic` 포함)
+**마이그레이션 파일:** `supabase_service_matching_migration.sql` (초기), `supabase_service_matching_v2_escrow_migration.sql` (v2 에스크로)
 
-**상태 플로우:**
+**상태 플로우 (v2 에스크로):**
 ```
-service_requests: open → matched → paid → confirmed → completed
-                  open → cancelled / expired
-service_bookings: PENDING → PAID → confirmed → completed
-                  PENDING/PAID → cancelled / cancellation_requested
+service_requests: pending_payment → (결제) → open → (호스트 선택) → matched → completed
+                  pending_payment → cancelled (결제 포기)
+                  open → cancelled (결제 후 호스트 미선택 상태에서 취소 + PG 환불)
+                  matched → cancelled (관리자 검토)
+service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_requested
 ```
 
 ### 10.3 라우팅
@@ -349,13 +350,12 @@ service_bookings: PENDING → PAID → confirmed → completed
 
 | 엔드포인트 | 용도 |
 |------------|------|
-| `POST /api/services/requests` | 의뢰 생성 + 해당 도시 승인 호스트 알림 |
-| `GET /api/services/requests?mode=board\|my` | 의뢰 목록 조회 |
+| `POST /api/services/requests` | 의뢰 생성(pending_payment) + 에스크로 예약 사전 생성(PENDING, host_id=null) |
+| `GET /api/services/requests?mode=board\|my` | 의뢰 목록 조회 (board: open만) |
 | `POST /api/services/applications` | 호스트 지원 (중복/재지원 처리) |
-| `POST /api/services/select-host` | 고객의 호스트 선택 → matched + 나머지 rejected |
-| `POST /api/services/bookings` | 원자적 예약 생성 (RPC 호출) |
-| `POST /api/services/payment/nicepay-callback` | NicePay 서명검증 + 결제확정 (SVC- 접두사 가드) |
-| `POST /api/services/cancel` | 취소 (PENDING: 즉시 / PAID+: 관리자 검토 요청) |
+| `POST /api/services/select-host` | 고객의 호스트 선택 → matched + 기존 예약에 host_id/application_id 채워넣기 |
+| `POST /api/services/payment/nicepay-callback` | 결제 확정 → request.status: open 전환 + 호스트 전체 알림 |
+| `POST /api/services/cancel` | PENDING: DB 취소 / open+PAID: NicePay PG 전액환불 / matched: 관리자 검토 |
 
 ### 10.5 타입 & 상수
 
@@ -562,3 +562,78 @@ service_bookings: PENDING → PAID → confirmed → completed
 - **구현 내용:**
   - **날짜 선택 UI 개선:** 네이티브 `input type="date"` 대신 Experience 상세 페이지(`ReservationCard.tsx`)에 쓰이는 **커스텀 달력(캘린더) UI** 로직을 Intro 폼 사이드바에 완전히 이식하여 네이티브 모달의 투박함을 제거.
   - **시간 선택 30분 단위 개편:** 분 단위 입력을 강제하는 네이티브 `input type="time"` 대신, 오전 8시부터 오후 8시까지 **30분 간격(08:00, 08:30 ...)** 으로 선택할 수 있는 직관적인 `<select>` 형태로 Intro와 Request 양쪽 폼 모두 변경.
+
+---
+
+## 16. 에스크로 선결제 시스템 전면 개편 (v3.8.0)
+
+**수정일:** 2026-03-01 | **수정자:** 에이전트 (수석 풀스택 아키텍트 / 결제 시스템 전문가)
+
+### 16.1 배경 — 노쇼 문제 해결
+
+**기존 플로우 (AS-IS):** 의뢰 등록(무료) → 호스트 지원 → 고객 선택 → 결제 → 확정
+- **문제:** 고객이 호스트를 선택해놓고 결제 단계에서 이탈 시 호스트 시간 낭비
+
+**v2 에스크로 플로우 (TO-BE):** 의뢰 등록 → **즉시 결제(에스크로)** → open 공개 → 호스트 지원 → 선택 → 확정
+- 고객 결제 완료 후 잡보드 공개 → 호스트 선택 → 이미 결제된 금액으로 바로 확정
+
+### 16.2 DB 변경사항
+
+- **`service_requests.status`:** `pending_payment` 상태 추가 (결제 전 잡보드 미노출)
+- **`service_bookings.host_id`:** NOT NULL → nullable (에스크로 단계에서 호스트 미정)
+- **`service_bookings.application_id`:** NOT NULL → nullable (호스트 선택 후 채워짐)
+- **마이그레이션:** `supabase_service_matching_v2_escrow_migration.sql` 실행 필요
+
+### 16.3 수정 파일 목록
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `supabase_service_matching_v2_escrow_migration.sql` | [NEW] DB 마이그레이션 (상태 제약 + nullable 컬럼 + 인덱스) |
+| `app/types/service.ts` | `ServiceRequestStatus`에 `pending_payment` 추가 |
+| `app/constants/serviceStatus.ts` | `isPendingPaymentServiceRequest`, `SERVICE_REQUEST_PENDING_PAYMENT_STATUSES` 추가 |
+| `app/api/services/requests/route.ts` | POST: status=`pending_payment`, 에스크로 예약 사전 생성, 호스트 알림 제거 |
+| `app/api/services/payment/nicepay-callback/route.ts` | 결제 완료 시 request.status → `open`, 호스트 전체 알림, signData 빈 값 허용 |
+| `app/api/services/cancel/route.ts` | PENDING: DB취소 / open+PAID: NicePay PG 환불 / matched: 관리자 검토 |
+| `app/api/services/select-host/route.ts` | 기존 PAID 예약에 host_id/application_id 채워넣기, 알림 메시지 업데이트 |
+| `app/services/request/page.tsx` | 제출 후 `/payment` 리다이렉트, 버튼/설명 문구 에스크로 맞게 수정 |
+| `app/services/[requestId]/payment/page.tsx` | DB에서 기존 PENDING 예약 조회, applicationId URL 파라미터 제거, 에스크로 안내 배너 추가 |
+| `app/services/[requestId]/page.tsx` | 새 스텝바(선결제/지원/확정/완료), pending_payment 결제 배너, 호스트 선택 후 router.refresh() |
+| `app/services/my/page.tsx` | STATUS_CONFIG에 `pending_payment` 추가 |
+
+### 16.4 결제 플로우 (v2 에스크로)
+
+```
+1. 고객: /services/request → 폼 작성
+2. POST /api/services/requests
+   → service_requests INSERT (status=pending_payment)
+   → service_bookings INSERT (status=PENDING, host_id=null, application_id=null)
+   → 반환: { requestId, orderId, amount }
+3. 프론트: /services/${requestId}/payment 리다이렉트
+4. 결제 페이지: DB에서 PENDING 예약 조회 (request_id + customer_id)
+5. IMP.request_pay() → NicePay 결제
+6. POST /api/services/payment/nicepay-callback
+   → service_bookings.status = PAID
+   → service_requests.status = open
+   → 승인 호스트 전체 알림 발송
+7. 잡보드(/services): open 의뢰만 표시
+8. 호스트: 지원서 제출 → 고객이 선택
+9. POST /api/services/select-host
+   → service_requests.status = matched
+   → service_bookings.host_id, application_id 채워넣기
+10. 매칭 확정 — 별도 결제 불필요
+```
+
+### 16.5 취소/환불 로직
+
+| 예약 상태 | 의뢰 상태 | 처리 방식 |
+|-----------|-----------|-----------|
+| PENDING | pending_payment | DB 취소만 (PG 미결제) |
+| PAID | open | NicePay PG 전액 환불 + DB 취소 |
+| PAID | matched / confirmed | cancellation_requested (관리자 검토) |
+
+### 16.6 주의사항
+
+- `isPendingPaymentServiceRequest` 유틸 사용 — raw 문자열 비교 금지
+- 잡보드 GET API: `status='open'` 필터 고정 — `pending_payment` 절대 노출 금지
+- IMP 클라이언트 콜백 시 `signData`/`ediDate` 비어있을 수 있음 → 비어있으면 서명 검증 건너뜀 (금액 검증으로 대체)
+- 기존 `/api/payment/nicepay-callback` 및 `experiences/bookings` 로직 일절 미변경

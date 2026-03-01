@@ -15,20 +15,22 @@ import {
   getServiceRequestStatusLabel,
   isOpenServiceRequest,
   isMatchedServiceRequest,
+  isPendingPaymentServiceRequest,
 } from '@/app/constants/serviceStatus';
 import type { ServiceRequest, ServiceApplicationWithProfile } from '@/app/types/service';
 
-// ── 매칭 스텝 정의 ─────────────────────────────────────────────
+// ── 매칭 스텝 정의 (v2 에스크로) ────────────────────────────────
 const MATCH_STEPS = [
-  { icon: ClipboardList, label: '의뢰 등록' },
+  { icon: CreditCard, label: '선결제' },
   { icon: Users, label: '호스트 지원' },
-  { icon: UserCheck, label: '호스트 선택' },
-  { icon: CreditCard, label: '결제 완료' },
+  { icon: UserCheck, label: '매칭 확정' },
+  { icon: ClipboardList, label: '서비스 완료' },
 ];
 
 function getActiveStep(status: string) {
-  if (status === 'open') return 1;
-  if (status === 'matched') return 2;
+  if (status === 'pending_payment') return 0; // 결제 대기 (스텝 0 = 아직 시작 전)
+  if (status === 'open') return 1;            // 결제 완료, 호스트 모집 중
+  if (status === 'matched') return 2;         // 호스트 선택 완료
   if (status === 'paid' || status === 'confirmed') return 3;
   if (status === 'completed') return 4;
   return 0;
@@ -36,8 +38,9 @@ function getActiveStep(status: string) {
 
 // ── 상태 칩 ───────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  pending_payment: { label: '결제 대기', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
   open: { label: '모집중', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  matched: { label: '결제 대기', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+  matched: { label: '매칭 완료', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
   paid: { label: '결제 완료', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
   confirmed: { label: '확정', cls: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   completed: { label: '완료', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
@@ -91,7 +94,7 @@ export default function ServiceRequestDetailPage() {
   }, [requestId, supabase]);
 
   const handleSelectHost = async (applicationId: string) => {
-    if (!window.confirm('이 호스트를 선택하시겠습니까?')) return;
+    if (!window.confirm('이 호스트를 선택하시겠습니까? 이미 결제된 금액으로 매칭이 확정됩니다.')) return;
     setSelecting(applicationId);
     try {
       const res = await fetch('/api/services/select-host', {
@@ -101,8 +104,9 @@ export default function ServiceRequestDetailPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) { showToast(data.error || '호스트 선택에 실패했습니다.', 'error'); return; }
-      showToast('호스트가 선택되었습니다! 결제 페이지로 이동합니다.', 'success');
-      router.push(`/services/${requestId}/payment?applicationId=${applicationId}`);
+      showToast('호스트 선택 완료! 매칭이 확정되었습니다.', 'success');
+      // v2 에스크로: 결제는 이미 완료 — 페이지 새로고침으로 상태 반영
+      router.refresh();
     } catch {
       showToast('서버 오류가 발생했습니다.', 'error');
     } finally { setSelecting(null); }
@@ -179,6 +183,26 @@ export default function ServiceRequestDetailPage() {
             })}
           </div>
         </div>
+
+        {/* ── [고객 뷰] pending_payment: 결제 대기 배너 ── */}
+        {isOwner && isPendingPaymentServiceRequest(request.status) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-4 flex flex-col items-center gap-3 text-center">
+            <CreditCard size={32} className="text-amber-500" />
+            <div>
+              <p className="font-black text-[15px] md:text-base text-amber-900 mb-1">결제가 필요합니다</p>
+              <p className="text-[12px] md:text-[13px] text-amber-700">결제 완료 후 현지 호스트들에게 공개됩니다.</p>
+            </div>
+            <button
+              onClick={() => router.push(`/services/${requestId}/payment`)}
+              className="w-full py-3.5 rounded-xl font-black text-[14px] md:text-sm text-white"
+              style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', boxShadow: '0 4px 15px rgba(217,119,6,0.35)' }}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <CreditCard size={16} /> 지금 결제하기
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* ── 의뢰 요약 카드 ── */}
         <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 mb-4 shadow-sm">
@@ -357,12 +381,12 @@ export default function ServiceRequestDetailPage() {
           </div>
         )}
 
-        {/* ── [선택된 호스트] 결제 대기 안내 ── */}
+        {/* ── [선택된 호스트] 매칭 확정 안내 ── */}
         {isSelectedHost && isMatchedServiceRequest(request.status) && (
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 text-center mb-4">
             <CheckCircle size={36} className="text-blue-500 mx-auto mb-2" />
-            <p className="font-black text-[15px] md:text-base text-blue-900 mb-1">고객에게 선택되었습니다! 🎉</p>
-            <p className="text-[12px] md:text-[13px] text-blue-600">고객이 결제를 완료하면 매칭이 확정됩니다.</p>
+            <p className="font-black text-[15px] md:text-base text-blue-900 mb-1">매칭이 확정되었습니다! 🎉</p>
+            <p className="text-[12px] md:text-[13px] text-blue-600">결제는 이미 완료되었습니다. 서비스 날짜에 고객을 만나세요!</p>
           </div>
         )}
 
@@ -406,22 +430,6 @@ export default function ServiceRequestDetailPage() {
                 <p className="text-slate-400 text-[13px] md:text-sm">마감된 의뢰입니다.</p>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── [고객 뷰] 결제 CTA (matched 상태) ── */}
-        {isOwner && isMatchedServiceRequest(request.status) && request.selected_application_id && (
-          <div className="mb-4">
-            <Link href={`/services/${requestId}/payment?applicationId=${request.selected_application_id}`}>
-              <button
-                className="w-full py-4 rounded-2xl font-black text-[15px] md:text-base text-white transition-all active:scale-[0.98] hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%)', boxShadow: '0 8px 25px rgba(5,150,105,0.35)' }}
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <CreditCard size={18} /> 결제하러 가기
-                </span>
-              </button>
-            </Link>
           </div>
         )}
 

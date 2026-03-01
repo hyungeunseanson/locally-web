@@ -97,19 +97,26 @@ export async function POST(request: Request) {
       .neq('id', application_id)
       .eq('status', 'pending');
 
-    // 6. 선택된 호스트에게 알림 (비동기)
+    // 6. 에스크로 예약에 호스트 정보 채워넣기 (PAID 상태 예약)
+    await supabaseAdmin
+      .from('service_bookings')
+      .update({ host_id: selectedHostId, application_id })
+      .eq('request_id', request_id)
+      .in('status', ['PAID', 'PENDING']);
+
+    // 7. 선택된 호스트에게 알림 (비동기) — 에스크로: 이미 결제 완료 상태
     supabaseAdmin.from('notifications').insert({
       user_id: selectedHostId,
       type: 'service_host_selected',
       title: '🎉 고객에게 선택되었습니다!',
-      message: `'${serviceRequest.title}' 의뢰에서 선택되셨습니다. 결제가 완료되면 최종 확정됩니다.`,
+      message: `'${serviceRequest.title}' 의뢰에서 선택되셨습니다. 결제는 이미 완료되어 바로 진행됩니다.`,
       link: `/services/${request_id}`,
       is_read: false,
     }).then(({ error }) => {
       if (error) console.error('Select Host Notification Error:', error);
     });
 
-    // 7. 미선택 호스트들에게 알림 조회 (비동기)
+    // 8. 미선택 호스트들에게 알림 조회 (비동기)
     supabaseAdmin
       .from('service_applications')
       .select('host_id')

@@ -14,6 +14,7 @@ import type { ServiceRequestCard } from '@/app/types/service';
 
 // 상태별 칩 스타일 — 강한 컬러로 즉각 식별 가능하게
 const STATUS_CONFIG: Record<string, { cls: string; dot: string }> = {
+  pending_payment: { cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
   open: { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
   matched: { cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-400' },
   paid: { cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', dot: 'bg-indigo-400' },

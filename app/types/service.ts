@@ -3,15 +3,17 @@
 // 기존 experiences / bookings 타입과 완전 독립
 // =============================================================================
 
-// service_requests 상태 플로우
-// open → matched(호스트 선택) → paid(결제 완료) → confirmed → completed
-// open → cancelled / expired
-// matched → cancelled (결제 전 취소)
+// service_requests 상태 플로우 (v2 에스크로)
+// pending_payment → (결제) → open → (호스트 선택) → matched → completed
+// pending_payment → cancelled (결제 포기)
+// open → cancelled (결제 후 호스트 미선택 상태에서 취소 + PG 환불)
+// matched → cancelled (매칭 후 취소 — 관리자 검토)
 export type ServiceRequestStatus =
+  | 'pending_payment'  // v2: 결제 대기 (잡보드 미노출)
   | 'open'
   | 'matched'
-  | 'paid'
-  | 'confirmed'
+  | 'paid'             // 레거시 호환
+  | 'confirmed'        // 레거시 호환
   | 'completed'
   | 'cancelled'
   | 'expired';

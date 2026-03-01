@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import crypto from 'crypto';
+
+function generateOrderId(): string {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const rand = crypto.randomBytes(4).toString('hex');
+  return `SVC-${date}-${rand}`;
+}
 
 type CreateRequestBody = {
   title?: string;
@@ -48,6 +55,7 @@ export async function POST(request: Request) {
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    // 1. service_requests 생성 (v2 에스크로: pending_payment 상태로 시작)
     const { data, error } = await supabaseAdmin
       .from('service_requests')
       .insert({
@@ -63,9 +71,9 @@ export async function POST(request: Request) {
         guest_count: guestNum,
         contact_name: contact_name.trim(),
         contact_phone: contact_phone.trim(),
-        status: 'open',
+        status: 'pending_payment',  // v2 에스크로: 결제 후 open 전환
       })
-      .select('id, total_customer_price, duration_hours')
+      .select('id, total_customer_price, total_host_payout, duration_hours')
       .single();
 
     if (error || !data) {
@@ -73,37 +81,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '의뢰 생성 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    // 해당 도시 활동 호스트들에게 알림 발송 (비동기)
-    supabaseAdmin
-      .from('host_applications')
-      .select('user_id')
-      .eq('status', 'approved')
-      .then(async ({ data: hosts }) => {
-        if (!hosts || hosts.length === 0) return;
-        const hostIds = hosts
-          .map((h) => h.user_id)
-          .filter((id): id is string => !!id && id !== user.id);
-        if (hostIds.length === 0) return;
-
-        const notifications = hostIds.map((hostId) => ({
-          user_id: hostId,
-          type: 'service_request_new',
-          title: `📋 새로운 맞춤 서비스 의뢰 — ${city}`,
-          message: `${title} (${durationNum}시간, ${guestNum}명)`,
-          link: `/services/${data.id}`,
-          is_read: false,
-        }));
-
-        const { error: notiError } = await supabaseAdmin
-          .from('notifications')
-          .insert(notifications);
-        if (notiError) console.error('Service Request Notification Error:', notiError);
+    // 2. 에스크로 예약 사전 생성 (PENDING, 호스트 미정)
+    const orderId = generateOrderId();
+    const { error: bookingError } = await supabaseAdmin
+      .from('service_bookings')
+      .insert({
+        order_id: orderId,
+        request_id: data.id,
+        customer_id: user.id,
+        host_id: null,          // v2: 호스트 선택 전이므로 null
+        application_id: null,   // v2: 호스트 선택 후 채워짐
+        amount: data.total_customer_price,
+        host_payout_amount: durationNum * 20000,
+        platform_revenue: durationNum * 15000,
+        status: 'PENDING',
+        contact_name: contact_name.trim(),
+        contact_phone: contact_phone.trim(),
+        payment_method: 'card',
+        payout_status: 'pending',
       });
+
+    if (bookingError) {
+      console.error('Service Booking Pre-create Error:', bookingError);
+      // 예약 생성 실패 시 의뢰 취소 처리
+      await supabaseAdmin.from('service_requests').update({ status: 'cancelled' }).eq('id', data.id);
+      return NextResponse.json({ success: false, error: '예약 생성 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    // 3. 호스트 알림은 결제 완료(open 전환) 시점에 발송 — 여기서는 생략
 
     return NextResponse.json({
       success: true,
       requestId: data.id,
-      totalPrice: data.total_customer_price,
+      orderId,
+      amount: data.total_customer_price,
     });
 
   } catch (error: unknown) {

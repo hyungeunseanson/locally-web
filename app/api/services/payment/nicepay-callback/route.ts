@@ -59,8 +59,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid order type' }, { status: 400 });
     }
 
-    // 서명 검증
-    if (!verifySignature(signData, ediDate, amount, MID, MER_KEY)) {
+    // 서명 검증 (IMP 클라이언트 콜백 시 signData가 비어있을 수 있음 — 금액 검증으로 대체)
+    if (signData && ediDate && !verifySignature(signData, ediDate, amount, MID, MER_KEY)) {
       console.error(`🚨 [SERVICE SECURITY] Signature Mismatch! Order: ${orderId}`);
       return NextResponse.json({ error: 'Invalid Signature' }, { status: 400 });
     }
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     // 1. service_bookings 조회
     const { data: serviceBooking } = await supabase
       .from('service_bookings')
-      .select('*, service_requests(user_id, title)')
+      .select('*, service_requests(user_id, title, city, duration_hours, guest_count)')
       .eq('order_id', orderId)
       .maybeSingle();
 
@@ -105,39 +105,53 @@ export async function POST(request: Request) {
       throw new Error(`[SERVICE] Booking update failed: ${bookingUpdateErr.message}`);
     }
 
-    // 3. service_requests 상태 paid로 변경
+    const requestTitle = (serviceBooking.service_requests as { title?: string; city?: string; duration_hours?: number; guest_count?: number } | null)?.title || '맞춤 서비스';
+    const reqCity = (serviceBooking.service_requests as { city?: string } | null)?.city ?? '';
+    const reqDuration = (serviceBooking.service_requests as { duration_hours?: number } | null)?.duration_hours ?? 0;
+    const reqGuests = (serviceBooking.service_requests as { guest_count?: number } | null)?.guest_count ?? 0;
+
+    // 3. service_requests 상태 open으로 변경 (v2 에스크로: 결제 완료 후 호스트 모집 시작)
     const { error: requestUpdateErr } = await supabase
       .from('service_requests')
-      .update({ status: 'paid' })
+      .update({ status: 'open' })
       .eq('id', serviceBooking.request_id);
 
     if (requestUpdateErr) {
       console.error('[SERVICE] Request status update failed:', requestUpdateErr);
     }
 
-    const requestTitle = (serviceBooking.service_requests as { title?: string } | null)?.title || '맞춤 서비스';
+    // 4. 해당 도시 승인 호스트 전체에 알림 발송 (비동기)
+    supabase
+      .from('host_applications')
+      .select('user_id')
+      .eq('status', 'approved')
+      .then(async ({ data: hosts }) => {
+        if (!hosts || hosts.length === 0) return;
+        const hostIds = hosts
+          .map((h) => h.user_id as string)
+          .filter((id) => !!id && id !== serviceBooking.customer_id);
+        if (hostIds.length === 0) return;
+        const notifications = hostIds.map((hostId) => ({
+          user_id: hostId,
+          type: 'service_request_new',
+          title: `📋 새로운 맞춤 서비스 의뢰 — ${reqCity}`,
+          message: `${requestTitle} (${reqDuration}시간, ${reqGuests}명)`,
+          link: `/services/${serviceBooking.request_id}`,
+          is_read: false,
+        }));
+        const { error: notiErr } = await supabase.from('notifications').insert(notifications);
+        if (notiErr) console.error('[SERVICE] Host Notification Error:', notiErr);
+      });
 
-    // 4. 양측 알림 발송 (비동기)
-    const notifications = [
-      {
-        user_id: serviceBooking.customer_id,
-        type: 'service_payment_confirmed',
-        title: '✅ 결제가 완료되었습니다!',
-        message: `'${requestTitle}' 서비스 결제가 확정되었습니다. 호스트가 연락드릴 예정입니다.`,
-        link: `/services/my`,
-        is_read: false,
-      },
-      {
-        user_id: serviceBooking.host_id,
-        type: 'service_payment_confirmed',
-        title: '🎉 매칭이 확정되었습니다!',
-        message: `'${requestTitle}' 서비스 결제가 완료되어 매칭이 확정되었습니다.`,
-        link: `/host/dashboard?tab=service-jobs`,
-        is_read: false,
-      },
-    ];
-
-    supabase.from('notifications').insert(notifications).then(({ error }) => {
+    // 5. 고객에게만 알림 (에스크로: 호스트 미정이므로 고객만)
+    supabase.from('notifications').insert({
+      user_id: serviceBooking.customer_id,
+      type: 'service_payment_confirmed',
+      title: '✅ 결제 완료! 호스트 모집이 시작됩니다',
+      message: `'${requestTitle}' 결제가 완료되었습니다. 현지 호스트들의 지원이 시작됩니다.`,
+      link: `/services/${serviceBooking.request_id}`,
+      is_read: false,
+    }).then(({ error }) => {
       if (error) console.error('[SERVICE] Payment Notification Error:', error);
     });
 

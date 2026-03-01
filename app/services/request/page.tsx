@@ -82,8 +82,8 @@ function ServiceRequestForm() {
         return;
       }
 
-      showToast('의뢰가 등록되었습니다! 호스트들이 지원을 시작합니다.', 'success');
-      router.push(`/services/${data.requestId}`);
+      showToast('의뢰가 등록되었습니다! 결제 후 호스트 모집이 시작됩니다.', 'success');
+      router.push(`/services/${data.requestId}/payment`);
     } catch {
       showToast('서버 오류가 발생했습니다.', 'error');
     } finally {
@@ -274,10 +274,10 @@ function ServiceRequestForm() {
             disabled={isSubmitting}
             className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg"
           >
-            {isSubmitting ? '의뢰 등록 중...' : '의뢰 등록하기'}
+            {isSubmitting ? '처리 중...' : '의뢰 등록 및 결제하기'}
           </button>
           <p className="text-[10px] md:text-xs text-slate-400 text-center">
-            의뢰 등록 후 현지 호스트들의 지원을 받고, 마음에 드는 호스트를 선택한 뒤 결제하면 매칭이 완료됩니다.
+            의뢰 등록 즉시 결제(에스크로)가 진행됩니다. 결제 완료 후 현지 호스트들에게 공개되고, 마음에 드는 호스트를 선택하면 매칭이 완료됩니다.
           </p>
         </div>
       </div>
