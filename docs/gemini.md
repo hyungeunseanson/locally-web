@@ -6,43 +6,15 @@
 
 ---
 
-## 1. 프로젝트 개요
+## 1. 프로젝트 미션
 
-### 1.1 미션
 Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C2C 로컬 체험 여행 플랫폼이다.
-
-### 1.2 핵심 기술 스택
-- Frontend: Next.js 14+ (App Router), TypeScript (strict)
-- Styling: Tailwind CSS (커스텀 디자인 시스템, 외부 UI 라이브러리 미사용)
-- Backend: Supabase (PostgreSQL/Auth/Realtime/Storage)
-- State:
-  - Global: Context API (Auth/Toast/Notification/Language)
-  - Server State: TanStack Query (Guest/Host)
-  - Local: React Hooks
-- Payment: Toss Payments, NicePay
-- Date/i18n: date-fns(ko), LanguageContext + contentHelper (ko/en/ja/zh)
 
 ---
 
 ## 2. 아키텍처 원칙
 
-### 2.1 디렉토리 구조
-```bash
-/app
-├── admin/
-├── host/
-├── guest/
-├── experiences/
-├── api/
-├── components/
-├── context/
-├── hooks/
-├── lib/
-├── types/
-└── utils/
-```
-
-### 2.2 Admin 구조
+### 2.1 Admin 구조
 - `page.tsx`: 뷰/탭 라우팅 (탭: APPROVALS/USERS/LEDGER/SALES/SERVICE_REQUESTS/ANALYTICS/CHATS/LOGS/TEAM)
 - `hooks/useAdminData.ts`: 체험/bookings 데이터 페칭 (변경 금지)
 - `hooks/useServiceAdminData.ts`: service_bookings 전용 독립 훅 (v3.9.0 신설)
@@ -66,7 +38,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 | 분류 | 테이블 | 비고 |
 | :--- | :--- | :--- |
 | 사용자/권한 | `profiles`, `admin_whitelist` | `profiles.role` 기반, whitelist 예외 허용 |
-| 상품/예약/결제 | `experiences`, `bookings` | 예약 상태는 서버 검증 기준 | 
+| 상품/예약/결제 | `experiences`, `bookings` | 예약 상태는 서버 검증 기준 |
 | 소통/리뷰 | `inquiries`, `inquiry_messages`, `reviews` | 채팅/리뷰 연동 |
 | 운영 | `admin_tasks`, `admin_task_comments`, `audit_logs` | 협업/로그 |
 
@@ -82,157 +54,15 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ---
 
-## 4. 현재 상태 요약 (핵심만)
+## 4. 현재 상태 요약
 
 - 결제/보안: NicePay 서명 검증, 결제 확정/취소 API 권한 검증 반영
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합
-- 예약 상태 단일화(P1-2): `bookingStatus` 공통 상수에 대소문자 무관 판정(`isConfirmedBookingStatus`, `isCancelledBookingStatus`)과 Admin 장부용 상태 파생 상수(`*_UPPER`)를 추가해 화면/집계/필터 기준을 일치
-- Admin 장부/분석 정합성(P1-2): `MasterLedgerTab`, `AnalyticsTab`의 하드코딩 상태 배열 비교를 공통 상수 기반으로 전환해 상태값 표기 혼합(`PAID`/`confirmed`)에도 동일 집계 결과를 유지
-- Guest Trips 분류 안정화(P1-2): `useGuestTrips`, `TripCard`의 취소/완료 분기를 공통 취소 상태 집합 기준으로 통일해 `declined`/대소문자 변형 상태 누락 위험 제거
-- 예약 상태 유틸 확장(P1-3): `bookingStatus`에 `pending / cancellation_requested / completed / cancelled` 전용 판정 유틸을 추가해 화면 컴포넌트에서 직접 문자열 비교를 축소
-- Admin 매출 탭 정합성(P1-3): `SalesTab`의 유효 매출/정산 대상/CSV 위약금/상태 뱃지 분기를 공통 상태 유틸로 정렬해 대소문자 변형 입력에도 동일 계산을 유지
-- Host 예약 관리 정합성(P1-3): `ReservationManager`, `ReservationCard`의 취소요청/취소완료/입금대기 분기를 공통 상태 유틸로 통일해 탭 분류·정렬·실시간 알림 조건의 일관성을 강화
-- Admin 정산 실행 정합성(P1-4): `SettlementTab`의 상세 유형(취소 위약금/여행 완료) 분기를 공통 취소 상태 유틸로 통일해 상태 문자열 비교 중복을 축소
-- Host 수익 계산 정합성(P1-4): `Earnings`의 취소 예약 제외/포함 판단을 공통 유틸 기반으로 정렬하고 조회 status 목록에 `CANCELLED` 변형을 보강
-- 결제 취소 API 가드 보강(P1-4): `/api/payment/cancel`의 “이미 취소됨” 판정을 공통 상태 유틸로 전환해 대소문자/입력 변형에 대한 방어를 강화
-- Admin 정산 조회 필터 보강(P1-5): `SettlementTab`의 Supabase `.or(...)` 문자열 조건을 축소하고, 조회 후 공통 상태 유틸(`completed/cancelled`) 기반 필터로 전환해 쿼리 표현과 화면 계산의 기준을 일치
-- Admin 장부 Pending 분기 통일(P1-5): `MasterLedgerTab`의 `PENDING` 직접 비교(상태 탭 필터/상세 액션 버튼)를 `isPendingBookingStatus`로 치환해 대소문자 변형 입력에도 동일 동작 유지
-- 결제 완료 상태 분기 통일(P1-6): `payment/complete`의 `PENDING` 직접 비교를 `isPendingBookingStatus`로 전환해 입금 대기 UI 분기를 공통 상태 유틸 기준으로 정렬
-- 결제 성공 상태 분기 통일(P1-6): `payment/success`의 `PENDING` 제목/설명 분기를 공통 상태 유틸로 치환해 상태 표기 변형(대소문자)에도 동일 메시지 노출을 보장
-- 결제 플로우 회귀 점검(P1-6): `payment → payment/complete(orderId) → guest/trips|guest/inbox|home` 동선 및 `order_id` 기반 조회 경로를 재검증했고, 빌드 단계는 기존 Google Fonts 네트워크 제약(`Noto Sans KR`) 외 신규 오류 없음 확인
-- 결제 좌석 점검 상태 집합 통일(P1-7): `bookingStatus`에 `BOOKING_PENDING_STATUSES`, `BOOKING_BLOCKING_STATUSES_FOR_CAPACITY`를 추가하고 `payment/page`의 `.in('status', ...)`를 해당 상수로 전환해 `PENDING` 하드코딩을 제거
-- 전역 폰트 로컬 전환(P1-8): `layout.tsx`를 `next/font/local` 기반으로 전환해 Google Font 의존(`Noto Sans KR`)을 제거하고 `Inter(영문 우선) + IBM Plex Sans KR(한글 fallback)` 스택을 적용
-- 전역 타이포 변수 정렬(P1-8): `globals.css`의 `--font-sans`를 `--font-inter`, `--font-ibm-plex-sans-kr` 기반으로 재매핑해 모바일/데스크탑 기존 레이아웃·기능 동선을 유지하면서 글리프 fallback만 교체
-- 안정성: 광범위한 `.single()` -> `.maybeSingle()` 전환
-- 모바일 UX: BottomTabNavigation 충돌/가림/z-index/뒤로가기 이슈 정리
-- 모바일 정보/커뮤니티/뉴스/공지 레이아웃 최적화 및 게스트 프로필(모바일/데스크탑) 기준 정렬
-- 모바일 모드 전환: 게스트↔호스트 전환 시 홈(`/`) 우회 제거, 게스트 메뉴(`/account`) 및 호스트 메뉴(`/host/menu`)로 직접 이동 고정
-- 링크 오픈 정책: 사용자/호스트 주요 화면의 `window.open`/`target="_blank"` 제거, 동일 탭 이동으로 통일 (소셜 미디어 선택 모달 구조는 유지)
-- Host 모바일 폼 동기화: `새 체험 등록` 종료(X) 및 완료 CTA를 `체험 관리 탭`으로 고정하고, 생성/수정 상단 헤더 레이아웃을 일정 수정 화면 패턴과 정렬
-- 모드 전환 목적지 재동기화: 게스트의 “호스트 모드로 전환” 동작은 `/host/menu`로 연결하고, 호스트→게스트는 `/account`로 유지
-- 데스크탑 호스트 전환 회귀 수정(P1-9): `SiteHeader` 드롭다운의 호스트 전환 목적지를 `/host/menu`에서 `/host/dashboard?tab=reservations`로 복원해 데스크탑에서 모바일 메뉴로 이동되던 경로를 차단
-- 모드 전환 경로 가드(P1-9): `/host/menu`는 모바일 메뉴/모바일 뒤로가기 fallback 전용으로 유지하고, 데스크탑 헤더 모드 전환에서는 사용하지 않음
-- 모바일 언어 전환 진입점 확장(P1-10): 모바일 전용 언어 스위처를 `홈 상단 검색 영역`, `게스트 계정 헤더`, `호스트 메뉴 헤더`에 추가해 데스크탑 레이아웃 영향 없이 즉시 전환 경로를 확보
-- 언어 자동 감지 안전화(P1-10): 초기 언어 선택 우선순위를 `URL 프리픽스 > localStorage(app_lang) > navigator 언어(최초 1회)`로 고정하고, 최초 추론 결과를 저장해 재방문 시 자동 덮어쓰기를 방지
-- 서버 로케일 동기화 보강(P1-10): `getCurrentLocale`에서 `app_lang` 쿠키 우선 + `Accept-Language` fallback을 적용해 메타데이터/서버 렌더의 언어 기본값이 클라이언트 선택 흐름과 어긋나지 않도록 보강
-- 폰트 검증 런북 고정(P1-10): 폰트 반영 확인 시 `.next` 정리 후 `npx next build --webpack` 기준으로 `@font-face(inter/ibm)` 존재와 `next/font/google|noto_sans_kr|fonts.googleapis` 미존재를 함께 확인
-- 데스크탑 레이아웃 복귀(P0): 호스트 대시보드 `예약 관리/문의함/가이드라인`과 게스트 `메시지/알림`의 `md:` 이상 타이포·간격·배치를 핀셋 복귀해 모바일 밀도값이 데스크탑에 누수된 회귀를 완화
-- 예약 카드 배치 재정렬(P0): 호스트 `예약 관리` 카드에서 데스크탑 액션을 하단 분리행 대신 우측 통합 컬럼으로 재배치해 과도한 빈 공간/어색한 줄바꿈을 완화하고, 모바일 버튼 동선은 유지
-- 예약 카드 데스크탑 원형 복원(P0): 기준 커밋 `d1a622f`를 따라 `md` 이상 레이아웃을 좌측 날짜패널/중앙 상세/우측 액션 3단 구조로 되돌리고, `예약번호(order_id||id)`를 상단 주요 식별자로 재노출
-- 예약 카드 번역 키 보강(P0): 데스크탑 복원 라벨용 `res_order_number`, `res_payment_time`, `res_expected_income`를 `ko/en/ja/zh` 사전에 추가해 하드코딩 텍스트 없이 다국어 일관성 유지
-- 게스트 나의 여행 누락 복구(P0): 데스크탑 `영수증 모달`에 `공유하기` 버튼을 복원하고, `TripCard` 더보기 메뉴에 `주소 복사`를 재추가해 과거 구현(`c18e704`) 대비 누락된 핵심 액션을 복구
-- 호스트 예약 카드 데스크탑 밀도 보정(P0): 연락처 블록 비노출 정책을 유지하면서 우측 액션 컬럼 상단에 `일정 추가`를 상시 배치해 메시지 영역 상단 공백을 완화
-- 호스트 문의함 높이 가드(P0): `InquiryChat` 데스크탑 컨테이너를 뷰포트 기준 높이로 제한해 대화 레이아웃이 하단 푸터 영역을 침범하던 현상을 완화
-- 데스크탑 모드 전환 체감 개선(P0): `SiteHeader`에 데스크탑 전용 전환 오버레이를 추가하고, `router.prefetch` 후 짧은 전환 애니메이션 동안 라우트를 준비해 애니메이션 종료 후 추가 로딩 체감을 축소
-- 운영 범위 고정(P0): 위 복구/보정은 `md` 이상 웹 레이아웃에 한정하고 모바일(`md` 미만) 카드 구조/메뉴 동선은 변경하지 않음
-- 게스트 여행 메뉴 재정렬(P0): 데스크탑 `TripCard` 더보기 메뉴를 `캘린더 추가 + 공유하기 + 취소 요청`으로 단순화하고 `체험 다시 보기/주소 복사` 항목은 제거
-- 영수증 모달 액션 정리(P0): 데스크탑 `ReceiptModal`에서 `공유하기`를 제거하고 저장(프린트) 단일 동작만 유지
-- 호스트 취소 승인 CTA 단순화(P0): 취소 요청 카드의 `취소 사유 문의` 버튼을 제거하고 `승인 및 환불` 단일 CTA만 유지
-- 데스크탑 전환 애니메이션 2차 보정(P0): 전환 일러스트/그림자 스케일을 확대하고 전환 유지 시간을 +1초 조정(총 1.65초)해 호스트↔게스트 전환을 더 부드럽게 연결
-- 사용자 화면 번역 키 정합성(P0): `LanguageContext`에 누락 키(`help`, 게스트 프로필 모달/언어 라벨, 체험 수정 탭 키셋 등)를 보강해 `ko/en/ja/zh` 사전 간 누락을 0으로 정렬
-- 번역 연결 보강(P0): `account` 언어 안내문과 `host/experiences/[id]/edit`의 하드코딩 토스트/권한 에러 문구를 `t()` 키로 치환해 언어 전환 시 일관성을 강화
-- 운영 범위 고정(P0): 이번 배치의 번역 정비는 `public/guest/host` 사용자 화면 우선으로 적용하고, Admin 번역 변경은 범위에서 제외
-- 새 체험 등록 UX 보정: 모바일/데스크탑 공통으로 스텝 타이포·간격·입력 영역 밀도를 축소해 한 화면 가독성 우선 레이아웃으로 재정렬
-- 새 체험 등록 스텝 검증: Step 1~6 필수 입력 검증을 추가해 누락 시 다음 단계(또는 등록) 진행 차단 + 토스트 피드백 적용
-- 체험 운영 알림 톤 통일: 일정 관리/체험 수정 화면의 브라우저 alert 기반 오류 안내를 가능한 범위에서 토스트 피드백으로 전환
-- Guest 모바일 여행 UX: 지난 여행 카드 전체 클릭 동선 복구(체험 상세 이동) 및 후기 작성 모달 높이/패딩/타이포를 모바일 하단 시트 기준으로 최적화
-- 홈 모바일 상단 시각 동기화: Hero 상단 배경과 본문 시작부 배경을 동일 톤의 그라데이션 계열로 맞추고, 검색 캡슐 크기/테두리/타이포를 레퍼런스 비율로 재조정
-- 홈 모바일 상단 CTA 분리: 상단 검색 캡슐 문구를 `search_placeholder`와 분리한 `home_search_cta` 키로 운영해 모달/데스크탑 검색 문구 회귀를 방지
-- 홈 모바일 탭 하단 요소: 체험/서비스 탭 아래에 `로컬리 소개` 캡슐 버튼을 추가해 상단 블록 레이아웃 밀도를 레퍼런스 흐름에 맞춤
-- 홈 모바일 스크롤 상단 보정: 스크롤 시에도 검색 캡슐을 유지하고 텍스트 탭만 전환해 레퍼런스의 상단 탐색 흐름(검색 고정 + 소형 탭)을 유지
-- 홈 모바일 구분선 보정: 단색 라인 분리 대신 섹션 사이 은은한 그라데이션 스페이서를 적용해 카드 그룹 전환을 부드럽게 처리
-- 홈 모바일 CTA 미세 조정: 상단 캡슐 문구를 `로컬리 소개 및 호스트 지원`으로 교체하고 `become-a-host` 연결, 배경은 반투명 캡슐로 조정해 뒤 배경 톤이 자연스럽게 투영되도록 구성
-- 홈 모바일 CTA/타이포 재보정: `로컬리 소개 및 호스트 지원` 캡슐의 텍스트 명도·굵기(`및` 경량)·테두리를 레퍼런스 대비로 조정하고 밑줄 제거, 내부 배경은 투명으로 통일
-- 홈 모바일 섹션 흐름 마감: 인기/신규/언어/서비스 타이틀 굵기를 완화하고, 섹션 전환 그라데이션 스페이서를 좌우 전체 폭으로 통일해 절단/이중선 인상을 제거
-- 홈 모바일 CTA 텍스트 규격화: `로컬리 소개 및 호스트 지원`에서 `로컬리 소개`/`호스트 지원`만 1단계 강조(굵기+밑줄)하고 `및`은 경량으로 유지, 단어 간 공백을 명시적으로 고정
-- 홈 모바일 서비스 탭 조정: 서비스 화면에서 상단 그라데이션 분리선을 제거하고, `로컬리 서비스` 타이틀로 변경했으며 모바일 서비스 리스트를 2x2 그리드로 고정(스크롤 슬라이드 제거)
-- 서비스 카드 스타일 동기화(P0): `ServiceCard`를 체험 카드와 동일한 카드 쉐도우/호버 리프트/타이포 스케일 구조로 재정렬하고, 모바일/데스크탑 모두 동일 밀도 체계로 맞춤
-- 서비스 탭 배치 동기화(P0): 홈 서비스 탭의 모바일 리스트를 체험 섹션과 같은 가로 스크롤 카드 폭(`42vw`)으로 복귀하고, 데스크탑 서비스 그리드를 체험 탭과 동일 컬럼 체계(`sm~2xl`)로 통일
-- 모바일 검색 모달 배경 보정: 여행지/날짜/언어 선택 모달의 박스 외곽 영역을 단색 회색에서 반투명+블러 레이어로 변경해 뒤 배경이 투영되도록 조정
-- 모바일 검색 모달 리디자인: 배경 반투명도를 높이고, 위치/날짜/언어 패널을 레퍼런스 기준의 카드/타이포로 정렬했으며 추천 여행지 목록(도시+체험)과 4개 언어 선택 UI로 구성
-- 모바일 검색 모달 개선: 패널 전환 애니메이션을 더 부드럽게 조정하고, 컬러 아이콘/추천 리스트를 실제 최근 검색 기반으로 갱신하며 언어 섹션은 `체험 언어` 문구로 고정
-- 모바일 검색 모달 추가 조정: 모노라인 컬러 아이콘(도쿄 타워/토리이/맥주/궁궐)로 통일하고 최근 검색은 1개만 표시, 하단 CTA를 주소창 위로 띄워 고정
-- 모바일 검색 모달 아이콘 리파인: 추천 여행지 아이콘을 레퍼런스 감성의 정교한 모노라인 세트로 재작업하고 배경/스트로크 대비를 높여 선명도 개선
-- 모바일 검색 모달 아이콘 정합화: 추천 아이콘을 레퍼런스 형상에 더 가깝게 재드로잉하고 블러 잔선 레이어를 추가해 원본 질감 유사도를 강화
-- 모바일 검색 모달 미세 조정: 추천 아이콘 선 굵기/잔상을 경량화하고 배지 배경 채도를 낮춰 레퍼런스 톤으로 보정, 하단 CTA 바는 모바일 주소창을 피하도록 상향 오프셋 확대
-- 모바일 검색 모달 언어 옵션 보강: 언어 선택에 `전체`를 재도입하고 하단 `전체 해제/검색` 고정 바를 추가 상향해 iOS 주소창 가림 이슈를 완화
-- 모바일 상세검색 구조 보정: 모달 내부 `체험/서비스` 상단 탭을 제거하고 닫기(X)를 `위치` 박스 우측으로 이동했으며, 위치/날짜/언어 패널 시작점을 상향 정렬해 하단 CTA와 함께 전체 수직 밀도를 재정렬
-- 모바일 검색 모달 하단 고정 안정화: `fixed + 하드코딩 bottom offset` 구조를 제거하고 모달 내부 하단 바(`sticky`) + `safe-area` 패딩으로 재설계해 iPhone 주소창 가림/겹침 이슈를 완화
-- 모바일 키보드 점프 대응: `여행지 검색` 확장 입력의 `autoFocus`를 제거하고 `preventScroll` 포커스 + `body position: fixed/top` 기반 스크롤 락 복원으로 iOS 키보드 오픈 시 홈 하단 점프 현상을 방지
-- 모바일 검색 모달 먹통 회귀 수정: `body fixed(top)` 스크롤 락이 iOS Safari에서 `fixed + portal` 모달 레이어와 충돌해 홈 화면 고정/터치 불가 상태를 유발하던 문제를 제거하고, 스크롤 락을 `body/html overflow` 기반으로 단순화해 여행지 검색 진입 시 모달 상호작용이 끊기지 않도록 안정화
-- 모바일 여행지 검색 확장 경로 안정화: 확장 입력 포커스 로직에서 브라우저별 예외 가능성이 있는 커서 강제 제어(`setSelectionRange`)를 제거하고 입력 `autoFocus`로 단순화했으며, `locally_recent_searches`의 레거시 데이터(문자열/비정상 객체)를 렌더 전 정규화해 확장 화면 진입 시 런타임 오류로 인한 화면 먹통을 방지
-- iOS 키보드 스크롤 점프 차단: 모바일 상세검색의 `여행지 검색` 확장 상태에서 iOS(Safari/Chrome) 전용 윈도우 스크롤 앵커 가드를 추가해 키보드 오픈 시 홈 최하단으로 배경 문서가 이동되는 현상을 방지하고, 모달 루트 높이를 `100dvh`에서 `100svh`로 전환해 키보드 노출 중 동적 뷰포트 흔들림을 완화
-- 모바일 확장 검색 회귀 교정: iOS 전용 `window.scrollTo` 앵커 강제 가드가 확장 화면을 즉시 붕괴시키는 회귀를 유발해 해당 가드를 제거하고, 확장/모달 루트는 `fixed + inset`만으로 높이를 계산하도록 단순화했으며 확장 진입 시 자동 키보드 오픈(`autoFocus`)을 해제해 홈 배경 강제 스크롤/레이어 이탈 위험을 낮춤
-- 모바일 여행지 검색 재안정화: `여행지 검색` 확장 진입 시 `autoFocus` 제거로 발생한 무반응 체감(키보드 미노출)을 `requestAnimationFrame + focus({preventScroll:true})`로 복구하고, 모달 오픈 스크롤락을 `body fixed(top:-scrollY)` 복원형으로 재정렬해 iOS에서 확장 진입 시 홈 하단 점프/배경 고정 잔류를 동시에 완화
-- 모바일 확장 검색 구조 단일화: `여행지 검색` 확장 화면을 별도 `createPortal` 분기 렌더에서 모달 내부 절대 오버레이로 통합해 확장 진입 시 트리 전환 중 레이어 손실/스크롤락 잔류가 발생하던 경로를 제거하고, 입력은 `autoFocus + preventScroll focus` 이중 경로로 키보드 호출 안정성을 보강
-- 모바일 검색 결과 화면 리디자인: 상단 캡슐 헤더/유형·시간대 필터 칩/수평 카드 섹션/하단 시트(시간대·체험유형) 구조를 레퍼런스 기반으로 정렬하고 검색 결과 없음 상태를 별도 일러스트 카드형으로 맞춤
-- 모바일 검색 결과 타이포 재보정: 섹션 타이틀/필터 칩/하단 시트 타이포를 축소해 레퍼런스 대비(작고 조밀한 인상)로 정렬
-- 검색어 안정화 가드: 모바일 검색 결과 API 호출 전 `location` 필터 문자열에서 PostgREST 문법 충돌 문자를 정리해 `Bad Request` 발생 가능성을 완화
-- 모바일 검색 결과 추가 정렬: 섹션 타이틀을 지역 특화 문구(이자카야/로컬 골목/일본어 투어)로 교체하고, 우측 설정 아이콘에서 여는 통합 필터 시트(체험 유형+시간대)와 `결과 보기` CTA 텍스트로 동작/문구를 통일
-- 가격 라벨 규격화: 모바일 검색 카드와 홈 체험 카드의 가격 표시를 `1인당 ₩xx,xxx부터` 포맷으로 통일
-- 모바일 검색 결과/홈 타이포 동기화: 검색 카드 제목은 홈 카드 모바일 제목 크기 기준으로 통일하고, 홈 섹션 헤드라인 크기를 검색 결과 섹션 타이틀과 동일 스케일로 상향
-- 모바일 검색 필터 헤더 확장: 우측 설정 아이콘 탭에서 통합 `필터` 시트를 열어 체험 유형+시간대를 함께 선택하고 CTA 문구를 `결과 보기`로 고정
-- 모바일 검색 언어 라벨 정리: 언어 섹션 헤더를 `진행 언어`로 단순화하고 `전체` 옵션 아이콘을 국기 톤과 어울리는 중립 글로벌 심볼로 교체
-- 모바일 검색 라우팅 파라미터 보강: 홈 검색 모달에서 `startDate/endDate/language/location`을 함께 전달해 검색 화면 헤더/필터 상태와 URL 쿼리 일관성을 유지
-- 검색 매칭 로직 강화: 검색어를 단어 단위로 정규화한 뒤 `title/description/city/country/category + 다국어 필드 + tags` 전체에서 AND 매칭해 도시/제목 키워드 동시 검색 정확도를 상향
-- 모바일 검색 필터 실동작 보강: 날짜 쿼리는 `available_dates` 범위와 실제 교차 검증하고, 시간대 칩 선택은 체험 시간 관련 필드 키워드 기반으로 결과 리스트에 반영
-- 체험 상세 레퍼런스 동기화: `/experiences/[id]` 모바일/데스크탑 상세 레이아웃을 레퍼런스 흐름(상단 2x2 갤러리, 체험 내용 리스트, 후기 카드/전체보기, 만나는 장소 지도, 자기소개 카드, 알아두어야 할 사항 카드, 하단 고정 예약 바)으로 재정렬하고 기존 예약/찜/공유/문의/리뷰 모달 동작은 유지
-- 체험 상세 레퍼런스 미세 조정: 모바일 상세의 상단 헤더/타이포 스케일/호스트·장소 요약 카드/체험 내용 텍스트 밀도/후기 카드 크기/지도 높이/자기소개 카드/알아두어야 할 사항 리스트/하단 예약 바 캡슐 배율을 레퍼런스 비율로 재축소 및 재배치
-- 체험 상세 후속 정합화: 모바일 상단의 `자동 번역됨` 문구 제거, 후기/별점 라인 축소, 장소 요약을 아이콘-텍스트 행 정렬로 전환, 후기 운영 방식 안내 모달 추가, 하단 예약 CTA를 플로팅 캡슐 스타일로 재구성(`7일 전에 취소하면 수수료 없음`)
-- 체험 상세 타이포 보정 2차: 하단 캡슐 가격 라벨을 `1인당`(회색 소형) + 금액 밑줄 구조로 재배치하고 문구를 `7일 전 취소 시 수수료 없음`으로 조정, 리뷰 없음 상태/예약 카드(날짜·시간·요약) 타이포 축소, 지도-자기소개 경계선 중복 제거, 모바일 배경 톤을 화이트 계열로 상향
-- 체험 상세 마감 조정: 리뷰 없음 문구를 2행 구성으로 정렬하고 호스트 CTA를 `~님에게 메시지 보내기` 포맷으로 통일, 하단 플로팅 캡슐은 높이/좌측 여백/보조 문구 간격을 재조정해 레퍼런스 비율에 맞춤
-- 체험 상세 모달 정합화: 후기 전체보기 모달을 레퍼런스 기반 시트 구조(상단 X, 대형 평점, `최신순/오래된 순` 정렬)로 재설계하고 검색 아이콘/번역 라인을 제외했으며, 모바일 `~님에게 메시지 보내기` CTA는 하단 문의 영역 노출 대신 전용 메시지 모달(질문 입력 + 전송 버튼)을 열도록 전환
-- 체험 상세 모달 타이포 재축소: 후기 전체보기/메시지 보내기 모달의 제목·본문·메타 타이포 굵기와 크기를 한 단계 더 축소하고, 문의 전송 완료 흐름은 브라우저 확인창 없이 `메시지가 발송되었습니다.` 토스트만 노출하도록 단순화
-- 체험 상세 3차 미세보정: 후기 전체보기 모달 텍스트를 추가 축소(약 20%)하고 평점 숫자 가중치를 상향했으며, 후기/메시지 모달 배경을 화이트 톤으로 조정하고 전역 토스트를 다크 톤 + 부드러운 등장 모션으로 재디자인
-- 호스트 체험 등록/수정 동기화(P0): 대표 사진은 `photos` 최대 5장으로 고정하고, 생성·수정 화면 모두 `meeting_point=만나는 장소명`, `location=정확한 주소`, `itinerary[].image_url=동선별 사진 1장` 구조로 정렬했으며 `불포함 사항` 입력은 제거
-- 체험 상세 상단 정보 재정렬(P0): `/experiences/[id]` 상단 라벨을 `city · category` 기준으로 전환하고, 데스크탑 사진 아래 요약 블록을 모바일 정보 계층(제목/소개/평점/도시·카테고리/호스트/만나는 장소) 기준으로 재구성해 중복 헤더를 제거
-- 체험 상세 정보 기준 통일(P0): 언어 안내는 `experience.languages` 우선으로 표기하고 팁형 아이콘 안내행으로 정리했으며, 만나는 장소는 `meeting_point` 1행 + `location` 2행으로 분리, 데스크탑 별도 `호스트에게 문의하기` 입력 박스와 `접근성` 섹션은 제거하고 환불 정책은 `표준 정책 (7일 전 무료 취소)` 고정 문구로 통일
-- 체험 상세 갤러리 확장(P0): 상세 상단 대표 갤러리와 `사진 모두 보기`는 `photos`뿐 아니라 `itinerary[].image_url`도 합쳐서 노출해 동선별 사진이 상단 사진 세트에 함께 포함되도록 정렬
-- 체험 상세 호스트 메타 보강(P0): 데스크탑 요약 블록의 `공유하기/저장`을 제목 우측으로 이동하고, 평점/후기 아래에 `지역 · 카테고리`를 분리 배치했으며, 호스트 보조 텍스트는 카테고리 fallback 대신 `직업` 우선으로 고정하고 `구사 언어 + 언어 숙련도(Lv.1~5)`를 얇은 보조 라인으로 추가
-- 체험 상세 문의/동선 UI 후속(P0): 동선 카드 텍스트는 사진 높이 안에서 중앙 정렬되도록 밀도를 줄였고, 데스크탑 `~님에게 메시지 보내기` 버튼도 모바일과 동일한 메시지 모달을 열도록 통합
-- 체험 상세 안정화 v2(예약 원자화): `create_booking_atomic` DB 함수 + 슬롯 advisory lock + 활성 프라이빗 부분 유니크 인덱스를 추가하고, `POST /api/bookings` 내부를 `select→insert`에서 RPC 단일 경로로 전환해 동시 요청 시 좌석 검증/삽입을 원자적으로 보장
-- 체험 상세 안정화 v2(문의 인증): `useChat.createInquiry`/`sendMessage`에서 `currentUser` 지연 상태 의존을 제거하고 호출 시점 `auth.getUser()` 기반으로 사용자 식별을 확정해 상세 진입 직후 문의 전송 실패 오탐을 완화
-- 체험 상세 안정화 v2(모바일 에러 UX): 상세 결제 흐름의 `alert`를 제거하고 토스트 + 인라인 에러 블록으로 통일, 실패 시 강제 뒤로가기 없이 현재 화면에서 재시도 가능한 상태로 유지
-- 체험 상세 안정화 v2(타입/접근성): 상세 영역 컴포넌트 `any` 제거 및 optional 타입 보정, `Link` 규칙 준수, 이미지 `alt`/`next/image` 보강, 후기 모달 초소형 텍스트 가독성을 최소 10px 기준으로 상향
-- 결제 플로우 모바일 밀도 최적화: `/experiences/[id]/payment`, `/experiences/[id]/payment/complete`, `/payment/success`의 모바일 타이포/간격을 1단계 축소하고 `md:` 기준 데스크탑 스타일을 보존
-- 게스트+공개 페이지 모바일 1.5단계 타이포·간격 축소 및 데스크탑 보존형 반응형 정렬 완료
-- Admin: Team Chat 가시성/알림 배지/모바일 디테일 화면 안정화
-- Host: 권한 스코프, 예약/수익 집계 기준, Realtime 범위 검증 정리
-- P0 정합성(예약 상태): 게스트 계정/모바일 프로필의 여행 횟수 집계를 하드코딩 `confirmed`에서 `BOOKING_CONFIRMED_STATUSES` 기반으로 통일
-- P0 정합성(API): `/api/guest/trips` 응답에서 `hostId` 사용 경로와 실제 select 컬럼(`experiences.host_id`)을 일치시켜 누락 가능성을 제거
-- P0 정합성(Admin 권한): 관리자 판정 기본 소스를 `users.role + admin_whitelist`로 통일하고, 화이트리스트 자동 승급/호스트 승인 반영도 `users.role` 갱신 기준으로 정리
-- P0 정합성(타입): `Booking.status` 유니온을 운영 중 상태 집합(`PENDING/PAID/confirmed/completed/cancelled/cancellation_requested/declined`)과 동기화
-- P1 정합성(상태 상수): 체험 상세 SSR 잔여석 조회, 결제 페이지 사전 좌석 점검, 게스트 여행 자동 완료 가공, 입금 콜백의 중복/좌석 검증 쿼리에 `BOOKING_ACTIVE_STATUS_FOR_CAPACITY`를 적용해 예약 상태 비교 기준을 통일
-- P1 정합성(Cron): 완료 스케줄러(`complete-trips`)의 대상 상태를 상수 기반으로 정렬하고 오류 처리 타입을 `unknown` 기반으로 보강
-- P1 정합성(Admin 조회 최소화): Global Team Chat의 `admin_whitelist` 조회를 `select('*')`에서 `select('id')`로 축소해 권한 판정 목적에 필요한 최소 데이터만 읽도록 정리
-- 데스크탑 홈 검색바 닫힘 안정화(P0): `MainSearchBar` 루트 기준 `mousedown` 외부 클릭 + `Escape` 키로 위치/날짜/언어 드롭다운을 닫도록 고정하고, 기존 검색 실행 로직은 유지
-- 검색 라벨 분리(P0): 홈 검색바 언어 라벨을 `label_progress_language`로 분리해 `언어` 대신 `진행 언어`를 노출하되 기존 `label_language` 사용처는 그대로 유지
-- 위시리스트 즉시 공유(P0): `guest/wishlists` 카드 오버레이에 공유 버튼을 추가하고 `navigator.share` 우선, 미지원 브라우저는 클립보드 복사 fallback으로 통일
-- 프로필 저장 400 차단(P0): 게스트 `account`와 호스트 `ProfileEditor`의 기본 저장 경로를 `profiles` 현재 행 기준 컬럼 필터 `update`로 정리하고, 게스트 `account`는 행 미존재 시 유효 컬럼만 `upsert`하는 fallback을 추가
-- 프로필 스키마 정합성 400 차단(P0): 실DB `profiles`에 없는 `role/name/is_admin/school` 직접 쿼리를 런타임 경로에서 제거하고, 관리자/팀 알림은 `users.role` 및 `admin_whitelist` 기반으로 재배선했으며 모바일 프로필 저장은 실컬럼 필터 `update`, 행 미존재 시 유효 컬럼만 `upsert`하는 fallback으로 고정
-- 프로필 저장 시드 가드 보강(P0): 게스트 `account`, 모바일 `MobileProfileView`, 호스트 `ProfileEditor`는 `profiles` 행이 비어 있을 때 전체 payload 직접 `upsert` 대신 `id + updated_at` 최소 시드 생성 후 실제 컬럼 기준 필터 `update`로 재진입해 컬럼 차이(`school`, 레거시 필드)로 인한 최초 저장 400 위험을 줄임
-- 게스트 프로필 저장/유도 정합화(P0): 데스크탑 `account`와 모바일 `MobileProfileView` 모두 `school`, `mbti`, `languages` 저장 경로를 일치시켰고, 두 화면 모두 프로필 완성도 카드/잔여 항목 배지/핵심 필드 안내문을 추가해 비강제형 입력 유도를 고정
-- 호스트 프로필 공개 편집 정합화(P0): `ProfileEditor`의 `구사 언어`를 쉼표 문자열에서 공통 선택 칩으로 전환하고, 공개 프로필 완성도 카드와 언어/자기소개 안내문을 추가했으며, 데스크탑 호스트 대시보드 `프로필` 탭에는 미완성 시 퍼센트 배지를 유지
-- 호스트/게스트 프로필 모달 소스 정리(P0): `UserProfileModal`, `GuestProfileModal`, `ReservationManager`, 체험 상세 호스트 모달은 `profiles.bio / nationality / languages`와 `host_applications.self_intro / host_nationality` 우선순위를 일치시켜 잘못된 필드 참조와 기본값 추측 노출을 줄였고, 체험 상세 호스트 모달의 가짜 `슈퍼호스트/검증/0개 후기` 표시는 제거
-- 프로필 화면 후속 안정화(P0): `account`, `MobileProfileView`, `host/dashboard`는 Supabase 클라이언트를 메모이즈하고 프로필/통계 조회 effect 의존성을 정리해 불필요한 lint 경고(미사용 import, 누락 dependency, 미사용 포맷 함수)를 줄였으며, 현재 남은 경고는 `img` 최적화 권고만 유지
-- 모바일 호스트 메뉴 완성도 유도(P0): `MobileHostMenu`가 `profiles + host_applications`를 병합한 공개 프로필 요약으로 완성도를 계산하고, `프로필 설정` 메뉴에 미완성 시 퍼센트 배지를 표시해 모바일 진입점에서도 프로필 입력 유도를 유지
-- 호스트 예약 조회 핫픽스(P0): `ReservationManager`의 게스트 프로필 select에서 실DB에 없는 `profiles.school` 명시 조회를 제거해 Supabase `42703 column does not exist`로 예약 관리가 400 실패하던 즉시 회귀를 복구
-- 게스트 모달 언어/가입일 정합화(P0): `GuestProfileModal`은 언어값이 `한국어/영어/...` 또는 `English/Korean/...` 어느 쪽으로 저장돼 있어도 공통 정규화 후 올바른 라벨을 렌더하고, `ReservationManager` 게스트 select에 `created_at`을 다시 포함해 가입일이 `가입일 정보 없음`으로 비어 보이던 문제를 복구
-- 게스트 학교 필드 UX 롤백(P0): 실DB `profiles.school` 부재로 저장되지 않는 입력을 계속 노출하지 않도록 데스크탑 `account`와 모바일 `MobileProfileView`의 `학교` 입력을 제거했고, 게스트 완성도 계산에서도 제외했다. 향후 스키마 추가 시에는 캡슐이 아니라 `기본 정보` 행 섹션으로 재노출하는 방향을 기준으로 둔다
-- 체험 상세 호스트 모달 밀도 복원(P0): 체험 상세 SSR에서 호스트 전체 리뷰 수/평균 평점을 실제 `reviews` 기준으로 계산해 `HostProfileModal` 좌측에 `이름 → 경력 문구 → 후기/평점` 순서로 다시 채우고, 빈 좌측 영역 체감을 줄였다
-- 빌드 반영 주의(P0): 위 스키마 정합성 수정 전 생성된 `.next` 산출물에는 기존 `profiles.role`, `is_admin`, `profiles.school` 요청 코드가 그대로 남아 있으므로, 반영 확인 전에는 `.next` 정리 후 dev 서버 또는 프로덕션 빌드를 새로 생성해야 한다
-- Admin 삭제 인증 복원(P0): `/api/admin/delete`는 `Authorization` 헤더 토큰 파싱 대신 `@/app/utils/supabase/server`의 쿠키 기반 서버 클라이언트로 `auth.getUser()`를 복원하도록 수정했고, 권한 체크 직전 `auth user / users 조회 / whitelist 조회 / final isAdmin` 로그를 추가해 401·403 원인을 서버 로그에서 직접 추적할 수 있게 했다
-- 관리자 문의 분류 정합성(P0): `inquiries.type`의 레거시 `admin`과 현행 `admin_support`를 공통 헬퍼로 함께 관리자 1:1 문의로 판정하도록 통일했고, Admin `ChatMonitor`와 게스트 메시지함의 표시/뱃지/상대명 분기를 모두 같은 기준으로 맞췄으며, `ChatMonitor`의 `host.full_name` 오참조를 `host.name`으로 수정해 `호스트: 알수없음` 오표시를 제거했다
-- 카테고리 표준 집합 동기화(P0): 호스트 등록 카테고리를 11개(기존 7 + 건축/공연·경기/랜드마크/원데이 클래스)로 확장하고 모바일 검색 `체험 유형`도 동일 집합으로 정렬
-- 카테고리 UI 정합화(P0): 호스트 체험 등록 Step1 카테고리를 모바일 `체험 유형`과 동일한 아이콘 칩 스타일로 재구성해 등록/검색 선택 기준과 시각 표현을 일치
-- 인증 세션 식별 고정(P0): 브라우저 Supabase 클라이언트를 싱글턴으로 고정하고, 로그인 직후 프로필 동기화를 액세스 토큰 기준 서버 경로로 재배선했으며, `layout/AuthContext/login/become-a-host`의 사용자 판정을 `getSession()`에서 `getUser()`로 전환해 캐시/쿠키 레이스로 다른 계정이 재주입될 가능성을 축소
-- 로그아웃 로컬 안정화(P0): `AuthContext` 로그아웃을 `signOut({ scope: 'local' })` + 앱 전용 localStorage 키만 선별 정리하는 방식으로 변경해 전체 저장소 초기화로 인한 세션/설정 교란 위험을 줄임
-- OAuth 프로필 동기화 보강(P0): `/auth/callback`에서 코드 교환 직후 동일 요청 컨텍스트로 프로필 동기화를 실행해 소셜 로그인 직후 `profiles` 누락과 세션 식별 불일치 가능성을 완화
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 기존 체험(`bookings`) 탭·`useAdminData.ts`는 전혀 변경하지 않음.
-- 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. complete 페이지에 `method=bank` 분기 추가(입금 대기 중 UI + 계좌번호 재표시). 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리. 카드 결제 기존 플로우 미변경.
-- 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab` 전체 의뢰 탭에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 추가. PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → `service_bookings` PENDING→PAID, `service_requests` pending_payment→open + 호스트 전체 알림 + 고객 알림 + 감사 로그(기존 nicepay-callback 로직과 동일).
+- 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
+- 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
 
-비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 별도 커밋 이력/문서에서 확인한다.
+비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 `docs/CHANGELOG.md` 또는 커밋 이력에서 확인한다.
 
 ---
 
@@ -269,7 +99,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 | --- | --- | --- |
 | 모바일 (< 768px) | 태블릿 + 데스크탑 (≥ 768px) | 대형 화면 (≥ 1024px) |
 
-### 6.3 z-index 기준 (요약)
+### 6.3 z-index 기준
 - `z-[9999]`: 최상위 전역 모달/토스트
 - `z-[200]`: 일반 모달
 - `z-[150]`: 상세/갤러리 오버레이
@@ -279,7 +109,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ---
 
-## 7. 백로그 (유지)
+## 7. 백로그
 
 - 지도 기반 검색 (국내/해외 지도 분기)
 - 메시징 기능 확장 (미디어, 읽음 상태 등)
@@ -290,9 +120,11 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ## 8. 문서 운영 규칙
 
-- 이 문서는 “현재 유효한 구현 기준”만 유지한다.
+- 이 문서는 "현재 유효한 구현 기준"만 유지한다. 과거 완료 작업·이력 서술은 작성하지 않는다.
 - 중복/과장/과거 상세 로그는 누적하지 않는다.
-- 대규모 변경 시 이 문서에는 결정사항만 요약하고, 상세 이력은 별도 문서 또는 커밋에 남긴다.
+- **[영구 규칙 1]** gemini.md는 DB 스키마 변경·신규 API 추가·아키텍처 결정 등 **핵심 시스템 골격 변경** 시에만 업데이트한다. UI 픽셀 조정·스타일 수정·컴포넌트 리파인은 gemini.md 업데이트 대상이 아니다.
+- **[영구 규칙 2]** 과거 완료된 버그 수정·UI/UX 조정·패치 내역은 반드시 `docs/CHANGELOG.md`에만 기록한다. gemini.md에 과거형(~수정, ~추가, ~변경) 서술을 쌓지 않는다.
+- 대규모 변경 시 이 문서에는 결정사항만 요약하고, 상세 이력은 `docs/CHANGELOG.md` 또는 커밋에 남긴다.
 - 모바일 전용 경로(`'/host/menu'` 등)는 데스크탑 전환/네비게이션의 기본 목적지로 사용하지 않는다.
 - 폰트 검증은 개발 캐시(`.next/dev`) 단독 결과를 기준으로 판단하지 않고, `.next` 정리 후 `webpack build` 산출물로 최종 확인한다.
 
@@ -375,7 +207,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 
 ### 10.6 네비게이션 연동
 
-- **홈 서비스 탭:** `LOCALLY_SERVICES` 5번째 항목(id=5) → 클릭 시 `/services/request` 라우팅 (기존 4개 카드 변경 없음)
+- **홈 서비스 탭:** `LOCALLY_SERVICES` 5번째 항목(id=5) → 클릭 시 `/services/intro` 라우팅
 - **호스트 대시보드:** `service-jobs` 탭 추가 (Briefcase 아이콘) → ServiceJobsTab 렌더
 - **MobileHostMenu:** "서비스 매칭" 메뉴 항목 추가 → `/host/dashboard?tab=service-jobs`
 - **BottomTabNavigation:** `isHostNavPath`에 `/services` 경로 추가 (호스트 잡보드 탐색 시 탭바 유지)
@@ -389,230 +221,23 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 
 ---
 
-## 11. 버그 수정 이력 (v3.3.1)
+## 11. 에스크로 선결제 시스템 (v3.8.0+)
 
-**수정일:** 2026-03-01 | **수정자:** 에이전트 (메인 QA 리드)
+### 11.1 배경 — 노쇼 문제 해결
 
-### 11.1 [Bug 1 - CRITICAL] 수수료 마진 유출 수정
-- **현상:** 호스트 계정으로 잡보드, 의뢰 상세 접속 시 고객 결제 금액(`total_customer_price`)이 노출.
-- **수정:**
-  - `app/services/page.tsx`: 잡보드 카드 금액 표시를 `total_host_payout`(예상 수입)으로 교체, 라벨/색상 구분
-  - `app/services/[requestId]/page.tsx`: 의뢰 상세 금액 블록을 `isOwner` 분기로 엄격 분리 — 고객에게만 총 금액, 호스트에게는 예상 수입만 노출
-  - `app/types/service.ts`: `ServiceRequestCard`에 `total_host_payout`, `user_id` 필드 추가
-  - `app/api/services/requests/route.ts`: API select 쿼리에 두 필드 추가
-
-### 11.2 [Bug 2 - DATA] 고객 화면 지원자 리스트 0명 표기 수정
-- **현상:** 호스트가 지원 완료 후에도 고객의 의뢰 상세에 "지원한 호스트 (0명)" 표기.
-- **근본 원인:** 클라이언트 SDK의 `service_applications` nested join 쿼리가 Supabase RLS 정책에 의해 차단되어 빈 배열 반환.
-- **수정:**
-  - `app/api/services/applications/route.ts`: `GET` 핸들러 신규 추가 — `service_role` 클라이언트로 RLS 우회, 의뢰 소유자에게는 전체 지원자 + `profiles`/`host_applications` 2단계 조인 반환
-  - `app/services/[requestId]/page.tsx`: 클라이언트 직접 조회에서 서버 API 호출로 전환
-
-### 11.3 [Bug 3 - UX] 호스트 '지원 완료' 상태 렌더링 누락 수정
-- **현상:** 호스트가 지원 후 같은 의뢰 상세에 재접속해도 "지원하기" 버튼이 계속 표시됨.
-- **근본 원인:** `myApplication` 도출이 `applications` 배열에서만 이루어졌는데, Bug 2로 인해 `applications`가 비어있어 `myApplication`이 항상 `undefined`.
-- **수정:**
-  - `app/services/[requestId]/page.tsx`: `myApplication`을 독립 state로 분리, `/api/services/applications?requestId=...` GET 호출 시 `myApplication` 직접 반환 — 의뢰 소유자 여부와 무관하게 본인 지원 상태 항상 표시
-
-### 11.4 [Bug 4 - UX] 고객(게스트) 진입점 누락 수정
-- **현상:** 고객이 의뢰 등록 후 "내 맞춤 의뢰" 목록으로 이동하는 메뉴가 어디에도 없음.
-- **수정:**
-  - `app/account/page.tsx` 모바일: 기본 메뉴 그룹에 `Briefcase` 아이콘 + "내 맞춤 의뢰" → `/services/my` 항목 추가
-  - `app/account/page.tsx` 데스크탑: 정보 수정 폼 상단에 "내 맞춤 의뢰" 링크 카드 추가
-  - **v3.4.0에서 진입점이 '나의 여행' 페이지로 이동됨 (아래 UX 개선 참고)**
-
----
-
-## 12. UX 개선 이력 (v3.4.0)
-
-**수정일:** 2026-03-01 | **수정자:** 에이전트 (UX 기획자 / 수석 프론트엔드 엔지니어)
-
-### 12.1 [메뉴 재배치] '내 맞춤 의뢰' 진입점 이동
-
-- **이전:** `app/account/page.tsx`(계정/프로필 관리) 내에 위치 — 사용자 맥락 불일치
-- **현재:** `app/guest/trips/page.tsx`(나의 여행 페이지) 하단 "나의 맞춤 의뢰" 섹션으로 통합
-  - 고객이 한 화면에서 **일반 예약 + 맞춤 의뢰**를 모두 확인 가능
-  - 모바일: 예정 여행 → 지난 여행 아래 하단 섹션
-  - 데스크탑: 왼쪽 메인 컬럼 하단에 섹션 추가
-  - 최대 5건 미리보기 + "전체 보기" 링크 → `/services/my`
-- **account 페이지 정리:** 잘못 추가되었던 모바일 메뉴 아이템, 데스크탑 링크 카드 모두 제거
-
-### 12.2 [랜딩 페이지 신설] 서비스 소개 페이지 `/services/intro`
-
-- **신규 파일:** `app/services/intro/page.tsx`
-- **구성:**
-  - Hero 섹션: 서비스 한 줄 소개 + 이중 CTA 버튼
-  - 가격 하이라이트: 시간당 ₩35,000 · 최소 4시간 · 평균 지원자 수
-  - 특징 4가지 카드 그리드 (검증된 호스트 / 빠른 매칭 / 정찰제 / 맞춤 서비스)
-  - 이용 방법 4단계 플로우
-  - 실제 후기 3건
-  - 하단 다크 배경 CTA + '현재 의뢰 목록 보기' 보조 버튼
-- **라우팅 변경:** `app/components/HomePageClient.tsx` — 홈 화면 5번째 서비스 카드 클릭 시 `/services/request` → `/services/intro`로 변경
-
-### 12.3 [알림 강화] 서비스 N 배지 시스템 구현
-
-알림 타입: `service_request_new`, `service_application_new`, `service_host_selected`, `service_host_rejected`, `service_payment_confirmed`, `service_cancelled`
-
-- **호스트 데스크탑:** `app/host/dashboard/page.tsx` — `useNotification` 훅으로 위 타입 중 `is_read=false`인 항목이 있으면 "서비스 매칭" 사이드바 버튼 우측에 빨간 점(애니메이션) 표시
-- **호스트 모바일:** `app/components/mobile/MobileHostMenu.tsx` — `HostMenuItem`에 `showDot` prop 추가, "서비스 매칭" 항목에 빨간 점 표시
-- **고객:** `app/guest/trips/page.tsx` — `useServiceUnread()` 훅으로 "나의 맞춤 의뢰" 섹션 제목 옆에 빨간 점(애니메이션) 표시
-
-### 12.4 라우팅/파일 변경 요약
-
-| 변경 | 파일 |
-|---|---|
-| [NEW] 서비스 소개 페이지 | `app/services/intro/page.tsx` |
-| [MODIFY] 홈 카드 라우팅 `/services/request` → `/services/intro` | `app/components/HomePageClient.tsx` |
-| [MODIFY] 맞춤 의뢰 섹션 + N 배지 추가 | `app/guest/trips/page.tsx` |
-| [MODIFY] 서비스 탭 N 배지 (데스크탑) | `app/host/dashboard/page.tsx` |
-| [MODIFY] 서비스 탭 N 배지 (모바일) | `app/components/mobile/MobileHostMenu.tsx` |
-| [MODIFY] 잘못 추가된 계정 페이지 진입점 제거 | `app/account/page.tsx` |
-
----
-
-## 13. UI/UX 프리미엄 전면 개편 (v3.5.0)
-
-**수정일:** 2026-03-01 | **수정자:** 에이전트 (수석 UI/UX 디자이너 / 프론트엔드 장인)
-
-### 13.1 [나의 여행 페이지] 섹션 순서 변경
-
-- **변경 파일:** `app/guest/trips/page.tsx`
-- **모바일:** "나의 맞춤 의뢰" 섹션 → 최상단 배치, "일반 예약" 구분선으로 분리 후 하단
-- **데스크탑:** 왼쪽 메인 컬럼 최상단에 맞춤 의뢰 섹션 → 구분선 → 일반 예약 순
-
-### 13.2 [서비스 상세 페이지] 에어비앤비 스타일 전면 재설계
-
-- **변경 파일:** `app/services/[requestId]/page.tsx` (전면 재작성)
-- **추가 요소:**
-  - **매칭 프로세스 스텝 바:** 의뢰 등록 → 호스트 지원 → 호스트 선택 → 결제 완료, 4단계를 시각화. emerald 완료 / dark 현재 단계 / slate 미완료 스타일
-  - **2×2 아이콘 그리드:** 지역·날짜·소요시간·인원을 아이콘 카드로 구성
-  - **LinkedIn 스타일 지원자 카드:** 64px 둥근 아바타, 5성 평점, 언어 pill, 자기소개 미리보기, 어필 메시지 구분 섹션
-  - **그라디언트 CTA 버튼:** "지원하기"(dark), "결제하기"(emerald), "호스트 선택"(navy) — 각각 box-shadow 적용
-  - **역할 기반 금액 표시** 유지 (고객: 총 금액, 호스트: 예상 수입 + 지원 가능 badge)
-
-### 13.3 [의뢰 목록 & 잡보드] 카드 UI 개선
-
-- **변경 파일:** `app/services/page.tsx`, `app/services/my/page.tsx`
-- **공통 개선:**
-  - **2섹션 카드 구조:** 상단(아이콘 + 제목 + 상태칩) / 구분선 / 하단(메타 + 금액)
-  - **상태 칩 강화:** 고유 컬러 solid 배지 (잡보드), 테두리+점 표시기 (내 의뢰 목록)
-  - **금액 강화:** "예상 수입/총 결제금액" 라벨 + 굵은 17px 폰트 우측 배치
-  - **언어 메타:** Globe2 아이콘 + 언어 최대 2개
-  - **회색 배경** (`#F8F8F8`) 도입으로 카드 depth 강조
-  - **hover 애니메이션:** shadow-lg + ChevronRight translate (0.5px)
-
-### 13.4 파일 변경 요약
-
-| 변경 | 파일 |
-|---|---|
-| [MODIFY] 맞춤 의뢰 섹션 최상단 배치 | `app/guest/trips/page.tsx` |
-| [MODIFY] 상세 페이지 전면 재설계 | `app/services/[requestId]/page.tsx` |
-| [MODIFY] 잡보드 카드 UI 개선 | `app/services/page.tsx` |
-| [MODIFY] 내 의뢰 목록 카드 UI 개선 | `app/services/my/page.tsx` |
-
----
-
-## 14. 서비스 소개 페이지 에어비앤비 스타일 전면 재설계 (v3.6.0)
-
-**수정일:** 2026-03-01 | **수정자:** 에이전트 (수석 UI/UX 디자이너)
-
-### 14.1 변경 파일
-
-`app/services/intro/page.tsx` 전면 재작성
-
-### 14.2 주요 디자인 요소
-
-| 영역 | 구현 내용 |
-|---|---|
-| **히어로** | 다크 그라디언트 배경 + 일본 이모지 float 애니메이션 + BEST/MD/SALE 배지 3종 |
-| **타이틀 바** | 서비스 제목 + ★5.0 평점 + 후기 개수 + 지역 한 줄 배치 |
-| **아이콘 그리드** | 2×2 카드 (소요시간 / 최대인원 / 언어 / 지역) |
-| **서비스 소개** | 강조 볼드 텍스트로 핵심 컨셉 강조 |
-| **추천 대상** | CheckCircle 아이콘 + 4가지 체크리스트 |
-| **포함/불포함** | emerald 박스(포함) + slate 박스(불포함) — 명확 구분 |
-| **후기** | 4개 카드형 + "모두 보기" 토글 |
-| **유의사항** | 점 리스트 형태 간결 안내 |
-| **데스크탑 사이드바** | sticky 가격 카드 (₩35,000/hr, 지역·시간 선택, 다크 그라디언트 CTA, 합계 미리보기) |
-| **모바일 하단 바** | 고정 바 — 가격 + 다크 그라디언트 "의뢰 등록하기" 버튼 |
-
-### 14.3 콘텐츠 데이터
-
-- **비용:** 시간당 ₩35,000 / 최소 4시간 기준 ₩140,000~
-- **호스트 언어:** 한국어 레벨 3~4 (중·고급)
-- **대상 지역:** 도쿄, 오사카, 후쿠오카
-- **불포함:** 고객 경비, 호스트 경비, 원거리 이동비, 비즈니스 계약 통역
-
----
-
-## 15. 서비스 소개 페이지 체험 상세(Experience) 완벽 복제 (v3.7.0)
-
-**수정일:** 2026-03-01 | **수정자:** 에이전트 (수석 프론트엔드 엔지니어 및 UI 복제 전문가)
-
-### 15.1 [서비스 소개] 체험 상세 UI 유전자 이식
-- **변경 파일:** `app/services/intro/page.tsx`
-- **구현 내용:** 
-  - `app/experiences/[id]/page.tsx`의 고품질 UI/UX 레이아웃 구조 완벽 복제
-  - **사진 갤러리:** 데스크탑 5분할 모자이크(1 메인, 4 서브), 모바일 2×2 모자이크 그리드 
-  - **헤더 & 호스트 바:** Experience와 동일한 타이포그래피(가독성 높은 폰트 위계)와 아바타 레이아웃
-  - **상세 내역:** 아이콘 그리드(소요시간, 인원, 언어 등), 서비스 본문, 추천대상, 안내사항을 에어비앤비 체험 룩앤필로 구현
-
-### 15.2 [폼 연동] 예약 바 → 의뢰 정보 수집 연동
-- **데스크탑 사이드바:** Experience의 우측 Sticky 예약 카드를 차용하되, **날짜, 시작 시간, 이용 시간(최소 4시간), 인원수**를 직접 선택하는 폼으로 개편
-- **모바일 액션 바:** 하단 Fixed Bar 디자인을 유지하면서 '의뢰 등록하기' 버튼 매핑
-- **Query String 라우팅:** 사용자가 입력한 데이터를 URL 파라미터로 담아 폼 페이지로 전달 (`/services/request?date=...&startTime=...`)
-
-### 15.3 [폼 연동] 의뢰 등록 폼 데이터 Hydration
-- **변경 파일:** `app/services/request/page.tsx`
-- **구현 내용:**
-  - `next/navigation`의 `useSearchParams` 도입 및 전체 폼 컴포넌트를 `<Suspense>`로 래핑
-  - Intro 페이지에서 전달된 `date`, `startTime`, `duration`, `guests` 쿼리 파라미터를 읽어 리액트 `useState`의 초기값으로 자동 매핑 (사용자 정보 연속성 확보)
-
-### 15.4 [Hotfix] 폼 UI 모던화 및 30분 단위 선택 (v3.7.1)
-- **변경 파일:** `app/services/intro/page.tsx`, `app/services/request/page.tsx`
-- **구현 내용:**
-  - **날짜 선택 UI 개선:** 네이티브 `input type="date"` 대신 Experience 상세 페이지(`ReservationCard.tsx`)에 쓰이는 **커스텀 달력(캘린더) UI** 로직을 Intro 폼 사이드바에 완전히 이식하여 네이티브 모달의 투박함을 제거.
-  - **시간 선택 30분 단위 개편:** 분 단위 입력을 강제하는 네이티브 `input type="time"` 대신, 오전 8시부터 오후 8시까지 **30분 간격(08:00, 08:30 ...)** 으로 선택할 수 있는 직관적인 `<select>` 형태로 Intro와 Request 양쪽 폼 모두 변경.
-
----
-
-## 16. 에스크로 선결제 시스템 전면 개편 (v3.8.0)
-
-**수정일:** 2026-03-01 | **수정자:** 에이전트 (수석 풀스택 아키텍트 / 결제 시스템 전문가)
-
-### 16.1 배경 — 노쇼 문제 해결
-
-**기존 플로우 (AS-IS):** 의뢰 등록(무료) → 호스트 지원 → 고객 선택 → 결제 → 확정
-- **문제:** 고객이 호스트를 선택해놓고 결제 단계에서 이탈 시 호스트 시간 낭비
-
-**v2 에스크로 플로우 (TO-BE):** 의뢰 등록 → **즉시 결제(에스크로)** → open 공개 → 호스트 지원 → 선택 → 확정
+**v2 에스크로 플로우:** 의뢰 등록 → **즉시 결제(에스크로)** → open 공개 → 호스트 지원 → 선택 → 확정
 - 고객 결제 완료 후 잡보드 공개 → 호스트 선택 → 이미 결제된 금액으로 바로 확정
 
-### 16.2 DB 변경사항
+### 11.2 DB 변경사항 (v3.8.0)
 
 - **`service_requests.status`:** `pending_payment` 상태 추가 (결제 전 잡보드 미노출)
 - **`service_bookings.host_id`:** NOT NULL → nullable (에스크로 단계에서 호스트 미정)
 - **`service_bookings.application_id`:** NOT NULL → nullable (호스트 선택 후 채워짐)
 - **마이그레이션:** `supabase_service_matching_v2_escrow_migration.sql` 실행 필요
 
-### 16.3 수정 파일 목록
+### 11.3 결제 플로우
 
-| 파일 | 변경 내용 |
-|------|-----------|
-| `supabase_service_matching_v2_escrow_migration.sql` | [NEW] DB 마이그레이션 (상태 제약 + nullable 컬럼 + 인덱스) |
-| `app/types/service.ts` | `ServiceRequestStatus`에 `pending_payment` 추가 |
-| `app/constants/serviceStatus.ts` | `isPendingPaymentServiceRequest`, `SERVICE_REQUEST_PENDING_PAYMENT_STATUSES` 추가 |
-| `app/api/services/requests/route.ts` | POST: status=`pending_payment`, 에스크로 예약 사전 생성, 호스트 알림 제거 |
-| `app/api/services/payment/nicepay-callback/route.ts` | 결제 완료 시 request.status → `open`, 호스트 전체 알림, signData 빈 값 허용 |
-| `app/api/services/cancel/route.ts` | PENDING: DB취소 / open+PAID: NicePay PG 환불 / matched: 관리자 검토 |
-| `app/api/services/select-host/route.ts` | 기존 PAID 예약에 host_id/application_id 채워넣기, 알림 메시지 업데이트 |
-| `app/services/request/page.tsx` | 제출 후 `/payment` 리다이렉트, 버튼/설명 문구 에스크로 맞게 수정 |
-| `app/services/[requestId]/payment/page.tsx` | DB에서 기존 PENDING 예약 조회, applicationId URL 파라미터 제거, 에스크로 안내 배너 추가 |
-| `app/services/[requestId]/page.tsx` | 새 스텝바(선결제/지원/확정/완료), pending_payment 결제 배너, 호스트 선택 후 router.refresh() |
-| `app/services/my/page.tsx` | STATUS_CONFIG에 `pending_payment` 추가 |
-
-### 16.4 결제 플로우 (v2 에스크로)
-
-**카드 결제 플로우:**
+**카드 결제:**
 ```
 1. 고객: /services/request → 폼 작성
 2. POST /api/services/requests
@@ -634,16 +259,15 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 10. 매칭 확정 — 별도 결제 불필요
 ```
 
-**무통장 입금 플로우 (v3.9.2 완성):**
+**무통장 입금 (v3.9.2 완성):**
 ```
 1~4. 동일
 5. [무통장] POST /api/services/payment/mark-bank
    → service_bookings.payment_method = 'bank' (service_role 경유)
 6. /payment/complete?orderId=...&method=bank 리다이렉트
    → "입금 대기 중" UI + 계좌번호 재표시
-   → service_bookings: PENDING 유지 (입금 미확인)
-   → service_requests: pending_payment 유지 (잡보드 미노출)
-7. Admin: ServiceAdminTab 전체 의뢰 탭 → "💰 입금 확인" 버튼
+   → service_bookings: PENDING 유지 / service_requests: pending_payment 유지
+7. Admin: ServiceAdminTab → "💰 입금 확인" 버튼
    → POST /api/admin/service-confirm-payment
    → service_bookings: PENDING → PAID
    → service_requests: pending_payment → open (잡보드 공개)
@@ -654,7 +278,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - `NEXT_PUBLIC_BANK_ACCOUNT`: 무통장 입금 계좌번호
 - `NEXT_PUBLIC_BANK_NAME`: 은행명 (기본: 카카오뱅크)
 
-### 16.5 취소/환불 로직
+### 11.4 취소/환불 로직
 
 | 예약 상태 | 의뢰 상태 | 처리 방식 |
 |-----------|-----------|-----------|
@@ -662,7 +286,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 | PAID | open | NicePay PG 전액 환불 + DB 취소 |
 | PAID | matched / confirmed | cancellation_requested (관리자 검토) |
 
-### 16.6 주의사항
+### 11.5 주의사항
 
 - `isPendingPaymentServiceRequest` 유틸 사용 — raw 문자열 비교 금지
 - 잡보드 GET API: `status='open'` 필터 고정 — `pending_payment` 절대 노출 금지
