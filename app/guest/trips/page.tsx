@@ -182,6 +182,16 @@ export default function GuestTripsPage() {
 
         {/* 📱 모바일 전용: 스크롤 레이아웃 */}
         <div className="md:hidden">
+          {/* ── 맞춤 의뢰 섹션 (최상단) ── */}
+          <ServiceRequestsSection />
+
+          {/* ── 구분선 ── */}
+          <div className="flex items-center gap-2 my-6">
+            <div className="h-px flex-1 bg-slate-100" />
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">일반 예약</span>
+            <div className="h-px flex-1 bg-slate-100" />
+          </div>
+
           {/* ── 예정된 여행 ── */}
           <div className="flex flex-col gap-3 mb-6">
             {upcomingTrips.length > 0 ? (
@@ -212,16 +222,23 @@ export default function GuestTripsPage() {
               </div>
             </>
           )}
-
-          {/* ── 맞춤 의뢰 섹션 (모바일) ── */}
-          <ServiceRequestsSection />
         </div>
 
         {/* 🖥️ 데스크탑 전용: 기존 2컬럼 레이아웃 */}
         <div className="hidden md:grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
 
-          {/* 1. 왼쪽 메인: 예정된 여행 + 맞춤 의뢰 */}
+          {/* 1. 왼쪽 메인: 맞춤 의뢰 (최상단) + 예정된 여행 */}
           <section className="lg:col-span-7">
+            {/* 맞춤 의뢰 섹션 (데스크탑 최상단) */}
+            <ServiceRequestsSection />
+
+            {/* 구분선 */}
+            <div className="flex items-center gap-3 my-8">
+              <div className="h-px flex-1 bg-slate-100" />
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">일반 예약</span>
+              <div className="h-px flex-1 bg-slate-100" />
+            </div>
+
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               {t('trip_upcoming')} <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full">{upcomingTrips.length}</span>
             </h2>
@@ -247,9 +264,6 @@ export default function GuestTripsPage() {
                 </div>
               )}
             </div>
-
-            {/* 맞춤 의뢰 섹션 (데스크탑 왼쪽 하단) */}
-            <ServiceRequestsSection />
           </section>
 
           {/* 2. 오른쪽 사이드: 지난 여행 */}

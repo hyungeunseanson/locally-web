@@ -457,3 +457,45 @@ service_bookings: PENDING → PAID → confirmed → completed
 | [MODIFY] 서비스 탭 N 배지 (데스크탑) | `app/host/dashboard/page.tsx` |
 | [MODIFY] 서비스 탭 N 배지 (모바일) | `app/components/mobile/MobileHostMenu.tsx` |
 | [MODIFY] 잘못 추가된 계정 페이지 진입점 제거 | `app/account/page.tsx` |
+
+---
+
+## 13. UI/UX 프리미엄 전면 개편 (v3.5.0)
+
+**수정일:** 2026-03-01 | **수정자:** 에이전트 (수석 UI/UX 디자이너 / 프론트엔드 장인)
+
+### 13.1 [나의 여행 페이지] 섹션 순서 변경
+
+- **변경 파일:** `app/guest/trips/page.tsx`
+- **모바일:** "나의 맞춤 의뢰" 섹션 → 최상단 배치, "일반 예약" 구분선으로 분리 후 하단
+- **데스크탑:** 왼쪽 메인 컬럼 최상단에 맞춤 의뢰 섹션 → 구분선 → 일반 예약 순
+
+### 13.2 [서비스 상세 페이지] 에어비앤비 스타일 전면 재설계
+
+- **변경 파일:** `app/services/[requestId]/page.tsx` (전면 재작성)
+- **추가 요소:**
+  - **매칭 프로세스 스텝 바:** 의뢰 등록 → 호스트 지원 → 호스트 선택 → 결제 완료, 4단계를 시각화. emerald 완료 / dark 현재 단계 / slate 미완료 스타일
+  - **2×2 아이콘 그리드:** 지역·날짜·소요시간·인원을 아이콘 카드로 구성
+  - **LinkedIn 스타일 지원자 카드:** 64px 둥근 아바타, 5성 평점, 언어 pill, 자기소개 미리보기, 어필 메시지 구분 섹션
+  - **그라디언트 CTA 버튼:** "지원하기"(dark), "결제하기"(emerald), "호스트 선택"(navy) — 각각 box-shadow 적용
+  - **역할 기반 금액 표시** 유지 (고객: 총 금액, 호스트: 예상 수입 + 지원 가능 badge)
+
+### 13.3 [의뢰 목록 & 잡보드] 카드 UI 개선
+
+- **변경 파일:** `app/services/page.tsx`, `app/services/my/page.tsx`
+- **공통 개선:**
+  - **2섹션 카드 구조:** 상단(아이콘 + 제목 + 상태칩) / 구분선 / 하단(메타 + 금액)
+  - **상태 칩 강화:** 고유 컬러 solid 배지 (잡보드), 테두리+점 표시기 (내 의뢰 목록)
+  - **금액 강화:** "예상 수입/총 결제금액" 라벨 + 굵은 17px 폰트 우측 배치
+  - **언어 메타:** Globe2 아이콘 + 언어 최대 2개
+  - **회색 배경** (`#F8F8F8`) 도입으로 카드 depth 강조
+  - **hover 애니메이션:** shadow-lg + ChevronRight translate (0.5px)
+
+### 13.4 파일 변경 요약
+
+| 변경 | 파일 |
+|---|---|
+| [MODIFY] 맞춤 의뢰 섹션 최상단 배치 | `app/guest/trips/page.tsx` |
+| [MODIFY] 상세 페이지 전면 재설계 | `app/services/[requestId]/page.tsx` |
+| [MODIFY] 잡보드 카드 UI 개선 | `app/services/page.tsx` |
+| [MODIFY] 내 의뢰 목록 카드 UI 개선 | `app/services/my/page.tsx` |
