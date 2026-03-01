@@ -5,6 +5,47 @@
 
 ---
 
+## v3.10.0 — SEO/OG 메타데이터 최적화
+
+**작업일:** 2026-03-02
+
+### 개요
+서비스 매칭(`services/*`) 페이지 전체를 구글 검색 및 소셜 공유(카카오톡 썸네일)에 최적화.
+
+### 변경 내용
+
+#### `app/layout.tsx`
+- `metadataBase` 추가 (`NEXT_PUBLIC_SITE_URL` 환경변수 기반, fallback: `https://locally.vercel.app`)
+  → 하위 페이지의 상대 경로 OG 이미지 URL이 absolute로 올바르게 해석됨
+- `keywords` 에 서비스 관련 키워드 추가: `일본 동행`, `일본 현지 가이드`, `맞춤 의뢰`
+
+#### `app/services/intro/` — Server Wrapper 패턴 적용
+- **기존 `page.tsx`** → `IntroClient.tsx`로 이름 변경 (내용 무변경)
+- **신규 `page.tsx`** (Server Component): 정적 `metadata` export 추가
+  - Title: `일본 현지인 동행 가이드 맞춤 의뢰 | Locally`
+  - Description: `도쿄·오사카·후쿠오카에서 검증된 현지인 호스트와 단둘이 떠나는 맞춤 여행. 시간당 ₩35,000, 최소 4시간부터 의뢰 가능.`
+  - OG/Twitter 카드 포함, keywords 7개
+  - OG 이미지: `NEXT_PUBLIC_SERVICE_OG_IMAGE` 환경변수 우선, 없으면 일본 Unsplash 이미지 fallback
+
+#### `app/services/[requestId]/` — Server Wrapper 패턴 적용
+- **기존 `page.tsx`** → `ServiceRequestClient.tsx`로 이름 변경 (내용 무변경)
+- **신규 `page.tsx`** (Server Component): `generateMetadata` 동적 생성 추가
+  - `service_requests` 테이블에서 `title, city, service_date, duration_hours, guest_count` 조회
+  - Title: `[의뢰 제목] — 현지 호스트 모집 중 | Locally`
+  - Description: `📍 [city] · 📅 [service_date] · ⏱ [n]시간 · 👥 [n]명. 현지인 호스트의 지원을 기다리고 있어요.`
+  - OG 이미지: `NEXT_PUBLIC_SERVICE_OG_IMAGE` 환경변수 우선, 없으면 사이트 대표 이미지 fallback (에러 없음 보장)
+
+### 파일 요약
+| 파일 | 액션 |
+|------|------|
+| `app/layout.tsx` | MODIFY — metadataBase 추가 + keywords 보강 |
+| `app/services/intro/IntroClient.tsx` | NEW — 기존 page.tsx 내용 이동 (로직 무변경) |
+| `app/services/intro/page.tsx` | MODIFY — 서버 래퍼로 교체, 정적 metadata export |
+| `app/services/[requestId]/ServiceRequestClient.tsx` | NEW — 기존 page.tsx 내용 이동 (로직 무변경) |
+| `app/services/[requestId]/page.tsx` | MODIFY — 서버 래퍼로 교체, generateMetadata 추가 |
+
+---
+
 ## v3.3.1 — 버그 수정 이력
 
 **수정일:** 2026-03-01

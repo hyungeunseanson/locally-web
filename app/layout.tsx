@@ -40,6 +40,7 @@ const ibmPlexSansKr = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://locally.vercel.app'),
   title: {
     template: '%s | Locally',
     default: 'Locally - 현지인과 함께하는 특별한 여행',
@@ -67,7 +68,7 @@ export const metadata: Metadata = {
     description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
     images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'],
   },
-  keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', 'Locally'],
+  keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', '일본 동행', '일본 현지 가이드', '맞춤 의뢰', 'Locally'],
 };
 
 export const viewport: Viewport = {
