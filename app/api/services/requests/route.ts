@@ -131,7 +131,7 @@ export async function GET(request: Request) {
 
     let query = supabaseAdmin
       .from('service_requests')
-      .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, status, created_at, user_id')
+      .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, total_host_payout, status, created_at, user_id')
       .order('created_at', { ascending: false });
 
     if (mode === 'my') {

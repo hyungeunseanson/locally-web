@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"LOCALLY_SERVICES\" /Users/sonhyungeun/Documents/locally-web/app/constants* -r)",
+      "Bash(ls /Users/sonhyungeun/Documents/locally-web/app/experiences/[id]/)",
+      "Bash(ls /Users/sonhyungeun/Documents/locally-web/app/experiences/[id]/payment/)",
+      "Bash(git add app/components/HomePageClient.tsx app/components/mobile/BottomTabNavigation.tsx app/components/mobile/MobileHostMenu.tsx app/constants.ts app/host/dashboard/page.tsx app/utils/notification.ts app/api/services/ app/constants/serviceStatus.ts app/host/dashboard/components/ServiceJobsTab.tsx app/services/ app/types/service.ts supabase_service_matching_migration.sql)",
+      "Bash(git commit:*)",
+      "Bash(git push origin main)"
+    ]
+  }
+}

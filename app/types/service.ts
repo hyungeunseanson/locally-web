@@ -133,8 +133,10 @@ export type ServiceRequestCard = Pick<
   | 'languages'
   | 'guest_count'
   | 'total_customer_price'
+  | 'total_host_payout'
   | 'status'
   | 'created_at'
+  | 'user_id'
 >;
 
 // 원자적 예약 RPC 반환 타입

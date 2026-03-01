@@ -56,11 +56,10 @@ export default function ServiceJobBoardPage() {
             <button
               key={city}
               onClick={() => setSelectedCity(city)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold border transition-colors ${
-                selectedCity === city
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold border transition-colors ${selectedCity === city
                   ? 'bg-slate-900 text-white border-slate-900'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-              }`}
+                }`}
             >
               {city}
             </button>
@@ -106,8 +105,8 @@ export default function ServiceJobBoardPage() {
                     <span className="text-[10px] md:text-xs text-slate-400">
                       {new Date(req.created_at).toLocaleDateString('ko-KR')} 등록
                     </span>
-                    <span className="font-black text-[14px] md:text-[15px] text-slate-900">
-                      ₩{req.total_customer_price.toLocaleString()}
+                    <span className="font-black text-[14px] md:text-[15px] text-emerald-700">
+                      예상 수입 ₩{(req.total_host_payout ?? 0).toLocaleString()}
                     </span>
                   </div>
                 </div>

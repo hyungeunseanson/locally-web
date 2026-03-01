@@ -115,3 +115,97 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
+
+// GET: 지원자 목록 조회 (service_role 클라이언트 사용 → RLS 우회)
+// - 의뢰 소유자 → 전체 지원자 목록 + profiles 조인
+// - 비소유자 → 본인 지원 내역만 반환
+export async function GET(request: Request) {
+  try {
+    const supabaseServer = await createServerClient();
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const requestId = searchParams.get('requestId');
+
+    if (!requestId) {
+      return NextResponse.json({ success: false, error: 'requestId is required' }, { status: 400 });
+    }
+
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // 의뢰 소유자 확인
+    const { data: serviceRequest } = await supabaseAdmin
+      .from('service_requests')
+      .select('user_id')
+      .eq('id', requestId)
+      .maybeSingle();
+
+    if (!serviceRequest) {
+      return NextResponse.json({ success: false, error: '의뢰를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    const isOwner = serviceRequest.user_id === user.id;
+
+    if (isOwner) {
+      // 전체 지원자 목록 조회
+      const { data: apps, error } = await supabaseAdmin
+        .from('service_applications')
+        .select('*')
+        .eq('request_id', requestId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Applications fetch error:', error);
+        return NextResponse.json({ success: false, error: '목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
+      }
+
+      if (!apps || apps.length === 0) {
+        return NextResponse.json({ success: true, data: [], isOwner: true });
+      }
+
+      // profiles & host_applications 별도 조회 (nested join RLS 우회)
+      const hostIds = apps.map((a) => a.host_id);
+      const [{ data: profiles }, { data: hostApps }] = await Promise.all([
+        supabaseAdmin.from('profiles').select('id, full_name, avatar_url, bio, languages').in('id', hostIds),
+        supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, self_intro, languages').in('user_id', hostIds),
+      ]);
+
+      const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+      const hostAppMap = new Map((hostApps ?? []).map((h) => [h.user_id, h]));
+
+      const enriched = apps.map((app) => ({
+        ...app,
+        profiles: profileMap.get(app.host_id) ?? null,
+        host_applications: hostAppMap.get(app.host_id) ?? null,
+      }));
+
+      return NextResponse.json({ success: true, data: enriched, isOwner: true });
+    } else {
+      // 본인 지원 내역만 반환
+      const { data: myApp } = await supabaseAdmin
+        .from('service_applications')
+        .select('*')
+        .eq('request_id', requestId)
+        .eq('host_id', user.id)
+        .maybeSingle();
+
+      return NextResponse.json({
+        success: true,
+        data: myApp ? [myApp] : [],
+        isOwner: false,
+        myApplication: myApp ?? null,
+      });
+    }
+
+  } catch (error: unknown) {
+    console.error('API Service Applications GET Error:', error);
+    return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+

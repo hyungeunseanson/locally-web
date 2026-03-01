@@ -376,3 +376,36 @@ service_bookings: PENDING → PAID → confirmed → completed
 - 기존 `/api/payment/nicepay-callback` 수정 금지 — 서비스 결제는 `/api/services/payment/nicepay-callback` 전용
 - 기존 `experiences` / `bookings` 테이블/API 변경 금지
 - 주문번호 `SVC-` 접두사: 기존 예약과 충돌 방지 + callback 라우팅 가드
+
+---
+
+## 11. 버그 수정 이력 (v3.3.1)
+
+**수정일:** 2026-03-01 | **수정자:** 에이전트 (메인 QA 리드)
+
+### 11.1 [Bug 1 - CRITICAL] 수수료 마진 유출 수정
+- **현상:** 호스트 계정으로 잡보드, 의뢰 상세 접속 시 고객 결제 금액(`total_customer_price`)이 노출.
+- **수정:**
+  - `app/services/page.tsx`: 잡보드 카드 금액 표시를 `total_host_payout`(예상 수입)으로 교체, 라벨/색상 구분
+  - `app/services/[requestId]/page.tsx`: 의뢰 상세 금액 블록을 `isOwner` 분기로 엄격 분리 — 고객에게만 총 금액, 호스트에게는 예상 수입만 노출
+  - `app/types/service.ts`: `ServiceRequestCard`에 `total_host_payout`, `user_id` 필드 추가
+  - `app/api/services/requests/route.ts`: API select 쿼리에 두 필드 추가
+
+### 11.2 [Bug 2 - DATA] 고객 화면 지원자 리스트 0명 표기 수정
+- **현상:** 호스트가 지원 완료 후에도 고객의 의뢰 상세에 "지원한 호스트 (0명)" 표기.
+- **근본 원인:** 클라이언트 SDK의 `service_applications` nested join 쿼리가 Supabase RLS 정책에 의해 차단되어 빈 배열 반환.
+- **수정:**
+  - `app/api/services/applications/route.ts`: `GET` 핸들러 신규 추가 — `service_role` 클라이언트로 RLS 우회, 의뢰 소유자에게는 전체 지원자 + `profiles`/`host_applications` 2단계 조인 반환
+  - `app/services/[requestId]/page.tsx`: 클라이언트 직접 조회에서 서버 API 호출로 전환
+
+### 11.3 [Bug 3 - UX] 호스트 '지원 완료' 상태 렌더링 누락 수정
+- **현상:** 호스트가 지원 후 같은 의뢰 상세에 재접속해도 "지원하기" 버튼이 계속 표시됨.
+- **근본 원인:** `myApplication` 도출이 `applications` 배열에서만 이루어졌는데, Bug 2로 인해 `applications`가 비어있어 `myApplication`이 항상 `undefined`.
+- **수정:**
+  - `app/services/[requestId]/page.tsx`: `myApplication`을 독립 state로 분리, `/api/services/applications?requestId=...` GET 호출 시 `myApplication` 직접 반환 — 의뢰 소유자 여부와 무관하게 본인 지원 상태 항상 표시
+
+### 11.4 [Bug 4 - UX] 고객(게스트) 진입점 누락 수정
+- **현상:** 고객이 의뢰 등록 후 "내 맞춤 의뢰" 목록으로 이동하는 메뉴가 어디에도 없음.
+- **수정:**
+  - `app/account/page.tsx` 모바일: 기본 메뉴 그룹에 `Briefcase` 아이콘 + "내 맞춤 의뢰" → `/services/my` 항목 추가
+  - `app/account/page.tsx` 데스크탑: 정보 수정 폼 상단에 "내 맞춤 의뢰" 링크 카드 추가

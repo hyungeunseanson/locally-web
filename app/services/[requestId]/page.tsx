@@ -19,18 +19,20 @@ export default function ServiceRequestDetailPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [request, setRequest] = useState<ServiceRequest | null>(null);
   const [applications, setApplications] = useState<ServiceApplicationWithProfile[]>([]);
+  const [myApplication, setMyApplication] = useState<{ id: string; status: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState<string | null>(null);
 
-  const isOwner = currentUserId === request?.user_id;
-  const isSelectedHost = currentUserId === request?.selected_host_id;
-  const myApplication = applications.find((a) => a.host_id === currentUserId);
+  const isOwner = currentUserId !== null && currentUserId === request?.user_id;
+  const isSelectedHost = currentUserId !== null && currentUserId === request?.selected_host_id;
 
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id ?? null);
+      const userId = user?.id ?? null;
+      setCurrentUserId(userId);
 
+      // 1. 의뢰 정보 로드
       const { data: req } = await supabase
         .from('service_requests')
         .select('*')
@@ -40,19 +42,26 @@ export default function ServiceRequestDetailPage() {
       if (!req) { setLoading(false); return; }
       setRequest(req as ServiceRequest);
 
-      // 지원서 목록 (고객 또는 선택된 호스트만 열람 가능)
-      if (req.user_id === user?.id || req.selected_host_id === user?.id) {
-        const { data: apps } = await supabase
-          .from('service_applications')
-          .select(`
-            *,
-            profiles:host_id (full_name, avatar_url, bio, languages),
-            host_applications:host_id (name, profile_photo, self_intro, languages)
-          `)
-          .eq('request_id', requestId)
-          .order('created_at', { ascending: true });
-
-        setApplications((apps ?? []) as ServiceApplicationWithProfile[]);
+      // 2. 지원자 목록 로드 — 서버 API 사용 (service_role → RLS 우회)
+      // - 의뢰 소유자: 전체 지원자 목록 + 프로필 조인
+      // - 비소유자(호스트): 본인 지원 내역만 반환
+      if (userId) {
+        try {
+          const appsRes = await fetch(`/api/services/applications?requestId=${requestId}`);
+          const appsData = await appsRes.json();
+          if (appsData.success) {
+            if (appsData.isOwner) {
+              setApplications((appsData.data ?? []) as ServiceApplicationWithProfile[]);
+            } else {
+              // 비소유자: 본인 지원 내역 세팅
+              if (appsData.myApplication) {
+                setMyApplication(appsData.myApplication as { id: string; status: string });
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Applications load error:', e);
+        }
       }
 
       setLoading(false);
@@ -112,11 +121,10 @@ export default function ServiceRequestDetailPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-[16px] md:text-xl font-black tracking-tight leading-tight">{request.title}</h1>
-              <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded-full font-semibold ${
-                isOpenServiceRequest(request.status) ? 'bg-emerald-100 text-emerald-700' :
-                isMatchedServiceRequest(request.status) ? 'bg-blue-100 text-blue-700' :
-                'bg-slate-100 text-slate-500'
-              }`}>
+              <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded-full font-semibold ${isOpenServiceRequest(request.status) ? 'bg-emerald-100 text-emerald-700' :
+                  isMatchedServiceRequest(request.status) ? 'bg-blue-100 text-blue-700' :
+                    'bg-slate-100 text-slate-500'
+                }`}>
                 {getServiceRequestStatusLabel(request.status)}
               </span>
             </div>
@@ -139,9 +147,22 @@ export default function ServiceRequestDetailPage() {
             </div>
           )}
           <p className="text-[12px] md:text-[13px] text-slate-700 leading-relaxed pt-1">{request.description}</p>
+
+          {/* 금액 표시 — 역할에 따라 엄격히 분리 */}
           <div className="flex justify-between items-center pt-1 border-t border-slate-200 mt-1">
-            <span className="text-[12px] md:text-sm text-slate-500">총 금액</span>
-            <span className="font-black text-[16px] md:text-lg text-slate-900">₩{request.total_customer_price.toLocaleString()}</span>
+            {isOwner ? (
+              // 고객(의뢰 소유자): 총 결제 금액
+              <>
+                <span className="text-[12px] md:text-sm text-slate-500">총 금액</span>
+                <span className="font-black text-[16px] md:text-lg text-slate-900">₩{request.total_customer_price.toLocaleString()}</span>
+              </>
+            ) : (
+              // 호스트 또는 비로그인: 예상 수입만 표시 (고객 결제금액 절대 노출 금지)
+              <>
+                <span className="text-[12px] md:text-sm text-slate-500">예상 수입</span>
+                <span className="font-black text-[16px] md:text-lg text-emerald-700">₩{request.total_host_payout.toLocaleString()}</span>
+              </>
+            )}
           </div>
         </div>
 
@@ -215,7 +236,7 @@ export default function ServiceRequestDetailPage() {
           </div>
         )}
 
-        {/* [호스트 뷰] 지원 상태/CTA */}
+        {/* [호스트 뷰] 지원 상태/CTA — 비소유자이면서 비선택 호스트 */}
         {!isOwner && !isSelectedHost && currentUserId && (
           <div className="mt-4">
             {myApplication ? (
