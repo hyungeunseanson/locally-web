@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Clock, Users, Globe, FileText, Phone, User } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -10,18 +10,19 @@ import SiteHeader from '@/app/components/SiteHeader';
 const LANGUAGE_OPTIONS = ['한국어', '영어', '일본어', '중국어'];
 const CITY_OPTIONS = ['도쿄', '오사카', '후쿠오카', '삿포로', '나고야', '서울', '부산', '제주'];
 
-export default function ServiceRequestPage() {
+function ServiceRequestForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [city, setCity] = useState('');
-  const [serviceDate, setServiceDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [durationHours, setDurationHours] = useState(4);
-  const [guestCount, setGuestCount] = useState(1);
+  const [serviceDate, setServiceDate] = useState(searchParams.get('date') || '');
+  const [startTime, setStartTime] = useState(searchParams.get('startTime') || '');
+  const [durationHours, setDurationHours] = useState(Number(searchParams.get('duration')) || 4);
+  const [guestCount, setGuestCount] = useState(Number(searchParams.get('guests')) || 1);
   const [languages, setLanguages] = useState<string[]>([]);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -194,11 +195,10 @@ export default function ServiceRequestPage() {
                   key={lang}
                   type="button"
                   onClick={() => toggleLanguage(lang)}
-                  className={`px-3 py-1.5 rounded-full text-[12px] md:text-sm font-medium border transition-colors ${
-                    languages.includes(lang)
+                  className={`px-3 py-1.5 rounded-full text-[12px] md:text-sm font-medium border transition-colors ${languages.includes(lang)
                       ? 'bg-slate-900 text-white border-slate-900'
                       : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-                  }`}
+                    }`}
                 >
                   {lang}
                 </button>
@@ -274,5 +274,17 @@ export default function ServiceRequestPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ServiceRequestPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-100 border-t-slate-900" />
+      </div>
+    }>
+      <ServiceRequestForm />
+    </Suspense>
   );
 }
