@@ -12,6 +12,7 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import HostModeTransition from './HostModeTransition';
 import MobileLanguageSwitcher from './MobileLanguageSwitcher';
 import { getProfileCompletion } from '@/app/utils/profile';
+import { useNotification } from '@/app/context/NotificationContext';
 
 type MobileHostProfile = {
     avatar_url?: string | null;
@@ -33,6 +34,15 @@ export default function MobileHostMenu() {
 
     const supabase = useMemo(() => createClient(), []);
     const profileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
+
+    const { notifications } = useNotification();
+    const serviceUnread = notifications.some(
+        (n) => !n.is_read && [
+            'service_request_new', 'service_application_new',
+            'service_host_selected', 'service_host_rejected',
+            'service_payment_confirmed', 'service_cancelled'
+        ].includes(n.type)
+    );
 
     useEffect(() => {
         const fetchData = async () => {
@@ -161,7 +171,7 @@ export default function MobileHostMenu() {
                 <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label="예약 관리" />
                 <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label="내 체험 관리" />
                 <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label="문의함" />
-                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label="서비스 매칭" />
+                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label="서비스 매칭" showDot={serviceUnread} />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />
@@ -205,16 +215,21 @@ function HostMenuItem({
     icon,
     label,
     badge,
+    showDot,
 }: {
     href: string;
     icon: React.ReactNode;
     label: string;
     badge?: string | null;
+    showDot?: boolean;
 }) {
     return (
         <Link href={href} className="flex items-center gap-3.5 py-3.5 border-b border-gray-100">
             <span className="text-gray-500 shrink-0">{icon}</span>
             <span className="flex-1 text-[13px] font-medium text-gray-800">{label}</span>
+            {showDot && (
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            )}
             {badge ? (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
                     {badge}

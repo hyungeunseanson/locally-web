@@ -9,7 +9,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
-import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import 추가
+import { useLanguage } from '@/app/context/LanguageContext';
+import { useNotification } from '@/app/context/NotificationContext';
 
 // 컴포넌트 임포트
 import ReservationManager from './components/ReservationManager';
@@ -43,7 +44,16 @@ interface HostDashboardProfile {
 
 // 실제 대시보드 로직
 function DashboardContent() {
-  const { t } = useLanguage(); // 🟢 2. t 함수 추가
+  const { t } = useLanguage();
+  const { notifications } = useNotification();
+  // 서비스 관련 안 읽은 알림 여부 (N 배지용)
+  const serviceUnread = notifications.some(
+    (n) => !n.is_read && [
+      'service_request_new', 'service_application_new',
+      'service_host_selected', 'service_host_rejected',
+      'service_payment_confirmed', 'service_cancelled'
+    ].includes(n.type)
+  );
   const [activeTab, setActiveTab] = useState('reservations');
   const [hostStatus, setHostStatus] = useState<HostStatusSummary | null>(null);
   const [profile, setProfile] = useState<HostDashboardProfile | null>(null);
@@ -227,6 +237,9 @@ function DashboardContent() {
 
           <button onClick={() => handleTabChange('service-jobs')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'service-jobs' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
             <Briefcase size={20} /> 서비스 매칭
+            {serviceUnread && activeTab !== 'service-jobs' && (
+              <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            )}
           </button>
 
           <button onClick={() => handleTabChange('earnings')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'earnings' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
@@ -275,24 +288,24 @@ function DashboardContent() {
           </div>
 
           <div className="flex justify-between items-end">
-          <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">
-            {activeTab === 'reservations' && t('menu_reservation')}
-            {activeTab === 'experiences' && t('menu_my_exp')}
-            {activeTab === 'inquiries' && t('menu_inquiry')}
-            {activeTab === 'service-jobs' && '서비스 매칭'}
-            {activeTab === 'earnings' && t('menu_earnings')}
-            {activeTab === 'reviews' && t('menu_reviews')}
-            {activeTab === 'profile' && t('menu_profile')}
-            {activeTab === 'guidelines' && '호스트 필수 교육'}
-          </h1>
-          {activeTab === 'experiences' && (
-            <Link href="/host/create" className="hidden md:block">
-              <button className="bg-slate-900 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl font-bold flex items-center gap-1.5 md:gap-2 hover:scale-105 transition-transform shadow-md text-xs md:text-sm">
-                <Plus size={16} className="md:w-[18px] md:h-[18px]" /> {t('exp_new')}
-              </button>
-            </Link>
-          )}
-        </div>
+            <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">
+              {activeTab === 'reservations' && t('menu_reservation')}
+              {activeTab === 'experiences' && t('menu_my_exp')}
+              {activeTab === 'inquiries' && t('menu_inquiry')}
+              {activeTab === 'service-jobs' && '서비스 매칭'}
+              {activeTab === 'earnings' && t('menu_earnings')}
+              {activeTab === 'reviews' && t('menu_reviews')}
+              {activeTab === 'profile' && t('menu_profile')}
+              {activeTab === 'guidelines' && '호스트 필수 교육'}
+            </h1>
+            {activeTab === 'experiences' && (
+              <Link href="/host/create" className="hidden md:block">
+                <button className="bg-slate-900 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl font-bold flex items-center gap-1.5 md:gap-2 hover:scale-105 transition-transform shadow-md text-xs md:text-sm">
+                  <Plus size={16} className="md:w-[18px] md:h-[18px]" /> {t('exp_new')}
+                </button>
+              </Link>
+            )}
+          </div>
         </div>
 
         {activeTab === 'reservations' && <ReservationManager />}

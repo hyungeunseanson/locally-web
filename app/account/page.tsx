@@ -470,7 +470,6 @@ export default function AccountPage() {
           <MobileMenuItem icon={<MessageSquare className="w-4 h-4" />} label="메시지" href="/guest/inbox" />
           <MobileMenuItem icon={<Smile className="w-4 h-4" />} label="나의 여행" href="/guest/trips" />
           <MobileMenuItem icon={<Star className="w-4 h-4" />} label="위시리스트" href="/guest/wishlists" />
-          <MobileMenuItem icon={<Briefcase className="w-4 h-4" />} label="내 맞춤 의뢰" href="/services/my" />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
@@ -651,20 +650,6 @@ export default function AccountPage() {
                   비어 있어도 저장은 가능하지만, 호스트가 예약 요청 전 먼저 확인하는 핵심 정보들입니다.
                 </p>
               </div>
-
-              {/* 내 맞춤 의뢰 진입점 */}
-              <Link href="/services/my" className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 hover:bg-slate-50 transition-colors group">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                    <Briefcase size={16} className="text-slate-700" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">내 맞춤 의뢰</p>
-                    <p className="text-xs text-slate-500">내가 올린 맞춤 서비스 의뢰 목록</p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
-              </Link>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>

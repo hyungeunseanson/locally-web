@@ -409,3 +409,51 @@ service_bookings: PENDING → PAID → confirmed → completed
 - **수정:**
   - `app/account/page.tsx` 모바일: 기본 메뉴 그룹에 `Briefcase` 아이콘 + "내 맞춤 의뢰" → `/services/my` 항목 추가
   - `app/account/page.tsx` 데스크탑: 정보 수정 폼 상단에 "내 맞춤 의뢰" 링크 카드 추가
+  - **v3.4.0에서 진입점이 '나의 여행' 페이지로 이동됨 (아래 UX 개선 참고)**
+
+---
+
+## 12. UX 개선 이력 (v3.4.0)
+
+**수정일:** 2026-03-01 | **수정자:** 에이전트 (UX 기획자 / 수석 프론트엔드 엔지니어)
+
+### 12.1 [메뉴 재배치] '내 맞춤 의뢰' 진입점 이동
+
+- **이전:** `app/account/page.tsx`(계정/프로필 관리) 내에 위치 — 사용자 맥락 불일치
+- **현재:** `app/guest/trips/page.tsx`(나의 여행 페이지) 하단 "나의 맞춤 의뢰" 섹션으로 통합
+  - 고객이 한 화면에서 **일반 예약 + 맞춤 의뢰**를 모두 확인 가능
+  - 모바일: 예정 여행 → 지난 여행 아래 하단 섹션
+  - 데스크탑: 왼쪽 메인 컬럼 하단에 섹션 추가
+  - 최대 5건 미리보기 + "전체 보기" 링크 → `/services/my`
+- **account 페이지 정리:** 잘못 추가되었던 모바일 메뉴 아이템, 데스크탑 링크 카드 모두 제거
+
+### 12.2 [랜딩 페이지 신설] 서비스 소개 페이지 `/services/intro`
+
+- **신규 파일:** `app/services/intro/page.tsx`
+- **구성:**
+  - Hero 섹션: 서비스 한 줄 소개 + 이중 CTA 버튼
+  - 가격 하이라이트: 시간당 ₩35,000 · 최소 4시간 · 평균 지원자 수
+  - 특징 4가지 카드 그리드 (검증된 호스트 / 빠른 매칭 / 정찰제 / 맞춤 서비스)
+  - 이용 방법 4단계 플로우
+  - 실제 후기 3건
+  - 하단 다크 배경 CTA + '현재 의뢰 목록 보기' 보조 버튼
+- **라우팅 변경:** `app/components/HomePageClient.tsx` — 홈 화면 5번째 서비스 카드 클릭 시 `/services/request` → `/services/intro`로 변경
+
+### 12.3 [알림 강화] 서비스 N 배지 시스템 구현
+
+알림 타입: `service_request_new`, `service_application_new`, `service_host_selected`, `service_host_rejected`, `service_payment_confirmed`, `service_cancelled`
+
+- **호스트 데스크탑:** `app/host/dashboard/page.tsx` — `useNotification` 훅으로 위 타입 중 `is_read=false`인 항목이 있으면 "서비스 매칭" 사이드바 버튼 우측에 빨간 점(애니메이션) 표시
+- **호스트 모바일:** `app/components/mobile/MobileHostMenu.tsx` — `HostMenuItem`에 `showDot` prop 추가, "서비스 매칭" 항목에 빨간 점 표시
+- **고객:** `app/guest/trips/page.tsx` — `useServiceUnread()` 훅으로 "나의 맞춤 의뢰" 섹션 제목 옆에 빨간 점(애니메이션) 표시
+
+### 12.4 라우팅/파일 변경 요약
+
+| 변경 | 파일 |
+|---|---|
+| [NEW] 서비스 소개 페이지 | `app/services/intro/page.tsx` |
+| [MODIFY] 홈 카드 라우팅 `/services/request` → `/services/intro` | `app/components/HomePageClient.tsx` |
+| [MODIFY] 맞춤 의뢰 섹션 + N 배지 추가 | `app/guest/trips/page.tsx` |
+| [MODIFY] 서비스 탭 N 배지 (데스크탑) | `app/host/dashboard/page.tsx` |
+| [MODIFY] 서비스 탭 N 배지 (모바일) | `app/components/mobile/MobileHostMenu.tsx` |
+| [MODIFY] 잘못 추가된 계정 페이지 진입점 제거 | `app/account/page.tsx` |

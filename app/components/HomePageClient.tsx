@@ -211,7 +211,7 @@ export default function HomePageClient() {
                 {LOCALLY_SERVICES.map((item) => (
                   <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
                     {item.id === 5 ? (
-                      <Link href="/services/request"><ServiceCard item={item} /></Link>
+                      <Link href="/services/intro"><ServiceCard item={item} /></Link>
                     ) : (
                       <ServiceCard item={item} />
                     )}
@@ -224,7 +224,7 @@ export default function HomePageClient() {
             <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
               {LOCALLY_SERVICES.map((item) => (
                 item.id === 5 ? (
-                  <Link key={item.id} href="/services/request"><ServiceCard item={item} /></Link>
+                  <Link key={item.id} href="/services/intro"><ServiceCard item={item} /></Link>
                 ) : (
                   <ServiceCard key={item.id} item={item} />
                 )
