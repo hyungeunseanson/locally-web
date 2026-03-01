@@ -86,6 +86,7 @@ export async function POST(request: Request) {
     const { error: bookingError } = await supabaseAdmin
       .from('service_bookings')
       .insert({
+        id: crypto.randomUUID(),
         order_id: orderId,
         request_id: data.id,
         customer_id: user.id,
