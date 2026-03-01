@@ -3,25 +3,49 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { CheckCircle, ArrowRight, Loader2, Clock } from 'lucide-react';
 
 function ServicePaymentCompleteContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId') ?? '';
+  const isBank = searchParams.get('method') === 'bank';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
-      <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-5">
-        <CheckCircle size={40} className="text-emerald-500" />
-      </div>
-
-      <h1 className="text-[22px] md:text-3xl font-black text-slate-900 mb-2">결제 완료!</h1>
-      <p className="text-[13px] md:text-base text-slate-500 mb-1">
-        매칭이 확정되었습니다.
-      </p>
-      <p className="text-[12px] md:text-sm text-slate-400 mb-6">
-        호스트가 연락드릴 예정이니 연락처를 확인해 주세요.
-      </p>
+      {isBank ? (
+        <>
+          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mb-5">
+            <Clock size={40} className="text-amber-500" />
+          </div>
+          <h1 className="text-[22px] md:text-3xl font-black text-slate-900 mb-2">입금 대기 중</h1>
+          <p className="text-[13px] md:text-base text-slate-500 mb-1">
+            아래 계좌로 입금 후 의뢰가 확정됩니다.
+          </p>
+          <div className="bg-slate-50 rounded-xl px-5 py-4 mb-6 w-full max-w-xs text-left">
+            <p className="text-[10px] md:text-xs font-bold text-slate-500 mb-1">입금 계좌</p>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-black text-[16px] md:text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
+              <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
+            </div>
+            <p className="text-[11px] md:text-xs text-rose-500 font-bold">
+              ※ 1시간 이내 미입금 시 자동 취소됩니다.
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-5">
+            <CheckCircle size={40} className="text-emerald-500" />
+          </div>
+          <h1 className="text-[22px] md:text-3xl font-black text-slate-900 mb-2">결제 완료!</h1>
+          <p className="text-[13px] md:text-base text-slate-500 mb-1">
+            매칭이 확정되었습니다.
+          </p>
+          <p className="text-[12px] md:text-sm text-slate-400 mb-6">
+            호스트가 연락드릴 예정이니 연락처를 확인해 주세요.
+          </p>
+        </>
+      )}
 
       {orderId && (
         <div className="bg-slate-50 rounded-xl px-5 py-3 mb-8">

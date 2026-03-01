@@ -2,7 +2,7 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, CreditCard, Loader2, Clock, Users, ShieldCheck, Lock } from 'lucide-react';
+import { ChevronLeft, CreditCard, Landmark, Loader2, Clock, Users, ShieldCheck, Lock } from 'lucide-react';
 import Script from 'next/script';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -58,6 +58,7 @@ function ServicePaymentContent() {
   const [contactPhone, setContactPhone] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
 
   const fetchData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -120,6 +121,12 @@ function ServicePaymentContent() {
 
     setIsProcessing(true);
     try {
+      // 무통장 입금: IMP 호출 없이 바로 완료 페이지로 이동
+      if (paymentMethod === 'bank') {
+        router.push(`/services/${requestId}/payment/complete?orderId=${pendingBooking.order_id}&method=bank`);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!window.IMP) {
         setPaymentError('결제 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');
@@ -245,6 +252,51 @@ function ServicePaymentContent() {
           </div>
         </div>
 
+        {/* 결제 수단 선택 */}
+        <div className="mb-5">
+          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">결제 수단</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('card')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
+                paymentMethod === 'card'
+                  ? 'border-slate-900 bg-slate-50'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <CreditCard size={20} className={paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'} />
+              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'}`}>카드 결제</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('bank')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
+                paymentMethod === 'bank'
+                  ? 'border-slate-900 bg-slate-50'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <Landmark size={20} className={paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'} />
+              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'}`}>무통장 입금</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 무통장 계좌 안내 */}
+        {paymentMethod === 'bank' && (
+          <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 mb-5 animate-in fade-in zoom-in-95">
+            <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-black text-[16px] md:text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
+              <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
+            </div>
+            <p className="text-[11px] md:text-xs text-slate-400">
+              * 예약 후 <span className="text-rose-500 font-bold">1시간 이내</span>에 미입금 시 자동 취소됩니다.
+            </p>
+          </div>
+        )}
+
         {/* 약관 동의 */}
         <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
           <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 accent-slate-900" />
@@ -274,6 +326,8 @@ function ServicePaymentContent() {
         >
           {isProcessing ? (
             <><Loader2 size={18} className="animate-spin" /> 처리 중...</>
+          ) : paymentMethod === 'bank' ? (
+            <><Landmark size={18} /> 무통장 입금 신청하기</>
           ) : (
             <><CreditCard size={18} /> ₩{request.total_customer_price.toLocaleString()} 결제하기</>
           )}
