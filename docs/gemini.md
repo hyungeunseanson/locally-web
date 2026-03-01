@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-02-28 (P0 Guest/Host Profile Modal Follow-up + School Field UX Rollback + Host Modal Stat Restore)  
-**Version:** 3.2.42 (P0 Guest/Host Profile Modal Follow-up + School Field UX Rollback + Host Modal Stat Restore)  
+**Last Updated:** 2026-03-01 (역경매 서비스 매칭 시스템 전체 구현)
+**Version:** 3.3.0 (Service Matching System — Reverse Auction)  
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -299,3 +299,80 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 체험의 `exclusions`는 생성/수정 화면 모두에서 직접 입력 가능하며, 상세 화면에서는 `포함 사항 / 불포함 사항 / 준비물`을 분리 노출한다.
 - 체험의 `is_private_enabled` / `private_price`는 생성뿐 아니라 호스트 대시보드의 체험 수정 화면에서도 실제 편집/저장 가능해야 한다.
 - 체험 상세 UI는 `rules.preparation_level`을 더 이상 표기하지 않고, `활동 강도`는 `rules.activity_level`만 노출한다.
+
+---
+
+## 10. 서비스 매칭 시스템 (역경매, v3.3.0)
+
+### 10.1 개요
+
+고객이 맞춤 동행/통역 서비스를 의뢰하면 해당 지역 호스트들이 지원하고, 고객이 선택 후 결제하는 **역경매 매칭 플로우**. 기존 `experiences` / `bookings` 테이블/로직과 **완전 독립**.
+
+**가격 구조 (수수료율 절대 노출 금지):**
+- 고객 결제: ₩35,000/hr × duration_hours (최소 4시간)
+- 호스트 수익: ₩20,000/hr × duration_hours
+- 플랫폼 마진: ₩15,000/hr (비공개)
+
+### 10.2 DB 테이블 (Supabase)
+
+| 테이블 | 용도 |
+|--------|------|
+| `service_requests` | 고객 의뢰. `total_customer_price`, `total_host_payout`은 GENERATED ALWAYS 컬럼 |
+| `service_applications` | 호스트 지원. UNIQUE(request_id, host_id) |
+| `service_bookings` | 결제/정산. `SVC-` 접두사 주문번호. service_role 전용 쓰기 |
+
+**마이그레이션 파일:** `supabase_service_matching_migration.sql` (RPC `create_service_booking_atomic` 포함)
+
+**상태 플로우:**
+```
+service_requests: open → matched → paid → confirmed → completed
+                  open → cancelled / expired
+service_bookings: PENDING → PAID → confirmed → completed
+                  PENDING/PAID → cancelled / cancellation_requested
+```
+
+### 10.3 라우팅
+
+**고객:**
+- `/services/request` — 의뢰 작성 폼 (₩35,000/hr 고정 표시)
+- `/services/my` — 내 의뢰 목록
+- `/services/[requestId]` — 의뢰 상세 (지원자 선택 포함)
+- `/services/[requestId]/payment` — NicePay 결제 (기존 결제 callback과 완전 분리)
+- `/services/[requestId]/payment/complete` — 결제 완료
+
+**호스트:**
+- `/services` — 잡보드 (열린 의뢰 목록)
+- `/services/[requestId]/apply` — 지원 폼 (₩20,000/hr 예상 수입 표시, 비율 미노출)
+- 호스트 대시보드 `?tab=service-jobs` — ServiceJobsTab (열린 의뢰 / 내 지원 / 진행중)
+
+### 10.4 API 라우트
+
+| 엔드포인트 | 용도 |
+|------------|------|
+| `POST /api/services/requests` | 의뢰 생성 + 해당 도시 승인 호스트 알림 |
+| `GET /api/services/requests?mode=board\|my` | 의뢰 목록 조회 |
+| `POST /api/services/applications` | 호스트 지원 (중복/재지원 처리) |
+| `POST /api/services/select-host` | 고객의 호스트 선택 → matched + 나머지 rejected |
+| `POST /api/services/bookings` | 원자적 예약 생성 (RPC 호출) |
+| `POST /api/services/payment/nicepay-callback` | NicePay 서명검증 + 결제확정 (SVC- 접두사 가드) |
+| `POST /api/services/cancel` | 취소 (PENDING: 즉시 / PAID+: 관리자 검토 요청) |
+
+### 10.5 타입 & 상수
+
+- `app/types/service.ts` — ServiceRequest, ServiceApplication, ServiceBooking 등
+- `app/constants/serviceStatus.ts` — 상태 유틸 함수 (`isOpenServiceRequest`, `getServiceRequestStatusLabel` 등)
+- `app/utils/notification.ts` — NotificationType에 `service_request_new`, `service_application_new`, `service_host_selected`, `service_host_rejected`, `service_payment_confirmed`, `service_cancelled` 추가
+
+### 10.6 네비게이션 연동
+
+- **홈 서비스 탭:** `LOCALLY_SERVICES` 5번째 항목(id=5) → 클릭 시 `/services/request` 라우팅 (기존 4개 카드 변경 없음)
+- **호스트 대시보드:** `service-jobs` 탭 추가 (Briefcase 아이콘) → ServiceJobsTab 렌더
+- **MobileHostMenu:** "서비스 매칭" 메뉴 항목 추가 → `/host/dashboard?tab=service-jobs`
+- **BottomTabNavigation:** `isHostNavPath`에 `/services` 경로 추가 (호스트 잡보드 탐색 시 탭바 유지)
+
+### 10.7 주요 제약사항
+
+- 수수료 비율(₩15,000/hr) 어디에도 노출 금지 — Generated 컬럼 기반으로 UI에서 계산 불필요
+- 기존 `/api/payment/nicepay-callback` 수정 금지 — 서비스 결제는 `/api/services/payment/nicepay-callback` 전용
+- 기존 `experiences` / `bookings` 테이블/API 변경 금지
+- 주문번호 `SVC-` 접두사: 기존 예약과 충돌 방지 + callback 라우팅 가드
