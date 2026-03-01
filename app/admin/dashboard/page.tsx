@@ -12,6 +12,7 @@ import ChatMonitor from './components/ChatMonitor';
 import AuditLogTab from './components/AuditLogTab';
 import MasterLedgerTab from './components/MasterLedgerTab';
 import TeamTab from './components/TeamTab';
+import ServiceAdminTab from './components/ServiceAdminTab';
 
 // Custom Hook
 import { useAdminData } from './hooks/useAdminData';
@@ -68,6 +69,8 @@ function AdminDashboardContent() {
         <SalesTab bookings={bookings} apps={apps} onRefresh={refresh} />
       ) : activeTab === 'ANALYTICS' ? (
         <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} searchLogs={searchLogs} analyticsEvents={analyticsEvents} inquiries={inquiries} inquiryMessages={inquiryMessages} />
+      ) : activeTab === 'SERVICE_REQUESTS' ? (
+        <ServiceAdminTab />
       ) : activeTab === 'CHATS' ? (
         <ChatMonitor />
       ) : activeTab === 'LOGS' ? (

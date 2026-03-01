@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DollarSign, TrendingUp, CreditCard, Wallet, AlertTriangle, CheckCircle, Calendar as CalendarIcon, ChevronDown, ChevronRight, ChevronUp, Download, Check } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css';
@@ -10,6 +10,7 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
 import { settleHostPayout } from '@/app/actions/admin';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
+import { createClient } from '@/app/utils/supabase/client';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
@@ -25,8 +26,19 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   const [settlementTab, setSettlementTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
   const [expandedHostId, setExpandedHostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [serviceBookings, setServiceBookings] = useState<any[]>([]);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
+  const supabase = useMemo(() => createClient(), []);
+
+  // Fetch service_bookings once for KPI aggregation
+  useEffect(() => {
+    supabase
+      .from('service_bookings')
+      .select('amount, host_payout_amount, platform_revenue, status, created_at')
+      .in('status', ['PAID', 'confirmed', 'completed'])
+      .then(({ data }) => { if (data) setServiceBookings(data); });
+  }, [supabase]);
 
   // 달력 외부 클릭 시 닫기
   useEffect(() => {
@@ -74,19 +86,29 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
     (isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && (b.platform_revenue > 0 || b.host_payout_amount > 0)))
   );
 
-  // 🟢 [수정] 매출/수익 계산 (DB 컬럼 기반)
-  const totalRevenue = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  // 맞춤 의뢰 service_bookings KPI (date range 필터 적용)
+  const validServiceBookings = serviceBookings.filter(b => filterDate(b.created_at));
+  const svcRevenue = validServiceBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const svcPlatformFee = validServiceBookings.reduce((sum, b) => sum + (b.platform_revenue || 0), 0);
+  const svcHostPayout = validServiceBookings.reduce((sum, b) => sum + (b.host_payout_amount || 0), 0);
+
+  // 🟢 [수정] 매출/수익 계산 (DB 컬럼 기반) — 체험 + 맞춤 의뢰 합산
+  const expRevenue = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const totalRevenue = expRevenue + svcRevenue;
 
   // 플랫폼 수익: platform_revenue 컬럼이 있으면 쓰고, 없으면(옛날데이터) 대충 계산
-  const platformFee = validBookings.reduce((sum, b) => {
+  const expPlatformFee = validBookings.reduce((sum, b) => {
     return sum + (b.platform_revenue || (b.amount - (b.host_payout_amount || (b.amount * 0.8))));
   }, 0);
+  const platformFee = expPlatformFee + svcPlatformFee;
 
-  const hostPayout = validBookings.reduce((sum, b) => {
+  const expHostPayout = validBookings.reduce((sum, b) => {
     return sum + (b.host_payout_amount || (b.amount * 0.8));
   }, 0);
+  const hostPayout = expHostPayout + svcHostPayout;
 
-  const averageOrderValue = validBookings.length > 0 ? totalRevenue / validBookings.length : 0;
+  const allCount = validBookings.length + validServiceBookings.length;
+  const averageOrderValue = allCount > 0 ? totalRevenue / allCount : 0;
 
   // 🟢 [핵심] 정산 예정 내역 계산 (위약금 포함)
   const calculateSettlements = () => {
@@ -307,7 +329,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
 
       {/* KPI 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard title="총 거래액 (GMV)" value={`₩${totalRevenue.toLocaleString()}`} sub={`기간 내 총 결제`} icon={<DollarSign size={16} className="text-white md:w-5 md:h-5" />} bg="bg-slate-900" />
+        <StatCard title="총 거래액 (GMV)" value={`₩${totalRevenue.toLocaleString()}`} sub={`체험 ₩${expRevenue.toLocaleString()} | 의뢰 ₩${svcRevenue.toLocaleString()}`} icon={<DollarSign size={16} className="text-white md:w-5 md:h-5" />} bg="bg-slate-900" />
         <StatCard title="순매출 (Net Revenue)" value={`₩${platformFee.toLocaleString()}`} sub="플랫폼 수익 (수수료)" icon={<TrendingUp size={16} className="text-white md:w-5 md:h-5" />} bg="bg-blue-600" />
         <StatCard title="정산 예정금 (AP)" value={`₩${hostPayout.toLocaleString()}`} sub="호스트 지급액" icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />} bg="bg-purple-600" />
         <StatCard title="객단가 (AOV)" value={`₩${Math.round(averageOrderValue).toLocaleString()}`} sub="건당 평균 결제액" icon={<Wallet size={16} className="text-slate-900 md:w-5 md:h-5" />} bg="bg-yellow-400" text="text-slate-900" />

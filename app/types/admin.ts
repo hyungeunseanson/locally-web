@@ -64,6 +64,39 @@ export interface HostApplication {
   content: any;
 }
 
+export interface AdminServiceBooking {
+  id: string;
+  order_id: string;
+  request_id: string;
+  customer_id: string;
+  host_id: string | null;
+  amount: number;
+  host_payout_amount: number | null;
+  platform_revenue: number | null; // internal only — never expose ratio in UI
+  status: string;
+  payout_status: string | null;
+  tid: string | null;
+  cancel_reason: string | null;
+  refund_amount: number | null;
+  created_at: string;
+  // Assembled via manual JOIN
+  service_request: {
+    title: string;
+    city: string;
+    service_date: string;
+    duration_hours: number;
+    status: string;
+  } | null;
+  customer_profile: { full_name: string | null; email: string | null } | null;
+  host_profile: { full_name: string | null } | null;
+  host_application: {
+    name: string | null;
+    bank_name: string | null;
+    account_number: string | null;
+    account_holder: string | null;
+  } | null;
+}
+
 export interface AdminDashboardState {
   apps: HostApplication[];
   exps: any[];
