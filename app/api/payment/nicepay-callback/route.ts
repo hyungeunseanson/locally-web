@@ -176,7 +176,8 @@ export async function POST(request: Request) {
                 experienceTitle: expTitle,
                 guestsCount: bookingData.guests,
                 bookingDate: bookingData.date,
-                bookingTime: bookingData.time
+                bookingTime: bookingData.time,
+                totalAmount: bookingData.amount || Number(amount)
               })
             }).catch(e => console.error('Background fetch to send-email failed:', e));
           }

@@ -5,6 +5,23 @@
 
 ---
 
+## v3.22.1 — React Email 렌더링 및 백그라운드 로깅 핫픽스 (Hotfix)
+
+**작업일:** 2026-03-03
+
+### 개요
+v3.22.0 분리 이후 발생한 `BookingConfirmationEmail` 렌더링 크래시 및 에러 로깅 누락(Silent Error) 해결.
+
+### [Hotfix-1] 이메일 페이로드 및 렌더링 타입 안정화
+- 결제 콜백 웹훅으로부터 누락되었던 필수 `totalAmount` 데이터를 페이로드에 추가.
+- React Email 컴포넌트 내부에서 `null` 값 참조 시 크래시가 발생하던 취약점을 방어하기 위해 Optional Chaining(`?.`) 및 컴포넌트 내부 런타임 Fallback 값 보강.
+
+### [Hotfix-2] 백그라운드 로깅 예외(Exception) 버그 수정
+- `app/api/notifications/send-email/route.ts` 내에서 이미 소모된 `request.json()` 스트림을 `catch` 블럭 안에서 `request.clone().json()`으로 중복 호출하여 "Type Error: stream already read" 에러가 이중으로 발생하던 설계상의 버그를 발견하여 즉각 수정.
+- 본문 변수(`body`)의 스코프를 `try..catch` 바깥으로 승격시켜 이제 시스템 에러 발생 시 정상적으로 `notifications` 테이블에 대상자와 원인 에러 로그가 강제 저장됨.
+
+---
+
 ## v3.22.0 — 결제 웹훅과 이메일 전송의 완전한 분리 (Decoupling)
 
 **작업일:** 2026-03-03

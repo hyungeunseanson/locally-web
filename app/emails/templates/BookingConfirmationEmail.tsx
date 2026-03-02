@@ -4,22 +4,24 @@ import EmailLayout from '../components/EmailLayout';
 import CTAButton from '../components/CTAButton';
 
 interface BookingConfirmationEmailProps {
-    hostName: string;
-    guestName: string;
-    experienceTitle: string;
-    guestsCount: number;
-    bookingDate: string;
-    bookingTime: string;
-    dashboardLink: string;
+    hostName?: string;
+    guestName?: string;
+    experienceTitle?: string;
+    guestsCount?: number;
+    bookingDate?: string;
+    bookingTime?: string;
+    totalAmount?: number;
+    dashboardLink?: string;
 }
 
 export default function BookingConfirmationEmail({
     hostName = 'Locally 호스트',
     guestName = '게스트',
     experienceTitle = '로컬라이프 체험',
-    guestsCount = 2,
-    bookingDate = '2026-03-01',
-    bookingTime = '14:00',
+    guestsCount = 1,
+    bookingDate = '일정 미정',
+    bookingTime = '',
+    totalAmount = 0,
     dashboardLink = 'https://locally.vercel.app/host/dashboard',
 }: BookingConfirmationEmailProps) {
     return (
@@ -39,6 +41,11 @@ export default function BookingConfirmationEmail({
                 <Row style={receiptRow}>
                     <Column style={labelCol}>참여 인원</Column>
                     <Column style={valueCol}>{guestsCount}명</Column>
+                </Row>
+                <Hr style={receiptHr} />
+                <Row style={receiptRow}>
+                    <Column style={labelCol}>총 결제 금액</Column>
+                    <Column style={valueCol}>₩{totalAmount?.toLocaleString() || 0}</Column>
                 </Row>
                 <Hr style={receiptHr} />
                 <Row style={receiptRow}>

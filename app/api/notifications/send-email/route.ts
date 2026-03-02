@@ -7,9 +7,10 @@ import BookingConfirmationEmail from '@/app/emails/templates/BookingConfirmation
 import BookingCancellationEmail from '@/app/emails/templates/BookingCancellationEmail';
 
 export async function POST(request: Request) {
+    let body: any = {};
     try {
-        const body = await request.json();
-        const { type, hostId, guestName, experienceTitle, guestsCount, bookingDate, bookingTime, cancelReason, refundAmount } = body;
+        body = await request.json();
+        const { type, hostId, guestName, experienceTitle, guestsCount, bookingDate, bookingTime, cancelReason, refundAmount, totalAmount } = body;
 
         if (!hostId || !type) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -47,9 +48,10 @@ export async function POST(request: Request) {
                     guestName: guestName || '게스트',
                     experienceTitle: experienceTitle || '체험',
                     guestsCount: guestsCount || 1,
-                    bookingDate: bookingDate || '',
+                    totalAmount: totalAmount || 0,
+                    bookingDate: bookingDate || '일정 미정',
                     bookingTime: bookingTime || '',
-                    dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard`
+                    dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/host/dashboard`
                 })
             );
         } else if (type === 'booking_cancellation') {
@@ -93,14 +95,14 @@ export async function POST(request: Request) {
                 process.env.SUPABASE_SERVICE_ROLE_KEY!
             );
 
-            const payloadBody = await request.clone().json().catch(() => ({}));
-            const hostId = payloadBody?.hostId;
+            // Fix: Do not call request.clone().json() as stream is already read by await request.json()
+            const errorHostId = body?.hostId || null;
 
             await supabase.from('notifications').insert({
-                user_id: hostId, // 이메일 발송에 실패한 대상자 기록
+                user_id: errorHostId, // 이메일 발송에 실패한 대상자 기록
                 type: 'system_error',
                 title: '🚨 이메일 발송 시스템 장애',
-                message: `이메일 렌더링 또는 전송이 실패했습니다: ${error.message}`,
+                message: `이메일 렌더링 또는 전송이 실패했습니다: ${error?.message || 'Unknown Error'}`,
                 link: '',
                 is_read: false
             });
