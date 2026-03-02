@@ -96,10 +96,18 @@ export default function ChatMonitor() {
     refresh();
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (selectedInquiry && replyText.trim()) {
       sendMessage(selectedInquiry.id, replyText);
       setReplyText('');
+
+      // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
+      if (activeTab === 'admin' && isAdminSupportInquiry(selectedInquiry.type)) {
+        const currentStatus = (selectedInquiry as any).status;
+        if (!currentStatus || currentStatus === 'open') {
+          await handleUpdateCSStatus(selectedInquiry.id, 'in_progress');
+        }
+      }
     }
   };
 
@@ -181,8 +189,8 @@ export default function ChatMonitor() {
                   key={s}
                   onClick={() => setCsStatusFilter(s)}
                   className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${csStatusFilter === s
-                      ? 'bg-slate-800 text-white border-slate-800'
-                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-slate-800 text-white border-slate-800'
+                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
                     }`}
                 >
                   {s === 'ALL' ? '전체' : CS_STATUS_LABELS[s as CSStatus]}
@@ -259,8 +267,8 @@ export default function ChatMonitor() {
                         key={s}
                         onClick={() => handleUpdateCSStatus(selectedInquiry.id, s)}
                         className={`px-1.5 md:px-2 py-0.5 rounded-full text-[8px] md:text-[9px] font-bold border transition-all ${isActive
-                            ? CS_STATUS_COLORS[s] + ' shadow-sm'
-                            : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
+                          ? CS_STATUS_COLORS[s] + ' shadow-sm'
+                          : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
                           }`}
                       >
                         {CS_STATUS_LABELS[s]}
@@ -320,11 +328,14 @@ export default function ChatMonitor() {
               {messages.map((msg) => {
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest;
+                // 🟢 관리자(alignRight)가 1:1 문의(isAdminSupport)에 답변할 경우 이름을 "로컬리"로 고정
+                const isAdminReply = alignRight && isAdminSupportInquiry(selectedInquiry.type);
+                const displayName = isAdminReply ? '로컬리' : (msg.sender?.name || '알 수 없음');
 
                 return (
                   <div key={msg.id} className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}>
                     <span className="text-[9px] md:text-[10px] text-slate-400 mb-0.5 md:mb-1 px-1">
-                      {msg.sender?.name || '알 수 없음'}
+                      {displayName}
                     </span>
                     <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed ${alignRight ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
                       {renderMessageContent(msg.content)}

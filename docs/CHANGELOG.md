@@ -24,6 +24,12 @@ MANAGEMENT 그룹 재배치 및 REVIEWS, LOGS 탭을 ANALYTICS 하위 중첩 탭
 - 기존 `ReviewsTab`, `AuditLogTab` 컴포넌트 렌더링 위치를 사이드바 라우팅이 아닌 `AnalyticsTab` 내부 상태 제어로 이관.
 - **파일:** `app/admin/dashboard/components/AnalyticsTab.tsx`, `app/admin/dashboard/page.tsx`
 
+### [UI-3] 1:1 문의 채널 상태 관리 및 프로필 고도화
+- 관리자가 대기(open) 상태인 1:1 문의에 첫 메시지를 전송 시 자동으로 '처리중(in_progress)' 상태로 전환되도록 자동화 적용. (완료 상태는 수동 관리 유지)
+- 관리자가 발송한 메시지의 렌더링 이름을 관리자 개인 계정 이름에서 공식 명칭인 '로컬리'로 고정 노출되도록 개선.
+- 기존 '해결' 텍스트를 '완료'로 용어 변경.
+- **파일:** `app/admin/dashboard/components/ChatMonitor.tsx`
+
 ## v3.15.0 — 리뷰 시스템 고도화 (알림 파이프라인 + Admin 관리 + 후기 수정 + 평점 집계)
 
 **작업일:** 2026-03-02
