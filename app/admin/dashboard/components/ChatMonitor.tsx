@@ -10,7 +10,7 @@ import { createClient } from '@/app/utils/supabase/client';
 type CSStatus = 'open' | 'in_progress' | 'resolved';
 type CSStatusFilter = 'ALL' | CSStatus;
 
-const CS_STATUS_LABELS: Record<CSStatus, string> = { open: '대기', in_progress: '처리중', resolved: '해결' };
+const CS_STATUS_LABELS: Record<CSStatus, string> = { open: '대기', in_progress: '처리중', resolved: '완료' };
 const CS_STATUS_COLORS: Record<CSStatus, string> = {
   open: 'bg-amber-100 text-amber-700 border-amber-200',
   in_progress: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -180,11 +180,10 @@ export default function ChatMonitor() {
                 <button
                   key={s}
                   onClick={() => setCsStatusFilter(s)}
-                  className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${
-                    csStatusFilter === s
+                  className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${csStatusFilter === s
                       ? 'bg-slate-800 text-white border-slate-800'
                       : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   {s === 'ALL' ? '전체' : CS_STATUS_LABELS[s as CSStatus]}
                 </button>
@@ -259,11 +258,10 @@ export default function ChatMonitor() {
                       <button
                         key={s}
                         onClick={() => handleUpdateCSStatus(selectedInquiry.id, s)}
-                        className={`px-1.5 md:px-2 py-0.5 rounded-full text-[8px] md:text-[9px] font-bold border transition-all ${
-                          isActive
+                        className={`px-1.5 md:px-2 py-0.5 rounded-full text-[8px] md:text-[9px] font-bold border transition-all ${isActive
                             ? CS_STATUS_COLORS[s] + ' shadow-sm'
                             : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
-                        }`}
+                          }`}
                       >
                         {CS_STATUS_LABELS[s]}
                       </button>

@@ -17,12 +17,12 @@ const NavButton = ({ active, onClick, icon, label, count }: any) => (
       : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       }`}
   >
-    <div className="flex items-center gap-2.5 md:gap-3">
-      {icon}
-      <span className="text-[11px] md:text-sm font-medium">{label}</span>
+    <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+      <div className="shrink-0">{icon}</div>
+      <span className="text-[11px] md:text-sm font-medium truncate">{label}</span>
     </div>
     {count !== undefined && count !== 0 && (
-      <span className={`text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 rounded-full font-bold ${active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
+      <span className={`text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 rounded-full font-bold ml-2 shrink-0 ${active ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
         }`}>
         {count}
       </span>
