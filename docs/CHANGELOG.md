@@ -30,6 +30,12 @@ MANAGEMENT 그룹 재배치 및 REVIEWS, LOGS 탭을 ANALYTICS 하위 중첩 탭
 - 기존 '해결' 텍스트를 '완료'로 용어 변경.
 - **파일:** `app/admin/dashboard/components/ChatMonitor.tsx`
 
+### [PERF-1] 유저 활동 상태 DB 업데이트 스로틀링 도입 (DB 쓰기 병목 해소)
+- 클라이언트의 페이지 전환(라우팅) 시마다 발생하는 무분별한 `last_active_at` 업데이트를 방지하기 위해 5분(300초)의 쿨타임을 적용했습니다.
+- 외부 캐시 서버(Redis 등) 도입 없이 브라우저의 `localStorage`와 리액트 의존성(`usePathname`)을 순수하게 활용한 애플리케이션 레벨의 방어 로직을 구축했습니다.
+- 실시간 접속 표시를 위한 웹소켓(`Supabase Channel`) 마운트 로직과 영구 저장용 DB 업데이트 로직을 2개의 단독 `useEffect` 훅으로 분리했습니다.
+- **파일:** `app/components/UserPresenceTracker.tsx`
+
 ## v3.15.0 — 리뷰 시스템 고도화 (알림 파이프라인 + Admin 관리 + 후기 수정 + 평점 집계)
 
 **작업일:** 2026-03-02
