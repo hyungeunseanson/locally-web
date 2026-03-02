@@ -22,7 +22,7 @@ export default function ExperienceCard({ data }: { data: any }) {
     : (data.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
 
   // 지역 정보 (없으면 기본값)
-  const location = data.city || data.location || '서울';
+  const location = [data.city, data.subCity].filter(Boolean).map(s => String(s).trim()).filter(Boolean).join(', ') || data.location || '서울';
 
   return (
     <Link href={`/experiences/${data.id}`} className="block group active:scale-[0.98] transition-transform duration-200">

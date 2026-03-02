@@ -19,6 +19,7 @@ export type ExperienceDetail = {
   title?: string;
   description?: string;
   city?: string;
+  subCity?: string;
   category?: string;
   languages?: string[];
   language_levels?: LanguageLevelEntry[];

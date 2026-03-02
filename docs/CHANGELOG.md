@@ -5,6 +5,28 @@
 
 ---
 
+## v3.18.0 — 체험 등록 파이프라인 데이터 렌더링 누수 복구
+
+**작업일:** 2026-03-03
+
+### 개요
+호스트가 체험 등록 시 입력한 데이터 중 어드민 및 게스트 화면에서 정상적으로 렌더링되지 않던 항목(누수 및 고립 데이터)을 복구하여 UI에 온전히 표시되도록 수정.
+
+### [UI-1] 어드민 체험 관리(EXPS) 상세 화면 데이터 매핑 복구
+- DB에는 저장되지만 화면에 누락되었던 필수 정보들을 추가 렌더링.
+- 복구 항목: 진행 언어 및 레벨, 카테고리, 상세 주소(`location`), 준비물, 단독 투어 옵션, 참가 제한 규정(연령, 활동 강도).
+- **파일:** `app/admin/dashboard/components/DetailsPanel.tsx`
+
+### [UI-2] 상세 지역(subCity) 고립 현상 해결
+- DB/폼에 보유 중이던 `subCity` 데이터를 `city`와 결합하여 렌더링하도록 UI 수정 (예: "오사카, 난바").
+- 어드민 상세 화면 및 게스트 체험 카드, 상세 화면 Location Header에 모두 적용 완료.
+- **파일:** 
+  - `app/experiences/[id]/ExperienceClient.tsx`
+  - `app/components/ExperienceCard.tsx`
+  - `app/admin/dashboard/components/DetailsPanel.tsx`
+
+---
+
 ## v3.17.0 — 글로벌 다국어(i18n) 통합 및 UX 라이팅 고도화
 
 **작업일:** 2026-03-02
@@ -33,6 +55,19 @@
   - `app/host/dashboard/page.tsx`
   - `app/host/dashboard/components/ServiceJobsTab.tsx`
   - `app/components/ReviewModal.tsx`
+
+### [i18n-3] 호스트 대시보드 누락 번역 및 Key 매핑 오류 전면 수정
+- 프로필 세팅, 문의함, 매칭현황, 정산, 후기, 가이드라인 등 대시보드 내 하단 탭 전체의 하드코딩된 텍스트와 누락 번역 보완.
+- `LanguageContext.tsx` 내 `hp_`, `hr_`, `hd_`, `hg_` 등의 프리픽스가 섞여 매핑되지 않던 오류를 전부 식별하고 올바른 Key 값으로 치환.
+- **파일:**
+  - `app/context/LanguageContext.tsx`
+  - `app/host/dashboard/components/ProfileEditor.tsx`
+  - `app/host/dashboard/InquiryChat.tsx`
+  - `app/host/dashboard/components/ServiceJobsTab.tsx`
+  - `app/host/dashboard/Earnings.tsx`
+  - `app/host/dashboard/HostReviews.tsx`
+  - `app/host/dashboard/components/GuidelinesTab.tsx`
+  - `app/host/dashboard/components/ReservationCard.tsx`
 
 ---
 

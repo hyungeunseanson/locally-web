@@ -63,9 +63,9 @@ export default function ExperienceClient({
   const translatedDescription = getContent(experience, 'description', lang);
   const category = getContent(experience, 'category', lang) || experience.category || '문화 체험';
   const meetingPoint = experience.meeting_point || experience.location || 'Locally';
-  const compactLocation = experience.city?.trim() || meetingPoint?.split(',')?.[0]?.trim() || 'Locally';
+  const compactLocation = [experience.city, experience.subCity].filter(Boolean).map(s => String(s).trim()).filter(Boolean).join(', ') || meetingPoint?.split(',')?.[0]?.trim() || 'Locally';
   const headerLabel = `${compactLocation} · ${category}`;
-  const addressLine = experience.location || experience.city || compactLocation;
+  const addressLine = experience.location || compactLocation;
   const hostJob = hostProfile?.job?.trim() || '로컬리 호스트';
   const hostLanguages = Array.isArray(hostProfile?.languages)
     ? Array.from(new Set(hostProfile.languages.map((language) => String(language).trim()).filter(Boolean)))

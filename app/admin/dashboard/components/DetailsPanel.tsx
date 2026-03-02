@@ -245,7 +245,7 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
                   ))
                   : applicationLanguageNames.length > 0
                     ? applicationLanguageNames.map((l: string) => <span key={l} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">{l}</span>)
-                  : <span className="text-xs md:text-sm font-bold text-slate-900">{selectedItem.target_language || '-'}</span>}
+                    : <span className="text-xs md:text-sm font-bold text-slate-900">{selectedItem.target_language || '-'}</span>}
               </div>
             </div>
 
@@ -324,21 +324,55 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             )}
 
             <div className="grid grid-cols-2 gap-2 md:gap-3">
+              <InfoBox label="카테고리" value={selectedItem.category || '-'} />
               <InfoBox label="가격" value={selectedItem.price !== undefined ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
               <InfoBox label="소요 시간" value={selectedItem.duration ? `${selectedItem.duration}시간` : '-'} />
               <InfoBox label="최대 인원" value={selectedItem.max_guests ? `${selectedItem.max_guests}명` : '-'} />
-              <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}` : '-'} />
+              <InfoBox label="지역" value={selectedItem.city ? `${selectedItem.country || ''} > ${selectedItem.city}${selectedItem.subCity ? `, ${selectedItem.subCity}` : ''}` : '-'} />
+              <InfoBox label="단독 투어" value={selectedItem.is_private_enabled ? `가능 (₩${selectedItem.private_price?.toLocaleString() || 0})` : '불가'} />
+            </div>
+
+            {/* 언어 */}
+            <div className="bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100">
+              <div className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1.5"><MessageCircle size={12} /> 진행 언어</div>
+              <div className="flex flex-wrap gap-1.5">
+                {applicationLanguageLevels.length > 0
+                  ? applicationLanguageLevels.map((entry) => (
+                    <span key={`${entry.language}-${entry.level}`} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">
+                      {entry.language} · Lv.{entry.level}
+                    </span>
+                  ))
+                  : applicationLanguageNames.length > 0
+                    ? applicationLanguageNames.map((l: string) => <span key={l} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">{l}</span>)
+                    : <span className="text-xs md:text-sm font-bold text-slate-900">-</span>}
+              </div>
+            </div>
+
+            {/* 참가 제한 규정 */}
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
+              <InfoBox label="참가 연령" value={selectedItem.rules?.age_limit || '-'} />
+              <InfoBox label="활동 강도" value={selectedItem.rules?.activity_level || '-'} />
             </div>
 
             <div className="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-100 flex items-start gap-2.5 md:gap-3">
               <MapPin size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5 md:mb-1">만나는 장소 (Meeting Point)</div>
+              <div className="min-w-0">
+                <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5 md:mb-1">만나는 장소 및 주소</div>
                 <div className="font-bold text-slate-900 text-xs md:text-sm">
                   {selectedItem.meeting_point || '정보 없음'}
                 </div>
+                <div className="text-[10px] md:text-xs text-slate-500 mt-0.5 truncate">
+                  {selectedItem.location || '상세 주소 없음'}
+                </div>
               </div>
             </div>
+
+            {selectedItem.supplies && (
+              <div>
+                <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1.5 md:mb-2">준비물</h4>
+                <div className="bg-slate-50 p-3 md:p-4 rounded-xl text-[11px] md:text-xs leading-relaxed text-slate-700 whitespace-pre-wrap border border-slate-100">{selectedItem.supplies}</div>
+              </div>
+            )}
 
             <Link href={`/host/experiences/${selectedItem.id}/edit`}>
               <button className="w-full py-2.5 md:py-3 bg-black text-white rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-slate-800 transition-colors mb-2 md:mb-4">
