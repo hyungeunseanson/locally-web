@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal';
 import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
+import Spinner from '@/app/components/ui/Spinner';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
@@ -101,7 +102,7 @@ export default function InquiryChat() {
         {/* 목록 스크롤 */}
         <div className="flex-1 overflow-y-auto">
           {isLoading && (
-            <div className="p-10 text-center text-slate-400 text-sm md:text-base">로딩 중...</div>
+            <div className="p-10 text-center text-slate-400 text-sm md:text-base"><Spinner size={24} /></div>
           )}
           {!isLoading && inquiries.length === 0 && (
             <div className="p-10 text-center text-slate-400 text-sm md:text-base">문의가 없습니다.</div>

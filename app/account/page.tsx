@@ -8,6 +8,7 @@ import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Calendar, Chevro
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
+import Spinner from '@/app/components/ui/Spinner';
 import MobileProfileView from '@/app/components/mobile/MobileProfileView';
 import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
@@ -371,7 +372,7 @@ export default function AccountPage() {
 
   const activeLinkConfig = activeLinkModal ? linkModalConfig[activeLinkModal] : null;
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center">Loading...</div>;
+  if (loading) return <Spinner fullScreen />;
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">

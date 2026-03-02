@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import Spinner from '@/app/components/ui/Spinner';
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 
 function SuccessContent() {
@@ -60,7 +61,7 @@ function SuccessContent() {
               : '결제 검증 상태는 나의 여행에서 확인할 수 있습니다.'}
           </p>
         )}
-        
+
         <div className="flex gap-2 md:gap-3">
           <Link href="/" className="flex-1"><button className="w-full py-3 md:py-4 border border-slate-200 rounded-lg md:rounded-xl font-bold text-[13px] md:text-base text-slate-600 hover:bg-slate-50">홈으로</button></Link>
           <Link href="/guest/trips" className="flex-1"><button className="w-full py-3 md:py-4 bg-slate-900 text-white rounded-lg md:rounded-xl font-bold text-[13px] md:text-base hover:bg-slate-800">나의 여행 보기</button></Link>
@@ -71,5 +72,5 @@ function SuccessContent() {
 }
 
 export default function PaymentSuccessPage() {
-  return <Suspense fallback={<div>Loading...</div>}><SuccessContent /></Suspense>;
+  return <Suspense fallback={<Spinner fullScreen />}><SuccessContent /></Suspense>;
 }

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
+import Spinner from '@/app/components/ui/Spinner';
 import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
 import { Send, ShieldCheck, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
@@ -328,10 +329,10 @@ function InboxContent() {
 
                       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[72%]`}>
                         {!isMe && (
-                        <span className="text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 cursor-pointer" onClick={() => handleProfileClick(msg.sender_id)}>
-                          {msg.sender?.name || currentHostDisplay.name}
-                        </span>
-                      )}
+                          <span className="text-[10px] md:text-[11px] text-gray-500 mb-0.5 ml-0.5 cursor-pointer" onClick={() => handleProfileClick(msg.sender_id)}>
+                            {msg.sender?.name || currentHostDisplay.name}
+                          </span>
+                        )}
 
                         <div className="flex items-end gap-1.5">
                           {isMe && (
@@ -412,7 +413,7 @@ function InboxContent() {
 
 export default function GuestInboxPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center">로딩 중...</div>}>
+    <Suspense fallback={<Spinner fullScreen />}>
       <InboxContent />
     </Suspense>
   );

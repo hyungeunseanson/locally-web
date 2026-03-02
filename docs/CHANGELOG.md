@@ -42,6 +42,11 @@ MANAGEMENT 그룹 재배치 및 REVIEWS, LOGS 탭을 ANALYTICS 하위 중첩 탭
 - **고급 로딩 경험 (Skeleton UI):** 밋밋한 Pulse 로딩을 걷어내고, 인스타그램/에어비앤비 모델 기반의 Shimmer 스켈레톤 애니메이션 컴포넌트로 전면 교체하여 체감 대기시간 극복.
 - **파일:** `app/components/ui/PageTransition.tsx`, `app/components/ui/Skeleton.tsx`, `app/components/ClientMainWrapper.tsx`, `app/components/ui/Button.tsx`, `app/globals.css` 및 카드 컴포넌트 전체.
 
+### [UX-2] 로딩 스피너 디자인 표준화 및 하드코딩 박멸
+- **디자인 표준화:** `app/components/ui/Spinner.tsx` 컴포넌트를 신설하여 기존 무분별하게 혼용되던 로딩 방식(텍스트/아이콘)을 통일했습니다. 
+- **브랜드 컬러 적용:** `Lucide-react`의 `Loader2`를 기반으로 `Locally` 브랜드 컬러(`text-[#FF385C]`)와 `animate-spin`을 적용, 모듈 십자 레이아웃 호환성을 위해 중앙 정렬(`flex justify-center`) 옵션 내장.
+- **하드코딩 텍스트 일괄 제거:** 글로벌 코드베이스를 스캔하여 임시로 작성되었던 `<div>Loading...</div>` 및 `로딩 중...` 텍스트 블록들을 모두 박멸하고 신규 스피너 컴포넌트로 마이그레이션 적용. (ex. `Guest Inbox`, `Account`, `Payment` 파이프라인 등)
+
 ## v3.15.0 — 리뷰 시스템 고도화 (알림 파이프라인 + Admin 관리 + 후기 수정 + 평점 집계)
 
 **작업일:** 2026-03-02

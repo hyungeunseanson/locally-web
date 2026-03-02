@@ -2,7 +2,8 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
-import { ChevronLeft, CreditCard, Loader2, Calendar, Users, ShieldCheck, Clock, Info, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, CreditCard, Calendar, Users, ShieldCheck, Clock, Info, CheckCircle2 } from 'lucide-react';
+import Spinner from '@/app/components/ui/Spinner';
 import Script from 'next/script';
 import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
@@ -301,7 +302,9 @@ function PaymentContent() {
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center py-1">
               <span className="text-[10px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5 uppercase tracking-wide">{experience?.location || 'SEOUL'}</span>
-              <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-[15px] md:text-lg">{experience?.title || '로딩 중...'}</h3>
+              <h3 className="font-bold text-slate-900 leading-snug line-clamp-3 text-[15px] md:text-lg">
+                {experience ? experience.title : <Spinner size={16} className="inline-block" />}
+              </h3>
             </div>
           </div>
 
@@ -400,7 +403,7 @@ function PaymentContent() {
 
           <button onClick={handlePayment} disabled={isProcessing}
             className="w-full h-12 md:h-14 rounded-xl md:rounded-2xl font-bold text-[15px] md:text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 md:gap-2 shadow-md md:shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100">
-            {isProcessing ? <Loader2 className="animate-spin w-[18px] h-[18px] md:w-5 md:h-5" /> : <><CreditCard className="w-[18px] h-[18px] md:w-5 md:h-5" /> ₩{finalAmount.toLocaleString()} 결제하기</>}
+            {isProcessing ? <Spinner size={20} className="w-[18px] h-[18px] md:w-5 md:h-5 text-white" /> : <><CreditCard className="w-[18px] h-[18px] md:w-5 md:h-5" /> ₩{finalAmount.toLocaleString()} 결제하기</>}
           </button>
         </div>
       </div>
@@ -409,5 +412,5 @@ function PaymentContent() {
 }
 
 export default function PaymentPage() {
-  return <Suspense fallback={<div>Loading...</div>}><PaymentContent /></Suspense>;
+  return <Suspense fallback={<Spinner fullScreen />}><PaymentContent /></Suspense>;
 }
