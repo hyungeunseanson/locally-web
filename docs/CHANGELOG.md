@@ -5,6 +5,39 @@
 
 ---
 
+## v3.14.0 — 메시징 시스템 Phase C (M3 읽음 시각 + M5 CS 상태 큐)
+
+**작업일:** 2026-03-02
+
+### 개요
+[M3] C2C 신뢰도 강화: 읽음 시각 정밀화 / [M5] Admin 운영 효율: CS 문의 칸반형 상태 관리.
+DB 스키마 변경 2건(마이그레이션 스크립트 `docs/migrations/v3_14_0_chat_enhancements.sql` 참조).
+
+### [M3] inquiry_messages — read_at 컬럼 추가 + "읽음 HH:MM" UI
+
+- **기존 문제:** 발신자 메시지에 '1'만 표시, 상대방이 정확히 언제 읽었는지 알 수 없음.
+- **DB 변경:** `inquiry_messages.read_at TIMESTAMPTZ` 컬럼 추가.
+- **useChat.ts:** `markAsRead()`에서 `is_read=true`와 함께 `read_at=NOW()` 기록. 이미 `read_at` 있는 메시지는 덮어쓰지 않음(`.is('read_at', null)` 조건).
+- **UI 변경 (C2C 발신자 메시지 좌측 메타 영역):**
+  - 미읽음: "1" (파란색 bold)
+  - 읽음 + read_at 있음: "읽음 오후 2:05" (회색 소문자)
+  - 읽음 + read_at 없음(레거시): 표시 없음 (마이그레이션 전 기존 메시지 보호)
+- **파일:** `app/hooks/useChat.ts`, `app/guest/inbox/page.tsx`, `app/host/dashboard/InquiryChat.tsx`
+
+### [M5] inquiries — status 컬럼 + ChatMonitor 칸반형 상태 관리
+
+- **기존 문제:** 1:1 CS 문의 상태 관리 불가, 대기/처리중/해결 구분 없음.
+- **DB 변경:** `inquiries.status TEXT DEFAULT NULL` 컬럼 추가 (NULL=C2C 무관, 'open'|'in_progress'|'resolved' CS 전용).
+- **useChat.ts:** `InquiryRow`에 `status?: string | null` 타입 추가 (select `*`로 자동 포함).
+- **ChatMonitor UI:**
+  - "1:1 문의" 탭 헤더에 상태 필터 필: 전체 / 대기 / 처리중 / 해결 (null 상태 문의는 '대기'에 포함)
+  - 문의 목록 각 아이템에 상태 뱃지 표시 (amber=대기, blue=처리중, green=해결)
+  - 채팅 헤더 우상단에 3개 상태 전환 버튼 (클릭 시 supabase.update + refresh() 재조회)
+- **C2C 채팅 영향 없음** (monitor 탭은 기존 로직 그대로)
+- **파일:** `app/hooks/useChat.ts`, `app/admin/dashboard/components/ChatMonitor.tsx`
+
+---
+
 ## v3.13.0 — 메시징 시스템 Phase A & B 고도화 (CS 뱃지 + Admin CS 개시)
 
 **작업일:** 2026-03-02

@@ -5,6 +5,17 @@ import { useSearchParams } from 'next/navigation';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
+import { createClient } from '@/app/utils/supabase/client';
+
+type CSStatus = 'open' | 'in_progress' | 'resolved';
+type CSStatusFilter = 'ALL' | CSStatus;
+
+const CS_STATUS_LABELS: Record<CSStatus, string> = { open: '대기', in_progress: '처리중', resolved: '해결' };
+const CS_STATUS_COLORS: Record<CSStatus, string> = {
+  open: 'bg-amber-100 text-amber-700 border-amber-200',
+  in_progress: 'bg-blue-100 text-blue-700 border-blue-200',
+  resolved: 'bg-green-100 text-green-700 border-green-200',
+};
 
 type MonitorGuest = {
   full_name?: string | null;
@@ -60,7 +71,9 @@ export default function ChatMonitor() {
     error
   } = useChat('admin') as unknown as AdminChatState;
 
+  const supabase = createClient();
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
+  const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [replyText, setReplyText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -78,6 +91,11 @@ export default function ChatMonitor() {
     }
   }, [targetInquiryId, inquiries?.length]);
 
+  const handleUpdateCSStatus = async (inquiryId: number | string, newStatus: CSStatus) => {
+    await supabase.from('inquiries').update({ status: newStatus }).eq('id', inquiryId);
+    refresh();
+  };
+
   const handleSend = () => {
     if (selectedInquiry && replyText.trim()) {
       sendMessage(selectedInquiry.id, replyText);
@@ -90,9 +108,13 @@ export default function ChatMonitor() {
     return guest.full_name || guest.name || guest.email || '익명 고객';
   };
 
-  const filteredInquiries = (inquiries || []).filter((inq) => {
+  const filteredInquiries = (inquiries || []).filter((inq: any) => {
     if (activeTab === 'monitor') return !isAdminSupportInquiry(inq.type);
-    return isAdminSupportInquiry(inq.type);
+    if (!isAdminSupportInquiry(inq.type)) return false;
+    if (csStatusFilter === 'ALL') return true;
+    // 상태 미설정(null) 문의는 'open' 필터에도 포함
+    if (csStatusFilter === 'open') return !inq.status || inq.status === 'open';
+    return inq.status === csStatusFilter;
   });
 
   // --- Keyword Detection Logic ---
@@ -150,6 +172,25 @@ export default function ChatMonitor() {
               <Eye size={12} className="md:w-3.5 md:h-3.5" /> 실시간 모니터링
             </button>
           </div>
+
+          {/* CS 상태 필터 (1:1 문의 탭에서만 노출) */}
+          {activeTab === 'admin' && (
+            <div className="flex gap-1 flex-wrap mt-2">
+              {(['ALL', 'open', 'in_progress', 'resolved'] as CSStatusFilter[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setCsStatusFilter(s)}
+                  className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${
+                    csStatusFilter === s
+                      ? 'bg-slate-800 text-white border-slate-800'
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {s === 'ALL' ? '전체' : CS_STATUS_LABELS[s as CSStatus]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && (
@@ -184,7 +225,9 @@ export default function ChatMonitor() {
                     {activeTab === 'monitor' ? (
                       <span className="text-[8px] md:text-[10px] bg-slate-100 text-slate-500 px-1 md:px-1.5 py-0.5 rounded whitespace-nowrap">유저↔호스트</span>
                     ) : (
-                      <span className="text-[8px] md:text-[10px] bg-green-100 text-green-700 px-1 md:px-1.5 py-0.5 rounded whitespace-nowrap">1:1문의</span>
+                      <span className={`text-[8px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded border whitespace-nowrap ${CS_STATUS_COLORS[(inq as any).status as CSStatus] || CS_STATUS_COLORS.open}`}>
+                        {CS_STATUS_LABELS[(inq as any).status as CSStatus] || '대기'}
+                      </span>
                     )}
                     <span className="truncate max-w-[80px] md:max-w-[100px]">{getGuestName(inq.guest)}</span>
                   </span>
@@ -206,6 +249,28 @@ export default function ChatMonitor() {
         {selectedInquiry ? (
           <>
             <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center relative gap-2 shrink-0 pt-3 md:pt-4">
+              {/* CS 상태 변경 버튼 (1:1 문의 탭에서만) */}
+              {activeTab === 'admin' && selectedIsAdminSupport && (
+                <div className="absolute top-2 right-2 md:top-3 md:right-3 flex gap-1 z-10">
+                  {(['open', 'in_progress', 'resolved'] as CSStatus[]).map((s) => {
+                    const currentStatus = (selectedInquiry as any)?.status;
+                    const isActive = currentStatus === s || (!currentStatus && s === 'open');
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => handleUpdateCSStatus(selectedInquiry.id, s)}
+                        className={`px-1.5 md:px-2 py-0.5 rounded-full text-[8px] md:text-[9px] font-bold border transition-all ${
+                          isActive
+                            ? CS_STATUS_COLORS[s] + ' shadow-sm'
+                            : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {CS_STATUS_LABELS[s]}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="flex items-center gap-1.5 md:gap-4 min-w-0">
                 <button
                   onClick={clearSelected} // 목록으로 돌아가기

@@ -36,6 +36,7 @@ type InquiryRow = {
   host_id: string | null;
   experience_id?: string | number | null;
   type?: InquiryType | string | null;
+  status?: string | null;  // CS 전용 상태: 'open' | 'in_progress' | 'resolved' | null (C2C)
   content?: string;
   updated_at?: string | null;
   experiences?: InquiryExperience | null;
@@ -66,6 +67,7 @@ type InquiryMessageRow = {
   image_url?: string | null;
   type?: string;
   is_read?: boolean;
+  read_at?: string | null;  // 상대방이 읽은 시각 (nullable, M3 신규)
   created_at: string;
 };
 
@@ -216,9 +218,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
     await supabase
       .from('inquiry_messages')
-      .update({ is_read: true })
+      .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('inquiry_id', inquiryId)
-      .neq('sender_id', currentUser.id);
+      .neq('sender_id', currentUser.id)
+      .is('read_at', null);  // 이미 read_at 기록된 메시지는 덮어쓰지 않음
   }, [currentUser, supabase]);
 
   const loadMessages = useCallback(async (inquiryId: number | string) => {

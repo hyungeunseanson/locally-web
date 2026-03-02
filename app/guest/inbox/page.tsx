@@ -336,7 +336,12 @@ function InboxContent() {
                         <div className="flex items-end gap-1.5">
                           {isMe && (
                             <div className="flex flex-col items-end shrink-0">
-                              <span className="text-[9px] md:text-[10px] font-bold text-blue-500">{msg.is_read ? '' : '1'}</span>
+                              {!msg.is_read
+                                ? <span className="text-[9px] md:text-[10px] font-bold text-blue-500">1</span>
+                                : msg.read_at
+                                  ? <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>읽음 {formatTime(msg.read_at)}</span>
+                                  : null
+                              }
                               <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
                             </div>
                           )}
