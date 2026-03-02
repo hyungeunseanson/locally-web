@@ -5,6 +5,23 @@
 
 ---
 
+## v3.22.0 — 결제 웹훅과 이메일 전송의 완전한 분리 (Decoupling)
+
+**작업일:** 2026-03-03
+
+### 개요
+결제망의 타임아웃을 유발하던 무거운 React Email 렌더링 부하를 메인 결제 스레드에서 완전히 분리하는 아키텍처 재설계 진행.
+
+### [Fix-1] 이메일 전용 백그라운드 API 신설
+- 무거운 HTML 렌더링(React Email)과 Nodemailer 발송 로직만을 전문적으로 담당하는 `app/api/notifications/send-email/route.ts` 신설.
+- 이메일 발송 실패 시(Catch), 아무도 모르게 무시(Swallow)하던 버그를 해결하기 위해 `notifications` 테이블에 `type: 'system_error'`로 장애 로그를 강제 기록하도록 구현.
+
+### [Fix-2] 결제 콜백 API에서 이메일 렌더링 로직 철거
+- `app/api/payment/nicepay-callback/route.ts` (예약 확정) 및 `app/api/payment/cancel/route.ts` (예약 취소) 내부에 있던 동기식 이메일 처리 로직을 완벽하게 도려냄.
+- DB 처리가 끝난 즉시 신설된 전용 API(`send-email`)를 비동기 Fetch(fire-and-forget) 방식으로 호출하고, PG망에는 1순위로 `200 OK`를 빠르게 반환하여 Timeout 및 Silent Failure 사태 원천 차단.
+
+---
+
 ## v3.21.0 — 프로필 동기화 아키텍처 개선 및 FK 결함 척결
 
 **작업일:** 2026-03-03

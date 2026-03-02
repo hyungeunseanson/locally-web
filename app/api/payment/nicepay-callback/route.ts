@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
-import * as React from 'react';
-import { render } from '@react-email/render';
-import BookingConfirmationEmail from '@/app/emails/templates/BookingConfirmationEmail';
 
 function verifySignature(signData: string, ediDate: string, amount: string, mid: string, key: string): boolean {
   try {
@@ -169,33 +165,20 @@ export async function POST(request: Request) {
           }
 
           if (hostEmail) {
-            try {
-              const transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-              });
-
-              const emailHtml = await render(
-                React.createElement(BookingConfirmationEmail, {
-                  hostName: hostProfile?.name || '로컬리 호스트',
-                  guestName: guestName,
-                  experienceTitle: expTitle || '체험',
-                  guestsCount: bookingData.guests,
-                  bookingDate: bookingData.date,
-                  bookingTime: bookingData.time,
-                  dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard`
-                })
-              );
-
-              await transporter.sendMail({
-                from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-                to: hostEmail,
-                subject: `[Locally] 🎉 새로운 예약이 도착했습니다!`,
-                html: emailHtml,
-              });
-            } catch (mailError) {
-              console.error('Email sending failed but ignored:', mailError);
-            }
+            // Decoupled Email Sending (Non-blocking background push)
+            fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'booking_confirmation',
+                hostId,
+                guestName,
+                experienceTitle: expTitle,
+                guestsCount: bookingData.guests,
+                bookingDate: bookingData.date,
+                bookingTime: bookingData.time
+              })
+            }).catch(e => console.error('Background fetch to send-email failed:', e));
           }
         }
       }

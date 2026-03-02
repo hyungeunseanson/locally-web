@@ -1,12 +1,8 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 import { toZonedTime } from 'date-fns-tz';
 import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
-import * as React from 'react';
-import { render } from '@react-email/render';
-import BookingCancellationEmail from '@/app/emails/templates/BookingCancellationEmail';
 
 const TAX_RATE = 1.1;
 const COMMISSION_RATE = 0.2;
@@ -184,31 +180,18 @@ export async function POST(request: Request) {
       }
 
       if (hostEmail) {
-        try {
-          const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-          });
-
-          const emailHtml = await render(
-            React.createElement(BookingCancellationEmail, {
-              hostName: hostProfile?.name || '로컬리 호스트',
-              experienceTitle: expTitle || '체험',
-              cancelReason: userReason,
-              refundAmount: refundAmount,
-              dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard`
-            })
-          );
-
-          await transporter.sendMail({
-            from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-            to: hostEmail,
-            subject: `[Locally] 예약 취소 알림`,
-            html: emailHtml,
-          });
-        } catch (mailError) {
-          console.error('Email sending failed but ignored:', mailError);
-        }
+        // Decoupled Email Sending (Non-blocking background push)
+        fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'booking_cancellation',
+            hostId,
+            experienceTitle: expTitle,
+            cancelReason: userReason,
+            refundAmount: refundAmount
+          })
+        }).catch(e => console.error('Background fetch to send-email failed:', e));
       }
     }
 
