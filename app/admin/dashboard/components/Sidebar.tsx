@@ -56,6 +56,7 @@ export default function Sidebar() {
     pendingBookings: 0,
     teamNewCount: 0,
     servicePendingBank: 0,  // 서비스 무통장 입금 대기 건수
+    csUnreadCount: 0,       // CS 미답변 건수
   });
 
   const fetchCounts = async () => {
@@ -86,6 +87,18 @@ export default function Sidebar() {
         supabase.from('admin_task_comments').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed)
       ]);
 
+      // CS 미답변 건수 (2-step: admin_support inquiry ID 수집 → 미읽은 메시지 카운트)
+      let csUnreadCount = 0;
+      const { data: csInquiries } = await supabase
+        .from('inquiries').select('id').or('type.eq.admin_support,type.eq.admin');
+      const csIds = (csInquiries || []).map((i: any) => i.id);
+      if (csIds.length > 0) {
+        const { count: csCount } = await supabase
+          .from('inquiry_messages').select('*', { count: 'exact', head: true })
+          .in('inquiry_id', csIds).eq('is_read', false);
+        csUnreadCount = csCount || 0;
+      }
+
       setCounts(prev => ({
         ...prev,
         apps: appsCount || 0,
@@ -93,6 +106,7 @@ export default function Sidebar() {
         pendingBookings: unviewedCount,
         teamNewCount: (newTasksCount || 0) + (newCommentsCount || 0),
         servicePendingBank: svcBankPendingCount || 0,
+        csUnreadCount,
       }));
     } catch (e) {
       console.error('Sidebar counts fetch error:', e);
@@ -171,7 +185,7 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
           <div className="space-y-0.5 md:space-y-1">
-            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" />
+            <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" count={activeTab !== 'CHATS' ? counts.csUnreadCount : undefined} />
             <NavButton
               active={activeTab === 'TEAM'}
               onClick={() => handleTabChange('TEAM')}

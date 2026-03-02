@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
@@ -44,6 +45,9 @@ type AdminChatState = {
 };
 
 export default function ChatMonitor() {
+  const searchParams = useSearchParams();
+  const targetInquiryId = searchParams.get('inquiryId');
+
   const {
     inquiries,
     selectedInquiry,
@@ -63,6 +67,16 @@ export default function ChatMonitor() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  // URL ?inquiryId=X 파라미터로 특정 1:1 문의 자동 선택 (DetailsPanel에서 CS 개시 후 이동)
+  useEffect(() => {
+    if (!targetInquiryId || !inquiries?.length) return;
+    const target = inquiries.find((inq: MonitorInquiry) => String(inq.id) === String(targetInquiryId));
+    if (target) {
+      setActiveTab('admin');
+      loadMessages(target.id);
+    }
+  }, [targetInquiryId, inquiries?.length]);
 
   const handleSend = () => {
     if (selectedInquiry && replyText.trim()) {

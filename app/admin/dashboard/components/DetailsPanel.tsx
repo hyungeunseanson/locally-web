@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Search, User, Mail, Globe, MessageCircle, Phone, Smile, Clock,
   MapPin, Cake, CheckCircle2, ShoppingBag, StickyNote, Star, Trash2, Link as LinkIcon, Edit,
@@ -12,7 +13,49 @@ import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels }
 
 export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem, updateStatus, deleteItem }: any) {
   const supabase = createClient();
+  const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [csLoading, setCsLoading] = useState(false);
+
+  const handleStartCSChat = async () => {
+    if (!selectedItem?.id) return;
+    setCsLoading(true);
+    try {
+      // 기존 admin_support 문의 확인
+      const { data: existing } = await supabase
+        .from('inquiries')
+        .select('id')
+        .eq('user_id', selectedItem.id)
+        .or('type.eq.admin_support,type.eq.admin')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        router.push(`/admin/dashboard?tab=CHATS&inquiryId=${existing.id}`);
+      } else {
+        // 새 CS 문의 생성
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: newInquiry } = await supabase
+          .from('inquiries')
+          .insert({
+            user_id: selectedItem.id,
+            host_id: user?.id,
+            type: 'admin_support',
+            content: '관리자가 문의를 시작했습니다.',
+          })
+          .select('id')
+          .single();
+        if (newInquiry) {
+          router.push(`/admin/dashboard?tab=CHATS&inquiryId=${newInquiry.id}`);
+        }
+      }
+    } catch (e) {
+      console.error('CS 채팅 시작 오류:', e);
+    } finally {
+      setCsLoading(false);
+    }
+  };
   const applicationLanguageLevels = normalizeLanguageLevels(
     selectedItem?.language_levels,
     selectedItem?.languages,
@@ -156,7 +199,14 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
                 <StatSmall label="마지막 구매" value="3일 전" color="bg-slate-50 text-slate-700" />
               </div>
             </div>
-            <div className="pt-6 mt-6 border-t border-slate-100">
+            <div className="pt-6 mt-6 border-t border-slate-100 space-y-2">
+              <button
+                onClick={handleStartCSChat}
+                disabled={csLoading}
+                className="w-full py-4 rounded-xl font-bold text-green-700 bg-green-50 border border-green-100 hover:bg-green-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <MessageCircle size={16} /> {csLoading ? '처리 중...' : '1:1 CS 메시지 보내기'}
+              </button>
               <button onClick={() => deleteItem('profiles', selectedItem.id)} className="w-full py-4 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"><Trash2 size={16} /> 계정 영구 삭제</button>
             </div>
           </div>

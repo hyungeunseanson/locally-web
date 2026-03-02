@@ -5,6 +5,41 @@
 
 ---
 
+## v3.13.0 — 메시징 시스템 Phase A & B 고도화 (CS 뱃지 + Admin CS 개시)
+
+**작업일:** 2026-03-02
+
+### 개요
+메시징 시스템 현황 진단 후 확인된 운영 긴급 공백(M1, M2) 구현.
+DB 스키마 변경 없이 기존 `inquiries.type` 구분 구조 그대로 활용.
+
+### [M2] Sidebar — CS 미답변 건수 뱃지 추가 (Phase A)
+
+- **기존 문제:** Admin 사이드바 "Message Monitoring" 버튼에 CS 1:1 문의 미답변 건수 미노출.
+- **수정:**
+  - `fetchCounts()`에 2-step 쿼리 추가: admin_support inquiry ID 수집 → `inquiry_messages.is_read=false` 건수 카운트.
+  - `counts.csUnreadCount` 상태값 추가, 탭 비활성 시 "Message Monitoring" NavButton 뱃지 노출.
+- **파일:** `app/admin/dashboard/components/Sidebar.tsx`
+
+### [M1] DetailsPanel — Admin CS 먼저 개시 기능 (Phase B)
+
+- **기존 문제:** Admin이 유저 목록에서 특정 유저에게 먼저 CS 메시지를 보낼 수 없었음.
+- **수정:**
+  - USERS 탭 상세 패널 하단에 "1:1 CS 메시지 보내기" 버튼 추가.
+  - 클릭 시: 기존 admin_support 문의 있으면 해당 채팅으로 이동, 없으면 신규 `inquiries` 레코드 생성 후 이동.
+  - `router.push('/admin/dashboard?tab=CHATS&inquiryId=X')` 패턴으로 ChatMonitor 자동 선택 연동.
+- **파일:** `app/admin/dashboard/components/DetailsPanel.tsx`
+
+### [M1] ChatMonitor — URL inquiryId 파라미터 자동 선택 (Phase B)
+
+- **기존 문제:** ChatMonitor에 특정 문의 자동 선택 진입점 없음.
+- **수정:**
+  - `useSearchParams()`로 `?inquiryId=X` 파라미터 감지.
+  - inquiries 로드 시 매칭 문의를 자동 선택 (`setActiveTab('admin')` + `loadMessages()`).
+- **파일:** `app/admin/dashboard/components/ChatMonitor.tsx`
+
+---
+
 ## v3.12.0 — Admin 대시보드 운영 공백(GAP) 고도화
 
 **작업일:** 2026-03-02
