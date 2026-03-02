@@ -5,6 +5,31 @@
 
 ---
 
+## v3.23.0 — Platform Stability & Email Infrastructure Overhaul Backend Patch
+
+**작업일:** 2026-03-03
+
+### 개요
+플랫폼의 치명적인 결함(Postgres 참조 무결성 500 에러 및 이메일 결합도로 인한 PG사 결제 타임아웃)을 전면 척결하고, 데이터 정합성과 알림 시스템의 독립성을 보장하는 대규모 백엔드 구조조정 완료.
+
+### [Core-1] Postgres DB Auth Trigger를 통한 프로필 동기화 아키텍처 (100% 보장)
+- 클라이언트단(`syncProfile.ts` 등 6곳)에 의존하던 수동 프로필 동기화 런타임을 폭파하고, DB 레벨의 Postgres Trigger(`on_auth_user_created`)로 마이그레이션.
+- 예약 및 1:1 문의 등 필수 파이프라인에서 발생하던 `profiles` FK Constraint Violation(`500 Error`) 영구 해결.
+
+### [Core-2] 결제 웹훅과 이메일 시스템의 완벽 분리 (Decoupling)
+- 메인 결제 라우트(`nicepay-callback`, `cancel`) 내부에 공생하며 타임아웃을 유발하던 무거운 React Email 렌더링 + Nodemailer 발송 로직 전단 도려냄.
+- 이메일 전용 백그라운드 API `/api/notifications/send-email`을 신설하고, PG망에는 `200 OK`를 우선 반환한 후 비동기 Fetch(fire-and-forget) 방식으로 알림을 넘기는 독립 아키텍처 구현.
+
+### [Core-3] React Email 렌더링 크래시 방어 및 안정성 패치
+- 결제 콜백 웹훅으로부터 누락되었던 필수 `totalAmount` 페이로드를 조인하여 전송.
+- `BookingConfirmationEmail`/`BookingCancellationEmail` 내부에서 조인되지 않은 `null`, `undefined`, 빈 문자열 등이 주입되어도 Vercel 엔진이 뻗지 않도록 모든 Props에 옵셔널 체이닝(`?.`) 및 런타임 Fallback(`|| 0`) 방어벽 100% 구축.
+
+### [Core-4] 백그라운드 에러 로깅 복구 및 무결성 확보 (Silent Error 추적)
+- `send-email` 내부의 렌더 에러 예외 처리 블록(`catch`)에서 `request.clone().json()`을 이중으로 호출하다가 "stream already read"로 죽어버려 에러를 은폐하던 치명적 버그 디버깅 완료.
+- 렌더에 실패하더라도 메인 결제 모델엔 지장 없이, `notifications` 테이블에 대상자의 `hostId`와 함께 `type: 'system_error'` 로그를 즉각 박아넣는 무결성 달성.
+
+---
+
 ## v3.22.1 — React Email 렌더링 및 백그라운드 로깅 핫픽스 (Hotfix)
 
 **작업일:** 2026-03-03
