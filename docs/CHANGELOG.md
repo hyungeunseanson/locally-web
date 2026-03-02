@@ -5,6 +5,24 @@
 
 ---
 
+## v3.21.0 — 프로필 동기화 아키텍처 개선 및 FK 결함 척결
+
+**작업일:** 2026-03-03
+
+### 개요
+예약 및 1:1 문의 등 주요 파이프라인에서 발생하던 `profiles` 테이블 참조 무결성(FK Constraint) 500 에러를 영구적으로 해결하기 위한 DB 레벨 아키텍처 개선.
+
+### [Arch-1] Postgres DB Trigger 기반 자동 프로필 생성 (Backfill 포함)
+- 클라이언트의 네트워크 상태나 비정상 종료에 의존하던 불안정한 수동 생성(Upsert) 방식을 폐기.
+- Supabase Auth 회원가입(`auth.users` Insert) 시 즉각적으로 연동되는 Postgres Trigger `on_auth_user_created` 구현.
+- 기존 DB 내 누락된 '유령 유저'들을 복구하는 Backfill 마이그레이션 스크립트 작성 반영 (`supabase_profile_sync_migration.sql`).
+
+### [Arch-2] 프론트엔드 불안정 코드 척결 및 Graceful Error Handling
+- 클라이언트 레벨에서 프로필 시드를 강제로 쑤셔넣던 위험 코드 전역 삭제 (`syncProfile.ts`, `auth/callback/route.ts`, `LoginModal.tsx`, `account/page.tsx`, `MobileProfileView.tsx`, `ProfileEditor.tsx`).
+- 핵심 API 라우트 (`api/bookings`, `useChat.ts` 등)에서 DB 지연에 따른 500 에러 발생 시, 유저 친화적인 400 Bad Request 에러 메시지로 반환하도록 런타임 안정성 보강.
+
+---
+
 ## v3.20.0 — 이메일 UX 글로벌 프리미엄 모던 리뉴얼 적용
 
 **작업일:** 2026-03-03

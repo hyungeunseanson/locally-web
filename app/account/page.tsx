@@ -300,8 +300,8 @@ export default function AccountPage() {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (loadError) {
-      console.error('Profile load error:', loadError);
+    if (loadError || !existingProfile) {
+      console.error('Profile load error or missing:', loadError);
       showToast(t('profile_save_fail'), 'error');
       setSaving(false);
       return;
@@ -309,47 +309,17 @@ export default function AccountPage() {
 
     let error: { message: string } | null = null;
 
-    if (!existingProfile) {
-      const seedRes = await supabase.from('profiles').upsert({
-        id: user.id,
-        updated_at: updates.updated_at,
-      });
-      if (seedRes.error) {
-        error = seedRes.error;
-      } else {
-        const { data: seededProfile, error: seedLoadError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
+    // Postgres DB Trigger가 이미 seed를 생성했으므로 바로 update만 수행합니다.
+    const allowedColumns = new Set(Object.keys(existingProfile));
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+    );
 
-        if (seedLoadError || !seededProfile) {
-          error = { message: seedLoadError?.message || '프로필 시드 생성 후 조회에 실패했습니다.' };
-        } else {
-          const allowedColumns = new Set(Object.keys(seededProfile));
-          const filteredUpdates = Object.fromEntries(
-            Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-          );
-
-          const updateRes = await supabase
-            .from('profiles')
-            .update(filteredUpdates)
-            .eq('id', user.id);
-          error = updateRes.error;
-        }
-      }
-    } else {
-      const allowedColumns = new Set(Object.keys(existingProfile));
-      const filteredUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-      );
-
-      const updateRes = await supabase
-        .from('profiles')
-        .update(filteredUpdates)
-        .eq('id', user.id);
-      error = updateRes.error;
-    }
+    const updateRes = await supabase
+      .from('profiles')
+      .update(filteredUpdates)
+      .eq('id', user.id);
+    error = updateRes.error;
 
     if (error) {
       console.error('Save error:', error);

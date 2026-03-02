@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/app/utils/supabase/server'; // 🟢 만들어둔 유틸리티 사용
-import { syncProfileWithSupabaseClient } from '@/app/utils/auth/syncProfile';
-
+import { createClient } from '@/app/utils/supabase/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
@@ -11,20 +9,15 @@ export async function GET(request: Request) {
   if (code) {
     // 🟢 [수정됨] 복잡한 설정 코드 삭제 -> 유틸리티 함수 한 줄로 대체
     const supabase = await createClient();
-    
+
     // 인증 코드 교환 (세션 생성)
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    
-    if (!error) {
-      const syncResult = await syncProfileWithSupabaseClient(supabase);
-      if (!syncResult.success) {
-        console.error('[AUTH] OAuth profile sync failed:', syncResult.error);
-      }
 
+    if (!error) {
       // 성공 시 원래 가려던 페이지로 이동
       const forwardedHost = request.headers.get('x-forwarded-host'); // 로드 밸런서 고려
       const isLocalEnv = process.env.NODE_ENV === 'development';
-      
+
       if (isLocalEnv) {
         return NextResponse.redirect(`${origin}${next}`);
       } else if (forwardedHost) {

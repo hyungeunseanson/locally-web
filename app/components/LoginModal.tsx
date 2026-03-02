@@ -5,9 +5,7 @@ import { X, ChevronDown } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
-import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 번역 훅
-import { syncProfile } from '@/app/actions/auth'; // 🟢 서버 액션 도입
-
+import { useLanguage } from '@/app/context/LanguageContext';
 type Gender = 'Male' | 'Female' | '';
 
 interface InputItemProps {
@@ -55,17 +53,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const supabase = createClient();
   const { showToast } = useToast();
 
-  const ensureProfileExists = async (accessToken?: string) => {
-    // [M-1] Security & Reliability Patch:
-    // 클라이언트에서 불안정하게 DB Insert 하던 로직을 지우고, 
-    // 백엔드 환경에서 100% 보장되는 Server Action 호출로 대체
-    const res = await syncProfile(accessToken);
-    if (!res.success) {
-      console.error('Failed to sync profile:', res.error);
-      // Even if it fails, maybe auth worked, but log it at least.
-    }
-  };
-
   const getCurrentAccessToken = async () => {
     const {
       data: { session },
@@ -109,7 +96,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
         if (data.user && data.session) {
           showToast('회원가입이 완료되었습니다!', 'success');
-          await ensureProfileExists(data.session.access_token);
           if (onLoginSuccess) {
             onLoginSuccess();
           } else {
@@ -133,8 +119,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           }
           throw error;
         }
-
-        await ensureProfileExists(data.session?.access_token || await getCurrentAccessToken());
 
         showToast('환영합니다! 로그인 되었습니다.', 'success');
         if (onLoginSuccess) {

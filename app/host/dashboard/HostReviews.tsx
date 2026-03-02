@@ -125,8 +125,8 @@ export default function HostReviews() {
         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
           <Star size={32} className="text-slate-300" fill="#cbd5e1" />
         </div>
-        <h3 className="text-lg font-bold text-slate-900">{t('hp_review_empty')}</h3>
-        <p className="text-slate-500 mt-2 text-sm">첫 게스트를 맞이하고 멋진 후기를 받아보세요!</p>
+        <h3 className="text-lg font-bold text-slate-900">{t('hr_empty_title')}</h3>
+        <p className="text-slate-500 mt-2 text-sm">{t('hr_empty_desc')}</p>
       </div>
     );
   }
@@ -137,11 +137,11 @@ export default function HostReviews() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
         <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">평균 평점</div>
+            <div className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">{t('hr_avg_rating')}</div>
             <div className="text-2xl md:text-4xl font-black text-slate-900 flex items-center gap-2">
               {averageRating} <Star size={20} className="text-amber-400 md:w-6 md:h-6" fill="#fbbf24" />
             </div>
-            <div className="text-xs text-slate-400 mt-2 font-medium">전체 후기 {totalReviews}개</div>
+            <div className="text-xs text-slate-400 mt-2 font-medium">{t('hr_total_count').replace('{count}', totalReviews.toString())}</div>
           </div>
           <div className="w-32 space-y-1">
             {ratingCounts.map((rc) => (
@@ -157,18 +157,18 @@ export default function HostReviews() {
 
         <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between cursor-pointer hover:border-rose-200 transition-colors" onClick={() => setFilter('unreplied')}>
           <div className="flex justify-between items-start">
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">{t('hp_review_needs_reply')}</div>
+            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">{t('hr_unreplied_title')}</div>
             <div className="bg-rose-100 text-rose-600 p-2 rounded-full"><MessageCircle size={20} /></div>
           </div>
           <div>
-            <div className="text-xl md:text-3xl font-black text-slate-900">{unrepliedCount}건</div>
-            <div className="text-xs text-slate-400 mt-1 font-medium">답글을 기다리고 있어요!</div>
+            <div className="text-xl md:text-3xl font-black text-slate-900">{unrepliedCount}</div>
+            <div className="text-xs text-slate-400 mt-1 font-medium">{t('hr_unreplied_desc')}</div>
           </div>
         </div>
 
         <div className="bg-slate-900 p-4 md:p-6 rounded-2xl md:rounded-3xl text-white shadow-lg flex flex-col justify-center relative overflow-hidden">
           <div className="relative z-10">
-            <h4 className="font-bold text-base md:text-lg mb-1.5 md:mb-2">답글의 힘! 💪</h4>
+            <h4 className="font-bold text-base md:text-lg mb-1.5 md:mb-2">{t('hr_reply_power_title')}</h4>
             <p className="text-xs text-slate-300 leading-relaxed">
               후기에 정성스러운 답글을 남기면<br />
               예약률이 평균 <span className="text-amber-400 font-bold">20% 이상 상승</span>합니다.
@@ -184,20 +184,20 @@ export default function HostReviews() {
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${filter === 'all' ? 'bg-white shadow text-black' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            <Filter size={14} /> 전체 보기
+            <Filter size={14} /> {t('hr_filter_all')}
           </button>
           <button
             onClick={() => setFilter('unreplied')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${filter === 'unreplied' ? 'bg-white shadow text-rose-500' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            <MessageCircle size={14} /> 미답변만 ({unrepliedCount})
+            <MessageCircle size={14} /> {t('hr_filter_unreplied')} ({unrepliedCount})
           </button>
         </div>
 
         <div className="divide-y divide-slate-100">
           {filteredReviews.length === 0 ? (
             <div className="py-20 text-center text-slate-400 text-sm">
-              {filter === 'unreplied' ? '모든 후기에 답글을 남기셨습니다! 🎉' : '후기가 없습니다.'}
+              {filter === 'unreplied' ? t('hr_all_replied') : t('hr_no_reviews')}
             </div>
           ) : (
             filteredReviews.map((review) => (
@@ -218,7 +218,7 @@ export default function HostReviews() {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <h4 className="font-bold text-slate-900 text-sm">{review.guest?.full_name || '익명 게스트'}</h4>
+                        <h4 className="font-bold text-slate-900 text-sm">{review.guest?.full_name || t('hr_anonymous_guest')}</h4>
                         <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
                           <span>{new Date(review.created_at).toLocaleDateString()}</span>
                           <span className="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
@@ -249,7 +249,7 @@ export default function HostReviews() {
                         <Reply size={16} className="text-slate-400 shrink-0 mt-1 rotate-180" />
                         <div className="flex-1">
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold text-slate-900">호스트님의 답글</span>
+                            <span className="text-xs font-bold text-slate-900">{t('hr_host_reply')}</span>
                             <span className="text-[10px] text-slate-400">{new Date(review.reply_at || Date.now()).toLocaleDateString()}</span>
                           </div>
                           <p className="text-xs text-slate-600 leading-relaxed">{review.reply}</p>
@@ -258,7 +258,7 @@ export default function HostReviews() {
                         <button
                           onClick={() => { setReplyingId(review.id); setReplyText(review.reply); }}
                           className="absolute top-2 right-2 p-1.5 bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-black"
-                          title="답글 수정"
+                          title={t('hr_reply_edit')}
                         >
                           <Edit2 size={12} />
                         </button>
@@ -271,7 +271,7 @@ export default function HostReviews() {
                               value={replyText}
                               onChange={(e) => setReplyText(e.target.value)}
                               className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:border-black focus:ring-0 transition-all min-h-[100px]"
-                              placeholder="게스트에게 감사의 인사를 전해보세요."
+                              placeholder={t('hr_reply_placeholder')}
                               autoFocus
                             />
                             <div className="flex justify-end gap-2 mt-2">
@@ -279,14 +279,14 @@ export default function HostReviews() {
                                 onClick={() => { setReplyingId(null); setReplyText(''); }}
                                 className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                               >
-                                취소
+                                {t('hr_reply_cancel')}
                               </button>
                               <button
                                 onClick={() => handleSubmitReply(review.id)}
                                 disabled={isSubmitting}
                                 className="px-4 py-2 text-xs font-bold bg-black text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
                               >
-                                {isSubmitting ? '등록 중...' : '답글 등록'}
+                                {isSubmitting ? t('hr_reply_submitting') : t('hr_reply_submit')}
                               </button>
                             </div>
                           </div>

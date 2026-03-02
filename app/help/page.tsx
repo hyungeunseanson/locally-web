@@ -196,7 +196,13 @@ export default function HelpCenterPage() {
       }
     } catch (e: unknown) {
       console.error("문의 접수 실패:", e);
-      const message = e instanceof Error ? e.message : '알 수 없는 오류';
+      const dbError = e as { code?: string, message?: string };
+      let message = e instanceof Error ? e.message : '알 수 없는 오류';
+
+      if (dbError.code === '23503' && dbError.message?.includes('profiles')) {
+        message = '계정 동기화에 지연이 발생했습니다. 5초 뒤 다시 시도해 주시기 바랍니다.';
+      }
+
       showToast("문의 접수 실패: " + message, 'error');
     }
   };

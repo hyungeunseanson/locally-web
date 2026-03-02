@@ -157,7 +157,7 @@ export default function MobileProfileView({
             .eq('id', userId)
             .maybeSingle();
 
-        if (loadError) {
+        if (loadError || !existingProfile) {
             showToast('저장 실패: 프로필을 불러오지 못했습니다.', 'error');
             setSaving(false);
             return;
@@ -165,48 +165,17 @@ export default function MobileProfileView({
 
         let error: { message: string } | null = null;
 
-        if (!existingProfile) {
-            const seedRes = await supabase.from('profiles').upsert({
-                id: userId,
-                updated_at: updates.updated_at,
-            });
+        // Postgres DB Trigger가 이미 seed를 생성했으므로 update만 수행합니다.
+        const allowedColumns = new Set(Object.keys(existingProfile));
+        const filteredUpdates = Object.fromEntries(
+            Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+        );
 
-            if (seedRes.error) {
-                error = seedRes.error;
-            } else {
-                const { data: seededProfile, error: seedLoadError } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', userId)
-                    .maybeSingle();
-
-                if (seedLoadError || !seededProfile) {
-                    error = { message: seedLoadError?.message || '프로필 시드 생성 후 조회에 실패했습니다.' };
-                } else {
-                    const allowedColumns = new Set(Object.keys(seededProfile));
-                    const filteredUpdates = Object.fromEntries(
-                        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-                    );
-
-                    const updateRes = await supabase
-                        .from('profiles')
-                        .update(filteredUpdates)
-                        .eq('id', userId);
-                    error = updateRes.error;
-                }
-            }
-        } else {
-            const allowedColumns = new Set(Object.keys(existingProfile));
-            const filteredUpdates = Object.fromEntries(
-                Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-            );
-
-            const updateRes = await supabase
-                .from('profiles')
-                .update(filteredUpdates)
-                .eq('id', userId);
-            error = updateRes.error;
-        }
+        const updateRes = await supabase
+            .from('profiles')
+            .update(filteredUpdates)
+            .eq('id', userId);
+        error = updateRes.error;
 
         if (error) {
             showToast('저장 실패: ' + error.message, 'error');

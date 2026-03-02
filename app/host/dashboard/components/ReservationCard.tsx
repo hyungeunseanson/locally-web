@@ -83,12 +83,11 @@ export default function ReservationCard({
     if (isCancelledOnlyBookingStatus(status))
       return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-bold">{t('res_status_cancelled')}</span>;
 
-    // 🟢 [수정] 입금 대기(PENDING) 상태 별도 처리 (반짝임 효과)
     if (isPendingBookingStatus(status)) {
       return (
         <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1 animate-pulse">
           <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></div>
-          입금 확인 중
+          {t('res_status_pending')}
         </span>
       );
     }
@@ -296,7 +295,7 @@ export default function ReservationCard({
                 }`}
             >
               <CheckCircle2 size={16} className={hasReview ? "text-slate-400" : "text-blue-500"} />
-              {hasReview ? '후기 작성됨' : '게스트 후기'}
+              {hasReview ? t('res_review_done') : t('res_review_write')}
             </button>
           )}
         </div>

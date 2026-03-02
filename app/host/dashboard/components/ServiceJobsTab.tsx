@@ -166,7 +166,7 @@ export default function ServiceJobsTab() {
                           </span>
                           {req && (
                             <span className="font-black text-[13px] md:text-[14px] text-emerald-600">
-                              ₩{(20000 * req.duration_hours).toLocaleString()} {t('expected')}
+                              ₩{(20000 * req.duration_hours).toLocaleString()} {t('hd_match_expected')}
                             </span>
                           )}
                         </div>

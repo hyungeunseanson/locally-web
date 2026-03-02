@@ -99,7 +99,7 @@ export default function InquiryChat() {
       `}>
         {/* 데스크탑 헤더 */}
         <div className="hidden md:flex items-center px-5 py-4 border-b border-slate-100 bg-white shrink-0">
-          <span className="font-bold text-[16px] text-slate-800">{t('hp_inbox_title')}</span>
+          <span className="font-bold text-[16px] text-slate-800">{t('hd_inbox_title')}</span>
         </div>
 
         {/* 목록 스크롤 */}
@@ -292,7 +292,7 @@ export default function InquiryChat() {
 
               <input
                 className="flex-1 h-10 md:h-11 border border-gray-200 rounded-full px-4 md:px-5 text-[13px] md:text-[14px] focus:outline-none focus:border-gray-400 transition-colors bg-gray-50 disabled:cursor-not-allowed"
-                placeholder="답장 입력..."
+                placeholder={t('hp_inbox_reply_ph')}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 disabled={isSending}
@@ -313,7 +313,7 @@ export default function InquiryChat() {
         ) : (
           <div className="flex-1 hidden md:flex items-center justify-center text-slate-400 flex-col gap-2">
             <div className="p-4 bg-slate-50 rounded-full"><User size={28} className="text-slate-300" /></div>
-            <p className="text-sm md:text-base">{t('hp_select_chat')}</p>
+            <p className="text-sm md:text-base">{t('hd_inbox_select')}</p>
           </div>
         )}
       </div>

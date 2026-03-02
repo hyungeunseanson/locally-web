@@ -165,8 +165,8 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         .eq('id', user.id)
         .maybeSingle();
 
-      if (loadError) {
-        showToast('저장 중 오류가 발생했습니다.', 'error');
+      if (loadError || !existingProfile) {
+        showToast('저장 중 오류가 발생했습니다: 프로필을 찾을 수 없습니다.', 'error');
         console.error(loadError);
         setLoading(false);
         return;
@@ -174,47 +174,17 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
 
       let error: { message: string } | null = null;
 
-      if (!existingProfile) {
-        const seedRes = await supabase.from('profiles').upsert({
-          id: user.id,
-          updated_at: updates.updated_at,
-        });
-        if (seedRes.error) {
-          error = seedRes.error;
-        } else {
-          const { data: seededProfile, error: seedLoadError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle();
+      // Postgres DB Trigger가 이미 seed를 생성했으므로 update만 수행합니다.
+      const allowedColumns = new Set(Object.keys(existingProfile));
+      const filteredUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+      );
 
-          if (seedLoadError || !seededProfile) {
-            error = { message: seedLoadError?.message || '프로필 시드 생성 후 조회에 실패했습니다.' };
-          } else {
-            const allowedColumns = new Set(Object.keys(seededProfile));
-            const filteredUpdates = Object.fromEntries(
-              Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-            );
-
-            const updateRes = await supabase
-              .from('profiles')
-              .update(filteredUpdates)
-              .eq('id', user.id);
-            error = updateRes.error;
-          }
-        }
-      } else {
-        const allowedColumns = new Set(Object.keys(existingProfile));
-        const filteredUpdates = Object.fromEntries(
-          Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
-        );
-
-        const updateRes = await supabase
-          .from('profiles')
-          .update(filteredUpdates)
-          .eq('id', user.id);
-        error = updateRes.error;
-      }
+      const updateRes = await supabase
+        .from('profiles')
+        .update(filteredUpdates)
+        .eq('id', user.id);
+      error = updateRes.error;
 
       if (!error) {
         showToast('정보가 성공적으로 저장되었습니다!', 'success');
@@ -304,13 +274,13 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <InputGroup label={t('hp_name')} name="name" value={formData.name} onChange={handleChange} icon={<User size={16} />} />
-              <InputGroup label={t('hp_job')} name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16} />} placeholder={t('hp_ph_job')} />
-              <InputGroup label={t('hp_dream_dest')} name="dream_destination" value={formData.dream_destination} onChange={handleChange} icon={<Globe size={16} />} placeholder={t('hp_ph_dream')} />
-              <InputGroup label={t('hp_song')} name="favorite_song" value={formData.favorite_song} onChange={handleChange} icon={<Music size={16} />} placeholder={t('hp_ph_song')} />
+              <InputGroup label={t('hp_name_label')} name="name" value={formData.name} onChange={handleChange} icon={<User size={16} />} />
+              <InputGroup label={t('hp_job_label')} name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16} />} placeholder={t('hp_job_ph')} />
+              <InputGroup label={t('hp_dream_label')} name="dream_destination" value={formData.dream_destination} onChange={handleChange} icon={<Globe size={16} />} placeholder={t('hp_dream_ph')} />
+              <InputGroup label={t('hp_song_label')} name="favorite_song" value={formData.favorite_song} onChange={handleChange} icon={<Music size={16} />} placeholder={t('hp_song_ph')} />
               <div className="md:col-span-2">
                 <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">
-                  <MessageCircle size={16} /> {t('hp_languages')}
+                  <MessageCircle size={16} /> {t('hp_lang_label')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {PROFILE_LANGUAGE_OPTIONS.map((language) => {
@@ -322,8 +292,8 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
                         type="button"
                         onClick={() => handleLanguageToggle(language)}
                         className={`rounded-full border px-3 py-1.5 text-[11px] md:text-xs font-bold transition-colors ${isSelected
-                            ? 'border-slate-900 bg-slate-900 text-white'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
                           }`}
                       >
                         {language}
@@ -338,8 +308,8 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
             </div>
 
             <div>
-              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase">{t('hp_intro')}</label>
-              <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-[13px] md:text-sm" placeholder={t('hp_ph_intro')} />
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase">{t('hp_intro_label')}</label>
+              <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-[13px] md:text-sm" placeholder={t('hp_intro_ph')} />
               <p className="mt-2 text-[11px] md:text-xs text-slate-400">
                 {t('hp_intro_desc')}
               </p>
@@ -353,10 +323,10 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
             <div className="bg-yellow-50 border border-yellow-100 p-4 md:p-5 rounded-xl flex gap-2.5 md:gap-3 text-yellow-800 text-xs md:text-sm leading-relaxed">
               <AlertTriangle className="flex-shrink-0 mt-0.5" size={16} />
               <div>
-                <p className="font-bold mb-1">{t('hp_private_alert_title')}</p>
+                <p className="font-bold mb-1">{t('hp_private_warn_title')}</p>
                 <p className="opacity-90">
-                  {t('hp_private_alert_desc1')}<br />
-                  {t('hp_private_alert_desc2')}
+                  {t('hp_private_warn_desc1')}<br />
+                  {t('hp_private_warn_desc2')}
                 </p>
               </div>
             </div>
@@ -365,11 +335,11 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
               <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><User size={16} className="md:w-[18px] md:h-[18px]" /> {t('hp_private_info')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                 {/* ✅ [수정] 모든 필드 disabled 처리 */}
-                <InputGroup label={t('hp_phone')} name="phone" value={formData.phone} disabled={true} placeholder={t('hp_no_content')} />
-                <InputGroup label={t('hp_dob')} name="dob" value={formData.dob} disabled={true} placeholder={t('hp_no_content')} />
+                <InputGroup label={t('hp_phone_label')} name="phone" value={formData.phone} disabled={true} placeholder={t('hp_no_content')} />
+                <InputGroup label={t('hp_dob_label')} name="dob" value={formData.dob} disabled={true} placeholder={t('hp_no_content')} />
                 <div className="col-span-2">
                   {/* ✅ [수정] 국적 필드 InputGroup으로 원복 */}
-                  <InputGroup label={t('hp_nationality')} name="host_nationality" value={formData.host_nationality} disabled={true} placeholder={t('hp_no_content')} />
+                  <InputGroup label={t('hp_nationality_label')} name="host_nationality" value={formData.host_nationality} disabled={true} placeholder={t('hp_no_content')} />
                 </div>
               </div>
             </div>
@@ -378,8 +348,8 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
               <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><CreditCard size={16} className="md:w-[18px] md:h-[18px]" /> {t('hp_bank_info')}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 <InputGroup label={t('hp_bank_name')} name="bank_name" value={formData.bank_name} disabled={true} placeholder={t('hp_no_content')} />
-                <InputGroup label={t('hp_account_num')} name="account_number" value={formData.account_number} disabled={true} placeholder={t('hp_no_content')} />
-                <InputGroup label={t('hp_account_holder')} name="account_holder" value={formData.account_holder} disabled={true} placeholder={t('hp_no_content')} />
+                <InputGroup label={t('hp_bank_acc')} name="account_number" value={formData.account_number} disabled={true} placeholder={t('hp_no_content')} />
+                <InputGroup label={t('hp_bank_holder')} name="account_holder" value={formData.account_holder} disabled={true} placeholder={t('hp_no_content')} />
               </div>
             </div>
 

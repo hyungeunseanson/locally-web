@@ -73,6 +73,9 @@ export async function POST(request: Request) {
             if (errorMessage.includes('BOOKING_BAD_REQUEST')) {
                 return NextResponse.json({ success: false, error: '필수 입력값이 올바르지 않습니다.' }, { status: 400 });
             }
+            if (errorMessage.includes('profiles') && bookingError?.code === '23503') {
+                return NextResponse.json({ success: false, error: '계정 동기화가 진행 중입니다. 약 5초 후 결제를 다시 시도해주세요.' }, { status: 400 });
+            }
             throw new Error(errorMessage);
         }
 

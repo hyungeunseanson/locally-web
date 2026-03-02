@@ -166,8 +166,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         });
 
         const safeData: InquiryListItem[] = inquiryRows.map((item) => {
-          const hostApp = appsMap.get(item.host_id);
-          const hostProfile = profilesMap.get(item.host_id);
+          const hostApp = appsMap.get(item.host_id || '');
+          const hostProfile = profilesMap.get(item.host_id || '');
           const hostName = hostApp?.name || hostProfile?.full_name || '호스트';
           const hostAvatar = hostApp?.profile_photo || hostProfile?.avatar_url;
 
@@ -370,7 +370,13 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
 
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
+      const dbError = err as { code?: string, message?: string };
+      let message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
+
+      if (dbError.code === '23503' && dbError.message?.includes('profiles')) {
+        message = '프로필 동기화가 진행 중입니다. 잠시 후(5초 뒤) 메시지를 다시 보내주세요.';
+      }
+
       showToast('메시지 전송 실패: ' + message, 'error');
     }
   };
@@ -391,7 +397,12 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       .select()
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '23503' && error.message.includes('profiles')) {
+        throw new Error('프로필 동기화가 지연되고 있습니다. 잠시 후 5초 뒤에 다시 시도해주세요.');
+      }
+      throw error;
+    }
     if (!data) throw new Error('문의방 생성에 실패했습니다.');
 
     await sendMessage(data.id as number | string, content, undefined, authUser.id);
