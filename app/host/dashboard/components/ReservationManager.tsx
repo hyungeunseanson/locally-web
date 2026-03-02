@@ -385,25 +385,25 @@ guest:profiles!bookings_user_id_fkey (
           />
         ) : (
           <div className="space-y-4">
-            <ReservationCard
-              key={res.id}
-              res={res}
-              // ✅ [복구] isNew, onCheck 로직 전달
-              isNew={isNew(res.created_at, res.id)}
-              isProcessing={processingId === res.id}
-              onApproveCancel={() => handleApproveCancel(res)}
-              onShowProfile={() => setSelectedGuest(res.guest || null)}
-              onCheck={() => markAsRead(res.id)}
-              onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
-              onCalendar={() => addToGoogleCalendar(res)}
-              // 🟢 [추가] 후기 관련 Props
-              hasReview={reviewedBookingIds.includes(res.id)}
-              onReview={() => {
-                setSelectedBookingForReview(res);
-                setReviewModalOpen(true);
-              }}
+            {filteredList.map(res => (
+              <ReservationCard
+                key={res.id}
+                res={res as any}
+                isNew={isNew(res.created_at, res.id)}
+                isProcessing={processingId === res.id}
+                onApproveCancel={() => handleApproveCancel(res)}
+                onShowProfile={() => setSelectedGuest(res.guest || null)}
+                onCheck={() => markAsRead(res.id)}
+                onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
+                onCalendar={() => addToGoogleCalendar(res)}
+                // 🟢 [추가] 후기 관련 Props
+                hasReview={reviewedBookingIds.includes(res.id)}
+                onReview={() => {
+                  setSelectedBookingForReview(res);
+                  setReviewModalOpen(true);
+                }}
 
-            />
+              />
             ))}
           </div>
         )}
