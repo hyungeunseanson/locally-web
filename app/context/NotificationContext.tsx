@@ -62,65 +62,27 @@ useEffect(() => {
     // 🟢 이미 구독 중이면 해제 후 다시 구독 (중복 방지)
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
-    // 2. 통합 리얼타임 구독
+    // 2. 리얼타임 구독 — notifications 테이블 INSERT만 감지
+    // (채팅 알림은 useChat.sendMessage()가 sendNotification()을 호출해 DB에 저장 후
+    //  여기 Channel A가 감지하므로, inquiry_messages를 별도 구독할 필요 없음)
     channelRef.current = supabase
       .channel('global-alerts')
-      // (A) 시스템 알림 (DB에 insert 되는 순간 감지)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' }, 
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
         (payload) => {
           const newNoti = payload.new as NotificationDB;
-          if (newNoti.user_id !== user.id) return; 
+          if (newNoti.user_id !== user.id) return;
 
           setNotifications((prev) => [newNoti, ...prev]);
-          
+
           setToast({
             title: newNoti.title,
             message: newNoti.message,
             link: newNoti.link,
-            type: 'notification'
+            type: newNoti.type.includes('message') ? 'message' : 'notification'
           });
           setTimeout(() => setToast(null), 5000);
-        }
-      )
-      // (B) 채팅 메시지
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
-        async (payload) => {
-          const newMsg = payload.new;
-          if (newMsg.sender_id === user.id) return; 
-
-          const { data: inquiry } = await supabase
-            .from('inquiries')
-            .select('user_id, host_id')
-            .eq('id', newMsg.inquiry_id)
-            .maybeSingle();
-
-          if (inquiry && (inquiry.user_id === user.id || inquiry.host_id === user.id)) {
-              const link = inquiry.host_id === user.id ? '/host/dashboard?tab=chat' : '/guest/inbox';
-              
-              setToast({
-                title: '새로운 메시지 💬',
-                message: newMsg.content || '사진을 보냈습니다.',
-                link: link,
-                type: 'message'
-              });
-              setTimeout(() => setToast(null), 5000);
-
-              const virtualNoti: NotificationUI = {
-                id: Date.now(),
-                user_id: user.id,
-                type: 'message',
-                title: '새로운 메시지',
-                message: newMsg.content || '사진을 보냈습니다.',
-                link: link,
-                is_read: false,
-                created_at: new Date().toISOString()
-              };
-              setNotifications((prev) => [virtualNoti, ...prev]);
-          }
         }
       )
       .subscribe();
@@ -138,9 +100,7 @@ useEffect(() => {
 
   const markAsRead = async (id: number) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    if (id < 1000000000000) { 
-        await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    }
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
   };
 
   const markAllAsRead = async () => {

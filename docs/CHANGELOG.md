@@ -5,6 +5,48 @@
 
 ---
 
+## v3.11.0 — 알림 시스템 Phase 1 긴급 수정
+
+**작업일:** 2026-03-02
+
+### 개요
+알림 시스템 현황 진단(3가지 치명적 리스크)에 따른 즉시 수정 릴리스.
+인앱 알림 + 이메일 2채널 구조를 완벽하게 보장하도록 방어 로직 추가.
+
+### [P1 - CRITICAL] 이메일 SMTP 실패 시 인앱 알림 유실 방지
+
+- **기존 문제:** `POST /api/notifications/email`에서 Gmail SMTP `sendMail()`이 예외를 던지면 외부 try/catch가 HTTP 500을 반환. DB insert는 이미 성공했음에도 불구하고 클라이언트에 에러가 반환되어 혼란 유발 가능.
+- **수정:** 단건 `sendMail()` 호출을 독립적인 try/catch 블록으로 격리. 이메일 실패는 `console.warn`으로 로깅만 하고 `{ success: true }` 정상 응답 반환. DB 인앱 알림은 이미 저장됐으므로 사용자 알림은 무조건 보장됨.
+- **파일:** `app/api/notifications/email/route.ts`
+
+### [P2 - BUG] 알림 타입 누락으로 인한 TypeScript 타입 불일치 수정
+
+- **기존 문제:** `NotificationType` 유니온에 실제 사용되는 타입 2종 미포함:
+  - `'cancellation'` — `app/api/payment/cancel/route.ts`에서 직접 DB INSERT 시 사용
+  - `'message'` — `NotificationContext` 내부 가상 알림 생성 시 사용
+- **수정:**
+  - `app/utils/notification.ts`: `'cancellation'`, `'message'` 두 타입을 유니온에 명시적 추가
+  - `app/notifications/page.tsx`: `getIcon()` 함수 개선 — `service_*` 타입에 초록색 Calendar 아이콘 명시 매핑 추가. `cancellation`/`message`가 기존 `includes` 로직으로 이미 올바른 아이콘으로 분기됨을 확인.
+
+### [P3 - CRITICAL] 채팅 알림 새로고침 시 증발 현상 수정
+
+- **기존 문제:** `NotificationContext`가 `inquiry_messages` 테이블 INSERT를 감지해 **메모리에만 존재하는 가상 알림**(id: Date.now())을 생성. 앱 재진입 시 사라지고 알림 페이지 이력에도 남지 않음. 또한 `useChat.sendMessage()`가 `sendNotification()`을 통해 이미 DB에 알림을 저장하므로 토스트가 **2번** 발생하는 중복 문제도 동반.
+- **수정:**
+  - `app/context/NotificationContext.tsx`: `inquiry_messages` INSERT 구독(Channel B) 완전 제거.
+  - `notifications` 테이블 INSERT 구독(Channel A)만 유지. `useChat.sendMessage()` → `sendNotification()` → DB INSERT → Channel A 감지 → 영구 알림 + 토스트의 단일 경로로 통합.
+  - `markAsRead()` 가상 ID 분기 가드(`id < 1000000000000`) 제거 — 이제 모든 알림이 실 DB 레코드이므로 항상 DB update 실행.
+  - 토스트 아이콘 타입: `newNoti.type.includes('message')` 조건으로 메시지 알림 자동 감지.
+
+### 파일 요약
+| 파일 | 변경 내용 |
+|------|-----------|
+| `app/utils/notification.ts` | MODIFY — `'cancellation'`, `'message'` 타입 추가 |
+| `app/api/notifications/email/route.ts` | MODIFY — 단건 sendMail try/catch 격리, 이메일 실패 시 성공 응답 보장 |
+| `app/context/NotificationContext.tsx` | MODIFY — Channel B(inquiry_messages) 제거, markAsRead 가드 제거, 토스트 타입 자동 감지 |
+| `app/notifications/page.tsx` | MODIFY — getIcon() service_* 타입 명시 매핑 추가 |
+
+---
+
 ## v3.10.0 — SEO/OG 메타데이터 최적화
 
 **작업일:** 2026-03-02

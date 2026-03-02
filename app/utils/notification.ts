@@ -6,8 +6,10 @@ export type NotificationType =
   | 'booking_cancel_request'
   | 'cancellation_requested'
   | 'cancellation_approved'
+  | 'cancellation'              // 예약 취소 완료 (payment/cancel API)
   | 'new_booking'
   | 'new_message'
+  | 'message'                   // 채팅 메시지 알림 (NotificationContext 내부)
   | 'admin_alert'
   // [서비스 매칭 시스템]
   | 'service_request_new'       // 호스트에게: 내 지역 새 의뢰 등록

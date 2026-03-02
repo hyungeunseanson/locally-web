@@ -120,20 +120,25 @@ export async function POST(request: Request) {
       // return NextResponse.json({ error: 'Email not found' }, { status: 404 });
     }
 
-    // 4. 메일 발송 (기존 로직)
+    // 4. 메일 발송 — 실패해도 인앱 알림(DB)은 이미 저장됐으므로 성공 응답
     if (emailToSend) {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-      });
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+        });
 
-      await transporter.sendMail({
-        from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-        to: emailToSend,
-        subject: `[Locally] ${title}`,
-        html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL}${link}">확인하기</a>`,
-      });
-      console.log('🚀 [Notification API] 이메일 발송 성공');
+        await transporter.sendMail({
+          from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+          to: emailToSend,
+          subject: `[Locally] ${title}`,
+          html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL}${link}">확인하기</a>`,
+        });
+        console.log('🚀 [Notification API] 이메일 발송 성공');
+      } catch (emailError: any) {
+        // 이메일 실패는 인앱 알림 성공과 무관 — 경고 로그만 남기고 계속 진행
+        console.warn('⚠️ [Notification API] 이메일 발송 실패 (인앱 알림은 저장됨):', emailError.message);
+      }
     }
 
     return NextResponse.json({ success: true });

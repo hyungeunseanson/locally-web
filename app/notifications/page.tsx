@@ -96,9 +96,10 @@ export default function NotificationsPage() {
   };
 
   const getIcon = (type: string) => {
-    if (type.includes('booking')) return <Calendar size={18} className="text-blue-500" />;
-    if (type.includes('message')) return <MessageSquare size={18} className="text-indigo-500" />;
-    if (type.includes('cancel')) return <AlertTriangle size={18} className="text-orange-500" />;
+    if (type.includes('booking') || type === 'new_booking') return <Calendar size={18} className="text-blue-500" />;
+    if (type.includes('message') || type === 'new_message') return <MessageSquare size={18} className="text-indigo-500" />;
+    if (type.includes('cancel') || type === 'cancellation') return <AlertTriangle size={18} className="text-orange-500" />;
+    if (type.startsWith('service_')) return <Calendar size={18} className="text-emerald-500" />;
     return <Info size={18} className="text-slate-500" />;
   };
 
