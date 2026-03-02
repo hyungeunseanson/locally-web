@@ -6,10 +6,12 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Skeleton from '@/app/components/ui/Skeleton';
 import { BOOKING_CONFIRMED_STATUSES, isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function Earnings() {
   const supabase = createClient();
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
@@ -151,7 +153,7 @@ export default function Earnings() {
 
       {/* 상단 헤더 & 설정 버튼 */}
       <div className="flex items-center justify-between mb-4 md:mb-8 px-1 md:px-2 relative z-50">
-        <h2 className="text-lg md:text-2xl font-bold text-slate-900">호스팅 수입</h2>
+        <h2 className="text-lg md:text-2xl font-bold text-slate-900">{t('hp_earn_title')}</h2>
         <div className="relative">
           <button
             onClick={(e) => {
@@ -187,7 +189,7 @@ export default function Earnings() {
 
         <div className="text-center mb-6 md:mb-10 relative z-10">
           <p className="text-slate-400 font-bold text-[10px] md:text-xs mb-1.5 md:mb-2 flex items-center justify-center gap-1 uppercase tracking-wider">
-            정산 예정 금액 <Info size={12} />
+            {t('hp_earn_total_pending')} <Info size={12} />
           </p>
           <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-2">
             ₩{stats.net.toLocaleString()}
@@ -195,7 +197,7 @@ export default function Earnings() {
 
           {/* ✅ [추가] 예약 건수 뱃지 (이게 빠져있었습니다!) */}
           <div className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
-            총 {stats.count}건의 예약 완료
+            {t('hp_earn_count_completed').replace('{count}', String(stats.count))}
           </div>
         </div>
 
@@ -244,14 +246,14 @@ export default function Earnings() {
           onClick={() => setShowSummary(!showSummary)}
           className="w-full bg-white hover:bg-slate-50 transition-colors py-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-slate-600 border border-slate-200 shadow-sm"
         >
-          {showSummary ? '요약 접기' : '수입 상세 내역 보기'}
+          {showSummary ? t('hp_earn_hide_summary') : t('hp_earn_show_summary')}
           {showSummary ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
 
         {showSummary && (
           <div className="mt-4 bg-slate-50 rounded-3xl p-6 md:p-8 animate-in slide-in-from-top-4 duration-300 fade-in border border-slate-100">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-base md:text-lg text-slate-800">정산 상세 내역</h3>
+              <h3 className="font-bold text-base md:text-lg text-slate-800">{t('hp_earn_details')}</h3>
               <span className="text-[10px] font-bold bg-white border px-2 py-1 rounded text-slate-400 uppercase tracking-wide">
                 Year to Date
               </span>
@@ -260,29 +262,29 @@ export default function Earnings() {
             <div className="space-y-4">
               {/* ✅ [추가] 여기에도 건수 표시 */}
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">총 예약 건수</span>
+                <span className="text-slate-500">{t('hp_earn_count')}</span>
                 <span className="font-bold text-slate-900">{stats.count}건</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">총 매출 (게스트 결제액)</span>
+                <span className="text-slate-500">{t('hp_earn_gross_sales')}</span>
                 <span className="font-bold text-slate-900">₩{stats.gross.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">서비스 수수료 (20%)</span>
+                <span className="text-slate-500">{t('hp_earn_fee')} (20%)</span>
                 <span className="font-bold text-rose-500">- ₩{stats.fee.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">결제망 이용료 (3%)</span>
+                <span className="text-slate-500">{t('hp_earn_pg_fee')} (3%)</span>
                 <span className="font-bold text-rose-500">- ₩{stats.exchangeFee.toLocaleString()}</span>
               </div>
 
               <div className="border-t border-slate-200 border-dashed my-4"></div>
 
               <div className="flex justify-between items-center">
-                <span className="font-black text-sm md:text-base text-slate-900">최종 지급액 (Net)</span>
+                <span className="font-black text-sm md:text-base text-slate-900">{t('hp_earn_net')}</span>
                 <span className="font-black text-xl md:text-2xl text-slate-900">₩{stats.net.toLocaleString()}</span>
               </div>
-              <p className="text-[10px] text-slate-400 text-right mt-1">* 세금 처리는 호스트 본인의 책임입니다.</p>
+              <p className="text-[10px] text-slate-400 text-right mt-1">{t('hp_earn_tax_note')}</p>
             </div>
           </div>
         )}

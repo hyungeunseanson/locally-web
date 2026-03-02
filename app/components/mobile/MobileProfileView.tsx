@@ -11,6 +11,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 type GuestReview = {
     id: string | number;
@@ -82,6 +83,7 @@ export default function MobileProfileView({
     const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 1 });
     const supabase = useMemo(() => createClient(), []);
     const { showToast } = useToast();
+    const { t } = useLanguage();
     const completion = getProfileCompletion(isEditing ? editData : profile, 'guest');
     const missingLabels = completion.missingFields
         .slice(0, 4)
@@ -309,7 +311,7 @@ export default function MobileProfileView({
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-3">
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">프로필 완성도</p>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('he_profile_completion')}</p>
                             <p className="mt-1 text-[20px] font-black text-slate-900">{completion.percent}%</p>
                         </div>
                         {missingLabels.length > 0 && (
@@ -327,7 +329,7 @@ export default function MobileProfileView({
                     </div>
                     <p className="text-[11px] leading-relaxed text-slate-600">
                         {completion.missingFields.length === 0
-                            ? '공개 프로필이 모두 채워졌습니다.'
+                            ? t('he_profile_done')
                             : `${completion.missingFields.length}개 항목이 비어 있습니다. 호스트가 예약 전 먼저 보는 정보입니다.`}
                     </p>
                 </div>

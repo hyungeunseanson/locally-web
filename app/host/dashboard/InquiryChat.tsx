@@ -7,6 +7,7 @@ import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Spinner from '@/app/components/ui/Spinner';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function InquiryChat() {
   const {
@@ -19,6 +20,8 @@ export default function InquiryChat() {
     clearSelected,
     isLoading,
   } = useChat('host');
+
+  const { t } = useLanguage();
 
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -96,7 +99,7 @@ export default function InquiryChat() {
       `}>
         {/* 데스크탑 헤더 */}
         <div className="hidden md:flex items-center px-5 py-4 border-b border-slate-100 bg-white shrink-0">
-          <span className="font-bold text-[16px] text-slate-800">문의 목록</span>
+          <span className="font-bold text-[16px] text-slate-800">{t('hp_inbox_title')}</span>
         </div>
 
         {/* 목록 스크롤 */}
@@ -310,7 +313,7 @@ export default function InquiryChat() {
         ) : (
           <div className="flex-1 hidden md:flex items-center justify-center text-slate-400 flex-col gap-2">
             <div className="p-4 bg-slate-50 rounded-full"><User size={28} className="text-slate-300" /></div>
-            <p className="text-sm md:text-base">대화를 선택하세요.</p>
+            <p className="text-sm md:text-base">{t('hp_select_chat')}</p>
           </div>
         )}
       </div>

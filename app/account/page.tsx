@@ -648,7 +648,7 @@ export default function AccountPage() {
                   )}
                 </div>
                 <p className="mt-3 text-xs text-slate-500">
-                  비어 있어도 저장은 가능하지만, 호스트가 예약 요청 전 먼저 확인하는 핵심 정보들입니다.
+                  {t('he_profile_desc_1')}
                 </p>
               </div>
 
@@ -844,7 +844,7 @@ export default function AccountPage() {
                     maxLength={4}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors uppercase"
                   />
-                  <p className="text-xs text-slate-400 mt-1">성향을 빠르게 파악할 수 있는 보조 정보입니다.</p>
+                  <p className="text-xs text-slate-400 mt-1">{t('he_profile_desc_2')}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-2">{t('profile_job')}</label>
@@ -855,7 +855,7 @@ export default function AccountPage() {
                     placeholder={t('profile_job')}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
                   />
-                  <p className="text-xs text-slate-400 mt-1">호스트와 대화가 자연스럽게 이어지는 공통 화제를 만들어 줍니다.</p>
+                  <p className="text-xs text-slate-400 mt-1">{t('he_profile_desc_3')}</p>
                 </div>
               </div>
 
@@ -906,7 +906,7 @@ export default function AccountPage() {
                   placeholder={t('ph_bio')}
                   className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors resize-none"
                 />
-                <p className="text-xs text-slate-400 mt-1">호스트가 예약 전 가장 먼저 보는 핵심 소개입니다. 여행 스타일과 기대를 짧게 적어두세요.</p>
+                <p className="text-xs text-slate-400 mt-1">{t('he_profile_desc_4')}</p>
               </div>
 
               <div className="pt-6 border-t border-slate-100 flex justify-end">

@@ -6,6 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 interface HostProfile {
   full_name?: string;
@@ -58,6 +59,7 @@ interface HostProfileFormData {
 
 export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps) {
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'public' | 'private'>('public');
 
   const [formData, setFormData] = useState<HostProfileFormData>({
@@ -250,13 +252,13 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
           onClick={() => setActiveTab('public')}
           className={`flex-1 py-3 md:py-4 text-xs md:text-sm font-bold flex items-center justify-center gap-1.5 md:gap-2 transition-colors ${activeTab === 'public' ? 'bg-white text-black border-b-2 border-black shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
         >
-          <User size={14} className="md:w-4 md:h-4" /> 공개 프로필
+          <User size={14} className="md:w-4 md:h-4" /> {t('hp_tab_public')}
         </button>
         <button
           onClick={() => setActiveTab('private')}
           className={`flex-1 py-3 md:py-4 text-xs md:text-sm font-bold flex items-center justify-center gap-1.5 md:gap-2 transition-colors ${activeTab === 'private' ? 'bg-white text-black border-b-2 border-black shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
         >
-          <Lock size={14} className="md:w-4 md:h-4" /> 비공개 정보
+          <Lock size={14} className="md:w-4 md:h-4" /> {t('hp_tab_private')}
         </button>
       </div>
 
@@ -269,17 +271,17 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" /></div>
                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
               </label>
-              <span className="text-[11px] md:text-xs text-slate-400 mt-2">프로필 사진 변경</span>
+              <span className="text-[11px] md:text-xs text-slate-400 mt-2">{t('hp_change_photo')}</span>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 md:px-5 md:py-5">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-[11px] md:text-xs font-bold uppercase tracking-[0.18em] text-slate-400">프로필 완성도</p>
+                  <p className="text-[11px] md:text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t('hp_completion_title')}</p>
                   <p className="mt-1 text-lg md:text-xl font-black text-slate-900">{completion.percent}%</p>
                   <p className="mt-1 text-[12px] md:text-sm text-slate-600">
                     {completion.missingFields.length === 0
-                      ? '공개 프로필 필수 항목이 모두 채워졌습니다.'
+                      ? t('hp_completion_done')
                       : `${completion.missingFields.length}개 항목이 비어 있습니다. 노출 품질과 신뢰도에 영향을 줍니다.`}
                   </p>
                 </div>
@@ -297,18 +299,18 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
                 )}
               </div>
               <p className="mt-3 text-[11px] md:text-xs text-slate-500">
-                비어 있어도 저장은 가능하지만, 게스트가 예약 전 호스트를 판단할 때 필요한 정보는 계속 노출됩니다.
+                {t('hp_completion_desc')}
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <InputGroup label="이름 (닉네임)" name="name" value={formData.name} onChange={handleChange} icon={<User size={16} />} />
-              <InputGroup label="직업 / 직장" name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16} />} placeholder="예: 패션 디자이너" />
-              <InputGroup label="꿈의 여행지" name="dream_destination" value={formData.dream_destination} onChange={handleChange} icon={<Globe size={16} />} placeholder="예: 아이슬란드 오로라 여행" />
-              <InputGroup label="최애 노래" name="favorite_song" value={formData.favorite_song} onChange={handleChange} icon={<Music size={16} />} placeholder="예: Bohemian Rhapsody" />
+              <InputGroup label={t('hp_name')} name="name" value={formData.name} onChange={handleChange} icon={<User size={16} />} />
+              <InputGroup label={t('hp_job')} name="job" value={formData.job} onChange={handleChange} icon={<Briefcase size={16} />} placeholder={t('hp_ph_job')} />
+              <InputGroup label={t('hp_dream_dest')} name="dream_destination" value={formData.dream_destination} onChange={handleChange} icon={<Globe size={16} />} placeholder={t('hp_ph_dream')} />
+              <InputGroup label={t('hp_song')} name="favorite_song" value={formData.favorite_song} onChange={handleChange} icon={<Music size={16} />} placeholder={t('hp_ph_song')} />
               <div className="md:col-span-2">
                 <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5">
-                  <MessageCircle size={16} /> 구사 언어
+                  <MessageCircle size={16} /> {t('hp_languages')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {PROFILE_LANGUAGE_OPTIONS.map((language) => {
@@ -319,11 +321,10 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
                         key={language}
                         type="button"
                         onClick={() => handleLanguageToggle(language)}
-                        className={`rounded-full border px-3 py-1.5 text-[11px] md:text-xs font-bold transition-colors ${
-                          isSelected
+                        className={`rounded-full border px-3 py-1.5 text-[11px] md:text-xs font-bold transition-colors ${isSelected
                             ? 'border-slate-900 bg-slate-900 text-white'
                             : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
-                        }`}
+                          }`}
                       >
                         {language}
                       </button>
@@ -331,16 +332,16 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
                   })}
                 </div>
                 <p className="mt-2 text-[11px] md:text-xs text-slate-400">
-                  게스트가 바로 소통 가능 여부를 판단하는 항목입니다. 최소 1개 이상 선택해 두는 것이 좋습니다.
+                  {t('hp_lang_desc')}
                 </p>
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase">자기소개</label>
-              <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-[13px] md:text-sm" placeholder="게스트에게 나를 소개해 주세요." />
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase">{t('hp_intro')}</label>
+              <textarea name="introduction" value={formData.introduction} onChange={handleChange} className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none focus:border-black text-[13px] md:text-sm" placeholder={t('hp_ph_intro')} />
               <p className="mt-2 text-[11px] md:text-xs text-slate-400">
-                예약 전 신뢰 형성에 가장 크게 영향을 주는 영역입니다. 실제 진행 스타일과 분위기를 간단히 적어두세요.
+                {t('hp_intro_desc')}
               </p>
             </div>
           </div>
@@ -352,40 +353,40 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
             <div className="bg-yellow-50 border border-yellow-100 p-4 md:p-5 rounded-xl flex gap-2.5 md:gap-3 text-yellow-800 text-xs md:text-sm leading-relaxed">
               <AlertTriangle className="flex-shrink-0 mt-0.5" size={16} />
               <div>
-                <p className="font-bold mb-1">개인 정보 및 정산 정보는 직접 수정할 수 없습니다.</p>
+                <p className="font-bold mb-1">{t('hp_private_alert_title')}</p>
                 <p className="opacity-90">
-                  이 정보는 게스트에게 공개되지 않으며, 정산 및 본인 확인 용도로만 사용됩니다. 정확하게 입력해 주세요.<br />
-                  정보 변경이 필요한 경우, <span className="font-bold underline cursor-pointer">보안 및 정산 오류 방지</span>를 위해 관리자에게 문의해 주세요.
+                  {t('hp_private_alert_desc1')}<br />
+                  {t('hp_private_alert_desc2')}
                 </p>
               </div>
             </div>
 
             <div className="bg-slate-50 p-3.5 md:p-6 rounded-2xl border border-slate-100 opacity-90">
-              <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><User size={16} className="md:w-[18px] md:h-[18px]" /> 개인 신상 정보</h3>
+              <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><User size={16} className="md:w-[18px] md:h-[18px]" /> {t('hp_private_info')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                 {/* ✅ [수정] 모든 필드 disabled 처리 */}
-                <InputGroup label="연락처" name="phone" value={formData.phone} disabled={true} placeholder="미입력" />
-                <InputGroup label="생년월일" name="dob" value={formData.dob} disabled={true} placeholder="미입력" />
+                <InputGroup label={t('hp_phone')} name="phone" value={formData.phone} disabled={true} placeholder={t('hp_no_content')} />
+                <InputGroup label={t('hp_dob')} name="dob" value={formData.dob} disabled={true} placeholder={t('hp_no_content')} />
                 <div className="col-span-2">
                   {/* ✅ [수정] 국적 필드 InputGroup으로 원복 */}
-                  <InputGroup label="국적" name="host_nationality" value={formData.host_nationality} disabled={true} placeholder="미입력" />
+                  <InputGroup label={t('hp_nationality')} name="host_nationality" value={formData.host_nationality} disabled={true} placeholder={t('hp_no_content')} />
                 </div>
               </div>
             </div>
 
             <div className="bg-slate-50 p-3.5 md:p-6 rounded-2xl border border-slate-100 opacity-90">
-              <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><CreditCard size={16} className="md:w-[18px] md:h-[18px]" /> 정산 계좌 정보</h3>
+              <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 md:mb-4 flex items-center gap-2"><CreditCard size={16} className="md:w-[18px] md:h-[18px]" /> {t('hp_bank_info')}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                <InputGroup label="은행명" name="bank_name" value={formData.bank_name} disabled={true} placeholder="미입력" />
-                <InputGroup label="계좌번호" name="account_number" value={formData.account_number} disabled={true} placeholder="미입력" />
-                <InputGroup label="예금주" name="account_holder" value={formData.account_holder} disabled={true} placeholder="미입력" />
+                <InputGroup label={t('hp_bank_name')} name="bank_name" value={formData.bank_name} disabled={true} placeholder={t('hp_no_content')} />
+                <InputGroup label={t('hp_account_num')} name="account_number" value={formData.account_number} disabled={true} placeholder={t('hp_no_content')} />
+                <InputGroup label={t('hp_account_holder')} name="account_holder" value={formData.account_holder} disabled={true} placeholder={t('hp_no_content')} />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5"><FileText size={14} /> 지원 동기 (가입 시 작성)</label>
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-2 uppercase flex items-center gap-1.5"><FileText size={14} /> {t('hp_motivation_label')}</label>
               <textarea
-                value={formData.motivation || '작성된 내용이 없습니다.'}
+                value={formData.motivation || t('hp_no_content')}
                 disabled
                 className="w-full h-32 p-3 md:p-4 border border-slate-200 rounded-xl resize-none text-[13px] md:text-sm bg-slate-100 text-slate-500 cursor-not-allowed"
               />
@@ -393,11 +394,10 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
           </div>
         )}
 
-        {/* ✅ [수정] 저장 버튼은 Public 탭에서만 노출 */}
         {activeTab === 'public' && (
           <div className="flex justify-end pt-6 md:pt-8 mt-4 border-t border-slate-100">
             <button onClick={handleSave} disabled={loading} className="bg-black text-white px-4 py-2.5 md:px-8 md:py-4 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50 text-xs md:text-base">
-              <Save size={18} /> {loading ? '저장 중...' : '변경사항 저장하기'}
+              <Save size={18} /> {loading ? t('hp_btn_saving') : t('hp_btn_save')}
             </button>
           </div>
         )}

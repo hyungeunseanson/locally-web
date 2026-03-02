@@ -147,7 +147,7 @@ export default function ServiceJobsTab() {
                       <div className="border border-slate-100 rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer bg-white [box-shadow:0_1px_3px_rgba(0,0,0,0.05)]">
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <h3 className="font-bold text-[13px] md:text-[14px] text-slate-900 line-clamp-2 flex-1">
-                            {req?.title ?? '의뢰'}
+                            {req?.title ?? t('req_default')}
                           </h3>
                           <span className={`shrink-0 text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${statusColor[app.status] ?? 'bg-slate-100 text-slate-500'}`}>
                             {getServiceApplicationStatusLabel(app.status)}

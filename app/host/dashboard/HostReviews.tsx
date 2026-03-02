@@ -7,10 +7,12 @@ import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import Skeleton from '@/app/components/ui/Skeleton';
 import { sendNotification } from '@/app/utils/notification';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function HostReviews() {
   const supabase = createClient();
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +125,7 @@ export default function HostReviews() {
         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
           <Star size={32} className="text-slate-300" fill="#cbd5e1" />
         </div>
-        <h3 className="text-lg font-bold text-slate-900">아직 작성된 후기가 없습니다</h3>
+        <h3 className="text-lg font-bold text-slate-900">{t('hp_review_empty')}</h3>
         <p className="text-slate-500 mt-2 text-sm">첫 게스트를 맞이하고 멋진 후기를 받아보세요!</p>
       </div>
     );
@@ -155,7 +157,7 @@ export default function HostReviews() {
 
         <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between cursor-pointer hover:border-rose-200 transition-colors" onClick={() => setFilter('unreplied')}>
           <div className="flex justify-between items-start">
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">미답변 후기</div>
+            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">{t('hp_review_needs_reply')}</div>
             <div className="bg-rose-100 text-rose-600 p-2 rounded-full"><MessageCircle size={20} /></div>
           </div>
           <div>
