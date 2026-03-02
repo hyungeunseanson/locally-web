@@ -6,6 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import Skeleton from '@/app/components/ui/Skeleton';
+import { sendNotification } from '@/app/utils/notification';
 
 export default function HostReviews() {
   const supabase = createClient();
@@ -67,6 +68,18 @@ export default function HostReviews() {
       if (error) throw error;
 
       showToast('답글이 등록되었습니다!', 'success');
+
+      // [R3] 게스트에게 답글 알림
+      const review = reviews.find(r => r.id === reviewId);
+      if (review?.user_id) {
+        sendNotification({
+          recipient_id: review.user_id,
+          type: 'review_reply',
+          title: '호스트님이 후기에 답글을 남겼습니다',
+          message: `후기에 답글이 달렸습니다: "${replyText.slice(0, 40)}${replyText.length > 40 ? '...' : ''}"`,
+          link: '/guest/trips',
+        }).catch(console.error);
+      }
 
       setReviews(prev => prev.map(r =>
         r.id === reviewId

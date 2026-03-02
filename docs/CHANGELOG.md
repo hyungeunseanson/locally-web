@@ -5,6 +5,77 @@
 
 ---
 
+## v3.15.0 — 리뷰 시스템 고도화 (알림 파이프라인 + Admin 관리 + 후기 수정 + 평점 집계)
+
+**작업일:** 2026-03-02
+
+### 개요
+리뷰 시스템 AS-IS 진단 후 확인된 운영 공백 R1~R7 구현 (R8 영구 폐기).
+DB 스키마 변경 2건(마이그레이션 스크립트 `docs/migrations/v3_15_0_review_enhancements.sql` 참조).
+R7(게스트 본인 받은 리뷰 열람)은 기존 코드에 이미 구현되어 있음 — 추가 변경 없음.
+
+### [R1] 리뷰 등록 → 호스트 알림
+
+- **기존 문제:** 게스트가 후기 작성 시 호스트에게 아무런 알림 없음. 호스트가 대시보드를 직접 방문해야만 인지 가능.
+- **수정:** `POST /api/reviews` 성공 후 `notifications` 테이블에 직접 INSERT (서버사이드 — sendNotification() 불가).
+  - type: `'new_review'`, 링크: `/host/dashboard?tab=reviews`
+- **파일:** `app/api/reviews/route.ts`
+
+### [R2] 예약 완료 → 게스트 후기 작성 요청 알림
+
+- **기존 문제:** 크론 잡이 예약을 `completed`로 처리하지만, 게스트에게 후기 작성 유도 없음.
+- **수정:** `GET /api/cron/complete-trips` — 완료 처리 후 각 게스트에게 `notifications` INSERT.
+  - type: `'review_request'`, 링크: `/guest/trips`
+  - 초기 select에 `user_id, experiences(title)` 추가.
+- **파일:** `app/api/cron/complete-trips/route.ts`
+
+### [R3] 호스트 답글 → 게스트 알림
+
+- **기존 문제:** 호스트가 후기에 답글 작성 시 게스트에게 알림 없음.
+- **수정:** `HostReviews.tsx` `handleSubmitReply()` 성공 후 `sendNotification()` 호출 (클라이언트사이드 가능).
+  - type: `'review_reply'`, 링크: `/guest/trips`
+- **파일:** `app/host/dashboard/HostReviews.tsx`
+
+### [R4] Admin 리뷰 관리 탭 신설
+
+- **기존 문제:** Admin 대시보드에 리뷰 조회/관리 탭 없음. 부적절 리뷰 대응 불가.
+- **수정:**
+  - `ReviewsTab.tsx` 신규 컴포넌트 생성: 전체 리뷰 목록 + 검색 + 별점 필터 + 강제 삭제.
+  - Admin Sidebar `Finance` 그룹에 "Review Management" NavButton 추가 (탭 키: `REVIEWS`).
+  - `page.tsx` 라우팅에 `activeTab === 'REVIEWS'` 케이스 추가.
+- **파일:** `app/admin/dashboard/components/ReviewsTab.tsx` (신규), `Sidebar.tsx`, `page.tsx`
+
+### [R5] 게스트 후기 수정 기능 (작성 후 7일 이내)
+
+- **기존 문제:** 후기 작성 후 수정 불가. 오탈자/오해 수정 방법 없음.
+- **수정:**
+  - `PATCH /api/reviews/[id]/route.ts` 신규 엔드포인트: 본인 후기 + 7일 이내 검증 + 평점 재집계.
+  - `GET /api/guest/trips`: `reviews (id)` → `reviews (id, rating, content, photos, created_at)` 변경. 응답에 `review` 객체 포함.
+  - `ReviewModal.tsx`: `trip.review?.id` 존재 시 수정 모드로 자동 진입. 기존 사진 유지 + 새 사진 추가 지원. 제목 "후기 작성" → "후기 수정" 전환.
+  - `PastTripCard.tsx`: 후기 작성 완료 시 "수정" 버튼 노출 (클릭 → `onOpenReview(trip)` 호출 → 수정 모드 ReviewModal 오픈).
+- **파일:** `app/api/reviews/[id]/route.ts` (신규), `app/api/guest/trips/route.ts`, `app/components/ReviewModal.tsx`, `app/guest/trips/components/PastTripCard.tsx`
+
+### [R6] 호스트 프로필 전체 평점 집계 (DB 저장 방식)
+
+- **기존 문제:** 호스트 전체 평점이 체험 상세 SSR에서 런타임 계산됨 (체험별 DB 저장값과 불일치).
+- **수정:**
+  - `profiles.average_rating NUMERIC(3,2)`, `profiles.total_review_count INTEGER` 컬럼 추가 (마이그레이션).
+  - `POST /api/reviews` + `PATCH /api/reviews/[id]`: 체험 집계 후 해당 호스트의 전체 리뷰 재집계 → `profiles` 업데이트.
+  - 집계 실패 시 후기 저장/수정에 영향 없도록 try-catch 처리.
+- **마이그레이션:** `docs/migrations/v3_15_0_review_enhancements.sql`
+
+### [R7] 게스트 본인 받은 리뷰 열람
+
+- **상태:** 기존 코드 확인 결과 이미 구현 완료 (`account/page.tsx` 데스크탑 + `MobileProfileView.tsx` 모바일 양쪽).
+- **추가 작업 없음**
+
+### notification.ts — 신규 타입 추가
+
+- `'new_review'`, `'review_reply'`, `'review_request'` 3개 타입 추가.
+- **파일:** `app/utils/notification.ts`
+
+---
+
 ## v3.14.0 — 메시징 시스템 Phase C (M3 읽음 시각 + M5 CS 상태 큐)
 
 **작업일:** 2026-03-02

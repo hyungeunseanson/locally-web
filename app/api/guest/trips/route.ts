@@ -16,7 +16,7 @@ export async function GET() {
       .select(`
         *,
         experiences (id, host_id, title, image_url, location),
-        reviews (id)
+        reviews (id, rating, content, photos, created_at)
       `)
       .eq('user_id', user.id)
       .order('date', { ascending: false });
@@ -38,6 +38,8 @@ export async function GET() {
         status = 'completed';
       }
 
+      const firstReview = booking.reviews?.[0] || null;
+
       updatedTrips.push({
         id: booking.id,
         orderId: booking.order_id || booking.id.slice(0, 8),
@@ -52,7 +54,14 @@ export async function GET() {
         status: status, // 업데이트된 상태 사용
         paymentDate: booking.created_at,
         hostId: booking.experiences?.host_id, // 메시지 보내기용
-        hasReview: booking.reviews && booking.reviews.length > 0 // 🟢 후기 작성 여부 (배열 길이로 체크)
+        hasReview: booking.reviews && booking.reviews.length > 0, // 🟢 후기 작성 여부 (배열 길이로 체크)
+        review: firstReview ? {  // [R5] 수정용 후기 데이터
+          id: firstReview.id,
+          rating: firstReview.rating,
+          content: firstReview.content,
+          photos: firstReview.photos || [],
+          created_at: firstReview.created_at,
+        } : null,
       });
     }
 

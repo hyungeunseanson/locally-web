@@ -45,9 +45,22 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
         {trip.status !== 'cancelled' ? (
           // 🟢 [수정] 후기 작성 여부에 따라 UI 분기
           trip.hasReview ? (
-            <span className="text-[11px] md:text-xs font-semibold text-green-600 mt-1 flex items-center gap-1">
-              <CheckCircle className="w-[11px] h-[11px] md:w-3 md:h-3" /> 후기 작성 완료
-            </span>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] md:text-xs font-semibold text-green-600 flex items-center gap-1">
+                <CheckCircle className="w-[11px] h-[11px] md:w-3 md:h-3" /> 후기 작성 완료
+              </span>
+              {trip.review?.id && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenReview(trip); // review 데이터 포함 → 수정 모드로 열림
+                  }}
+                  className="text-[10px] md:text-[11px] font-semibold text-slate-400 hover:text-slate-700 hover:underline"
+                >
+                  수정
+                </button>
+              )}
+            </div>
           ) : (
             <button
               onClick={(e) => {

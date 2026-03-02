@@ -8,37 +8,47 @@ import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 
 interface ReviewModalProps {
   trip: any;
   onClose: () => void;
-  onReviewSubmitted?: () => void; // 🟢 후기 작성 완료 후 목록 새로고침용 콜백
+  onReviewSubmitted?: () => void; // 🟢 후기 작성/수정 완료 후 목록 새로고침용 콜백
 }
 
 export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
   const supabase = createClient();
   const { showToast } = useToast();
 
-  const [rating, setRating] = useState(0);
+  // [R5] 수정 모드 감지: trip.review가 있으면 수정 모드
+  const isEditMode = !!(trip.review?.id);
+  const existingReview = trip.review || null;
+
+  const [rating, setRating] = useState(isEditMode ? (existingReview.rating || 0) : 0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [reviewText, setReviewText] = useState('');
+  const [reviewText, setReviewText] = useState(isEditMode ? (existingReview.content || '') : '');
 
   // 이미지 관리
-  const [images, setImages] = useState<string[]>([]); // 미리보기용 URL
-  const [imageFiles, setImageFiles] = useState<File[]>([]); // 실제 업로드할 파일
+  const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>(isEditMode ? (existingReview.photos || []) : []);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      if (images.length >= 2) return showToast("사진은 최대 2장까지 첨부 가능합니다.", 'error');
+      const totalImages = existingPhotoUrls.length + imageFiles.length;
+      if (totalImages >= 2) return showToast("사진은 최대 2장까지 첨부 가능합니다.", 'error');
 
       const file = e.target.files[0];
       const imageUrl = URL.createObjectURL(file);
 
-      setImages([...images, imageUrl]);
-      setImageFiles([...imageFiles, file]);
+      setNewImagePreviews(prev => [...prev, imageUrl]);
+      setImageFiles(prev => [...prev, file]);
     }
   };
 
-  const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-    setImageFiles(imageFiles.filter((_, i) => i !== index));
+  const removeExistingPhoto = (index: number) => {
+    setExistingPhotoUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewImage = (index: number) => {
+    setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
@@ -51,39 +61,54 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("로그인이 필요합니다.");
 
-      // 1. 이미지 업로드 (있을 경우)
+      // 새 이미지 업로드
       const uploadedUrls: string[] = [];
-
       for (const file of imageFiles) {
-        // 파일명: reviews/유저ID_시간_랜덤문자
         const fileName = `reviews/${user.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         const { error: uploadError } = await supabase.storage.from('images').upload(fileName, file);
-
         if (uploadError) throw uploadError;
-
         const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
         uploadedUrls.push(publicUrl);
       }
 
-      // 2. 후기 데이터 저장 (API 호출로 변경 - 백엔드에서 평균 평점 업데이트 처리)
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          experienceId: trip.expId,
-          bookingId: trip.id,
-          rating,
-          content: reviewText,
-          photos: uploadedUrls
-        })
-      });
+      // 최종 사진 배열: 기존 유지 + 새 업로드
+      const finalPhotos = [...existingPhotoUrls, ...uploadedUrls];
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || '후기 저장에 실패했습니다.');
+      if (isEditMode) {
+        // [R5] 수정 모드: PATCH API 호출
+        const res = await fetch(`/api/reviews/${existingReview.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rating, content: reviewText, photos: finalPhotos })
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || '후기 수정에 실패했습니다.');
+        }
+
+        showToast("후기가 수정되었습니다!", 'success');
+      } else {
+        // 신규 작성: POST API 호출
+        const res = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            experienceId: trip.expId,
+            bookingId: trip.id,
+            rating,
+            content: reviewText,
+            photos: finalPhotos
+          })
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || '후기 저장에 실패했습니다.');
+        }
+
+        showToast("소중한 후기가 등록되었습니다!", 'success');
       }
-
-      showToast("소중한 후기가 등록되었습니다!", 'success');
 
       // 🟢 목록 새로고침 요청 후 모달 닫기
       if (onReviewSubmitted) onReviewSubmitted();
@@ -91,7 +116,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
     } catch (error: any) {
       console.error(error);
-      showToast("후기 등록 실패: " + error.message, 'error');
+      showToast((isEditMode ? "후기 수정 실패: " : "후기 등록 실패: ") + error.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -107,7 +132,9 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 md:px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-base md:text-lg text-slate-900">후기 작성</h3>
+          <h3 className="font-bold text-base md:text-lg text-slate-900">
+            {isEditMode ? '후기 수정' : '후기 작성'}
+          </h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900">
             <X size={20} />
           </button>
@@ -157,19 +184,33 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             onChange={(e) => setReviewText(e.target.value)}
           />
 
-          <div className="flex gap-2.5 md:gap-3 mb-5 md:mb-6">
-            {images.map((img, idx) => (
-              <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group">
-                <img src={img} alt="review" className="w-full h-full object-cover" />
+          <div className="flex gap-2.5 md:gap-3 mb-5 md:mb-6 flex-wrap">
+            {/* 기존 사진 (수정 모드) */}
+            {existingPhotoUrls.map((url, idx) => (
+              <div key={`existing-${idx}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group">
+                <img src={url} alt="review" className="w-full h-full object-cover" />
                 <button
-                  onClick={() => removeImage(idx)}
+                  onClick={() => removeExistingPhoto(idx)}
                   className="absolute top-0 right-0 bg-black/50 text-white p-0.5 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X size={12} />
                 </button>
               </div>
             ))}
-            {images.length < 2 && (
+            {/* 새로 추가된 사진 */}
+            {newImagePreviews.map((url, idx) => (
+              <div key={`new-${idx}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-blue-200 group">
+                <img src={url} alt="new review" className="w-full h-full object-cover" />
+                <button
+                  onClick={() => removeNewImage(idx)}
+                  className="absolute top-0 right-0 bg-black/50 text-white p-0.5 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            {/* 사진 추가 버튼 */}
+            {existingPhotoUrls.length + imageFiles.length < 2 && (
               <label className="w-16 h-16 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-slate-500 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100">
                 <Camera size={20} />
                 <span className="text-[10px] mt-1 font-medium">사진 추가</span>
@@ -178,12 +219,18 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             )}
           </div>
 
+          {isEditMode && (
+            <p className="text-[11px] text-slate-400 text-center mb-3">
+              후기는 작성 후 7일 이내에만 수정할 수 있습니다.
+            </p>
+          )}
+
           <button
             onClick={handleSubmit}
             disabled={rating === 0 || reviewText.length < 10 || isSubmitting}
             className="w-full bg-black text-white font-bold py-3.5 md:py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 text-sm md:text-base"
           >
-            {isSubmitting ? <><Loader2 className="animate-spin" size={20} /> 저장 중...</> : '후기 등록하기'}
+            {isSubmitting ? <><Loader2 className="animate-spin" size={20} /> 저장 중...</> : (isEditMode ? '후기 수정하기' : '후기 등록하기')}
           </button>
         </div>
       </div>

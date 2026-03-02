@@ -17,7 +17,11 @@ export type NotificationType =
   | 'service_host_selected'     // 호스트에게: 고객에게 선택됨
   | 'service_host_rejected'     // 호스트에게: 다른 호스트 선택됨 (미선택)
   | 'service_payment_confirmed' // 양측: 결제 확정 → 매칭 완료
-  | 'service_cancelled';        // 양측: 서비스 취소
+  | 'service_cancelled'        // 양측: 서비스 취소
+  // [리뷰 시스템]
+  | 'new_review'               // 호스트에게: 게스트가 새 후기 작성
+  | 'review_reply'             // 게스트에게: 호스트가 후기에 답글
+  | 'review_request';          // 게스트에게: 체험 완료 후 후기 작성 요청
 
   interface SendNotificationParams {
     recipient_id?: string;

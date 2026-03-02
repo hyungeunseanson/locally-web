@@ -13,6 +13,7 @@ import AuditLogTab from './components/AuditLogTab';
 import MasterLedgerTab from './components/MasterLedgerTab';
 import TeamTab from './components/TeamTab';
 import ServiceAdminTab from './components/ServiceAdminTab';
+import ReviewsTab from './components/ReviewsTab';
 
 // Custom Hook
 import { useAdminData } from './hooks/useAdminData';
@@ -71,6 +72,8 @@ function AdminDashboardContent() {
         <AnalyticsTab bookings={bookings} users={users} exps={exps} apps={apps} reviews={reviews} searchLogs={searchLogs} analyticsEvents={analyticsEvents} inquiries={inquiries} inquiryMessages={inquiryMessages} />
       ) : activeTab === 'SERVICE_REQUESTS' ? (
         <ServiceAdminTab />
+      ) : activeTab === 'REVIEWS' ? (
+        <ReviewsTab />
       ) : activeTab === 'CHATS' ? (
         <ChatMonitor />
       ) : activeTab === 'LOGS' ? (

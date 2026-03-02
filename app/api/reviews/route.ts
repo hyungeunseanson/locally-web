@@ -46,6 +46,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '이미 후기를 작성하셨습니다.' }, { status: 409 });
     }
 
+    // [R1] 체험 정보 조회 (호스트 알림 + R6 프로필 집계용)
+    const { data: experience } = await supabase
+      .from('experiences')
+      .select('host_id, title')
+      .eq('id', experienceId)
+      .maybeSingle();
+
     // 3. 후기 저장 (Insert)
     const { error: insertError } = await supabase.from('reviews').insert({
       user_id: user.id,
@@ -79,6 +86,43 @@ export async function POST(request: Request) {
           review_count: newCount
         })
         .eq('id', experienceId);
+    }
+
+    // [R1] 호스트에게 새 후기 알림 발송
+    if (experience?.host_id) {
+      await supabase.from('notifications').insert({
+        user_id: experience.host_id,
+        type: 'new_review',
+        title: '새 후기가 등록되었습니다',
+        message: `'${experience.title}'에 새 후기가 작성되었습니다.`,
+        link: '/host/dashboard?tab=reviews',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    // [R6] 호스트 프로필 전체 평점 집계 업데이트
+    if (experience?.host_id) {
+      try {
+        const { data: hostReviews } = await supabase
+          .from('reviews')
+          .select('rating, experiences!inner(host_id)')
+          .eq('experiences.host_id', experience.host_id);
+
+        if (hostReviews && hostReviews.length > 0) {
+          const hostTotal = hostReviews.reduce((sum, r) => sum + r.rating, 0);
+          const hostAvg = Number((hostTotal / hostReviews.length).toFixed(2));
+          await supabase
+            .from('profiles')
+            .update({
+              average_rating: hostAvg,
+              total_review_count: hostReviews.length,
+            })
+            .eq('id', experience.host_id);
+        }
+      } catch {
+        // 프로필 집계 실패는 후기 등록 성공에 영향 없음
+      }
     }
 
     return NextResponse.json({ success: true });
