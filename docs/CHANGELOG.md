@@ -5,6 +5,30 @@
 
 ---
 
+## v3.20.0 — 이메일 UX 글로벌 프리미엄 모던 리뉴얼 적용
+
+**작업일:** 2026-03-03
+
+### 개요
+글로벌 스탠다드에 맞추어 `react-email`을 도입하고, 핵심 비즈니스 이메일(예약 확정 / 예약 취소)의 디자인을 에어비앤비 수준의 모던하고 친근한 영수증 스타일로 전면 개편.
+
+### [Email-1] 공통 이메일 레이아웃 및 컴포넌트 에셋 구축
+- **파일:** `app/emails/components/EmailLayout.tsx`, `CTAButton.tsx`
+- 연한 회색 바탕과 중앙 정렬된 16px 곡률의 흰색 컨테이너를 기본 레이아웃으로 제정.
+- 명확도 높은 검은색 큰 CTA 버튼 적용.
+
+### [Email-2] 핵심 비즈니스 이메일 템플릿(React Email) 교체
+- 기존의 하드코딩 Raw HTML을 버리고, React 기반의 선언적 템플릿 렌더링 도입.
+- **예약 확정 메일:** 직관적인 영수증 형태의 정보 배치 (인원수, 일자 명확히 분리 표기).
+- **예약 취소 알림:** 위약금 환불액과 취소 사유를 명시하는 정중한 톤앤매너 템플릿 적용.
+- **파일:**
+  - `app/emails/templates/BookingConfirmationEmail.tsx`
+  - `app/emails/templates/BookingCancellationEmail.tsx`
+  - `app/api/payment/nicepay-callback/route.ts` (템플릿 render() 연결)
+  - `app/api/payment/cancel/route.ts` (템플릿 render() 연결)
+
+---
+
 ## v3.19.0 — 관리자 대시보드 유저 상세 모달 더미 데이터 척결
 
 **작업일:** 2026-03-03

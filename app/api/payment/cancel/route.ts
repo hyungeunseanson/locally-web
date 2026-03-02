@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { toZonedTime } from 'date-fns-tz';
 import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
+import * as React from 'react';
+import { render } from '@react-email/render';
+import BookingCancellationEmail from '@/app/emails/templates/BookingCancellationEmail';
 
 const TAX_RATE = 1.1;
 const COMMISSION_RATE = 0.2;
@@ -171,7 +174,7 @@ export async function POST(request: Request) {
 
       // (B) 이메일 발송
       let hostEmail = '';
-      const { data: hostProfile } = await supabaseAdmin.from('profiles').select('email').eq('id', hostId).maybeSingle();
+      const { data: hostProfile } = await supabaseAdmin.from('profiles').select('email, name').eq('id', hostId).maybeSingle();
 
       if (hostProfile?.email) {
         hostEmail = hostProfile.email;
@@ -187,20 +190,21 @@ export async function POST(request: Request) {
             auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
           });
 
+          const emailHtml = await render(
+            React.createElement(BookingCancellationEmail, {
+              hostName: hostProfile?.name || '로컬리 호스트',
+              experienceTitle: expTitle || '체험',
+              cancelReason: userReason,
+              refundAmount: refundAmount,
+              dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard`
+            })
+          );
+
           await transporter.sendMail({
             from: `"Locally Team" <${process.env.GMAIL_USER}>`,
             to: hostEmail,
             subject: `[Locally] 예약 취소 알림`,
-            html: `
-              <div style="padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                <h2 style="color: #000;">예약 취소 알림 😢</h2>
-                <p><b>[${expTitle}]</b> 예약이 취소되었습니다.</p>
-                <p>사유: ${userReason}</p>
-                <p>환불 금액: ₩${refundAmount.toLocaleString()}</p>
-                <br/>
-                <a href="${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard" style="background: #f0f0f0; color: #333; padding: 10px 20px; text-decoration: none; border-radius: 5px;">대시보드 확인</a>
-              </div>
-            `,
+            html: emailHtml,
           });
         } catch (mailError) {
           console.error('Email sending failed but ignored:', mailError);
