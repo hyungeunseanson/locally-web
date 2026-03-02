@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
+import { createClient } from '@/app/utils/supabase/client';
 
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
 function timeAgo(dateString: string | null) {
@@ -25,6 +26,7 @@ function timeAgo(dateString: string | null) {
 }
 
 export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
+  const supabase = createClient();
   const { showToast } = useToast(); // 🟢 추가
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -37,6 +39,44 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [isSending, setIsSending] = useState(false);
   // 1분마다 화면을 갱신해서 "몇 분 전" 시간을 최신화하는 코드
   const [tick, setTick] = useState(0);
+
+  // 🟢 실제 결제 내역 및 리뷰 상태
+  const [userBookings, setUserBookings] = useState<any[]>([]);
+  const [userReviews, setUserReviews] = useState<any[]>([]);
+  const [isActivityLoading, setIsActivityLoading] = useState(false);
+
+  useEffect(() => {
+    if (selectedUser?.id) {
+      let isMounted = true;
+      const fetchActivity = async () => {
+        setIsActivityLoading(true);
+        try {
+          const { data: bData } = await supabase
+            .from('bookings')
+            .select('*, experiences(title)')
+            .eq('user_id', selectedUser.id)
+            .order('created_at', { ascending: false });
+
+          const { data: rData } = await supabase
+            .from('reviews')
+            .select('*, experiences(title)')
+            .eq('user_id', selectedUser.id)
+            .order('created_at', { ascending: false });
+
+          if (isMounted) {
+            setUserBookings(bData || []);
+            setUserReviews(rData || []);
+          }
+        } catch (e) {
+          console.error('Failed to fetch user activity', e);
+        } finally {
+          if (isMounted) setIsActivityLoading(false);
+        }
+      };
+      fetchActivity();
+      return () => { isMounted = false; };
+    }
+  }, [selectedUser?.id]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -282,61 +322,99 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               </div>
             </div>
 
-            {/* 3. 구매 활동 (기존 유지) */}
+            {/* 3. 구매 활동 (동적 데이터 연동) */}
             <div className="p-4 md:p-6 border-b border-slate-100">
               <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">구매 활동</h4>
-              <div className="grid grid-cols-3 gap-2 mb-4 md:mb-6">
-                <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
-                  <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">총 구매액</div>
-                  <div className="font-bold text-[11px] md:text-sm text-slate-900">₩1.25M</div>
+              {isActivityLoading ? (
+                <div className="flex justify-center items-center py-6 opacity-50">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-900"></div>
                 </div>
-                <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
-                  <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">구매 횟수</div>
-                  <div className="font-bold text-[11px] md:text-sm text-slate-900">5회</div>
+              ) : userBookings.length === 0 ? (
+                <div className="text-center py-8 bg-slate-50 border border-slate-100 border-dashed rounded-xl">
+                  <p className="text-[11px] md:text-xs font-bold text-slate-500">구매 내역이 없습니다</p>
                 </div>
-                <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
-                  <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">마지막 구매</div>
-                  <div className="font-bold text-[11px] md:text-sm text-slate-900">3일 전</div>
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2 mb-4 md:mb-6">
+                    <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
+                      <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">총 구매액</div>
+                      <div className="font-bold text-[11px] md:text-sm text-slate-900">
+                        ₩{userBookings.reduce((sum, b) => sum + (b.total_price || 0), 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
+                      <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">구매 횟수</div>
+                      <div className="font-bold text-[11px] md:text-sm text-slate-900">{userBookings.length}회</div>
+                    </div>
+                    <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
+                      <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">마지막 구매</div>
+                      <div className="font-bold text-[11px] md:text-sm text-slate-900">
+                        {timeAgo(userBookings[0]?.created_at) || '-'}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="border rounded-lg overflow-hidden text-[10px] md:text-xs">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-slate-500">
-                    <tr>
-                      <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium">체험명</th>
-                      <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium">날짜</th>
-                      <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium text-right">금액</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {[1, 2, 3].map((i) => (
-                      <tr key={i}>
-                        <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-900 truncate max-w-[100px] md:max-w-[120px]">을지로 노포 투어 - {i}차</td>
-                        <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-500">2026.02.0{i}</td>
-                        <td className="px-2 md:px-3 py-1.5 md:py-2 text-right font-bold">₩50,000</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  <div className="border border-slate-100 rounded-lg overflow-hidden text-[10px] md:text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                          <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium">체험명</th>
+                          <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium">날짜</th>
+                          <th className="px-2 md:px-3 py-1.5 md:py-2 font-medium text-right">금액</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {userBookings.slice(0, 5).map((b) => (
+                          <tr key={b.id} className="hover:bg-slate-50">
+                            <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-900 truncate max-w-[100px] md:max-w-[120px]">
+                              {b.experiences?.title || '알 수 없음'}
+                            </td>
+                            <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-500">
+                              {new Date(b.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-2 md:px-3 py-1.5 md:py-2 text-right font-bold">
+                              ₩{(b.total_price || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* 4. 받은 리뷰 (기존 유지) */}
+            {/* 4. 등록한 리뷰 (동적 연동) */}
             <div className="p-4 md:p-6 border-b border-slate-100">
-              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">받은 리뷰 (3개)</h4>
-              <div className="space-y-3 md:space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="bg-slate-50 p-2.5 md:p-3 rounded-xl">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-bold text-[11px] md:text-xs">Host Kim</span>
-                      <div className="flex items-center text-[9px] md:text-[10px] font-bold text-orange-500"><Star size={10} fill="currentColor" className="mr-0.5" /> 5.0</div>
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">받은 리뷰 ({userReviews.length}개)</h4>
+              {isActivityLoading ? (
+                <div className="flex justify-center items-center py-6">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900"></div>
+                </div>
+              ) : userReviews.length === 0 ? (
+                <div className="text-center py-8 bg-slate-50 border border-slate-100 border-dashed rounded-xl">
+                  <p className="text-[11px] md:text-xs font-bold text-slate-500">아직 받은 리뷰가 없습니다</p>
+                </div>
+              ) : (
+                <div className="space-y-3 md:space-y-4">
+                  {userReviews.slice(0, 5).map((r) => (
+                    <div key={r.id} className="bg-slate-50 p-2.5 md:p-3 rounded-xl">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-bold text-[11px] md:text-xs truncate mr-2">
+                          {r.experiences?.title || '알 수 없음'}
+                        </span>
+                        <div className="flex items-center text-[9px] md:text-[10px] font-bold text-orange-500 shrink-0">
+                          <Star size={10} fill="currentColor" className="mr-0.5" /> {(r.rating || 0).toFixed(1)}
+                        </div>
+                      </div>
+                      <p className="text-[10px] md:text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{r.content || '(내용 없음)'}</p>
+                      <div className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 md:mt-2">
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </div>
                     </div>
-                    <p className="text-[10px] md:text-xs text-slate-600 leading-relaxed">약속 시간도 잘 지켜주시고 매너가 너무 좋으신 게스트님이었습니다.</p>
-                    <div className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 md:mt-2">2026.01.1{i}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* 5. 관리자 메모 (기존 유지) */}
