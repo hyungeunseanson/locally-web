@@ -27,6 +27,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   const [expandedHostId, setExpandedHostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
+  const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const supabase = useMemo(() => createClient(), []);
@@ -262,6 +263,67 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
     }
   };
 
+  const handleDownloadServiceCSV = async () => {
+    setServiceCSVLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('service_bookings')
+        .select(`
+          id, order_id, amount, host_payout_amount, platform_revenue,
+          status, payment_method, created_at, customer_id,
+          service_requests ( title, city, service_date, duration_hours ),
+          host_applications ( name, bank_name, account_number, account_holder, host_nationality ),
+          profiles!service_bookings_customer_id_fkey ( full_name, email )
+        `)
+        .in('status', ['PAID', 'confirmed', 'completed'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      const rows = (data || []).filter((b: any) => filterDate(b.created_at));
+
+      if (rows.length === 0) {
+        showToast('해당 기간에 서비스 결제 내역이 없습니다.', 'error');
+        return;
+      }
+
+      const escapeCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
+      const headers = ['결제일시', '주문번호', '의뢰명', '도시', '서비스일', '고객명', '호스트명', '결제수단', '결제액', '플랫폼수수료', '호스트지급액', '예금주', '은행', '계좌번호', '상태'];
+
+      const csvRows = rows.map((b: any) => [
+        escapeCSV(format(new Date(b.created_at), 'yyyy-MM-dd HH:mm')),
+        escapeCSV(b.order_id || b.id),
+        escapeCSV(b.service_requests?.title || '-'),
+        escapeCSV(b.service_requests?.city || '-'),
+        escapeCSV(b.service_requests?.service_date || '-'),
+        escapeCSV(b.profiles?.full_name || b.profiles?.email || b.customer_id?.slice(-6)),
+        escapeCSV(b.host_applications?.name || '-'),
+        escapeCSV(b.payment_method === 'bank' ? '무통장' : '카드'),
+        b.amount || 0,
+        b.platform_revenue || 0,
+        b.host_payout_amount || 0,
+        escapeCSV(b.host_applications?.account_holder || '-'),
+        escapeCSV(b.host_applications?.bank_name || '-'),
+        escapeCSV(b.host_applications?.account_number || '-'),
+        escapeCSV(b.status),
+      ]);
+
+      const csv = [headers.join(','), ...csvRows.map((r: any[]) => r.join(','))].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `맞춤의뢰_정산명세서_${format(dateRange[0].startDate!, 'yyyyMMdd')}_${format(dateRange[0].endDate!, 'yyyyMMdd')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`맞춤 의뢰 명세서 ${rows.length}건 다운로드 완료`, 'success');
+    } catch (err: any) {
+      console.error('Service CSV error:', err);
+      showToast('서비스 CSV 생성 오류: ' + err.message, 'error');
+    } finally {
+      setServiceCSVLoading(false);
+    }
+  };
+
   return (
     <div className="flex-1 space-y-4 md:space-y-8 overflow-y-auto p-1 md:p-2 animate-in fade-in zoom-in-95 duration-300">
 
@@ -342,11 +404,20 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
             <button onClick={() => setSettlementTab('PENDING')} className={`font-bold text-xs md:text-sm pb-2 sm:pb-0 border-b-2 sm:border-b-2 sm:-mb-[17px] md:-mb-[25px] transition-all ${settlementTab === 'PENDING' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 대기 (Pending)</button>
             <button onClick={() => setSettlementTab('COMPLETED')} className={`font-bold text-xs md:text-sm pb-2 sm:pb-0 border-b-2 sm:border-b-2 sm:-mb-[17px] md:-mb-[25px] transition-all ${settlementTab === 'COMPLETED' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 완료 (History)</button>
           </div>
-          {settlementTab === 'PENDING' && (
-            <button className="bg-slate-900 text-white px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors w-full sm:w-auto">
-              <CheckCircle size={14} /> 지급 실행
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownloadServiceCSV}
+              disabled={serviceCSVLoading}
+              className="border border-slate-200 text-slate-600 px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors w-full sm:w-auto disabled:opacity-60"
+            >
+              <Download size={14} /> {serviceCSVLoading ? '생성 중...' : '맞춤 의뢰 명세서 ↓'}
             </button>
-          )}
+            {settlementTab === 'PENDING' && (
+              <button className="bg-slate-900 text-white px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors w-full sm:w-auto">
+                <CheckCircle size={14} /> 지급 실행
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">

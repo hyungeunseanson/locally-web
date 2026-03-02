@@ -55,6 +55,7 @@ export default function Sidebar() {
     online: 0,
     pendingBookings: 0,
     teamNewCount: 0,
+    servicePendingBank: 0,  // 서비스 무통장 입금 대기 건수
   });
 
   const fetchCounts = async () => {
@@ -62,11 +63,13 @@ export default function Sidebar() {
       const [
         { count: appsCount },
         { count: expsCount },
-        { data: pendingBookingsData }
+        { data: pendingBookingsData },
+        { count: svcBankPendingCount }
       ] = await Promise.all([
         supabase.from('host_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('bookings').select('id').eq('status', 'PENDING')
+        supabase.from('bookings').select('id').eq('status', 'PENDING'),
+        supabase.from('service_bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING').eq('payment_method', 'bank')
       ]);
 
       // 미열람 예약 필터링
@@ -88,7 +91,8 @@ export default function Sidebar() {
         apps: appsCount || 0,
         exps: expsCount || 0,
         pendingBookings: unviewedCount,
-        teamNewCount: (newTasksCount || 0) + (newCommentsCount || 0)
+        teamNewCount: (newTasksCount || 0) + (newCommentsCount || 0),
+        servicePendingBank: svcBankPendingCount || 0,
       }));
     } catch (e) {
       console.error('Sidebar counts fetch error:', e);
@@ -183,7 +187,7 @@ export default function Sidebar() {
           <div className="space-y-0.5 md:space-y-1">
             <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" count={counts.pendingBookings} />
             <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={16} className="md:w-[18px] md:h-[18px]" />} label="Billing & Revenue" />
-            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="맞춤 의뢰 관리" />
+            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="맞춤 의뢰 관리" count={counts.servicePendingBank} />
             <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={16} className="md:w-[18px] md:h-[18px]" />} label="Data Analytics" />
             <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />} label="Audit Logs" />
             <NavButton active={false} onClick={() => router.push('/')} icon={<House size={16} className="md:w-[18px] md:h-[18px]" />} label="Home" />

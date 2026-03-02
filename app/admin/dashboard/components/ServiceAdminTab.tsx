@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import {
   Briefcase, DollarSign, RefreshCcw, CheckCircle, AlertTriangle, ChevronDown, ChevronUp,
-  X, Loader2
+  X, Loader2, Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
@@ -145,10 +145,18 @@ function ForceCancelModal({
 }
 
 // ── 서브탭 1: 전체 의뢰 목록 ────────────────────────────────────────────────
+type AllFilter = 'ALL' | 'CANCEL_REQ';
+
 function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[]; onRefresh: () => void }) {
   const { showToast } = useToast();
   const [cancelTarget, setCancelTarget] = useState<AdminServiceBooking | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [allFilter, setAllFilter] = useState<AllFilter>('ALL');
+
+  const cancelReqCount = bookings.filter(b => b.status === 'cancellation_requested').length;
+  const displayedBookings = allFilter === 'CANCEL_REQ'
+    ? bookings.filter(b => b.status === 'cancellation_requested')
+    : bookings;
 
   const handleConfirmPayment = async (orderId: string) => {
     if (!confirm('입금이 확인되었습니까? 의뢰를 공개하고 호스트 모집을 시작합니다.')) return;
@@ -183,6 +191,27 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
         />
       )}
 
+      {/* 필터 필 */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setAllFilter('ALL')}
+          className={`px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors ${allFilter === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+        >
+          전체
+        </button>
+        <button
+          onClick={() => setAllFilter('CANCEL_REQ')}
+          className={`px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors flex items-center gap-1 ${allFilter === 'CANCEL_REQ' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
+        >
+          취소 요청
+          {cancelReqCount > 0 && (
+            <span className={`px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-black ${allFilter === 'CANCEL_REQ' ? 'bg-white/30 text-white' : 'bg-orange-500 text-white'}`}>
+              {cancelReqCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       <div className="bg-white rounded-xl md:rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs md:text-sm text-left min-w-[800px]">
@@ -201,8 +230,8 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {bookings.length > 0 ? bookings.map(b => (
-                <tr key={b.id} className="hover:bg-slate-50 transition-colors">
+              {displayedBookings.length > 0 ? displayedBookings.map(b => (
+                <tr key={b.id} className={`hover:bg-slate-50 transition-colors ${b.status === 'cancellation_requested' ? 'bg-orange-50/40' : ''}`}>
                   <td className="px-4 py-3 font-mono text-slate-400 text-[10px] md:text-xs">
                     {b.order_id ? b.order_id.slice(-12) : b.id.slice(-8)}
                   </td>
@@ -262,7 +291,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
               )) : (
                 <tr>
                   <td colSpan={10} className="px-4 py-10 text-center text-[11px] md:text-sm text-slate-400">
-                    등록된 맞춤 의뢰가 없습니다.
+                    {allFilter === 'CANCEL_REQ' ? '취소 요청 건이 없습니다.' : '등록된 맞춤 의뢰가 없습니다.'}
                   </td>
                 </tr>
               )}
@@ -317,6 +346,25 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
 
   const groups = Array.from(grouped.values());
   const totalWaiting = groups.reduce((s, g) => s + g.totalPayout, 0);
+
+  const handleDownloadSettlementCSV = (group: typeof groups[0]) => {
+    const headers = ['의뢰명', '서비스 날짜', '결제 상태', '결제액', '호스트 지급액'];
+    const rows = group.items.map(item => [
+      `"${item.service_request?.title || '-'}"`,
+      item.service_request?.service_date || format(new Date(item.created_at), 'yyyy-MM-dd'),
+      BOOKING_STATUS_LABELS[item.status]?.label || item.status,
+      item.amount,
+      item.host_payout_amount ?? 0,
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `service_settlement_${group.hostName}_${format(new Date(), 'yyyyMMdd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const markAsPaid = async (hostId: string, bookingIds: string[]) => {
     if (!confirm(`총 ${bookingIds.length}건 이체를 완료하셨습니까?\n확인 시 '정산 완료' 처리됩니다.`)) return;
@@ -425,7 +473,13 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
                     </tbody>
                   </table>
                 </div>
-                <div className="flex justify-end pt-2 border-t border-slate-200">
+                <div className="flex justify-end items-center gap-2 pt-2 border-t border-slate-200">
+                  <button
+                    onClick={() => handleDownloadSettlementCSV(group)}
+                    className="px-4 py-2.5 md:px-5 md:py-3 rounded-xl font-bold text-[12px] md:text-sm flex items-center gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <Download size={14} /> 명세서 CSV
+                  </button>
                   <button
                     onClick={() => markAsPaid(group.hostId, group.items.map(i => i.id))}
                     disabled={isProcessing || group.bank === '계좌 미등록'}
@@ -529,6 +583,7 @@ export default function ServiceAdminTab() {
   const totalPaid = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status)).reduce((s, b) => s + b.amount, 0);
   const pendingSettlement = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status) && b.payout_status === 'pending' && b.host_id).length;
   const cancelledCount = bookings.filter(b => b.status === 'cancelled').length;
+  const cancellationRequestedCount = bookings.filter(b => b.status === 'cancellation_requested').length;
 
   return (
     <div className="flex-1 space-y-4 md:space-y-6 overflow-y-auto p-1 md:p-2 animate-in fade-in zoom-in-95 duration-300">
@@ -546,7 +601,7 @@ export default function ServiceAdminTab() {
       </div>
 
       {/* KPI mini cards */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <div className="bg-white rounded-xl border border-slate-100 p-3 md:p-4 shadow-sm">
           <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">총 결제액 (GMV)</p>
           <p className="text-[15px] md:text-2xl font-black text-slate-900">₩{totalPaid.toLocaleString()}</p>
@@ -558,6 +613,12 @@ export default function ServiceAdminTab() {
         <div className="bg-white rounded-xl border border-slate-100 p-3 md:p-4 shadow-sm">
           <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">취소 건수</p>
           <p className="text-[15px] md:text-2xl font-black text-red-600">{cancelledCount}건</p>
+        </div>
+        <div className={`rounded-xl border p-3 md:p-4 shadow-sm ${cancellationRequestedCount > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-100'}`}>
+          <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">취소 요청 검토</p>
+          <p className={`text-[15px] md:text-2xl font-black ${cancellationRequestedCount > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
+            {cancellationRequestedCount}건
+          </p>
         </div>
       </div>
 

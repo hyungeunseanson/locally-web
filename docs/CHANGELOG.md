@@ -5,6 +5,42 @@
 
 ---
 
+## v3.12.0 — Admin 대시보드 운영 공백(GAP) 고도화
+
+**작업일:** 2026-03-02
+
+### 개요
+맞춤 의뢰(Service) 에스크로 선결제 도입 이후 진단된 6개 운영 공백 중 우선순위 4개(G1~G4)를 해결.
+기존 useAdminData.ts 무거운 훅 미수정, 테이블 강제 병합 없이 KPI 통합 + 운영 분리 원칙 유지.
+
+### [G4] Sidebar — 서비스 무통장 입금 대기 뱃지 추가
+
+- **기존 문제:** 사이드바의 "맞춤 의뢰 관리" 버튼에 알림 뱃지 없음. 무통장 입금 대기 건수 파악 불가.
+- **수정:** `service_bookings` 테이블에서 `status=PENDING & payment_method=bank` 건수를 `fetchCounts()`에 추가. "맞춤 의뢰 관리" NavButton에 `count={counts.servicePendingBank}` 뱃지 노출.
+- **파일:** `app/admin/dashboard/components/Sidebar.tsx`
+
+### [G2] ServiceAdminTab — 취소 요청 검토 KPI 카드 + 필터 필
+
+- **기존 문제:** `cancellation_requested` 상태 건이 전체 목록에 섞여 운영자가 식별하기 어려움.
+- **수정:**
+  - KPI 그리드를 `grid-cols-3` → `grid-cols-2 md:grid-cols-4`로 변경하고 4번째 "취소 요청 검토" 카드 추가(건수 > 0일 때 오렌지 강조).
+  - AllRequestsTab 상단에 필터 필 2종(전체 / 취소 요청) 추가. 취소 요청 탭 선택 시 해당 행 오렌지 배경 강조 및 빈 상태 메시지 별도 표시.
+- **파일:** `app/admin/dashboard/components/ServiceAdminTab.tsx`
+
+### [G3] ServiceAdminTab — 정산 명세서 CSV 다운로드 추가
+
+- **기존 문제:** SettlementTab에 "이체 완료 처리" 버튼만 있고 정산 명세서 내보내기 기능 없음.
+- **수정:** 각 호스트 그룹 아코디언 하단에 "명세서 CSV" 버튼 추가. 클릭 시 해당 호스트의 서비스 정산 항목(의뢰명, 날짜, 결제액, 지급액)을 UTF-8 BOM CSV로 다운로드.
+- **파일:** `app/admin/dashboard/components/ServiceAdminTab.tsx`
+
+### [G1] SalesTab — 맞춤 의뢰 정산 명세서 CSV 추가 (세무 대응)
+
+- **기존 문제:** SalesTab의 "명세서 다운로드"는 체험 bookings 전용 → 서비스 결제가 세무 명세서에서 완전 누락.
+- **수정:** 정산 섹션 헤더에 "맞춤 의뢰 명세서 ↓" 버튼 추가. 클릭 시 현재 날짜 필터 기준으로 `service_bookings` + `service_requests` + `host_applications` + `profiles` on-demand JOIN 조회 후 국세청 소명용 CSV(결제일시/주문번호/의뢰명/고객/호스트/결제수단/금액 등) 생성.
+- **파일:** `app/admin/dashboard/components/SalesTab.tsx`
+
+---
+
 ## v3.11.0 — 알림 시스템 Phase 1 긴급 수정
 
 **작업일:** 2026-03-02
