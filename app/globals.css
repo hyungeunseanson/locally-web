@@ -37,3 +37,9 @@ body {
 .bg-primary {
   background-color: var(--color-primary);
 }
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

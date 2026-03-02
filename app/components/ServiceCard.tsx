@@ -17,7 +17,7 @@ export default function ServiceCard({ item }: { item: LocallyService }) {
   const { t } = useLanguage();
 
   return (
-    <div className="block group cursor-pointer">
+    <div className="block group cursor-pointer active:scale-[0.98] transition-transform duration-200">
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-2 md:mb-3 border border-transparent [box-shadow:var(--shadow-card)] group-hover:[box-shadow:var(--shadow-card-hover)] group-hover:-translate-y-1 transition-all duration-500 ease-out">
         <Image
           src={item.image}

@@ -10,9 +10,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', size = 'md', isLoading, children, disabled, ...props }, ref) => {
-    // 🟢 1. 기본 스타일 (모든 버튼 공통)
-    const baseStyle = "inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 outline-none disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap";
-    
+    // 🟢 1. 기본 스타일 (모든 버튼 공통) - active:scale-95 로 네이티브 앱 같은 타격감 부여
+    const baseStyle = "inline-flex items-center justify-center font-bold rounded-xl transition-all duration-200 outline-none active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 whitespace-nowrap";
+
     // 🟢 2. 변형(Variant) 스타일 매핑 (기존 하드코딩된 색상들)
     const variants = {
       primary: "bg-[#FF385C] text-white hover:bg-[#D70466]", // 에어비앤비 코어 컬러

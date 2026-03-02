@@ -202,7 +202,7 @@ guest:profiles!bookings_user_id_fkey (
               link_url: '/host/dashboard'
             });
           }
-          else if (eventPayload.eventType === 'UPDATE' && isCancellationRequestedBookingStatus(eventPayload.new.status)) {
+          else if (eventPayload.eventType === 'UPDATE' && eventPayload.new?.status && isCancellationRequestedBookingStatus(eventPayload.new.status)) {
             showToast(t('res_toast_cancel'), 'error'); // 🟢 번역
             await sendNotification({
               recipient_id: user.id,
@@ -362,11 +362,13 @@ guest:profiles!bookings_user_id_fkey (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="border rounded-2xl p-6 bg-white flex gap-4">
-                <Skeleton className="w-24 h-24 rounded-xl" />
-                <div className="space-y-3 flex-1">
+                <Skeleton className="w-24 h-24 rounded-xl shrink-0" />
+                <div className="space-y-3 flex-1 flex flex-col justify-center">
                   <Skeleton className="w-1/3 h-5" />
                   <Skeleton className="w-1/4 h-4" />
-                  <Skeleton className="w-full h-10 rounded-lg" />
+                  <div className="mt-auto">
+                    <Skeleton className="w-full h-10 rounded-lg mt-2" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -383,26 +385,25 @@ guest:profiles!bookings_user_id_fkey (
           />
         ) : (
           <div className="space-y-4">
-            {filteredList.map(res => (
-              <ReservationCard
-                key={res.id}
-                res={res}
-                // ✅ [복구] isNew, onCheck 로직 전달
-                isNew={isNew(res.created_at, res.id)}
-                isProcessing={processingId === res.id}
-                onApproveCancel={() => handleApproveCancel(res)}
-                onShowProfile={() => setSelectedGuest(res.guest)}
-                onCheck={() => markAsRead(res.id)}
-                onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
-                onCalendar={() => addToGoogleCalendar(res)}
-                // 🟢 [추가] 후기 관련 Props
-                hasReview={reviewedBookingIds.includes(res.id)}
-                onReview={() => {
-                  setSelectedBookingForReview(res);
-                  setReviewModalOpen(true);
-                }}
+            <ReservationCard
+              key={res.id}
+              res={res}
+              // ✅ [복구] isNew, onCheck 로직 전달
+              isNew={isNew(res.created_at, res.id)}
+              isProcessing={processingId === res.id}
+              onApproveCancel={() => handleApproveCancel(res)}
+              onShowProfile={() => setSelectedGuest(res.guest || null)}
+              onCheck={() => markAsRead(res.id)}
+              onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
+              onCalendar={() => addToGoogleCalendar(res)}
+              // 🟢 [추가] 후기 관련 Props
+              hasReview={reviewedBookingIds.includes(res.id)}
+              onReview={() => {
+                setSelectedBookingForReview(res);
+                setReviewModalOpen(true);
+              }}
 
-              />
+            />
             ))}
           </div>
         )}

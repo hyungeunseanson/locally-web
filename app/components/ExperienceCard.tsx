@@ -25,7 +25,7 @@ export default function ExperienceCard({ data }: { data: any }) {
   const location = data.city || data.location || '서울';
 
   return (
-    <Link href={`/experiences/${data.id}`} className="block group">
+    <Link href={`/experiences/${data.id}`} className="block group active:scale-[0.98] transition-transform duration-200">
       {/* 🖼️ 이미지 영역 (프리미엄 쉐도우 및 Lift 애니메이션 적용) */}
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-slate-200 mb-2 md:mb-3 border border-transparent [box-shadow:var(--shadow-card)] group-hover:[box-shadow:var(--shadow-card-hover)] group-hover:-translate-y-1 transition-all duration-500 ease-out">
         <Image

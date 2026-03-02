@@ -36,6 +36,12 @@ MANAGEMENT 그룹 재배치 및 REVIEWS, LOGS 탭을 ANALYTICS 하위 중첩 탭
 - 실시간 접속 표시를 위한 웹소켓(`Supabase Channel`) 마운트 로직과 영구 저장용 DB 업데이트 로직을 2개의 단독 `useEffect` 훅으로 분리했습니다.
 - **파일:** `app/components/UserPresenceTracker.tsx`
 
+### [UX-1] 네이티브 수준의 시각적 고급화 (Premium UX & Micro-interactions)
+- **부드러운 페이지 전환 (Page Transitions):** `framer-motion`을 도입하여 페이지 라우팅 시 글로벌 페이드&슬라이드 업 효과 스펙 적용. (어드민 대시보드 예외 처리)
+- **쫀득한 조작감 (Bouncy Micro-interactions):** `Button`, `ExperienceCard`, `TripCard`, `ServiceCard`, `HostProfileCard` 등 상호작용 가능한 요소들에 `active:scale-95` 또는 `active:scale-[0.98]` 기반의 물리적 수축 효과 부여. 리플로우(Reflow)를 발생시키지 않는 GPU 가속 애니메이션만을 사용하여 성능을 방어합니다.
+- **고급 로딩 경험 (Skeleton UI):** 밋밋한 Pulse 로딩을 걷어내고, 인스타그램/에어비앤비 모델 기반의 Shimmer 스켈레톤 애니메이션 컴포넌트로 전면 교체하여 체감 대기시간 극복.
+- **파일:** `app/components/ui/PageTransition.tsx`, `app/components/ui/Skeleton.tsx`, `app/components/ClientMainWrapper.tsx`, `app/components/ui/Button.tsx`, `app/globals.css` 및 카드 컴포넌트 전체.
+
 ## v3.15.0 — 리뷰 시스템 고도화 (알림 파이프라인 + Admin 관리 + 후기 수정 + 평점 집계)
 
 **작업일:** 2026-03-02

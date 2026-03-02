@@ -28,7 +28,7 @@ export default function HostProfileCard({
   return (
     <div className="py-12 border-t border-slate-200">
       <h3 className="text-2xl font-bold mb-8">호스트 {name}님 소개</h3>
-      
+
       <div className="flex flex-col md:flex-row gap-8">
         {/* 왼쪽: 프로필 사진 및 기본 정보 */}
         <div className="md:w-1/3">
@@ -44,9 +44,9 @@ export default function HostProfileCard({
             </div>
             <h2 className="text-2xl font-bold mb-1">{name}</h2>
             <p className="text-sm text-slate-500 mb-4">슈퍼호스트</p>
-            
+
             <Link href={`/users/${hostId}`}>
-              <button className="w-full py-3 rounded-xl border border-black font-bold hover:bg-slate-50 transition-colors">
+              <button className="w-full py-3 rounded-xl border border-black font-bold hover:bg-slate-50 active:scale-95 transition-all">
                 프로필 보기
               </button>
             </Link>
@@ -55,7 +55,7 @@ export default function HostProfileCard({
 
         {/* 오른쪽: 상세 정보 (첨부해주신 이미지 스타일) */}
         <div className="md:w-2/3 space-y-6">
-          
+
           {/* 재미있는 사실들 (Grid 레이아웃) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {job && (
@@ -67,7 +67,7 @@ export default function HostProfileCard({
                 </div>
               </div>
             )}
-            
+
             {dreamDestination && (
               <div className="flex items-start gap-3">
                 <Globe className="text-slate-900 mt-1" size={20} />
@@ -105,7 +105,7 @@ export default function HostProfileCard({
               {intro || `안녕하세요! 저는 ${name}입니다. 여행과 만남을 사랑하는 호스트예요. 저와 함께 특별한 추억을 만들어보세요!`}
             </p>
           </div>
-          
+
           {/* 더 보기 버튼 */}
           <Link href={`/users/${hostId}`} className="inline-block font-bold underline decoration-1 underline-offset-4 hover:text-slate-600">
             더 읽어보기
