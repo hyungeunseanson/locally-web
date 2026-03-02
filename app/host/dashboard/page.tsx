@@ -158,7 +158,7 @@ function DashboardContent() {
   const status = hostStatus.status?.toLowerCase().trim();
 
   // 2. 심사 중 / 보완 요청 / 거절 (단, 가이드라인 탭은 모두 접근 가능)
-  if (['pending', 'revision', 'rejected'].includes(status) && activeTab !== 'guidelines') {
+  if (status && ['pending', 'revision', 'rejected'].includes(status) && activeTab !== 'guidelines') {
     return (
       <div className="max-w-2xl mx-auto px-6 py-20 text-center space-y-6 animate-in fade-in">
         <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto ${status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
@@ -202,7 +202,7 @@ function DashboardContent() {
           {(status === 'pending' || status === 'revision') && (
             <div className="pt-8 border-t border-slate-100 mt-8">
               <button onClick={() => handleTabChange('guidelines')} className="text-sm font-bold text-slate-700 flex items-center justify-center gap-2 mx-auto bg-slate-50 px-6 py-3 rounded-xl hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm hover:shadow">
-                <ShieldCheck size={18} className="text-red-500" /> 호스트 필수 가이드라인 다시 읽기
+                <ShieldCheck size={18} className="text-red-500" /> {t('btn_read_guidelines')}
               </button>
             </div>
           )}
@@ -236,7 +236,7 @@ function DashboardContent() {
           </button>
 
           <button onClick={() => handleTabChange('service-jobs')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'service-jobs' ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <Briefcase size={20} /> 서비스 매칭
+            <Briefcase size={20} /> {t('menu_service_jobs')}
             {serviceUnread && activeTab !== 'service-jobs' && (
               <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             )}
@@ -251,7 +251,7 @@ function DashboardContent() {
           </button>
 
           <button onClick={() => handleTabChange('guidelines')} className={`w-full px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'guidelines' ? 'bg-red-50 font-bold text-red-600' : 'text-slate-500 hover:bg-slate-50 hover:text-red-600'}`}>
-            <ShieldCheck size={20} className={activeTab === 'guidelines' ? 'text-red-600' : 'text-slate-400'} /> 교육 및 가이드라인
+            <ShieldCheck size={20} className={activeTab === 'guidelines' ? 'text-red-600' : 'text-slate-400'} /> {t('menu_guidelines')}
           </button>
 
           <div className="pt-4 mt-4 border-t border-slate-100">
@@ -292,11 +292,11 @@ function DashboardContent() {
               {activeTab === 'reservations' && t('menu_reservation')}
               {activeTab === 'experiences' && t('menu_my_exp')}
               {activeTab === 'inquiries' && t('menu_inquiry')}
-              {activeTab === 'service-jobs' && '서비스 매칭'}
+              {activeTab === 'service-jobs' && t('menu_service_jobs')}
               {activeTab === 'earnings' && t('menu_earnings')}
               {activeTab === 'reviews' && t('menu_reviews')}
               {activeTab === 'profile' && t('menu_profile')}
-              {activeTab === 'guidelines' && '호스트 필수 교육'}
+              {activeTab === 'guidelines' && t('title_guidelines')}
             </h1>
             {activeTab === 'experiences' && (
               <Link href="/host/create" className="hidden md:block">
@@ -314,7 +314,7 @@ function DashboardContent() {
         {activeTab === 'service-jobs' && <ServiceJobsTab />}
         {activeTab === 'earnings' && <Earnings />}
         {activeTab === 'reviews' && <HostReviews />}
-        {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}
+        {activeTab === 'profile' && <ProfileEditor profile={profile as any} onUpdate={fetchData} />}
         {activeTab === 'guidelines' && <GuidelinesTab />}
       </main>
     </div>

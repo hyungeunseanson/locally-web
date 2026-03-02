@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard } from '@/app/types/service';
 
@@ -27,6 +28,7 @@ const STATUS_CONFIG: Record<string, { cls: string; dot: string }> = {
 export default function MyServiceRequestsPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const { t } = useLanguage();
   const [requests, setRequests] = useState<ServiceRequestCard[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,7 @@ export default function MyServiceRequestsPage() {
               <ArrowLeft size={14} />
             </button>
             <div>
-              <h1 className="text-[18px] md:text-2xl font-black tracking-tight">나의 맞춤 의뢰</h1>
+              <h1 className="text-[18px] md:text-2xl font-black tracking-tight">{t('req_my_title')}</h1>
               {!loading && requests.length > 0 && (
                 <p className="text-[11px] text-slate-400 mt-0.5">총 {requests.length}건의 의뢰</p>
               )}
@@ -80,12 +82,11 @@ export default function MyServiceRequestsPage() {
               <Briefcase size={28} className="text-slate-300" />
             </div>
             <div>
-              <p className="font-semibold text-slate-600 text-[14px] mb-1">아직 등록한 의뢰가 없어요</p>
-              <p className="text-slate-400 text-[12px]">현지인 호스트가 직접 지원합니다</p>
+              <p className="font-semibold text-slate-600 text-[14px] mb-1">{t('req_my_empty')}</p>
             </div>
             <Link href="/services/intro">
               <button className="mt-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-[13px] md:text-sm hover:bg-slate-800 transition-colors shadow-lg active:scale-[0.98]">
-                첫 의뢰 등록하기 →
+                {t('req_btn_first')} →
               </button>
             </Link>
           </div>
@@ -128,7 +129,7 @@ export default function MyServiceRequestsPage() {
                         {getServiceRequestStatusLabel(req.status)}
                       </span>
                       <div className="text-right">
-                        <p className="text-[9px] text-slate-400 mb-0.5">총 결제금액</p>
+                        <p className="text-[9px] text-slate-400 mb-0.5">{t('req_total_paid')}</p>
                         <p className="font-black text-[15px] md:text-[17px] text-slate-900">
                           ₩{req.total_customer_price.toLocaleString()}
                         </p>

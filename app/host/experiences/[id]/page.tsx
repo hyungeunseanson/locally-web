@@ -1,19 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
 import { MapPin, Star, Calendar, Edit, ChevronLeft, Trash2 } from 'lucide-react';
 import Spinner from '@/app/components/ui/Spinner';
 import Link from 'next/link';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function HostExperienceDetailPage() {
-  const supabase = createClient();
-  const params = useParams();
   const router = useRouter();
+  const params = useParams();
+  const supabase = useMemo(() => createClient(), []);
   const [experience, setExperience] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const fetchExperience = async () => {
@@ -40,7 +42,7 @@ export default function HostExperienceDetailPage() {
   }, [params.id, router, supabase]);
 
   const handleDelete = async () => {
-    if (!confirm("정말 이 체험을 삭제하시겠습니까? 복구할 수 없습니다.")) return;
+    if (!confirm(t('exp_del_confirm') as string)) return;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -53,15 +55,15 @@ export default function HostExperienceDetailPage() {
       .delete()
       .eq('id', experience.id)
       .eq('host_id', user.id);
-    if (error) alert("삭제 실패");
+    if (error) alert(t('exp_del_fail'));
     else {
-      alert("삭제되었습니다.");
+      alert(t('exp_del_success'));
       router.push('/host/dashboard');
     }
   };
 
   if (loading) return <Spinner fullScreen />;
-  if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
+  if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">{t('exp_not_found')}</div>;
 
   const previewImage = experience.photos?.[0] || experience.image_url;
   const locationText = experience.location || experience.meeting_point || [experience.country, experience.city].filter(Boolean).join(' ');
@@ -111,7 +113,7 @@ export default function HostExperienceDetailPage() {
           {previewImage ? (
             <img src={previewImage} className="w-full h-full object-cover" alt={experience.title} />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400">이미지 없음</div>
+            <div className="w-full h-full flex items-center justify-center text-slate-400">{t('exp_no_img')}</div>
           )}
         </div>
 
@@ -129,10 +131,9 @@ export default function HostExperienceDetailPage() {
             </div>
 
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-              <h3 className="font-bold mb-2">💡 호스트 팁</h3>
-              <p className="text-sm text-slate-500">
-                이 페이지는 호스트님만 볼 수 있는 관리 페이지입니다.<br />
-                게스트에게 보여지는 화면을 확인하려면 로그아웃하거나 게스트 계정으로 접속하세요.
+              <h3 className="font-bold mb-2">{t('exp_host_tip')}</h3>
+              <p className="text-sm text-slate-500 whitespace-pre-line">
+                {t('exp_host_tip_desc')}
               </p>
             </div>
           </div>
@@ -140,7 +141,7 @@ export default function HostExperienceDetailPage() {
           {/* 오른쪽: 요약 카드 */}
           <div className="md:col-span-1">
             <div className="border border-slate-200 rounded-2xl p-6 shadow-sm bg-white">
-              <h3 className="font-bold text-lg mb-4">설정 정보</h3>
+              <h3 className="font-bold text-lg mb-4">{t('exp_setting_info')}</h3>
               <div className="space-y-4 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-500">가격</span>

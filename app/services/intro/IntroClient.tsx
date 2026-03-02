@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 // ── 사진 데이터 ───────────────────────────────────────────────
 const PHOTOS = [
@@ -32,6 +33,7 @@ const QUICK_FACTS = [
 export default function ServiceIntroAirbnbStylePage() {
     const router = useRouter();
     const { showToast } = useToast();
+    const { t } = useLanguage();
 
     const [isSaved, setIsSaved] = useState(false);
     const [isCopySuccess, setIsCopySuccess] = useState(false);
@@ -108,8 +110,8 @@ export default function ServiceIntroAirbnbStylePage() {
     };
 
     const handleReserve = () => {
-        if (!date) return showToast('날짜를 선택해주세요.', 'error');
-        if (!time) return showToast('시작 시간을 선택해주세요.', 'error');
+        if (!date) return showToast(t('si_select_date_err') as string, 'error');
+        if (!time) return showToast(t('si_select_time_err') as string, 'error');
 
         // 의뢰 폼으로 데이터 전달
         const params = new URLSearchParams({
@@ -133,7 +135,7 @@ export default function ServiceIntroAirbnbStylePage() {
             {/* 링크 복사 토스트 */}
             {isCopySuccess && (
                 <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-                    <Check size={16} className="text-green-400" /> 링크가 복사되었습니다.
+                    <Check size={16} className="text-green-400" /> {t('si_copied')}
                 </div>
             )}
 
@@ -145,7 +147,7 @@ export default function ServiceIntroAirbnbStylePage() {
                 <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
                     <ArrowLeft size={18} className="text-slate-900" />
                 </button>
-                <p className="absolute left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500">일본 전역 · 맞춤 동행</p>
+                <p className="absolute left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500">{t('si_mobile_tag')}</p>
                 <div className="flex items-center gap-1">
                     <button onClick={handleShare} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                         <Share size={16} className="text-slate-900" />
@@ -173,7 +175,7 @@ export default function ServiceIntroAirbnbStylePage() {
                         onClick={(e) => { e.stopPropagation(); setIsGalleryOpen(true); }}
                         className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform z-10"
                     >
-                        <Grid size={16} /> 사진 모두 보기
+                        <Grid size={16} /> {t('si_view_all_photos')}
                     </button>
                 </section>
 
@@ -207,19 +209,19 @@ export default function ServiceIntroAirbnbStylePage() {
                 <div className="md:hidden text-center px-2 mb-6">
                     <div className="flex justify-center mb-3">
                         <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-sm">
-                            <Sparkles size={10} /> 로컬리 전용 서비스
+                            <Sparkles size={10} /> {t('si_badge_exclusive')}
                         </span>
                     </div>
                     <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">
-                        일본 현지인 통역 동행 및 가이드 서비스 (맞춤형/시간당)
+                        {t('si_title_short')}
                     </h1>
                     <div className="flex items-center justify-center gap-1.5 text-[12px] font-medium mb-4">
                         <Star size={12} className="fill-slate-900" />
                         <span>5.0</span>
                         <span className="text-slate-300">·</span>
-                        <span className="underline underline-offset-2">후기 24개</span>
+                        <span className="underline underline-offset-2">{t('si_reviews_24')}</span>
                         <span className="text-slate-300">·</span>
-                        <span className="text-slate-500">일본 전역</span>
+                        <span className="text-slate-500">{t('si_region_desc')}</span>
                     </div>
                 </div>
 
@@ -228,19 +230,18 @@ export default function ServiceIntroAirbnbStylePage() {
                         <div className="flex items-start justify-between gap-6">
                             <div>
                                 <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[11px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-full shadow-sm mb-3">
-                                    <Sparkles size={11} /> 로컬리 전용 서비스
+                                    <Sparkles size={11} /> {t('si_badge_exclusive')}
                                 </span>
-                                <h1 className="text-[40px] leading-[1.15] font-black tracking-tight text-slate-900">
-                                    일본 현지인 통역 동행<br />가이드 서비스 <span className="text-[24px] text-slate-400 font-medium align-middle ml-2">(맞춤형/시간당)</span>
+                                <h1 className="text-[40px] leading-[1.15] font-black tracking-tight text-slate-900" dangerouslySetInnerHTML={{ __html: t('si_title') as string }}>
                                 </h1>
                             </div>
                             <div className="flex shrink-0 gap-2 pt-1">
                                 <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
-                                    <Share size={16} /> 공유하기
+                                    <Share size={16} /> {t('si_share')}
                                 </button>
                                 <button onClick={() => setIsSaved(!isSaved)} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
                                     <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
-                                    {isSaved ? '저장됨' : '저장'}
+                                    {isSaved ? t('si_saved') : t('si_save')}
                                 </button>
                             </div>
                         </div>
@@ -249,9 +250,9 @@ export default function ServiceIntroAirbnbStylePage() {
                             <Star size={14} className="fill-slate-900" />
                             <span>5.0</span>
                             <span className="text-slate-300">·</span>
-                            <span className="underline underline-offset-2 cursor-pointer">후기 24개</span>
+                            <span className="underline underline-offset-2 cursor-pointer">{t('si_reviews_24')}</span>
                             <span className="text-slate-300">·</span>
-                            <span className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14} />도쿄, 오사카, 후쿠오카 등 일본 전역</span>
+                            <span className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14} />{t('si_region_desc')}</span>
                         </div>
                     </div>
                 </section>
@@ -267,9 +268,9 @@ export default function ServiceIntroAirbnbStylePage() {
                                     <span className="text-slate-400 text-xl font-bold">L</span>
                                 </div>
                                 <div>
-                                    <p className="text-[18px] md:text-[20px] font-semibold">호스트: 한국어 가능한 로컬리 현지인</p>
+                                    <p className="text-[18px] md:text-[20px] font-semibold">{t('si_host_title')}</p>
                                     <p className="mt-1 text-[14px] text-slate-500 flex items-center gap-2">
-                                        통역 특화 호스트 <span className="text-slate-300">|</span> <Globe size={13} /> 한국어 레벨 3~4
+                                        {t('si_host_subtitle_1')} <span className="text-slate-300">|</span> <Globe size={13} /> {t('si_host_subtitle_2')}
                                     </p>
                                 </div>
                             </div>
@@ -277,41 +278,55 @@ export default function ServiceIntroAirbnbStylePage() {
 
                         {/* 핵심 아이콘 그리드 */}
                         <div className="mb-10 text-[15px] md:text-[16px] text-slate-800 space-y-5">
-                            {QUICK_FACTS.map((fact, idx) => {
-                                const Icon = fact.icon;
-                                return (
-                                    <div key={idx} className="flex gap-4 items-start">
-                                        <Icon size={24} className="text-slate-900 shrink-0" />
-                                        <div>
-                                            <p className="font-semibold">{fact.label}</p>
-                                            <p className="text-slate-500 text-[14px] mt-0.5">{fact.val}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            <div className="flex gap-4 items-start">
+                                <Clock size={24} className="text-slate-900 shrink-0" />
+                                <div>
+                                    <p className="font-semibold">{t('si_time')}</p>
+                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_time_desc')}</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 items-start">
+                                <Users size={24} className="text-slate-900 shrink-0" />
+                                <div>
+                                    <p className="font-semibold">{t('si_guests')}</p>
+                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_guests_desc')}</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 items-start">
+                                <Globe2 size={24} className="text-slate-900 shrink-0" />
+                                <div>
+                                    <p className="font-semibold">{t('si_lang')}</p>
+                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_lang_desc')}</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 items-start">
+                                <MapPin size={24} className="text-slate-900 shrink-0" />
+                                <div>
+                                    <p className="font-semibold">{t('si_region')}</p>
+                                    <p className="text-slate-500 text-[14px] mt-0.5">{t('si_region_desc')}</p>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="border-t border-slate-200 mb-8" />
 
                         {/* 소개 상세 내용 */}
                         <div className="prose prose-slate prose-p:leading-[1.7] prose-p:text-[16px] text-slate-600 mb-10">
-                            <h2 className="text-[22px] font-bold text-slate-900 mb-4 pb-2">서비스 소개</h2>
-                            <p>🇯🇵 일본어가 걱정되어 일본 여행이 망설여지셨나요? <strong>이제 걱정 마세요!</strong><br />
-                                한국어를 유창하게 구사하는 일본인 현지 호스트가 여러분의 일본 여행을 더욱 편리하게 만들어 드립니다.
-                            </p>
-                            <p>로컬리 현지인 한국어 동행 서비스는 여러분의 자유 일정에 현지인 친구처럼 동행하며 모든 일본어 문제를 해결해 드립니다. 단순한 여행 가이드가 아닌, 여러분의 일본 여행을 편안하게 서포트하는 <strong>현지 파트너</strong>입니다.</p>
+                            <h2 className="text-[22px] font-bold text-slate-900 mb-4 pb-2">{t('si_about_title')}</h2>
+                            <p dangerouslySetInnerHTML={{ __html: t('si_about_p1') as string }} />
+                            <p dangerouslySetInnerHTML={{ __html: t('si_about_p2') as string }} />
 
-                            <h3 className="text-[18px] font-bold text-slate-900 mt-8 mb-3">이런 분들에게 추천!</h3>
+                            <h3 className="text-[18px] font-bold text-slate-900 mt-8 mb-3">{t('si_recommend_title')}</h3>
                             <ul className="list-none pl-0 space-y-3">
                                 {[
-                                    '전자상가, 로컬샵 등에서 상품의 정보나 구매에 대해 물어보고 싶을 때',
-                                    '부동산, 병원, 미용실 등 일본어로만 상담이 필요한 곳을 방문해야 할 때',
-                                    '일본 여행에서 언어 걱정 없이, 온전히 풍경과 분위기에 집중하고 싶을 때',
-                                    '특정 상권을 벤치마킹하고, 현지인 관점의 설명이 가볍게 필요할 때'
+                                    t('si_recommend_1'),
+                                    t('si_recommend_2'),
+                                    t('si_recommend_3'),
+                                    t('si_recommend_4')
                                 ].map((item, i) => (
                                     <li key={i} className="flex gap-3 items-start p-0 m-0">
                                         <Check size={20} className="text-emerald-500 shrink-0 mt-0.5" />
-                                        <span>{item}</span>
+                                        <span>{item as string}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -321,14 +336,14 @@ export default function ServiceIntroAirbnbStylePage() {
 
                         {/* 포함/불포함 내역 */}
                         <div className="mb-10">
-                            <h2 className="text-[22px] font-bold text-slate-900 mb-5">안내 사항</h2>
+                            <h2 className="text-[22px] font-bold text-slate-900 mb-5">{t('si_info_title')}</h2>
                             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
-                                <p className="font-bold text-slate-900 mb-4">불포함 내역 (고객 부담)</p>
+                                <p className="font-bold text-slate-900 mb-4">{t('si_info_not_included')}</p>
                                 <ul className="space-y-3 text-[15px] text-slate-600">
-                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />고객 본인의 모든 경비 (교통비, 식비, 입장료, 쇼핑비 등)</li>
-                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />호스트의 모든 경비 (함께 입장하는 시설 입장료, 식사비 등)</li>
-                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />호스트의 기본 교통비(1,000엔)를 초과한 최소 원거리 이동 교통비</li>
-                                    <li className="flex gap-2.5 items-start"><AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />본 서비스는 전문 비즈니스 미팅, 계약 통역을 포함하지 않습니다. (별도 문의)</li>
+                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />{t('si_not_incl_1')}</li>
+                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />{t('si_not_incl_2')}</li>
+                                    <li className="flex gap-2.5 items-start"><X size={18} className="text-red-400 shrink-0 mt-0.5" />{t('si_not_incl_3')}</li>
+                                    <li className="flex gap-2.5 items-start"><AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />{t('si_not_incl_4')}</li>
                                 </ul>
                             </div>
                         </div>
@@ -341,7 +356,7 @@ export default function ServiceIntroAirbnbStylePage() {
                             <div className="flex justify-between items-end mb-5">
                                 <div>
                                     <span className="text-xl md:text-2xl font-semibold">₩35,000</span>
-                                    <span className="text-slate-500 text-xs md:text-sm"> / 1시간</span>
+                                    <span className="text-slate-500 text-xs md:text-sm">{t('si_form_price_hour')}</span>
                                 </div>
                             </div>
 
@@ -354,7 +369,7 @@ export default function ServiceIntroAirbnbStylePage() {
                                         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}><ChevronRight size={16} /></button>
                                     </div>
                                     <div className="grid grid-cols-7 text-center mb-2">
-                                        {['일', '월', '화', '수', '목', '금', '토'].map(d => <span key={d} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{d}</span>)}
+                                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <span key={d} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{t(`day_${d.toLowerCase()}`) || d}</span>)}
                                     </div>
                                     <div className="grid grid-cols-7 gap-y-1 justify-items-center">
                                         {renderCalendar()}
@@ -364,37 +379,37 @@ export default function ServiceIntroAirbnbStylePage() {
                                 {/* 시작 시간 및 이용 시간 */}
                                 <div className="flex border-b border-slate-300">
                                     <div className="flex-1 p-3 border-r border-slate-300">
-                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">시작 시간</label>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">{t('si_form_start_time')}</label>
                                         <select
                                             value={time}
                                             onChange={(e) => setTime(e.target.value)}
                                             className="w-full text-[13px] md:text-sm outline-none cursor-pointer bg-transparent font-semibold py-1"
                                         >
-                                            <option value="">선택</option>
-                                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                            <option value="">{t('si_form_select')}</option>
+                                            {TIME_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
                                         </select>
                                     </div>
                                     <div className="flex-1 p-3 bg-white">
-                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">이용 시간 (최소 4시간)</label>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">{t('si_form_duration')}</label>
                                         <select
                                             value={duration}
                                             onChange={(e) => setDuration(Number(e.target.value))}
                                             className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
                                         >
-                                            {DURATION_OPTIONS.map(h => <option key={h} value={h}>{h}시간</option>)}
+                                            {DURATION_OPTIONS.map(h => <option key={h} value={h}>{h}{t('si_form_duration_hr')}</option>)}
                                         </select>
                                     </div>
                                 </div>
 
                                 {/* 인원 */}
                                 <div className="p-3 bg-white flex flex-col justify-center">
-                                    <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">인원 (최대 4명 기준가)</label>
+                                    <label className="block text-[10px] uppercase font-bold text-slate-800 mb-1">{t('si_form_guests')}</label>
                                     <select
                                         value={guests}
                                         onChange={(e) => setGuests(Number(e.target.value))}
                                         className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
                                     >
-                                        {GUEST_OPTIONS.map(g => <option key={g} value={String(g)}>게스트 {g}명</option>)}
+                                        {GUEST_OPTIONS.map(g => <option key={g} value={String(g)}>{g}{t('si_form_guests_unit')}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -403,23 +418,23 @@ export default function ServiceIntroAirbnbStylePage() {
                                 onClick={handleReserve}
                                 className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4"
                             >
-                                의뢰 등록하기 (조건 확정)
+                                {t('si_btn_reserve')}
                             </button>
-                            <p className="text-center text-slate-500 text-xs mb-3">예약 확정 전에는 요금이 청구되지 않습니다.</p>
+                            <p className="text-center text-slate-500 text-xs mb-3">{t('si_reserve_notice')}</p>
 
                             <div className="space-y-2 pt-4 border-t border-slate-100 text-[12px] md:text-sm">
                                 <div className="flex justify-between text-slate-600">
-                                    <span className="underline">₩35,000 x {duration}시간</span>
+                                    <span className="underline">{(t('si_price_calc') as string).replace('{hrs}', duration.toString())}</span>
                                     <span>₩{totalPrice.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-slate-600">
-                                    <span className="underline">로컬리 서비스 수수료</span>
+                                    <span className="underline">{t('si_fee')}</span>
                                     <span>₩0</span>
                                 </div>
                             </div>
 
                             <div className="flex justify-between font-semibold pt-4 border-t border-slate-100 mt-4 text-base md:text-lg">
-                                <span>총 합계</span>
+                                <span>{t('si_total')}</span>
                                 <span>₩{totalPrice.toLocaleString()}</span>
                             </div>
                         </div>
@@ -435,8 +450,8 @@ export default function ServiceIntroAirbnbStylePage() {
             >
                 <div className="flex justify-between items-center gap-4">
                     <div>
-                        <p className="text-[15px] font-bold text-slate-900">₩35,000 <span className="text-[12px] font-normal text-slate-500">/ 1시간</span></p>
-                        <p className="text-[12px] text-slate-500 underline underline-offset-2">날짜 및 시간 선택</p>
+                        <p className="text-[15px] font-bold text-slate-900">₩35,000 <span className="text-[12px] font-normal text-slate-500">{t('si_form_price_hour')}</span></p>
+                        <p className="text-[12px] text-slate-500 underline underline-offset-2">{t('si_mobile_date_select')}</p>
                     </div>
                     <button
                         onClick={() => {
@@ -446,7 +461,7 @@ export default function ServiceIntroAirbnbStylePage() {
                         }}
                         className="flex-1 max-w-[160px] py-3 bg-gradient-to-r from-rose-600 to-rose-500 text-white rounded-xl font-bold text-[15px] hover:opacity-90 transition-opacity flex justify-center items-center shadow-md"
                     >
-                        의뢰 등록하기
+                        {t('si_mobile_btn_reserve')}
                     </button>
                 </div>
             </div>
@@ -456,7 +471,7 @@ export default function ServiceIntroAirbnbStylePage() {
                 <div className="fixed inset-0 z-[150] bg-white animate-in fade-in duration-200 flex flex-col">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                         <button onClick={() => setIsGalleryOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
-                        <h3 className="font-bold text-lg">사진 모두 보기</h3>
+                        <h3 className="font-bold text-lg">{t('si_view_all_photos')}</h3>
                         <div className="w-10"></div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-slate-50">

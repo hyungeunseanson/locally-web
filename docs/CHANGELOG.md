@@ -5,6 +5,37 @@
 
 ---
 
+## v3.17.0 — 글로벌 다국어(i18n) 통합 및 UX 라이팅 고도화
+
+**작업일:** 2026-03-02
+
+### 개요
+글로벌 런칭 스펙 확정에 따라, 플랫폼 전체(어드민 제외)의 다국어(i18n) 통합 및 에어비앤비 스타일의 프리미엄 UX 라이팅 고도화 작업을 실시결함.
+
+### [i18n-1] LanguageContext 딕셔너리 확장
+- 한국어(`ko`), 영어(`en`), 일본어(`ja`), 중국어(`zh`) 4개 국어 사전을 지원하도록 `LanguageContext.tsx` 전면 동기화.
+- 리뷰 모달, 메인 알림센터, 서비스 의뢰(목록, 상세, 도입, 신청, 결제, 완료 등), 호스트 대시보드의 서비스 탭 등 주요 컴포넌트에 필요한 다국어 Key-Value 쌍 추가.
+- **파일:** `app/context/LanguageContext.tsx`
+
+### [i18n-2] 컴포넌트 내 하드코딩 텍스트 전면 치환 (UX 라이팅 고도화 적용)
+- 사용자 경험 향상을 위해 간결하고 행동 지향적이며, 구어체 기반의 친근한 UX 라이팅 적용.
+- `t()` 훅을 전역적으로 주입하여 기존 하드코딩되어 있던 한글 텍스트 완벽 교체 완료.
+- **파일:**
+  - `app/services/page.tsx`
+  - `app/services/request/page.tsx`
+  - `app/services/[requestId]/ServiceRequestClient.tsx`
+  - `app/services/[requestId]/apply/page.tsx`
+  - `app/services/[requestId]/payment/page.tsx`
+  - `app/services/[requestId]/payment/complete/page.tsx`
+  - `app/services/intro/IntroClient.tsx`
+  - `app/services/my/page.tsx`
+  - `app/host/experiences/[id]/page.tsx`
+  - `app/host/dashboard/page.tsx`
+  - `app/host/dashboard/components/ServiceJobsTab.tsx`
+  - `app/components/ReviewModal.tsx`
+
+---
+
 ## v3.16.0 — Admin 대시보드 UI/UX 라우팅 재설계 (Domain Grouping)
 
 **작업일:** 2026-03-02

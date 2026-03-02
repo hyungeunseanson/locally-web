@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Star, X, Camera, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
+import { useLanguage } from '@/app/context/LanguageContext';
 
 interface ReviewModalProps {
   trip: any;
@@ -14,6 +15,7 @@ interface ReviewModalProps {
 export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
   const supabase = createClient();
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   // [R5] 수정 모드 감지: trip.review가 있으면 수정 모드
   const isEditMode = !!(trip.review?.id);
@@ -32,7 +34,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const totalImages = existingPhotoUrls.length + imageFiles.length;
-      if (totalImages >= 2) return showToast("사진은 최대 2장까지 첨부 가능합니다.", 'error');
+      if (totalImages >= 2) return showToast(t('rv_max_photos') as string, 'error');
 
       const file = e.target.files[0];
       const imageUrl = URL.createObjectURL(file);
@@ -52,8 +54,8 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
   };
 
   const handleSubmit = async () => {
-    if (rating === 0) return showToast("별점을 선택해주세요!", 'error');
-    if (reviewText.length < 10) return showToast("후기는 10자 이상 작성해주세요.", 'error');
+    if (rating === 0) return showToast(t('rv_select_rating') as string, 'error');
+    if (reviewText.length < 10) return showToast(t('rv_min_length') as string, 'error');
 
     setIsSubmitting(true);
 
@@ -84,10 +86,10 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(errorData.error || '후기 수정에 실패했습니다.');
+          throw new Error(errorData.error || (t('rv_edit_fail') as string));
         }
 
-        showToast("후기가 수정되었습니다!", 'success');
+        showToast(t('rv_edit_success') as string, 'success');
       } else {
         // 신규 작성: POST API 호출
         const res = await fetch('/api/reviews', {
@@ -104,10 +106,10 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
         if (!res.ok) {
           const errorData = await res.json();
-          throw new Error(errorData.error || '후기 저장에 실패했습니다.');
+          throw new Error(errorData.error || (t('rv_save_fail') as string));
         }
 
-        showToast("소중한 후기가 등록되었습니다!", 'success');
+        showToast(t('rv_save_success') as string, 'success');
       }
 
       // 🟢 목록 새로고침 요청 후 모달 닫기
@@ -116,7 +118,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
     } catch (error: any) {
       console.error(error);
-      showToast((isEditMode ? "후기 수정 실패: " : "후기 등록 실패: ") + error.message, 'error');
+      showToast((isEditMode ? `${t('rv_edit_fail')} ` : `${t('rv_save_fail')} `) + error.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -133,7 +135,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
       >
         <div className="px-5 md:px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-base md:text-lg text-slate-900">
-            {isEditMode ? '후기 수정' : '후기 작성'}
+            {isEditMode ? t('rv_title_edit') : t('rv_title_new')}
           </h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900">
             <X size={20} />
@@ -147,7 +149,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             </div>
             <div>
               <h4 className="font-bold text-sm text-slate-900 line-clamp-1">{trip.title}</h4>
-              <p className="text-xs text-slate-500 mt-1">{trip.hostName || trip.host} 호스트님과의 만남은 어떠셨나요?</p>
+              <p className="text-xs text-slate-500 mt-1">{trip.hostName || trip.host} {t('rv_host_ask')}</p>
             </div>
           </div>
 
@@ -169,17 +171,17 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             ))}
           </div>
           <p className="text-center text-xs md:text-sm font-bold text-slate-700 mb-5 md:mb-8 h-5">
-            {rating === 5 ? "최고였어요! 😍" :
-              rating === 4 ? "좋았어요! 😊" :
-                rating === 3 ? "보통이에요 🙂" :
-                  rating === 2 ? "아쉬웠어요 🙁" :
-                    rating === 1 ? "별로였어요 😫" :
-                      "별점을 눌러 평가해주세요"}
+            {rating === 5 ? t('rv_rating_5') :
+              rating === 4 ? t('rv_rating_4') :
+                rating === 3 ? t('rv_rating_3') :
+                  rating === 2 ? t('rv_rating_2') :
+                    rating === 1 ? t('rv_rating_1') :
+                      t('rv_rating_0')}
           </p>
 
           <textarea
             className="w-full h-28 md:h-32 p-3.5 md:p-4 border border-slate-300 rounded-xl resize-none focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm mb-4 placeholder:text-slate-400"
-            placeholder="솔직한 후기를 남겨주세요. (최소 10자 이상)"
+            placeholder={t('rv_placeholder') as string}
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
           />
@@ -213,7 +215,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             {existingPhotoUrls.length + imageFiles.length < 2 && (
               <label className="w-16 h-16 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-slate-500 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100">
                 <Camera size={20} />
-                <span className="text-[10px] mt-1 font-medium">사진 추가</span>
+                <span className="text-[10px] mt-1 font-medium">{t('rv_add_photo')}</span>
                 <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
               </label>
             )}
@@ -221,7 +223,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
           {isEditMode && (
             <p className="text-[11px] text-slate-400 text-center mb-3">
-              후기는 작성 후 7일 이내에만 수정할 수 있습니다.
+              {t('rv_edit_rule')}
             </p>
           )}
 
@@ -230,7 +232,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             disabled={rating === 0 || reviewText.length < 10 || isSubmitting}
             className="w-full bg-black text-white font-bold py-3.5 md:py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 text-sm md:text-base"
           >
-            {isSubmitting ? <><Loader2 className="animate-spin" size={20} /> 저장 중...</> : (isEditMode ? '후기 수정하기' : '후기 등록하기')}
+            {isSubmitting ? <><Loader2 className="animate-spin" size={20} /> {t('rv_btn_saving')}</> : (isEditMode ? t('rv_btn_edit') : t('rv_btn_submit'))}
           </button>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import type { ServiceRequestCard } from '@/app/types/service';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 const CITY_FILTERS = ['전체', '도쿄', '오사카', '후쿠오카', '삿포로', '나고야', '서울', '부산', '제주'];
 
@@ -27,6 +28,7 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
 export default function ServiceJobBoardPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const { t } = useLanguage();
   const [requests, setRequests] = useState<ServiceRequestCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCity, setSelectedCity] = useState('전체');
@@ -64,15 +66,15 @@ export default function ServiceJobBoardPage() {
               <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center">
                 <Briefcase size={15} className="text-white" />
               </div>
-              <h1 className="text-[19px] md:text-2xl font-black tracking-tight">서비스 잡보드</h1>
+              <h1 className="text-[19px] md:text-2xl font-black tracking-tight">{t('sjb_title')}</h1>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] md:text-xs text-slate-400">
               <SlidersHorizontal size={12} />
-              <span>{requests.length}건</span>
+              <span>{requests.length}{t('sjb_count')}</span>
             </div>
           </div>
           <p className="text-[11px] md:text-sm text-slate-500 pl-10">
-            고객의 맞춤 서비스 의뢰 — 원하는 의뢰에 지원하세요
+            {t('sjb_desc')}
           </p>
         </div>
 
@@ -83,11 +85,11 @@ export default function ServiceJobBoardPage() {
               key={city}
               onClick={() => setSelectedCity(city)}
               className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] md:text-xs font-bold border transition-all ${selectedCity === city
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-md'
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-900'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-900'
                 }`}
             >
-              {city}
+              {city === '전체' ? t('city_all') : t(`city_${city === '도쿄' ? 'tokyo' : city === '오사카' ? 'osaka' : city === '후쿠오카' ? 'fukuoka' : city === '삿포로' ? 'sapporo' : city === '나고야' ? 'nagoya' : city === '서울' ? 'seoul' : city === '부산' ? 'busan' : city === '제주' ? 'jeju' : ''}`)}
             </button>
           ))}
         </div>
@@ -104,8 +106,8 @@ export default function ServiceJobBoardPage() {
             <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
               <Briefcase size={24} className="text-slate-300" />
             </div>
-            <p className="font-semibold text-slate-500 text-[13px] md:text-sm">현재 열린 의뢰가 없습니다</p>
-            <p className="text-slate-400 text-[11px] md:text-xs">다른 도시를 선택하거나 나중에 다시 확인해보세요.</p>
+            <p className="font-semibold text-slate-500 text-[13px] md:text-sm">{t('sjb_empty_title')}</p>
+            <p className="text-slate-400 text-[11px] md:text-xs">{t('sjb_empty_desc')}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -124,7 +126,7 @@ export default function ServiceJobBoardPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <span className={`text-[9px] md:text-[10px] px-2 py-0.5 rounded-full font-black tracking-wide ${cfg.cls}`}>
-                            {cfg.label}
+                            {t(`status_${req.status}`)}
                           </span>
                           <span className="text-[10px] md:text-xs text-slate-400">{req.city}</span>
                         </div>
@@ -142,14 +144,14 @@ export default function ServiceJobBoardPage() {
                     <div className="px-4 pb-4 pt-3 flex items-center justify-between gap-3">
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] md:text-[11px] text-slate-400">
                         <span className="flex items-center gap-1"><Calendar size={10} />{req.service_date}</span>
-                        <span className="flex items-center gap-1"><Clock size={10} />{req.duration_hours}시간</span>
-                        <span className="flex items-center gap-1"><Users size={10} />{req.guest_count}명</span>
+                        <span className="flex items-center gap-1"><Clock size={10} />{req.duration_hours}{t('req_duration_hours') || 'h'}</span>
+                        <span className="flex items-center gap-1"><Users size={10} />{req.guest_count}{t('req_guest_count') || '인'}</span>
                         {req.languages?.length > 0 && (
                           <span className="flex items-center gap-1"><Globe2 size={10} />{req.languages.slice(0, 2).join(' · ')}</span>
                         )}
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-[9px] md:text-[10px] text-slate-400 mb-0.5">예상 수입</p>
+                        <p className="text-[9px] md:text-[10px] text-slate-400 mb-0.5">{t('sjb_expected_income')}</p>
                         <p className="font-black text-[15px] md:text-[17px] text-emerald-600">{earnStr}</p>
                       </div>
                     </div>

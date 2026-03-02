@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, Clock, Users, Globe, FileText, Phone, User } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import SiteHeader from '@/app/components/SiteHeader';
 
 const LANGUAGE_OPTIONS = ['한국어', '영어', '일본어', '중국어'];
@@ -15,6 +16,7 @@ function ServiceRequestForm() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const TIME_OPTIONS = Array.from({ length: 25 }, (_, i) => {
     const hour = Math.floor(i / 2) + 8;
@@ -44,17 +46,17 @@ function ServiceRequestForm() {
 
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim() || !city || !serviceDate || !startTime || !contactName.trim() || !contactPhone.trim()) {
-      showToast('모든 필수 항목을 입력해주세요.', 'error');
+      showToast(t('srf_err_required') as string, 'error');
       return;
     }
     if (durationHours < 4) {
-      showToast('최소 이용 시간은 4시간입니다.', 'error');
+      showToast(t('srf_err_min_hrs') as string, 'error');
       return;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      showToast('로그인이 필요합니다.', 'error');
+      showToast(t('srf_err_login') as string, 'error');
       router.push('/login');
       return;
     }
@@ -78,14 +80,14 @@ function ServiceRequestForm() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        showToast(data.error || '의뢰 등록에 실패했습니다.', 'error');
+        showToast(data.error || t('srf_err_fail'), 'error');
         return;
       }
 
-      showToast('의뢰가 등록되었습니다! 결제 후 호스트 모집이 시작됩니다.', 'success');
+      showToast(t('srf_success') as string, 'success');
       router.push(`/services/${data.requestId}/payment`);
     } catch {
-      showToast('서버 오류가 발생했습니다.', 'error');
+      showToast(t('server_error') as string || '서버 오류가 발생했습니다.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -101,8 +103,8 @@ function ServiceRequestForm() {
             <ChevronLeft size={18} />
           </button>
           <div>
-            <h1 className="text-[18px] md:text-2xl font-black tracking-tight">맞춤 서비스 의뢰</h1>
-            <p className="text-[11px] md:text-sm text-slate-500 mt-0.5">원하는 내용을 작성하면 현지 호스트가 지원합니다</p>
+            <h1 className="text-[18px] md:text-2xl font-black tracking-tight">{t('srf_title')}</h1>
+            <p className="text-[11px] md:text-sm text-slate-500 mt-0.5">{t('srf_desc')}</p>
           </div>
         </div>
 
@@ -110,12 +112,12 @@ function ServiceRequestForm() {
           {/* 의뢰 제목 */}
           <div>
             <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">
-              <FileText size={13} className="inline mr-1.5" />의뢰 제목 *
+              <FileText size={13} className="inline mr-1.5" />{t('srf_req_title_label')}
             </label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 도쿄 아사쿠사 지역 반나절 동행 통역"
+              placeholder={t('srf_req_title_ph') as string}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 placeholder:text-slate-400"
             />
           </div>
@@ -123,16 +125,16 @@ function ServiceRequestForm() {
           {/* 도시 */}
           <div>
             <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">
-              <Globe size={13} className="inline mr-1.5" />도시 *
+              <Globe size={13} className="inline mr-1.5" />{t('srf_city_label')}
             </label>
             <select
               value={city}
               onChange={(e) => setCity(e.target.value)}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
             >
-              <option value="">도시를 선택하세요</option>
+              <option value="">{t('srf_city_ph')}</option>
               {CITY_OPTIONS.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>{c === '도쿄' ? t('city_tokyo') : c === '오사카' ? t('city_osaka') : c === '후쿠오카' ? t('city_fukuoka') : c === '삿포로' ? t('city_sapporo') : c === '나고야' ? t('city_nagoya') : c === '서울' ? t('city_seoul') : c === '부산' ? t('city_busan') : c === '제주' ? t('city_jeju') : c}</option>
               ))}
             </select>
           </div>
@@ -140,7 +142,7 @@ function ServiceRequestForm() {
           {/* 날짜 & 시간 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">서비스 날짜 *</label>
+              <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">{t('srf_date_label')}</label>
               <input
                 type="date"
                 value={serviceDate}
@@ -150,13 +152,13 @@ function ServiceRequestForm() {
               />
             </div>
             <div>
-              <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">시작 시간 *</label>
+              <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">{t('srf_time_label')}</label>
               <select
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
               >
-                <option value="">시작 시간을 선택하세요</option>
+                <option value="">{t('srf_time_ph')}</option>
                 {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
@@ -166,7 +168,7 @@ function ServiceRequestForm() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">
-                <Clock size={13} className="inline mr-1.5" />이용 시간 (최소 4h) *
+                <Clock size={13} className="inline mr-1.5" />{t('srf_duration_label')}
               </label>
               <select
                 value={durationHours}
@@ -174,13 +176,13 @@ function ServiceRequestForm() {
                 className="w-full border border-slate-200 rounded-xl px-3 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
               >
                 {[4, 5, 6, 7, 8, 9, 10, 12].map((h) => (
-                  <option key={h} value={h}>{h}시간</option>
+                  <option key={h} value={h}>{h}{t('req_duration_hours')}</option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">
-                <Users size={13} className="inline mr-1.5" />인원 *
+                <Users size={13} className="inline mr-1.5" />{t('srf_guests_label')}
               </label>
               <select
                 value={guestCount}
@@ -188,7 +190,7 @@ function ServiceRequestForm() {
                 className="w-full border border-slate-200 rounded-xl px-3 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
               >
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                  <option key={n} value={n}>{n}명</option>
+                  <option key={n} value={n}>{n}{t('req_guest_count')}</option>
                 ))}
               </select>
             </div>
@@ -196,7 +198,7 @@ function ServiceRequestForm() {
 
           {/* 필요 언어 */}
           <div>
-            <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-2">필요 언어 (복수 선택 가능)</label>
+            <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-2">{t('srf_lang_label')}</label>
             <div className="flex flex-wrap gap-2">
               {LANGUAGE_OPTIONS.map((lang) => (
                 <button
@@ -208,7 +210,7 @@ function ServiceRequestForm() {
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
                     }`}
                 >
-                  {lang}
+                  {lang === '한국어' ? t('lang_ko') : lang === '영어' ? t('lang_en') : lang === '일본어' ? t('lang_ja') : lang === '중국어' ? t('lang_zh') : lang}
                 </button>
               ))}
             </div>
@@ -216,12 +218,12 @@ function ServiceRequestForm() {
 
           {/* 상세 설명 */}
           <div>
-            <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">상세 설명 *</label>
+            <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">{t('srf_desc_label')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
-              placeholder="원하시는 서비스 내용을 자세히 설명해주세요.&#10;예: 병원 통역, 쇼핑 동행, 비즈니스 미팅 등..."
+              placeholder={t('srf_desc_ph') as string}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none placeholder:text-slate-400"
             />
           </div>
@@ -230,23 +232,23 @@ function ServiceRequestForm() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">
-                <User size={13} className="inline mr-1.5" />이름 *
+                <User size={13} className="inline mr-1.5" />{t('srf_name_label')}
               </label>
               <input
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
-                placeholder="홍길동"
+                placeholder={t('srf_name_ph') as string}
                 className="w-full border border-slate-200 rounded-xl px-3 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 placeholder:text-slate-400"
               />
             </div>
             <div>
               <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">
-                <Phone size={13} className="inline mr-1.5" />연락처 *
+                <Phone size={13} className="inline mr-1.5" />{t('srf_phone_label')}
               </label>
               <input
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="010-1234-5678"
+                placeholder={t('srf_phone_ph') as string}
                 className="w-full border border-slate-200 rounded-xl px-3 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 placeholder:text-slate-400"
               />
             </div>
@@ -255,15 +257,15 @@ function ServiceRequestForm() {
           {/* 가격 요약 */}
           <div className="bg-slate-50 rounded-2xl p-4 md:p-5 border border-slate-100">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[12px] md:text-sm text-slate-500">시간당 요금</span>
+              <span className="text-[12px] md:text-sm text-slate-500">{t('srf_summary_price_hr')}</span>
               <span className="text-[13px] md:text-sm font-semibold">₩35,000</span>
             </div>
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[12px] md:text-sm text-slate-500">이용 시간</span>
-              <span className="text-[13px] md:text-sm font-semibold">{durationHours}시간</span>
+              <span className="text-[12px] md:text-sm text-slate-500">{t('srf_summary_duration')}</span>
+              <span className="text-[13px] md:text-sm font-semibold">{durationHours}{t('req_duration_hours')}</span>
             </div>
             <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between items-center">
-              <span className="text-[13px] md:text-sm font-bold text-slate-900">총 예상 금액</span>
+              <span className="text-[13px] md:text-sm font-bold text-slate-900">{t('srf_summary_total')}</span>
               <span className="text-[16px] md:text-lg font-black text-slate-900">₩{totalPrice.toLocaleString()}</span>
             </div>
           </div>
@@ -274,10 +276,10 @@ function ServiceRequestForm() {
             disabled={isSubmitting}
             className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg"
           >
-            {isSubmitting ? '처리 중...' : '의뢰 등록 및 결제하기'}
+            {isSubmitting ? t('processing') : t('srf_btn_submit')}
           </button>
           <p className="text-[10px] md:text-xs text-slate-400 text-center">
-            의뢰 등록 즉시 결제(에스크로)가 진행됩니다. 결제 완료 후 현지 호스트들에게 공개되고, 마음에 드는 호스트를 선택하면 매칭이 완료됩니다.
+            {t('srf_submit_notice')}
           </p>
         </div>
       </div>

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Clock, MapPin, Users, Calendar, ChevronRight, Briefcase } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
+import { useLanguage } from '@/app/context/LanguageContext';
 import {
   getServiceRequestStatusLabel,
   getServiceApplicationStatusLabel,
@@ -19,6 +20,7 @@ type ApplicationWithRequest = ServiceApplication & {
 
 export default function ServiceJobsTab() {
   const supabase = useMemo(() => createClient(), []);
+  const { t } = useLanguage();
   const [subTab, setSubTab] = useState<SubTab>('board');
   const [requests, setRequests] = useState<ServiceRequestCard[]>([]);
   const [myApplications, setMyApplications] = useState<ApplicationWithRequest[]>([]);
@@ -65,10 +67,9 @@ export default function ServiceJobsTab() {
   }, [subTab, userId, supabase]);
 
   const subTabClass = (tab: SubTab) =>
-    `px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold border transition-colors ${
-      subTab === tab
-        ? 'bg-slate-900 text-white border-slate-900'
-        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+    `px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold border transition-colors ${subTab === tab
+      ? 'bg-slate-900 text-white border-slate-900'
+      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
     }`;
 
   const statusColor: Record<string, string> = {
@@ -83,13 +84,13 @@ export default function ServiceJobsTab() {
       {/* 서브탭 */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         <button className={subTabClass('board')} onClick={() => setSubTab('board')}>
-          열린 의뢰
+          {t('tab_open_reqs')}
         </button>
         <button className={subTabClass('my-applications')} onClick={() => setSubTab('my-applications')}>
-          내 지원 현황
+          {t('tab_my_apps')}
         </button>
         <button className={subTabClass('active')} onClick={() => setSubTab('active')}>
-          진행중 서비스
+          {t('tab_active_services')}
         </button>
       </div>
 
@@ -103,7 +104,7 @@ export default function ServiceJobsTab() {
           {subTab === 'board' && (
             requests.length === 0 ? (
               <div className="text-center py-16 text-slate-400 text-[13px] md:text-sm">
-                현재 열린 의뢰가 없습니다.
+                {t('empty_open_reqs')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -135,7 +136,7 @@ export default function ServiceJobsTab() {
           {(subTab === 'my-applications' || subTab === 'active') && (
             myApplications.length === 0 ? (
               <div className="text-center py-16 text-slate-400 text-[13px] md:text-sm">
-                {subTab === 'active' ? '현재 진행 중인 서비스가 없습니다.' : '아직 지원한 의뢰가 없습니다.'}
+                {subTab === 'active' ? t('empty_active_services') : t('empty_my_apps')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -165,7 +166,7 @@ export default function ServiceJobsTab() {
                           </span>
                           {req && (
                             <span className="font-black text-[13px] md:text-[14px] text-emerald-600">
-                              ₩{(20000 * req.duration_hours).toLocaleString()} 예정
+                              ₩{(20000 * req.duration_hours).toLocaleString()} {t('expected')}
                             </span>
                           )}
                         </div>
@@ -183,7 +184,7 @@ export default function ServiceJobsTab() {
       {subTab === 'board' && (
         <Link href="/services">
           <button className="w-full border border-slate-200 rounded-2xl py-3 text-[12px] md:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 mt-2">
-            <Briefcase size={14} /> 잡보드 전체 보기
+            <Briefcase size={14} /> {t('btn_view_job_board')}
           </button>
         </Link>
       )}

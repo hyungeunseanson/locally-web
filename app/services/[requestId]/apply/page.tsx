@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft, Clock, MapPin, Users, DollarSign } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import SiteHeader from '@/app/components/SiteHeader';
 import type { ServiceRequest } from '@/app/types/service';
 
@@ -13,6 +14,7 @@ export default function ServiceApplyPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const [request, setRequest] = useState<ServiceRequest | null>(null);
   const [appealMessage, setAppealMessage] = useState('');
@@ -99,8 +101,8 @@ export default function ServiceApplyPage() {
             <ChevronLeft size={18} />
           </button>
           <div>
-            <h1 className="text-[18px] md:text-xl font-black">서비스 지원하기</h1>
-            <p className="text-[11px] md:text-xs text-slate-500 mt-0.5">고객에게 나를 어필해보세요</p>
+            <h1 className="text-[18px] md:text-xl font-black">{t('req_apply_title')}</h1>
+            <p className="text-[11px] md:text-xs text-slate-500 mt-0.5">{t('req_apply_subtitle')}</p>
           </div>
         </div>
 
@@ -117,7 +119,7 @@ export default function ServiceApplyPage() {
           {/* 예상 수입 (호스트 단가 ₩20,000 — 비율 노출 금지) */}
           <div className="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2">
             <DollarSign size={13} className="text-emerald-500" />
-            <span className="text-[11px] md:text-[12px] text-slate-500">예상 수입</span>
+            <span className="text-[11px] md:text-[12px] text-slate-500">{t('req_est_income')}</span>
             <span className="font-black text-[14px] md:text-[15px] text-emerald-600">
               ₩{hostEarning.toLocaleString()}
             </span>
@@ -127,7 +129,7 @@ export default function ServiceApplyPage() {
         {/* 어필 메시지 */}
         <div className="mb-5">
           <label className="block text-[13px] md:text-sm font-bold text-slate-700 mb-1.5">
-            어필 메시지 * <span className="font-normal text-slate-400 text-[11px]">(최소 20자)</span>
+            {t('req_appeal_msg')} * <span className="font-normal text-slate-400 text-[11px]">(최소 20자)</span>
           </label>
           <textarea
             value={appealMessage}
@@ -144,7 +146,7 @@ export default function ServiceApplyPage() {
           disabled={isSubmitting || appealMessage.trim().length < 20}
           className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg"
         >
-          {isSubmitting ? '지원 중...' : '지원 완료하기'}
+          {isSubmitting ? t('loading') : t('req_btn_apply')}
         </button>
         <p className="text-[10px] md:text-xs text-slate-400 text-center mt-3">
           지원 후 고객이 선택하면 결제가 완료되어 매칭이 확정됩니다.

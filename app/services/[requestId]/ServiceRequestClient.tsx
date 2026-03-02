@@ -11,6 +11,7 @@ import {
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import SiteHeader from '@/app/components/SiteHeader';
+import { useLanguage } from '@/app/context/LanguageContext';
 import {
   getServiceRequestStatusLabel,
   isOpenServiceRequest,
@@ -20,11 +21,11 @@ import {
 import type { ServiceRequest, ServiceApplicationWithProfile } from '@/app/types/service';
 
 // ── 매칭 스텝 정의 (v2 에스크로) ────────────────────────────────
-const MATCH_STEPS = [
-  { icon: CreditCard, label: '선결제' },
-  { icon: Users, label: '호스트 지원' },
-  { icon: UserCheck, label: '매칭 확정' },
-  { icon: ClipboardList, label: '서비스 완료' },
+const MATCHING_STEPS = [
+  { icon: CreditCard, labelKey: 'sr_step_pay' },
+  { icon: Users, labelKey: 'sr_step_apply' },
+  { icon: UserCheck, labelKey: 'sr_step_match' },
+  { icon: ClipboardList, labelKey: 'sr_step_complete' },
 ];
 
 function getActiveStep(status: string) {
@@ -53,6 +54,7 @@ export default function ServiceRequestDetailPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [request, setRequest] = useState<ServiceRequest | null>(null);
@@ -94,7 +96,7 @@ export default function ServiceRequestDetailPage() {
   }, [requestId, supabase]);
 
   const handleSelectHost = async (applicationId: string) => {
-    if (!window.confirm('이 호스트를 선택하시겠습니까? 이미 결제된 금액으로 매칭이 확정됩니다.')) return;
+    if (!window.confirm(t('sr_confirm_select_host'))) return;
     setSelecting(applicationId);
     try {
       const res = await fetch('/api/services/select-host', {
@@ -103,12 +105,12 @@ export default function ServiceRequestDetailPage() {
         body: JSON.stringify({ request_id: requestId, application_id: applicationId }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) { showToast(data.error || '호스트 선택에 실패했습니다.', 'error'); return; }
-      showToast('호스트 선택 완료! 매칭이 확정되었습니다.', 'success');
+      if (!res.ok || !data.success) { showToast(data.error || t('sr_select_host_fail'), 'error'); return; }
+      showToast(t('sr_select_host_success'), 'success');
       // v2 에스크로: 결제는 이미 완료 — 페이지 새로고침으로 상태 반영
       router.refresh();
     } catch {
-      showToast('서버 오류가 발생했습니다.', 'error');
+      showToast(t('server_error'), 'error');
     } finally { setSelecting(null); }
   };
 
@@ -120,13 +122,13 @@ export default function ServiceRequestDetailPage() {
 
   if (!request) return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4">
-      <p className="text-slate-400 text-sm">의뢰를 찾을 수 없습니다.</p>
-      <Link href="/services"><button className="text-slate-900 underline text-sm">목록으로</button></Link>
+      <p className="text-slate-400 text-sm">{t('req_not_found')}</p>
+      <Link href="/services"><button className="text-slate-900 underline text-sm">{t('btn_go_to_list')}</button></Link>
     </div>
   );
 
   const statusCfg = STATUS_CFG[request.status] ?? { label: request.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
-  const activeStep = getActiveStep(request.status);
+  const currentStepIndex = getActiveStep(request.status);
 
   return (
     <div className="min-h-screen bg-[#F8F8F8] text-slate-900 font-sans">
@@ -147,25 +149,25 @@ export default function ServiceRequestDetailPage() {
               {request.title}
             </h1>
             <span className={`text-[10px] md:text-xs px-2.5 py-0.5 rounded-full font-bold border ${statusCfg.cls}`}>
-              {statusCfg.label}
+              {t(`status_${request.status}`)}
             </span>
           </div>
         </div>
 
         {/* ── 매칭 프로세스 스텝 가이드 ── */}
         <div className="bg-white rounded-2xl border border-slate-100 px-4 py-4 mb-4 shadow-sm">
-          <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">매칭 진행 상황</p>
+          <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">{t('sr_progress')}</p>
           <div className="flex items-center">
-            {MATCH_STEPS.map((step, idx) => {
-              const done = idx < activeStep;
-              const active = idx === activeStep - 1 || (activeStep === 0 && idx === 0);
+            {MATCHING_STEPS.map((step, idx) => {
+              const done = idx < currentStepIndex;
+              const active = idx === currentStepIndex - 1 || (currentStepIndex === 0 && idx === 0);
               const StepIcon = step.icon;
               return (
                 <React.Fragment key={idx}>
                   <div className="flex flex-col items-center gap-1 flex-1">
                     <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center transition-all ${done ? 'bg-emerald-500' :
-                        active ? 'bg-slate-900 ring-4 ring-slate-900/10' :
-                          'bg-slate-100'
+                      active ? 'bg-slate-900 ring-4 ring-slate-900/10' :
+                        'bg-slate-100'
                       }`}>
                       {done
                         ? <CheckCircle size={16} className="text-white" />
@@ -173,9 +175,9 @@ export default function ServiceRequestDetailPage() {
                       }
                     </div>
                     <p className={`text-[9px] md:text-[10px] font-semibold text-center leading-tight ${done ? 'text-emerald-600' : active ? 'text-slate-900' : 'text-slate-400'
-                      }`}>{step.label}</p>
+                      }`}>{t(step.labelKey)}</p>
                   </div>
-                  {idx < MATCH_STEPS.length - 1 && (
+                  {idx < MATCHING_STEPS.length - 1 && (
                     <div className={`h-0.5 flex-1 mx-1 transition-colors ${done ? 'bg-emerald-400' : 'bg-slate-100'}`} />
                   )}
                 </React.Fragment>
@@ -189,8 +191,8 @@ export default function ServiceRequestDetailPage() {
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-4 flex flex-col items-center gap-3 text-center">
             <CreditCard size={32} className="text-amber-500" />
             <div>
-              <p className="font-black text-[15px] md:text-base text-amber-900 mb-1">결제가 필요합니다</p>
-              <p className="text-[12px] md:text-[13px] text-amber-700">결제 완료 후 현지 호스트들에게 공개됩니다.</p>
+              <p className="font-black text-[15px] md:text-base text-amber-900 mb-1">{t('sr_need_pay')}</p>
+              <p className="text-[12px] md:text-[13px] text-amber-700">{t('sr_need_pay_desc')}</p>
             </div>
             <button
               onClick={() => router.push(`/services/${requestId}/payment`)}
@@ -198,7 +200,7 @@ export default function ServiceRequestDetailPage() {
               style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', boxShadow: '0 4px 15px rgba(217,119,6,0.35)' }}
             >
               <span className="flex items-center justify-center gap-2">
-                <CreditCard size={16} /> 지금 결제하기
+                <CreditCard size={16} /> {t('btn_pay_now')}
               </span>
             </button>
           </div>
@@ -206,14 +208,14 @@ export default function ServiceRequestDetailPage() {
 
         {/* ── 의뢰 요약 카드 ── */}
         <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 mb-4 shadow-sm">
-          <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">의뢰 정보</p>
+          <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">{t('sr_info')}</p>
 
           <div className="grid grid-cols-2 gap-2.5 mb-4">
             {[
-              { icon: MapPin, label: '지역', val: request.city },
-              { icon: Calendar, label: '날짜', val: `${request.service_date} ${request.start_time}` },
-              { icon: Clock, label: '소요 시간', val: `${request.duration_hours}시간` },
-              { icon: Users, label: '인원', val: `${request.guest_count}명` },
+              { icon: MapPin, label: t('sr_label_region'), val: request.city },
+              { icon: Calendar, label: t('sr_label_date'), val: `${request.service_date} ${request.start_time}` },
+              { icon: Clock, label: t('sr_label_duration'), val: `${request.duration_hours}${t('req_duration_hours')}` },
+              { icon: Users, label: t('sr_label_guests'), val: `${request.guest_count}${t('req_guest_count')}` },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -242,7 +244,7 @@ export default function ServiceRequestDetailPage() {
 
           {/* 요청 내용 */}
           <div className="bg-slate-50 rounded-xl px-3.5 py-3 mb-4">
-            <p className="text-[10px] text-slate-400 font-semibold mb-1">요청 내용</p>
+            <p className="text-[10px] text-slate-400 font-semibold mb-1">{t('sr_label_content')}</p>
             <p className="text-[12px] md:text-[13px] text-slate-700 leading-relaxed whitespace-pre-line">{request.description}</p>
           </div>
 
@@ -250,18 +252,18 @@ export default function ServiceRequestDetailPage() {
           <div className="flex items-center justify-between pt-3 border-t border-slate-100">
             {isOwner ? (
               <>
-                <span className="text-[12px] md:text-[13px] text-slate-500">총 결제 금액</span>
+                <span className="text-[12px] md:text-[13px] text-slate-500">{t('req_total_paid')}</span>
                 <span className="font-black text-[18px] md:text-xl text-slate-900">₩{request.total_customer_price.toLocaleString()}</span>
               </>
             ) : (
               <>
                 <div>
-                  <p className="text-[10px] text-slate-400 mb-0.5">예상 수입</p>
+                  <p className="text-[10px] text-slate-400 mb-0.5">{t('req_est_income')}</p>
                   <p className="font-black text-[18px] md:text-xl text-emerald-600">₩{request.total_host_payout.toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-1.5">
                   <Sparkles size={12} className="text-emerald-500" />
-                  <span className="text-[10px] md:text-[11px] text-emerald-700 font-bold">지원 가능</span>
+                  <span className="text-[10px] md:text-[11px] text-emerald-700 font-bold">{t('sr_can_apply')}</span>
                 </div>
               </>
             )}
@@ -269,25 +271,25 @@ export default function ServiceRequestDetailPage() {
         </div>
 
         {/* ── [고객 뷰] 지원자 목록 ── */}
-        {isOwner && (
+        {isOwner && request.status !== 'pending_payment' && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-[14px] md:text-base font-black">
-                지원한 호스트
-                <span className="ml-2 text-[12px] text-slate-400 font-normal">({applications.length}명)</span>
+                {t('sr_host_list')}
+                <span className="ml-2 text-[12px] text-slate-400 font-normal">({applications.length}{t('req_guest_count')})</span>
               </h2>
             </div>
 
             {applications.length === 0 ? (
               <div className="bg-white rounded-2xl border border-dashed border-slate-200 py-12 text-center">
                 <Users size={28} className="text-slate-200 mx-auto mb-2" />
-                <p className="text-slate-400 text-[13px] font-medium">아직 지원한 호스트가 없습니다</p>
-                <p className="text-slate-300 text-[11px] mt-1">조금만 기다려 주세요!</p>
+                <p className="text-slate-400 text-[13px] font-medium">{t('sr_empty_host')}</p>
+                <p className="text-slate-300 text-[11px] mt-1">{t('sr_empty_host_sub')}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {applications.map((app) => {
-                  const name = app.profiles?.full_name || app.host_applications?.name || '호스트';
+                  const name = app.profiles?.full_name || app.host_applications?.name || t('host');
                   const avatar = app.profiles?.avatar_url || app.host_applications?.profile_photo;
                   const langs = app.profiles?.languages || app.host_applications?.languages || [];
                   const bio = app.host_applications?.self_intro || app.profiles?.bio;
@@ -321,7 +323,7 @@ export default function ServiceRequestDetailPage() {
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-black text-[14px] md:text-[15px] text-slate-900">{name}</span>
                             {isSelected && (
-                              <span className="text-[9px] md:text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold">선택됨</span>
+                              <span className="text-[9px] md:text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold">{t('sr_selected')}</span>
                             )}
                           </div>
                           {/* 평점 */}
@@ -333,7 +335,7 @@ export default function ServiceRequestDetailPage() {
                               <span className="text-[10px] text-slate-500 ml-0.5">{app.review_avg?.toFixed(1)} ({app.review_count})</span>
                             </div>
                           ) : (
-                            <p className="text-[10px] text-slate-300 mb-1.5">아직 후기 없음</p>
+                            <p className="text-[10px] text-slate-300 mb-1.5">{t('sr_no_reviews')}</p>
                           )}
                           {/* 언어 */}
                           {langs.length > 0 && (
@@ -356,7 +358,7 @@ export default function ServiceRequestDetailPage() {
                       {/* ─ 어필 메시지 구분 ─ */}
                       <div className="mx-4 border-t border-slate-50" />
                       <div className="px-4 py-3">
-                        <p className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">지원 메시지</p>
+                        <p className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">{t('sr_appeal_message')}</p>
                         <p className="text-[12px] md:text-[13px] text-slate-700 leading-relaxed">{app.appeal_message}</p>
                       </div>
 
@@ -369,7 +371,7 @@ export default function ServiceRequestDetailPage() {
                             className="w-full py-3 rounded-xl font-black text-[13px] md:text-sm text-white transition-all active:scale-[0.98] disabled:opacity-60"
                             style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', boxShadow: '0 4px 15px rgba(15,52,96,0.3)' }}
                           >
-                            {selecting === app.id ? '처리 중...' : '이 호스트 선택하기 →'}
+                            {selecting === app.id ? t('processing') : t('btn_select_host')}
                           </button>
                         </div>
                       )}
@@ -385,8 +387,8 @@ export default function ServiceRequestDetailPage() {
         {isSelectedHost && isMatchedServiceRequest(request.status) && (
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 text-center mb-4">
             <CheckCircle size={36} className="text-blue-500 mx-auto mb-2" />
-            <p className="font-black text-[15px] md:text-base text-blue-900 mb-1">매칭이 확정되었습니다! 🎉</p>
-            <p className="text-[12px] md:text-[13px] text-blue-600">결제는 이미 완료되었습니다. 서비스 날짜에 고객을 만나세요!</p>
+            <p className="font-black text-[15px] md:text-base text-blue-900 mb-1">{t('sr_selected_host_banner_title')}</p>
+            <p className="text-[12px] md:text-[13px] text-blue-600">{t('sr_selected_host_banner_desc')}</p>
           </div>
         )}
 
@@ -395,23 +397,23 @@ export default function ServiceRequestDetailPage() {
           <div className="mb-4">
             {myApplication ? (
               <div className={`rounded-2xl p-5 border text-center ${myApplication.status === 'selected'
-                  ? 'bg-blue-50 border-blue-200'
-                  : myApplication.status === 'rejected'
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-slate-50 border-slate-200'
+                ? 'bg-blue-50 border-blue-200'
+                : myApplication.status === 'rejected'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-slate-50 border-slate-200'
                 }`}>
                 <p className={`font-black text-[14px] md:text-[15px] ${myApplication.status === 'selected' ? 'text-blue-700'
-                    : myApplication.status === 'rejected' ? 'text-red-600'
-                      : 'text-slate-700'
+                  : myApplication.status === 'rejected' ? 'text-red-600'
+                    : 'text-slate-700'
                   }`}>
                   {myApplication.status === 'selected'
-                    ? '🎉 고객에게 선택되었습니다!'
+                    ? t('sr_selected_host')
                     : myApplication.status === 'rejected'
-                      ? '이번에는 선택되지 않았습니다.'
-                      : '✉️ 지원 완료 — 검토 중'}
+                      ? t('sr_not_selected_host')
+                      : t('sr_application_pending')}
                 </p>
                 {myApplication.status === 'pending' && (
-                  <p className="text-[11px] md:text-[12px] text-slate-400 mt-1">고객이 호스트를 검토하고 있습니다.</p>
+                  <p className="text-[11px] md:text-[12px] text-slate-400 mt-1">{t('sr_customer_reviewing')}</p>
                 )}
               </div>
             ) : isOpenServiceRequest(request.status) ? (
@@ -421,7 +423,7 @@ export default function ServiceRequestDetailPage() {
                   style={{ background: 'linear-gradient(135deg, #111827 0%, #1f2937 50%, #374151 100%)', boxShadow: '0 8px 25px rgba(17,24,39,0.35)' }}
                 >
                   <span className="flex items-center justify-center gap-2">
-                    지원하기 <ArrowRight size={18} />
+                    {t('btn_apply')} <ArrowRight size={18} />
                   </span>
                 </button>
               </Link>

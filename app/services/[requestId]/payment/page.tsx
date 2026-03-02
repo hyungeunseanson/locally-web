@@ -6,6 +6,7 @@ import { ChevronLeft, CreditCard, Landmark, Loader2, Clock, Users, ShieldCheck, 
 import Script from 'next/script';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import type { ServiceRequest } from '@/app/types/service';
 
 type ImpRequestData = {
@@ -48,6 +49,7 @@ function ServicePaymentContent() {
   const params = useParams<{ requestId: string }>();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const requestId = params.requestId;
 
@@ -107,15 +109,15 @@ function ServicePaymentContent() {
     setPaymentError('');
 
     if (!contactName.trim() || !contactPhone.trim()) {
-      showToast('이름과 연락처를 입력해주세요.', 'error');
+      showToast(t('sp_err_empty') as string, 'error');
       return;
     }
     if (!agreeTerms) {
-      showToast('이용 약관에 동의해주세요.', 'error');
+      showToast(t('sp_err_terms') as string, 'error');
       return;
     }
     if (!request || !pendingBooking) {
-      showToast('결제 정보가 올바르지 않습니다.', 'error');
+      showToast(t('sp_err_info') as string, 'error');
       return;
     }
 
@@ -129,7 +131,7 @@ function ServicePaymentContent() {
           body: JSON.stringify({ orderId: pendingBooking.order_id }),
         });
         if (!markRes.ok) {
-          setPaymentError('결제 수단 저장에 실패했습니다. 다시 시도해 주세요.');
+          setPaymentError(t('sp_err_bank_fail') as string);
           setIsProcessing(false);
           return;
         }
@@ -139,7 +141,7 @@ function ServicePaymentContent() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!window.IMP) {
-        setPaymentError('결제 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+        setPaymentError(t('sp_err_module') as string);
         setIsProcessing(false);
         return;
       }
@@ -162,7 +164,7 @@ function ServicePaymentContent() {
         },
         async (rsp: ImpResponse) => {
           if (!rsp.success) {
-            setPaymentError(rsp.error_msg || '결제가 취소되었습니다.');
+            setPaymentError(rsp.error_msg || (t('sp_err_cancel') as string));
             setIsProcessing(false);
             return;
           }
@@ -184,7 +186,7 @@ function ServicePaymentContent() {
           });
 
           if (!callbackRes.ok) {
-            setPaymentError('결제 검증에 실패했습니다. 고객센터에 문의해주세요.');
+            setPaymentError(t('sp_err_verify') as string);
             setIsProcessing(false);
             return;
           }
@@ -193,7 +195,7 @@ function ServicePaymentContent() {
         }
       );
     } catch {
-      setPaymentError('결제 처리 중 오류가 발생했습니다.');
+      setPaymentError(t('sp_err_process') as string);
       setIsProcessing(false);
     }
   };
@@ -215,16 +217,16 @@ function ServicePaymentContent() {
           <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50">
             <ChevronLeft size={18} />
           </button>
-          <h1 className="text-[18px] md:text-xl font-black">결제하기</h1>
+          <h1 className="text-[18px] md:text-xl font-black">{t('sp_title')}</h1>
         </div>
 
         {/* 에스크로 안내 */}
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 mb-5 flex items-start gap-3">
           <Lock size={16} className="text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <p className="text-[12px] md:text-[13px] font-bold text-amber-800 mb-0.5">에스크로 선결제 방식</p>
+            <p className="text-[12px] md:text-[13px] font-bold text-amber-800 mb-0.5">{t('sp_escrow_badge')}</p>
             <p className="text-[11px] md:text-[12px] text-amber-700 leading-relaxed">
-              결제금액은 안전하게 보관되며, 호스트를 선택하지 않으면 전액 환불됩니다.
+              {t('sp_escrow_desc')}
             </p>
           </div>
         </div>
@@ -233,30 +235,30 @@ function ServicePaymentContent() {
         <div className="bg-slate-50 rounded-2xl p-4 md:p-5 mb-5">
           <h2 className="font-bold text-[14px] md:text-[15px] mb-2 line-clamp-2">{request.title}</h2>
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] md:text-[13px] text-slate-500">
-            <span className="flex items-center gap-1"><Clock size={11} />{request.duration_hours}시간</span>
-            <span className="flex items-center gap-1"><Users size={11} />{request.guest_count}명</span>
+            <span className="flex items-center gap-1"><Clock size={11} />{request.duration_hours}{t('req_duration_hours')}</span>
+            <span className="flex items-center gap-1"><Users size={11} />{request.guest_count}{t('req_guest_count')}</span>
             <span>{request.service_date} {request.start_time}</span>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
-            <span className="text-[12px] md:text-sm text-slate-500">결제 금액</span>
+            <span className="text-[12px] md:text-sm text-slate-500">{t('sp_payment_amount')}</span>
             <span className="font-black text-[18px] md:text-xl text-slate-900">₩{request.total_customer_price.toLocaleString()}</span>
           </div>
         </div>
 
         {/* 예약자 정보 */}
         <div className="mb-5">
-          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">예약자 정보</h3>
+          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">{t('sp_booker_info')}</h3>
           <div className="space-y-3">
             <input
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
-              placeholder="이름 *"
+              placeholder={t('sp_booker_name_ph') as string}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
             <input
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
-              placeholder="연락처 * (예: 010-1234-5678)"
+              placeholder={t('sp_booker_phone_ph') as string}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
@@ -264,31 +266,29 @@ function ServicePaymentContent() {
 
         {/* 결제 수단 선택 */}
         <div className="mb-5">
-          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">결제 수단</h3>
+          <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">{t('sp_method_title')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setPaymentMethod('card')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
-                paymentMethod === 'card'
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'card'
                   ? 'border-slate-900 bg-slate-50'
                   : 'border-slate-200 hover:border-slate-300'
-              }`}
+                }`}
             >
               <CreditCard size={20} className={paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'} />
-              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'}`}>카드 결제</span>
+              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'}`}>{t('sp_method_card')}</span>
             </button>
             <button
               type="button"
               onClick={() => setPaymentMethod('bank')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
-                paymentMethod === 'bank'
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'bank'
                   ? 'border-slate-900 bg-slate-50'
                   : 'border-slate-200 hover:border-slate-300'
-              }`}
+                }`}
             >
               <Landmark size={20} className={paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'} />
-              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'}`}>무통장 입금</span>
+              <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'}`}>{t('sp_method_bank')}</span>
             </button>
           </div>
         </div>
@@ -296,13 +296,13 @@ function ServicePaymentContent() {
         {/* 무통장 계좌 안내 */}
         {paymentMethod === 'bank' && (
           <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 mb-5 animate-in fade-in zoom-in-95">
-            <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
+            <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">{t('sp_bank_account')}</p>
             <div className="flex items-center gap-2 mb-2">
               <span className="font-black text-[16px] md:text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
               <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
             </div>
             <p className="text-[11px] md:text-xs text-slate-400">
-              * 예약 후 <span className="text-rose-500 font-bold">1시간 이내</span>에 미입금 시 자동 취소됩니다.
+              {t('sp_bank_notice_1')}<span className="text-rose-500 font-bold">{t('sp_bank_notice_hl')}</span>{t('sp_bank_notice_2')}
             </p>
           </div>
         )}
@@ -311,14 +311,14 @@ function ServicePaymentContent() {
         <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
           <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 accent-slate-900" />
           <span className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
-            서비스 이용약관 및 개인정보 처리방침에 동의합니다. 호스트 미선택 시 전액 환불됩니다.
+            {t('sp_agree_terms')}
           </span>
         </label>
 
         {/* 안전 결제 안내 */}
         <div className="flex items-center gap-2 text-[10px] md:text-xs text-slate-400 mb-5">
           <ShieldCheck size={13} className="text-emerald-500 shrink-0" />
-          NicePay 안전 결제 시스템으로 보호됩니다.
+          {t('sp_safe_pay')}
         </div>
 
         {/* 에러 */}
@@ -335,11 +335,11 @@ function ServicePaymentContent() {
           className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
         >
           {isProcessing ? (
-            <><Loader2 size={18} className="animate-spin" /> 처리 중...</>
+            <><Loader2 size={18} className="animate-spin" /> {t('processing')}</>
           ) : paymentMethod === 'bank' ? (
-            <><Landmark size={18} /> 무통장 입금 신청하기</>
+            <><Landmark size={18} /> {t('sp_btn_bank')}</>
           ) : (
-            <><CreditCard size={18} /> ₩{request.total_customer_price.toLocaleString()} 결제하기</>
+            <><CreditCard size={18} /> {(t('sp_btn_card') as string).replace('{price}', `₩${request.total_customer_price.toLocaleString()}`)}</>
           )}
         </button>
       </div>
