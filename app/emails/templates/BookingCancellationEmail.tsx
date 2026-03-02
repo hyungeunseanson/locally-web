@@ -4,11 +4,11 @@ import EmailLayout from '../components/EmailLayout';
 import CTAButton from '../components/CTAButton';
 
 interface BookingCancellationEmailProps {
-    hostName: string;
-    experienceTitle: string;
-    cancelReason: string;
-    refundAmount: number;
-    dashboardLink: string;
+    hostName?: string;
+    experienceTitle?: string;
+    cancelReason?: string;
+    refundAmount?: number;
+    dashboardLink?: string;
 }
 
 export default function BookingCancellationEmail({
@@ -34,7 +34,7 @@ export default function BookingCancellationEmail({
                 <Hr style={receiptHr} />
                 <Row style={receiptRow}>
                     <Column style={labelCol}>게스트 환불액</Column>
-                    <Column style={valueColAlert}>₩{refundAmount.toLocaleString()}</Column>
+                    <Column style={valueColAlert}>₩{refundAmount?.toLocaleString() || 0}</Column>
                 </Row>
             </Section>
 
