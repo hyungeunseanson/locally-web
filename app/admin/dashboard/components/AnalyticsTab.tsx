@@ -10,6 +10,8 @@ import 'react-date-range/dist/theme/default.css';
 import { Range } from 'react-date-range';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
+import ReviewsTab from './ReviewsTab';
+import AuditLogTab from './AuditLogTab';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
@@ -29,7 +31,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
-  const [activeMainTab, setActiveMainTab] = useState<'business' | 'host'>('business'); // 🟢 서브탭 구분
+  const [activeMainTab, setActiveMainTab] = useState<'business' | 'host' | 'reviews' | 'logs'>('business'); // 🟢 서브탭 구분
 
   // 날짜 필터 상태 추가
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -549,29 +551,28 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         </div>
       </div>
 
-      {/* 🟢 신설: 메인 탭 전환 (Business vs Host) */}
-      <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-fit mb-6 md:mb-8">
-        <button
-          onClick={() => setActiveMainTab('business')}
-          className={`flex-1 md:flex-none px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 ${activeMainTab === 'business'
-            ? 'bg-white text-slate-900 shadow-sm'
-            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-            }`}
-        >
-          Business & Guest
-        </button>
-        <button
-          onClick={() => setActiveMainTab('host')}
-          className={`flex-1 md:flex-none px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 ${activeMainTab === 'host'
-            ? 'bg-white text-slate-900 shadow-sm'
-            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-            }`}
-        >
-          Host Ecosystem
-        </button>
+      {/* 🟢 수정: 메인 탭 전환 (Business / Host / Reviews / Logs) */}
+      <div className="flex flex-nowrap md:flex-wrap bg-slate-100 p-1 rounded-xl w-full md:w-fit mb-6 md:mb-8 overflow-x-auto scrollbar-hide gap-1">
+        {[
+          { id: 'business', label: 'Business & Guest' },
+          { id: 'host', label: 'Host Ecosystem' },
+          { id: 'reviews', label: 'Review Management' },
+          { id: 'logs', label: 'Audit Logs' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveMainTab(tab.id as any)}
+            className={`flex-none px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 whitespace-nowrap ${activeMainTab === tab.id
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+              }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {activeMainTab === 'business' ? (
+      {activeMainTab === 'business' && (
         <>
           {/* 1. 핵심 지표 (KPI) - 원본 순서 및 기능 100% 복구 */}
           <section>
@@ -809,7 +810,9 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
             </div>
           </section>
         </>
-      ) : (
+      )}
+
+      {activeMainTab === 'host' && (
         <div className="space-y-12 animate-in slide-in-from-bottom-[50px] duration-500">
           {/* 1. 호스트 활성화 퍼널 (Health Funnel) */}
           <section>
@@ -1025,6 +1028,18 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
             </div>
           </section>
+        </div>
+      )}
+
+      {activeMainTab === 'reviews' && (
+        <div className="animate-in slide-in-from-bottom-[50px] duration-500">
+          <ReviewsTab />
+        </div>
+      )}
+
+      {activeMainTab === 'logs' && (
+        <div className="animate-in slide-in-from-bottom-[50px] duration-500">
+          <AuditLogTab />
         </div>
       )}
 

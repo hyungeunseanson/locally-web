@@ -179,6 +179,7 @@ export default function Sidebar() {
               count={counts.apps + counts.exps}
             />
             <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={16} className="md:w-[18px] md:h-[18px]" />} label="User Management" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
+            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="Service Requests" count={counts.servicePendingBank} />
           </div>
         </div>
 
@@ -201,10 +202,7 @@ export default function Sidebar() {
           <div className="space-y-0.5 md:space-y-1">
             <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" count={counts.pendingBookings} />
             <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={16} className="md:w-[18px] md:h-[18px]" />} label="Billing & Revenue" />
-            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="맞춤 의뢰 관리" count={counts.servicePendingBank} />
-            <NavButton active={activeTab === 'REVIEWS'} onClick={() => handleTabChange('REVIEWS')} icon={<Star size={16} className="md:w-[18px] md:h-[18px]" />} label="Review Management" />
             <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={16} className="md:w-[18px] md:h-[18px]" />} label="Data Analytics" />
-            <NavButton active={activeTab === 'LOGS'} onClick={() => handleTabChange('LOGS')} icon={<ShieldCheck size={16} className="md:w-[18px] md:h-[18px]" />} label="Audit Logs" />
             <NavButton active={false} onClick={() => router.push('/')} icon={<House size={16} className="md:w-[18px] md:h-[18px]" />} label="Home" />
           </div>
         </div>

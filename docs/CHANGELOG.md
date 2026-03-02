@@ -5,6 +5,25 @@
 
 ---
 
+## v3.16.0 — Admin 대시보드 UI/UX 라우팅 재설계 (Domain Grouping)
+
+**작업일:** 2026-03-02
+
+### 개요
+C레벨 파트너의 의사결정에 따라 데이터/API 로직 변경 없이 순수 프론트엔드 UI/UX 배치만 조정.
+MANAGEMENT 그룹 재배치 및 REVIEWS, LOGS 탭을 ANALYTICS 하위 중첩 탭으로 흡수.
+
+### [UI-1] Sidebar 네비게이션 재배치
+- `MANAGEMENT` 그룹에 'Approvals (승인 관리)', 'User Management (유저 관리)', 'Service Requests' 3종 집중 배치.
+- 서비스 의뢰 네비게이션 영문 텍스트 통일.
+- 메인 사이드바에서 `Review Management`와 `Audit Logs` 탭 제거.
+- **파일:** `app/admin/dashboard/components/Sidebar.tsx`
+
+### [UI-2] AnalyticsTab 내부 중첩 서브 탭 연동
+- 메인 Analytics 페이지 상단에 4개의 서브 탭 네비게이터 배치: `Business & Guest`, `Host Ecosystem`, `Review Management`, `Audit Logs`.
+- 기존 `ReviewsTab`, `AuditLogTab` 컴포넌트 렌더링 위치를 사이드바 라우팅이 아닌 `AnalyticsTab` 내부 상태 제어로 이관.
+- **파일:** `app/admin/dashboard/components/AnalyticsTab.tsx`, `app/admin/dashboard/page.tsx`
+
 ## v3.15.0 — 리뷰 시스템 고도화 (알림 파이프라인 + Admin 관리 + 후기 수정 + 평점 집계)
 
 **작업일:** 2026-03-02
