@@ -85,9 +85,8 @@ export default function ReservationCard({
 
     if (isPendingBookingStatus(status)) {
       return (
-        <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1 animate-pulse">
-          <div className="w-1.5 h-1.5 bg-yellow-600 rounded-full"></div>
-          {t('res_status_pending')}
+        <span className="bg-slate-100 border border-slate-200 text-slate-600 text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 animate-pulse">
+          <Clock size={10} /> 결제 대기중
         </span>
       );
     }
@@ -300,6 +299,16 @@ export default function ReservationCard({
           )}
         </div>
       </div>
+
+      {/* 호스트 취소 안내 문구 (확정된 예약) */}
+      {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && (
+        <div className="mx-3 md:mx-6 mb-3 bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
+          <AlertTriangle className="text-slate-400 shrink-0 mt-0.5" size={14} />
+          <p className="text-[11px] text-slate-500 leading-snug">
+            호스트 사정으로 예약을 진행할 수 없는 경우, <strong>게스트에게 메시지로 상황을 설명하고 예약을 취소하도록 요청</strong>해 주세요.
+          </p>
+        </div>
+      )}
 
       {/* 취소 요청 승인 박스 */}
       {isCancellationRequestedBookingStatus(res.status) && (

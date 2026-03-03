@@ -27,15 +27,16 @@ export async function GET() {
     const updatedTrips = [];
 
     // 2. 데이터 가공 및 '자동 완료' 로직
+    const bookingsToUpdate: string[] = [];
+
     for (const booking of bookings || []) {
       const expDate = new Date(`${booking.date}T${booking.time}`);
       let status = booking.status;
 
-      // 🟢 [M-2] 클라이언트 측 조회 API에서는 무거운 DB 덮어쓰기(Side-effect)를 제거합니다.
-      // 단순히 날짜가 지났으면 클라이언트 화면에만 'completed'로 가공해서 내려주고,
-      // 실제 DB 업데이트는 매 시간 도는 Cron Job 서버가 전담하여 서버 부하와 Vercel 타임아웃을 방지합니다.
+      // 🟢 시간이 지난 활성 예약(PAID, confirmed)은 런타임에 즉시 DB를 동기화하여 상태 불일치를 방지합니다. (Lazy Update)
       if (expDate < now && BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(status)) {
         status = 'completed';
+        bookingsToUpdate.push(booking.id);
       }
 
       const firstReview = booking.reviews?.[0] || null;
@@ -63,6 +64,18 @@ export async function GET() {
           created_at: firstReview.created_at,
         } : null,
       });
+    }
+
+    // 3. Fake 'completed' 상태 물리적 동기화 (Lazy Update)
+    if (bookingsToUpdate.length > 0) {
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({ status: 'completed' })
+        .in('id', bookingsToUpdate);
+
+      if (updateError) {
+        console.error('Failed to sync completed status:', updateError);
+      }
     }
 
     return NextResponse.json({ trips: updatedTrips });
