@@ -5,6 +5,21 @@
 
 ---
 
+## v3.25.5 — 지난 여행 카드(PastTripCard) 썸네일 누락 핫픽스 (Hotfix)
+
+**작업일:** 2026-03-04
+
+### 개요
+`/guest/trips` 페이지의 "나의 여행" 중 과거 여행 목록(`PastTripCard.tsx`)에서 썸네일 사진이 빈 회색 상자로 노출되는 UI 버그(Image Disappearance)를 해결.
+
+### [Bugfix] 구형 사진 렌더링 스크립트 최신화
+- **원인:** 진행 중인 예약 카드(`TripCard.tsx`)는 최신 다중 사진 스펙(`trip.photos`)을 바라보도록 앞서 업데이트되었으나, 과거 여행 카드(`PastTripCard.tsx`)는 예전 코드베이스로 방치되어 오직 텅 빈 `trip.image` 스트링만 조회하며 사진이 없다고 판정해버림.
+- **수정:** 
+  - `PastTripCard.tsx`의 이미지 렌더링 로직을 `trip.photos && trip.photos[0]` 우선 조회 방식으로 3줄 교체.
+  - 만약 예전 방식의 사진 구조라면 `trip.image`를 띄우도록 Fallback을, 사진이 아예 없는 비정상 케이스라면 로컬리 표준 빈 이미지 아이콘인 `<Mountain />`이 뜨도록 UI 일관성 보완.
+
+---
+
 ## v3.25.4 — 회원가입 500 에러 긴급 복구 및 프로필 동기화 트리거 안정성(Exception) 강화 (Hotfix)
 
 **작업일:** 2026-03-04
