@@ -5,6 +5,26 @@
 
 ---
 
+## v3.26.0 — 자체 커뮤니티 엔진 (Community Forum) Phase 1 & Phase 2 연동 성공
+
+**작업일:** 2026-03-04
+
+### 개요
+Locally 플랫폼의 자생적 체류 시간 증대 및 검색엔진(SEO) 확장을 위한 **"100% 자체 제작 커뮤니티 엔진"**이 OOM(서버 다운) 방어 체계를 갖추고 성공적으로 연동되었습니다.
+
+### [DB & Server] Phase 1 구조 셋업
+- **OOM(서버 다운) 완벽 차단 구조:** 모든 API 및 Feed 렌더링에 `.limit(15)` + `Intersection Observer` 무한 스크롤 강제 적용. 수만 건의 데이터가 쏟아져도 관리자 대시보드처럼 메모리가 폭주하지 않습니다.
+- **`community_posts`, `community_comments`, `community_likes` 테이블 신설 & 마이그레이션 적용 완료.**
+- **안전한 권한 통제 (RLS):** 구글 크롤러와 모든 게스트는 읽을 수 있지만, 쓰기와 수정/삭제는 자신에게만 권한이 열려있도록 `Row Level Security` 다중 정책 셋업 완료.
+
+### [Frontend UI] Phase 2 코어 연동
+- **주요 페이지 라우팅 (`/community`):** 메인 피드 렌더링(`CommunityFeed.tsx`) 셋업. Q&A / 동행 / 꿀팁 카테고리 필터(`CommunityCategoryTabs.tsx`).
+- **인게이지먼트 최적화 카드 (`PostCard.tsx`):** 현지 체험 상품 유도를 위한 `LinkedExperienceChip.tsx` (Rich Embeds) 개발 완료. 글을 읽다가 칩을 누르면 즉시 예약 상세 화면으로 빨려 들어갑니다.
+- **Dynamic SSR SEO 완성:** `app/community/page.tsx`에 `generateMetadata`를 적용하여 탭 클릭 시마다 구글 봇에게 즉시 최적화된 URL을 제공합니다.
+- **내비게이션 통합:** 데스크탑 `SiteHeader` 주요 네비게이션과 모바일 `BottomTabNavigation`의 정중앙에 100% 무손실로 메뉴 삽입. (화면 깜빡임이나 React Hydration 에러 없음)
+
+---
+
 ## v3.25.6 — 다국어 동적 메타데이터(SEO) 적용 (feat/seo: implement middleware-based dynamic metadata for i18n)
 
 **작업일:** 2026-03-04

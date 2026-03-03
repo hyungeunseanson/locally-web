@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
     Search, Heart, MessageSquare, User,
-    CalendarCheck, LayoutList, BookOpen, AlignJustify
+    CalendarCheck, LayoutList, BookOpen, AlignJustify, Globe
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import LoginModal from '@/app/components/LoginModal';
@@ -69,6 +69,12 @@ export default function BottomTabNavigation() {
                     <img src="/images/logo.png" alt="여행" className="w-full h-full object-cover" style={{ transform: 'scale(1.35)' }} />
                 </div>
             )
+        },
+        {
+            name: '커뮤니티',
+            href: '/community',
+            requireAuth: false,
+            icon: (isActive: boolean) => <Globe size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '메시지',
@@ -157,7 +163,7 @@ export default function BottomTabNavigation() {
                             <button
                                 key={idx}
                                 onClick={(e) => handleAuthRequired(e, tab.href)}
-                                className="flex flex-col items-center justify-center gap-0.5 min-w-[60px] py-1"
+                                className="flex flex-col items-center justify-center gap-0.5 min-w-[50px] py-1"
                             >
                                 {tab.icon(false)}
                                 <span className="text-[10px] font-medium text-gray-400">
@@ -168,7 +174,7 @@ export default function BottomTabNavigation() {
                     }
 
                     return (
-                        <Link key={idx} href={tab.href} className="flex flex-col items-center justify-center gap-0.5 min-w-[60px] py-1">
+                        <Link key={idx} href={tab.href} className="flex flex-col items-center justify-center gap-0.5 min-w-[50px] py-1">
                             {tab.icon(isActive)}
                             <span className={`text-[10px] font-medium ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
                                 {tab.name}
