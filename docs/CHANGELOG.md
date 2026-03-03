@@ -5,6 +5,21 @@
 
 ---
 
+## v3.25.1 — 외부 이미지 도메인 허용 (Image Host 보안 정책 완화)
+
+**작업일:** 2026-03-03
+
+### 개요
+외부 서비스에서 불러온 썸네일 등의 이미지가 렌더링될 때 발생하는 `unconfigured host` (400 Bad Request) 보안 에러 핫픽스입니다.
+
+### [Fix] 외부 더미 이미지 서비스 종속성 제거 (안정성 강화)
+- **문제 현상:** `next/image` 컴포넌트 사용 시 `via.placeholder.com` 등 외부 더미 이미지 서비스를 사용할 경우, Vercel Edge 서버에서의 DNS Resolve 실패(502 Bad Gateway) 문제와 더불어 실제 화면에 '400x400' 같은 글자가 노출되어 UX를 저해하는 현상 발생.
+- **수정:** 
+  1. 기존 `next.config.ts`의 `images.remotePatterns` 배열에 임시로 추가했던 외부 더미 이미지 도메인(`via.placeholder.com`, `placehold.co`)을 롤백(제거 대상 여부 검토)하려 했으나, 보험용으로 화이트리스트엔 유지.
+  2. 실제 코드베이스(`TripCard.tsx`, `HostReviews.tsx`) 내부의 `[trip.image || 'https://placehold.co/...']` 구문을 Vercel 배포망 내부에 안전하게 캐싱되어 있는 정적 로컬 어셋인 `/images/logo-black-transparent.png`로 전면 교체하여 네트워크 에러 및 UI 품질 저하 문제를 완벽히 해결했습니다.
+
+---
+
 ## v3.25.0 — System Performance & Image Compression Optimization
 
 **작업일:** 2026-03-03

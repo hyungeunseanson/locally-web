@@ -207,7 +207,7 @@ export default function HostReviews() {
                   <div className="shrink-0">
                     <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden relative border border-slate-100">
                       <Image
-                        src={review.guest?.avatar_url || 'https://via.placeholder.com/150'}
+                        src={review.guest?.avatar_url || '/images/logo-black-transparent.png'} // 🟢 외부 테스트 도메인 대신 로컬 에셋 사용
                         alt="Guest"
                         fill
                         className="object-cover"

@@ -32,6 +32,14 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'uhinvcydgzqlpnvieyal.supabase.co', // Supabase Storage
+      },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com', // 🟢 테스트용 임시 이미지 로드 허용
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co', // 🟢 테스트용 임시 이미지 허용 (추가 방어)
       }
     ],
     dangerouslyAllowSVG: true,
