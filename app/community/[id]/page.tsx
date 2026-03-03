@@ -1,0 +1,179 @@
+import React from 'react';
+import { Metadata } from 'next';
+import { createClient } from '@/app/utils/supabase/server';
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, MapPin, CalendarCheck, Share2, MoreVertical, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import LinkedExperienceChip from '../components/LinkedExperienceChip';
+
+// 🚀 Dynamic Metadata (SSR SEO)
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+    const { id } = await params;
+    const supabase = await createClient();
+    const { data: post } = await supabase.from('community_posts').select('title, content, images, category').eq('id', id).maybeSingle();
+
+    if (!post) {
+        return { title: '게시글을 찾을 수 없습니다 | Locally' };
+    }
+
+    const snippet = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
+    const defaultImage = post.images && post.images.length > 0 ? post.images[0] : 'https://locally.com/images/og-default.jpg';
+
+    let prefix = '';
+    if (post.category === 'qna') prefix = '[Q&A] ';
+    else if (post.category === 'companion') prefix = '[동행] ';
+
+    return {
+        title: `${prefix}${post.title} | Locally`,
+        description: snippet,
+        openGraph: {
+            title: `${prefix}${post.title} | Locally 커뮤니티`,
+            description: snippet,
+            images: [defaultImage],
+            type: 'article',
+        }
+    };
+}
+
+const getTimeString = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('ko-KR', {
+        year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+};
+
+export default async function CommunityPostDetail({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const supabase = await createClient();
+
+    // 1. Fetch Post Detail
+    const { data: post } = await supabase
+        .from('community_posts')
+        .select(`
+            *,
+            profiles:user_id(name, avatar_url, role),
+            linked_experience:experiences(id, title, image_url, price)
+        `)
+        .eq('id', id)
+        .maybeSingle();
+
+    if (!post) {
+        notFound();
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const isOwner = user?.id === post.user_id;
+    const isCompanion = post.category === 'companion';
+    const isQna = post.category === 'qna';
+
+    // (조회수는 Client 훅에서 올리거나, Redis Queue를 쓰는 것이 OOM 방어에 탁월하므로 SSR에서는 읽기만 수행합니다)
+
+    return (
+        <main className="max-w-[768px] mx-auto min-h-screen bg-white md:border-x md:border-slate-100 pb-32">
+            {/* Header */}
+            <div className="sticky top-[80px] z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+                <Link href="/community" className="text-slate-600 hover:text-slate-900 transition-colors">
+                    <ArrowLeft size={24} />
+                </Link>
+                <div className="flex items-center gap-3 text-slate-400">
+                    <button className="hover:text-slate-900 transition-colors"><Share2 size={20} /></button>
+                    {isOwner && <button className="hover:text-slate-900 transition-colors"><MoreVertical size={20} /></button>}
+                </div>
+            </div>
+
+            <article className="px-5 py-6">
+                {/* User Profile */}
+                <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                            {post.profiles?.avatar_url ? (
+                                <img src={post.profiles.avatar_url} alt="profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">?</div>
+                            )}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-1">
+                                <span className="text-[15px] font-bold text-slate-900 leading-tight">
+                                    {post.profiles?.name || '로컬리 유저'}
+                                </span>
+                                {post.profiles?.role === 'admin' && (
+                                    <ShieldCheck size={14} className="text-blue-500" />
+                                )}
+                            </div>
+                            <div className="text-[12px] font-medium text-slate-400 mt-0.5">
+                                {getTimeString(post.created_at)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Title and Category Badges */}
+                <h1 className="text-[22px] md:text-[24px] font-bold text-slate-900 leading-snug mb-4">
+                    {post.title}
+                </h1>
+
+                {isCompanion && (post.companion_city || post.companion_date) && (
+                    <div className="flex items-center gap-2 mb-6">
+                        {post.companion_city && (
+                            <div className="flex items-center gap-1.5 bg-rose-50 text-[#FF385C] text-[13px] font-bold px-3 py-1.5 rounded-lg border border-rose-100">
+                                <MapPin size={14} strokeWidth={2.5} /> {post.companion_city}
+                            </div>
+                        )}
+                        {post.companion_date && (
+                            <div className="flex items-center gap-1.5 bg-slate-50 text-slate-700 text-[13px] font-bold px-3 py-1.5 rounded-lg border border-slate-200">
+                                <CalendarCheck size={14} strokeWidth={2.5} /> {post.companion_date}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {isQna && (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-50 border border-slate-200 text-slate-600 text-[13px] font-bold mb-6">
+                        <CheckCircle2 size={16} className="text-slate-400" /> 답변대기
+                    </div>
+                )}
+
+                {/* Content */}
+                <div className="text-[16px] text-slate-800 leading-relaxed whitespace-pre-wrap mb-8">
+                    {post.content}
+                </div>
+
+                {/* Images */}
+                {post.images && post.images.length > 0 && (
+                    <div className="space-y-3 mb-8">
+                        {post.images.map((img: string, idx: number) => (
+                            <img key={idx} src={img} alt={`첨부 이미지 ${idx + 1}`} className="w-full rounded-2xl bg-slate-50" loading="lazy" />
+                        ))}
+                    </div>
+                )}
+
+                {/* Linked Experience Embed */}
+                {post.linked_experience && (
+                    <div className="mb-8">
+                        <h4 className="text-[13px] font-bold text-slate-500 mb-2">언급된 로컬리 상품</h4>
+                        <LinkedExperienceChip exp={post.linked_experience} />
+                    </div>
+                )}
+
+                {/* Stats */}
+                <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5">
+                    <span>조회 {post.view_count || 0}</span>
+                    <span>좋아요 {post.like_count || 0}</span>
+                    <span>댓글 {post.comment_count || 0}</span>
+                </div>
+            </article>
+
+            {/* Comments Divider */}
+            <div className="w-full h-2 bg-slate-50 border-y border-slate-100"></div>
+
+            <section className="px-5 py-6">
+                <h3 className="text-[17px] font-bold text-slate-900 mb-6">댓글 {post.comment_count || 0}</h3>
+
+                <div className="text-center py-10 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
+                    첫 번째 댓글을 남겨보세요! (Phase 4 예정)
+                </div>
+            </section>
+        </main>
+    );
+}

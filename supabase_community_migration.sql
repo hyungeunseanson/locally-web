@@ -60,17 +60,17 @@ ALTER TABLE public.community_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_likes ENABLE ROW LEVEL SECURITY;
 
--- Posts: 누구나(익명 포함) 읽기 가능, 로그인 유저 작성 가능, 작성자 본인/Admin만 수정/삭제
+-- Posts: 누구나(익명 포함) 읽기 가능, 로그인 유저 작성 가능, 작성자 본인만 수정/삭제
 CREATE POLICY "Anyone can view community posts" ON public.community_posts FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can create posts" ON public.community_posts FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own posts" ON public.community_posts FOR UPDATE TO authenticated USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY "Users can delete their own posts" ON public.community_posts FOR DELETE TO authenticated USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "Users can update their own posts" ON public.community_posts FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own posts" ON public.community_posts FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
--- Comments: 누구나 읽기 가능, 로그인 유저 작성 가능, 작성자 본인/Admin만 수정/삭제
+-- Comments: 누구나 읽기 가능, 로그인 유저 작성 가능, 작성자 본인만 수정/삭제
 CREATE POLICY "Anyone can view comments" ON public.community_comments FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can create comments" ON public.community_comments FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own comments" ON public.community_comments FOR UPDATE TO authenticated USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY "Users can delete their own comments" ON public.community_comments FOR DELETE TO authenticated USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "Users can update their own comments" ON public.community_comments FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own comments" ON public.community_comments FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 -- Likes: 누구나 읽기 가능, 로그인 유저 작성(토글) 및 본인 것 삭제 가능
 CREATE POLICY "Anyone can view likes" ON public.community_likes FOR SELECT USING (true);

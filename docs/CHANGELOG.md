@@ -5,6 +5,16 @@
 
 ---
 
+## v3.26.1 — 커뮤니티 Phase 3: 글쓰기 & 상세보기 SEO
+
+**작업일:** 2026-03-04
+
+- **글쓰기 페이지 (`/community/write`):** 카테고리 선택(Q&A/동행/꿀팁), 사진(최대 3장) 첨부 기능. 업로드 전 `compressImage` 유틸 강제 적용으로 OOM 원천 차단.
+- **글 상세 페이지 (`/community/[id]`):** SSR + `generateMetadata`로 개별 게시글 URL이 구글 검색 결과에 직접 노출.
+- **글 작성 API (`/api/community/posts`):** `auth.uid` 서버 검증 후 `community_posts` INSERT. RLS 이중 방어 적용.
+
+---
+
 ## v3.26.0 — 자체 커뮤니티 엔진 (Community Forum) Phase 1 & Phase 2 연동 성공
 
 **작업일:** 2026-03-04
