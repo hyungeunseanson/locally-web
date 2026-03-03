@@ -254,6 +254,20 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                             </span>
                         </div>
                     </div>
+
+                    {request.payment_channel === 'LOCALLY' && request.payment_status === 'WAITING' && !isAdmin && (
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <div className="text-sm font-bold text-slate-800 mb-2">무통장 입금 안내</div>
+                                <div className="text-xs text-slate-600 mb-3 leading-relaxed">
+                                    서비스 수수료 <span className="font-bold text-blue-600">3,000원</span>을 아래 계좌로 입금해 주시면, 확인 후 담당자가 전화를 진행합니다.
+                                </div>
+                                <div className="bg-white p-3 rounded text-sm font-mono text-center font-bold border border-slate-200 cursor-text select-all">
+                                    {process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'} {process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-01-1234567'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Form Meta Info */}

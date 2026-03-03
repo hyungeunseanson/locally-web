@@ -26,13 +26,13 @@ export async function POST(
             return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
         }
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+        const { data: adminData } = await supabase
+            .from('admin_whitelist')
+            .select('email')
+            .eq('email', user.email)
+            .maybeSingle();
 
-        const isAdmin = profile?.role === 'admin';
+        const isAdmin = !!adminData;
 
         // Must be either the owner or an admin
         if (proxyReq.user_id !== user.id && !isAdmin) {

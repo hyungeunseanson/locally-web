@@ -111,10 +111,26 @@ export async function POST(request: Request) {
             );
 
             // Fix: Do not call request.clone().json() as stream is already read by await request.json()
-            const errorHostId = body?.hostId || null;
+            // Look up target Email to get the actual user ID if hostId isn't provided
+            let errorHostId = body?.hostId || null;
+            if (!errorHostId && body?.targetEmail) {
+                const { data: userProfile } = await supabase.from('profiles').select('id').eq('email', body.targetEmail).maybeSingle();
+                if (userProfile?.id) {
+                    errorHostId = userProfile.id;
+                } else {
+                    const { data: authData } = await supabase.auth.admin.listUsers();
+                    const matchedUser = authData?.users?.find((u: any) => u.email === body.targetEmail);
+                    if (matchedUser) errorHostId = matchedUser.id;
+                }
+            }
+
+            if (!errorHostId) {
+                console.warn('🔥 [Email API] Could not resolve user_id for system_error notification. Skipping DB log to prevent Null Constraint violation.');
+                return NextResponse.json({ error: error.message }, { status: 500 });
+            }
 
             await supabase.from('notifications').insert({
-                user_id: errorHostId, // 이메일 발송에 실패한 대상자 기록
+                user_id: errorHostId,
                 type: 'system_error',
                 title: '🚨 이메일 발송 시스템 장애',
                 message: `이메일 렌더링 또는 전송이 실패했습니다: ${error?.message || 'Unknown Error'}`,

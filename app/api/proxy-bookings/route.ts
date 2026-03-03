@@ -68,18 +68,19 @@ export async function GET(request: Request) {
         }
 
         // Role check to fetch all requests if admin
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+        const { data: adminData } = await supabase
+            .from('admin_whitelist')
+            .select('email')
+            .eq('email', user.email)
+            .maybeSingle();
 
-        const isAdmin = profile?.role === 'admin';
+        const isAdmin = !!adminData;
 
         let query = supabase
             .from('proxy_requests')
             .select('*, profiles(name, email)') // Fetch basic client profile
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(50);
 
         if (!isAdmin) {
             // Regular user can only fetch their own requests

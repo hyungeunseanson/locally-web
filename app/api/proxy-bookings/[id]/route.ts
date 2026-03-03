@@ -11,13 +11,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+        const { data: adminData } = await supabase
+            .from('admin_whitelist')
+            .select('email')
+            .eq('email', user.email)
+            .maybeSingle();
 
-        const isAdmin = profile?.role === 'admin';
+        const isAdmin = !!adminData;
 
         let query = supabase
             .from('proxy_requests')
@@ -68,13 +68,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+        const { data: adminData } = await supabase
+            .from('admin_whitelist')
+            .select('email')
+            .eq('email', user.email)
+            .maybeSingle();
 
-        const isAdmin = profile?.role === 'admin';
+        const isAdmin = !!adminData;
         const body = await request.json();
         const { status, payment_status } = body;
 
