@@ -5,6 +5,17 @@
 
 ---
 
+## v3.26.2 — 커뮤니티 Phase 4: 댓글 & 좋아요 시스템
+
+**작업일:** 2026-03-04
+
+- **댓글 API (`GET/POST /api/community/comments`):** 게시글별 댓글 조회와 포스팅 API. `.limit(100)` 에러 안전 펯지, 인증 후 INSERT.
+- **좋아요 토글 API (`POST /api/community/likes`):** UNIQUE 제약 + DB 트리거로 `like_count` 자동 증감 요청.
+- **`CommentSection.tsx`:** 내부 데이터 패치 + `Sticky` 하단 입력츸 UI. Q&A 선택 도구(is_selected) 지원.
+- **`LikeButton.tsx`:** 정관적 UI 업데이트 + 실패시 롤백(Rollback) 보언.
+
+---
+
 ## v3.26.1 — 커뮤니티 Phase 3: 글쓰기 & 상세보기 SEO
 
 **작업일:** 2026-03-04

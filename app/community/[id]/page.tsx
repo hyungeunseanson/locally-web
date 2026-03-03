@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, CalendarCheck, Share2, MoreVertical, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
+import CommentSection from '../components/CommentSection';
+import LikeButton from '../components/LikeButton';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -156,11 +158,13 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
                     </div>
                 )}
 
-                {/* Stats */}
+                {/* Stats + Like Button */}
                 <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5">
                     <span>조회 {post.view_count || 0}</span>
-                    <span>좋아요 {post.like_count || 0}</span>
                     <span>댓글 {post.comment_count || 0}</span>
+                    <div className="ml-auto">
+                        <LikeButton postId={post.id} initialCount={post.like_count || 0} />
+                    </div>
                 </div>
             </article>
 
@@ -169,10 +173,7 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
 
             <section className="px-5 py-6">
                 <h3 className="text-[17px] font-bold text-slate-900 mb-6">댓글 {post.comment_count || 0}</h3>
-
-                <div className="text-center py-10 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-100">
-                    첫 번째 댓글을 남겨보세요! (Phase 4 예정)
-                </div>
+                <CommentSection postId={post.id} initialCount={post.comment_count || 0} />
             </section>
         </main>
     );
