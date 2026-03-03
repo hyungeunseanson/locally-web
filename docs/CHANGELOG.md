@@ -5,6 +5,21 @@
 
 ---
 
+## v3.25.3 — 회원가입 프로필 동기화 DB 트리거 누락 핫픽스 (Hotfix)
+
+**작업일:** 2026-03-04
+
+### 개요
+v3.21.0에서 단행된 프로필 동기화 아키텍처(Postgres Trigger) 전환 시 누락되었던 필수 게스트 정보(휴대폰 번호, 생년월일, 성별) 컬럼 매핑을 추가하여 회원가입 시 데이터가 100% 정상적으로 `profiles` 테이블에 복사되도록 SQL 마이그레이션을 재작성했습니다.
+
+### [Bugfix] DB 트리거(`handle_new_user`) 매핑 누락 및 오탈자 복구
+- **원인:** 기존 `on_auth_user_created` 트리거가 `email`, `name`, `avatar_url`만 복사하고 프론트엔드에서 고생해서 받아온 `phone`, `birth_date`, `gender`를 무시(Drop)하여 가입 데이터가 공중분해되는 현상 및 `full_name` 컬럼 매핑 불일치 발견.
+- **수정:** 
+  - `supabase_profile_sync_v2_migration.sql` 스크립트를 작성하여 `handle_new_user` 트리거 함수 선언부 전면 교체(REPLACE).
+  - 결과적으로 프론트(LoginModal)에서 `auth.signUp` 시 `user_metadata`에 실어 보낸 연락처, 생년월일, 성별, 이름이 계정 관리 페이지(`/account`)에 1:1로 렌더링되도록 백엔드 싱크 로직 정상화 완료.
+
+---
+
 ## v3.25.2 — 게스트 썸네일 이미지 매핑 버그 및 Fallback 로직 핫픽스
 
 **작업일:** 2026-03-03
