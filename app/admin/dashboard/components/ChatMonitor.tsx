@@ -238,7 +238,7 @@ export default function ChatMonitor() {
                     )}
                     <span className="truncate max-w-[80px] md:max-w-[100px]">{getGuestName(inq.guest)}</span>
                   </span>
-                  <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0">{new Date(inq.updated_at).toLocaleDateString()}</span>
+                  <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0">{inq.updated_at ? new Date(inq.updated_at).toLocaleDateString() : ''}</span>
                 </div>
                 <div className="text-[10px] md:text-xs text-slate-500 mb-0.5 md:mb-1 truncate">
                   {inq.experiences?.title ? `🏠 ${inq.experiences.title}` : '📄 문의 내용'}

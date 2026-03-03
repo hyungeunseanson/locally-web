@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
 
@@ -11,6 +11,7 @@ export async function PATCH(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const params = await context.params;
     const reviewId = Number(params.id);
     if (!reviewId) return NextResponse.json({ error: '잘못된 후기 ID입니다.' }, { status: 400 });
 

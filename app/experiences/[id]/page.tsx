@@ -99,13 +99,13 @@ export default async function Page({ params }: Props) {
         .select('rating, experiences!inner(host_id)')
         .eq('experiences.host_id', experience.host_id),
     ]);
-    
+
     const joinedYear = profile?.created_at
       ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
       : null;
     const hostReviewCount = reviewRows?.length || 0;
     const hostAverageRating = hostReviewCount > 0
-      ? Number((reviewRows.reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
+      ? Number(((reviewRows || []).reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
       : null;
 
     hostProfile = {
@@ -135,7 +135,7 @@ export default async function Page({ params }: Props) {
 
     availabilityRows.forEach((d) => {
       const availTime = String(d.start_time).substring(0, 5);
-      
+
       const currentBooked = bookingRows
         .filter((b) => {
           const bookingTime = String(b.time).substring(0, 5);
@@ -154,13 +154,13 @@ export default async function Page({ params }: Props) {
         remainingSeatsMap[key] = remaining;
       }
     });
-    
+
     Object.keys(dateToTimeMap).sort().forEach(date => availableDates.push(date));
   }
 
   // 4. Client Component로 데이터 전달
   return (
-    <ExperienceClient 
+    <ExperienceClient
       initialUser={userResult.data.user}
       initialExperience={experience}
       initialHostProfile={hostProfile}

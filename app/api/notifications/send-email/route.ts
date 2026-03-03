@@ -10,9 +10,9 @@ export async function POST(request: Request) {
     let body: any = {};
     try {
         body = await request.json();
-        const { type, hostId, guestName, experienceTitle, guestsCount, bookingDate, bookingTime, cancelReason, refundAmount, totalAmount } = body;
+        const { type, hostId, guestName, experienceTitle, guestsCount, bookingDate, bookingTime, cancelReason, refundAmount, totalAmount, targetEmail, targetRole, requestId, content } = body;
 
-        if (!hostId || !type) {
+        if ((!hostId && !targetEmail) || !type) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -32,9 +32,11 @@ export async function POST(request: Request) {
             if (authData?.user?.email) hostEmail = authData.user.email;
         }
 
-        if (!hostEmail) {
+        if (!hostEmail && !targetEmail) {
             throw new Error(`Email not found for host ${hostId}`);
         }
+
+        const finalEmail = targetEmail || hostEmail;
 
         // Render HTML based on email type
         let emailHtml = '';
@@ -65,6 +67,19 @@ export async function POST(request: Request) {
                     dashboardLink: `${process.env.NEXT_PUBLIC_SITE_URL}/host/dashboard`
                 })
             );
+        } else if (type === 'proxy_comment_notify') {
+            subject = `[Locally] 전화 대행 예약에 새로운 답변이 등록되었습니다`;
+            const headerText = targetRole === 'admin' ? '관리자님, 새로운 답변이 등록되었습니다.' : '고객님, 요청하신 예약에 답변이 등록되었습니다.';
+            emailHtml = `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>${headerText}</h2>
+                <div style="padding: 16px; background-color: #f9fafb; border-radius: 8px; margin: 16px 0;">
+                  <p style="white-space: pre-wrap; margin: 0;">${content}</p>
+                </div>
+                <p>로컬리 웹사이트에서 확인해주세요.</p>
+                <a href="${process.env.NEXT_PUBLIC_SITE_URL}/proxy-bookings/${requestId}" style="display: inline-block; padding: 12px 24px; background-color: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">예약 확인하기</a>
+              </div>
+            `;
         } else {
             throw new Error(`Invalid email type: ${type}`);
         }
@@ -77,12 +92,12 @@ export async function POST(request: Request) {
 
         await transporter.sendMail({
             from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-            to: hostEmail,
+            to: finalEmail,
             subject,
             html: emailHtml,
         });
 
-        console.log(`✅ [Email API] Successfully sent ${type} email to ${hostEmail}`);
+        console.log(`✅ [Email API] Successfully sent ${type} email to ${finalEmail}`);
         return NextResponse.json({ success: true });
 
     } catch (error: any) {
