@@ -5,6 +5,16 @@
 
 ---
 
+## v3.24.1 — RLS 보안 정책 최적화 및 통합 마이그레이션 스크립트 갱신
+
+**작업일:** 2026-03-03
+
+### 개요
+- DB 마이그레이션 적용 중 발생한 Permission Denied 에러를 원천 차단하기 위해 `auth.users` 서브쿼리를 조회하는 불안정한 방식을 폐기하고, Supabase 권장 안전 방식인 `auth.jwt() ->> 'email'` 클레임 추출 방식으로 모든 RLS(Row Level Security) 정책 8개를 전면 재작성했습니다. (안정성 극대화 및 레이턴시 단축)
+- 분산될 수 있는 테이블 생성(`proxy_requests`, `proxy_comments`) 및 인덱스/트리거 로직을 하나의 통합본인 `supabase_proxy_service_migration.sql` 파일에 모두 병합하여, 빈 DB에서도 한 번의 실행으로 완벽한 인프라가 구축되도록 무결성을 보장했습니다.
+
+---
+
 ## v3.24.0 — 일본 현지 전화 대행 예약 서비스 (Proxy Service) 내재화
 
 **작업일:** 2026-03-03

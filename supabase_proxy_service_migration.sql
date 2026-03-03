@@ -103,7 +103,7 @@ CREATE POLICY "pr_select" ON public.proxy_requests
   FOR SELECT
   USING (
     auth.uid() = user_id OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.admin_whitelist WHERE email = (auth.jwt() ->> 'email')::text)
   );
 
 -- INSERT: 인증된 사용자가 본인 명의로만 생성 가능
@@ -116,17 +116,17 @@ CREATE POLICY "pr_update" ON public.proxy_requests
   FOR UPDATE
   USING (
     auth.uid() = user_id OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.admin_whitelist WHERE email = (auth.jwt() ->> 'email')::text)
   )
   WITH CHECK (
     auth.uid() = user_id OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.admin_whitelist WHERE email = (auth.jwt() ->> 'email')::text)
   );
 
 -- DELETE: 관리자만 권한 부여 (고객은 취소 상태로만 변경 유도)
 CREATE POLICY "pr_delete" ON public.proxy_requests
   FOR DELETE
-  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+  USING (EXISTS (SELECT 1 FROM public.admin_whitelist WHERE email = (auth.jwt() ->> 'email')::text));
 
 
 -- ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ CREATE POLICY "pc_select" ON public.proxy_comments
   FOR SELECT
   USING (
     EXISTS (SELECT 1 FROM public.proxy_requests WHERE id = request_id AND user_id = auth.uid()) OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.admin_whitelist WHERE email = (auth.jwt() ->> 'email')::text)
   );
 
 -- INSERT: 해당 request의 소유자(고객)이거나 관리자일 경우
@@ -148,7 +148,7 @@ CREATE POLICY "pc_insert" ON public.proxy_comments
   WITH CHECK (
     auth.uid() = author_id AND (
       EXISTS (SELECT 1 FROM public.proxy_requests WHERE id = request_id AND user_id = auth.uid()) OR
-      EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+      EXISTS (SELECT 1 FROM public.admin_whitelist WHERE email = (auth.jwt() ->> 'email')::text)
     )
   );
 
@@ -163,5 +163,5 @@ CREATE POLICY "pc_delete" ON public.proxy_comments
   FOR DELETE
   USING (
     auth.uid() = author_id OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.admin_whitelist WHERE email = (auth.jwt() ->> 'email')::text)
   );
