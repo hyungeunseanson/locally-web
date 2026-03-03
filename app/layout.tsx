@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Suspense } from "react";
@@ -39,37 +40,76 @@ const ibmPlexSansKr = localFont({
   variable: "--font-ibm-plex-sans-kr",
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://locally.vercel.app'),
-  title: {
-    template: '%s | Locally',
-    default: 'Locally - 현지인과 함께하는 특별한 여행',
-  },
-  description: "현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.",
-  openGraph: {
-    title: 'Locally - 현지인과 함께하는 특별한 여행',
-    description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
-    url: 'https://locally.vercel.app',
-    siteName: '로컬리 Locally',
-    images: [
-      {
-        url: 'https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png',
-        width: 1200,
-        height: 630,
-        alt: 'Locally Hero Image',
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = await headers();
+  const locale = headersList.get('x-locally-locale') || 'ko';
+
+  const titleMap: Record<string, string> = {
+    ko: 'Locally - 현지인과 함께하는 특별한 여행',
+    en: 'Locally - Unique Travel with Local Guides',
+    ja: 'Locally - 現地の人と行く特別な旅',
+    zh: 'Locally - 与当地人一起的特别旅行'
+  };
+
+  const descMap: Record<string, string> = {
+    ko: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
+    en: 'Book local experiences planned and hosted by locals.',
+    ja: '現地ホストが直接企画・進行するローカル体験を予約しましょう。',
+    zh: '预订由当地房东亲自策划并举办的本地体验活动。'
+  };
+
+  const siteNameMap: Record<string, string> = {
+    ko: '로컬리 Locally',
+    en: 'Locally',
+    ja: 'ローカリー Locally',
+    zh: 'Locally'
+  };
+
+  const title = titleMap[locale] || titleMap.ko;
+  const description = descMap[locale] || descMap.ko;
+  const siteName = siteNameMap[locale] || siteNameMap.ko;
+
+  return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://locally.vercel.app'),
+    title: {
+      template: '%s | Locally',
+      default: title,
+    },
+    description: description,
+    openGraph: {
+      title: title,
+      description: description,
+      url: 'https://locally.vercel.app',
+      siteName: siteName,
+      images: [
+        {
+          url: 'https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png',
+          width: 1200,
+          height: 630,
+          alt: 'Locally Hero Image',
+        },
+      ],
+      locale: locale === 'ko' ? 'ko_KR' : locale === 'ja' ? 'ja_JP' : locale === 'zh' ? 'zh_CN' : 'en_US',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: title,
+      description: description,
+      images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'],
+    },
+    keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', '일본 동행', '일본 현지 가이드', '맞춤 의뢰', 'Locally'],
+    alternates: {
+      languages: {
+        'ko': 'https://locally.vercel.app/ko',
+        'en': 'https://locally.vercel.app/en',
+        'ja': 'https://locally.vercel.app/ja',
+        'zh': 'https://locally.vercel.app/zh',
       },
-    ],
-    locale: 'ko_KR',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Locally - 현지인과 함께하는 특별한 여행',
-    description: '현지 호스트가 직접 기획하고 진행하는 로컬 체험을 예약하세요.',
-    images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'],
-  },
-  keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', '일본 동행', '일본 현지 가이드', '맞춤 의뢰', 'Locally'],
-};
+      canonical: locale === 'ko' ? 'https://locally.vercel.app' : `https://locally.vercel.app/${locale}`
+    }
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',

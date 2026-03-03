@@ -5,6 +5,20 @@
 
 ---
 
+## v3.25.6 — 다국어 동적 메타데이터(SEO) 적용 (feat/seo: implement middleware-based dynamic metadata for i18n)
+
+**작업일:** 2026-03-04
+
+### 개요
+기존 구조를 완벽하게 유지한 채로, 구글 로봇과 해외 검색 엔진 유입을 극대화하기 위한 "무손실 다국어 개별 메타데이터(SEO)" 구조를 도입 성공했습니다.
+
+### [Feature] 미들웨어 기반 헤더 인젝션 다국어 최적화
+- **안전한 구조 보존:** `app/[locale]` 폴더 전환이라는 파괴적인 프레임워크 변경 없이, 기존 정적 라우팅 구조를 100% 보존하며 구현했습니다.
+- **Middleware 언어 탐지:** `app/middleware.ts`에서 접속 URL의 언어 코드(`/ko`, `/ja`, `/zh`, `/en`)를 가로채어 비밀 헤더(`x-locally-locale`)로 서버단에 넘겨주는 로직을 주입.
+- **Dynamic SEO Metadata:** `app/layout.tsx`에서 고정 타이틀/설명을 제거하고 `generateMetadata()` 엔진을 투입. 이 엔진이 미들웨어가 찔러준 헤더 언어를 읽고 즉시 현지화(Localization)된 타이틀(`Locally - 日本の現地ガイド`, `로컬리 Locally` 등)과 `hreflang` 태그를 동적으로 생성하여 구글 크롤러에게 제공하게 됩니다.
+
+---
+
 ## v3.25.5 — 지난 여행 카드(PastTripCard) 썸네일 누락 핫픽스 (Hotfix)
 
 **작업일:** 2026-03-04
