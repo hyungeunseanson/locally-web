@@ -94,9 +94,9 @@ export default function ProxyBookingsBoard() {
                     )}
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 mt-8">
                     {requests.map(req => (
-                        <Link key={req.id} href={`/proxy-bookings/${req.id}`}>
+                        <Link key={req.id} href={`/proxy-bookings/${req.id}`} className="block">
                             <div className="border border-slate-100 bg-white rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer group">
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex flex-col gap-1">
