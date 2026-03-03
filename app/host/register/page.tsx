@@ -11,6 +11,7 @@ import {
   getLanguageNames,
   normalizeLanguageLevels,
 } from '@/app/utils/languageLevels';
+import { compressImage } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
 type HostRegisterFormData = {
   languageLevels: LanguageLevelEntry[];
@@ -205,8 +206,9 @@ export default function HostRegisterPage() {
       let idCardUrl = formData.idCardFile;
 
       if (files.profile) {
+        const compressedProfile = await compressImage(files.profile); // 🟢 압축 추가
         const fileName = `profile/${user.id}_${Date.now()}`;
-        const { error } = await supabase.storage.from('images').upload(fileName, files.profile);
+        const { error } = await supabase.storage.from('images').upload(fileName, compressedProfile);
         if (!error) {
           const { data } = supabase.storage.from('images').getPublicUrl(fileName);
           profileUrl = data.publicUrl;
@@ -214,8 +216,9 @@ export default function HostRegisterPage() {
       }
 
       if (files.idCard) {
+        const compressedIdCard = await compressImage(files.idCard); // 🟢 압축 추가
         const fileName = `id_card/${user.id}_${Date.now()}`;
-        const { error } = await supabase.storage.from('images').upload(fileName, files.idCard);
+        const { error } = await supabase.storage.from('images').upload(fileName, compressedIdCard);
         if (!error) {
           const { data } = supabase.storage.from('images').getPublicUrl(fileName);
           idCardUrl = data.publicUrl;

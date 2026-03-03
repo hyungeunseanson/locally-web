@@ -7,6 +7,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { compressImage } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
 interface HostProfile {
   full_name?: string;
@@ -129,8 +130,9 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const file = e.target.files[0];
+      const compressedFile = await compressImage(file); // 🟢 압축 추가
       const fileName = `profile/${user.id}_${Date.now()}`;
-      const { error } = await supabase.storage.from('images').upload(fileName, file);
+      const { error } = await supabase.storage.from('images').upload(fileName, compressedFile);
       if (error) throw error;
       const { data } = supabase.storage.from('images').getPublicUrl(fileName);
       setAvatarUrl(data.publicUrl);

@@ -5,6 +5,25 @@
 
 ---
 
+## v3.25.0 — System Performance & Image Compression Optimization
+
+**작업일:** 2026-03-03
+
+### 개요
+플랫폼 내 이미지 압축 누락 구간과 어드민 대시보드 및 채팅에서 발생하던 치명적인 메모리 누수(OOM) 취약점을 보완하여 서버 과부하를 원천 차단했습니다.
+
+### [PERF-1] 프리미엄 이미지 최적화 및 스토리지 과부하 방어
+- **기존 문제:** `ReviewModal`, `ProfileEditor`, `HostRegisterPage`에서 고해상도 이미지를 원본 그대로 스토리지에 업로드하여 네트워크 업스트림 지연 및 브라우저 성능이 하락하는 취약점이 발견되었습니다.
+- **수정:** 모든 누락된 업로드 폼에 `compressImage()` 파이프라인을 강제 적용하여 Storage 트래픽을 대폭 절감했습니다.
+
+### [PERF-2] 무제한 쿼리(Limitless Query) 방어벽 구축 (OOM 차단)
+- **기존 문제:** `useAdminData.ts` 및 `useChat.ts` 내부에서 `.limit()` 제어 없이 전체 테이블을 스캔하여 브라우저 크래시(Crash) 및 Vercel Timeout 위험이 높았습니다.
+- **수정:** 어드민 페이지네이션 시스템을 갈아엎는 위험한 도박 대신, 무결성을 보장하는 "엔진 안전 제한(Engine Safety Limit)"을 도입했습니다.
+  - `Admin Dashboard`: `reviews`, `profiles`는 5000개, `experiences`, `apps`는 3000개 제한 도입.
+  - `Chat Inbox`: 전체 문의 내역 대신 최신 100개(`limit(100)`)만 스캔하도록 최적화.
+
+---
+
 ## v3.24.4 — E2E 예약 파이프라인 정합성 패치 (Runtime Sync & UI 가이드)
 
 **작업일:** 2026-03-03

@@ -105,10 +105,10 @@ export function useAdminData() {
         { data: inquiryMessagesData }, // 🟢 추가
         { data: bookingRawData, error: bookingError }
       ] = await Promise.all([
-        supabase.from('host_applications').select('*').order('created_at', { ascending: false }),
-        supabase.from('experiences').select('*').order('created_at', { ascending: false }),
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-        supabase.from('reviews').select('rating, experience_id, created_at'),
+        supabase.from('host_applications').select('*').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
+        supabase.from('experiences').select('*').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
+        supabase.from('reviews').select('rating, experience_id, created_at').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('search_logs').select('*').order('created_at', { ascending: false }).limit(2000), // 🟢 최근 검색 로그
         supabase.from('analytics_events').select('*').order('created_at', { ascending: false }).limit(10000), // 🟢 이벤트 로그 (퍼널용)
         supabase.from('inquiries').select('id, created_at, host_id').order('created_at', { ascending: false }).limit(2000), // 🟢 호스트 응답률 계산용

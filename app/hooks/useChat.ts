@@ -125,7 +125,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       let query = supabase
         .from('inquiries')
         .select('*, experiences (id, title, photos, image_url, host_id)')
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
+        .limit(100); // 🟢 OOM 방지 및 빠른 렌더링을 위한 최근 100개 제한
 
       if (role === 'guest') query = query.eq('user_id', user.id);
       else if (role === 'host') query = query.eq('host_id', user.id).eq('type', 'general');

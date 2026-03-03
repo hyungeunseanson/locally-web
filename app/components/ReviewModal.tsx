@@ -5,6 +5,7 @@ import { Star, X, Camera, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
 import { useLanguage } from '@/app/context/LanguageContext';
+import { compressImage } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
 interface ReviewModalProps {
   trip: any;
@@ -63,11 +64,12 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("로그인이 필요합니다.");
 
-      // 새 이미지 업로드
+      // 새 이미지 업로드 (최적화 적용)
       const uploadedUrls: string[] = [];
       for (const file of imageFiles) {
+        const compressedFile = await compressImage(file); // 🟢 압축 추가
         const fileName = `reviews/${user.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-        const { error: uploadError } = await supabase.storage.from('images').upload(fileName, file);
+        const { error: uploadError } = await supabase.storage.from('images').upload(fileName, compressedFile);
         if (uploadError) throw uploadError;
         const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
         uploadedUrls.push(publicUrl);
