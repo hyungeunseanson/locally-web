@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import Link from 'next/link';
-import { Menu, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Bell, ShieldCheck, Globe } from 'lucide-react';
+import { Menu, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Bell, ShieldCheck, Users2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -157,9 +157,6 @@ function SiteHeaderContent() {
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
-            <Link href="/community" className="hidden md:flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-black hover:bg-slate-50 px-4 py-2 rounded-full transition-colors">
-              <Globe size={18} /> {t('community') || '커뮤니티'}
-            </Link>
             <button
               onClick={handleMainHeaderButtonClick}
               className="hidden md:block text-sm font-semibold px-4 py-2 hover:bg-slate-50 rounded-full transition-colors text-slate-900 cursor-pointer"
@@ -200,6 +197,9 @@ function SiteHeaderContent() {
               {!isLoading && user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
+                    <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                      <Users2 size={18} /> {t('community') || '커뮤니티'}
+                    </Link>
                     <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
                       <span className="flex items-center gap-3"><MessageSquare size={18} /> {t('messages')}</span>
                     </Link>

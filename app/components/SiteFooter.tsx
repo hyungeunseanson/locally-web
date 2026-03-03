@@ -68,7 +68,7 @@ export default function SiteFooter() {
               <h5 className="font-bold">{t('footer_hosting')}</h5>
               <ul className="space-y-3 text-[#717171] font-light">
                 <li><Link href="/become-a-host" className="hover:underline">{t('footer_become_host')}</Link></li>
-                <li><Link href="/company/community" className="hover:underline">{t('footer_community')}</Link></li>
+                <li><Link href="/community" className="hover:underline">{t('footer_community')}</Link></li>
               </ul>
             </div>
 
