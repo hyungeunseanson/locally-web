@@ -15,7 +15,7 @@ export async function GET() {
       .from('bookings')
       .select(`
         *,
-        experiences (id, host_id, title, image_url, location),
+        experiences (id, host_id, title, image_url, photos, location),
         reviews (id, rating, content, photos, created_at)
       `)
       .eq('user_id', user.id)
@@ -47,6 +47,7 @@ export async function GET() {
         expId: booking.experiences?.id,
         title: booking.experiences?.title,
         image: booking.experiences?.image_url,
+        photos: booking.experiences?.photos, // 🟢 누락되었던 체험 사진 배열 추가 매핑
         location: booking.experiences?.location,
         date: booking.date,
         time: booking.time,

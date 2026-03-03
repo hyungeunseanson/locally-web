@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Star, MessageCircle, Filter, CheckCircle, Reply, MoreHorizontal, Edit2 } from 'lucide-react';
+import { Star, MessageCircle, Filter, CheckCircle, Reply, MoreHorizontal, Edit2, User } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
@@ -205,13 +205,17 @@ export default function HostReviews() {
                 <div className="flex gap-4">
 
                   <div className="shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden relative border border-slate-100">
-                      <Image
-                        src={review.guest?.avatar_url || '/images/logo-black-transparent.png'} // 🟢 외부 테스트 도메인 대신 로컬 에셋 사용
-                        alt="Guest"
-                        fill
-                        className="object-cover"
-                      />
+                    <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden relative border border-slate-100 flex items-center justify-center">
+                      {review.guest?.avatar_url ? (
+                        <Image
+                          src={review.guest.avatar_url}
+                          alt="Guest"
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-slate-400" />
+                      )}
                     </div>
                   </div>
 

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, MessageSquare, Map, Receipt, Lock, Share2 } from 'lucide-react';
+import { MoreHorizontal, MapPin, Clock, Calendar, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, MessageSquare, Map, Receipt, Lock, Share2, Mountain } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CancellationModal from './CancellationModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
@@ -77,7 +77,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const photos = trip.photos && trip.photos.length > 0
     ? trip.photos
-    : [trip.image || '/images/logo-black-transparent.png']; // 🟢 외부 테스트 도메인 대신 로컬 에셋 사용
+    : (trip.image ? [trip.image] : []);
 
   const nextPhoto = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -183,14 +183,20 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
       <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64 relative">
 
         {/* 왼쪽: 이미지 섹션 */}
-        <div className="w-full md:w-72 h-48 md:h-full relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide">
+        <div className="w-full md:w-72 h-48 md:h-full relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide flex items-center justify-center">
           <Link href={`/experiences/${trip.expId}`} className="block w-full h-full relative">
-            <Image
-              src={photos[currentPhotoIndex]}
-              alt={trip.title}
-              fill
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
-            />
+            {photos.length > 0 ? (
+              <Image
+                src={photos[currentPhotoIndex]}
+                alt={trip.title}
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-slate-200">
+                <Mountain className="w-8 h-8 text-slate-300" />
+              </div>
+            )}
           </Link>
 
           {trip.isPrivate && (
