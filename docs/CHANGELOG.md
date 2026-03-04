@@ -5,7 +5,27 @@
 
 ---
 
+## v3.27.4 — [피드 갱신] 글 등록 후 커뮤니티 피드에 새 글이 안 보이는 버그 수정
+
+**작업일:** 2026-03-04
+
+### 원인 3가지 (동시 발생)
+
+| # | 원인 | 수정 |
+|---|------|------|
+| 1 | `posts/route.ts`에 `revalidatePath('/community')` 미호출 — 글 등록 후 Next.js 라우터 캐시가 구 피드 서빙 | `revalidatePath('/community')` 추가 |
+| 2 | `community/page.tsx`에 `dynamic='force-dynamic'` 없음 — Vercel 엣지 캐시가 구 SSR 결과물 서빙 | `export const dynamic = 'force-dynamic'` 추가 |
+| 3 | `page.tsx` + `api/community/route.ts`가 단일 join 쿼리 사용 — join 에러 시 `data=null`→ 빈 피드 | 각각 join 분리 패턴(① post → ② profiles → ③ experiences 별도 조회)으로 전환 |
+
+### 수정 파일
+- `app/api/community/posts/route.ts` — `revalidatePath('/community')` 추가
+- `app/community/page.tsx` — `force-dynamic` + SSR 쿼리 join 분리
+- `app/api/community/route.ts` — 무한스크롤 API join 분리
+
+---
+
 ## v3.27.3 — [핵심버그] 커뮤니티 게시글 상세 404 근본 원인 수정
+
 
 **작업일:** 2026-03-04
 

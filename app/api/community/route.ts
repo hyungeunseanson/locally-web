@@ -9,13 +9,10 @@ export async function GET(request: NextRequest) {
         const offset = parseInt(searchParams.get('offset') || '0', 10);
         const limit = 15;
 
+        // ① community_posts 단독 조회 (join 없음 — join 에러로 전체 피드가 빈값이 되는 버그 방지)
         let query = supabase
             .from('community_posts')
-            .select(`
-        *,
-        profiles(name, avatar_url),
-        linked_experience:experiences(id, title, image_url, price)
-      `)
+            .select('*')
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
 
@@ -23,17 +20,45 @@ export async function GET(request: NextRequest) {
             query = query.eq('category', category);
         }
 
-        const { data, error } = await query;
+        const { data: posts, error } = await query;
 
         if (error) {
             console.error('API Error fetching community posts:', error);
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        let nextOffset = null;
-        if (data && data.length === limit) {
-            nextOffset = offset + limit;
+        if (!posts || posts.length === 0) {
+            return NextResponse.json({ data: [], nextOffset: null });
         }
+
+        // ② profiles 별도 조회 (실패해도 피드는 유지됨)
+        const userIds = [...new Set(posts.map((p: any) => p.user_id))];
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .in('id', userIds);
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+        // ③ experiences 별도 조회 (linked_exp_id가 있는 포스트만)
+        const expIds = [...new Set(posts.map((p: any) => p.linked_exp_id).filter(Boolean))];
+        let expMap = new Map();
+        if (expIds.length > 0) {
+            const { data: experiences } = await supabase
+                .from('experiences')
+                .select('id, title, image_url, price')
+                .in('id', expIds);
+            expMap = new Map((experiences || []).map((e: any) => [e.id, e]));
+        }
+
+        // ④ 조립
+        const data = posts.map((post: any) => ({
+            ...post,
+            profiles: profileMap.get(post.user_id) ?? null,
+            linked_experience: post.linked_exp_id ? (expMap.get(post.linked_exp_id) ?? null) : null,
+        }));
+
+        const nextOffset = data.length === limit ? offset + limit : null;
 
         return NextResponse.json({ data, nextOffset });
     } catch (err: any) {

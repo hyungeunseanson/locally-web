@@ -8,6 +8,9 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
 
+// ✅ Vercel 엣지 캐시 비활성화 — 새 글 등록 후 피드가 구 버전 캐시를 서빙하는 버그 방지
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }): Promise<Metadata> {
     const params = await searchParams;
     const categoryQuery = params?.category as string;
@@ -39,13 +42,11 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     }
 
     const limit = 15;
+
+    // ① community_posts 단독 조회 (join 에러로 initialData가 빈값→피드 공백 버그 방지)
     let query = supabase
         .from('community_posts')
-        .select(`
-            *,
-            profiles(name, avatar_url),
-            linked_experience:experiences(id, title, image_url, price)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .range(0, limit - 1);
 
@@ -53,12 +54,37 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         query = query.eq('category', category);
     }
 
-    const { data: initialData } = await query;
+    const { data: posts } = await query;
 
-    let initialNextOffset = null;
-    if (initialData && initialData.length === limit) {
-        initialNextOffset = limit;
+    // ② profiles 별도 조회 (실패해도 피드 유지)
+    let initialData: any[] = [];
+    if (posts && posts.length > 0) {
+        const userIds = [...new Set(posts.map((p: any) => p.user_id))];
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .in('id', userIds);
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+        // ③ experiences 조건부 조회
+        const expIds = [...new Set(posts.map((p: any) => p.linked_exp_id).filter(Boolean))];
+        let expMap = new Map();
+        if (expIds.length > 0) {
+            const { data: experiences } = await supabase
+                .from('experiences')
+                .select('id, title, image_url, price')
+                .in('id', expIds);
+            expMap = new Map((experiences || []).map((e: any) => [e.id, e]));
+        }
+
+        initialData = posts.map((post: any) => ({
+            ...post,
+            profiles: profileMap.get(post.user_id) ?? null,
+            linked_experience: post.linked_exp_id ? (expMap.get(post.linked_exp_id) ?? null) : null,
+        }));
     }
+
+    const initialNextOffset = (posts && posts.length === limit) ? limit : null;
 
     return (
         <>
