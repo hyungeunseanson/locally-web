@@ -48,7 +48,7 @@ export default function SiteFooter() {
   return (
     <>
       <footer className="hidden md:block bg-white border-t border-[#DDDDDD] pt-12 pb-6 text-sm text-[#222222] font-sans">
-        <div className="max-w-[1440px] mx-auto px-6">
+        <div className="max-w-[1760px] mx-auto px-12">
 
           {/* 상단 링크 모음 (3단 그리드, 좌측 정렬) */}
           <div className="grid grid-cols-3 gap-8 mb-10">
