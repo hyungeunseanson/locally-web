@@ -5,7 +5,22 @@
 
 ---
 
+## v3.29.1 — [커뮤니티] 리스트 피드 원 블록 화이트 보드 스타일 적용
+
+**작업일:** 2026-03-04
+
+- `CommunityFeed.tsx`: 일반 탭 리스트 래퍼에 `bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden` 적용 → 전체 피드가 하나의 하얀 카드 안에 담기는 구조
+- `PostListCard.tsx`: 개별 아이템 스타일 정리
+  - 바깥 테두리/그림자 제거
+  - `border-b border-gray-100 last:border-0` 로만 행 구분
+  - `hover:bg-gray-50 transition-colors` hover 강조
+  - `px-5` 내부 패딩 통일
+- 데이터 패칭·무한스크롤 로직 완전 무손실
+
+---
+
 ## v3.29.0 — [커뮤니티] 하이브리드 UI (리스트형 + 그리드형) 전면 개편
+
 
 **작업일:** 2026-03-04
 

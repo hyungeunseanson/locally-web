@@ -39,7 +39,7 @@ export default function PostListCard({ post }: PostListCardProps) {
 
     return (
         <Link href={`/community/${post.id}`} className="block">
-            <article className="flex items-start gap-3 py-4 border-b border-gray-100 hover:bg-gray-50/60 rounded-xl px-2 -mx-2 transition-colors duration-150 active:bg-gray-100 cursor-pointer">
+            <article className="flex items-start gap-3 px-5 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
 
                 {/* 좌측: 썸네일 (이미지 있을 때만) */}
                 {thumbnail && (

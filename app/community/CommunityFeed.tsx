@@ -146,8 +146,8 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
                     ))}
                 </div>
             ) : (
-                /* 일반 탭: 리스트형 피드 */
-                <div>
+                /* 일반 탭: 리스트형 피드 — 원 블록 화이트 보드 */
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {posts.map((post) => (
                         <PostListCard key={`${post.id}`} post={post} />
                     ))}
