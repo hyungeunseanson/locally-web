@@ -48,19 +48,41 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
     const { id } = await params;
     const supabase = await createClient();
 
-    // 1. Fetch Post Detail
-    const { data: post } = await supabase
+    // ────────────────────────────────────────────────────────────
+    // ① post 자체만 먼저 조회 (join 없음 — 가장 안정적)
+    //    join을 포함한 단일 쿼리는 profiles/experiences 스키마 문제 시
+    //    전체 data = null이 되어 notFound() 호출되는 버그가 있었음.
+    // ────────────────────────────────────────────────────────────
+    const { data: post, error: postError } = await supabase
         .from('community_posts')
-        .select(`
-            *,
-            profiles:user_id(name, avatar_url),
-            linked_experience:experiences(id, title, image_url, price)
-        `)
+        .select('*')
         .eq('id', id)
         .maybeSingle();
 
+    if (postError) {
+        console.error('[Community Post Detail] Post query error:', postError);
+    }
+
     if (!post) {
         notFound();
+    }
+
+    // ② profile 별도 조회 (실패해도 post 렌더에 영향 없음)
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('name, avatar_url')
+        .eq('id', post.user_id)
+        .maybeSingle();
+
+    // ③ 연동 체험 별도 조회 (linked_exp_id가 있을 때만)
+    let linkedExperience: { id: number; title: string; image_url: string; price: number } | null = null;
+    if (post.linked_exp_id) {
+        const { data: exp } = await supabase
+            .from('experiences')
+            .select('id, title, image_url, price')
+            .eq('id', post.linked_exp_id)
+            .maybeSingle();
+        linkedExperience = exp ?? null;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -88,8 +110,8 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
                 <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                            {post.profiles?.avatar_url ? (
-                                <img src={post.profiles.avatar_url} alt="profile" className="w-full h-full object-cover" />
+                            {profile?.avatar_url ? (
+                                <img src={profile.avatar_url} alt="profile" className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">?</div>
                             )}
@@ -97,7 +119,7 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
                         <div>
                             <div className="flex items-center gap-1">
                                 <span className="text-[15px] font-bold text-slate-900 leading-tight">
-                                    {post.profiles?.name || '로컬리 유저'}
+                                    {profile?.name || '로컬리 유저'}
                                 </span>
                             </div>
                             <div className="text-[12px] font-medium text-slate-400 mt-0.5">
@@ -148,10 +170,10 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
                 )}
 
                 {/* Linked Experience Embed */}
-                {post.linked_experience && (
+                {linkedExperience && (
                     <div className="mb-8">
                         <h4 className="text-[13px] font-bold text-slate-500 mb-2">언급된 로컬리 상품</h4>
-                        <LinkedExperienceChip exp={post.linked_experience} />
+                        <LinkedExperienceChip exp={linkedExperience} />
                     </div>
                 )}
 
