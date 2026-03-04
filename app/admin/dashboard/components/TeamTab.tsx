@@ -62,8 +62,16 @@ export default function TeamTab() {
   };
 
   const fetchComments = async () => {
-    // 🟢 과부하 방지: 최대 100개 제한
-    const { data } = await supabase.from('admin_task_comments').select('*').order('created_at', { ascending: true }).limit(100);
+    // 🔧 [버그픽스] MiniChatBar가 동일 테이블에 task_id='00000000-...' 로 메시지를 쌓아
+    // limit(100)을 먼저 채워버려 실제 TODO 댓글이 fetch 안 되던 문제 수정.
+    // 팀 미니채팅 전용 고정 UUID를 제외하고 가져옴.
+    const MINI_CHAT_ID = '00000000-0000-0000-0000-000000000000';
+    const { data } = await supabase
+      .from('admin_task_comments')
+      .select('*')
+      .neq('task_id', MINI_CHAT_ID)
+      .order('created_at', { ascending: true })
+      .limit(300);
     if (data) setComments(data);
   };
 

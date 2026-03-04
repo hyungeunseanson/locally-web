@@ -5,6 +5,18 @@
 
 ---
 
+## v3.31.3 — [어드민 버그픽스] 팀 할 일 댓글 미표시 근본 원인 수정
+
+**작업일:** 2026-03-05
+
+| 항목 | 내용 |
+|------|------|
+| 🔧 버그: 팀 할 일 댓글 안 보임 | **근본 원인:** `MiniChatBar`(팀 미니채팅)가 동일한 `admin_task_comments` 테이블에 `task_id='00000000-...'` 고정 UUID로 채팅 메시지를 쌓아, `fetchComments()`의 `limit(100)`을 먼저 채워버려 실제 TODO 댓글이 fetch 결과에서 밀려나던 문제. |
+| 🔧 수정 1: `fetchComments` 필터 추가 | `TeamTab.tsx` — 미니채팅 전용 UUID를 `.neq()` 로 제외하고 limit를 300으로 증가. |
+| 🔧 수정 2: insert 후 즉시 갱신 | `addComment`, `addMemoComment` 함수에 insert 성공 후 `fetchComments()` 직접 호출 추가 — Realtime 구독 지연/환경 차이 대응. |
+
+---
+
 ## v3.31.2 — [보안 및 규정 준비] Supabase Linter 1차 해결 (Search Path & 비밀번호 정책)
 
 **작업일:** 2026-03-04
