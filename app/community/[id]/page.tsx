@@ -96,7 +96,7 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
     return (
         <main className="max-w-[768px] mx-auto min-h-screen bg-white md:border-x md:border-slate-100 pb-32">
             {/* Header */}
-            <div className="sticky top-[80px] z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
                 <Link href="/community" className="text-slate-600 hover:text-slate-900 transition-colors">
                     <ArrowLeft size={24} />
                 </Link>

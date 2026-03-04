@@ -5,7 +5,19 @@
 
 ---
 
+## v3.29.2 — [커뮤니티] 상세 페이지 댓글 500 오류 + sticky 헤더 위치 버그 수정
+
+**작업일:** 2026-03-04
+
+| 버그 | 원인 | 수정 파일 |
+|------|------|---------|
+| 댓글 작성/조회 500 오류 (`profiles_1.name does not exist`) | `profiles:user_id(name, avatar_url)` Supabase FK join alias가 내부적으로 `profiles_1` 로 생성되어 컬럼 미존재 | `api/community/comments/route.ts` — GET/POST 모두 join 제거, profiles 별도 조회로 변경 |
+| 상단 헤더가 80px 아래에 기괴하게 고정 | `sticky top-[80px]` — SiteHeader 없는 상세 페이지에서 의미없는 오프셋 | `community/[id]/page.tsx` — `top-0`으로 수정 |
+
+---
+
 ## v3.29.1 — [커뮤니티] 리스트 피드 원 블록 화이트 보드 스타일 적용
+
 
 **작업일:** 2026-03-04
 

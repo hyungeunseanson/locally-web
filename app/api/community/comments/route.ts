@@ -12,14 +12,31 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Missing post_id' }, { status: 400 });
         }
 
-        const { data, error } = await supabase
+        // ① comments 단독 조회 (join 없음 — profiles FK join이 "profiles_1.name" 오류 유발)
+        const { data: comments, error } = await supabase
             .from('community_comments')
-            .select('*, profiles:user_id(name, avatar_url)')
+            .select('*')
             .eq('post_id', postId)
             .order('created_at', { ascending: true })
             .limit(100);
 
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        if (!comments || comments.length === 0) return NextResponse.json({ data: [] });
+
+        // ② profiles 별도 조회
+        const userIds = [...new Set(comments.map((c: any) => c.user_id))];
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .in('id', userIds);
+
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+        const data = comments.map((c: any) => ({
+            ...c,
+            profiles: profileMap.get(c.user_id) ?? null,
+        }));
+
         return NextResponse.json({ data });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
@@ -41,13 +58,24 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
 
-        const { data, error } = await supabase
+        // ① insert (join 없음)
+        const { data: inserted, error: insertError } = await supabase
             .from('community_comments')
             .insert({ post_id, user_id: user.id, content: content.trim() })
-            .select('*, profiles:user_id(name, avatar_url)')
+            .select('*')
             .single();
 
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+        // ② profile 별도 조회
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        const data = { ...inserted, profiles: profile ?? null };
+
         return NextResponse.json({ data });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
