@@ -3,11 +3,13 @@ import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, CalendarCheck, Share2, MoreVertical, CheckCircle2 } from 'lucide-react';
+import { MapPin, CalendarCheck, MoreVertical } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
 import PostImages from '../components/PostImages';
 import CommentSection from '../components/CommentSection';
 import LikeButton from '../components/LikeButton';
+import BackButton from '../components/BackButton';
+import ShareButton from '../components/ShareButton';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -49,33 +51,24 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
     const { id } = await params;
     const supabase = await createClient();
 
-    // ────────────────────────────────────────────────────────────
-    // ① post 자체만 먼저 조회 (join 없음 — 가장 안정적)
-    //    join을 포함한 단일 쿼리는 profiles/experiences 스키마 문제 시
-    //    전체 data = null이 되어 notFound() 호출되는 버그가 있었음.
-    // ────────────────────────────────────────────────────────────
+    // ① post 단독 조회 (SSR Join 분리 원칙)
     const { data: post, error: postError } = await supabase
         .from('community_posts')
         .select('*')
         .eq('id', id)
         .maybeSingle();
 
-    if (postError) {
-        console.error('[Community Post Detail] Post query error:', postError);
-    }
+    if (postError) console.error('[Community Post Detail] Post query error:', postError);
+    if (!post) notFound();
 
-    if (!post) {
-        notFound();
-    }
-
-    // ② profile 별도 조회 (실패해도 post 렌더에 영향 없음)
+    // ② profile 별도 조회
     const { data: profile } = await supabase
         .from('profiles')
-        .select('name, avatar_url')
+        .select('id, name, avatar_url')
         .eq('id', post.user_id)
         .maybeSingle();
 
-    // ③ 연동 체험 별도 조회 (linked_exp_id가 있을 때만)
+    // ③ 연동 체험 별도 조회
     let linkedExperience: { id: number; title: string; image_url: string; price: number } | null = null;
     if (post.linked_exp_id) {
         const { data: exp } = await supabase
@@ -86,113 +79,168 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
         linkedExperience = exp ?? null;
     }
 
+    // ④ 이전글/다음글 (같은 카테고리)
+    const [{ data: prevPost }, { data: nextPost }] = await Promise.all([
+        supabase.from('community_posts')
+            .select('id, title, created_at')
+            .eq('category', post.category)
+            .lt('created_at', post.created_at)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        supabase.from('community_posts')
+            .select('id, title, created_at')
+            .eq('category', post.category)
+            .gt('created_at', post.created_at)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+    ]);
+
     const { data: { user } } = await supabase.auth.getUser();
     const isOwner = user?.id === post.user_id;
     const isCompanion = post.category === 'companion';
-    const isQna = post.category === 'qna';
-
-    // (조회수는 Client 훅에서 올리거나, Redis Queue를 쓰는 것이 OOM 방어에 탁월하므로 SSR에서는 읽기만 수행합니다)
+    const pageUrl = `https://locally-web.vercel.app/community/${id}`;
 
     return (
-        <main className="max-w-[768px] mx-auto min-h-screen bg-white md:border-x md:border-slate-100 pb-32">
-            {/* Header */}
-            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
-                <Link href="/community" className="text-slate-600 hover:text-slate-900 transition-colors">
-                    <ArrowLeft size={24} />
-                </Link>
-                <div className="flex items-center gap-3 text-slate-400">
-                    <button className="hover:text-slate-900 transition-colors"><Share2 size={20} /></button>
-                    {isOwner && <button className="hover:text-slate-900 transition-colors"><MoreVertical size={20} /></button>}
+        // 데스크탑: max-w-7xl 2컬럼 / 모바일: max-w-[768px] 단일 컬럼
+        <div className="min-h-screen bg-[#F7F7F9]">
+            <div className="max-w-7xl mx-auto lg:px-4 lg:py-8">
+                <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+
+                    {/* ─── 좌측: 게시글 본문 (lg:col-span-8) ─── */}
+                    <div className="lg:col-span-8">
+                        <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-32">
+
+                            {/* Sticky 헤더 */}
+                            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+                                <BackButton />
+                                <div className="flex items-center gap-3 text-slate-400">
+                                    <ShareButton title={post.title} url={pageUrl} />
+                                    {isOwner && <button className="hover:text-slate-900 transition-colors"><MoreVertical size={20} /></button>}
+                                </div>
+                            </div>
+
+                            <article className="px-5 py-6">
+                                {/* ① 제목 최상단 */}
+                                <h1 className="text-[18px] md:text-[24px] font-bold text-slate-900 leading-snug mb-4">
+                                    {post.title}
+                                </h1>
+
+                                {/* ② 유저 정보 (제목 아래) */}
+                                <div className="flex items-center gap-3 mb-5">
+                                    <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+                                        {profile?.avatar_url ? (
+                                            <img src={profile.avatar_url} alt="profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">
+                                                {profile?.name?.[0]?.toUpperCase() || '?'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <span className="text-[13px] md:text-[15px] font-semibold md:font-bold text-slate-900 leading-tight block">
+                                            {profile?.name || '로컬리 유저'}
+                                        </span>
+                                        <span className="text-[11px] md:text-[12px] font-medium text-slate-400">
+                                            {getTimeString(post.created_at)}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* 동행 뱃지 (동행 카테고리만, 답변대기 제거) */}
+                                {isCompanion && (post.companion_city || post.companion_date) && (
+                                    <div className="flex items-center gap-2 mb-6">
+                                        {post.companion_city && (
+                                            <div className="flex items-center gap-1.5 bg-rose-50 text-[#FF385C] text-[13px] font-bold px-3 py-1.5 rounded-lg border border-rose-100">
+                                                <MapPin size={14} strokeWidth={2.5} /> {post.companion_city}
+                                            </div>
+                                        )}
+                                        {post.companion_date && (
+                                            <div className="flex items-center gap-1.5 bg-slate-50 text-slate-700 text-[13px] font-bold px-3 py-1.5 rounded-lg border border-slate-200">
+                                                <CalendarCheck size={14} strokeWidth={2.5} /> {post.companion_date}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 본문 */}
+                                <div className="text-[16px] text-slate-800 leading-relaxed whitespace-pre-wrap mb-8">
+                                    {post.content}
+                                </div>
+
+                                {/* 이미지 */}
+                                {post.images && post.images.length > 0 && (
+                                    <div className="mb-8">
+                                        <PostImages images={post.images} detail />
+                                    </div>
+                                )}
+
+                                {/* 연동 체험 */}
+                                {linkedExperience && (
+                                    <div className="mb-8">
+                                        <h4 className="text-[13px] font-bold text-slate-500 mb-2">언급된 로컬리 체험</h4>
+                                        <LinkedExperienceChip exp={linkedExperience} />
+                                    </div>
+                                )}
+
+                                {/* Stats + LikeButton */}
+                                <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5">
+                                    <span>조회 {post.view_count || 0}</span>
+                                    <span>댓글 {post.comment_count || 0}</span>
+                                    <div className="ml-auto">
+                                        <LikeButton postId={post.id} initialCount={post.like_count || 0} />
+                                    </div>
+                                </div>
+                            </article>
+
+                            {/* 댓글 구분선 */}
+                            <div className="w-full h-2 bg-slate-50 border-y border-slate-100" />
+
+                            <section className="px-5 py-6">
+                                <h3 className="text-[17px] font-bold text-slate-900 mb-6">댓글 {post.comment_count || 0}</h3>
+                                <CommentSection postId={post.id} initialCount={post.comment_count || 0} />
+                            </section>
+
+                            {/* 이전글 / 다음글 */}
+                            {(prevPost || nextPost) && (
+                                <div className="border-t border-slate-100 mx-5 pt-5 pb-6 space-y-2">
+                                    {prevPost && (
+                                        <Link href={`/community/${prevPost.id}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
+                                            <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex-shrink-0">◀ 이전글</span>
+                                            <span className="text-[13px] text-slate-700 line-clamp-1 group-hover:underline">{prevPost.title}</span>
+                                        </Link>
+                                    )}
+                                    {nextPost && (
+                                        <Link href={`/community/${nextPost.id}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
+                                            <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex-shrink-0">▶ 다음글</span>
+                                            <span className="text-[13px] text-slate-700 line-clamp-1 group-hover:underline">{nextPost.title}</span>
+                                        </Link>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* 모바일 전용 광고 영역 (댓글 아래) */}
+                            <div className="lg:hidden mx-5 mb-6 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 h-24 flex items-center justify-center">
+                                <span className="text-[12px] font-medium text-gray-400">광고 영역</span>
+                            </div>
+                        </main>
+                    </div>
+
+                    {/* ─── 우측: 광고 사이드바 (lg:col-span-4, 모바일 hidden) ─── */}
+                    <div className="hidden lg:block lg:col-span-4">
+                        <div className="sticky top-8 space-y-4">
+                            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-64 flex items-center justify-center shadow-sm">
+                                <span className="text-[13px] font-medium text-gray-400">광고 영역</span>
+                            </div>
+                            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-48 flex items-center justify-center shadow-sm">
+                                <span className="text-[13px] font-medium text-gray-400">광고 영역 2</span>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-
-            <article className="px-5 py-6">
-                {/* User Profile */}
-                <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                            {profile?.avatar_url ? (
-                                <img src={profile.avatar_url} alt="profile" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">?</div>
-                            )}
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-1">
-                                <span className="text-[15px] font-bold text-slate-900 leading-tight">
-                                    {profile?.name || '로컬리 유저'}
-                                </span>
-                            </div>
-                            <div className="text-[12px] font-medium text-slate-400 mt-0.5">
-                                {getTimeString(post.created_at)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Title and Category Badges */}
-                <h1 className="text-[22px] md:text-[24px] font-bold text-slate-900 leading-snug mb-4">
-                    {post.title}
-                </h1>
-
-                {isCompanion && (post.companion_city || post.companion_date) && (
-                    <div className="flex items-center gap-2 mb-6">
-                        {post.companion_city && (
-                            <div className="flex items-center gap-1.5 bg-rose-50 text-[#FF385C] text-[13px] font-bold px-3 py-1.5 rounded-lg border border-rose-100">
-                                <MapPin size={14} strokeWidth={2.5} /> {post.companion_city}
-                            </div>
-                        )}
-                        {post.companion_date && (
-                            <div className="flex items-center gap-1.5 bg-slate-50 text-slate-700 text-[13px] font-bold px-3 py-1.5 rounded-lg border border-slate-200">
-                                <CalendarCheck size={14} strokeWidth={2.5} /> {post.companion_date}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {isQna && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-50 border border-slate-200 text-slate-600 text-[13px] font-bold mb-6">
-                        <CheckCircle2 size={16} className="text-slate-400" /> 답변대기
-                    </div>
-                )}
-
-                {/* Content */}
-                <div className="text-[16px] text-slate-800 leading-relaxed whitespace-pre-wrap mb-8">
-                    {post.content}
-                </div>
-
-                {/* Images */}
-                {post.images && post.images.length > 0 && (
-                    <div className="mb-8">
-                        <PostImages images={post.images} detail />
-                    </div>
-                )}
-
-                {/* Linked Experience Embed */}
-                {linkedExperience && (
-                    <div className="mb-8">
-                        <h4 className="text-[13px] font-bold text-slate-500 mb-2">언급된 로컬리 상품</h4>
-                        <LinkedExperienceChip exp={linkedExperience} />
-                    </div>
-                )}
-
-                {/* Stats + Like Button */}
-                <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5">
-                    <span>조회 {post.view_count || 0}</span>
-                    <span>댓글 {post.comment_count || 0}</span>
-                    <div className="ml-auto">
-                        <LikeButton postId={post.id} initialCount={post.like_count || 0} />
-                    </div>
-                </div>
-            </article>
-
-            {/* Comments Divider */}
-            <div className="w-full h-2 bg-slate-50 border-y border-slate-100"></div>
-
-            <section className="px-5 py-6">
-                <h3 className="text-[17px] font-bold text-slate-900 mb-6">댓글 {post.comment_count || 0}</h3>
-                <CommentSection postId={post.id} initialCount={post.comment_count || 0} />
-            </section>
-        </main>
+        </div>
     );
 }

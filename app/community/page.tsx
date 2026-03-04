@@ -104,6 +104,18 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 <CommunityCategoryTabs />
                             </div>
 
+                            {/* 데스크탑 전용 글쓰기 넛지 박스 — 피드 상단 (기존 위치 복구) */}
+                            {category !== 'locally_content' && (
+                                <Link href="/community/write" className="hidden lg:block mb-5">
+                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text hover:border-gray-200 hover:shadow-md transition-all duration-200">
+                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                            <Edit3 size={16} className="text-gray-400" />
+                                        </div>
+                                        <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
+                                    </div>
+                                </Link>
+                            )}
+
                             {/* 모바일 전용 위젯 스트립: 실시간 업데이트 + 지금 뜨는 라운지 글 */}
                             {category !== 'locally_content' && (
                                 <MobileWidgetStrip />
@@ -116,14 +128,14 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 category={category}
                             />
 
-                            {/* 글쓰기 넛지 박스 — 피드 최하단 (모바일만 표시, 데스크탑은 RightSidebar CTA) */}
+                            {/* 글쓰기 넛지 박스 — 피드 최하단 (모바일만, 패딩 축소) */}
                             {category !== 'locally_content' && (
                                 <Link href="/community/write" className="block lg:hidden mt-4">
-                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text hover:border-gray-200 hover:shadow-md transition-all duration-200">
-                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                            <Edit3 size={16} className="text-gray-400" />
+                                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text hover:border-gray-200 hover:shadow-md transition-all duration-200">
+                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                            <Edit3 size={14} className="text-gray-400" />
                                         </div>
-                                        <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
+                                        <span className="text-gray-400 text-[13px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
                                     </div>
                                 </Link>
                             )}
@@ -139,10 +151,10 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
             <Link
                 href="/community/write"
-                className="block lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
+                className="block lg:hidden fixed bottom-20 right-4 w-12 h-12 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
                 aria-label="글쓰기"
             >
-                <Edit3 size={22} strokeWidth={2.5} />
+                <Edit3 size={20} strokeWidth={2.5} />
             </Link>
         </>
     );
