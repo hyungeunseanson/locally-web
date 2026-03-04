@@ -28,33 +28,24 @@ export async function POST(request: Request) {
 
         console.log(`🚀 [Admin Notify API] 팀 협업 알림 발송 준비: ${title}`);
 
-        // 1. 수신 대상자 수집 (users.role + Whitelist)
-        const [adminUsersData, whitelistData] = await Promise.all([
-            supabaseAdmin.from('users').select('id').eq('role', 'admin'),
-            supabaseAdmin.from('admin_whitelist').select('email')
-        ]);
+        // 1. 수신 대상자 수집 — admin_whitelist 단일 소스
+        // ⚠️ 과거: users.role='admin' + admin_whitelist 이중 소스 합산으로 인해
+        //   whitelist에서 삭제된 관리자에게도 계속 메일이 발송되는 버그가 있었음.
+        //   → 수정: admin_whitelist만 사용 (whitelist에서 삭제 = 즉시 발송 중단)
+        const { data: whitelistData } = await supabaseAdmin
+            .from('admin_whitelist')
+            .select('email');
 
-        const adminIds = (adminUsersData.data || []).map(userRow => userRow.id);
-        let adminEmails: string[] = [];
+        const uniqueEmails = (whitelistData || []).map((w: { email: string }) => w.email).filter(Boolean);
 
-        if (adminIds.length > 0) {
-            const { data: adminProfiles } = await supabaseAdmin
-                .from('profiles')
-                .select('email')
-                .in('id', adminIds);
-            adminEmails = (adminProfiles || []).map(profile => profile.email).filter(Boolean);
-        }
-
-        const whitelistEmails = (whitelistData.data || []).map(w => w.email).filter(Boolean);
-
-        // 중복 제거 및 현재 액션을 취한 당사자(user.email)는 발송 제외
-        const uniqueEmails = Array.from(new Set([...adminEmails, ...whitelistEmails]));
-        const targetEmails = uniqueEmails.filter(email => email !== user.email);
+        // 액션을 취한 본인(user.email)은 발송 제외
+        const targetEmails = uniqueEmails.filter((email: string) => email !== user.email);
 
         if (targetEmails.length === 0) {
             console.log('ℹ️ [Admin Notify API] 수신 대상자가 없어 발송을 스킵합니다.');
             return NextResponse.json({ success: true, count: 0 });
         }
+
 
         // 2. 이메일 전송 (Nodemailer)
         const transporter = nodemailer.createTransport({

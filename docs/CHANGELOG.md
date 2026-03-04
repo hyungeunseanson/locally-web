@@ -5,7 +5,37 @@
 
 ---
 
+## v3.27.2 — [보안] 어드민 팀 협업 이메일 무단 발송 버그 수정
+
+**작업일:** 2026-03-04
+
+### 버그 원인 (전수조사)
+
+`/api/admin/notify-team` API에서 **이중 소스(Dual-Source)** 로 이메일을 수집하는 로직이 루트 원인:
+
+```
+① supabaseAdmin.from('users').eq('role', 'admin')  → profiles 경유로 이메일 추출
+② supabaseAdmin.from('admin_whitelist').select('email')
+→ 두 소스를 Array.from(new Set([...① , ...②])) 합산
+```
+
+`admin_whitelist`에서 삭제해도 **`users.role='admin'`이 남아있는 한 ① 소스에서 계속 이메일이 수집**되어 삭제된 관리자에게 무한히 알림 메일이 발송되었음.
+
+### 수정 내용
+
+- **`app/api/admin/notify-team/route.ts`**: `users.role` 소스 완전 제거. `admin_whitelist` 단일 소스로 교체.
+- **이후 팀원 관리 원칙**: 추가/삭제는 반드시 `admin_whitelist` 테이블에서만 수행.
+
+### 트리거 지점 (이메일 발송 유발 액션)
+
+팀 협업에서 아래 액션 시 notify-team API 호출됨:
+- TeamTab: 할 일 추가, 할 일 댓글, 메모 신규 작성, 메모 댓글
+- GlobalTeamChat: 채팅 메시지 전송
+
+---
+
 ## v3.27.1 — 커뮤니티 버그 핫픽스 (SiteHeader 사라짐 / 게시글 상세 404 / 메뉴 텍스트)
+
 
 **작업일:** 2026-03-04
 
