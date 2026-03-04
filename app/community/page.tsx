@@ -4,8 +4,6 @@ import { createClient } from '@/app/utils/supabase/server';
 import CommunityCategoryTabs from './components/CommunityCategoryTabs';
 import CommunityFeed from './CommunityFeed';
 import RightSidebar from './components/RightSidebar';
-import SiteHeader from '@/app/components/SiteHeader';
-import SiteFooter from '@/app/components/SiteFooter';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -63,7 +61,6 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
     return (
         <>
-            <SiteHeader />
             {/* 페이지 배경 */}
             <div className="min-h-screen bg-[#F7F7F9]">
                 <div className="max-w-7xl mx-auto px-4 py-8">
@@ -103,7 +100,6 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                 </div>
             </div>
 
-            {/* 모바일 전용 FAB (플로팅 글쓰기 버튼) */}
             <Link
                 href="/community/write"
                 className="block lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
@@ -111,8 +107,6 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
             >
                 <Edit3 size={22} strokeWidth={2.5} />
             </Link>
-
-            <SiteFooter />
         </>
     );
 }

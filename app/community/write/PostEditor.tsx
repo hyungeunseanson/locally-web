@@ -108,9 +108,8 @@ export default function PostEditor() {
 
             const { id } = await response.json();
 
-            // Revalidate via refresh and go to detail view
-            router.refresh();
-            router.push(`/community/${id}`);
+            // 하드 네비게이션으로 이동 (router.refresh + push 레이스 컨디션으로 인한 404 방지)
+            window.location.href = `/community/${id}`;
 
         } catch (error: any) {
             console.error(error);
