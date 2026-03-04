@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
     Search, Heart, MessageSquare, User,
-    CalendarCheck, LayoutList, BookOpen, AlignJustify, Users2
+    CalendarCheck, LayoutList, BookOpen, AlignJustify
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import LoginModal from '@/app/components/LoginModal';
@@ -69,12 +69,6 @@ export default function BottomTabNavigation() {
                     <img src="/images/logo.png" alt="여행" className="w-full h-full object-cover" style={{ transform: 'scale(1.35)' }} />
                 </div>
             )
-        },
-        {
-            name: '커뮤니티',
-            href: '/community',
-            requireAuth: false,
-            icon: (isActive: boolean) => <Users2 size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '메시지',

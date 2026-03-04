@@ -4,7 +4,7 @@ import React, { useRef, useCallback } from 'react';
 
 interface PostImagesProps {
     images: string[];
-    /** 상세 페이지에서는 true (단일 이미지를 크게) */
+    /** 상세 페이지에서는 true */
     detail?: boolean;
 }
 
@@ -12,14 +12,13 @@ interface PostImagesProps {
  * 이미지 비율 자동 감지 컴포넌트
  *
  * 규칙:
- *  - 이미지 1장 + 세로형(ratio ≥ 1.15, 즉 4:5에 가까운) → aspect-[4/5]
- *  - 이미지 1장 + 가로/정방형                             → aspect-square
- *  - 이미지 2~3장                                         → 항상 aspect-square 그리드
+ *  - 1장 + 세로형 (ratio ≥ 1.15, 4:5에 가까운) → aspect-[4/5]
+ *  - 1장 + 가로/정방형                          → aspect-square
+ *  - 2~3장                                      → 항상 aspect-square 그리드
  *
- * 왜 onLoad 방식인가:
- *  - SSR 단계에서는 이미지 비율을 알 수 없음
- *  - naturalWidth/naturalHeight는 클라이언트에서만 접근 가능
- *  - 기본값 aspect-square → 비율 감지 후 업데이트하면 레이아웃 시프트 최소화
+ * 데스크탑 비율 이슈 해결:
+ *  - 이전: aspect-square + w-full + max-h → 세 클래스가 충돌해 이상한 비율
+ *  - 현재: max-w로 너비를 먼저 제한 → aspect로 높이 결정 (충돌 없음)
  */
 export default function PostImages({ images, detail = false }: PostImagesProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -28,7 +27,6 @@ export default function PostImages({ images, detail = false }: PostImagesProps) 
         if (!wrapperRef.current) return;
         const img = e.currentTarget;
         const ratio = img.naturalHeight / img.naturalWidth;
-        // 4:5 = 1.25, 여유 허용 범위: 1.15 이상이면 4:5로 판정
         if (ratio >= 1.15) {
             wrapperRef.current.classList.remove('aspect-square');
             wrapperRef.current.classList.add('aspect-[4/5]');
@@ -37,16 +35,18 @@ export default function PostImages({ images, detail = false }: PostImagesProps) 
 
     if (!images || images.length === 0) return null;
 
-    // ─── 단일 이미지 (비율 자동 감지) ───────────────────────────────
+    // ─── 단일 이미지 ──────────────────────────────────────────────────
     if (images.length === 1) {
-        const maxClass = detail
-            ? 'max-w-sm md:max-w-md mx-auto'   // 상세 페이지: 너무 크지 않게 제한
-            : 'max-h-72 md:max-h-80';          // 피드 카드: 높이 상한 제한
+        // 피드 카드: 모바일은 full-width, 데스크탑은 max-w-xs(320px)로 제한 후 중앙 정렬
+        // 상세 페이지: max-w-sm(384px) 고정
+        const sizeClass = detail
+            ? 'w-full max-w-sm mx-auto'
+            : 'w-full md:max-w-xs md:mx-auto';
 
         return (
             <div
                 ref={wrapperRef}
-                className={`aspect-square rounded-xl overflow-hidden bg-gray-100 ${maxClass} w-full`}
+                className={`${sizeClass} aspect-square rounded-xl overflow-hidden bg-gray-100`}
             >
                 <img
                     src={images[0]}
@@ -59,12 +59,11 @@ export default function PostImages({ images, detail = false }: PostImagesProps) 
         );
     }
 
-    // ─── 2~3장 이미지 그리드 (항상 1:1) ────────────────────────────
+    // ─── 2~3장 그리드 (항상 1:1) ─────────────────────────────────────
     const gridClass = images.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
-    const maxClass = detail ? '' : 'max-h-64 md:max-h-72';
 
     return (
-        <div className={`grid ${gridClass} gap-1 rounded-xl overflow-hidden ${maxClass}`}>
+        <div className={`grid ${gridClass} gap-1 rounded-xl overflow-hidden`}>
             {images.slice(0, 3).map((img, idx) => (
                 <div key={idx} className="aspect-square bg-gray-100 overflow-hidden">
                     <img

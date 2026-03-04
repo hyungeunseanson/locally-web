@@ -441,6 +441,7 @@ export default function AccountPage() {
           <MobileMenuItem icon={<MessageSquare className="w-4 h-4" />} label="메시지" href="/guest/inbox" />
           <MobileMenuItem icon={<Smile className="w-4 h-4" />} label="나의 여행" href="/guest/trips" />
           <MobileMenuItem icon={<Star className="w-4 h-4" />} label="위시리스트" href="/guest/wishlists" />
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" href="/community" />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
@@ -455,11 +456,10 @@ export default function AccountPage() {
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
 
-        {/* ── 메뉴 그룹 3: Locally & 커뮤니티 ── */}
+        {/* ── 메뉴 그룹 3: Locally ── */}
         <div className="px-4">
           <MobileMenuItem icon={<FileText className="w-4 h-4" />} label="로컬리 소개" href="/about" />
           <MobileMenuItem icon={<Bell className="w-4 h-4" />} label="공지사항" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('notices'); }} />
-          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" href="/community" />
           <MobileMenuItem icon={<BookOpen className="w-4 h-4" />} label="뉴스" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('news'); }} />
           <MobileMenuItem icon={<Globe className="w-4 h-4" />} label="소셜 미디어" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('social'); }} />
         </div>
