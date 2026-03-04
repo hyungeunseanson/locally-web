@@ -5,6 +5,16 @@
 
 ---
 
+## v3.31.2 — [보안 및 규정 준비] Supabase Linter 1차 해결 (Search Path & 비밀번호 정책)
+
+**작업일:** 2026-03-04
+
+| 항목 | 내용 |
+|------|------|
+| 🔒 보안 패치 | Supabase 보안 경고 `Function Search Path Mutable` (12건) 해결을 위한 `search_path=public` 강제 세팅 SQL 마이그레이션 파일 작성 및 적용 |
+
+---
+
 ## v3.31.1 — [런칭 준비] 푸터 사업자 정보 노출 & Web Analytics 연동
 
 **작업일:** 2026-03-04
