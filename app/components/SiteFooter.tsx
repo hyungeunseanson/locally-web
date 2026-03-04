@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Globe, X } from 'lucide-react';
+import { Globe, Instagram, ChevronDown, ChevronUp, X } from 'lucide-react';
 // ❗ 아래 경로는 아까 만드신 파일 위치와 정확히 일치해야 합니다.
 import { TERMS_OF_USE, PRIVACY_POLICY, TRAVEL_TERMS, REFUND_POLICY } from '@/app/constants/legalText';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function SiteFooter() {
   const { t, lang } = useLanguage();
+  const [instaOpen, setInstaOpen] = useState(false);
 
 
   // 모달 상태 관리 ('terms', 'privacy', 'travel', 'refund', null)
@@ -50,8 +51,8 @@ export default function SiteFooter() {
       <footer className="hidden md:block bg-white border-t border-[#DDDDDD] pt-12 pb-6 text-sm text-[#222222] font-sans">
         <div className="max-w-[1760px] mx-auto px-12">
 
-          {/* 상단 링크 모음 (3단 그리드, 좌측 정렬) */}
-          <div className="grid grid-cols-3 gap-8 mb-10">
+          {/* 상단 링크 모음 (4단 그리드, 좌측 정렬) */}
+          <div className="grid grid-cols-4 gap-8 mb-10">
 
             {/* 1. 로컬리 지원 */}
             <div className="space-y-4">
@@ -80,6 +81,57 @@ export default function SiteFooter() {
                 <li><Link href="/company/careers" className="hover:underline">{t('footer_careers')}</Link></li>
                 <li><Link href="/company/investors" className="hover:underline">{t('footer_investors')}</Link></li>
                 <li><Link href="/company/partnership" className="hover:underline">{t('footer_partnership')}</Link></li>
+              </ul>
+            </div>
+
+            {/* 4. 소셜 미디어 */}
+            <div className="space-y-4">
+              <h5 className="font-bold">{t('footer_social')}</h5>
+              <ul className="space-y-3 text-[#717171] font-light relative">
+
+                {/* 인스타그램 (다중 계정 팝업) */}
+                <li className="relative">
+                  <button
+                    onClick={() => setInstaOpen(!instaOpen)}
+                    className="hover:text-black flex items-center gap-1 focus:outline-none transition-colors"
+                  >
+                    <Instagram size={16} /> Instagram
+                    {instaOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+
+                  {instaOpen && (
+                    <div className="absolute left-0 bottom-full mb-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                      <div className="py-1">
+                        <a href="https://www.instagram.com/locally.official/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                          Locally Official (KR)
+                        </a>
+                        <a href="https://www.instagram.com/locally.experience/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                          Locally Experience (KR)
+                        </a>
+                        <a href="https://www.instagram.com/locally.japan/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                          Locally Japan (JP)
+                        </a>
+                        <a href="https://www.instagram.com/locally.partners/" rel="noopener noreferrer" className="block px-4 py-2 hover:bg-gray-50 text-xs text-gray-600 hover:text-black">
+                          Locally Partners (EN)
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </li>
+
+                {/* 네이버 블로그 */}
+                <li>
+                  <Link
+                    href="https://blog.naver.com/locally-travel"
+                    rel="noopener noreferrer"
+                    className="hover:text-black flex items-center gap-2 group text-[#717171] transition-colors"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:stroke-black transition-colors">
+                      <path d="M3 3h4l10 18h4" /> <path d="M3 3v18" /> <path d="M21 3v18" />
+                    </svg>
+                    <span>Naver Blog</span>
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
