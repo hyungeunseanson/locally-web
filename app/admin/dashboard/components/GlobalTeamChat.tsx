@@ -1,13 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
-import { Send, MessageSquare, ChevronUp, ChevronDown, Paperclip, X, Image as ImageIcon } from 'lucide-react';
+import { Send, MessageSquare, ChevronUp, ChevronDown, Paperclip, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { usePathname, useSearchParams } from 'next/navigation';
 
+// ─── 리액션 이모지 목록 ───────────────────────────────────────────────────────
+const REACTION_EMOJIS = ['❤️', '✅', '🙏'] as const;
+type ReactionEmoji = typeof REACTION_EMOJIS[number];
+
+// ─── 타입 정의 ────────────────────────────────────────────────────────────────
 interface ChatMessage {
     id: string;
     task_id: string;
@@ -15,9 +20,11 @@ interface ChatMessage {
     author_id: string;
     author_name: string;
     created_at: string;
-    metadata?: {
-        image_url?: string;
-    };
+    metadata?: { image_url?: string };
+    // Phase 2: 리액션 { "❤️": ["uid1","uid2"], "✅": ["uid3"] }
+    reactions?: Record<string, string[]>;
+    // Phase 3: 읽음 처리 (읽은 사용자 id 배열)
+    read_by?: string[];
 }
 
 interface CurrentAdminUser {
@@ -32,33 +39,73 @@ export default function GlobalTeamChat() {
     const [isOpen, setIsOpen] = useState(false);
     const [hasUnread, setHasUnread] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [selectedImage, setSelectedImage] = useState<{ file: File, url: string } | null>(null);
+    const [selectedImage, setSelectedImage] = useState<{ file: File; url: string } | null>(null);
     const [zoomImage, setZoomImage] = useState<string | null>(null);
     const [isClient, setIsClient] = useState(false);
+    // 리액션 팝업: 열린 메시지 id
+    const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
 
     const desktopScrollRef = useRef<HTMLDivElement>(null);
     const mobileScrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // isOpen 최신값을 closure 안에서 안전하게 읽기 위한 ref (Chrome 재구독 버그 방지)
+    const isOpenRef = useRef(false);
+    const currentUserRef = useRef<CurrentAdminUser | null>(null);
+
     const supabase = createClient();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const activeTab = searchParams.get('tab')?.toUpperCase();
     const isTeamWorkspace = pathname?.startsWith('/admin/dashboard') && activeTab === 'TEAM';
-    const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000'; // Global Room ID
+    const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 
-    const scrollToBottom = (delay = 0) => {
+    // ─── ref 동기화 ──────────────────────────────────────────────────────────
+    useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
+    useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+
+    // ─── 스크롤 헬퍼 ─────────────────────────────────────────────────────────
+    const scrollToBottom = useCallback((delay = 0) => {
         const scroll = () => {
             if (desktopScrollRef.current) desktopScrollRef.current.scrollTop = desktopScrollRef.current.scrollHeight;
             if (mobileScrollRef.current) mobileScrollRef.current.scrollTop = mobileScrollRef.current.scrollHeight;
         };
-
-        if (delay > 0) {
-            setTimeout(scroll, delay);
-            return;
-        }
+        if (delay > 0) { setTimeout(scroll, delay); return; }
         scroll();
-    };
+    }, []);
 
+    // ─── Phase 3: 읽음 처리 ──────────────────────────────────────────────────
+    const markMessagesRead = useCallback(async (msgs: ChatMessage[], userId: string) => {
+        // 자신이 아직 read_by에 없는 메시지들만 업데이트
+        const unreadIds = msgs
+            .filter(m => m.author_id !== userId && !(m.read_by || []).includes(userId))
+            .map(m => m.id);
+
+        if (unreadIds.length === 0) return;
+
+        // 낙관적 UI 업데이트
+        setMessages(prev => prev.map(m =>
+            unreadIds.includes(m.id)
+                ? { ...m, read_by: [...(m.read_by || []), userId] }
+                : m
+        ));
+
+        // DB 업데이트: 각 메시지의 read_by에 userId를 array_append
+        // NOTE: Supabase는 array_append를 rpc없이 직접 지원하지 않으므로
+        // 각 메시지를 fetch 후 업데이트하는 방식 사용
+        for (const id of unreadIds) {
+            const msg = msgs.find(m => m.id === id);
+            if (!msg || id.startsWith('temp_')) continue;
+            const newReadBy = [...new Set([...(msg.read_by || []), userId])];
+            try {
+                await supabase
+                    .from('admin_task_comments')
+                    .update({ read_by: newReadBy })
+                    .eq('id', id);
+            } catch { /* 컬럼 없을 시 무시 */ }
+        }
+    }, [supabase]);
+
+    // ─── 초기화: Auth & Admin check ──────────────────────────────────────────
     useEffect(() => {
         setIsClient(true);
         if (!isTeamWorkspace) {
@@ -66,7 +113,6 @@ export default function GlobalTeamChat() {
             return;
         }
 
-        // Auth & Check Admin Role
         const initChat = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -77,7 +123,6 @@ export default function GlobalTeamChat() {
             ]);
 
             const isAdmin = userData.data?.role === 'admin' || !!whitelistData.data;
-
             if (isAdmin) {
                 setCurrentUser({
                     id: user.id,
@@ -89,6 +134,8 @@ export default function GlobalTeamChat() {
         initChat();
     }, [isTeamWorkspace]);
 
+    // ─── 메시지 fetch + 실시간 구독 ──────────────────────────────────────────
+    // 핵심 수정: isOpen을 deps에서 제거 → 채팅창 토글마다 채널 재구독 방지 (Chrome 성능 버그)
     useEffect(() => {
         if (!isTeamWorkspace || !currentUser) return;
 
@@ -102,10 +149,10 @@ export default function GlobalTeamChat() {
 
             if (data) {
                 setMessages(data);
-                if (isOpen) {
+                if (isOpenRef.current) {
                     scrollToBottom(120);
                 } else if (data.length > 0) {
-                    const lastMsg = data[data.length - 1]; // ascending -> newest
+                    const lastMsg = data[data.length - 1];
                     const lastViewed = localStorage.getItem('global_chat_last_viewed');
                     if (
                         lastMsg.author_id !== currentUser.id &&
@@ -119,7 +166,7 @@ export default function GlobalTeamChat() {
 
         fetchMessages();
 
-        const channel = supabase.channel('global_admin_chat')
+        const channel = supabase.channel('global_admin_chat_v2')
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -129,22 +176,46 @@ export default function GlobalTeamChat() {
                 const newMsg = payload.new as ChatMessage;
                 setMessages(prev => {
                     if (prev.some(m => m.id === newMsg.id)) return prev;
-                    return [...prev.filter(m => !m.id.startsWith('temp_') || m.content !== newMsg.content), newMsg];
+                    // Optimistic UI 교체: temp_ + created_at 기반 (content 기반 제거 → 중복 방지)
+                    const filtered = prev.filter(m => {
+                        if (!m.id.startsWith('temp_')) return true;
+                        const timeDiff = Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime());
+                        return !(m.author_id === newMsg.author_id && timeDiff < 5000);
+                    });
+                    return [...filtered, newMsg];
                 });
 
-                if (!isOpen && newMsg.author_id !== currentUser.id) {
+                // isOpenRef로 stale closure 방지
+                if (!isOpenRef.current && newMsg.author_id !== currentUserRef.current?.id) {
                     setHasUnread(true);
-                } else if (isOpen) {
+                } else if (isOpenRef.current) {
                     scrollToBottom(120);
+                    // 새 메시지 자동 읽음 처리
+                    if (currentUserRef.current && newMsg.author_id !== currentUserRef.current.id) {
+                        setMessages(prev => prev.map(m =>
+                            m.id === newMsg.id && !(m.read_by || []).includes(currentUserRef.current!.id)
+                                ? { ...m, read_by: [...(m.read_by || []), currentUserRef.current!.id] }
+                                : m
+                        ));
+                    }
                 }
+            })
+            // Phase 2 + Phase 3: UPDATE 이벤트 구독 (리액션, 읽음처리 반영)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'admin_task_comments',
+                filter: `task_id=eq.${CHAT_ROOM_ID}`
+            }, (payload) => {
+                const updated = payload.new as ChatMessage;
+                setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m));
             })
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [currentUser, isOpen, isTeamWorkspace]);
+        return () => { supabase.removeChannel(channel); };
+    }, [currentUser, isTeamWorkspace, scrollToBottom]); // isOpen 제거됨
 
+    // ─── 채팅창 오픈/클로즈 사이드이펙트 ────────────────────────────────────
     useEffect(() => {
         if (!isTeamWorkspace) {
             setIsOpen(false);
@@ -156,10 +227,15 @@ export default function GlobalTeamChat() {
         if (isOpen) {
             setHasUnread(false);
             localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
+            setReactionPickerFor(null);
             scrollToBottom(50);
             scrollToBottom(220);
 
-            // 🟢 모바일 버블 오픈 시 Body Scroll Lock (배경화면 오버스크롤 방지)
+            // Phase 3: 채팅 오픈 시 안 읽은 메시지 읽음 처리
+            if (currentUser && messages.length > 0) {
+                markMessagesRead(messages, currentUser.id);
+            }
+
             if (window.innerWidth < 768) {
                 document.body.style.overflow = 'hidden';
             }
@@ -167,21 +243,13 @@ export default function GlobalTeamChat() {
             document.body.style.overflow = '';
         }
 
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [isOpen, messages.length, isTeamWorkspace]);
-    useEffect(() => {
-        if (isTeamWorkspace && isOpen && messages.length > 0) {
-            localStorage.setItem('global_chat_last_viewed', new Date().toISOString());
-        }
-    }, [messages.length, isOpen, isTeamWorkspace]);
+        return () => { document.body.style.overflow = ''; };
+    }, [isOpen, isTeamWorkspace]); // messages는 deps에서 제거 (열 때만 처리)
+
+    // ─── 파일 처리 ────────────────────────────────────────────────────────────
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const url = URL.createObjectURL(file);
-            setSelectedImage({ file, url });
-        }
+        if (file) setSelectedImage({ file, url: URL.createObjectURL(file) });
     };
 
     const clearSelectedImage = () => {
@@ -194,23 +262,21 @@ export default function GlobalTeamChat() {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `chat_images/${fileName}`;
-
         const { error } = await supabase.storage.from('admin_files').upload(filePath, file);
         if (error) throw error;
-
         const { data } = supabase.storage.from('admin_files').getPublicUrl(filePath);
         return data.publicUrl;
     };
 
+    // ─── 메시지 전송 ──────────────────────────────────────────────────────────
     const sendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if ((!newMessage.trim() && !selectedImage) || !currentUser || isUploading) return;
 
-        let imageUrl = undefined;
+        let imageUrl: string | undefined;
         const messageText = newMessage;
         const tempId = `temp_${Date.now()}`;
 
-        // Optimistic UI for text
         const opMessage: ChatMessage = {
             id: tempId,
             task_id: CHAT_ROOM_ID,
@@ -218,14 +284,15 @@ export default function GlobalTeamChat() {
             author_id: currentUser.id,
             author_name: currentUser.name,
             created_at: new Date().toISOString(),
-            metadata: selectedImage ? { image_url: selectedImage.url } : undefined
+            metadata: selectedImage ? { image_url: selectedImage.url } : undefined,
+            reactions: {},
+            read_by: [currentUser.id]
         };
 
         setMessages(prev => [...prev, opMessage]);
         setNewMessage('');
         const imageToUpload = selectedImage;
         clearSelectedImage();
-
         scrollToBottom();
         scrollToBottom(120);
 
@@ -240,10 +307,11 @@ export default function GlobalTeamChat() {
                 content: messageText || '사진을 1장 보냈습니다.',
                 author_id: currentUser.id,
                 author_name: currentUser.name,
-                metadata: imageUrl ? { image_url: imageUrl } : null
+                metadata: imageUrl ? { image_url: imageUrl } : null,
+                reactions: {},
+                read_by: [currentUser.id]
             });
 
-            // 알림 발송 (비동기 처리)
             fetch('/api/admin/notify-team', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -263,7 +331,77 @@ export default function GlobalTeamChat() {
         }
     };
 
-    // ── 메시지 목록 렌더러 ──
+    // ─── Phase 2: 리액션 토글 ────────────────────────────────────────────────
+    const handleReaction = async (msgId: string, emoji: ReactionEmoji) => {
+        if (!currentUser) return;
+        setReactionPickerFor(null);
+
+        setMessages(prev => prev.map(m => {
+            if (m.id !== msgId) return m;
+            const reactions = { ...(m.reactions || {}) };
+            const users = reactions[emoji] ? [...reactions[emoji]] : [];
+            const idx = users.indexOf(currentUser.id);
+            if (idx === -1) users.push(currentUser.id);
+            else users.splice(idx, 1);
+            reactions[emoji] = users;
+            return { ...m, reactions };
+        }));
+
+        const msg = messages.find(m => m.id === msgId);
+        if (!msg || msgId.startsWith('temp_')) return;
+
+        const reactions = { ...(msg.reactions || {}) };
+        const users = reactions[emoji] ? [...reactions[emoji]] : [];
+        const idx = users.indexOf(currentUser.id);
+        if (idx === -1) users.push(currentUser.id);
+        else users.splice(idx, 1);
+        reactions[emoji] = users;
+
+        await supabase.from('admin_task_comments').update({ reactions }).eq('id', msgId);
+    };
+
+    // ─── 렌더: 리액션 집계 표시 ──────────────────────────────────────────────
+    const renderReactions = (msg: ChatMessage, isMe: boolean) => {
+        const reactions = msg.reactions || {};
+        const activeEmojis = REACTION_EMOJIS.filter(e => (reactions[e] || []).length > 0);
+        if (activeEmojis.length === 0) return null;
+
+        return (
+            <div className={`flex gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                {activeEmojis.map(emoji => {
+                    const users = reactions[emoji] || [];
+                    const iMine = currentUser ? users.includes(currentUser.id) : false;
+                    return (
+                        <button
+                            key={emoji}
+                            onClick={() => handleReaction(msg.id, emoji)}
+                            className={`flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full border transition-all ${iMine
+                                ? 'bg-rose-50 border-rose-200 text-rose-600'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                }`}
+                        >
+                            <span>{emoji}</span>
+                            <span className="font-semibold">{users.length}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    // ─── 렌더: 읽음 표시 ─────────────────────────────────────────────────────
+    const renderReadBy = (msg: ChatMessage, isLastFromMe: boolean) => {
+        if (!isLastFromMe || !currentUser) return null;
+        const readBy = (msg.read_by || []).filter(id => id !== currentUser.id);
+        if (readBy.length === 0) return null;
+        return (
+            <div className="text-[9px] text-slate-400 mt-0.5 text-right">
+                읽음 {readBy.length}명
+            </div>
+        );
+    };
+
+    // ─── 렌더: 메시지 목록 ───────────────────────────────────────────────────
     const renderMessages = (isMobile = false) => {
         const meId = currentUser?.id;
         if (messages.length === 0) {
@@ -277,10 +415,17 @@ export default function GlobalTeamChat() {
                 </div>
             );
         }
+
+        // 내가 보낸 마지막 메시지 id (읽음 표시용)
+        const myMsgs = messages.filter(m => m.author_id === meId);
+        const lastMyMsgId = myMsgs.length > 0 ? myMsgs[myMsgs.length - 1].id : null;
+
         return messages.map((msg, idx) => {
             const isMe = Boolean(meId) && msg.author_id === meId;
             const showAuthorInfo = idx === 0 || messages[idx - 1].author_id !== msg.author_id;
             const maxW = isMobile ? 'max-w-[75vw]' : 'max-w-[240px]';
+            const isLastFromMe = isMe && msg.id === lastMyMsgId;
+
             return (
                 <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     {!isMe && showAuthorInfo && (
@@ -291,15 +436,21 @@ export default function GlobalTeamChat() {
                             <span className="text-[10px] md:text-[11px] font-bold text-slate-600">{msg.author_name}</span>
                         </div>
                     )}
-                    <div className="flex items-end gap-1.5 group">
+
+                    {/* 메시지 버블 + 리액션 피커 트리거 */}
+                    <div className="flex items-end gap-1.5 group relative">
                         {isMe && (
                             <span className="text-[10px] text-slate-400 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                 {format(new Date(msg.created_at), 'aa h:mm', { locale: ko })}
                             </span>
                         )}
+
                         <div className={`flex flex-col gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
                             {msg.metadata?.image_url && (
-                                <div onClick={() => setZoomImage(msg.metadata!.image_url!)} className={`p-1 bg-white border border-slate-200 ${maxW} cursor-pointer hover:opacity-90 transition-opacity rounded-2xl ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'}`}>
+                                <div
+                                    onClick={() => setZoomImage(msg.metadata!.image_url!)}
+                                    className={`p-1 bg-white border border-slate-200 ${maxW} cursor-pointer hover:opacity-90 transition-opacity rounded-2xl ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'}`}
+                                >
                                     <img src={msg.metadata.image_url} alt="attached" className="rounded-xl w-full object-cover max-h-48" loading="lazy" />
                                 </div>
                             )}
@@ -311,11 +462,46 @@ export default function GlobalTeamChat() {
                             {msg.content === '사진 전송 중...' && (
                                 <div className="px-3 py-1.5 text-xs bg-slate-100 text-slate-500 rounded-2xl animate-pulse border border-slate-200">사진 전송 중...</div>
                             )}
+                            {/* 리액션 집계 표시 */}
+                            {renderReactions(msg, isMe)}
+                            {/* 읽음 표시 */}
+                            {renderReadBy(msg, isLastFromMe)}
                         </div>
+
                         {!isMe && (
                             <span className="text-[10px] text-slate-400 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                 {format(new Date(msg.created_at), 'aa h:mm', { locale: ko })}
                             </span>
+                        )}
+
+                        {/* 리액션 피커 버튼 - hover 시 표시 */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setReactionPickerFor(prev => prev === msg.id ? null : msg.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600 text-[13px] mb-0.5 shrink-0"
+                            title="리액션 추가"
+                        >
+                            😊
+                        </button>
+
+                        {/* 리액션 피커 팝업 */}
+                        {reactionPickerFor === msg.id && (
+                            <div
+                                className={`absolute bottom-full mb-1 ${isMe ? 'right-0' : 'left-0'} bg-white border border-slate-200 rounded-2xl shadow-lg px-2 py-1.5 flex gap-1 z-50`}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                {REACTION_EMOJIS.map(emoji => (
+                                    <button
+                                        key={emoji}
+                                        onClick={() => handleReaction(msg.id, emoji)}
+                                        className="text-xl hover:scale-125 transition-transform p-0.5 rounded-lg hover:bg-slate-50"
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>
@@ -323,7 +509,7 @@ export default function GlobalTeamChat() {
         });
     };
 
-    // ── 입력 영역 렌더러 ──
+    // ─── 렌더: 입력 영역 ─────────────────────────────────────────────────────
     const renderInput = (isMobile = false) => (
         <div className={`border-t border-slate-200 bg-white z-10 ${isMobile ? 'p-2.5' : 'p-3'}`}>
             {selectedImage && (
@@ -338,7 +524,11 @@ export default function GlobalTeamChat() {
             )}
             <form onSubmit={sendMessage} className="flex gap-2 items-center">
                 <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
-                <button type="button" onClick={() => fileInputRef.current?.click()} className={`text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors shrink-0 ${isMobile ? 'p-2' : 'p-2.5'}`}>
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors shrink-0 ${isMobile ? 'p-2' : 'p-2.5'}`}
+                >
                     <Paperclip size={isMobile ? 17 : 19} />
                 </button>
                 <input
@@ -365,7 +555,10 @@ export default function GlobalTeamChat() {
     return (
         <>
             {/* ── 데스크탑: 우하단 플로팅 패널 ── */}
-            <div className={`hidden md:flex fixed bottom-0 right-10 w-96 bg-white border border-slate-200 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.15)] transition-all duration-300 z-50 flex-col ${isOpen ? 'h-[650px]' : 'h-12 hover:-translate-y-1'}`}>
+            <div
+                className={`hidden md:flex fixed bottom-0 right-10 w-96 bg-white border border-slate-200 rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.15)] transition-all duration-300 z-50 flex-col ${isOpen ? 'h-[650px]' : 'h-12 hover:-translate-y-1'}`}
+                onClick={() => reactionPickerFor && setReactionPickerFor(null)}
+            >
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     className="w-full h-12 px-5 flex items-center justify-between border-b border-slate-800 bg-black text-white rounded-t-2xl hover:bg-slate-900 transition-colors shrink-0"
@@ -380,21 +573,17 @@ export default function GlobalTeamChat() {
                     {isOpen ? <ChevronDown size={20} className="text-slate-300" /> : <ChevronUp size={20} className="text-slate-300" />}
                 </button>
 
-                {/* 🟢 핵심 수정: {isOpen &&} 조건을 제거하고 항상 렌더, CSS로 visibility 제어
-                     → 데스크탑/모바일 스크롤 컨테이너가 항상 존재하여 오픈 시 즉시 최하단 이동 가능 */}
+                {/* 항상 렌더 (CSS visibility 제어) → scrollRef null 버그 방지 */}
                 <div className={`flex flex-col flex-1 min-h-0 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none h-0 overflow-hidden'}`}>
-                    {/* 메시지 목록 */}
                     <div ref={desktopScrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/80 scrollbar-thin">
                         {renderMessages()}
                     </div>
-                    {/* 입력 영역 */}
                     {renderInput()}
                 </div>
             </div>
 
-            {/* ── 모바일: 하단 고정 바 + 슬라이드업 드로어 ── */}
+            {/* ── 모바일: 슬라이드업 드로어 ── */}
             <div className="md:hidden">
-                {/* 슬라이드업 메시지 패널 */}
                 <div
                     className="fixed left-0 right-0 z-[9990] bg-white flex flex-col transition-all duration-300 ease-in-out"
                     style={{
@@ -404,39 +593,31 @@ export default function GlobalTeamChat() {
                         boxShadow: isOpen ? '0 -4px 24px rgba(0,0,0,0.12)' : 'none',
                         borderTop: isOpen ? '1px solid #e2e8f0' : 'none',
                     }}
+                    onClick={() => reactionPickerFor && setReactionPickerFor(null)}
                 >
-                    {isOpen && (
-                        <>
-                            {/* 핸들 + 타이틀 */}
-                            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-1 bg-slate-200 rounded-full mx-auto" />
-                                </div>
-                                <span className="text-[11px] font-bold text-slate-500 tracking-widest uppercase">Team Chat</span>
-                                <button onClick={() => setIsOpen(false)} className="p-1 text-slate-400 hover:text-slate-800">
-                                    <X size={15} />
-                                </button>
-                            </div>
-                            {/* 메시지 목록 */}
-                            <div ref={mobileScrollRef} className="flex-1 overflow-y-auto px-2 py-2 md:px-3 md:py-2 space-y-2 md:space-y-3 bg-slate-50 min-h-0" style={{ maxHeight: 'calc(65vh - 100px)' }}>
-                                {renderMessages(true)}
-                            </div>
-                            {/* 입력 */}
-                            {renderInput(true)}
-                        </>
-                    )}
+                    {/* 핵심 수정: 항상 렌더 (CSS overflow 제어) → mobileScrollRef null 없앰 */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 shrink-0">
+                        <div className="w-8 h-1 bg-slate-200 rounded-full" />
+                        <span className="text-[11px] font-bold text-slate-500 tracking-widest uppercase">Team Chat</span>
+                        <button onClick={() => setIsOpen(false)} className="p-1 text-slate-400 hover:text-slate-800">
+                            <X size={15} />
+                        </button>
+                    </div>
+                    <div
+                        ref={mobileScrollRef}
+                        className="flex-1 overflow-y-auto px-2 py-2 space-y-2 bg-slate-50 min-h-0"
+                        style={{ maxHeight: 'calc(65vh - 100px)' }}
+                    >
+                        {renderMessages(true)}
+                    </div>
+                    {renderInput(true)}
                 </div>
 
-                {/* 하단 플로팅 Pill 버튼 — Drawer가 열려있지 않을 때만 표시 */}
-                <div
-                    className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-[9989] transition-all duration-300 ${isOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 translate-y-0'}`}
-                >
+                {/* 하단 Pill 버튼 */}
+                <div className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-[9989] transition-all duration-300 ${isOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 translate-y-0'}`}>
                     <div
                         className="bg-black text-white flex items-center justify-center gap-2 px-8 py-3 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] cursor-pointer active:scale-95 transition-all"
-                        onClick={() => {
-                            setHasUnread(false);
-                            setIsOpen(true);
-                        }}
+                        onClick={() => { setHasUnread(false); setIsOpen(true); }}
                     >
                         <MessageSquare size={16} />
                         <span className="text-[13px] font-bold tracking-tight">Team Chat</span>

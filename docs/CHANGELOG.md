@@ -5,7 +5,49 @@
 
 ---
 
+## v3.28.0 — [팀챗] Chrome 모바일 성능 + 리액션 + 읽음처리 전면 개선
+
+**작업일:** 2026-03-04
+
+### Phase 1 — Chrome 모바일 버그 수정 (DB 변경 없음)
+
+| 버그 | 원인 | 수정 |
+|------|------|------|
+| 채팅창 열 때마다 느려짐 | `isOpen`이 useEffect deps → 토글마다 Supabase 채널 재구독 | `isOpenRef` 도입, deps에서 `isOpen` 제거 |
+| 최초 오픈 시 스크롤 안 됨 | 모바일 메시지가 `{isOpen && ...}` 조건부 렌더 → `mobileScrollRef = null` | 항상 렌더 + CSS `overflow: hidden` 제어로 변경 |
+| 간헐적 중복 메시지 | content 기반 temp_ 중복 제거 → 동일 내용 메시지 오작동 | `author_id + created_at 5초 이내` 기반으로 교체 |
+
+### Phase 2 — 메시지 리액션 ❤️ ✅ 🙏
+
+- hover/tap 시 🙂 버튼 → 리액션 피커 팝업
+- 리액션 집계 버블 (내 리액션 강조 표시)
+- Realtime UPDATE 구독 추가 → 다른 팀원 리액션 실시간 반영
+- **DB 마이그레이션 필요:** `reactions JSONB` 컬럼 (`docs/migrations/v3_28_0_team_chat_reactions.sql`)
+
+### Phase 3 — 읽음처리 DB 기반
+
+- 기존 localStorage 방식 → `read_by TEXT[]` DB 컬럼으로 업그레이드
+- 채팅 오픈 시 자신의 ID를 `read_by`에 추가
+- 내가 보낸 마지막 메시지 아래 "읽음 N명" 표시
+- **DB 마이그레이션 필요:** `read_by TEXT[]` 컬럼 (동일 SQL 파일)
+
+> [!IMPORTANT]
+> **Supabase 콘솔에서 마이그레이션 실행 필요**
+> `docs/migrations/v3_28_0_team_chat_reactions.sql` 파일을 Supabase SQL Editor에서 실행하면 Phase 2~3 기능이 활성화됩니다.
+> Phase 1 버그 수정은 DB 변경 없이 이미 적용됩니다.
+
+### 회귀 위험 분석 결과
+
+| 파일 | 영향 | 판정 |
+|------|------|------|
+| `TeamTab.tsx` | `select('*')` 후 JS 렌더 → 새 컬럼 단순 무시 | ✅ 없음 |
+| `MiniChatBar.tsx` | 동일 패턴 | ✅ 없음 |
+| `Sidebar.tsx` | COUNT만 조회 | ✅ 없음 |
+
+---
+
 ## v3.27.6 — [커뮤니티 UI] 하단 탭 복원 + 프로필 메뉴 위치 + 이미지 비율 수정
+
 
 **작업일:** 2026-03-04
 
