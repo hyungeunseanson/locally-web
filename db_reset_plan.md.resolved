@@ -1,0 +1,163 @@
+# DB 초기화 실행 계획서
+
+> **목적**: 테스트 환경 초기화. **팀 워크스페이스(admin_tasks, admin_task_comments, admin_whitelist, admin_files) 데이터는 보존**하고, 나머지 유저/호스트/예약/체험 등 모든 테스트 데이터를 깔끔하게 삭제합니다.
+
+> [!CAUTION]
+> **이 작업은 되돌릴 수 없습니다.** Supabase 대시보드에서 SQL을 실행하기 전 반드시 **스냅샷(백업)** 을 먼저 생성하세요.
+
+---
+
+## 사전 준비 (필수)
+
+### Step 0: 백업 생성
+1. [Supabase Dashboard](https://app.supabase.com) → 해당 프로젝트 → **Settings → Database**
+2. 우측 상단 **"Backups"** 탭 클릭
+3. **"Create a backup"** 버튼 클릭 → 몇 분 대기 후 완료 확인
+
+---
+
+## 실행 계획
+
+### Step 1: 삭제 대상 / 보존 대상 분류
+
+| 분류 | 테이블 | 처리 |
+|------|--------|------|
+| ✅ **보존** | `admin_tasks` | 팀 TODO/메모 |
+| ✅ **보존** | `admin_task_comments` | 팀 댓글 |
+| ✅ **보존** | `admin_whitelist` | 관리자 이메일 목록 |
+| ✅ **보존** | `admin_files` | 팀 첨부 파일 |
+| ✅ **보존** | `auth.users` 중 관리자 계정 | 직접 삭제 X (아래 참고) |
+| 🗑️ **삭제** | `bookings` | 예약 내역 |
+| 🗑️ **삭제** | `reviews` | 후기 |
+| 🗑️ **삭제** | `experiences` | 체험 |
+| 🗑️ **삭제** | `host_applications` | 호스트 지원서 |
+| 🗑️ **삭제** | `inquiries` | 문의/채팅방 |
+| 🗑️ **삭제** | `inquiry_messages` | 채팅 메시지 |
+| 🗑️ **삭제** | `notifications` | 알림 |
+| 🗑️ **삭제** | `search_logs` | 검색 로그 |
+| 🗑️ **삭제** | `analytics_events` | 분석 이벤트 로그 |
+| 🗑️ **삭제** | `service_requests` | 맞춤 의뢰 |
+| 🗑️ **삭제** | `service_bookings` | 서비스 예약 |
+| 🗑️ **삭제** | `service_applications` | 서비스 지원 |
+| 🗑️ **삭제** | `community_posts` | 커뮤니티 글 |
+| 🗑️ **삭제** | `community_comments` | 커뮤니티 댓글 |
+| 🗑️ **삭제** | `community_likes` | 커뮤니티 좋아요 |
+| 🗑️ **삭제** | `profiles` 중 테스트 유저 | 관리자 제외 |
+
+---
+
+### Step 2: Supabase SQL Editor에서 실행
+
+> Supabase Dashboard → `SQL Editor` → **New Query** → 아래 SQL 전체 복사+붙여넣기 → **Run**
+
+```sql
+-- ==========================================
+-- Locally 플랫폼 DB 테스트 데이터 초기화
+-- 팀 워크스페이스(admin_*) 데이터는 보존
+-- ==========================================
+
+-- 1. 의존성 순서를 고려해 자식 테이블부터 삭제
+
+-- 리뷰
+DELETE FROM reviews;
+
+-- 알림
+DELETE FROM notifications;
+
+-- 채팅 메시지 → 채팅방 순서
+DELETE FROM inquiry_messages;
+DELETE FROM inquiries;
+
+-- 예약
+DELETE FROM bookings;
+
+-- 서비스 관련
+DELETE FROM service_applications;
+DELETE FROM service_bookings;
+DELETE FROM service_requests;
+
+-- 체험
+DELETE FROM experiences;
+
+-- 호스트 지원서
+DELETE FROM host_applications;
+
+-- 커뮤니티
+DELETE FROM community_likes;
+DELETE FROM community_comments;
+DELETE FROM community_posts;
+
+-- 로그/분석
+DELETE FROM search_logs;
+DELETE FROM analytics_events;
+
+-- ==========================================
+-- 유저 삭제 (관리자 계정 제외)
+-- ==========================================
+-- ⚠️ 관리자 이메일을 정확히 입력하세요!
+-- 예시: 'admin@locally.com' 부분을 실제 관리자 이메일로 교체
+
+DELETE FROM profiles
+WHERE email NOT IN (
+  'admin@locally.com'  -- ← 여기에 관리자 이메일 입력
+);
+
+-- Supabase Auth 유저 삭제 (프로필 삭제로 연계됩니다)
+-- auth.users는 직접 삭제가 위험하므로, Supabase Dashboard에서 수동 삭제 권장
+-- Dashboard → Authentication → Users → 테스트 계정 선택 → Delete
+
+-- ==========================================
+-- 확인 쿼리 (삭제 후 실행해서 검증)
+-- ==========================================
+SELECT 
+  'bookings' AS table_name, COUNT(*) AS remaining FROM bookings
+UNION ALL SELECT 'experiences', COUNT(*) FROM experiences
+UNION ALL SELECT 'host_applications', COUNT(*) FROM host_applications
+UNION ALL SELECT 'reviews', COUNT(*) FROM reviews
+UNION ALL SELECT 'profiles', COUNT(*) FROM profiles
+UNION ALL SELECT 'admin_tasks', COUNT(*) FROM admin_tasks
+UNION ALL SELECT 'admin_whitelist', COUNT(*) FROM admin_whitelist;
+```
+
+---
+
+### Step 3: Auth 유저 수동 삭제
+
+SQL로 `profiles` 삭제 후에도 Supabase Auth의 실제 로그인 계정은 남아있습니다.
+
+1. **Supabase Dashboard** → **Authentication** → **Users**
+2. 관리자 계정 제외하고 테스트 계정들 체크박스 선택
+3. **Delete Users** 클릭
+
+> [!TIP]
+> 계정이 많다면 이메일 도메인으로 필터링 가능. 테스트 계정은 보통 `@test.com` 등 패턴이 있습니다.
+
+---
+
+### Step 4: Supabase Storage 이미지 정리 (선택)
+
+체험 사진, 프로필 사진 등 Storage도 정리하고 싶다면:
+
+1. **Supabase Dashboard** → **Storage**
+2. `experiences` 버킷 → 내부 파일 전체 선택 → Delete
+3. `avatars` 버킷 → 테스트 계정 파일 정리
+
+---
+
+### Step 5: 최종 확인
+
+Step 2의 마지막 **확인 쿼리**를 다시 실행하여 아래를 검증합니다:
+
+- `bookings`, `experiences`, `reviews` → `0`
+- `admin_tasks`, `admin_whitelist` → 기존 데이터 유지 확인
+- `profiles` → 관리자 계정만 남아있는지 확인
+
+---
+
+## 주의사항
+
+> [!WARNING]
+> - `DELETE`는 테이블 구조(스키마)는 건드리지 않습니다. 데이터만 삭제됩니다.
+> - `language_levels` 컬럼 등 최근 추가한 스키마는 **그대로 유지**됩니다.
+> - 관리자 이메일을 반드시 정확히 입력 후 실행하세요.
+> - auth.users는 Dashboard에서 직접 삭제하는 것이 가장 안전합니다.

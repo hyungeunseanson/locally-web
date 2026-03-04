@@ -1,0 +1,353 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - main [ref=e3]:
+      - generic [ref=e4]:
+        - complementary [ref=e6]:
+          - generic [ref=e7]:
+            - img "Locally Logo" [ref=e9]
+            - generic [ref=e10]:
+              - heading "Locally" [level=1] [ref=e11]
+              - paragraph [ref=e12]: Admin console
+          - generic [ref=e13]:
+            - generic [ref=e14]:
+              - heading "Management" [level=2] [ref=e15]
+              - generic [ref=e16]:
+                - button "Approvals 2" [ref=e17]:
+                  - generic [ref=e18]:
+                    - img [ref=e20]
+                    - generic [ref=e23]: Approvals
+                  - generic [ref=e24]: "2"
+                - button "User Management" [ref=e25]:
+                  - generic [ref=e26]:
+                    - img [ref=e28]
+                    - generic [ref=e33]: User Management
+                - button "Service Requests" [ref=e34]:
+                  - generic [ref=e35]:
+                    - img [ref=e37]
+                    - generic [ref=e40]: Service Requests
+            - generic [ref=e41]:
+              - heading "Operation" [level=2] [ref=e42]
+              - generic [ref=e43]:
+                - button "Message Monitoring 73" [ref=e44]:
+                  - generic [ref=e45]:
+                    - img [ref=e47]
+                    - generic [ref=e49]: Message Monitoring
+                  - generic [ref=e50]: "73"
+                - button "Team Workspace 130" [ref=e51]:
+                  - generic [ref=e52]:
+                    - img [ref=e54]
+                    - generic [ref=e57]: Team Workspace
+                  - generic [ref=e58]: "130"
+            - generic [ref=e59]:
+              - heading "Finance" [level=2] [ref=e60]
+              - generic [ref=e61]:
+                - button "Master Ledger" [ref=e62]:
+                  - generic [ref=e63]:
+                    - img [ref=e65]
+                    - generic [ref=e70]: Master Ledger
+                - button "Billing & Revenue" [ref=e71]:
+                  - generic [ref=e72]:
+                    - img [ref=e74]
+                    - generic [ref=e76]: Billing & Revenue
+                - button "Data Analytics" [ref=e77]:
+                  - generic [ref=e78]:
+                    - img [ref=e80]
+                    - generic [ref=e81]: Data Analytics
+                - button "Home" [ref=e82]:
+                  - generic [ref=e83]:
+                    - img [ref=e85]
+                    - generic [ref=e88]: Home
+          - generic [ref=e89]:
+            - generic [ref=e92]: 0 Online Now
+            - generic [ref=e93]:
+              - generic [ref=e94]: A
+              - generic [ref=e95]:
+                - paragraph [ref=e96]: Master Admin
+                - paragraph [ref=e97]: admin@test.com
+        - main [ref=e98]:
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - heading "승인 관리" [level=2] [ref=e103]
+              - generic [ref=e104]:
+                - button "호스트 지원서 (7)" [ref=e105]:
+                  - img [ref=e106]
+                  - text: 호스트 지원서 (7)
+                - button "체험 등록 (2)" [ref=e111]:
+                  - img [ref=e112]
+                  - text: 체험 등록 (2)
+            - generic [ref=e115]:
+              - generic [ref=e117]:
+                - generic [ref=e118]:
+                  - heading "📝 호스트 지원서" [level=3] [ref=e119]
+                  - generic [ref=e120]:
+                    - button "ALL" [ref=e121]
+                    - button "PENDING" [ref=e122]
+                    - button "APPROVED" [ref=e123]
+                - generic [ref=e124]:
+                  - generic [ref=e125] [cursor=pointer]:
+                    - img [ref=e127]
+                    - generic [ref=e130]:
+                      - generic [ref=e131]:
+                        - generic [ref=e132]: Test host 1772639871400
+                        - generic [ref=e133]: pending
+                      - generic [ref=e134]:
+                        - generic [ref=e135]: Korea / 한국어
+                        - generic [ref=e136]: 3/5/2026
+                  - generic [ref=e137] [cursor=pointer]:
+                    - img [ref=e139]
+                    - generic [ref=e142]:
+                      - generic [ref=e143]:
+                        - generic [ref=e144]: Test host 1772639791977
+                        - generic [ref=e145]: pending
+                      - generic [ref=e146]:
+                        - generic [ref=e147]: Korea / 한국어
+                        - generic [ref=e148]: 3/5/2026
+                  - generic [ref=e149] [cursor=pointer]:
+                    - img [ref=e151]
+                    - generic [ref=e154]:
+                      - generic [ref=e155]:
+                        - generic [ref=e156]: Test host 1772639661065
+                        - generic [ref=e157]: pending
+                      - generic [ref=e158]:
+                        - generic [ref=e159]: Korea / 한국어
+                        - generic [ref=e160]: 3/5/2026
+                  - generic [ref=e161] [cursor=pointer]:
+                    - img [ref=e163]
+                    - generic [ref=e166]:
+                      - generic [ref=e167]:
+                        - generic [ref=e168]: Test host 1772639498948
+                        - generic [ref=e169]: pending
+                      - generic [ref=e170]:
+                        - generic [ref=e171]: Korea / 한국어
+                        - generic [ref=e172]: 3/5/2026
+                  - generic [ref=e173] [cursor=pointer]:
+                    - img [ref=e175]
+                    - generic [ref=e178]:
+                      - generic [ref=e179]:
+                        - generic [ref=e180]: Test host 1772639140128
+                        - generic [ref=e181]: pending
+                      - generic [ref=e182]:
+                        - generic [ref=e183]: Korea / 한국어
+                        - generic [ref=e184]: 3/5/2026
+                  - generic [ref=e185] [cursor=pointer]:
+                    - img [ref=e187]
+                    - generic [ref=e190]:
+                      - generic [ref=e191]:
+                        - generic [ref=e192]: Test host 1772639042254
+                        - generic [ref=e193]: pending
+                      - generic [ref=e194]:
+                        - generic [ref=e195]: Korea / 한국어
+                        - generic [ref=e196]: 3/5/2026
+                  - generic [ref=e197] [cursor=pointer]:
+                    - img [ref=e199]
+                    - generic [ref=e202]:
+                      - generic [ref=e203]:
+                        - generic [ref=e204]: Test host 1772638796425
+                        - generic [ref=e205]: pending
+                      - generic [ref=e206]:
+                        - generic [ref=e207]: Korea / 한국어
+                        - generic [ref=e208]: 3/5/2026
+                  - generic [ref=e209] [cursor=pointer]:
+                    - img [ref=e210]
+                    - generic [ref=e211]:
+                      - generic [ref=e212]:
+                        - generic [ref=e213]: 이노우에 나오야
+                        - generic [ref=e214]: revision
+                      - generic [ref=e215]:
+                        - generic [ref=e216]: Japan / 일본어, 한국어
+                        - generic [ref=e217]: 2/8/2026
+                  - generic [ref=e218] [cursor=pointer]:
+                    - img [ref=e220]
+                    - generic [ref=e223]:
+                      - generic [ref=e224]:
+                        - generic [ref=e225]: Unknown
+                        - generic [ref=e226]: approved
+                      - generic [ref=e227]:
+                        - generic [ref=e228]: Korea / -
+                        - generic [ref=e229]: 2/5/2026
+                  - generic [ref=e230] [cursor=pointer]:
+                    - img [ref=e231]
+                    - generic [ref=e232]:
+                      - generic [ref=e233]:
+                        - generic [ref=e234]: 마유 니시무라
+                        - generic [ref=e235]: approved
+                      - generic [ref=e236]:
+                        - generic [ref=e237]: Korea / Japanese
+                        - generic [ref=e238]: 2/4/2026
+                  - generic [ref=e239] [cursor=pointer]:
+                    - img [ref=e241]
+                    - generic [ref=e244]:
+                      - generic [ref=e245]:
+                        - generic [ref=e246]: Hyungeun SON
+                        - generic [ref=e247]: approved
+                      - generic [ref=e248]:
+                        - generic [ref=e249]: null / -
+                        - generic [ref=e250]: 2/3/2026
+              - generic [ref=e253]:
+                - generic [ref=e255]:
+                  - img [ref=e258]
+                  - generic [ref=e261]:
+                    - generic [ref=e262]: pending
+                    - heading "Test host 1772639661065" [level=2] [ref=e263]
+                    - paragraph [ref=e264]: "ID: 93803e96-02be-47fb-af5d-2186fdaea291"
+                - generic [ref=e265]:
+                  - generic [ref=e266]:
+                    - generic [ref=e267]:
+                      - generic [ref=e268]:
+                        - img [ref=e269]
+                        - text: 연락처
+                      - generic [ref=e271]: 010-1234-5678
+                    - generic [ref=e272]:
+                      - generic [ref=e273]:
+                        - img [ref=e274]
+                        - text: 이메일
+                      - generic [ref=e277]: host_1772639661065@test.com
+                    - generic [ref=e278]:
+                      - generic [ref=e279]:
+                        - img [ref=e280]
+                        - text: 국적
+                      - generic [ref=e283]: 🇰🇷 한국인
+                    - generic [ref=e284]:
+                      - generic [ref=e285]:
+                        - img [ref=e286]
+                        - text: 생년월일
+                      - generic [ref=e289]: 1990.01.01
+                  - generic [ref=e290]:
+                    - img [ref=e293]
+                    - generic [ref=e296]:
+                      - generic [ref=e297]: 프로필 사진
+                      - text: 사진 없음
+                  - generic [ref=e298]:
+                    - generic [ref=e299]:
+                      - img [ref=e300]
+                      - text: 언어
+                    - generic [ref=e303]: 한국어 · Lv.5
+                  - generic [ref=e304]:
+                    - generic [ref=e305]:
+                      - generic [ref=e306]: Instagram
+                      - generic [ref=e307]: "-"
+                    - generic [ref=e308]:
+                      - generic [ref=e309]: 가입 경로
+                      - generic [ref=e310]: "-"
+                  - generic [ref=e311]:
+                    - generic [ref=e312]: 어학 자격증 (선택사항)
+                    - generic [ref=e313]: "-"
+                    - generic [ref=e314]: "언어 레벨 요약: 한국어 Lv.5"
+                  - generic [ref=e315]:
+                    - heading "자기소개" [level=4] [ref=e316]
+                    - generic [ref=e317]: 안녕하세요 봇입니다. 자동화 테스트 중입니다.
+                  - generic [ref=e318]:
+                    - heading "지원 동기" [level=4] [ref=e319]
+                    - generic [ref=e320]: 자동화 E2E 테스트 목적으로 지원합니다.
+                  - generic [ref=e321]:
+                    - heading "정산 계좌 정보" [level=4] [ref=e322]:
+                      - img [ref=e323]
+                      - text: 정산 계좌 정보
+                    - generic [ref=e325]:
+                      - generic [ref=e326]:
+                        - generic [ref=e327]: 은행
+                        - text: 오토뱅크
+                      - generic [ref=e328]:
+                        - generic [ref=e329]: 계좌번호
+                        - text: "1234567890"
+                      - generic [ref=e330]:
+                        - generic [ref=e331]: 예금주
+                        - text: Test host 1772639661065
+                  - generic [ref=e332]:
+                    - heading "신분증/자격증 확인 (관리자 전용)" [level=4] [ref=e333]:
+                      - img [ref=e334]
+                      - text: 신분증/자격증 확인 (관리자 전용)
+                    - generic [ref=e336]:
+                      - img [ref=e337]
+                      - text: 제출된 신분증이 없습니다.
+                  - generic [ref=e340]:
+                    - button "보완 요청" [ref=e341]
+                    - button "거절" [ref=e342]
+                    - button "승인 (호스트 권한 부여)" [active] [ref=e343]:
+                      - img [ref=e344]
+                      - text: 승인 (호스트 권한 부여)
+                    - button "영구 삭제" [ref=e346]:
+                      - img [ref=e347]
+                      - text: 영구 삭제
+    - contentinfo [ref=e350]:
+      - generic [ref=e351]:
+        - generic [ref=e352]:
+          - generic [ref=e353]:
+            - heading "Support" [level=5] [ref=e354]
+            - list [ref=e355]:
+              - listitem [ref=e356]:
+                - link "About Locally" [ref=e357] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e358]:
+                - link "Notices" [ref=e359] [cursor=pointer]:
+                  - /url: /company/notices
+              - listitem [ref=e360]:
+                - link "Help Center" [ref=e361] [cursor=pointer]:
+                  - /url: /help
+          - generic [ref=e362]:
+            - heading "Hosting" [level=5] [ref=e363]
+            - list [ref=e364]:
+              - listitem [ref=e365]:
+                - link "Become a Host" [ref=e366] [cursor=pointer]:
+                  - /url: /become-a-host
+              - listitem [ref=e367]:
+                - link "Community Forum" [ref=e368] [cursor=pointer]:
+                  - /url: /community
+          - generic [ref=e369]:
+            - heading "Locally" [level=5] [ref=e370]
+            - list [ref=e371]:
+              - listitem [ref=e372]:
+                - link "Newsroom" [ref=e373] [cursor=pointer]:
+                  - /url: /company/news
+              - listitem [ref=e374]:
+                - link "Careers" [ref=e375] [cursor=pointer]:
+                  - /url: /company/careers
+              - listitem [ref=e376]:
+                - link "Investors" [ref=e377] [cursor=pointer]:
+                  - /url: /company/investors
+              - listitem [ref=e378]:
+                - link "Partnerships" [ref=e379] [cursor=pointer]:
+                  - /url: /company/partnership
+          - generic [ref=e380]:
+            - heading "Social" [level=5] [ref=e381]
+            - list [ref=e382]:
+              - listitem [ref=e383]:
+                - button "Instagram" [ref=e384]:
+                  - img [ref=e385]
+                  - text: Instagram
+                  - img [ref=e388]
+              - listitem [ref=e390]:
+                - link "Naver Blog" [ref=e391] [cursor=pointer]:
+                  - /url: https://blog.naver.com/locally-travel
+                  - img [ref=e392]
+                  - generic [ref=e394]: Naver Blog
+        - generic [ref=e396]:
+          - text: 로컬리 (Locally)
+          - text: "대표자 : 손현근 | 개인정보보호책임자 : Nishimura Mayu"
+          - text: "사업자등록번호 : 367-53-00874 | 통신판매업 : 2024-제주일도일-0021"
+          - text: "주소 : 제주특별자치도 제주시 동문로 16, 2층 31호(일도일동, 동문시장(주))"
+          - text: "이메일 : locally.partners@gmail.com"
+        - generic [ref=e397]:
+          - generic [ref=e398]:
+            - generic [ref=e399]: © 2026 Locally, Inc.
+            - generic [ref=e400]: ·
+            - button "Privacy Policy" [ref=e401]
+            - generic [ref=e402]: ·
+            - button "Terms of Service" [ref=e403]
+            - generic [ref=e404]: ·
+            - button "Travel Terms" [ref=e405]
+            - generic [ref=e406]: ·
+            - button "Refund Policy" [ref=e407]
+            - generic [ref=e408]: ·
+            - link "Sitemap" [ref=e409] [cursor=pointer]:
+              - /url: /site-map
+          - button "English (US)" [ref=e411]:
+            - img [ref=e412]
+            - text: English (US)
+  - button "Open Next.js Dev Tools" [ref=e420] [cursor=pointer]:
+    - img [ref=e421]
+  - alert [ref=e424]
+```

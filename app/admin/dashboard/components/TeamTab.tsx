@@ -167,6 +167,8 @@ export default function TeamTab() {
       }).catch(e => console.error('Notify error:', e));
 
       setNewComment('');
+      // 🔧 [버그픽스] Realtime이 누락/지연되는 환경 대비 — 직접 댓글 목록 갱신
+      await fetchComments();
     } catch (error: any) {
       showToast('댓글 작성 실패: ' + error.message, 'error');
     }
@@ -239,6 +241,8 @@ export default function TeamTab() {
       }).catch(e => console.error('Notify error:', e));
 
       setMemoCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+      // 🔧 [버그픽스] Realtime이 누락/지연되는 환경 대비 — 직접 댓글 목록 갱신
+      await fetchComments();
       showToast('답글을 남겼습니다.', 'success');
     } catch (error: any) {
       showToast('오류: ' + error.message, 'error');
