@@ -5,7 +5,22 @@
 
 ---
 
+## v3.27.1 — 커뮤니티 버그 핫픽스 (SiteHeader 사라짐 / 게시글 상세 404 / 메뉴 텍스트)
+
+**작업일:** 2026-03-04
+
+### 원인 분석
+
+| 버그 | 근본 원인 | 수정 |
+|------|-----------|------|
+| SiteHeader 사라짐 | 이 프로젝트는 `layout.tsx`에 `SiteHeader`가 없고 **각 페이지마다 직접 import·렌더링**하는 패턴. v3.27.0 작업 중 `community/page.tsx`에서 중복 제거 목적으로 SiteHeader까지 삭제함. | `community/page.tsx`에 `SiteHeader` import 및 렌더링 복원 |
+| 게시글 상세 Vercel 404 | `community/[id]/page.tsx`의 Supabase 쿼리에서 `profiles:user_id(name, avatar_url, role)` — `profiles` 테이블에 `role` 컬럼이 존재하지 않아 쿼리 전체가 에러 반환 → `post`가 `null` → `notFound()` 호출 → Vercel 404 페이지 출력 | `profiles:user_id` select에서 `role` 제거. 미사용 `ShieldCheck` import 정리 |
+| 우측 드롭다운 'community' 텍스트 | `LanguageContext.t()` 함수가 번역 키가 없을 때 키 이름(`'community'`)을 문자열로 반환하는 패턴이어서 `\|\| '커뮤니티'` fallback이 작동하지 않음 | SiteHeader 메뉴 텍스트를 `'커뮤니티'`로 하드코딩 |
+
+---
+
 ## v3.27.0 — 커뮤니티 UI 프리미엄 리뉴얼 (에어비앤비/트리플 스타일 7:3 반응형 레이아웃)
+
 
 **작업일:** 2026-03-04
 

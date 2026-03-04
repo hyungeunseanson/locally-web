@@ -198,7 +198,7 @@ function SiteHeaderContent() {
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                   <div className="py-2 border-b border-slate-100">
                     <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                      <Users2 size={18} /> {t('community') || '커뮤니티'}
+                      <Users2 size={18} /> 커뮤니티
                     </Link>
                     <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
                       <span className="flex items-center gap-3"><MessageSquare size={18} /> {t('messages')}</span>

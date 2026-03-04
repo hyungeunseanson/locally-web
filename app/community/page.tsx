@@ -4,6 +4,7 @@ import { createClient } from '@/app/utils/supabase/server';
 import CommunityCategoryTabs from './components/CommunityCategoryTabs';
 import CommunityFeed from './CommunityFeed';
 import RightSidebar from './components/RightSidebar';
+import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -61,6 +62,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
     return (
         <>
+            <SiteHeader />
             {/* 페이지 배경 */}
             <div className="min-h-screen bg-[#F7F7F9]">
                 <div className="max-w-7xl mx-auto px-4 py-8">

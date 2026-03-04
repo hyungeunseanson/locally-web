@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, CalendarCheck, Share2, MoreVertical, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, CalendarCheck, Share2, MoreVertical, CheckCircle2 } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
 import CommentSection from '../components/CommentSection';
 import LikeButton from '../components/LikeButton';
@@ -53,7 +53,7 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
         .from('community_posts')
         .select(`
             *,
-            profiles:user_id(name, avatar_url, role),
+            profiles:user_id(name, avatar_url),
             linked_experience:experiences(id, title, image_url, price)
         `)
         .eq('id', id)
@@ -99,9 +99,6 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
                                 <span className="text-[15px] font-bold text-slate-900 leading-tight">
                                     {post.profiles?.name || '로컬리 유저'}
                                 </span>
-                                {post.profiles?.role === 'admin' && (
-                                    <ShieldCheck size={14} className="text-blue-500" />
-                                )}
                             </div>
                             <div className="text-[12px] font-medium text-slate-400 mt-0.5">
                                 {getTimeString(post.created_at)}
