@@ -16,9 +16,15 @@ const getTimeAgo = (dateStr: string) => {
         if (Math.abs(diff) < 3600) return rtf.format(Math.floor(diff / 60), 'minute');
         if (Math.abs(diff) < 86400) return rtf.format(Math.floor(diff / 3600), 'hour');
         return rtf.format(Math.floor(diff / 86400), 'day');
-    } catch (e) {
+    } catch {
         return dateStr.split('T')[0];
     }
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+    qna: '💡 Q&A',
+    companion: '🤝 동행',
+    info: '🗺️ 꿀팁',
 };
 
 export default function PostCard({ post }: PostCardProps) {
@@ -27,92 +33,114 @@ export default function PostCard({ post }: PostCardProps) {
     const isQna = category === 'qna';
 
     return (
-        <div className="bg-white border-b border-gray-100 py-6">
-            {/* Header: User & Time */}
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-slate-100 overflow-hidden border border-slate-100">
-                        {profiles?.avatar_url ? (
-                            <img src={profiles.avatar_url} alt="profile" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">?</div>
+        <Link href={`/community/${post.id}`} className="block">
+            <article className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-1 active:scale-[0.99] transition-all duration-200 cursor-pointer p-5">
+
+                {/* ── 카드 헤더: 아바타 + 닉네임 + 시간 / 카테고리 뱃지 ── */}
+                <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden border border-gray-100 flex-shrink-0">
+                            {profiles?.avatar_url ? (
+                                <img src={profiles.avatar_url} alt="profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold text-sm">
+                                    {profiles?.name?.[0]?.toUpperCase() || '?'}
+                                </div>
+                            )}
+                        </div>
+                        <div>
+                            <div className="font-semibold text-gray-900 text-[14px] leading-tight">
+                                {profiles?.name || '로컬리 유저'}
+                            </div>
+                            <div className="text-sm text-gray-400 mt-0.5">
+                                {getTimeAgo(post.created_at)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 카테고리 + QnA 뱃지 */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {category && (
+                            <span className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-md font-medium">
+                                {CATEGORY_LABEL[category] || category}
+                            </span>
+                        )}
+                        {isQna && (
+                            <span className="flex items-center gap-1 border border-gray-200 text-gray-500 text-xs px-2 py-1 rounded-md font-medium">
+                                <CheckCircle2 size={11} /> 답변대기
+                            </span>
                         )}
                     </div>
-                    <div>
-                        <div className="text-sm font-bold text-slate-900 leading-tight">
-                            {profiles?.name || '로컬리 유저'}
-                        </div>
-                        <div className="text-[11px] font-medium text-slate-400 mt-0.5">
-                            {getTimeAgo(post.created_at)}
-                        </div>
-                    </div>
                 </div>
-                {/* Status Badges */}
-                {isQna && (
-                    <div className="px-2.5 py-1 rounded border border-slate-200 text-slate-600 text-[11px] font-bold flex items-center gap-1">
-                        <CheckCircle2 size={12} className="text-slate-400" /> 답변대기
-                    </div>
-                )}
-            </div>
 
-            {/* Content Link */}
-            <Link href={`/community/${post.id}`}>
-                <div className="group cursor-pointer">
-                    <h3 className="text-[17px] font-bold text-slate-900 mb-1 group-hover:text-[#FF385C] transition-colors leading-snug">
+                {/* ── 콘텐츠 본문 ── */}
+                <div className="group">
+                    <h3 className="text-lg font-bold text-gray-900 line-clamp-2 mt-3 leading-snug group-hover:text-[#FF385C] transition-colors">
                         {post.title}
                     </h3>
 
-                    {/* Companion Badges */}
+                    {/* 동행 뱃지 */}
                     {isCompanion && (post.companion_city || post.companion_date) && (
-                        <div className="flex items-center gap-1.5 mb-2.5 mt-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                             {post.companion_city && (
-                                <span className="flex items-center gap-1 bg-slate-100 text-slate-700 text-[12px] font-bold px-2 py-1 rounded-md">
-                                    <MapPin size={12} strokeWidth={2.5} /> {post.companion_city}
+                                <span className="flex items-center gap-1 bg-gray-100 text-gray-700 text-[12px] font-bold px-2 py-1 rounded-md">
+                                    <MapPin size={11} strokeWidth={2.5} /> {post.companion_city}
                                 </span>
                             )}
                             {post.companion_date && (
-                                <span className="flex items-center gap-1 bg-slate-100 text-slate-700 text-[12px] font-bold px-2 py-1 rounded-md">
-                                    <CalendarCheck size={12} strokeWidth={2.5} /> {post.companion_date}
+                                <span className="flex items-center gap-1 bg-gray-100 text-gray-700 text-[12px] font-bold px-2 py-1 rounded-md">
+                                    <CalendarCheck size={11} strokeWidth={2.5} /> {post.companion_date}
                                 </span>
                             )}
                         </div>
                     )}
 
-                    <p className="text-[15px] text-slate-600 line-clamp-2 mt-1 mb-4 leading-relaxed tracking-tight">{post.content}</p>
+                    <p className="text-gray-600 line-clamp-3 mt-1 text-[15px] leading-relaxed">
+                        {post.content}
+                    </p>
 
-                    {/* Image Grid (Max 3) */}
+                    {/* 이미지 그리드 */}
                     {post.images && post.images.length > 0 && (
-                        <div className={`grid gap-1 mb-4 rounded-xl overflow-hidden ${post.images.length === 1 ? 'grid-cols-1 aspect-[2/1] max-h-[300px]' :
-                                post.images.length === 2 ? 'grid-cols-2 aspect-[2/1] max-h-[250px]' :
-                                    'grid-cols-3 aspect-[2/1] max-h-[200px]'
+                        <div className={`grid gap-1 mt-4 rounded-xl overflow-hidden ${post.images.length === 1 ? 'grid-cols-1' :
+                                post.images.length === 2 ? 'grid-cols-2' :
+                                    'grid-cols-3'
                             }`}>
                             {post.images.slice(0, 3).map((img, idx) => (
-                                <div key={idx} className="w-full h-full bg-slate-100">
-                                    <img src={img} alt={`이미지 ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+                                <div key={idx} className="aspect-video bg-gray-100 overflow-hidden">
+                                    <img
+                                        src={img}
+                                        alt={`이미지 ${idx + 1}`}
+                                        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                                    />
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
-            </Link>
 
-            {/* Linked Experience Embed */}
-            {post.linked_exp_id && linked_experience && (
-                <LinkedExperienceChip exp={linked_experience} />
-            )}
+                {/* 연동 체험 칩 */}
+                {post.linked_exp_id && linked_experience && (
+                    <div onClick={(e) => e.preventDefault()}>
+                        <LinkedExperienceChip exp={linked_experience} />
+                    </div>
+                )}
 
-            {/* Footer Stats */}
-            <div className="flex items-center gap-4 mt-3 text-slate-400">
-                <div className="flex items-center gap-1.5 text-xs font-semibold">
-                    <Heart size={16} strokeWidth={2.5} /> <span>{post.like_count || 0}</span>
+                {/* 푸터: 좋아요 / 댓글 / 조회수 */}
+                <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-50 text-gray-400">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Heart size={15} strokeWidth={2} />
+                        <span>{post.like_count || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                        <MessageSquare size={15} strokeWidth={2} />
+                        <span>{post.comment_count || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold ml-auto">
+                        <Eye size={15} strokeWidth={2} />
+                        <span>{post.view_count || 0}</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-semibold">
-                    <MessageSquare size={16} strokeWidth={2.5} /> <span>{post.comment_count || 0}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs font-semibold ml-auto">
-                    <Eye size={16} strokeWidth={2.5} /> <span>{post.view_count || 0}</span>
-                </div>
-            </div>
-        </div>
+            </article>
+        </Link>
     );
 }

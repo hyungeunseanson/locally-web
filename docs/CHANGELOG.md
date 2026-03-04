@@ -5,7 +5,45 @@
 
 ---
 
+## v3.27.0 — 커뮤니티 UI 프리미엄 리뉴얼 (에어비앤비/트리플 스타일 7:3 반응형 레이아웃)
+
+**작업일:** 2026-03-04
+
+기존 API 로직과 헤더/푸터를 완벽히 보존한 채, 커뮤니티 UI를 에어비앤비/트리플 스타일의 프리미엄 반응형 7:3 레이아웃으로 전면 리팩토링했습니다.
+
+### [Layout] 7:3 반응형 2단 그리드 신설
+- `page.tsx` 전면 재작성: `bg-[#F7F7F9]` 배경 + `grid-cols-12` (피드 8칸 / 사이드바 4칸) 적용.
+- `SiteHeader` / `SiteFooter` 100% 보존. 기존 모바일 단일 컬럼 레이아웃은 `hidden lg:flex`로 분기.
+
+### [Component] RightSidebar.tsx 신설
+- `sticky top-28` 고정 사이드바에 4개 위젯 구성: 글쓰기 CTA(로즈 그라디언트 버튼), 주간 인기 체험 리스트, 지금 뜨는 라운지 글, 앱 다운로드 CTA.
+
+### [Component] CommunityCategoryTabs.tsx 알약 탭 전환
+- 밑줄 탭 → `rounded-full` 알약(Pill) 형태로 전환. 활성: `bg-black text-white`, 비활성: `bg-white text-gray-500 border border-gray-200`.
+
+### [Component] PostCard.tsx 프리미엄 카드 리뉴얼
+- `bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-1 active:scale-[0.99] transition-all` 카드 적용.
+- 카드 헤더: `w-10 h-10` 원형 아바타(첫 글자 폴백) + 카테고리 뱃지. 푸터: 아이콘 인게이지먼트 + `border-t` 구분선.
+
+### [Component] LinkedExperienceChip.tsx 세련된 미니 카드 업그레이드
+- `bg-[#F7F7F9] hover:bg-gray-100 border border-gray-200 rounded-xl` + 가격 로즈 컬러 강조 + 썸네일 스케일 호버 효과.
+
+### [UX] Empty State & Loading Skeleton 고도화
+- **Empty State:** `MessageSquareDashed` 아이콘 + "첫 글의 주인공이 되어보세요!" + CTA 버튼 (`border-dashed rounded-2xl` 카드).
+- **Shimmer Skeleton:** 새 카드 레이아웃(`rounded-2xl`)과 일치하는 `animate-pulse` 스켈레톤 3카드.
+
+### [UX] 글쓰기 유도 넛지 + 모바일 FAB 추가
+- 피드 상단에 글쓰기 유도 입력창 카드 (`/community/write` 라우팅).
+- 모바일 전용 `fixed bottom-20 right-4 w-14 h-14 bg-[#FF385C]` 플로팅 버튼(FAB) 신설.
+
+### Constraints 준수
+- `limit(15)` + `IntersectionObserver` 무한 스크롤 로직 100% 무손실 보존.
+
+---
+
 ## v3.26.3 — 커뮤니티 내비게이션 재배치
+
+
 
 **작업일:** 2026-03-04
 

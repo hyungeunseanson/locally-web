@@ -3,6 +3,9 @@ import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
 import CommunityCategoryTabs from './components/CommunityCategoryTabs';
 import CommunityFeed from './CommunityFeed';
+import RightSidebar from './components/RightSidebar';
+import SiteHeader from '@/app/components/SiteHeader';
+import SiteFooter from '@/app/components/SiteFooter';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -51,7 +54,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         query = query.eq('category', category);
     }
 
-    const { data: initialData, error } = await query;
+    const { data: initialData } = await query;
 
     let initialNextOffset = null;
     if (initialData && initialData.length === limit) {
@@ -59,28 +62,57 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     }
 
     return (
-        <main className="max-w-[768px] mx-auto min-h-screen bg-slate-50 flex flex-col md:border-x md:border-slate-100 shadow-sm relative">
-            {/* Header Area (Sticky) */}
-            <div className="sticky top-[80px] z-[90] bg-white/95 backdrop-blur-md pt-5 px-5 border-b border-slate-200">
-                <div className="flex items-center justify-between mb-1">
-                    <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">커뮤니티</h1>
+        <>
+            <SiteHeader />
+            {/* 페이지 배경 */}
+            <div className="min-h-screen bg-[#F7F7F9]">
+                <div className="max-w-7xl mx-auto px-4 py-8">
+                    {/* 반응형 2단 그리드: 좌측 8칸 + 우측 4칸 */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                    {/* Write Button */}
-                    <Link href="/community/write" className="flex items-center gap-1.5 text-[14px] font-bold text-white bg-slate-900 px-4 py-2 rounded-full hover:bg-slate-800 transition-colors shadow-sm cursor-pointer whitespace-nowrap group">
-                        <Edit3 size={15} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" /> 글쓰기
-                    </Link>
+                        {/* ─── 좌측 메인 피드 (8/12) ─── */}
+                        <div className="col-span-1 lg:col-span-8">
+                            {/* 상단 헤더: 카테고리 탭 */}
+                            <div className="mb-4">
+                                <CommunityCategoryTabs />
+                            </div>
+
+                            {/* 글쓰기 유도 넛지 */}
+                            <Link href="/community/write">
+                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text mb-5 hover:border-gray-200 hover:shadow-md transition-all duration-200">
+                                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                        <Edit3 size={16} className="text-gray-400" />
+                                    </div>
+                                    <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
+                                </div>
+                            </Link>
+
+                            {/* 피드 */}
+                            <CommunityFeed
+                                initialData={initialData || []}
+                                initialNextOffset={initialNextOffset}
+                                category={category}
+                            />
+                        </div>
+
+                        {/* ─── 우측 사이드바 (4/12, 모바일 hidden) ─── */}
+                        <div className="col-span-1 lg:col-span-4 hidden lg:flex flex-col">
+                            <RightSidebar />
+                        </div>
+                    </div>
                 </div>
-                <CommunityCategoryTabs />
             </div>
 
-            {/* Feed List Area */}
-            <div className="flex-1 bg-white px-5 min-h-[500px]">
-                <CommunityFeed
-                    initialData={initialData || []}
-                    initialNextOffset={initialNextOffset}
-                    category={category}
-                />
-            </div>
-        </main>
+            {/* 모바일 전용 FAB (플로팅 글쓰기 버튼) */}
+            <Link
+                href="/community/write"
+                className="block lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
+                aria-label="글쓰기"
+            >
+                <Edit3 size={22} strokeWidth={2.5} />
+            </Link>
+
+            <SiteFooter />
+        </>
     );
 }

@@ -266,19 +266,10 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   const handleDownloadServiceCSV = async () => {
     setServiceCSVLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('service_bookings')
-        .select(`
-          id, order_id, amount, host_payout_amount, platform_revenue,
-          status, payment_method, created_at, customer_id,
-          service_requests ( title, city, service_date, duration_hours ),
-          host_applications ( name, bank_name, account_number, account_holder, host_nationality ),
-          profiles!service_bookings_customer_id_fkey ( full_name, email )
-        `)
-        .in('status', ['PAID', 'confirmed', 'completed'])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // 🔒 host_applications(계좌 포함 민감 정보)는 service_role API Route로 조회
+      const res = await fetch('/api/admin/service-bookings-csv');
+      if (!res.ok) throw new Error('서버 오류: 데이터 조회 실패');
+      const { data } = await res.json();
       const rows = (data || []).filter((b: any) => filterDate(b.created_at));
 
       if (rows.length === 0) {
@@ -296,14 +287,14 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
         escapeCSV(b.service_requests?.city || '-'),
         escapeCSV(b.service_requests?.service_date || '-'),
         escapeCSV(b.profiles?.full_name || b.profiles?.email || b.customer_id?.slice(-6)),
-        escapeCSV(b.host_applications?.name || '-'),
+        escapeCSV(b.host_application?.name || '-'),
         escapeCSV(b.payment_method === 'bank' ? '무통장' : '카드'),
         b.amount || 0,
         b.platform_revenue || 0,
         b.host_payout_amount || 0,
-        escapeCSV(b.host_applications?.account_holder || '-'),
-        escapeCSV(b.host_applications?.bank_name || '-'),
-        escapeCSV(b.host_applications?.account_number || '-'),
+        escapeCSV(b.host_application?.account_holder || '-'),
+        escapeCSV(b.host_application?.bank_name || '-'),
+        escapeCSV(b.host_application?.account_number || '-'),
         escapeCSV(b.status),
       ]);
 

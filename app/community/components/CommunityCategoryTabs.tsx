@@ -3,31 +3,34 @@
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+const tabs = [
+    { id: 'qna', label: '💡 Q&A' },
+    { id: 'companion', label: '🤝 동행 찾기' },
+    { id: 'info', label: '🗺️ 현지 꿀팁' },
+];
+
 export default function CommunityCategoryTabs() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const currentCategory = searchParams.get('category') || 'qna';
-
-    const tabs = [
-        { id: 'qna', label: '💡 Q&A' },
-        { id: 'companion', label: '🤝 동행 찾기' },
-        { id: 'info', label: '🗺️ 현지 꿀팁' }
-    ];
 
     const handleTabClick = (id: string) => {
         router.push(`/community?category=${id}`);
     };
 
     return (
-        <div className="flex items-center gap-4 mb-4 mt-2 border-b border-gray-100 pb-0 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
             {tabs.map((tab) => (
                 <button
                     key={tab.id}
                     onClick={() => handleTabClick(tab.id)}
-                    className={`whitespace-nowrap px-2 pb-3 text-[15px] font-bold transition-colors relative ${currentCategory === tab.id
-                            ? 'text-gray-900 border-b-2 border-gray-900'
-                            : 'text-gray-400 hover:text-gray-600'
-                        }`}
+                    className={`
+                        whitespace-nowrap rounded-full px-5 py-2.5 text-[14px] md:text-[15px] font-medium transition-colors flex-shrink-0
+                        ${currentCategory === tab.id
+                            ? 'bg-black text-white shadow-sm'
+                            : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                        }
+                    `}
                 >
                     {tab.label}
                 </button>

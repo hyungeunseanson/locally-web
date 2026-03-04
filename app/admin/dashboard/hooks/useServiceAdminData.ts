@@ -65,14 +65,11 @@ export function useServiceAdminData() {
           })
       );
       fetches.push(
-        supabase
-          .from('host_applications')
-          .select('user_id, name, bank_name, account_number, account_holder')
-          .in('user_id', hostIds)
-          .order('created_at', { ascending: false })
+        fetch(`/api/admin/host-applications?user_ids=${hostIds.join(',')}&select=user_id,name,bank_name,account_number,account_holder`)
+          .then(r => r.ok ? r.json() : { data: [] })
           .then(({ data }) => {
             if (data) {
-              data.forEach(a => {
+              data.forEach((a: any) => {
                 if (!hostAppMap.has(a.user_id)) hostAppMap.set(a.user_id, a);
               });
             }

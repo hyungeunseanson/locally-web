@@ -56,12 +56,16 @@ export function useAdminData() {
 
     let hostAppMap = new Map();
     if (hostIds.length > 0) {
-      const { data: apps } = await supabase.from('host_applications').select('user_id, name').in('user_id', hostIds).order('created_at', { ascending: false });
-      if (apps) {
-        // user_id별 가장 최근 신청서의 name을 사용
-        for (const app of apps) {
-          if (!hostAppMap.has(app.user_id)) {
-            hostAppMap.set(app.user_id, app.name);
+      // 🔒 host_applications는 RLS로 보호됨 → service_role 기반 admin API 사용
+      const res = await fetch(`/api/admin/host-applications?user_ids=${hostIds.join(',')}&select=user_id,name`);
+      if (res.ok) {
+        const { data: apps } = await res.json();
+        if (apps) {
+          // user_id별 가장 최근 신청서의 name을 사용
+          for (const app of apps) {
+            if (!hostAppMap.has(app.user_id)) {
+              hostAppMap.set(app.user_id, app.name);
+            }
           }
         }
       }
@@ -105,7 +109,7 @@ export function useAdminData() {
         { data: inquiryMessagesData }, // 🟢 추가
         { data: bookingRawData, error: bookingError }
       ] = await Promise.all([
-        supabase.from('host_applications').select('*').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
+        fetch('/api/admin/host-applications').then(r => r.ok ? r.json() : { data: [] }), // 🔒 service_role API 사용
         supabase.from('experiences').select('*').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
         supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('reviews').select('rating, experience_id, created_at').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
@@ -123,9 +127,13 @@ export function useAdminData() {
 
       const enrichedBookings = await enrichBookings(bookingRawData || []);
 
+      // appData는 fetch 응답에서 { data: [...] } 형태로 옴
+      const appsResult = appData as any;
+      const appsArray = Array.isArray(appsResult) ? appsResult : (appsResult?.data || []);
+
       setState(prev => ({
         ...prev,
-        apps: appData || [],
+        apps: appsArray,
         exps: expData || [],
         users: userData || [],
         bookings: enrichedBookings,
