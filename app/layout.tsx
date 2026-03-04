@@ -16,6 +16,7 @@ import { AuthProvider } from '@/app/context/AuthContext';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { createClient } from '@/app/utils/supabase/server';
 import type { User } from '@supabase/supabase-js';
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = localFont({
   src: [
@@ -177,7 +178,7 @@ export default async function RootLayout({
                     <SiteFooter />
                     <BottomTabNavigation />
                   </div>
-
+                  <Analytics />
                 </LanguageProvider>
               </NotificationProvider>
             </ToastProvider>

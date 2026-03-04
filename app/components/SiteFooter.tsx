@@ -138,6 +138,15 @@ export default function SiteFooter() {
           {/* 구분선 */}
           <div className="border-t border-[#DDDDDD] my-8"></div>
 
+          {/* 사업자 정보 (PG 심사 및 전자상거래법 필수 표기사항) */}
+          <div className="mb-6 text-xs text-[#717171] leading-relaxed">
+            <span className="font-bold text-[#484848]">로컬리 (Locally)</span><br />
+            대표자 : 손현근 | 개인정보보호책임자 : Nishimura Mayu<br />
+            사업자등록번호 : 367-53-00874 | 통신판매업 : 2024-제주일도일-0021<br />
+            주소 : 제주특별자치도 제주시 동문로 16, 2층 31호(일도일동, 동문시장(주))<br />
+            이메일 : locally.partners@gmail.com
+          </div>
+
           {/* 하단: 저작권 및 약관 링크 (모달 트리거) */}
           <div className="flex flex-col xl:flex-row justify-between items-center gap-4 text-[#717171]">
             <div className="flex flex-wrap justify-center xl:justify-start items-center gap-x-1 gap-y-2 text-xs md:text-sm">

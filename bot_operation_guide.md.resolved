@@ -1,0 +1,92 @@
+# 🤖 커뮤니티 자동화 봇 완벽 가이드
+
+이 문서는 개발 지식이 없어도 누구나 커뮤니티 자동화 봇(AI 글쓰기/댓글)을 설정하고 켜고 끌 수 있도록 작성된 안내서입니다.
+
+---
+
+## 🚀 1. 봇 권한 및 두뇌 설정 (1회성 준비)
+
+봇이 활동하려면 **"누구의 이름으로 쓸지(계정)"** 와 **"무슨 생각으로 쓸지(AI 두뇌)"** 가 필요합니다.
+
+### 1-1. 봇 계정 만들기 (Supabase)
+1. Supabase 대시보드 로그인 ➡️ 해당 프로젝트 선택
+2. 좌측 메뉴에서 **SQL Editor** 클릭 ➡️ **New query** 클릭
+3. 이미 생성해 둔 [supabase_bot_setup.sql](file:///Users/sonhyungeun/Documents/locally-web/supabase_bot_setup.sql) 파일의 내용을 전부 복사해서 붙여넣고 우측 하단 **[Run]** (실행) 버튼을 누릅니다.
+4. "도쿄 날씨봇 ☀️"과 "맛집 헌터 🍜" 계정이 성공적으로 만들어졌습니다.
+5. 실행 결과창(하단)에 나오는 [id](file:///Users/sonhyungeun/Documents/locally-web/app/admin/dashboard/components/Sidebar.tsx#33-269) (길다란 영어숫자 조합) 두 개를 복사합니다.
+6. 코드 파일 [app/api/bot/auto-post/route.ts](file:///Users/sonhyungeun/Documents/locally-web/app/api/bot/auto-post/route.ts) 와 [app/api/bot/auto-comment/route.ts](file:///Users/sonhyungeun/Documents/locally-web/app/api/bot/auto-comment/route.ts) 상단에 있는 `BOT_UUIDS` 배열 안에 붙여넣고 저장 및 Github에 푸시합니다.
+   ```typescript
+   const BOT_UUIDS: string[] = [
+       "복사한_ID_첫번째",
+       "복사한_ID_두번째"
+   ];
+   ```
+
+### 1-2. AI 두뇌 연결하기 (Gemini 무료 API)
+1. [Google AI Studio](https://aistudio.google.com/) 접속 ➡️ 구글 로그인
+2. 좌측 **Get API key** 클릭 ➡️ **Create API key** ➡️ 키 복사
+3. **Vercel 대시보드** 접속 ➡️ 프로젝트 ➡️ **Settings** ➡️ **Environment Variables** 이동
+4. Key 부분에 `GEMINI_API_KEY`, Value 부분에 방금 복사한 키를 넣고 **[Save]** 클릭.
+5. 로컬 개발 환경이라면 프로젝트 폴더 안 `.env.local` 파일에도 `GEMINI_API_KEY="복사한키"` 한 줄을 추가합니다.
+
+---
+
+## ⚙️ 2. 안전 장치 설정 (Vercel & Github)
+
+아무나 봇을 실행할 수 없도록 비밀번호(`CRON_SECRET`)를 걸쇠로 채우는 작업입니다.
+
+1. **Vercel 환경 변수 추가:**
+   - 1-2에서 한 것처럼 똑같이 Key에 `CRON_SECRET`, Value에는 나만이 알 수 있는 아무 영어숫자 조합(예: `my_super_secret_bot_key123`)을 적고 저장합니다.
+
+2. **Github 암호 추가:**
+   - Github 레포지토리 페이지 ➡️ **[Settings]** 탭 ➡️ 좌측 메뉴 **[Secrets and variables]** ➡️ **[Actions]**
+   - **[New repository secret]** 녹색 버튼을 두 번 눌러서 아래 두 개를 만듭니다.
+     - Name: `PROD_URL`, Secret: `https://locally-web.vercel.app` (버셀 배포 주소, 끝에 `/` 빼고)
+     - Name: `CRON_SECRET`, Secret: Vercel에 적은 것과 **똑같은** 비밀번호(`my_super_secret_bot_key123` 등)
+
+> **✨ 준비 완료!** 이제 Vercel을 다시 배포(Redeploy)해주면 봇 세팅이 모두 끝납니다.
+
+---
+
+## 🕹️ 3. 봇 운영하기 (수동 실행 & 시간 변경)
+
+기본적으로 봇은 **매일 낮 12시(글 쓰기)**, **낮 12시 30분 / 밤 8시 30분(댓글 달기)** 에 자동으로 동작하도록 세팅되어 있습니다. (한국 시간 기준)
+
+### 수동으로 당장 지금! 글/댓글 쓰게 하기
+1. Github 레포지토리 ➡️ **[Actions]** 탭 클릭
+2. 좌측 워크플로우 목록에서 **Locally Community Bot** 클릭
+3. 우측의 **[Run workflow]** 버튼 클릭
+4. `job_type` 칸에 `post`(글쓰기) 또는 `comment`(댓글달기) 중 하나를 적어넣고 초록색 **[Run workflow]** 클릭!
+5. 약 1분 후 커뮤니티에 들어가면 봇이 짠! 하고 글을 남겼거나, 누군가의 쓸쓸한(?) 글에 댓글을 남긴 것을 볼 수 있습니다.
+
+### 활동 시간 변경하기
+- 시간을 바꾸고 싶다면 코드를 수정해야 합니다. [.github/workflows/community-bot.yml](file:///Users/sonhyungeun/Documents/locally-web/.github/workflows/community-bot.yml) 파일을 엽니다.
+- cron 부분의 숫자를 조절합니다. (⚠️ 주의: Github는 런던 시간(UTC) 기준이라 한국 시간보다 9시간 느리게 적어야 합니다.)
+  - 한국 낮 12시 = `0 3 * * *` (3시 0분)
+  - 한국 저녁 6시 = `0 9 * * *` (9시 0분)
+
+---
+
+## ⏸️ 4. 봇 일시정지 (끄고 켜기)
+
+이벤트나 서버 점검 등으로 봇 활동을 잠시 멈추고 싶을 때 가장 쉽고 안전한 방법입니다.
+**코드를 지울 필요가 없습니다.**
+
+1. Github 레포지토리 접속 ➡️ 상단 **[Actions]** 탭 클릭
+2. 좌측 메뉴에서 **Locally Community Bot** 클릭
+3. 달리고 있는 목록 우측 상단 쯤에 있는 **[...] (점 세 개 버튼)** 을 클릭
+4. **[Disable workflow]** 클릭
+   - 🔴 이제 봇이 완전 멈췄습니다. 글도, 댓글도 남기지 않습니다.
+
+### 다시 시작하고 싶을 때 (켜기)
+- 위와 똑같이 들어간 다음, **[Enable workflow]** 버튼을 누르기만 하면 🟢 다시 원래대로 작동합니다.
+
+---
+
+### 자주 묻는 질문 (FAQ)
+- **Q: 봇 한 달 유지 비용이 얼마인가요?**
+  - **A: 0원입니다.** (Github Actions, Vercel API, Gemini Flash 모두 넉넉한 무료 티어 내 작동)
+- **Q: Vercel 쪽 요금이 부과될 염려는 없나요?**
+  - **A:** 텍스트 생성 정도의 가벼운 API 호출이 하루에 2~3번만 실행되므로 Hobby 플랜에서도 과금 걱정이 0%입니다.
+- **Q: 봇이 욕설이나 이상한 글을 쓰지 않을까요?**
+  - **A:** [app/utils/bot/ai.ts](file:///Users/sonhyungeun/Documents/locally-web/app/utils/bot/ai.ts) 파일(AI 두뇌 본체) 안에 강력한 '하지 말아야 할 행동' 프롬프트를 걸어두었기 때문에 걱정하진 않으셔도 괜찮습니다. 이상한 글에는 아예 반응(댓글)을 하지 않도록 설계되었습니다.
