@@ -5,7 +5,29 @@
 
 ---
 
+## v3.29.0 — [커뮤니티] 하이브리드 UI (리스트형 + 그리드형) 전면 개편
+
+**작업일:** 2026-03-04
+
+### 변경 내용
+
+| 파일 | 변경 |
+|------|------|
+| `CommunityCategoryTabs.tsx` | 4번째 탭 **✨ 로컬리 콘텐츠** 추가, 활성 탭 scale 애니메이션 |
+| `PostListCard.tsx` (신설) | Q&A·동행·꿀팁 전용 F-Pattern 수평 리스트형 카드 (좌측 썸네일 + 우측 정보) |
+| `PostGridCard.tsx` (신설) | 로컬리 콘텐츠 전용 인스타그램형 그리드 카드 (aspect-square + hover 오버레이) |
+| `CommunityFeed.tsx` | `category === 'locally_content'` → 그리드 3/4칸, 나머지 → 리스트 조건부 렌더 |
+| `page.tsx` | `locally_content` 카테고리 허용 범위에 추가, 넛지 박스 콘텐츠 탭에서 숨김 |
+| `RightSidebar.tsx` | 앱 CTA 배너 삭제 → **⚡ 실시간 업데이트** 위젯으로 교체 (Supabase Realtime INSERT 구독, 그린 Live Indicator) |
+
+### 설계 원칙
+- 무한스크롤 / 데이터 패칭 로직 **완전 무손실**
+- 모바일 FAB 기존 코드 유지
+
+---
+
 ## v3.28.0 — [팀챗] Chrome 모바일 성능 + 리액션 + 읽음처리 전면 개선
+
 
 **작업일:** 2026-03-04
 

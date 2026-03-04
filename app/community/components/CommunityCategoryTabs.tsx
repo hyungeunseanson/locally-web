@@ -7,6 +7,7 @@ const tabs = [
     { id: 'qna', label: '💡 Q&A' },
     { id: 'companion', label: '🤝 동행 찾기' },
     { id: 'info', label: '🗺️ 현지 꿀팁' },
+    { id: 'locally_content', label: '✨ 로컬리 콘텐츠' },
 ];
 
 export default function CommunityCategoryTabs() {
@@ -25,9 +26,9 @@ export default function CommunityCategoryTabs() {
                     key={tab.id}
                     onClick={() => handleTabClick(tab.id)}
                     className={`
-                        whitespace-nowrap rounded-full px-5 py-2.5 text-[14px] md:text-[15px] font-medium transition-colors flex-shrink-0
+                        whitespace-nowrap rounded-full px-5 py-2.5 text-[14px] md:text-[15px] font-medium transition-all duration-200 flex-shrink-0
                         ${currentCategory === tab.id
-                            ? 'bg-black text-white shadow-sm'
+                            ? 'bg-black text-white shadow-sm scale-[1.02]'
                             : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
                         }
                     `}

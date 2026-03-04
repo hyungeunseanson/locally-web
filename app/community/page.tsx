@@ -19,6 +19,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
     if (categoryQuery === 'qna') title = '💡 질문과 답변 - 커뮤니티 | Locally';
     else if (categoryQuery === 'companion') title = '🤝 동행 찾기 - 커뮤니티 | Locally';
     else if (categoryQuery === 'info') title = '🗺️ 여행 꿀팁 - 커뮤니티 | Locally';
+    else if (categoryQuery === 'locally_content') title = '✨ 로컬리 콘텐츠 - 커뮤니티 | Locally';
 
     return {
         title,
@@ -37,7 +38,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
     // 기본 디폴트 탭 (값이 없거나 이상하면 qna)
     let category = (params?.category as string) || 'qna';
-    if (!['qna', 'companion', 'info'].includes(category)) {
+    if (!['qna', 'companion', 'info', 'locally_content'].includes(category)) {
         category = 'qna';
     }
 
@@ -102,15 +103,17 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 <CommunityCategoryTabs />
                             </div>
 
-                            {/* 글쓰기 유도 넛지 */}
-                            <Link href="/community/write">
-                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text mb-5 hover:border-gray-200 hover:shadow-md transition-all duration-200">
-                                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                        <Edit3 size={16} className="text-gray-400" />
+                            {/* 일반 탭일 때만 글쓰기 년지 박스 표시 */}
+                            {category !== 'locally_content' && (
+                                <Link href="/community/write">
+                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text mb-5 hover:border-gray-200 hover:shadow-md transition-all duration-200">
+                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                            <Edit3 size={16} className="text-gray-400" />
+                                        </div>
+                                        <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
                                     </div>
-                                    <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
-                                </div>
-                            </Link>
+                                </Link>
+                            )}
 
                             {/* 피드 */}
                             <CommunityFeed

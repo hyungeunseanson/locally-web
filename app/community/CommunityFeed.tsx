@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CommunityPost } from '@/app/types/community';
 import PostCard from './components/PostCard';
+import PostListCard from './components/PostListCard';
+import PostGridCard from './components/PostGridCard';
 import { Loader2, MessageSquareDashed } from 'lucide-react';
 import Link from 'next/link';
 
@@ -139,12 +141,21 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
 
     return (
         <div className="pb-24">
-            {/* 게시글 목록 */}
-            <div className="space-y-4">
-                {posts.map((post) => (
-                    <PostCard key={`${post.id}`} post={post} />
-                ))}
-            </div>
+            {/* 지웴립니다 콘텐츠: 인스타그램 3/4콼 그리드 */}
+            {category === 'locally_content' ? (
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-1">
+                    {posts.map((post) => (
+                        <PostGridCard key={`${post.id}`} post={post} />
+                    ))}
+                </div>
+            ) : (
+                /* 일반 탭: 리스트형 피드 */
+                <div>
+                    {posts.map((post) => (
+                        <PostListCard key={`${post.id}`} post={post} />
+                    ))}
+                </div>
+            )}
 
             {/* Empty State */}
             {posts.length === 0 && !isLoading && (
