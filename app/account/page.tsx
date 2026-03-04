@@ -126,7 +126,7 @@ export default function AccountPage() {
       title: '커뮤니티',
       desc: '여행자와 호스트의 이야기를 모았습니다.',
       actions: [
-        { label: '커뮤니티 보기', href: '/company/community', external: false },
+        { label: '커뮤니티 보기', href: '/community', external: false },
       ]
     },
     news: {
@@ -459,7 +459,7 @@ export default function AccountPage() {
         <div className="px-4">
           <MobileMenuItem icon={<FileText className="w-4 h-4" />} label="로컬리 소개" href="/about" />
           <MobileMenuItem icon={<Bell className="w-4 h-4" />} label="공지사항" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('notices'); }} />
-          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('community'); }} />
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" href="/community" />
           <MobileMenuItem icon={<BookOpen className="w-4 h-4" />} label="뉴스" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('news'); }} />
           <MobileMenuItem icon={<Globe className="w-4 h-4" />} label="소셜 미디어" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('social'); }} />
         </div>

@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, CalendarCheck, Share2, MoreVertical, CheckCircle2 } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
+import PostImages from '../components/PostImages';
 import CommentSection from '../components/CommentSection';
 import LikeButton from '../components/LikeButton';
 
@@ -162,10 +163,8 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
 
                 {/* Images */}
                 {post.images && post.images.length > 0 && (
-                    <div className="space-y-3 mb-8">
-                        {post.images.map((img: string, idx: number) => (
-                            <img key={idx} src={img} alt={`첨부 이미지 ${idx + 1}`} className="w-full rounded-2xl bg-slate-50" loading="lazy" />
-                        ))}
+                    <div className="mb-8">
+                        <PostImages images={post.images} detail />
                     </div>
                 )}
 

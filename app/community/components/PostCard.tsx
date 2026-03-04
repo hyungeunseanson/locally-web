@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { CommunityPost } from '@/app/types/community';
 import LinkedExperienceChip from './LinkedExperienceChip';
+import PostImages from './PostImages';
 import { MessageSquare, Heart, Eye, MapPin, CalendarCheck, CheckCircle2 } from 'lucide-react';
 
 interface PostCardProps {
@@ -99,21 +100,10 @@ export default function PostCard({ post }: PostCardProps) {
                         {post.content}
                     </p>
 
-                    {/* 이미지 그리드 */}
+                    {/* 이미지 */}
                     {post.images && post.images.length > 0 && (
-                        <div className={`grid gap-1 mt-4 rounded-xl overflow-hidden ${post.images.length === 1 ? 'grid-cols-1' :
-                                post.images.length === 2 ? 'grid-cols-2' :
-                                    'grid-cols-3'
-                            }`}>
-                            {post.images.slice(0, 3).map((img, idx) => (
-                                <div key={idx} className="aspect-video bg-gray-100 overflow-hidden">
-                                    <img
-                                        src={img}
-                                        alt={`이미지 ${idx + 1}`}
-                                        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                                    />
-                                </div>
-                            ))}
+                        <div className="mt-4">
+                            <PostImages images={post.images} />
                         </div>
                     )}
                 </div>

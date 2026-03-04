@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
     Search, Heart, MessageSquare, User,
-    CalendarCheck, LayoutList, BookOpen, AlignJustify, Globe
+    CalendarCheck, LayoutList, BookOpen, AlignJustify, Users2
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import LoginModal from '@/app/components/LoginModal';
@@ -74,7 +74,7 @@ export default function BottomTabNavigation() {
             name: '커뮤니티',
             href: '/community',
             requireAuth: false,
-            icon: (isActive: boolean) => <Globe size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+            icon: (isActive: boolean) => <Users2 size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
             name: '메시지',
