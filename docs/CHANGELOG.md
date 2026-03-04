@@ -5,6 +5,19 @@
 
 ---
 
+## v3.31.0 — [커뮤니티] 100% 무료 자동화 봇 아키텍처 구축 (게시물/댓글)
+
+**작업일:** 2026-03-04
+
+| 항목 | 내용 |
+|------|------|
+| ✨ 신규: AI 코어 모듈 | `@google/generative-ai` 설치 및 `generateFriendlyComment`, `generateAutoPost` 유틸 생성 (Gemini 1.5 Flash 무료 API 기반) |
+| ✨ 신규: 자동 접속 API | `GET /api/bot/auto-post` (여행 꿀팁/날씨 자동 포스팅 API), `GET /api/bot/auto-comment` (댓글 0개인 글에 매직 댓글 생성 API) 신설 |
+| ✨ 신규: 봇 스케줄러 | `.github/workflows/community-bot.yml` — 매일 1회 글 작성, 매일 2회 댓글 스캔 Github Actions 설정 |
+| 🛠️ 도구: DB 봇 계정 | `supabase_bot_setup.sql` 봇 마이그레이션 도구 작성 (도쿄 날씨봇, 맛집 헌터) |
+
+---
+
 ## v3.30.0 — [커뮤니티] 상세 페이지 전면 개선 (버그 5종 수정 + UX 리뉴얼)
 
 **작업일:** 2026-03-04

@@ -1,0 +1,37 @@
+name: Locally Community Bot
+
+on:
+  schedule:
+    # 매일 한국 시간 낮 12시 0분 (UTC 03:00)에 자동 게시물 작성
+    - cron: '0 3 * * *'
+    
+    # 한국 시간 낮 12시 30분, 밤 8시 30분 두 번 자동 댓글 작성 스캔 (UTC 03:30, 11:30)
+    - cron: '30 3,11 * * *'
+  
+  # 수동 트리거 지원
+  workflow_dispatch:
+    inputs:
+      job_type:
+        description: '실행할 작업 (post 또는 comment)'
+        required: true
+        default: 'post'
+        type: choice
+        options:
+          - post
+          - comment
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto Post Job
+        if: github.event.schedule == '0 3 * * *' || github.event.inputs.job_type == 'post'
+        run: |
+          curl -X GET "${{ secrets.PROD_URL }}/api/bot/auto-post" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      - name: Auto Comment Job
+        if: github.event.schedule == '30 3,11 * * *' || github.event.inputs.job_type == 'comment'
+        run: |
+          curl -X GET "${{ secrets.PROD_URL }}/api/bot/auto-comment" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
