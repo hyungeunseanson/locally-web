@@ -110,7 +110,7 @@ export default function CommentSection({ postId, initialCount, onOpenLogin }: Co
             )}
 
             {/* Input Box */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-3 flex items-end gap-3 z-[90] md:max-w-[768px] md:mx-auto">
+            <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-3 flex items-end gap-3 z-[90] md:max-w-[768px] md:mx-auto">
                 <div className="w-9 h-9 rounded-full bg-slate-100 overflow-hidden border border-slate-100 flex-shrink-0">
                     {user?.user_metadata?.avatar_url ? (
                         <img src={user.user_metadata.avatar_url} alt="me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
