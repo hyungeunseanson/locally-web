@@ -4,6 +4,7 @@ import { createClient } from '@/app/utils/supabase/server';
 import CommunityCategoryTabs from './components/CommunityCategoryTabs';
 import CommunityFeed from './CommunityFeed';
 import RightSidebar from './components/RightSidebar';
+import MobileWidgetStrip from './components/MobileWidgetStrip';
 import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
@@ -103,16 +104,9 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 <CommunityCategoryTabs />
                             </div>
 
-                            {/* 일반 탭일 때만 글쓰기 년지 박스 표시 */}
+                            {/* 모바일 전용 위젯 스트립: 실시간 업데이트 + 지금 뜨는 라운지 글 */}
                             {category !== 'locally_content' && (
-                                <Link href="/community/write">
-                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text mb-5 hover:border-gray-200 hover:shadow-md transition-all duration-200">
-                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                            <Edit3 size={16} className="text-gray-400" />
-                                        </div>
-                                        <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
-                                    </div>
-                                </Link>
+                                <MobileWidgetStrip />
                             )}
 
                             {/* 피드 */}
@@ -121,6 +115,18 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 initialNextOffset={initialNextOffset}
                                 category={category}
                             />
+
+                            {/* 글쓰기 넛지 박스 — 피드 최하단 (모바일만 표시, 데스크탑은 RightSidebar CTA) */}
+                            {category !== 'locally_content' && (
+                                <Link href="/community/write" className="block lg:hidden mt-4">
+                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text hover:border-gray-200 hover:shadow-md transition-all duration-200">
+                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                            <Edit3 size={16} className="text-gray-400" />
+                                        </div>
+                                        <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
+                                    </div>
+                                </Link>
+                            )}
                         </div>
 
                         {/* ─── 우측 사이드바 (4/12, 모바일 hidden) ─── */}
