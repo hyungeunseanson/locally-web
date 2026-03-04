@@ -41,11 +41,13 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 | 상품/예약/결제 | `experiences`, `bookings` | 예약 상태는 서버 검증 기준 |
 | 소통/리뷰 | `inquiries`, `inquiry_messages`, `reviews` | 채팅/리뷰 연동 |
 | 운영 | `admin_tasks`, `admin_task_comments`, `audit_logs` | 협업/로그 |
+| 커뮤니티 | `community_posts`, `community_comments`, `community_likes` | RLS: SELECT USING(true), INSERT/UPDATE/DELETE는 auth 필수 |
 
 ### 3.2 권한 원칙
 - 기본: 인증 사용자 + 본인 데이터 범위
 - 관리자: `profiles.role='admin'` 또는 `admin_whitelist` 매칭
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
+- **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
 
 ### 3.3 결제/정합성 원칙
 - 결제 확정/취소는 서버 검증 경로를 단일 소스로 유지
@@ -81,6 +83,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 4. SSR/CSR 불일치가 생길 수 있는 `window`, `localStorage`, `Date` 접근은 `useEffect` 또는 client guard로 분리한다.
 5. 실패 처리 시 로그만 남기지 말고 사용자 피드백(Toast)을 제공한다.
 6. 수정 전 연관 컴포넌트/훅/API 흐름을 교차 검증하고, 핀셋 수정(최소 변경)을 우선한다.
+7. **[SSR Join 분리 원칙]** `page.tsx` 서버 컴포넌트에서 여러 테이블을 join하는 단일 Supabase 쿼리는 쓰지 않는다. join 에러 시 `data=null`이 되어 `notFound()`가 호출되는 문제가 있음. 대신 ① 핵심 테이블 단독 조회 → ② 보조 테이블 별도 조회 패턴으로 분리한다.
 
 ### 5.2 DON'T
 - 외부 UI 라이브러리 임의 추가 금지
