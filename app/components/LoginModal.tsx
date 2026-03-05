@@ -326,27 +326,43 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
             {mode === 'SIGNUP' && (
               <div className={`mb-6 rounded-xl border ${termsError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} text-xs text-gray-700`}>
-                <div className="flex items-center p-4 border-b border-gray-200">
-                  <input type="checkbox" id="allAgree" checked={termsAgreed && privacyAgreed} onChange={(e) => {
-                    setTermsAgreed(e.target.checked);
-                    setPrivacyAgreed(e.target.checked);
-                  }} className="w-5 h-5 rounded border-gray-300 text-black focus:ring-black cursor-pointer" />
-                  <label htmlFor="allAgree" className="ml-3 font-bold text-sm cursor-pointer select-none">전체 동의</label>
+                <div
+                  className="flex items-center p-4 border-b border-gray-200 cursor-pointer select-none group"
+                  onClick={() => {
+                    const newValue = !(termsAgreed && privacyAgreed);
+                    setTermsAgreed(newValue);
+                    setPrivacyAgreed(newValue);
+                  }}
+                >
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${termsAgreed && privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                    {(termsAgreed && privacyAgreed) && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                  </div>
+                  <span className="ml-3 font-bold text-sm text-gray-900">전체 동의</span>
                 </div>
 
                 <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <input type="checkbox" id="terms" checked={termsAgreed} onChange={(e) => setTermsAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer" />
-                      <label htmlFor="terms" className="ml-2 cursor-pointer select-none">[필수] 서비스 이용약관 동의</label>
+                    <div
+                      className="flex items-center cursor-pointer select-none group"
+                      onClick={() => setTermsAgreed(!termsAgreed)}
+                    >
+                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${termsAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                        {termsAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                      </div>
+                      <span className="ml-2.5 text-gray-700 font-medium text-xs">[필수] 서비스 이용약관 동의</span>
                     </div>
                     <button type="button" onClick={() => setShowLegalText('TERMS')} className="text-gray-400 hover:text-black underline font-medium">보기</button>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <input type="checkbox" id="privacy" checked={privacyAgreed} onChange={(e) => setPrivacyAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer" />
-                      <label htmlFor="privacy" className="ml-2 cursor-pointer select-none">[필수] 개인정보 수집 및 이용 동의</label>
+                    <div
+                      className="flex items-center cursor-pointer select-none group"
+                      onClick={() => setPrivacyAgreed(!privacyAgreed)}
+                    >
+                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
+                        {privacyAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                      </div>
+                      <span className="ml-2.5 text-gray-700 font-medium text-xs">[필수] 개인정보 수집 및 이용 동의</span>
                     </div>
                     <button type="button" onClick={() => setShowLegalText('PRIVACY')} className="text-gray-400 hover:text-black underline font-medium">보기</button>
                   </div>
