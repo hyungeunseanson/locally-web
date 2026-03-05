@@ -313,12 +313,12 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
             <div className="p-4 md:p-6 border-b border-slate-100">
               <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">고객 프로필</h4>
               <div className="space-y-3 md:space-y-4 text-xs md:text-sm">
-                <InfoRow icon={<Mail className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="이메일" value={selectedUser.email} />
-                <InfoRow icon={<Phone className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="연락처" value={selectedUser.phone || '+82 10-0000-0000'} />
-                <InfoRow icon={<Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="생년월일" value={selectedUser.birthdate || '1999-09-01 (만 26세)'} />
-                <InfoRow icon={<MapPin className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="국적" value={selectedUser.nationality || 'KR (대한민국)'} />
-                <InfoRow icon={<MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="카카오톡 ID" value={selectedUser.kakao_id || '미등록'} />
-                <InfoRow icon={<Smile className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="MBTI" value={selectedUser.mbti || 'ENTP'} />
+                <InfoRow icon={<Mail className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="이메일" value={selectedUser.email || '-'} />
+                <InfoRow icon={<Phone className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="연락처" value={selectedUser.phone || '미입력'} />
+                <InfoRow icon={<Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="생년월일" value={selectedUser.birth_date || '미입력'} />
+                <InfoRow icon={<MapPin className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="국적" value={selectedUser.nationality || '미입력'} />
+                <InfoRow icon={<MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="카카오톡 ID" value={selectedUser.kakao_id || '미입력'} />
+                <InfoRow icon={<Smile className="w-3.5 h-3.5 md:w-4 md:h-4" />} label="MBTI" value={selectedUser.mbti || '미입력'} />
               </div>
             </div>
 

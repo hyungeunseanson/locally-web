@@ -23,12 +23,15 @@ BEGIN
 EXCEPTION WHEN others THEN
   -- 시도 2 (Fallback): 만약 생년월일 포맷 오류(invalid input syntax for type date) 등의 이유로 1번 쿼리가 실패할 경우, 
   -- 회원가입 500 에러를 방지하고 최소한의 필수 정보만이라도 Insert하여 유저 가입을 보장합니다.
-  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  INSERT INTO public.profiles (id, email, full_name, avatar_url, phone, gender, nationality)
   VALUES (
     NEW.id, 
     NEW.email, 
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'User'), 
-    NULLIF(NEW.raw_user_meta_data->>'avatar_url', '')
+    NULLIF(NEW.raw_user_meta_data->>'avatar_url', ''),
+    NULLIF(NEW.raw_user_meta_data->>'phone', ''),
+    NULLIF(NEW.raw_user_meta_data->>'gender', ''),
+    NULLIF(NEW.raw_user_meta_data->>'nationality', '')
   );
   RETURN NEW;
 END;

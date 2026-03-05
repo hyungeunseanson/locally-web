@@ -82,6 +82,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         showToast('이름, 국적, 연락처, 생년월일, 성별을 모두 입력해주세요.', 'error');
         return;
       }
+      if (!birthDate.match(/^(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) {
+        showToast('생년월일 8자리(YYYYMMDD)를 올바르게 입력해주세요.', 'error');
+        return;
+      }
+      if (phone.length < 9) {
+        showToast('올바른 연락처를 입력해주세요.', 'error');
+        return;
+      }
       if (!termsAgreed || !privacyAgreed) {
         setTermsError(true);
         showToast('필수 약관에 동의해주세요.', 'error');
