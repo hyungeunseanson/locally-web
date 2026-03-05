@@ -711,6 +711,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_err_login: "로그인이 필요합니다.",
     srf_err_fail: "의뢰 등록에 실패했습니다.",
     srf_success: "의뢰가 등록되었습니다! 결제 후 호스트 모집이 시작됩니다.",
+    req_duration_hours: "시간",
+    req_guest_count: "명",
 
     // [Service Payment]
     sp_title: "결제하기",
@@ -1558,6 +1560,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_err_login: "Login is required.",
     srf_err_fail: "Failed to register request.",
     srf_success: "Request registered! Host recruitment begins after payment.",
+    req_duration_hours: "hrs",
+    req_guest_count: " pax",
 
     // [Service Payment]
     sp_title: "Payment",
@@ -2406,6 +2410,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_err_login: "ログインが必要です。",
     srf_err_fail: "リクエストの登録に失敗しました。",
     srf_success: "リクエストが登録されました！決済後にホスト募集が開始されます。",
+    req_duration_hours: "時間",
+    req_guest_count: "名",
 
     // [Service Payment]
     sp_title: "お支払い",
@@ -3253,6 +3259,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_err_login: "需要登录。",
     srf_err_fail: "需求提交失败。",
     srf_success: "需求已提交！支付后将开始招募房东。",
+    req_duration_hours: "小时",
+    req_guest_count: "人",
 
     // [Service Payment]
     sp_title: "支付",
