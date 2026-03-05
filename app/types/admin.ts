@@ -83,6 +83,7 @@ export interface AdminServiceBooking {
   // Assembled via manual JOIN
   service_request: {
     title: string;
+    description: string;
     city: string;
     service_date: string;
     duration_hours: number;

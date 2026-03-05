@@ -713,6 +713,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_success: "의뢰가 등록되었습니다! 결제 후 호스트 모집이 시작됩니다.",
     req_duration_hours: "시간",
     req_guest_count: "명",
+    btn_apply: "지원하기",
+    sr_application_pending: "지원 완료 — 고객 검토 중",
+    sr_customer_reviewing: "고객이 지원자 목록을 검토 중입니다.",
+    sr_no_reviews: "후기 없음",
+    btn_select_host: "이 호스트 선택",
 
     // [Service Payment]
     sp_title: "결제하기",
@@ -1562,6 +1567,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_success: "Request registered! Host recruitment begins after payment.",
     req_duration_hours: "hrs",
     req_guest_count: " pax",
+    btn_apply: "Apply",
+    sr_application_pending: "Applied — Awaiting Selection",
+    sr_customer_reviewing: "The customer is reviewing applicants.",
+    sr_no_reviews: "No reviews yet",
+    btn_select_host: "Select Host",
 
     // [Service Payment]
     sp_title: "Payment",
@@ -2412,6 +2422,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_success: "リクエストが登録されました！決済後にホスト募集が開始されます。",
     req_duration_hours: "時間",
     req_guest_count: "名",
+    btn_apply: "応募する",
+    sr_application_pending: "応募済み — 審査中",
+    sr_customer_reviewing: "お客様が申込者を確認中です。",
+    sr_no_reviews: "レビューなし",
+    btn_select_host: "このホストを選択",
 
     // [Service Payment]
     sp_title: "お支払い",
@@ -3261,6 +3276,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
     srf_success: "需求已提交！支付后将开始招募房东。",
     req_duration_hours: "小时",
     req_guest_count: "人",
+    btn_apply: "申请",
+    sr_application_pending: "已申请 — 等待审核",
+    sr_customer_reviewing: "客户正在审核申请者。",
+    sr_no_reviews: "暂无评价",
+    btn_select_host: "选择此主机",
 
     // [Service Payment]
     sp_title: "支付",

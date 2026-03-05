@@ -19,6 +19,7 @@ import {
   isPendingPaymentServiceRequest,
 } from '@/app/constants/serviceStatus';
 import type { ServiceRequest, ServiceApplicationWithProfile } from '@/app/types/service';
+import HostProfileModal from '@/app/experiences/[id]/components/HostProfileModal';
 
 // ── 매칭 스텝 정의 (v2 에스크로) ────────────────────────────────
 const MATCHING_STEPS = [
@@ -62,6 +63,7 @@ export default function ServiceRequestDetailPage() {
   const [myApplication, setMyApplication] = useState<{ id: string; status: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [hostModal, setHostModal] = useState<{ open: boolean; hostId: string | null }>({ open: false, hostId: null });
 
   const isOwner = currentUserId !== null && currentUserId === request?.user_id;
   const isSelectedHost = currentUserId !== null && currentUserId === request?.selected_host_id;
@@ -298,8 +300,9 @@ export default function ServiceRequestDetailPage() {
                   return (
                     <div
                       key={app.id}
-                      className={`bg-white rounded-2xl border transition-all overflow-hidden shadow-sm ${isSelected ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-100 hover:border-slate-200 hover:shadow-md'
+                      className={`bg-white rounded-2xl border transition-all overflow-hidden shadow-sm cursor-pointer ${isSelected ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-100 hover:border-slate-200 hover:shadow-md'
                         }`}
+                      onClick={() => setHostModal({ open: true, hostId: app.host_id })}
                     >
                       {/* ─ 호스트 프로필 헤더 ─ */}
                       <div className="px-4 pt-4 pb-3 flex items-start gap-3.5">
@@ -364,7 +367,7 @@ export default function ServiceRequestDetailPage() {
 
                       {/* ─ 선택 버튼 ─ */}
                       {isOpenServiceRequest(request.status) && !isSelected && (
-                        <div className="px-4 pb-4">
+                        <div className="px-4 pb-4" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleSelectHost(app.id)}
                             disabled={selecting === app.id}
@@ -442,6 +445,31 @@ export default function ServiceRequestDetailPage() {
           </Link>
         </div>
       </div>
+
+      {/* ── 호스트 프로필 모달 ── */}
+      {(() => {
+        const app = hostModal.hostId ? applications.find((a) => a.host_id === hostModal.hostId) : null;
+        if (!app) return null;
+        const modalName = app.profiles?.full_name || app.host_applications?.name || t('host');
+        return (
+          <HostProfileModal
+            isOpen={hostModal.open}
+            onClose={() => setHostModal({ open: false, hostId: null })}
+            host={{
+              name: modalName,
+              avatarUrl: app.profiles?.avatar_url || app.host_applications?.profile_photo || undefined,
+              reviewCount: app.review_count,
+              rating: app.review_avg,
+              joinedYear: app.profiles?.created_at ? new Date(app.profiles.created_at).getFullYear() : undefined,
+              job: app.host_applications?.profession || undefined,
+              dreamDestination: app.host_applications?.dream_destination || undefined,
+              favoriteSong: app.host_applications?.favorite_song || undefined,
+              languages: app.profiles?.languages || app.host_applications?.languages || undefined,
+              intro: app.host_applications?.self_intro || app.profiles?.bio || undefined,
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

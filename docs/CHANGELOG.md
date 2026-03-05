@@ -5,6 +5,20 @@
 
 ---
 
+## v3.33.0 — [맞춤의뢰] 서비스 매칭 2차 개선 — 호스트 모달·어드민 수정·재무지표·Master Ledger 통합
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 i18n 키 5개 추가 | `btn_apply`, `sr_application_pending`, `sr_customer_reviewing`, `sr_no_reviews`, `btn_select_host` — ko/en/ja/zh 4개 언어 모두 추가. 키 문자열 그대로 노출되던 문제 해결. |
+| 🔴 호스트 프로필 모달 연결 | `ServiceRequestClient.tsx` — 지원자 카드 클릭 시 `HostProfileModal` 오픈. `ServiceApplicationWithProfile` 타입에 `created_at`, `profession`, `dream_destination`, `favorite_song` 추가. `/api/services/applications` GET select 쿼리에 해당 필드 추가. |
+| 🟡 어드민 서비스의뢰 수정 기능 | `app/api/admin/service-requests/route.ts` 신규 (PATCH). `ServiceAdminTab.tsx`에 편집 모달(제목+설명) 및 ✏️ 버튼 추가. |
+| 🟡 어드민 재무 지표 추가 | `ServiceAdminTab.tsx` — AllRequestsTab 테이블에 `호스트 지급액` · `순수익` 컬럼 추가. KPI 카드 6개로 확장(호스트 지급액 총계, 순수익 추가). |
+| 🟠 Master Ledger service_bookings 통합 | `MasterLedgerTab.tsx` — 컴포넌트 마운트 시 `/api/admin/service-bookings` 병렬 fetch, 정규화 후 일반예약과 통합 정렬. Type 컬럼(일반예약/서비스의뢰 배지) 추가. KPI, CSV 다운로드 모두 통합 계산. 서비스의뢰 상세 클릭 시 관리 액션 버튼 미노출(서비스 의뢰 탭 안내 표시). |
+
+---
+
 ## v3.32.0 — [어드민 TEAM] 중복 댓글 방지·읽음처리 RPC·카운트 경량화
 
 **작업일:** 2026-03-05

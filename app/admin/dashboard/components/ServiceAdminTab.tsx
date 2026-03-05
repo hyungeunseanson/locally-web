@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import {
   Briefcase, DollarSign, RefreshCcw, CheckCircle, AlertTriangle, ChevronDown, ChevronUp,
-  X, Loader2, Download
+  X, Loader2, Download, Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
@@ -37,6 +37,84 @@ function statusBadge(status: string, map: Record<string, { label: string; cls: s
     <span className={`px-2 py-0.5 rounded text-[10px] md:text-[11px] font-bold ${cfg.cls}`}>
       {cfg.label}
     </span>
+  );
+}
+
+// ── 의뢰 내용 수정 모달 ─────────────────────────────────────────────────────
+function EditRequestModal({
+  requestId,
+  initialTitle,
+  initialDescription,
+  onClose,
+  onSuccess,
+}: {
+  requestId: string;
+  initialTitle: string;
+  initialDescription: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { showToast } = useToast();
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!title.trim()) { showToast('제목을 입력해주세요.', 'error'); return; }
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/admin/service-requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, title: title.trim(), description: description.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { showToast(data.error || '수정 실패', 'error'); return; }
+      showToast('의뢰 내용이 수정되었습니다.', 'success');
+      onSuccess();
+      onClose();
+    } catch { showToast('서버 오류가 발생했습니다.', 'error'); }
+    finally { setIsSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-black text-[15px] md:text-base text-slate-900">의뢰 내용 수정</h3>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-100 transition-colors"><X size={16} /></button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">의뢰 제목</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">요청 내용</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-200 text-[12px] md:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">취소</button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[12px] md:text-sm font-bold hover:bg-slate-800 transition-colors disabled:opacity-60"
+          >
+            {isSaving ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -150,6 +228,7 @@ type AllFilter = 'ALL' | 'CANCEL_REQ';
 function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[]; onRefresh: () => void }) {
   const { showToast } = useToast();
   const [cancelTarget, setCancelTarget] = useState<AdminServiceBooking | null>(null);
+  const [editTarget, setEditTarget] = useState<AdminServiceBooking | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [allFilter, setAllFilter] = useState<AllFilter>('ALL');
 
@@ -190,6 +269,15 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
           onSuccess={onRefresh}
         />
       )}
+      {editTarget && editTarget.service_request && (
+        <EditRequestModal
+          requestId={editTarget.request_id}
+          initialTitle={editTarget.service_request.title}
+          initialDescription={editTarget.service_request.description ?? ''}
+          onClose={() => setEditTarget(null)}
+          onSuccess={onRefresh}
+        />
+      )}
 
       {/* 필터 필 */}
       <div className="flex gap-2">
@@ -221,6 +309,8 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                 <th className="px-4 py-3">의뢰 내용</th>
                 <th className="px-4 py-3">고객</th>
                 <th className="px-4 py-3">결제액</th>
+                <th className="px-4 py-3">호스트 지급액</th>
+                <th className="px-4 py-3">순수익</th>
                 <th className="px-4 py-3">결제수단</th>
                 <th className="px-4 py-3">의뢰 상태</th>
                 <th className="px-4 py-3">결제 상태</th>
@@ -243,6 +333,12 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                     {b.customer_profile?.full_name || b.customer_profile?.email || b.customer_id.slice(-6)}
                   </td>
                   <td className="px-4 py-3 font-bold text-[11px] md:text-sm text-slate-900">₩{b.amount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-[11px] md:text-sm text-emerald-700 font-semibold">
+                    {b.host_payout_amount != null ? `₩${b.host_payout_amount.toLocaleString()}` : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-[11px] md:text-sm text-blue-700 font-semibold">
+                    {b.platform_revenue != null ? `₩${b.platform_revenue.toLocaleString()}` : '-'}
+                  </td>
                   <td className="px-4 py-3">
                     {b.payment_method === 'bank' ? (
                       <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">🏛️ 무통장</span>
@@ -265,32 +361,39 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                     {format(new Date(b.created_at), 'yy.MM.dd')}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {b.status === 'cancelled' || b.service_request?.status === 'completed' ? (
-                      <span className="text-[10px] md:text-xs text-slate-300 font-medium">불가</span>
-                    ) : (
-                      <div className="flex items-center justify-end gap-2">
-                        {b.status === 'PENDING' && b.payment_method === 'bank' && (
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setEditTarget(b)}
+                        className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                        title="의뢰 수정"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      {b.status !== 'cancelled' && b.service_request?.status !== 'completed' && (
+                        <>
+                          {b.status === 'PENDING' && b.payment_method === 'bank' && (
+                            <button
+                              onClick={() => handleConfirmPayment(b.order_id)}
+                              disabled={isProcessing}
+                              className="px-2 py-1 md:px-3 md:py-1.5 bg-blue-600 text-white border border-blue-700 rounded-lg text-[10px] md:text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-60"
+                            >
+                              💰 입금 확인
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleConfirmPayment(b.order_id)}
-                            disabled={isProcessing}
-                            className="px-2 py-1 md:px-3 md:py-1.5 bg-blue-600 text-white border border-blue-700 rounded-lg text-[10px] md:text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-60"
+                            onClick={() => setCancelTarget(b)}
+                            className="px-2 py-1 md:px-3 md:py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition-colors"
                           >
-                            💰 입금 확인
+                            강제 취소
                           </button>
-                        )}
-                        <button
-                          onClick={() => setCancelTarget(b)}
-                          className="px-2 py-1 md:px-3 md:py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition-colors"
-                        >
-                          강제 취소
-                        </button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-[11px] md:text-sm text-slate-400">
+                  <td colSpan={12} className="px-4 py-10 text-center text-[11px] md:text-sm text-slate-400">
                     {allFilter === 'CANCEL_REQ' ? '취소 요청 건이 없습니다.' : '등록된 맞춤 의뢰가 없습니다.'}
                   </td>
                 </tr>
@@ -584,6 +687,8 @@ export default function ServiceAdminTab() {
   const pendingSettlement = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status) && b.payout_status === 'pending' && b.host_id).length;
   const cancelledCount = bookings.filter(b => b.status === 'cancelled').length;
   const cancellationRequestedCount = bookings.filter(b => b.status === 'cancellation_requested').length;
+  const totalHostPayout = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status)).reduce((s, b) => s + (b.host_payout_amount ?? 0), 0);
+  const totalPlatformRevenue = bookings.filter(b => ['PAID', 'confirmed', 'completed'].includes(b.status)).reduce((s, b) => s + (b.platform_revenue ?? 0), 0);
 
   return (
     <div className="flex-1 space-y-4 md:space-y-6 overflow-y-auto p-1 md:p-2 animate-in fade-in zoom-in-95 duration-300">
@@ -601,10 +706,18 @@ export default function ServiceAdminTab() {
       </div>
 
       {/* KPI mini cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         <div className="bg-white rounded-xl border border-slate-100 p-3 md:p-4 shadow-sm">
           <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">총 결제액 (GMV)</p>
           <p className="text-[15px] md:text-2xl font-black text-slate-900">₩{totalPaid.toLocaleString()}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-100 p-3 md:p-4 shadow-sm">
+          <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">호스트 지급액</p>
+          <p className="text-[15px] md:text-2xl font-black text-emerald-600">₩{totalHostPayout.toLocaleString()}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-100 p-3 md:p-4 shadow-sm">
+          <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">순수익</p>
+          <p className="text-[15px] md:text-2xl font-black text-blue-600">₩{totalPlatformRevenue.toLocaleString()}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-100 p-3 md:p-4 shadow-sm">
           <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1">정산 대기 건수</p>

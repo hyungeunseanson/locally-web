@@ -172,8 +172,8 @@ export async function GET(request: Request) {
       // profiles & host_applications 별도 조회 (nested join RLS 우회)
       const hostIds = apps.map((a) => a.host_id);
       const [{ data: profiles }, { data: hostApps }] = await Promise.all([
-        supabaseAdmin.from('profiles').select('id, full_name, avatar_url, bio, languages').in('id', hostIds),
-        supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, self_intro, languages').in('user_id', hostIds),
+        supabaseAdmin.from('profiles').select('id, full_name, avatar_url, bio, languages, created_at').in('id', hostIds),
+        supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, self_intro, languages, profession, dream_destination, favorite_song').in('user_id', hostIds),
       ]);
 
       const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));

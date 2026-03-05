@@ -110,12 +110,16 @@ export type ServiceApplicationWithProfile = ServiceApplication & {
     avatar_url: string | null;
     bio: string | null;
     languages: string[] | null;
+    created_at: string | null;
   } | null;
   host_applications?: {
     name: string | null;
     profile_photo: string | null;
     self_intro: string | null;
     languages: string[] | null;
+    profession: string | null;
+    dream_destination: string | null;
+    favorite_song: string | null;
   } | null;
   // 후기 집계 (클라이언트에서 계산)
   review_count?: number;
