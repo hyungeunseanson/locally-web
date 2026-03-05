@@ -97,6 +97,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
   // 실시간 이벤트 중복 수신 방지 (메시지 id 단위)
   const processedEventRef = useRef<Set<string>>(new Set());
+  // 실시간 핸들러가 최신 상태를 참조하기 위한 refs (의존성 배열 안정화)
+  const inquiriesRef = useRef<InquiryListItem[]>([]);
+  const selectedInquiryRef = useRef<InquiryListItem | null>(null);
 
   const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return null;
@@ -113,7 +116,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   }, [supabase, currentUser]);
 
   const fetchInquiries = useCallback(async (showLoading = true) => {
-    if (showLoading && inquiries.length === 0) setIsLoading(true);
+    if (showLoading && inquiriesRef.current.length === 0) setIsLoading(true);
 
     try {
       const user = await getAuthenticatedUser();
@@ -201,15 +204,17 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         });
 
         setInquiries(safeData);
+        inquiriesRef.current = safeData;
       } else {
         setInquiries([]);
+        inquiriesRef.current = [];
       }
     } catch (err: unknown) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, role, inquiries.length, getAuthenticatedUser]);
+  }, [supabase, role, getAuthenticatedUser]);
 
   const markAsRead = useCallback(async (inquiryId: number | string) => {
     if (!currentUser) return;
@@ -268,15 +273,16 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         setMessages(safeMessages);
       }
 
-      const selected = inquiries.find((i) => String(i.id) === String(inquiryId));
+      const selected = inquiriesRef.current.find((i) => String(i.id) === String(inquiryId));
       if (selected) {
+        selectedInquiryRef.current = selected;
         setSelectedInquiry(selected);
         markAsRead(inquiryId);
       }
     } catch (err: unknown) {
       console.error(err);
     }
-  }, [supabase, inquiries, markAsRead]);
+  }, [supabase, markAsRead]);
 
   const sendMessage = async (inquiryId: number | string, content: string, file?: File, senderId?: string) => {
     const cleanContent = sanitizeText(content);
@@ -450,8 +456,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
           if (newPayload && newPayload.sender_id !== currentUser.id) {
             fetchInquiries(false);
-            if (selectedInquiry && String(newPayload.inquiry_id) === String(selectedInquiry.id)) {
-              loadMessages(selectedInquiry.id);
+            if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
+              loadMessages(selectedInquiryRef.current.id);
             }
           }
         }
@@ -466,9 +472,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, fetchInquiries, selectedInquiry, currentUser, loadMessages]);
+  }, [supabase, fetchInquiries, currentUser, loadMessages]);
 
   const clearSelected = () => {
+    selectedInquiryRef.current = null;
     setSelectedInquiry(null);
     setMessages([]);
   };

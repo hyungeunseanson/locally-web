@@ -141,12 +141,10 @@ export default function InquiryChat() {
               >
                 {/* 아바타 */}
                 <div className="w-11 h-11 md:w-12 md:h-12 rounded-full shrink-0 overflow-hidden relative bg-slate-100 border border-slate-200">
-                  <Image
-                    src={secureUrl(inq.guest?.avatar_url)}
-                    alt="guest"
-                    fill
-                    className="object-cover"
-                  />
+                  {inq.guest?.avatar_url
+                    ? <Image src={secureUrl(inq.guest.avatar_url)!} alt="guest" fill className="object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><User size={18} className="text-slate-400" /></div>
+                  }
                 </div>
 
                 {/* 텍스트 */}
@@ -205,12 +203,10 @@ export default function InquiryChat() {
                 onClick={() => setModalUserId(selectedInquiry.user_id)}
               >
                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
-                  <Image
-                    src={secureUrl(selectedInquiry.guest?.avatar_url)}
-                    alt="guest"
-                    fill
-                    className="object-cover"
-                  />
+                  {selectedInquiry.guest?.avatar_url
+                    ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill className="object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><User size={14} className="text-slate-400" /></div>
+                  }
                 </div>
                 <div className="min-w-0">
                   <div className="font-bold text-[14px] md:text-[15px] leading-tight truncate">
@@ -233,12 +229,10 @@ export default function InquiryChat() {
                         onClick={() => setModalUserId(msg.sender_id)}
                       >
                         <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
-                          <Image
-                            src={secureUrl(selectedInquiry.guest?.avatar_url)}
-                            alt="guest"
-                            fill
-                            className="object-cover"
-                          />
+                          {selectedInquiry.guest?.avatar_url
+                            ? <Image src={secureUrl(selectedInquiry.guest.avatar_url)!} alt="guest" fill className="object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center"><User size={12} className="text-slate-400" /></div>
+                          }
                         </div>
                       </div>
                     )}
@@ -256,13 +250,16 @@ export default function InquiryChat() {
                       <div className="flex items-end gap-1.5">
                         {isMe && (
                           <div className="flex flex-col items-end shrink-0">
-                            {!msg.is_read
-                              ? <span className="text-[9px] md:text-[10px] font-bold text-blue-500">1</span>
-                              : msg.read_at
-                                ? <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>읽음 {formatTime(msg.read_at)}</span>
-                                : null
-                            }
-                            <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
+                            {!msg.is_read ? (
+                              <>
+                                <span className="text-[9px] md:text-[10px] font-bold text-blue-500">1</span>
+                                <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
+                              </>
+                            ) : msg.read_at ? (
+                              <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>읽음 {formatTime(msg.read_at)}</span>
+                            ) : (
+                              <span className="text-[9px] md:text-[10px] text-gray-400" suppressHydrationWarning>{formatTime(msg.created_at)}</span>
+                            )}
                           </div>
                         )}
 

@@ -5,6 +5,29 @@
 
 ---
 
+## v3.31.8 — [메시지] 채팅 버그 3종 수정 및 실시간 구독 안정화
+
+**작업일:** 2026-03-05
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 버그: 읽음 시간 두 번 표시 | `InquiryChat.tsx` / `guest/inbox/page.tsx` 모두 "읽음 {read_at}" 표시 시 `created_at` 시간이 항상 추가 렌더링되는 구조적 오류. 조건 분기를 `is_read=false → 1+created_at`, `is_read=true+read_at → 읽음 read_at만`, `is_read=true+read_at없음 → created_at만`으로 정리. |
+| 🔴 버그: 프로필 사진 없는 게스트 자리에 사이트 로고 표시 | `InquiryChat.tsx`의 `secureUrl` fallback이 `/images/logo.png`로 설정돼 있어 아바타 3곳(목록/헤더/메시지)에 로고 노출. `avatar_url` 존재 여부에 따라 `<Image>` vs `<User>` 아이콘 조건부 렌더링으로 교체. |
+| 🔴 버그: 실시간 메시지 미수신 (새로고침 필요) | `useChat.ts`의 Realtime useEffect 의존성에 `selectedInquiry`(state)와 `fetchInquiries`의 `inquiries.length` 의존이 있어, 채팅방 전환 및 문의 목록 변경 시마다 채널이 재구독되며 메시지 누락 발생. `inquiriesRef` / `selectedInquiryRef`를 도입해 핸들러 내 최신 값 참조를 ref로 분리 → realtime effect에서 `selectedInquiry` 제거, `fetchInquiries` 의존성에서 `inquiries.length` 제거, `loadMessages` 의존성에서 `inquiries` 제거. 채널이 사용자 변경 시에만 재구독되도록 안정화. |
+
+---
+
+## v3.31.7 — [메시지] 게스트↔호스트 메시지 자동 연결 수정
+
+**작업일:** 2026-03-05
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 버그: 게스트 나의 예약 메시지 버튼 → 호스트 연결 안됨 | `TripCard.tsx`가 `/guest/inbox?hostId=...`만 전달하고 `expId` 누락 → inbox가 `hostId+expId` 둘 다 있어야 자동 연결하므로 빈 목록만 표시. `expId`, `expTitle` URL 파라미터 추가. |
+| 🔴 버그: 호스트 예약관리 메시지 버튼 → 게스트 연결 안됨 | `InquiryChat.tsx`가 `guestId`로 기존 문의를 찾지 못하면 아무 것도 열지 않음(호스트 선제 채팅 불가). `/api/host/start-chat` 신규 API 생성(체험 소유 검증 + service_role로 inquiry 생성 또는 기존 반환). `ReservationManager.tsx`에 `expId` 추가, `InquiryChat.tsx`에 자동 생성 후 연결 로직 추가. |
+
+---
+
 ## v3.31.6 — [어드민 핫픽스] Master Ledger 예약 목록 미노출 수정
 
 **작업일:** 2026-03-05
