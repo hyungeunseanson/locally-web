@@ -148,8 +148,8 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                     onClick={() => { if (matchedUser) setSelectedUser(matchedUser); }}
                     className={`flex-shrink-0 w-36 md:w-48 p-2.5 md:p-4 bg-slate-50 border border-green-100 rounded-xl flex items-center gap-2.5 md:gap-3 relative overflow-hidden ${matchedUser ? 'cursor-pointer hover:bg-slate-100 transition-colors' : ''}`}
                   >
-                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm overflow-hidden shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-blue-500'}`}>
-                      {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : (u.full_name ? u.full_name[0].toUpperCase() : (u.email ? u.email[0].toUpperCase() : 'G'))}
+                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm overflow-hidden shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-slate-200 text-slate-500'}`}>
+                      {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <User className="w-4 h-4 md:w-5 md:h-5" />}
                     </div>
                     <div className="min-w-0">
                       <div className="text-[10px] md:text-xs font-bold truncate text-slate-900">{u.full_name || u.email || '비회원'}</div>
