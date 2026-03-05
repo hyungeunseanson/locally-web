@@ -142,11 +142,11 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
             <div className="flex gap-2.5 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide">
               {onlineUsers.map((u: any, idx: number) => (
                 <div key={idx} className="flex-shrink-0 w-36 md:w-48 p-2.5 md:p-4 bg-slate-50 border border-green-100 rounded-xl flex items-center gap-2.5 md:gap-3 relative overflow-hidden">
-                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-blue-500'}`}>
-                    {u.email ? u.email[0].toUpperCase() : 'G'}
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm overflow-hidden shadow-sm ${u.is_anonymous ? 'bg-slate-300' : 'bg-blue-500'}`}>
+                    {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : (u.full_name ? u.full_name[0].toUpperCase() : (u.email ? u.email[0].toUpperCase() : 'G'))}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] md:text-xs font-bold truncate text-slate-900">{u.email || '비회원'}</div>
+                    <div className="text-[10px] md:text-xs font-bold truncate text-slate-900">{u.full_name || u.email || '비회원'}</div>
                     <div className="text-[9px] md:text-[10px] text-green-600 font-medium leading-none mt-0.5">지금 활동 중</div>
                   </div>
                   <div className="absolute top-2 right-2 w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-ping"></div>

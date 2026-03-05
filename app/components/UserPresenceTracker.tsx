@@ -17,9 +17,25 @@ export default function UserPresenceTracker() {
       const channel = supabase.channel('online_users');
       channel.on('presence', { event: 'sync' }, () => { }).subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
+          let fullName = '비회원';
+          let avatarUrl = '';
+
+          if (user) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', user.id)
+              .maybeSingle();
+
+            fullName = profile?.full_name || user.user_metadata?.full_name || '이름 없음';
+            avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url || '';
+          }
+
           await channel.track({
             user_id: user?.id || 'guest',
             email: user?.email || '비회원',
+            full_name: fullName,
+            avatar_url: avatarUrl,
             connected_at: new Date().toISOString(),
             is_anonymous: !user
           });
