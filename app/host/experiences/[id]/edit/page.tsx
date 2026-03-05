@@ -30,6 +30,7 @@ export default function EditExperiencePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadingItineraryIndex, setUploadingItineraryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'course'>('basic');
+  const [isAdminUser, setIsAdminUser] = useState(false);
 
   // 데이터 불러오기
   useEffect(() => {
@@ -42,12 +43,20 @@ export default function EditExperiencePage() {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('experiences')
-          .select('*')
-          .eq('id', params.id)
-          .eq('host_id', user.id)
-          .maybeSingle();
+        // 🟢 어드민 계정 여부 확인
+        const [profileRes, whitelistRes] = await Promise.all([
+          supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+          supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
+        ]);
+        const isAdmin = profileRes.data?.role === 'admin' || !!whitelistRes.data;
+        setIsAdminUser(isAdmin);
+
+        let query = supabase.from('experiences').select('*').eq('id', params.id);
+        if (!isAdmin) {
+          query = query.eq('host_id', user.id);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (error || !data) {
           showToast(t('msg_load_fail'), 'error');
@@ -129,7 +138,7 @@ export default function EditExperiencePage() {
       const normalizedLanguageLevels = normalizeLanguageLevels(formData.language_levels, formData.languages || [], 3);
       const languageNames = getLanguageNames(normalizedLanguageLevels);
 
-      const { data, error } = await supabase
+      let updateQuery = supabase
         .from('experiences')
         .update({
           // ✅ 기존 필드
@@ -168,10 +177,13 @@ export default function EditExperiencePage() {
           category_ja: formData.category_ja,
           category_zh: formData.category_zh,
         })
-        .eq('id', params.id)
-        .eq('host_id', user.id)
-        .select('id')
-        .maybeSingle();
+        .eq('id', params.id);
+
+      if (!isAdminUser) {
+        updateQuery = updateQuery.eq('host_id', user.id);
+      }
+
+      const { data, error } = await updateQuery.select('id').maybeSingle();
 
       if (error || !data) throw new Error(t('msg_edit_permission_fail'));
       showToast(t('msg_save_success'), 'success'); // 🟢 번역
@@ -296,9 +308,9 @@ export default function EditExperiencePage() {
           >
             <ChevronLeft size={16} /> {t('nav_dashboard')}
           </button>
-        <button onClick={handleUpdate} disabled={saving} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
-          {saving ? <><Loader2 className="animate-spin" size={16} /> {t('btn_save_loading')}</> : <><Save size={16} /> {t('btn_save')}</>} {/* 🟢 번역 */}
-        </button>
+          <button onClick={handleUpdate} disabled={saving} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
+            {saving ? <><Loader2 className="animate-spin" size={16} /> {t('btn_save_loading')}</> : <><Save size={16} /> {t('btn_save')}</>} {/* 🟢 번역 */}
+          </button>
         </div>
 
         <h1 className="text-lg md:text-2xl font-black text-slate-900 leading-tight mb-4 md:mb-6 line-clamp-2">{formData.title}</h1>
