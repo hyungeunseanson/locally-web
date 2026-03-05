@@ -19,6 +19,7 @@ export default function InquiryChat() {
     sendMessage,
     clearSelected,
     isLoading,
+    refresh,
   } = useChat('host');
 
   const { t } = useLanguage();
@@ -32,21 +33,39 @@ export default function InquiryChat() {
   const pathname = usePathname();
   const router = useRouter();
   const guestIdFromUrl = searchParams.get('guestId');
+  const expIdFromUrl = searchParams.get('expId');
+  const [pendingChatCreated, setPendingChatCreated] = useState(false);
 
   const [modalUserId, setModalUserId] = useState<string | null>(null);
 
   // 자동 채팅방 열기 (URL 파라미터)
   useEffect(() => {
-    if (guestIdFromUrl && inquiries.length > 0) {
-      const targetInquiry = inquiries.find(inq =>
-        String(inq.user_id) === String(guestIdFromUrl) ||
-        String(inq.guest?.id) === String(guestIdFromUrl)
-      );
-      if (targetInquiry && selectedInquiry?.id !== targetInquiry.id) {
-        loadMessages(targetInquiry.id);
-      }
+    if (!guestIdFromUrl || isLoading) return;
+
+    const targetInquiry = inquiries.find(inq =>
+      String(inq.user_id) === String(guestIdFromUrl) ||
+      String(inq.guest?.id) === String(guestIdFromUrl)
+    );
+
+    if (targetInquiry && selectedInquiry?.id !== targetInquiry.id) {
+      loadMessages(targetInquiry.id);
+    } else if (!targetInquiry && expIdFromUrl && !pendingChatCreated) {
+      // 기존 문의 없음 → 서버 API로 문의방 생성 후 자동 연결
+      setPendingChatCreated(true);
+      fetch('/api/host/start-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestId: guestIdFromUrl, expId: expIdFromUrl }),
+      })
+        .then(r => r.json())
+        .then(result => {
+          if (result.inquiryId) {
+            refresh(); // inquiries 갱신 → useEffect 재실행 → targetInquiry 발견 → loadMessages
+          }
+        })
+        .catch(err => console.error('[InquiryChat] start-chat error:', err));
     }
-  }, [guestIdFromUrl, inquiries, loadMessages, selectedInquiry]);
+  }, [guestIdFromUrl, expIdFromUrl, inquiries, selectedInquiry, isLoading, pendingChatCreated, loadMessages, refresh]);
 
   // 스크롤 자동 하단 이동
   useEffect(() => {

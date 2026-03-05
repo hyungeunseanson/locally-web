@@ -286,7 +286,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
           {/* 하단 3버튼 */}
           <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 grid grid-cols-3 gap-1.5 md:gap-2">
             <button
-              onClick={() => router.push(`/guest/inbox?hostId=${trip.hostId}`)}
+              onClick={() => router.push(`/guest/inbox?hostId=${trip.hostId}&expId=${trip.expId}&expTitle=${encodeURIComponent(trip.title)}`)}
               className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
             >
               <MessageSquare className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]" /> {t('messages')} {/* 🟢 교체 */}

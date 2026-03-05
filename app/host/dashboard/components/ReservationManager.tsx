@@ -394,7 +394,7 @@ guest:profiles!bookings_user_id_fkey (
                 onApproveCancel={() => handleApproveCancel(res)}
                 onShowProfile={() => setSelectedGuest(res.guest || null)}
                 onCheck={() => markAsRead(res.id)}
-                onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}`)}
+                onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}&expId=${res.experience_id || ''}`)}
                 onCalendar={() => addToGoogleCalendar(res)}
                 // 🟢 [추가] 후기 관련 Props
                 hasReview={reviewedBookingIds.includes(res.id)}
