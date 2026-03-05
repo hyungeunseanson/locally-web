@@ -93,7 +93,7 @@ export default async function Page({ params }: Props) {
   if (experience.host_id) {
     const [{ data: profile }, { data: app }, { data: reviewRows }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', experience.host_id).maybeSingle(),
-      supabase.from('host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle(),
+      supabase.from('public_host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle(),
       supabase
         .from('reviews')
         .select('rating, experiences!inner(host_id)')

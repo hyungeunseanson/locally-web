@@ -25,7 +25,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
 
       // 2. 호스트 승인 여부 확인
       const { data: hostApp } = await supabase
-        .from('host_applications')
+        .from('public_host_applications')
         .select('status')
         .eq('user_id', params.id)
         .maybeSingle();

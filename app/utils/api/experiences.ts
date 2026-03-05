@@ -7,7 +7,7 @@ export const fetchActiveExperiences = async (): Promise<Experience[]> => {
 
   // 1. 승인된 호스트 목록 조회 (안전한 필터링)
   const { data: approvedApps, error: appError } = await supabase
-    .from('host_applications')
+    .from('public_host_applications')
     .select('user_id')
     .eq('status', 'approved');
 
