@@ -231,7 +231,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                           {isOnline && <div className="absolute bottom-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
                         </div>
                         <div>
-                          <div className="font-bold text-[11px] md:text-sm text-slate-900">{user.name || '이름 없음'}</div>
+                          <div className="font-bold text-[11px] md:text-sm text-slate-900">{user.full_name || '이름 없음'}</div>
                           <div className="text-[9px] md:text-xs text-slate-400">{user.email}</div>
                         </div>
                       </td>
@@ -288,11 +288,14 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
           <div className="flex-1 overflow-y-auto">
             {/* 1. 기본 정보 */}
             <div className="p-4 md:p-6 border-b border-slate-100 flex items-center gap-3 md:gap-5">
-              <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+              <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0 relative">
                 {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><User className="w-6 h-6 md:w-8 md:h-8" /></div>}
+                {onlineUserIds.has(selectedUser.id) && <div className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>}
               </div>
               <div>
-                <h2 className="text-base md:text-xl font-bold text-slate-900 leading-tight">{selectedUser.name || 'Locally User'}</h2>
+                <h2 className="text-base md:text-xl font-bold text-slate-900 leading-tight">
+                  {selectedUser.full_name || '이름 없음'}
+                </h2>
 
                 {/* 🟢 상세 페이지 최근 접속 표시 (수정됨) */}
                 <div className={`flex items-center gap-1.5 text-[9px] md:text-xs font-bold mt-1 px-1.5 md:px-2 py-0.5 md:py-1 rounded w-fit ${onlineUserIds.has(selectedUser.id) ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>

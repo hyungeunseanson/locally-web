@@ -271,9 +271,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                         onBlur={() => setIsFocused(null)}
                       >
                         <option value="" disabled className="text-gray-900">국적 선택</option>
-                        <option value="Korea" className="text-gray-900">대한민국 (Korea)</option>
-                        <option value="Japan" className="text-gray-900">일본 (Japan)</option>
-                        <option value="USA" className="text-gray-900">미국 (USA)</option>
+                        <option value="KR" className="text-gray-900">대한민국 (Korea)</option>
+                        <option value="JP" className="text-gray-900">일본 (Japan)</option>
+                        <option value="US" className="text-gray-900">미국 (USA)</option>
+                        <option value="CN" className="text-gray-900">중국 (China)</option>
+                        <option value="TW" className="text-gray-900">대만 (Taiwan)</option>
+                        <option value="HK" className="text-gray-900">홍콩 (Hong Kong)</option>
+                        <option value="SG" className="text-gray-900">싱가포르 (Singapore)</option>
+                        <option value="MY" className="text-gray-900">말레이시아 (Malaysia)</option>
                         <option value="Other" className="text-gray-900">기타 (Other)</option>
                       </select>
                       <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-4 z-0 origin-[0] left-4 font-medium pointer-events-none ${!nationality ? 'text-gray-500' : 'text-gray-500'}`}>
