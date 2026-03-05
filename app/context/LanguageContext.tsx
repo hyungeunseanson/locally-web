@@ -718,6 +718,15 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_customer_reviewing: "고객이 지원자 목록을 검토 중입니다.",
     sr_no_reviews: "후기 없음",
     btn_select_host: "이 호스트 선택",
+    sr_appeal_message: "지원 메시지",
+    sr_selected: "선택됨",
+    sr_confirm_select_host: "이 호스트를 선택하시겠습니까?",
+    sr_selected_host_banner_title: "매칭이 완료되었습니다!",
+    sr_selected_host_banner_desc: "선택하신 호스트와 함께 서비스가 진행됩니다.",
+    sr_selected_host: "내가 선택되었습니다!",
+    sr_not_selected_host: "이번에는 선택되지 않았습니다.",
+    sr_select_host_fail: "호스트 선택 중 오류가 발생했습니다.",
+    sr_select_host_success: "호스트 선택 완료! 매칭이 확정되었습니다.",
 
     // [Service Payment]
     sp_title: "결제하기",
@@ -1572,6 +1581,15 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_customer_reviewing: "The customer is reviewing applicants.",
     sr_no_reviews: "No reviews yet",
     btn_select_host: "Select Host",
+    sr_appeal_message: "Appeal Message",
+    sr_selected: "Selected",
+    sr_confirm_select_host: "Do you want to select this host?",
+    sr_selected_host_banner_title: "Matching Complete!",
+    sr_selected_host_banner_desc: "Your service will proceed with the selected host.",
+    sr_selected_host: "You have been selected!",
+    sr_not_selected_host: "Not selected this time.",
+    sr_select_host_fail: "Failed to select host.",
+    sr_select_host_success: "Host selected! Matching confirmed.",
 
     // [Service Payment]
     sp_title: "Payment",
@@ -2427,6 +2445,15 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_customer_reviewing: "お客様が申込者を確認中です。",
     sr_no_reviews: "レビューなし",
     btn_select_host: "このホストを選択",
+    sr_appeal_message: "応募メッセージ",
+    sr_selected: "選択済み",
+    sr_confirm_select_host: "このホストを選択しますか？",
+    sr_selected_host_banner_title: "マッチング完了！",
+    sr_selected_host_banner_desc: "選択したホストとサービスが進みます。",
+    sr_selected_host: "選ばれました！",
+    sr_not_selected_host: "今回は選ばれませんでした。",
+    sr_select_host_fail: "ホスト選択中にエラーが発生しました。",
+    sr_select_host_success: "ホスト選択完了！マッチングが確定しました。",
 
     // [Service Payment]
     sp_title: "お支払い",
@@ -3281,6 +3308,15 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_customer_reviewing: "客户正在审核申请者。",
     sr_no_reviews: "暂无评价",
     btn_select_host: "选择此主机",
+    sr_appeal_message: "申请消息",
+    sr_selected: "已选择",
+    sr_confirm_select_host: "是否选择此主机？",
+    sr_selected_host_banner_title: "匹配完成！",
+    sr_selected_host_banner_desc: "服务将与所选主机一起进行。",
+    sr_selected_host: "您被选中了！",
+    sr_not_selected_host: "本次未被选中。",
+    sr_select_host_fail: "选择主机时出错。",
+    sr_select_host_success: "已选择主机！匹配已确认。",
 
     // [Service Payment]
     sp_title: "支付",

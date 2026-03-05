@@ -64,6 +64,7 @@ export default function ServiceRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [hostModal, setHostModal] = useState<{ open: boolean; hostId: string | null }>({ open: false, hostId: null });
+  const [confirmTarget, setConfirmTarget] = useState<{ applicationId: string; hostName: string } | null>(null);
 
   const isOwner = currentUserId !== null && currentUserId === request?.user_id;
   const isSelectedHost = currentUserId !== null && currentUserId === request?.selected_host_id;
@@ -97,20 +98,24 @@ export default function ServiceRequestDetailPage() {
     void load();
   }, [requestId, supabase]);
 
-  const handleSelectHost = async (applicationId: string) => {
-    if (!window.confirm(t('sr_confirm_select_host'))) return;
-    setSelecting(applicationId);
+  const handleSelectHost = (applicationId: string, hostName: string) => {
+    setConfirmTarget({ applicationId, hostName });
+  };
+
+  const handleConfirmSelect = async () => {
+    if (!confirmTarget) return;
+    setSelecting(confirmTarget.applicationId);
+    setConfirmTarget(null);
     try {
       const res = await fetch('/api/services/select-host', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id: requestId, application_id: applicationId }),
+        body: JSON.stringify({ request_id: requestId, application_id: confirmTarget.applicationId }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) { showToast(data.error || t('sr_select_host_fail'), 'error'); return; }
       showToast(t('sr_select_host_success'), 'success');
-      // v2 에스크로: 결제는 이미 완료 — 페이지 새로고침으로 상태 반영
-      router.refresh();
+      router.push(`/services/${requestId}`);
     } catch {
       showToast(t('server_error'), 'error');
     } finally { setSelecting(null); }
@@ -369,7 +374,7 @@ export default function ServiceRequestDetailPage() {
                       {isOpenServiceRequest(request.status) && !isSelected && (
                         <div className="px-4 pb-4" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => handleSelectHost(app.id)}
+                            onClick={() => handleSelectHost(app.id, name)}
                             disabled={selecting === app.id}
                             className="w-full py-3 rounded-xl font-black text-[13px] md:text-sm text-white transition-all active:scale-[0.98] disabled:opacity-60"
                             style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', boxShadow: '0 4px 15px rgba(15,52,96,0.3)' }}
@@ -445,6 +450,33 @@ export default function ServiceRequestDetailPage() {
           </Link>
         </div>
       </div>
+
+      {/* ── 호스트 선택 확인 모달 ── */}
+      {confirmTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+            <p className="font-black text-[16px] md:text-[17px] text-slate-900 mb-2 text-center">{t('sr_confirm_select_host')}</p>
+            <p className="text-[13px] md:text-[14px] text-slate-500 text-center mb-6">
+              <span className="font-bold text-slate-800">{confirmTarget.hostName}</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmTarget(null)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-[13px] md:text-sm font-bold text-slate-600 hover:bg-slate-50"
+              >
+                {t('btn_cancel')}
+              </button>
+              <button
+                onClick={handleConfirmSelect}
+                className="flex-1 py-3 rounded-xl text-[13px] md:text-sm font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)' }}
+              >
+                {t('btn_select_host')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 호스트 프로필 모달 ── */}
       {(() => {

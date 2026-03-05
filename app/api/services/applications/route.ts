@@ -179,11 +179,31 @@ export async function GET(request: Request) {
       const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
       const hostAppMap = new Map((hostApps ?? []).map((h) => [h.user_id, h]));
 
-      const enriched = apps.map((app) => ({
-        ...app,
-        profiles: profileMap.get(app.host_id) ?? null,
-        host_applications: hostAppMap.get(app.host_id) ?? null,
-      }));
+      // reviews 조회 (체험 기반 후기수/평점)
+      const { data: reviewRows } = await supabaseAdmin
+        .from('reviews')
+        .select('rating, experiences!inner(host_id)')
+        .in('experiences.host_id', hostIds);
+
+      const reviewMap: Record<string, { count: number; sum: number }> = {};
+      (reviewRows ?? []).forEach((r: any) => {
+        const hid = (r.experiences as any)?.host_id;
+        if (!hid) return;
+        if (!reviewMap[hid]) reviewMap[hid] = { count: 0, sum: 0 };
+        reviewMap[hid].count++;
+        reviewMap[hid].sum += Number(r.rating || 0);
+      });
+
+      const enriched = apps.map((app) => {
+        const rev = reviewMap[app.host_id];
+        return {
+          ...app,
+          profiles: profileMap.get(app.host_id) ?? null,
+          host_applications: hostAppMap.get(app.host_id) ?? null,
+          review_count: rev?.count ?? 0,
+          review_avg: rev && rev.count > 0 ? rev.sum / rev.count : null,
+        };
+      });
 
       return NextResponse.json({ success: true, data: enriched, isOwner: true });
     } else {

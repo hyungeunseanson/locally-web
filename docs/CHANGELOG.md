@@ -5,6 +5,21 @@
 
 ---
 
+## v3.34.0 — [맞춤의뢰] 서비스 매칭 3차 개선 — i18n·리뷰·커스텀 모달·탭 UX·알림 도시 필터
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 i18n 9키 × 4언어 | `sr_appeal_message`, `sr_selected`, `sr_confirm_select_host`, `sr_selected_host_banner_title/desc`, `sr_selected_host`, `sr_not_selected_host`, `sr_select_host_fail/success` — ko/en/ja/zh 전부 추가. 키 원문 노출 완전 해결. |
+| 🔴 호스트 후기수/평점 표시 | `/api/services/applications` GET — `reviews` 테이블 조회 추가. `review_count`/`review_avg` enriched 후 반환. 지원자 카드 + 호스트 프로필 모달에 별점·후기수 정상 표시. |
+| 🔴 커스텀 confirm 모달 | `ServiceRequestClient.tsx` — `window.confirm()` 제거. `confirmTarget` state + `handleConfirmSelect` 분리. 호스트 이름 표시하는 커스텀 오버레이 모달로 교체 (z-[200]). |
+| 🔴 호스트 선택 후 페이지 갱신 | `router.refresh()` → `router.push(\`/services/\${requestId}\`)` 교체. 클라이언트 useEffect 재실행되어 상태 즉시 반영. |
+| 🟡 호스트 대시보드 탭 개선 | `ServiceJobsTab.tsx` — 기본 탭 `my-applications`으로 변경. 탭 순서 내 지원 → 열린 의뢰 → 진행중. 카드 디자인: selected=파란 그라디언트, pending=amber 테두리. 금액 하드코딩 제거 → `total_host_payout` 사용. |
+| 🟡 알림 도시 필터 | `nicepay-callback/route.ts` — 결제 완료 시 experiences 테이블 기준으로 해당 도시 보유 호스트만 필터링 후 알림 발송. `reqCity` 미존재 시 기존 전체 발송 동작 유지. |
+
+---
+
 ## v3.33.0 — [맞춤의뢰] 서비스 매칭 2차 개선 — 호스트 모달·어드민 수정·재무지표·Master Ledger 통합
 
 **작업일:** 2026-03-06

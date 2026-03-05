@@ -127,9 +127,21 @@ export async function POST(request: Request) {
       .eq('status', 'approved')
       .then(async ({ data: hosts }) => {
         if (!hosts || hosts.length === 0) return;
+
+        // 도시 필터: reqCity가 있으면 해당 도시에 experiences 보유 호스트만 발송
+        let eligibleHostIds: Set<string> | null = null;
+        if (reqCity) {
+          const { data: cityHosts } = await supabase
+            .from('experiences')
+            .select('host_id')
+            .ilike('city', `%${reqCity}%`)
+            .eq('is_active', true);
+          eligibleHostIds = new Set((cityHosts ?? []).map((e) => e.host_id as string).filter(Boolean));
+        }
+
         const hostIds = hosts
           .map((h) => h.user_id as string)
-          .filter((id) => !!id && id !== serviceBooking.customer_id);
+          .filter((id) => !!id && id !== serviceBooking.customer_id && (eligibleHostIds === null || eligibleHostIds.has(id)));
         if (hostIds.length === 0) return;
         const notifications = hostIds.map((hostId) => ({
           user_id: hostId,

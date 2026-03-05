@@ -21,7 +21,7 @@ type ApplicationWithRequest = ServiceApplication & {
 export default function ServiceJobsTab() {
   const supabase = useMemo(() => createClient(), []);
   const { t } = useLanguage();
-  const [subTab, setSubTab] = useState<SubTab>('board');
+  const [subTab, setSubTab] = useState<SubTab>('my-applications');
   const [requests, setRequests] = useState<ServiceRequestCard[]>([]);
   const [myApplications, setMyApplications] = useState<ApplicationWithRequest[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,21 +73,28 @@ export default function ServiceJobsTab() {
     }`;
 
   const statusColor: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-700',
+    pending: 'bg-amber-100 text-amber-700',
     selected: 'bg-blue-100 text-blue-700',
     rejected: 'bg-red-100 text-red-600',
     withdrawn: 'bg-slate-100 text-slate-400',
+  };
+
+  const cardStyle: Record<string, string> = {
+    selected: 'border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md',
+    pending: 'border-amber-200 bg-amber-50/40',
+    rejected: 'border-slate-100 bg-slate-50 opacity-60',
+    withdrawn: 'border-slate-100 bg-slate-50 opacity-40',
   };
 
   return (
     <div className="space-y-4">
       {/* 서브탭 */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        <button className={subTabClass('board')} onClick={() => setSubTab('board')}>
-          {t('tab_open_reqs')}
-        </button>
         <button className={subTabClass('my-applications')} onClick={() => setSubTab('my-applications')}>
           {t('tab_my_apps')}
+        </button>
+        <button className={subTabClass('board')} onClick={() => setSubTab('board')}>
+          {t('tab_open_reqs')}
         </button>
         <button className={subTabClass('active')} onClick={() => setSubTab('active')}>
           {t('tab_active_services')}
@@ -144,7 +151,7 @@ export default function ServiceJobsTab() {
                   const req = app.service_requests;
                   return (
                     <Link key={app.id} href={`/services/${app.request_id}`}>
-                      <div className="border border-slate-100 rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer bg-white [box-shadow:0_1px_3px_rgba(0,0,0,0.05)]">
+                      <div className={`border rounded-2xl p-4 transition-all cursor-pointer ${cardStyle[app.status] ?? 'border-slate-100 bg-white [box-shadow:0_1px_3px_rgba(0,0,0,0.05)]'}`}>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <h3 className="font-bold text-[13px] md:text-[14px] text-slate-900 line-clamp-2 flex-1">
                             {req?.title ?? t('req_default')}
@@ -166,7 +173,7 @@ export default function ServiceJobsTab() {
                           </span>
                           {req && (
                             <span className="font-black text-[13px] md:text-[14px] text-emerald-600">
-                              ₩{(20000 * req.duration_hours).toLocaleString()} {t('hd_match_expected')}
+                              ₩{req.total_host_payout.toLocaleString()} {t('hd_match_expected')}
                             </span>
                           )}
                         </div>
