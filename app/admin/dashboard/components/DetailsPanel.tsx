@@ -334,6 +334,7 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
             )}
 
             <div className="grid grid-cols-2 gap-2 md:gap-3">
+              <InfoBox label="담당 호스트" value={selectedItem.profiles?.full_name || '알 수 없음'} />
               <InfoBox label="카테고리" value={selectedItem.category || '-'} />
               <InfoBox label="가격" value={selectedItem.price !== undefined ? `₩${selectedItem.price.toLocaleString()}` : '-'} />
               <InfoBox label="소요 시간" value={selectedItem.duration ? `${selectedItem.duration}시간` : '-'} />

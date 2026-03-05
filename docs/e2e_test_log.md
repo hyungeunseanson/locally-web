@@ -38,4 +38,16 @@
 
 ---
 
+### 4. QA 02 (호스트 지원서 및 체험 노출 버킷 관리)
+* **이슈**: 관리자 대시보드 호스트 지원 정보에서 '신분증 사진' 썸네일 이미지가 깨지는 현상.
+* **해결**: 호스트 지원서 제출 시(`app/host/register/page.tsx`) 공개 `images` 버킷이 아닌 보안 권한이 필요한 `verification-docs` 버킷에 곧바로 업로드하도록 수정. 또한 `DetailsPanel.tsx`에서 이전에 `images` 버킷에 올라갔던 공개 파일들을 볼 수 있도록 Fallback URL 렌더링 로직 추가.
+* **이슈**: 호스트가 정식 승인(`approved`)되기 전의 대기 상태(`pending`)이거나 재심사(`revision`) 상태임에도 불구하고, 호스트가 임의로 먼저 작성해둔 '활성 체험'이 메인 및 검색 페이지(사용자 목록)에 노출되고 예약 가능한 상태가 됨.
+* **해결**: 메인 화면/검색에 사용되는 API(`app/utils/api/experiences.ts`) 및 유저 프로필 조회 페이지(`users/[id]/page.tsx`)에서, 체험(`experiences`)을 조회하기 전 `host_applications` 테이블의 `status`를 선제적으로 조회하여 반드시 `'approved'`인 호스트의 체험만 필터링하여 데이터를 병합해 응답하도록 쿼리 조인 가드 로직 적용.
+
 _새로운 E2E 테스트 프로세스나 QA 내용이 있을 경우, 이 문서의 상단이나 하단에 계속해서 누적 기록합니다._
+
+---
+
+### 5. QA 03 (관리자 대시보드 체험 호스트 식별명 추가)
+* **이슈**: 관리자 대시보드 내 `체험 관리(EXPS)` 탭에서 해당 체험을 등록한 호스트의 이름을 확인할 수 없는 UI/DB 조회 한계 발생. 기존에는 `experiences` 테이블 단일 조회로만 코딩됨.
+* **해결**: `app/admin/dashboard/hooks/useAdminData.ts`의 체험 데이터 패치 쿼리를 `select('*, profiles(full_name, email)')`로 수정하여 관계형 조인을 통해 호스트 이름 데이터를 확보. এরপর `ListPanel.tsx` 리스트 카드 텍스트와 `DetailsPanel.tsx` 상세 패널 InfoBox 영역에 `Host: {item.profiles?.full_name}`을 매핑하여 가시성 확보.

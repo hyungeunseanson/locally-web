@@ -91,7 +91,7 @@ export default function ListPanel({
                 <div className="flex justify-between text-[9px] md:text-[10px] text-slate-500">
                   <span className="truncate pr-1">
                     {activeTab === 'APPS' ? `${item.host_nationality} / ${getAppLanguageSummary(item)}`
-                      : activeTab === 'EXPS' ? `₩${item.price?.toLocaleString()}`
+                      : activeTab === 'EXPS' ? `Host: ${item.profiles?.full_name || '알 수 없음'} | ₩${item.price?.toLocaleString()}`
                         : item.email}
                   </span>
                   <span className="text-slate-400 font-mono">{new Date(item.created_at).toLocaleDateString()}</span>

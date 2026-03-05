@@ -110,7 +110,7 @@ export function useAdminData() {
         { data: bookingRawData, error: bookingError }
       ] = await Promise.all([
         fetch('/api/admin/host-applications').then(r => r.ok ? r.json() : { data: [] }), // 🔒 service_role API 사용
-        supabase.from('experiences').select('*').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
+        supabase.from('experiences').select('*, profiles(full_name, email)').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한 (profiles 조인 포함)
         supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('reviews').select('rating, experience_id, created_at').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('search_logs').select('*').order('created_at', { ascending: false }).limit(2000), // 🟢 최근 검색 로그
