@@ -78,32 +78,28 @@ export default function GlobalTeamChat() {
         // 자신이 아직 read_by에 없는 메시지들만 업데이트
         const unreadIds = msgs
             .filter(m => m.author_id !== userId && !(m.read_by || []).includes(userId))
+            .filter(m => !m.id.startsWith('temp_'))
             .map(m => m.id);
 
         if (unreadIds.length === 0) return;
 
+        const unreadSet = new Set(unreadIds);
         // 낙관적 UI 업데이트
         setMessages(prev => prev.map(m =>
-            unreadIds.includes(m.id)
-                ? { ...m, read_by: [...(m.read_by || []), userId] }
+            unreadSet.has(m.id)
+                ? { ...m, read_by: [...new Set([...(m.read_by || []), userId])] }
                 : m
         ));
 
-        // DB 업데이트: 각 메시지의 read_by에 userId를 array_append
-        // NOTE: Supabase는 array_append를 rpc없이 직접 지원하지 않으므로
-        // 각 메시지를 fetch 후 업데이트하는 방식 사용
-        for (const id of unreadIds) {
-            const msg = msgs.find(m => m.id === id);
-            if (!msg || id.startsWith('temp_')) continue;
-            const newReadBy = [...new Set([...(msg.read_by || []), userId])];
-            try {
-                await supabase
-                    .from('admin_task_comments')
-                    .update({ read_by: newReadBy })
-                    .eq('id', id);
-            } catch { /* 컬럼 없을 시 무시 */ }
+        const { error } = await supabase.rpc('mark_room_messages_read', {
+            p_room_id: CHAT_ROOM_ID,
+            p_user_id: userId
+        });
+
+        if (error) {
+            console.error('mark_room_messages_read failed:', error);
         }
-    }, [supabase]);
+    }, [supabase, CHAT_ROOM_ID]);
 
     // ─── 초기화: Auth & Admin check ──────────────────────────────────────────
     useEffect(() => {
@@ -192,11 +188,7 @@ export default function GlobalTeamChat() {
                     scrollToBottom(120);
                     // 새 메시지 자동 읽음 처리
                     if (currentUserRef.current && newMsg.author_id !== currentUserRef.current.id) {
-                        setMessages(prev => prev.map(m =>
-                            m.id === newMsg.id && !(m.read_by || []).includes(currentUserRef.current!.id)
-                                ? { ...m, read_by: [...(m.read_by || []), currentUserRef.current!.id] }
-                                : m
-                        ));
+                        markMessagesRead([newMsg], currentUserRef.current.id);
                     }
                 }
             })
@@ -244,7 +236,7 @@ export default function GlobalTeamChat() {
         }
 
         return () => { document.body.style.overflow = ''; };
-    }, [isOpen, isTeamWorkspace]); // messages는 deps에서 제거 (열 때만 처리)
+    }, [isOpen, isTeamWorkspace]); // 열릴 때 읽음 반영
 
     // ─── 파일 처리 ────────────────────────────────────────────────────────────
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

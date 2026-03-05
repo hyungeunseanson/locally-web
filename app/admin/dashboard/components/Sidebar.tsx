@@ -61,8 +61,7 @@ export default function Sidebar() {
 
   const fetchCounts = async () => {
     try {
-      const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
-      const res = await fetch(`/api/admin/sidebar-counts?lastViewed=${encodeURIComponent(lastViewed)}`);
+      const res = await fetch('/api/admin/sidebar-counts');
 
       if (!res.ok) throw new Error('Failed to fetch sidebar counts');
 
@@ -78,12 +77,30 @@ export default function Sidebar() {
         apps: data.appsCount || 0,
         exps: data.expsCount || 0,
         pendingBookings: unviewedPendingBookings,
-        teamNewCount: (data.newTasksCount || 0) + (data.newCommentsCount || 0),
         servicePendingBank: data.svcBankPendingCount || 0,
         csUnreadCount: data.csUnreadCount || 0,
       }));
     } catch (e) {
       console.error('Sidebar counts fetch error:', e);
+    }
+  };
+
+  const fetchTeamCounts = async () => {
+    try {
+      const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
+      const res = await fetch(`/api/admin/team-counts?lastViewed=${encodeURIComponent(lastViewed)}`);
+
+      if (!res.ok) throw new Error('Failed to fetch team counts');
+
+      const { data, success } = await res.json();
+      if (!success || !data) throw new Error('Invalid backend response');
+
+      setCounts(prev => ({
+        ...prev,
+        teamNewCount: (data.newTasksCount || 0) + (data.newCommentsCount || 0),
+      }));
+    } catch (e) {
+      console.error('Sidebar team counts fetch error:', e);
     }
   };
 
@@ -98,10 +115,12 @@ export default function Sidebar() {
 
   useEffect(() => {
     fetchCounts();
+    fetchTeamCounts();
     fetchCurrentUser();
 
     // 열람 상태 변경 감지를 위한 이벤트 리스너
     window.addEventListener('booking-viewed', fetchCounts);
+    const intervalId = window.setInterval(fetchCounts, 45000);
 
     const channel = supabase.channel('online_users_sidebar')
       .on('presence', { event: 'sync' }, () => {
@@ -112,14 +131,15 @@ export default function Sidebar() {
       .subscribe();
 
     const teamChannel = supabase.channel('team_notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_tasks' }, () => { fetchCounts(); })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { fetchCounts(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_tasks' }, () => { fetchTeamCounts(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { fetchTeamCounts(); })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(teamChannel);
       window.removeEventListener('booking-viewed', fetchCounts);
+      window.clearInterval(intervalId);
     };
   }, []);
 

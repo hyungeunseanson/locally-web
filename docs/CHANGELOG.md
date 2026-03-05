@@ -5,6 +5,22 @@
 
 ---
 
+## v3.32.0 — [어드민 TEAM] 중복 댓글 방지·읽음처리 RPC·카운트 경량화
+
+**작업일:** 2026-03-05
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 중복 댓글 방지 1차 | `TeamTab.tsx`에 task별 전송 in-flight 락 추가, 전송 중 입력/버튼 비활성화, IME 조합 입력 Enter 무시 처리. |
+| 🔴 Realtime 과부하 완화 | `TeamTab.tsx`의 `admin_task_comments` 구독을 `INSERT/DELETE`로 축소하고, 현재 task 집합 외 이벤트 무시 + 200ms 디바운스 재조회 적용. |
+| 🔴 읽음처리 UPDATE 루프 제거 | `GlobalTeamChat.tsx`에서 메시지별 UPDATE 반복을 제거하고 `mark_room_messages_read` RPC 1회 호출 방식으로 전환. |
+| 🟡 사이드바 경량화 | `/api/admin/team-counts` 신규 추가, Sidebar TEAM 실시간 뱃지는 경량 API만 호출하도록 분리. `/api/admin/sidebar-counts`는 운영 카운트 중심으로 단순화. |
+| 🟡 TEAM 탭 선로딩 제거 | `admin/dashboard/page.tsx`에서 `TEAM/CHATS/SERVICE_REQUESTS` 탭은 `useAdminData()` 미호출 구조로 분리하여 초기 부하 완화. |
+| 🟡 DB 마이그레이션 | `docs/migrations/v3_29_0_team_workspace_stability.sql` 추가: `admin_task_comments.client_nonce`, partial unique index, `mark_room_messages_read` RPC. |
+| ✅ 검증 | `npx tsc --noEmit` 통과, `npx next build --webpack` 통과, 원격 DB에서 `client_nonce` 컬럼 조회 및 `mark_room_messages_read` RPC 응답(0건 업데이트) 확인. |
+
+---
+
 ## v3.31.9 — [맞춤의뢰] 서비스 매칭 시스템 검수 수정
 
 **작업일:** 2026-03-05

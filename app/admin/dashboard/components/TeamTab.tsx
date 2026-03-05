@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import MarkdownMemoEditor from './MarkdownMemoEditor';
@@ -37,8 +37,10 @@ export default function TeamTab() {
   const [expandedMemos, setExpandedMemos] = useState<Set<string>>(new Set());
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmittingCommentByTaskId, setIsSubmittingCommentByTaskId] = useState<Record<string, boolean>>({});
 
   const threadRef = useRef<HTMLDivElement>(null);
+  const commentsFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = createClient();
 
   const toggleMemoExpand = (id: string) => {
@@ -65,7 +67,7 @@ export default function TeamTab() {
     return data;
   };
 
-  const fetchComments = async (taskList?: { id: string }[]) => {
+  const fetchComments = useCallback(async (taskList?: { id: string }[]) => {
     // 🔧 [구조적 수정] task_id를 실제 admin_tasks ID 목록으로 필터링.
     // MiniChatBar가 아무리 채팅을 쌓아도 영향 없고, limit도 불필요.
     // ⭐ 수정: tasks대신 tasksRef.current 사용
@@ -77,6 +79,35 @@ export default function TeamTab() {
       .in('task_id', ids)
       .order('created_at', { ascending: true });
     if (data) setComments(data);
+  }, [supabase]);
+
+  const scheduleFetchComments = useCallback((taskList?: { id: string }[]) => {
+    if (commentsFetchTimerRef.current) {
+      clearTimeout(commentsFetchTimerRef.current);
+    }
+    commentsFetchTimerRef.current = setTimeout(() => {
+      fetchComments(taskList).catch((error: any) => {
+        console.error('Failed to fetch comments:', error);
+      });
+    }, 200);
+  }, [fetchComments]);
+
+  const generateClientNonce = (taskId: string) => {
+    const uuid = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return `${taskId}:${currentUser?.id || 'anonymous'}:${uuid}`;
+  };
+
+  const setTaskCommentSubmitting = (taskId: string, isSubmitting: boolean) => {
+    setIsSubmittingCommentByTaskId(prev => {
+      if (isSubmitting) {
+        return { ...prev, [taskId]: true };
+      }
+      const next = { ...prev };
+      delete next[taskId];
+      return next;
+    });
   };
 
   const fetchWhitelist = async () => {
@@ -100,8 +131,24 @@ export default function TeamTab() {
     initData();
 
     const channel = supabase.channel('team_workspace_realtime_final')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => { fetchTasks(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_task_comments' }, () => { fetchComments(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, async () => {
+        const nextTasks = await fetchTasks();
+        scheduleFetchComments(nextTasks ?? []);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, (payload) => {
+        const taskId = payload.new?.task_id as string | undefined;
+        if (!taskId) return;
+        const currentTaskIds = new Set(tasksRef.current.map(task => task.id));
+        if (!currentTaskIds.has(taskId)) return;
+        scheduleFetchComments();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'admin_task_comments' }, (payload) => {
+        const taskId = payload.old?.task_id as string | undefined;
+        if (!taskId) return;
+        const currentTaskIds = new Set(tasksRef.current.map(task => task.id));
+        if (!currentTaskIds.has(taskId)) return;
+        scheduleFetchComments();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_whitelist' }, () => { fetchWhitelist(); })
       .subscribe();
 
@@ -115,6 +162,9 @@ export default function TeamTab() {
     return () => {
       supabase.removeChannel(channel);
       document.removeEventListener('mousedown', handleClickOutside);
+      if (commentsFetchTimerRef.current) {
+        clearTimeout(commentsFetchTimerRef.current);
+      }
     };
   }, []);
 
@@ -159,15 +209,24 @@ export default function TeamTab() {
   };
 
   const addComment = async (taskId: string) => {
-    if (!newComment.trim() || !currentUser) return;
+    const text = newComment.trim();
+    if (!text || !currentUser || isSubmittingCommentByTaskId[taskId]) return;
+    setTaskCommentSubmitting(taskId, true);
     try {
       const { error } = await supabase.from('admin_task_comments').insert({
         task_id: taskId,
-        content: newComment,
+        content: text,
         author_id: currentUser.id,
-        author_name: currentUser.name
+        author_name: currentUser.name,
+        client_nonce: generateClientNonce(taskId)
       });
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          setNewComment('');
+          return;
+        }
+        throw error;
+      }
 
       // 알림 발송 (비동기 처리)
       fetch('/api/admin/notify-team', {
@@ -175,7 +234,7 @@ export default function TeamTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `할 일에 새로운 댓글이 등록되었습니다.`,
-          message: `${currentUser.name}: ${newComment}`,
+          message: `${currentUser.name}: ${text}`,
           link: '/admin/dashboard?tab=TEAM'
         })
       }).catch(e => console.error('Notify error:', e));
@@ -185,6 +244,8 @@ export default function TeamTab() {
       await fetchComments();
     } catch (error: any) {
       showToast('댓글 작성 실패: ' + error.message, 'error');
+    } finally {
+      setTaskCommentSubmitting(taskId, false);
     }
   };
 
@@ -236,13 +297,24 @@ export default function TeamTab() {
   };
 
   const addMemoComment = async (taskId: string) => {
-    const text = memoCommentInputs[taskId];
-    if (!text?.trim() || !currentUser) return;
+    const text = memoCommentInputs[taskId]?.trim();
+    if (!text || !currentUser || isSubmittingCommentByTaskId[taskId]) return;
+    setTaskCommentSubmitting(taskId, true);
     try {
       const { error } = await supabase.from('admin_task_comments').insert({
-        task_id: taskId, content: text, author_id: currentUser.id, author_name: currentUser.name
+        task_id: taskId,
+        content: text,
+        author_id: currentUser.id,
+        author_name: currentUser.name,
+        client_nonce: generateClientNonce(taskId)
       });
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          setMemoCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+          return;
+        }
+        throw error;
+      }
 
       fetch('/api/admin/notify-team', {
         method: 'POST',
@@ -260,6 +332,8 @@ export default function TeamTab() {
       showToast('답글을 남겼습니다.', 'success');
     } catch (error: any) {
       showToast('오류: ' + error.message, 'error');
+    } finally {
+      setTaskCommentSubmitting(taskId, false);
     }
   };
 
@@ -298,6 +372,37 @@ export default function TeamTab() {
     }
   };
 
+  const dailyLogs = tasks.filter(t => t.type === 'DAILY_LOG');
+  const todos = tasks.filter(t => t.type === 'TODO');
+  const memos = tasks.filter(t => t.type === 'MEMO' && t.id !== '00000000-0000-0000-0000-000000000000');
+
+  const viewedAt = useMemo(() => new Date(lastViewed), [lastViewed]);
+  const isNew = (createdAt: string) => new Date(createdAt) > viewedAt;
+
+  const commentsByTaskId = useMemo(() => {
+    const grouped = new Map<string, AdminComment[]>();
+    for (const comment of comments) {
+      const current = grouped.get(comment.task_id);
+      if (current) current.push(comment);
+      else grouped.set(comment.task_id, [comment]);
+    }
+    return grouped;
+  }, [comments]);
+
+  const todoTaskIds = useMemo(() => new Set(todos.map(todo => todo.id)), [todos]);
+  const memoTaskIds = useMemo(() => new Set(memos.map(memo => memo.id)), [memos]);
+
+  const hasNewTodoIndicator = useMemo(() => {
+    if (todos.some(todo => new Date(todo.created_at) > viewedAt)) return true;
+    if (dailyLogs.some(log => new Date(log.created_at) > viewedAt)) return true;
+    return comments.some(comment => todoTaskIds.has(comment.task_id) && new Date(comment.created_at) > viewedAt);
+  }, [comments, dailyLogs, todoTaskIds, todos, viewedAt]);
+
+  const hasNewMemoIndicator = useMemo(() => {
+    if (memos.some(memo => new Date(memo.created_at) > viewedAt)) return true;
+    return comments.some(comment => memoTaskIds.has(comment.task_id) && new Date(comment.created_at) > viewedAt);
+  }, [comments, memos, memoTaskIds, viewedAt]);
+
   if (!isClient) return null;
 
   if (isLoading) {
@@ -320,12 +425,6 @@ export default function TeamTab() {
     );
   }
 
-  const dailyLogs = tasks.filter(t => t.type === 'DAILY_LOG');
-  const todos = tasks.filter(t => t.type === 'TODO');
-  const memos = tasks.filter(t => t.type === 'MEMO' && t.id !== '00000000-0000-0000-0000-000000000000');
-
-  const isNew = (createdAt: string) => new Date(createdAt) > new Date(lastViewed);
-
   return (
     <div className="flex flex-col h-full gap-3 md:gap-6 relative pt-2 md:pt-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-2.5 md:pb-4 gap-2">
@@ -341,7 +440,7 @@ export default function TeamTab() {
           >
             Daily Log & Tasks
             {/* 🟢 이슈2: 탭 N 뱃지 — 새 할일/일지/댓글 있을 때 */}
-            {innerTab !== 'todo' && (todos.some(t => isNew(t.created_at)) || dailyLogs.some(l => isNew(l.created_at)) || comments.filter(c => todos.some(t => t.id === c.task_id)).some(c => isNew(c.created_at))) && (
+            {innerTab !== 'todo' && hasNewTodoIndicator && (
               <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
             )}
           </button>
@@ -351,7 +450,7 @@ export default function TeamTab() {
           >
             <NotebookPen size={11} /> 팀 메모장
             {/* 🟢 이슈2: 탭 N 뱃지 — 새 메모/메모 댓글 있을 때 */}
-            {innerTab !== 'memo' && (memos.some(m => isNew(m.created_at)) || comments.filter(c => memos.some(m => m.id === c.task_id)).some(c => isNew(c.created_at))) && (
+            {innerTab !== 'memo' && hasNewMemoIndicator && (
               <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
             )}
           </button>
@@ -450,7 +549,7 @@ export default function TeamTab() {
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {todos.map(todo => {
-                  const taskComments = comments.filter(c => c.task_id === todo.id);
+                  const taskComments = commentsByTaskId.get(todo.id) ?? [];
                   const hasNewComment = taskComments.some(c => isNew(c.created_at));
                   const isTodoNew = isNew(todo.created_at);
 
@@ -493,8 +592,25 @@ export default function TeamTab() {
                             )}
                           </div>
                           <div className="flex gap-1.5 pt-1.5 border-t border-slate-50 mt-1" onClick={e => e.stopPropagation()}>
-                            <input type="text" placeholder="Reply..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(todo.id)} className="flex-1 text-[10px] md:text-[12px] px-2.5 py-1.5 md:py-1 rounded-md border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20 placeholder:text-slate-400" />
-                            <button onClick={() => addComment(todo.id)} className="bg-blue-500 hover:bg-blue-600 text-white px-2.5 rounded-md flex justify-center items-center transition-colors"><Send size={10} /></button>
+                            <input
+                              type="text"
+                              placeholder="Reply..."
+                              value={newComment}
+                              disabled={Boolean(isSubmittingCommentByTaskId[todo.id])}
+                              onChange={e => setNewComment(e.target.value)}
+                              onKeyDown={e => {
+                                if ((e.nativeEvent as KeyboardEvent).isComposing) return;
+                                if (e.key === 'Enter') addComment(todo.id);
+                              }}
+                              className="flex-1 text-[10px] md:text-[12px] px-2.5 py-1.5 md:py-1 rounded-md border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20 placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-400"
+                            />
+                            <button
+                              onClick={() => addComment(todo.id)}
+                              disabled={Boolean(isSubmittingCommentByTaskId[todo.id])}
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-2.5 rounded-md flex justify-center items-center transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+                            >
+                              <Send size={10} />
+                            </button>
                           </div>
                         </div>
                       )}
@@ -541,7 +657,7 @@ export default function TeamTab() {
                   ) : (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 pb-6">
                       {memos.map(memo => {
-                        const memoComments = comments.filter(c => c.task_id === memo.id);
+                        const memoComments = commentsByTaskId.get(memo.id) ?? [];
                         return (
                           <div key={memo.id} className="bg-white p-3 md:p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-auto max-h-[70vh] md:h-[500px] md:max-h-none">
                             <div className="flex justify-between items-start mb-2 md:mb-4 pb-2 md:pb-4 border-b border-slate-100 shrink-0">
@@ -624,11 +740,19 @@ export default function TeamTab() {
                                   type="text"
                                   placeholder="진행 상황이나 의견을 남겨주세요..."
                                   value={memoCommentInputs[memo.id] || ''}
+                                  disabled={Boolean(isSubmittingCommentByTaskId[memo.id])}
                                   onChange={e => setMemoCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
-                                  onKeyDown={e => e.key === 'Enter' && addMemoComment(memo.id)}
-                                  className="flex-1 text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all"
+                                  onKeyDown={e => {
+                                    if ((e.nativeEvent as KeyboardEvent).isComposing) return;
+                                    if (e.key === 'Enter') addMemoComment(memo.id);
+                                  }}
+                                  className="flex-1 text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all disabled:bg-slate-100 disabled:text-slate-400"
                                 />
-                                <button onClick={() => addMemoComment(memo.id)} className="bg-slate-900 text-white px-3 md:px-3.5 rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center">
+                                <button
+                                  onClick={() => addMemoComment(memo.id)}
+                                  disabled={Boolean(isSubmittingCommentByTaskId[memo.id])}
+                                  className="bg-slate-900 text-white px-3 md:px-3.5 rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center disabled:bg-slate-300 disabled:cursor-not-allowed"
+                                >
                                   <Send size={14} className="md:w-4 md:h-4" />
                                 </button>
                               </div>

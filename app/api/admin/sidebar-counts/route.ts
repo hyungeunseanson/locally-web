@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
-export async function GET(request: Request) {
+export async function GET() {
     try {
         const supabaseServer = await createServerClient();
         const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
@@ -24,29 +24,22 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
         }
 
-        const { searchParams } = new URL(request.url);
-        const lastViewed = searchParams.get('lastViewed') || new Date(0).toISOString();
-
         const [
             appsRes,
             expsRes,
             bookingsRes,
             svcRes,
-            tasksRes,
-            commentsRes,
             inquiriesRes
         ] = await Promise.all([
-            supabaseAdmin.from('host_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-            supabaseAdmin.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+            supabaseAdmin.from('host_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+            supabaseAdmin.from('experiences').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
             supabaseAdmin.from('bookings').select('id').eq('status', 'PENDING'),
-            supabaseAdmin.from('service_bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING').eq('payment_method', 'bank'),
-            supabaseAdmin.from('admin_tasks').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed),
-            supabaseAdmin.from('admin_task_comments').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed),
+            supabaseAdmin.from('service_bookings').select('id', { count: 'exact', head: true }).eq('status', 'PENDING').eq('payment_method', 'bank'),
             supabaseAdmin.from('inquiries').select('id').or('type.eq.admin_support,type.eq.admin')
         ]);
 
         let csUnreadCount = 0;
-        const csIds = (inquiriesRes.data || []).map((i: any) => i.id);
+        const csIds = (inquiriesRes.data || []).map((i: { id: string }) => i.id);
         if (csIds.length > 0) {
             const { count } = await supabaseAdmin
                 .from('inquiry_messages')
@@ -63,13 +56,12 @@ export async function GET(request: Request) {
                 expsCount: expsRes.count || 0,
                 pendingBookingIds: (bookingsRes.data || []).map(b => b.id),
                 svcBankPendingCount: svcRes.count || 0,
-                newTasksCount: tasksRes.count || 0,
-                newCommentsCount: commentsRes.count || 0,
                 csUnreadCount
             }
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Server error';
         console.error('[ADMIN] /api/admin/sidebar-counts error:', error);
-        return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
+        return NextResponse.json({ success: false, error: message }, { status: 500 });
     }
 }
