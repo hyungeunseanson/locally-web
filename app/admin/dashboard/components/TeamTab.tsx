@@ -22,6 +22,7 @@ export default function TeamTab() {
   const [whitelist, setWhitelist] = useState<any[]>([]);
   const [newWhitemail, setNewWhitemail] = useState('');
   const [showWhitelist, setShowWhitelist] = useState(false);
+  const tasksRef = useRef<AdminTask[]>([]); // ⭐ 추가: stale closure 방지를 위한 ref
   const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
   const [innerTab, setInnerTab] = useState<'todo' | 'memo'>('todo'); // 🟢 새로운 서브 탭
@@ -57,14 +58,18 @@ export default function TeamTab() {
 
   const fetchTasks = async () => {
     const { data } = await supabase.from('admin_tasks').select('*').order('created_at', { ascending: false }).limit(100);
-    if (data) setTasks(data);
+    if (data) {
+      setTasks(data);
+      tasksRef.current = data; // ⭐ 추가: ref도 함께 업데이트
+    }
     return data;
   };
 
   const fetchComments = async (taskList?: { id: string }[]) => {
     // 🔧 [구조적 수정] task_id를 실제 admin_tasks ID 목록으로 필터링.
     // MiniChatBar가 아무리 채팅을 쌓아도 영향 없고, limit도 불필요.
-    const ids = (taskList ?? tasks).map(t => t.id);
+    // ⭐ 수정: tasks대신 tasksRef.current 사용
+    const ids = (taskList ?? tasksRef.current).map(t => t.id);
     if (ids.length === 0) { setComments([]); return; }
     const { data } = await supabase
       .from('admin_task_comments')
