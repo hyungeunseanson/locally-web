@@ -5,6 +5,18 @@
 
 ---
 
+## v3.31.5 — [어드민 핫픽스] 맞춤 의뢰 관리 탭 403 인증 버그 전수 수정
+
+**작업일:** 2026-03-05
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 버그: 맞춤 의뢰 탭 전체 비어있음 | **근본 원인:** `service-bookings`, `sidebar-counts`, `service-confirm-payment`, `service-cancel` 4개 admin API가 `supabaseServer`(일반 JWT 클라이언트)로 `admin_whitelist` 테이블을 조회할 때 RLS 정책이 데이터를 차단 → `isAdmin = false` → 403 Forbidden 반환. |
+| 🔧 수정: admin 인증 로직 전수 교체 | 4개 API의 `admin_whitelist`·`role` 조회를 `supabaseServer` → `createAdminClient()` (Service Role, RLS 우회)로 교체. `users` 테이블 → `profiles` 테이블로도 수정 (gemini.md §3.1 기준). |
+| ✅ 빌드 검증 | `tsc --noEmit` exit 0 확인 완료. |
+
+---
+
 ## v3.31.4 — [결제/어드민] 무통장 입금 UI 버그 픽스 및 RLS 권한 우회 서버 API 도입
 
 **작업일:** 2026-03-05

@@ -11,18 +11,18 @@ export async function GET() {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Check if user is admin or in whitelist
+        const supabaseAdmin = createAdminClient(); // bypasses RLS
+
+        // Admin role check using admin client (bypasses RLS on admin_whitelist)
         const [userEntry, whitelist] = await Promise.all([
-            supabaseServer.from('users').select('role').eq('id', user.id).maybeSingle(),
-            supabaseServer.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
+            supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+            supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
         ]);
 
         const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
         if (!isAdmin) {
             return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
         }
-
-        const supabaseAdmin = createAdminClient(); // bypasses RLS
 
         // Fetch all service bookings ordered by creation date
         const { data: serviceBookings, error: sbError } = await supabaseAdmin

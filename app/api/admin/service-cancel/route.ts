@@ -19,10 +19,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Admin role check (role=admin OR admin_whitelist)
+    const supabaseAdmin = createAdminClient();
+
+    // 2. Admin role check using admin client (bypasses RLS on admin_whitelist)
     const [userEntry, whitelist] = await Promise.all([
-      supabaseServer.from('users').select('role').eq('id', user.id).maybeSingle(),
-      supabaseServer.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
+      supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+      supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
     ]);
 
     const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
@@ -37,7 +39,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '주문 번호가 필요합니다.' }, { status: 400 });
     }
 
-    const supabaseAdmin = createAdminClient();
 
     // 3. Fetch booking
     const { data: booking, error: bookingError } = await supabaseAdmin

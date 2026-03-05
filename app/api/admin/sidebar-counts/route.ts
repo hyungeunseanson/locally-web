@@ -11,9 +11,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
+        const supabaseAdmin = createAdminClient();
+
+        // Admin role check using admin client (bypasses RLS on admin_whitelist)
         const [userEntry, whitelist] = await Promise.all([
-            supabaseServer.from('users').select('role').eq('id', user.id).maybeSingle(),
-            supabaseServer.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
+            supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+            supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
         ]);
 
         const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
@@ -23,8 +26,6 @@ export async function GET(request: Request) {
 
         const { searchParams } = new URL(request.url);
         const lastViewed = searchParams.get('lastViewed') || new Date(0).toISOString();
-
-        const supabaseAdmin = createAdminClient();
 
         const [
             appsRes,
