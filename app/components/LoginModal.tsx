@@ -6,6 +6,8 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { TERMS_OF_USE, PRIVACY_POLICY } from '@/app/constants/legalText';
+
 type Gender = 'Male' | 'Female' | '';
 
 interface InputItemProps {
@@ -49,8 +51,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
-  const [marketingAgreed, setMarketingAgreed] = useState(false);
   const [termsError, setTermsError] = useState(false);
+  const [showLegalText, setShowLegalText] = useState<'TERMS' | 'PRIVACY' | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -99,8 +101,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               phone: phone,
               birth_date: birthDate,
               gender: gender,
-              nationality: nationality,
-              marketing_agreed: marketingAgreed
+              nationality: nationality
             }
           }
         });
@@ -173,6 +174,39 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
 
       <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[480px]' : 'max-w-[420px]'} rounded-2xl shadow-2xl overflow-hidden relative z-10 animate-in zoom-in-95 duration-200 transition-all`}>
+
+        {/* 🟢 약관 모달 오버레이 */}
+        {showLegalText && (
+          <div className="absolute inset-0 z-50 bg-white flex flex-col h-full">
+            <div className="h-14 flex items-center justify-between px-5 border-b border-gray-100 flex-shrink-0">
+              <button
+                onClick={() => setShowLegalText(null)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2 text-gray-900"
+                type="button"
+              >
+                <X size={18} />
+              </button>
+              <span className="font-bold text-[15px] text-gray-900">
+                {showLegalText === 'TERMS' ? '서비스 이용약관' : '개인정보 처리방침'}
+              </span>
+              <div className="w-8"></div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 md:p-6 bg-slate-50">
+              <div className="text-[13px] text-gray-600 leading-relaxed bg-white p-5 rounded-xl border border-gray-200 shadow-sm whitespace-pre-wrap">
+                {showLegalText === 'TERMS' ? TERMS_OF_USE : PRIVACY_POLICY}
+              </div>
+            </div>
+            <div className="p-4 md:p-5 border-t border-gray-100 bg-white flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowLegalText(null)}
+                className="w-full bg-black text-white font-bold h-12 rounded-xl text-[15px] hover:bg-gray-800 transition-all active:scale-[0.98]"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="h-14 flex items-center justify-between px-5 border-b border-gray-100">
           <button onClick={onClose} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
@@ -291,26 +325,31 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             </div>
 
             {mode === 'SIGNUP' && (
-              <div className={`mb-6 p-4 rounded-xl border ${termsError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} text-xs text-gray-700 space-y-3`}>
-                <div className="flex items-center gap-2 font-bold mb-1">
-                  <input type="checkbox" id="allAgree" checked={termsAgreed && privacyAgreed && marketingAgreed} onChange={(e) => {
+              <div className={`mb-6 rounded-xl border ${termsError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} text-xs text-gray-700`}>
+                <div className="flex items-center p-4 border-b border-gray-200">
+                  <input type="checkbox" id="allAgree" checked={termsAgreed && privacyAgreed} onChange={(e) => {
                     setTermsAgreed(e.target.checked);
                     setPrivacyAgreed(e.target.checked);
-                    setMarketingAgreed(e.target.checked);
-                  }} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
-                  <label htmlFor="allAgree">전체 동의</label>
+                  }} className="w-5 h-5 rounded border-gray-300 text-black focus:ring-black cursor-pointer" />
+                  <label htmlFor="allAgree" className="ml-3 font-bold text-sm cursor-pointer select-none">전체 동의</label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="terms" checked={termsAgreed} onChange={(e) => setTermsAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
-                  <label htmlFor="terms">[필수] 서비스 이용약관 동의</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="privacy" checked={privacyAgreed} onChange={(e) => setPrivacyAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
-                  <label htmlFor="privacy">[필수] 개인정보 수집 및 이용 동의</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="marketing" checked={marketingAgreed} onChange={(e) => setMarketingAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
-                  <label htmlFor="marketing">[선택] 마케팅 정보 수신 동의</label>
+
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <input type="checkbox" id="terms" checked={termsAgreed} onChange={(e) => setTermsAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer" />
+                      <label htmlFor="terms" className="ml-2 cursor-pointer select-none">[필수] 서비스 이용약관 동의</label>
+                    </div>
+                    <button type="button" onClick={() => setShowLegalText('TERMS')} className="text-gray-400 hover:text-black underline font-medium">보기</button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <input type="checkbox" id="privacy" checked={privacyAgreed} onChange={(e) => setPrivacyAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer" />
+                      <label htmlFor="privacy" className="ml-2 cursor-pointer select-none">[필수] 개인정보 수집 및 이용 동의</label>
+                    </div>
+                    <button type="button" onClick={() => setShowLegalText('PRIVACY')} className="text-gray-400 hover:text-black underline font-medium">보기</button>
+                  </div>
                 </div>
               </div>
             )}
