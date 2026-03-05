@@ -103,10 +103,20 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
               .from('verification-docs')
               .createSignedUrl(`id_card/${foundFile.name}`, 3600);
 
-            if (signedData) setSignedUrl(signedData.signedUrl);
+            if (signedData?.signedUrl) {
+              setSignedUrl(signedData.signedUrl);
+            } else if (selectedItem.id_card_file.startsWith('http')) {
+              setSignedUrl(selectedItem.id_card_file);
+            } else {
+              setSignedUrl(null);
+            }
           } else {
-            console.warn("⚠️ 해당 유저의 파일이 스토리지에 없습니다.");
-            setSignedUrl(null);
+            console.warn("⚠️ 해당 유저의 파일이 스토리지에 없습니다. Fallback URL 사용 시도");
+            if (selectedItem.id_card_file.startsWith('http')) {
+              setSignedUrl(selectedItem.id_card_file);
+            } else {
+              setSignedUrl(null);
+            }
           }
 
         } catch (e) {

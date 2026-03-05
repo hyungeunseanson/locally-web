@@ -23,14 +23,23 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
 
       setProfile(profileData);
 
-      // 2. 호스트가 운영 중인 체험 가져오기
-      const { data: expData } = await supabase
-        .from('experiences')
-        .select('*')
-        .eq('host_id', params.id)
-        .eq('status', 'active');
+      // 2. 호스트 승인 여부 확인
+      const { data: hostApp } = await supabase
+        .from('host_applications')
+        .select('status')
+        .eq('user_id', params.id)
+        .maybeSingle();
 
-      if (expData) setHostExperiences(expData);
+      // 3. 승인된 호스트의 경우에만 운영 중인 활성 체험 가져오기
+      if (hostApp?.status === 'approved') {
+        const { data: expData } = await supabase
+          .from('experiences')
+          .select('*')
+          .eq('host_id', params.id)
+          .eq('status', 'active');
+
+        if (expData) setHostExperiences(expData);
+      }
       setLoading(false);
     };
 

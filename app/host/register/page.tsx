@@ -218,10 +218,11 @@ export default function HostRegisterPage() {
       if (files.idCard) {
         const compressedIdCard = await compressImage(files.idCard); // 🟢 압축 추가
         const fileName = `id_card/${user.id}_${Date.now()}`;
-        const { error } = await supabase.storage.from('images').upload(fileName, compressedIdCard);
+        // 🟢 신분증은 보안 버킷인 verification-docs로 업로드합니다.
+        const { error } = await supabase.storage.from('verification-docs').upload(fileName, compressedIdCard);
         if (!error) {
-          const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-          idCardUrl = data.publicUrl;
+          // 보안 버킷이므로 PublicURL 대신 파일명(경로)만 저장하여 DetailsPanel에서 추출 및 서명된 URL 발급할 수 있게 함
+          idCardUrl = fileName;
         }
       }
 
