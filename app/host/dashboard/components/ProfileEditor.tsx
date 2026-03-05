@@ -243,7 +243,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" /></div>
                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
               </label>
-              <span className="text-[11px] md:text-xs text-slate-400 mt-2">{t('hp_change_photo')}</span>
+              <span className="text-[11px] md:text-xs text-slate-400 mt-2">{t('hp_photo_change')}</span>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 md:px-5 md:py-5">
