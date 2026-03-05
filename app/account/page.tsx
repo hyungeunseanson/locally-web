@@ -15,6 +15,7 @@ import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitch
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
+import { validateImage, compressImage, sanitizeFileName } from '@/app/utils/image';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 type GuestReview = {
@@ -254,16 +255,31 @@ export default function AccountPage() {
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
     if (!user) return;
-    setUploading(true);
+
     const file = event.target.files[0];
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
+
+    // 1. 유효성 검사
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      alert(validation.message);
+      return;
+    }
+
+    setUploading(true);
 
     try {
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+      // 2. 이미지 압축 (최대 1MB, 1280px 해상도)
+      const compressedFile = await compressImage(file);
+
+      // 3. 안전한 파일명 생성 (한글 깨짐 등 방지)
+      const fileName = sanitizeFileName(compressedFile.name);
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, compressedFile);
       if (uploadError) throw uploadError;
+
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
       setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
       alert(t('profile_photo_change_done')); // 🟢 번역
@@ -272,6 +288,7 @@ export default function AccountPage() {
       alert(t('profile_photo_fail') + ' ' + message); // 🟢 번역
     } finally {
       setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // input 초기화
     }
   };
 

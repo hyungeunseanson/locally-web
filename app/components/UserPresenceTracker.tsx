@@ -12,6 +12,7 @@ export default function UserPresenceTracker() {
   // 1. 실시간 채널 (Online 상태 표시용 - 로그인 유저 전용 & 다이나믹 리스너)
   useEffect(() => {
     let channel: any;
+    let profileChannel: any;
 
     const trackPresence = async (user: any) => {
       if (channel) {
@@ -50,18 +51,47 @@ export default function UserPresenceTracker() {
     const setupInitialPresence = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       trackPresence(session?.user);
+
+      // 🟢 1-2. DB `profiles` 수정(아바타 등) 감지용 추가 옵저버
+      if (session?.user) {
+        profileChannel = supabase.channel(`public:profiles:id=eq.${session.user.id}`)
+          .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${session.user.id}`
+          }, () => {
+            trackPresence(session.user); // 아바타 등이 바뀌면 다시 정보 세팅
+          })
+          .subscribe();
+      }
     };
     setupInitialPresence();
 
     // 로그인/로그아웃 상태가 바뀔 때 감지하여 트래킹 재시작
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        if (profileChannel) {
+          supabase.removeChannel(profileChannel);
+          profileChannel = null;
+        }
+
         trackPresence(session?.user);
+
+        // 새 세션이면 다시 profile 감지 등록
+        if (event === 'SIGNED_IN' && session?.user) {
+          profileChannel = supabase.channel(`public:profiles:id=eq.${session.user.id}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, () => {
+              trackPresence(session.user);
+            })
+            .subscribe();
+        }
       }
     });
 
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (profileChannel) supabase.removeChannel(profileChannel);
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
