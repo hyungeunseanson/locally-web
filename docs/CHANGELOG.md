@@ -5,6 +5,20 @@
 
 ---
 
+## v3.31.4 — [결제/어드민] 무통장 입금 UI 버그 픽스 및 RLS 권한 우회 서버 API 도입
+
+**작업일:** 2026-03-05
+
+| 항목 | 내용 |
+|------|------|
+| 🔧 버그: 관리자 '입금 확인' 버튼 미노출 | **원인:** `service_bookings` 테이블의 RLS 정책(`/sb_select/`)이 게스트와 호스트 본인만 조회 가능하도록 제한되어, 관리자 대시보드 로그인 시 데이터 빈 배열 반환. |
+| 🔧 수정 1: RLS 우회 API 신설 | `useServiceAdminData.ts` 프론트엔드 직접 조회를 전면 제거하고, `createAdminClient`를 사용해 서버단에서 검증 후 데이터를 내려주는 `/api/admin/service-bookings` GET 라우트 생성 (Manual Join 로직 백엔드 이관). |
+| 🔧 수정 2: 사이드바 카운트 우회 API | `Sidebar.tsx` 내부 알림 뱃지 쿼리들(`pending_bookings`, `service_bookings` 등)이 RLS에 막혀 0건으로 나오는 현상 해결을 위해 `/api/admin/sidebar-counts` GET 라우트 분리. |
+| 📦 DB 스키마: `bookings` 결제수단 추가 | 기존 `bookings` 에 존재하지 않던 `payment_method` 컬럼 추가 (디폴트값 'card'). |
+| 🔧 수정 3: 일반 예약 백엔드 파라미터 연동 | `app/api/bookings/route.ts` 에서 `create_booking_atomic` RPC 호출 시 새롭게 추가된 `payment_method` 파라미터 전달하도록 수정 (`supabase_add_payment_method_bookings_v3.9.3.sql` 작성). |
+
+---
+
 ## v3.31.3 — [어드민 버그픽스] 팀 할 일 댓글 미표시 근본 원인 수정
 
 **작업일:** 2026-03-05

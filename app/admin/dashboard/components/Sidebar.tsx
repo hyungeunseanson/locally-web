@@ -61,52 +61,26 @@ export default function Sidebar() {
 
   const fetchCounts = async () => {
     try {
-      const [
-        { count: appsCount },
-        { count: expsCount },
-        { data: pendingBookingsData },
-        { count: svcBankPendingCount }
-      ] = await Promise.all([
-        supabase.from('host_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('bookings').select('id').eq('status', 'PENDING'),
-        supabase.from('service_bookings').select('*', { count: 'exact', head: true }).eq('status', 'PENDING').eq('payment_method', 'bank')
-      ]);
+      const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
+      const res = await fetch(`/api/admin/sidebar-counts?lastViewed=${encodeURIComponent(lastViewed)}`);
+
+      if (!res.ok) throw new Error('Failed to fetch sidebar counts');
+
+      const { data, success } = await res.json();
+      if (!success || !data) throw new Error('Invalid backend response');
 
       // 미열람 예약 필터링
       const viewedIds = JSON.parse(localStorage.getItem('viewed_booking_ids') || '[]');
-      const unviewedCount = (pendingBookingsData || []).filter((b: any) => !viewedIds.includes(b.id)).length;
-
-      // 신규 투두 및 댓글 수 합산
-      const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
-      const [
-        { count: newTasksCount },
-        { count: newCommentsCount }
-      ] = await Promise.all([
-        supabase.from('admin_tasks').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed),
-        supabase.from('admin_task_comments').select('*', { count: 'exact', head: true }).gt('created_at', lastViewed)
-      ]);
-
-      // CS 미답변 건수 (2-step: admin_support inquiry ID 수집 → 미읽은 메시지 카운트)
-      let csUnreadCount = 0;
-      const { data: csInquiries } = await supabase
-        .from('inquiries').select('id').or('type.eq.admin_support,type.eq.admin');
-      const csIds = (csInquiries || []).map((i: any) => i.id);
-      if (csIds.length > 0) {
-        const { count: csCount } = await supabase
-          .from('inquiry_messages').select('*', { count: 'exact', head: true })
-          .in('inquiry_id', csIds).eq('is_read', false);
-        csUnreadCount = csCount || 0;
-      }
+      const unviewedPendingBookings = (data.pendingBookingIds || []).filter((id: string) => !viewedIds.includes(id)).length;
 
       setCounts(prev => ({
         ...prev,
-        apps: appsCount || 0,
-        exps: expsCount || 0,
-        pendingBookings: unviewedCount,
-        teamNewCount: (newTasksCount || 0) + (newCommentsCount || 0),
-        servicePendingBank: svcBankPendingCount || 0,
-        csUnreadCount,
+        apps: data.appsCount || 0,
+        exps: data.expsCount || 0,
+        pendingBookings: unviewedPendingBookings,
+        teamNewCount: (data.newTasksCount || 0) + (data.newCommentsCount || 0),
+        servicePendingBank: data.svcBankPendingCount || 0,
+        csUnreadCount: data.csUnreadCount || 0,
       }));
     } catch (e) {
       console.error('Sidebar counts fetch error:', e);

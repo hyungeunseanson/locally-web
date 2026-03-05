@@ -58,7 +58,8 @@ export async function POST(request: Request) {
                 p_guests: guestCount,
                 p_is_private: Boolean(isPrivate),
                 p_customer_name: customerName,
-                p_customer_phone: customerPhone
+                p_customer_phone: customerPhone,
+                p_payment_method: paymentMethod || 'card'
             })
             .maybeSingle<AtomicBookingResult>();
 
