@@ -73,6 +73,16 @@ function InboxContent() {
   useEffect(() => {
     if (isLoading || isUrlProcessed) return;
 
+    // hostId만 있고 expId 없는 경우: 서비스 매칭 채팅 자동 선택
+    if (hostId && !expId) {
+      const existing = inquiries.find(i => String(i.host_id) === String(hostId));
+      if (existing && selectedInquiry?.id !== existing.id) {
+        loadMessages(existing.id);
+      }
+      setIsUrlProcessed(true);
+      return;
+    }
+
     if (!hostId || !expId) {
       setIsUrlProcessed(true);
       return;

@@ -117,6 +117,7 @@ export type ServiceApplicationWithProfile = ServiceApplication & {
     profile_photo: string | null;
     self_intro: string | null;
     languages: string[] | null;
+    language_levels?: unknown; // JSON: LanguageLevelEntry[]
     profession: string | null;
     dream_destination: string | null;
     favorite_song: string | null;

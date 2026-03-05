@@ -5,6 +5,21 @@
 
 ---
 
+## v3.35.0 — [맞춤의뢰] 매칭 후 1:1 메시지·언어레벨·고객센터 링크 개선
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 매칭 완료 후 1:1 메시지 | `/api/services/start-chat` 신규 API — 매칭된 고객↔호스트 간 inquiry 생성(experience_id 없는 general 타입). 고객 뷰: "호스트에게 메시지" 버튼. 호스트 뷰: "고객에게 메시지" 버튼. |
+| 🔴 언어 중복 표기 수정 | `profiles.languages` + `host_applications.languages` 혼용 중복 → `normalizeLanguageLevels`로 통합. 언어 배지에 레벨(`Lv.X 단계`) 병기. |
+| 🟡 고객센터 링크 수정 | `/guest/inbox` → `/help`(admin_support 채팅 생성 페이지). |
+| 🟡 i18n 2키 추가 | `msg_send_to_host`, `msg_send_to_customer` ko/en/ja/zh. |
+| 🟡 `/guest/inbox` hostId 단독 파라미터 지원 | expId 없이 hostId만으로 기존 채팅 자동 선택. |
+| 🟡 language_levels API 반환 | `/api/services/applications` — host_applications.language_levels select 추가. |
+
+---
+
 ## v3.34.0 — [맞춤의뢰] 서비스 매칭 3차 개선 — i18n·리뷰·커스텀 모달·탭 UX·알림 도시 필터
 
 **작업일:** 2026-03-06

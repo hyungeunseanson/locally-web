@@ -727,6 +727,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_not_selected_host: "이번에는 선택되지 않았습니다.",
     sr_select_host_fail: "호스트 선택 중 오류가 발생했습니다.",
     sr_select_host_success: "호스트 선택 완료! 매칭이 확정되었습니다.",
+    msg_send_to_host: "호스트에게 메시지",
+    msg_send_to_customer: "고객에게 메시지",
 
     // [Service Payment]
     sp_title: "결제하기",
@@ -1590,6 +1592,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_not_selected_host: "Not selected this time.",
     sr_select_host_fail: "Failed to select host.",
     sr_select_host_success: "Host selected! Matching confirmed.",
+    msg_send_to_host: "Message Host",
+    msg_send_to_customer: "Message Customer",
 
     // [Service Payment]
     sp_title: "Payment",
@@ -2454,6 +2458,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_not_selected_host: "今回は選ばれませんでした。",
     sr_select_host_fail: "ホスト選択中にエラーが発生しました。",
     sr_select_host_success: "ホスト選択完了！マッチングが確定しました。",
+    msg_send_to_host: "ホストにメッセージ",
+    msg_send_to_customer: "お客様にメッセージ",
 
     // [Service Payment]
     sp_title: "お支払い",
@@ -3317,6 +3323,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sr_not_selected_host: "本次未被选中。",
     sr_select_host_fail: "选择主机时出错。",
     sr_select_host_success: "已选择主机！匹配已确认。",
+    msg_send_to_host: "向主机发消息",
+    msg_send_to_customer: "向客户发消息",
 
     // [Service Payment]
     sp_title: "支付",

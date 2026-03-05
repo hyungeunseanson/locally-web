@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ChevronLeft, Clock, MapPin, Users, Calendar, CheckCircle,
   MessageSquare, Star, Globe2, ArrowRight, Sparkles, CreditCard,
-  UserCheck, ClipboardList
+  UserCheck, ClipboardList, MessageCircle
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -15,9 +15,10 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import {
   getServiceRequestStatusLabel,
   isOpenServiceRequest,
-  isMatchedServiceRequest,
   isPendingPaymentServiceRequest,
+  isActiveServiceRequest,
 } from '@/app/constants/serviceStatus';
+import { normalizeLanguageLevels, formatLanguageLevelLabel, getLanguageNames } from '@/app/utils/languageLevels';
 import type { ServiceRequest, ServiceApplicationWithProfile } from '@/app/types/service';
 import HostProfileModal from '@/app/experiences/[id]/components/HostProfileModal';
 
@@ -65,6 +66,7 @@ export default function ServiceRequestDetailPage() {
   const [selecting, setSelecting] = useState<string | null>(null);
   const [hostModal, setHostModal] = useState<{ open: boolean; hostId: string | null }>({ open: false, hostId: null });
   const [confirmTarget, setConfirmTarget] = useState<{ applicationId: string; hostName: string } | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const isOwner = currentUserId !== null && currentUserId === request?.user_id;
   const isSelectedHost = currentUserId !== null && currentUserId === request?.selected_host_id;
@@ -97,6 +99,32 @@ export default function ServiceRequestDetailPage() {
     };
     void load();
   }, [requestId, supabase]);
+
+  const handleOpenMessage = async () => {
+    if (sendingMessage) return;
+    setSendingMessage(true);
+    try {
+      const res = await fetch('/api/services/start-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.inquiryId) {
+        showToast(data.error || t('server_error'), 'error');
+        return;
+      }
+      if (isOwner) {
+        router.push(`/guest/inbox?hostId=${data.hostId}`);
+      } else {
+        router.push(`/host/dashboard?tab=inquiries&guestId=${data.guestId}`);
+      }
+    } catch {
+      showToast(t('server_error'), 'error');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
 
   const handleSelectHost = (applicationId: string, hostName: string) => {
     setConfirmTarget({ applicationId, hostName });
@@ -298,7 +326,11 @@ export default function ServiceRequestDetailPage() {
                 {applications.map((app) => {
                   const name = app.profiles?.full_name || app.host_applications?.name || t('host');
                   const avatar = app.profiles?.avatar_url || app.host_applications?.profile_photo;
-                  const langs = app.profiles?.languages || app.host_applications?.languages || [];
+                  // language_levels 우선, 없으면 languages 배열로 정규화 (중복 방지)
+                  const langEntries = normalizeLanguageLevels(
+                    app.host_applications?.language_levels,
+                    app.host_applications?.languages ?? app.profiles?.languages
+                  );
                   const bio = app.host_applications?.self_intro || app.profiles?.bio;
                   const isSelected = request.selected_application_id === app.id;
 
@@ -345,11 +377,13 @@ export default function ServiceRequestDetailPage() {
                           ) : (
                             <p className="text-[10px] text-slate-300 mb-1.5">{t('sr_no_reviews')}</p>
                           )}
-                          {/* 언어 */}
-                          {langs.length > 0 && (
+                          {/* 언어 + 레벨 */}
+                          {langEntries.length > 0 && (
                             <div className="flex flex-wrap gap-1">
-                              {langs.slice(0, 4).map((l) => (
-                                <span key={l} className="text-[9px] md:text-[10px] bg-slate-50 border border-slate-150 px-2 py-0.5 rounded-full text-slate-500 font-medium">{l}</span>
+                              {langEntries.slice(0, 4).map((e) => (
+                                <span key={e.language} className="text-[9px] md:text-[10px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full text-slate-500 font-medium">
+                                  {e.language} <span className="text-slate-400">{formatLanguageLevelLabel(e.level)}</span>
+                                </span>
                               ))}
                             </div>
                           )}
@@ -391,12 +425,34 @@ export default function ServiceRequestDetailPage() {
           </div>
         )}
 
-        {/* ── [선택된 호스트] 매칭 확정 안내 ── */}
-        {isSelectedHost && isMatchedServiceRequest(request.status) && (
+        {/* ── [선택된 호스트] 매칭 확정 안내 + 메시지 버튼 ── */}
+        {isSelectedHost && isActiveServiceRequest(request.status) && (
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 text-center mb-4">
             <CheckCircle size={36} className="text-blue-500 mx-auto mb-2" />
             <p className="font-black text-[15px] md:text-base text-blue-900 mb-1">{t('sr_selected_host_banner_title')}</p>
-            <p className="text-[12px] md:text-[13px] text-blue-600">{t('sr_selected_host_banner_desc')}</p>
+            <p className="text-[12px] md:text-[13px] text-blue-600 mb-4">{t('sr_selected_host_banner_desc')}</p>
+            <button
+              onClick={handleOpenMessage}
+              disabled={sendingMessage}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-[13px] md:text-sm text-white disabled:opacity-60 transition-all active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)' }}
+            >
+              <MessageCircle size={14} /> {t('msg_send_to_customer')}
+            </button>
+          </div>
+        )}
+
+        {/* ── [고객 뷰] 매칭 완료 후 호스트에게 메시지 ── */}
+        {isOwner && isActiveServiceRequest(request.status) && request.selected_host_id && (
+          <div className="mb-4 flex justify-center">
+            <button
+              onClick={handleOpenMessage}
+              disabled={sendingMessage}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-[13px] md:text-sm text-white disabled:opacity-60 transition-all active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)' }}
+            >
+              <MessageCircle size={14} /> {t('msg_send_to_host')}
+            </button>
           </div>
         )}
 
@@ -445,7 +501,7 @@ export default function ServiceRequestDetailPage() {
 
         {/* ── 고객센터 ── */}
         <div className="text-center">
-          <Link href="/guest/inbox" className="inline-flex items-center gap-1.5 text-[11px] md:text-xs text-slate-400 hover:text-slate-600 transition-colors">
+          <Link href="/help" className="inline-flex items-center gap-1.5 text-[11px] md:text-xs text-slate-400 hover:text-slate-600 transition-colors">
             <MessageSquare size={11} /> 문의가 있으신가요? 고객센터에 물어보세요
           </Link>
         </div>
@@ -496,7 +552,7 @@ export default function ServiceRequestDetailPage() {
               job: app.host_applications?.profession || undefined,
               dreamDestination: app.host_applications?.dream_destination || undefined,
               favoriteSong: app.host_applications?.favorite_song || undefined,
-              languages: app.profiles?.languages || app.host_applications?.languages || undefined,
+              languages: (() => { const names = getLanguageNames(normalizeLanguageLevels(app.host_applications?.language_levels, app.host_applications?.languages ?? app.profiles?.languages)); return names.length > 0 ? names : undefined; })(),
               intro: app.host_applications?.self_intro || app.profiles?.bio || undefined,
             }}
           />
