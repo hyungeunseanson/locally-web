@@ -15,11 +15,6 @@ export default function UserPresenceTracker() {
     let profileChannel: any;
 
     const trackPresence = async (user: any) => {
-      if (channel) {
-        supabase.removeChannel(channel);
-        channel = null;
-      }
-
       // 비회원이면 트래킹 안 함
       if (!user) return;
 
@@ -32,19 +27,26 @@ export default function UserPresenceTracker() {
       const fullName = profile?.full_name || user.user_metadata?.full_name || '이름 없음';
       const avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url || '';
 
-      channel = supabase.channel('online_users');
-      channel.on('presence', { event: 'sync' }, () => { }).subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: user.id,
-            email: user.email,
-            full_name: fullName,
-            avatar_url: avatarUrl,
-            connected_at: new Date().toISOString(),
-            is_anonymous: false
-          });
-        }
-      });
+      const payload = {
+        user_id: user.id,
+        email: user.email,
+        full_name: fullName,
+        avatar_url: avatarUrl,
+        connected_at: new Date().toISOString(),
+        is_anonymous: false
+      };
+
+      if (!channel) {
+        channel = supabase.channel('online_users');
+        channel.on('presence', { event: 'sync' }, () => { }).subscribe(async (status: string) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.track(payload);
+          }
+        });
+      } else {
+        // 채널이 이미 존재하면 다시 track만 호출하여 덮어씌움
+        await channel.track(payload);
+      }
     };
 
     // 최초 렌더링 시 현재 세션 확인
@@ -85,6 +87,12 @@ export default function UserPresenceTracker() {
               trackPresence(session.user);
             })
             .subscribe();
+        } else if (event === 'SIGNED_OUT') {
+          // 로그아웃 시 채널 폭파
+          if (channel) {
+            supabase.removeChannel(channel);
+            channel = null;
+          }
         }
       }
     });
