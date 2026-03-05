@@ -369,7 +369,7 @@ export default function ServiceIntroAirbnbStylePage() {
                                         <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}><ChevronRight size={16} /></button>
                                     </div>
                                     <div className="grid grid-cols-7 text-center mb-2">
-                                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <span key={d} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{t(`day_${d.toLowerCase()}`) || d}</span>)}
+                                        {[0, 1, 2, 3, 4, 5, 6].map(i => <span key={i} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{t(`day_${i}`)}</span>)}
                                     </div>
                                     <div className="grid grid-cols-7 gap-y-1 justify-items-center">
                                         {renderCalendar()}

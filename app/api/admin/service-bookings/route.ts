@@ -44,7 +44,7 @@ export async function GET() {
                 ? supabaseAdmin.from('service_requests').select('*').in('id', requestIds)
                 : { data: [] },
             userIds.length > 0
-                ? supabaseAdmin.from('profiles').select('id, name, email, avatar_url').in('id', userIds)
+                ? supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', userIds)
                 : { data: [] },
             appIds.length > 0
                 ? supabaseAdmin.from('service_applications').select('id, request_id, host_id, appeal_message').in('id', appIds)

@@ -15,7 +15,7 @@ import type { ServiceRequestCard, ServiceApplication } from '@/app/types/service
 type SubTab = 'board' | 'my-applications' | 'active';
 
 type ApplicationWithRequest = ServiceApplication & {
-  service_requests?: Pick<ServiceRequestCard, 'id' | 'title' | 'city' | 'service_date' | 'duration_hours' | 'total_customer_price' | 'status'> | null;
+  service_requests?: Pick<ServiceRequestCard, 'id' | 'title' | 'city' | 'service_date' | 'duration_hours' | 'total_host_payout' | 'status'> | null;
 };
 
 export default function ServiceJobsTab() {
@@ -48,7 +48,7 @@ export default function ServiceJobsTab() {
           .from('service_applications')
           .select(`
             *,
-            service_requests:request_id (id, title, city, service_date, duration_hours, total_customer_price, status)
+            service_requests:request_id (id, title, city, service_date, duration_hours, total_host_payout, status)
           `)
           .eq('host_id', userId)
           .order('created_at', { ascending: false });
@@ -123,7 +123,7 @@ export default function ServiceJobsTab() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] md:text-[10px] text-slate-400">{new Date(req.created_at).toLocaleDateString('ko-KR')}</span>
-                        <span className="font-black text-[13px] md:text-[14px] text-slate-900">₩{req.total_customer_price.toLocaleString()}</span>
+                        <span className="font-black text-[13px] md:text-[14px] text-emerald-600">₩{req.total_host_payout.toLocaleString()}</span>
                       </div>
                     </div>
                   </Link>
