@@ -215,9 +215,21 @@ export function useAdminData() {
         showToast('🔔 새로운 예약이 접수되었습니다!', 'success');
       }).subscribe();
 
+    const profileChannel = supabase.channel('realtime_profiles')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, (payload) => {
+        // 🟢 새 유저가 가입하면 users 배열의 맨 앞에 실시간 추가
+        const newUser = payload.new as any;
+        setState(prev => ({
+          ...prev,
+          users: [newUser, ...prev.users]
+        }));
+        showToast('🔔 신규 회원이 가입했습니다!', 'success');
+      }).subscribe();
+
     return () => {
       supabase.removeChannel(presenceChannel);
       supabase.removeChannel(bookingChannel);
+      supabase.removeChannel(profileChannel);
     };
   }, [supabase, fetchInitialData, showToast]);
 

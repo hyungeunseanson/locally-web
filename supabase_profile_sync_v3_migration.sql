@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   -- 시도 1: 모든 부가정보(연락처, 생일, 성별)를 포함하여 완벽하게 Insert 시도
-  INSERT INTO public.profiles (id, email, full_name, avatar_url, phone, birth_date, gender)
+  INSERT INTO public.profiles (id, email, full_name, avatar_url, phone, birth_date, gender, nationality)
   VALUES (
     NEW.id, 
     NEW.email, 
@@ -15,7 +15,8 @@ BEGIN
     NULLIF(NEW.raw_user_meta_data->>'avatar_url', ''),
     NULLIF(NEW.raw_user_meta_data->>'phone', ''),
     (NULLIF(NEW.raw_user_meta_data->>'birth_date', ''))::date,
-    NULLIF(NEW.raw_user_meta_data->>'gender', '')
+    NULLIF(NEW.raw_user_meta_data->>'gender', ''),
+    NULLIF(NEW.raw_user_meta_data->>'nationality', '')
   );
   RETURN NEW;
 

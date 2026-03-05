@@ -45,6 +45,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState<Gender>('');
+  const [nationality, setNationality] = useState('');
+
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
+  const [termsError, setTermsError] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -70,8 +76,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     }
 
     if (mode === 'SIGNUP') {
-      if (!fullName || !phone || !birthDate || !gender) {
-        showToast('이름, 연락처, 생년월일, 성별을 모두 입력해주세요.', 'error');
+      if (!fullName || !phone || !birthDate || !gender || !nationality) {
+        showToast('이름, 국적, 연락처, 생년월일, 성별을 모두 입력해주세요.', 'error');
+        return;
+      }
+      if (!termsAgreed || !privacyAgreed) {
+        setTermsError(true);
+        showToast('필수 약관에 동의해주세요.', 'error');
         return;
       }
     }
@@ -87,7 +98,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               full_name: fullName,
               phone: phone,
               birth_date: birthDate,
-              gender: gender
+              gender: gender,
+              nationality: nationality,
+              marketing_agreed: marketingAgreed
             }
           }
         });
@@ -199,11 +212,34 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
               {mode === 'SIGNUP' && (
                 <>
-                  <InputItem
-                    type="text" label="이름 (실명)" value={fullName} setValue={setFullName}
-                    isFirst={false} focusKey="NAME" currentFocus={isFocused} setFocus={setIsFocused}
-                    autoComplete="name"
-                  />
+                  <div className="flex border-t border-gray-300">
+                    <div className="w-1/2 border-r border-gray-300">
+                      <InputItem
+                        type="text" label="이름 (실명)" value={fullName} setValue={setFullName}
+                        isFirst={true} focusKey="NAME" currentFocus={isFocused} setFocus={setIsFocused}
+                        autoComplete="name"
+                      />
+                    </div>
+                    <div className={`relative h-14 w-1/2 ${isFocused === 'NATION' ? 'ring-2 ring-black z-10' : ''}`}>
+                      <select
+                        className={`block w-full h-full pt-5 pb-1 px-4 text-[15px] bg-white appearance-none focus:outline-none peer relative cursor-pointer ${!nationality ? 'text-transparent' : 'text-gray-900'}`}
+                        value={nationality}
+                        onChange={(e) => setNationality(e.target.value)}
+                        onFocus={() => setIsFocused('NATION')}
+                        onBlur={() => setIsFocused(null)}
+                      >
+                        <option value="" disabled className="text-gray-900">국적 선택</option>
+                        <option value="Korea" className="text-gray-900">대한민국 (Korea)</option>
+                        <option value="Japan" className="text-gray-900">일본 (Japan)</option>
+                        <option value="USA" className="text-gray-900">미국 (USA)</option>
+                        <option value="Other" className="text-gray-900">기타 (Other)</option>
+                      </select>
+                      <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-4 z-0 origin-[0] left-4 font-medium pointer-events-none ${!nationality ? 'text-gray-500' : 'text-gray-500'}`}>
+                        국적
+                      </label>
+                      <ChevronDown size={16} className="absolute right-3 top-5 text-gray-500 pointer-events-none" />
+                    </div>
+                  </div>
 
                   <InputItem
                     type="tel" label="휴대폰 번호 (- 없이 입력)" value={phone} setValue={setPhone}
@@ -233,18 +269,18 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
                     <div className={`relative h-14 w-1/2 ${isFocused === 'GENDER' ? 'ring-2 ring-black z-10' : ''}`}>
                       <select
-                        className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none peer bg-transparent z-10 relative cursor-pointer"
+                        className={`block w-full h-full pt-5 pb-1 px-4 text-[15px] bg-white appearance-none focus:outline-none peer relative cursor-pointer ${!gender ? 'text-transparent' : 'text-gray-900'}`}
                         value={gender}
                         onChange={(e) => setGender(e.target.value as Gender)}
                         onFocus={() => setIsFocused('GENDER')}
                         onBlur={() => setIsFocused(null)}
                         autoComplete="sex"
                       >
-                        <option value="" disabled>성별 선택</option>
-                        <option value="Male">남성</option>
-                        <option value="Female">여성</option>
+                        <option value="" disabled className="text-gray-900">성별 선택</option>
+                        <option value="Male" className="text-gray-900">남성</option>
+                        <option value="Female" className="text-gray-900">여성</option>
                       </select>
-                      <label className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-0 origin-[0] left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
+                      <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-4 z-0 origin-[0] left-4 font-medium pointer-events-none ${!gender ? 'text-gray-500' : 'text-gray-500'}`}>
                         성별
                       </label>
                       <ChevronDown size={16} className="absolute right-3 top-5 text-gray-500 pointer-events-none" />
@@ -254,9 +290,35 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               )}
             </div>
 
-            <div className="text-[11px] text-gray-500 mb-6 leading-relaxed">
-              {t('agree_terms')} {/* 🟢 번역 적용 */}
-            </div>
+            {mode === 'SIGNUP' && (
+              <div className={`mb-6 p-4 rounded-xl border ${termsError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'} text-xs text-gray-700 space-y-3`}>
+                <div className="flex items-center gap-2 font-bold mb-1">
+                  <input type="checkbox" id="allAgree" checked={termsAgreed && privacyAgreed && marketingAgreed} onChange={(e) => {
+                    setTermsAgreed(e.target.checked);
+                    setPrivacyAgreed(e.target.checked);
+                    setMarketingAgreed(e.target.checked);
+                  }} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
+                  <label htmlFor="allAgree">전체 동의</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="terms" checked={termsAgreed} onChange={(e) => setTermsAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
+                  <label htmlFor="terms">[필수] 서비스 이용약관 동의</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="privacy" checked={privacyAgreed} onChange={(e) => setPrivacyAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
+                  <label htmlFor="privacy">[필수] 개인정보 수집 및 이용 동의</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="marketing" checked={marketingAgreed} onChange={(e) => setMarketingAgreed(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black" />
+                  <label htmlFor="marketing">[선택] 마케팅 정보 수신 동의</label>
+                </div>
+              </div>
+            )}
+            {mode === 'LOGIN' && (
+              <div className="text-[11px] text-gray-500 mb-6 leading-relaxed">
+                {t('agree_terms')} {/* 🟢 번역 적용 */}
+              </div>
+            )}
 
             <button
               type="submit"
