@@ -107,25 +107,26 @@ export function useAdminData() {
         { data: analyticsEventsData },
         { data: inquiriesData }, // 🟢 추가
         { data: inquiryMessagesData }, // 🟢 추가
-        { data: bookingRawData, error: bookingError }
+        bookingRawData, // 🔒 /api/admin/bookings fetch 결과
       ] = await Promise.all([
         fetch('/api/admin/host-applications').then(r => r.ok ? r.json() : { data: [] }), // 🔒 service_role API 사용
-        supabase.from('experiences').select('*, profiles!experiences_host_id_fkey(full_name, email)').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한 (profiles 조인 포함)
+        supabase.from('experiences').select('*, profiles!experiences_host_id_fkey(full_name, email)').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
         supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('reviews').select('rating, experience_id, created_at').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('search_logs').select('*').order('created_at', { ascending: false }).limit(2000), // 🟢 최근 검색 로그
         supabase.from('analytics_events').select('*').order('created_at', { ascending: false }).limit(10000), // 🟢 이벤트 로그 (퍼널용)
         supabase.from('inquiries').select('id, created_at, host_id').order('created_at', { ascending: false }).limit(2000), // 🟢 호스트 응답률 계산용
         supabase.from('inquiry_messages').select('inquiry_id, sender_id, created_at').order('created_at', { ascending: false }).limit(10000), // 🟢 호스트 응답 시간 계산용
-        supabase.from('bookings')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(0, ITEMS_PER_PAGE - 1) // 🟢 초기 로딩: 0 ~ 19 (20개)
+        fetch('/api/admin/bookings?from=0&to=19').then(r => r.ok ? r.json() : { success: false, data: [] }), // 🔒 service_role API 사용 (RLS 우회)
       ]);
 
-      if (bookingError) throw bookingError;
 
-      const enrichedBookings = await enrichBookings(bookingRawData || []);
+
+      const bookingApiResult = bookingRawData as any;
+      if (!bookingApiResult?.success && bookingApiResult?.success !== undefined) throw new Error(bookingApiResult?.error || '예약 로딩 실패');
+      const bookingRawArray = Array.isArray(bookingApiResult) ? bookingApiResult : (bookingApiResult?.data || []);
+
+      const enrichedBookings = await enrichBookings(bookingRawArray);
 
       // appData는 fetch 응답에서 { data: [...] } 형태로 옴
       const appsResult = appData as any;
@@ -162,13 +163,10 @@ export function useAdminData() {
     const to = from + ITEMS_PER_PAGE - 1;
 
     try {
-      const { data: moreBookings, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (error) throw error;
+      const res = await fetch(`/api/admin/bookings?from=${from}&to=${to}`);
+      if (!res.ok) throw new Error('예약 추가 로딩 실패');
+      const result = await res.json();
+      const moreBookings: any[] = Array.isArray(result) ? result : (result?.data || []);
 
       if (!moreBookings || moreBookings.length < ITEMS_PER_PAGE) {
         setHasMoreBookings(false); // 더 이상 데이터 없음

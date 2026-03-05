@@ -36,9 +36,11 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Admin role check using admin client (bypasses RLS on admin_whitelist)
+        const supabaseAdmin = createAdminClient();
         const [userEntry, whitelist] = await Promise.all([
-            supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
-            supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
+            supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+            supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
         ]);
 
         const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
@@ -46,8 +48,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // 2. service_role 키로 데이터 조회 (RLS 우회)
-        const supabaseAdmin = createAdminClient();
+        // 2. service_role 키로 데이터 조회 (위 admin client 재사용)
         const { searchParams } = new URL(request.url);
 
         const userIdsParam = searchParams.get('user_ids');

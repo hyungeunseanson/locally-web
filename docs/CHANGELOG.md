@@ -5,6 +5,20 @@
 
 ---
 
+## v3.31.6 — [어드민 핫픽스] Master Ledger 예약 목록 미노출 수정
+
+**작업일:** 2026-03-05
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 버그: Master Ledger 예약 목록 완전 비어있음 | **근본 원인:** `useAdminData.ts`에서 `bookings` 테이블을 일반 브라우저 JWT 클라이언트로 직접 SELECT 조회하여 RLS가 본인 예약만 허용 → 어드민이 자신이 예약한 것 없으면 0행 반환. |
+| 🔧 신규 API 생성 | `app/api/admin/bookings/route.ts` — `createAdminClient()`(service_role, RLS 우회)로 bookings 전체 조회. 페이지네이션(`from`, `to`) 지원. |
+| 🔧 useAdminData.ts 교체 | 초기 로딩(`fetchInitialData`)과 더보기(`loadMoreBookings`) 모두 `/api/admin/bookings` API 경유로 전환. |
+| 🔧 host-applications API 인증 버그도 수정 | `host-applications/route.ts`에서 `supabaseServer`(일반 JWT)로 `admin_whitelist` 조회 → RLS 차단 버그. `createAdminClient` + `profiles.role`로 교체. |
+| ✅ 빌드 검증 | `tsc --noEmit` exit 0 확인. |
+
+---
+
 ## v3.31.5 — [어드민 핫픽스] 맞춤 의뢰 관리 탭 403 인증 버그 전수 수정
 
 **작업일:** 2026-03-05
