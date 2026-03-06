@@ -514,7 +514,7 @@ export default function GlobalTeamChat() {
                     </div>
                 </div>
             )}
-            <form onSubmit={sendMessage} className="flex gap-2 items-center">
+            <form onSubmit={sendMessage} className="flex gap-2 items-end">
                 <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
                 <button
                     type="button"
@@ -523,12 +523,21 @@ export default function GlobalTeamChat() {
                 >
                     <Paperclip size={isMobile ? 17 : 19} />
                 </button>
-                <input
-                    type="text"
+                <textarea
+                    rows={1}
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
+                    onKeyDown={e => {
+                        const native = e.nativeEvent as KeyboardEvent;
+                        if (native.isComposing) return;
+                        if (e.key === 'Enter') {
+                            if (native.shiftKey) return;
+                            e.preventDefault();
+                            sendMessage();
+                        }
+                    }}
                     placeholder="메시지를 입력하세요..."
-                    className={`flex-1 text-[11px] md:text-[13px] bg-slate-100 border-transparent focus:bg-white focus:border-slate-300 focus:ring-2 focus:ring-slate-200 rounded-full outline-none transition-all placeholder:text-slate-400 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}
+                    className={`flex-1 text-[11px] md:text-[13px] bg-slate-100 border-transparent focus:bg-white focus:border-slate-300 focus:ring-2 focus:ring-slate-200 rounded-2xl outline-none transition-all placeholder:text-slate-400 resize-none ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}
                     disabled={isUploading}
                 />
                 <button
