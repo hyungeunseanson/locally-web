@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -21,11 +21,13 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
 
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
+    useLayoutEffect(() => {
+        if (!textareaRef.current || isPreview) return;
+        textareaRef.current.style.height = 'auto';
+        const maxHeight = Math.min(window.innerHeight * 0.65, 720);
+        const nextHeight = Math.min(textareaRef.current.scrollHeight, maxHeight);
+        textareaRef.current.style.height = `${nextHeight}px`;
+        textareaRef.current.style.overflowY = textareaRef.current.scrollHeight > maxHeight ? 'auto' : 'hidden';
     }, [content, isPreview]);
 
     const insertSyntax = (prefix: string, suffix: string = '') => {
@@ -125,7 +127,7 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                         onChange={(e) => setContent(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="마크다운(Markdown) 포맷으로 자유롭게 메모를 작성하세요..."
-                        className="w-full min-h-[300px] h-full resize-none outline-none bg-transparent text-sm leading-loose text-slate-800 placeholder:text-slate-500 font-mono"
+                        className="w-full min-h-[300px] max-h-[65vh] resize-none outline-none bg-transparent text-sm leading-loose text-slate-800 placeholder:text-slate-500 font-mono"
                     />
                 ) : (
                     <div className="prose prose-slate max-w-none !text-[13px] [&_p]:!text-[13px] [&_p]:!text-slate-700 [&_p]:!leading-relaxed [&_li]:!text-[13px] [&_li]:!text-slate-700 [&_img]:!max-w-[50%] [&_img]:!h-auto [&_img]:!object-contain [&_img]:!rounded-xl [&_img]:!shadow-sm [&_img]:!cursor-pointer hover:[&_img]:!opacity-90 [&_img]:!transition-opacity [&_img]:!my-2 [&_a]:!text-blue-600 prose-headings:font-bold prose-headings:text-slate-800">

@@ -41,7 +41,48 @@ export default function TeamTab() {
 
   const threadRef = useRef<HTMLDivElement>(null);
   const commentsFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newTodoTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const todoCommentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const memoCommentTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const supabase = createClient();
+
+  const autoResizeTextarea = useCallback((element: HTMLTextAreaElement | null, maxHeight: number) => {
+    if (!element) return;
+    element.style.height = 'auto';
+    const nextHeight = Math.min(element.scrollHeight, maxHeight);
+    element.style.height = `${nextHeight}px`;
+    element.style.overflowY = element.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  const handleSubmitOnEnter = useCallback(
+    (
+      event: React.KeyboardEvent<HTMLTextAreaElement>,
+      submit: () => void
+    ) => {
+      const native = event.nativeEvent as KeyboardEvent;
+      if (native.isComposing) return;
+      if (event.key !== 'Enter') return;
+      if (native.shiftKey) return;
+      event.preventDefault();
+      submit();
+    },
+    []
+  );
+
+  const getMemoCommentSectionClassName = useCallback((commentCount: number) => {
+    if (commentCount === 0) {
+      return 'min-h-[104px]';
+    }
+    if (commentCount <= 2) {
+      return 'min-h-[148px]';
+    }
+    return 'min-h-[220px] max-h-[30vh]';
+  }, []);
+
+  const setMemoCommentTextareaRef = useCallback((taskId: string, element: HTMLTextAreaElement | null) => {
+    memoCommentTextareaRefs.current[taskId] = element;
+    autoResizeTextarea(element, 144);
+  }, [autoResizeTextarea]);
 
   const toggleMemoExpand = (id: string) => {
     const newSet = new Set(expandedMemos);
@@ -167,6 +208,20 @@ export default function TeamTab() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    autoResizeTextarea(newTodoTextareaRef.current, 112);
+  }, [newTodo, autoResizeTextarea]);
+
+  useEffect(() => {
+    autoResizeTextarea(todoCommentTextareaRef.current, 112);
+  }, [newComment, autoResizeTextarea]);
+
+  useEffect(() => {
+    Object.values(memoCommentTextareaRefs.current).forEach((element) => {
+      autoResizeTextarea(element, 144);
+    });
+  }, [memoCommentInputs, autoResizeTextarea]);
 
   const addWhitelistEmail = async () => {
     if (!newWhitemail.trim()) return;
@@ -545,20 +600,13 @@ export default function TeamTab() {
               <div className="flex items-center gap-1 mb-2"><CheckSquare size={11} className="text-green-500" /><h3 className="text-[8px] md:text-base font-bold text-slate-800">팀 할 일</h3></div>
               <div className="flex flex-col md:flex-row gap-1.5 mb-2.5">
                 <textarea
+                  ref={newTodoTextareaRef}
                   rows={2}
                   value={newTodo}
                   onChange={e => setNewTodo(e.target.value)}
-                  onKeyDown={e => {
-                    const native = e.nativeEvent as KeyboardEvent;
-                    if (native.isComposing) return;
-                    if (e.key === 'Enter') {
-                      if (native.shiftKey) return;
-                      e.preventDefault();
-                      addTodo();
-                    }
-                  }}
+                  onKeyDown={e => handleSubmitOnEnter(e, addTodo)}
                   placeholder="할 일 추가..."
-                  className="flex-1 text-[10px] md:text-sm border border-slate-200 rounded-md px-2 py-2 md:py-1.5 outline-none placeholder:text-slate-400 resize-none"
+                  className="flex-1 min-h-[44px] max-h-[112px] text-[10px] md:text-sm border border-slate-200 rounded-md px-2 py-2 md:py-1.5 outline-none placeholder:text-slate-400 resize-none"
                 />
                 <button onClick={addTodo} className="bg-slate-900 text-white p-2 md:p-1.5 text-[10px] md:text-sm flex justify-center items-center rounded-md font-bold hover:bg-slate-800 transition-colors"><Plus size={14} className="md:hidden" /><span className="hidden md:inline">추가</span></button>
               </div>
@@ -608,21 +656,14 @@ export default function TeamTab() {
                           </div>
                           <div className="flex gap-1.5 pt-1.5 border-t border-slate-50 mt-1" onClick={e => e.stopPropagation()}>
                             <textarea
+                              ref={todoCommentTextareaRef}
                               rows={2}
                               placeholder="Reply..."
                               value={newComment}
                               disabled={Boolean(isSubmittingCommentByTaskId[todo.id])}
                               onChange={e => setNewComment(e.target.value)}
-                              onKeyDown={e => {
-                                const native = e.nativeEvent as KeyboardEvent;
-                                if (native.isComposing) return;
-                                if (e.key === 'Enter') {
-                                  if (native.shiftKey) return;
-                                  e.preventDefault();
-                                  addComment(todo.id);
-                                }
-                              }}
-                              className="flex-1 text-[10px] md:text-[12px] px-2.5 py-1.5 md:py-1 rounded-md border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20 placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-400 resize-none"
+                              onKeyDown={e => handleSubmitOnEnter(e, () => addComment(todo.id))}
+                              className="flex-1 min-h-[40px] max-h-[112px] text-[10px] md:text-[12px] px-2.5 py-1.5 md:py-1 rounded-md border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20 placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-400 resize-none"
                             />
                             <button
                               onClick={() => addComment(todo.id)}
@@ -679,7 +720,7 @@ export default function TeamTab() {
                       {memos.map(memo => {
                         const memoComments = commentsByTaskId.get(memo.id) ?? [];
                         return (
-                          <div key={memo.id} className="bg-white p-3 md:p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-auto max-h-[70vh] md:h-[500px] md:max-h-none">
+                          <div key={memo.id} className="bg-white p-3 md:p-6 rounded-2xl border border-slate-200 shadow-sm group hover:shadow-md transition-all relative flex flex-col h-auto max-h-[75vh] min-h-0 overflow-hidden">
                             <div className="flex justify-between items-start mb-2 md:mb-4 pb-2 md:pb-4 border-b border-slate-100 shrink-0">
                               <div className="flex items-center gap-2 md:gap-3">
                                 {/* 🟢 이슈4-B: 메모 저자 아바타 모바일 축소 */}
@@ -718,8 +759,7 @@ export default function TeamTab() {
                               )}
                             </div>
 
-                            {/* 리치 텍스트 렌더러 기반 뷰어 (본문 높이 고정 유지) */}
-                            <div className="shrink-0 min-h-[150px] md:min-h-[210px] max-h-[32vh] md:h-[210px] md:max-h-[210px] overflow-y-auto prose prose-slate max-w-none text-[11px] md:text-[13px] [&_p]:text-[11px] md:[&_p]:text-[13px] [&_p]:text-slate-700 [&_p]:leading-relaxed [&_li]:text-[11px] md:[&_li]:text-[13px] [&_li]:text-slate-700 [&_img]:max-w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-xl [&_img]:shadow-sm [&_img]:cursor-pointer hover:[&_img]:opacity-90 [&_img]:transition-opacity [&_img]:my-2 [&_a]:text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
+                            <div className="shrink min-h-[96px] md:min-h-[120px] max-h-[38vh] overflow-y-auto prose prose-slate max-w-none text-[11px] md:text-[13px] [&_p]:text-[11px] md:[&_p]:text-[13px] [&_p]:text-slate-700 [&_p]:leading-relaxed [&_li]:text-[11px] md:[&_li]:text-[13px] [&_li]:text-slate-700 [&_img]:max-w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-xl [&_img]:shadow-sm [&_img]:cursor-pointer hover:[&_img]:opacity-90 [&_img]:transition-opacity [&_img]:my-2 [&_a]:text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin min-h-0">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
@@ -739,10 +779,10 @@ export default function TeamTab() {
                             </div>
 
                             {/* 댓글 구역 */}
-                            <div className="mt-4 pt-5 border-t-2 border-slate-100 shrink-0 flex flex-col h-[260px] md:h-[220px] bg-slate-50/80 -mx-4 md:-mx-6 -mb-4 md:-mb-6 p-4 md:p-5 rounded-b-2xl shadow-inner">
+                            <div className={`mt-4 pt-4 border-t border-slate-100 shrink-0 flex flex-col bg-slate-50/60 -mx-4 md:-mx-6 -mb-4 md:-mb-6 px-4 md:px-5 pb-4 md:pb-5 rounded-b-2xl shadow-inner ${getMemoCommentSectionClassName(memoComments.length)}`}>
                               <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                                 {memoComments.length === 0 ? (
-                                  <p className="text-[10px] md:text-[11px] text-slate-400/80 text-center py-2 font-medium">작성된 답글이 없습니다.</p>
+                                  <p className="text-[10px] md:text-[11px] text-slate-400/80 text-center py-1 font-medium">작성된 답글이 없습니다.</p>
                                 ) : (
                                   memoComments.map(c => (
                                     <div key={c.id} className="text-[10px] md:text-[12px] bg-white p-2.5 md:p-3 rounded-xl border border-slate-200 shadow-[0_2px_4px_-2px_rgba(0,0,0,0.05)]">
@@ -757,21 +797,14 @@ export default function TeamTab() {
                               </div>
                               <div className="flex gap-2 pt-2 border-t border-slate-200/50 mt-2 shrink-0">
                                 <textarea
-                                  rows={4}
+                                  ref={element => setMemoCommentTextareaRef(memo.id, element)}
+                                  rows={2}
                                   placeholder="진행 상황이나 의견을 남겨주세요..."
                                   value={memoCommentInputs[memo.id] || ''}
                                   disabled={Boolean(isSubmittingCommentByTaskId[memo.id])}
                                   onChange={e => setMemoCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
-                                  onKeyDown={e => {
-                                    const native = e.nativeEvent as KeyboardEvent;
-                                    if (native.isComposing) return;
-                                    if (e.key === 'Enter') {
-                                      if (native.shiftKey) return;
-                                      e.preventDefault();
-                                      addMemoComment(memo.id);
-                                    }
-                                  }}
-                                  className="flex-1 text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all disabled:bg-slate-100 disabled:text-slate-400 resize-none"
+                                  onKeyDown={e => handleSubmitOnEnter(e, () => addMemoComment(memo.id))}
+                                  className="flex-1 min-h-[40px] max-h-[144px] text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all disabled:bg-slate-100 disabled:text-slate-400 resize-none"
                                 />
                                 <button
                                   onClick={() => addMemoComment(memo.id)}
