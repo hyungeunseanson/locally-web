@@ -34,7 +34,7 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
 function statusBadge(status: string, map: Record<string, { label: string; cls: string }>) {
   const cfg = map[status] ?? { label: status, cls: 'bg-slate-50 text-slate-500' };
   return (
-    <span className={`px-2 py-0.5 rounded text-[10px] md:text-[11px] font-bold ${cfg.cls}`}>
+    <span className={`px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold whitespace-nowrap ${cfg.cls}`}>
       {cfg.label}
     </span>
   );
@@ -341,19 +341,19 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                   </td>
                   <td className="px-4 py-3">
                     {b.payment_method === 'bank' ? (
-                      <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">🏛️ 무통장</span>
+                      <span className="text-[9px] md:text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold whitespace-nowrap">🏛️ 무통장</span>
                     ) : (
-                      <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">💳 카드</span>
+                      <span className="text-[9px] md:text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-medium whitespace-nowrap">💳 카드</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                    <span className="text-[9px] md:text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium whitespace-nowrap">
                       {REQUEST_STATUS_LABELS[b.service_request?.status ?? ''] ?? (b.service_request?.status ?? '-')}
                     </span>
                   </td>
                   <td className="px-4 py-3">{statusBadge(b.status, BOOKING_STATUS_LABELS)}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded font-bold ${b.payout_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-yellow-50 text-yellow-700'}`}>
+                    <span className={`text-[9px] md:text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap ${b.payout_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-yellow-50 text-yellow-700'}`}>
                       {b.payout_status === 'paid' ? '정산완료' : (b.host_id ? '정산대기' : '미선택')}
                     </span>
                   </td>
@@ -375,16 +375,16 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                             <button
                               onClick={() => handleConfirmPayment(b.order_id)}
                               disabled={isProcessing}
-                              className="px-2 py-1 md:px-3 md:py-1.5 bg-blue-600 text-white border border-blue-700 rounded-lg text-[10px] md:text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-60"
+                              className="px-2 py-1 md:px-3 md:py-1.5 bg-blue-600 text-white border border-blue-700 rounded-lg text-[9px] md:text-[10px] font-bold whitespace-nowrap hover:bg-blue-700 transition-colors disabled:opacity-60"
                             >
                               💰 입금 확인
                             </button>
                           )}
                           <button
                             onClick={() => setCancelTarget(b)}
-                            className="px-2 py-1 md:px-3 md:py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] md:text-xs font-bold hover:bg-red-100 transition-colors"
+                            className="px-2 py-1 md:px-3 md:py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-[9px] md:text-[10px] font-bold whitespace-nowrap hover:bg-red-100 transition-colors"
                           >
-                            강제 취소
+                            취소
                           </button>
                         </>
                       )}
