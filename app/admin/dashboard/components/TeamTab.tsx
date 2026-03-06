@@ -561,7 +561,7 @@ export default function TeamTab() {
                       >
                         <button onClick={(e) => { e.stopPropagation(); toggleStatus(todo.id, todo.is_completed); }} className={todo.is_completed ? 'text-green-500' : 'text-slate-300'}>{todo.is_completed ? <CheckCircle2 size={14} /> : <Circle size={14} />}</button>
                         <div className="flex-1 relative">
-                          <p className={`text-[9px] md:text-sm ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
+                          <p className={`text-[9px] md:text-sm whitespace-pre-wrap break-words ${todo.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{todo.content}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             {/* author_name — 수정 불필요 (유지) */}
                             <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
@@ -586,23 +586,26 @@ export default function TeamTab() {
                                     <span className="font-bold text-slate-700 text-[11px] md:text-sm">{comment.author_name}</span>
                                     <span className="text-[9px] md:text-xs text-slate-400">{format(new Date(comment.created_at), 'HH:mm')}</span>
                                   </div>
-                                  <p className="text-[10px] md:text-sm text-slate-600">{comment.content}</p>
+                                  <p className="text-[10px] md:text-sm text-slate-600 whitespace-pre-wrap break-words">{comment.content}</p>
                                 </div>
                               ))
                             )}
                           </div>
                           <div className="flex gap-1.5 pt-1.5 border-t border-slate-50 mt-1" onClick={e => e.stopPropagation()}>
-                            <input
-                              type="text"
+                            <textarea
+                              rows={2}
                               placeholder="Reply..."
                               value={newComment}
                               disabled={Boolean(isSubmittingCommentByTaskId[todo.id])}
                               onChange={e => setNewComment(e.target.value)}
                               onKeyDown={e => {
                                 if ((e.nativeEvent as KeyboardEvent).isComposing) return;
-                                if (e.key === 'Enter') addComment(todo.id);
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  addComment(todo.id);
+                                }
                               }}
-                              className="flex-1 text-[10px] md:text-[12px] px-2.5 py-1.5 md:py-1 rounded-md border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20 placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-400"
+                              className="flex-1 text-[10px] md:text-[12px] px-2.5 py-1.5 md:py-1 rounded-md border border-slate-200 outline-none focus:ring-1 focus:ring-blue-500/20 placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-400 resize-none"
                             />
                             <button
                               onClick={() => addComment(todo.id)}
@@ -730,23 +733,26 @@ export default function TeamTab() {
                                         <span className="font-bold text-slate-800">{c.author_name}</span>
                                         <span className="text-[9px] md:text-[10px] text-slate-400 font-medium">{format(new Date(c.created_at), 'MM.dd HH:mm')}</span>
                                       </div>
-                                      <p className="text-slate-600 leading-relaxed">{c.content}</p>
+                                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{c.content}</p>
                                     </div>
                                   ))
                                 )}
                               </div>
                               <div className="flex gap-2 pt-2 border-t border-slate-200/50 mt-1">
-                                <input
-                                  type="text"
+                                <textarea
+                                  rows={4}
                                   placeholder="진행 상황이나 의견을 남겨주세요..."
                                   value={memoCommentInputs[memo.id] || ''}
                                   disabled={Boolean(isSubmittingCommentByTaskId[memo.id])}
                                   onChange={e => setMemoCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
                                   onKeyDown={e => {
                                     if ((e.nativeEvent as KeyboardEvent).isComposing) return;
-                                    if (e.key === 'Enter') addMemoComment(memo.id);
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault();
+                                      addMemoComment(memo.id);
+                                    }
                                   }}
-                                  className="flex-1 text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                                  className="flex-1 text-[10px] md:text-xs px-2.5 py-2 md:px-3 md:py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 bg-white placeholder:text-slate-400 shadow-sm transition-all disabled:bg-slate-100 disabled:text-slate-400 resize-none"
                                 />
                                 <button
                                   onClick={() => addMemoComment(memo.id)}

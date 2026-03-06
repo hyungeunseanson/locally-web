@@ -5,6 +5,20 @@
 
 ---
 
+## v3.37.0 — [팀 워크스페이스] 줄바꿈 지원 + 메모 댓글 입력 확장
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 팀 할 일 줄바꿈 | `todo.content` 표시에 `whitespace-pre-wrap break-words` 추가 |
+| 🔴 팀 할 일 댓글 줄바꿈 | 댓글 표시 `<p>`에 `whitespace-pre-wrap break-words` 추가 |
+| 🔴 팀 할 일 댓글 입력 | `<input type="text">` → `<textarea rows={2}>` 전환. Shift+Enter=줄바꿈, Enter=제출 |
+| 🔴 팀 메모장 댓글 줄바꿈 | 댓글 표시 `<p>`에 `whitespace-pre-wrap break-words` 추가 |
+| 🔴 팀 메모장 댓글 입력 확장 | `<input type="text">` → `<textarea rows={4}>` 전환(약 2배 높이). Shift+Enter=줄바꿈, Enter=제출 |
+
+---
+
 ## v3.36.0 — [맞춤의뢰] 호스트 프로필 모달 연락하기 기능 + 고객센터 커스텀 모달
 
 **작업일:** 2026-03-06
