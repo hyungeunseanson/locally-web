@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
@@ -8,20 +8,32 @@ export default function DatePicker({
   selectedRange,
   onChange,
   variant = 'default',
+  mode = 'range',
 }: {
   selectedRange: any;
   onChange: (range: any) => void;
   variant?: 'default' | 'mobile';
+  mode?: 'range' | 'single';
 }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => selectedRange?.start ? new Date(selectedRange.start) : new Date());
   const { t } = useLanguage(); // 🟢 추가
   const isMobile = variant === 'mobile';
+
+  useEffect(() => {
+    if (selectedRange?.start) {
+      setCurrentDate(new Date(selectedRange.start));
+    }
+  }, [selectedRange?.start]);
   
   const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
   
   const handleDateClick = (day: number) => {
     const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    if (mode === 'single') {
+      onChange({ start: clickedDate, end: null });
+      return;
+    }
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) { 
       onChange({ start: clickedDate, end: null }); 
     } else { 

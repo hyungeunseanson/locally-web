@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
             .select('*')
             .range(offset, offset + limit - 1);
 
-        if (category) {
+        if (category && category !== 'all') {
             query = query.eq('category', category);
         }
 

@@ -1,13 +1,43 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { compressImage, sanitizeFileName, validateImage } from '@/app/utils/image';
-import { ImagePlus, X, Loader2, ArrowLeft, ChevronDown } from 'lucide-react';
+import DatePicker from '@/app/components/DatePicker';
+import { ArrowLeft, CalendarDays, ChevronRight, ImagePlus, Loader2, MapPin, X } from 'lucide-react';
 import type { CommunityCategory } from '@/app/types/community';
 
-const WRITABLE_CATEGORIES: CommunityCategory[] = ['qna', 'companion', 'info'];
+const WRITABLE_CATEGORIES: CommunityCategory[] = ['qna', 'companion', 'info', 'locally_content'];
+
+const CATEGORY_OPTIONS: { id: CommunityCategory; label: string }[] = [
+    { id: 'qna', label: 'Q&A' },
+    { id: 'companion', label: '동행 구하기' },
+    { id: 'info', label: '꿀팁' },
+    { id: 'locally_content', label: '로컬리 콘텐츠' },
+];
+
+const formatDateLabel = (dateString: string) => {
+    if (!dateString) return '날짜 선택';
+    const [year, month, day] = dateString.split('-').map(Number);
+    if (!year || !month || !day) return dateString;
+    return `${year}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')}`;
+};
+
+const formatDateForStorage = (date: Date | null) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const parseStoredDate = (dateString: string) => {
+    if (!dateString) return null;
+    const [year, month, day] = dateString.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+};
 
 export default function PostEditor() {
     const router = useRouter();
@@ -19,49 +49,57 @@ export default function PostEditor() {
         : 'qna';
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [category, setCategory] = useState<'qna' | 'companion' | 'info'>(defaultCategory as 'qna' | 'companion' | 'info');
+    const [category, setCategory] = useState<CommunityCategory>(defaultCategory);
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [imageFiles, setImageFiles] = useState<File[]>([]);
-    const [imageUrls, setImageUrls] = useState<string[]>([]); // For preview
-
-    // Companion specific
+    const [imageUrls, setImageUrls] = useState<string[]>([]);
     const [companionDate, setCompanionDate] = useState('');
     const [companionCity, setCompanionCity] = useState('');
+    const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+    const [draftCompanionDate, setDraftCompanionDate] = useState<Date | null>(parseStoredDate(companionDate));
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files) return;
-        const files = Array.from(e.target.files);
+    const selectedDateRange = useMemo(
+        () => ({ start: draftCompanionDate, end: null }),
+        [draftCompanionDate],
+    );
 
-        // Prevent strictly more than 3 images
+    const isCompanion = category === 'companion';
+    const canSubmit = title.trim().length > 0 && content.trim().length > 0 && (!isCompanion || (companionDate && companionCity.trim()));
+
+    const openDateModal = () => {
+        setDraftCompanionDate(parseStoredDate(companionDate));
+        setIsDateModalOpen(true);
+    };
+
+    const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (!event.target.files) return;
+        const files = Array.from(event.target.files);
+
         if (imageFiles.length + files.length > 3) {
             alert('사진은 최대 3장까지만 업로드 가능합니다.');
             return;
         }
 
-        const validFiles = files.filter(file => validateImage(file).valid);
-
-        setImageFiles(prev => [...prev, ...validFiles]);
-
-        // Create preivews
-        const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
-        setImageUrls(prev => [...prev, ...newPreviewUrls]);
+        const validFiles = files.filter((file) => validateImage(file).valid);
+        setImageFiles((prev) => [...prev, ...validFiles]);
+        setImageUrls((prev) => [...prev, ...validFiles.map((file) => URL.createObjectURL(file))]);
     };
 
     const removeImage = (index: number) => {
-        setImageFiles(prev => prev.filter((_, i) => i !== index));
-        setImageUrls(prev => {
-            const newUrls = [...prev];
-            URL.revokeObjectURL(newUrls[index]); // Free memory
-            newUrls.splice(index, 1);
-            return newUrls;
+        setImageFiles((prev) => prev.filter((_, fileIndex) => fileIndex !== index));
+        setImageUrls((prev) => {
+            const nextUrls = [...prev];
+            URL.revokeObjectURL(nextUrls[index]);
+            nextUrls.splice(index, 1);
+            return nextUrls;
         });
     };
 
     const uploadImages = async (): Promise<string[]> => {
         const uploadedPaths: string[] = [];
+
         for (const file of imageFiles) {
-            // 🛡️ OOM Protection: Force compress large images before upload
             const compressed = await compressImage(file);
             const fileName = sanitizeFileName(compressed.name);
             const filePath = `community/${Date.now()}-${fileName}`;
@@ -78,26 +116,28 @@ export default function PostEditor() {
             const { data } = supabase.storage.from('images').getPublicUrl(filePath);
             uploadedPaths.push(data.publicUrl);
         }
+
         return uploadedPaths;
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (event?: React.FormEvent) => {
+        event?.preventDefault();
+
         if (!title.trim() || !content.trim()) {
             alert('제목과 내용을 입력해주세요.');
             return;
         }
-        if (category === 'companion' && (!companionDate || !companionCity)) {
+
+        if (isCompanion && (!companionDate || !companionCity.trim())) {
             alert('동행 날짜와 지역을 입력해주세요.');
             return;
         }
 
         setIsSubmitting(true);
+
         try {
-            // 1. Upload Images
             const finalImageUrls = await uploadImages();
 
-            // 2. Save Post
             const response = await fetch('/api/community/posts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -107,18 +147,15 @@ export default function PostEditor() {
                     content,
                     images: finalImageUrls,
                     companion_date: companionDate || undefined,
-                    companion_city: companionCity || undefined,
-                    linked_exp_id: null // TODO: Implement Modal Selector in next PR
-                })
+                    companion_city: companionCity.trim() || undefined,
+                    linked_exp_id: null,
+                }),
             });
 
             if (!response.ok) throw new Error('글 등록에 실패했습니다.');
 
             const { id } = await response.json();
-
-            // 하드 네비게이션으로 이동 (router.refresh + push 레이스 컨디션으로 인한 404 방지)
             window.location.href = `/community/${id}`;
-
         } catch (error: any) {
             console.error(error);
             alert(error.message || '글 등록 중 오류가 발생했습니다.');
@@ -128,104 +165,219 @@ export default function PostEditor() {
     };
 
     return (
-        <div className="max-w-[768px] mx-auto min-h-screen bg-white md:border-x md:border-slate-100 pb-32">
-            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
-                <button onClick={() => router.back()} className="text-slate-600 hover:text-slate-900 transition-colors">
-                    <ArrowLeft size={24} />
-                </button>
-                <h1 className="text-[17px] font-bold text-slate-900">글쓰기</h1>
-                <button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || !title || !content}
-                    className="text-[15px] font-bold text-[#FF385C] disabled:text-slate-300 transition-colors"
+        <div className="min-h-screen bg-[#F7F7F9]">
+            <div className="mx-auto max-w-4xl px-4 py-5 md:px-6 md:py-10">
+                <div className="mb-5 flex items-center justify-between md:mb-6">
+                    <button
+                        type="button"
+                        onClick={() => router.back()}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50"
+                        aria-label="뒤로가기"
+                    >
+                        <ArrowLeft size={20} />
+                    </button>
+
+                    <div className="text-center">
+                        <h1 className="text-[18px] font-semibold text-slate-900 md:text-[22px]">커뮤니티 글쓰기</h1>
+                        <p className="mt-1 hidden text-[13px] text-slate-500 md:block">깔끔하게 정리해서 올리면 더 읽기 좋습니다.</p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => handleSubmit()}
+                        disabled={isSubmitting || !canSubmit}
+                        className="inline-flex h-11 items-center justify-center rounded-full bg-[#FF385C] px-5 text-[13px] font-semibold text-white shadow-[0_8px_18px_rgba(255,56,92,0.22)] transition-colors hover:bg-[#E31C5F] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+                    >
+                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : '등록'}
+                    </button>
+                </div>
+
+                <form
+                    onSubmit={handleSubmit}
+                    className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]"
                 >
-                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : '등록'}
-                </button>
+                    <div className="border-b border-slate-100 px-5 py-5 md:px-8 md:py-6">
+                        <div className="flex flex-wrap gap-2">
+                            {CATEGORY_OPTIONS.map((item) => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => setCategory(item.id)}
+                                    className={`rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors md:text-[13px] ${
+                                        category === item.id
+                                            ? 'border-slate-900 bg-slate-900 text-white'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                                    }`}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-6 px-5 py-5 md:px-8 md:py-8">
+                        {isCompanion && (
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <button
+                                    type="button"
+                                    onClick={openDateModal}
+                                    className="flex h-[58px] items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 text-left transition-colors hover:border-slate-300"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                                            <CalendarDays size={18} />
+                                        </div>
+                                        <div>
+                                            <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">날짜</div>
+                                            <div className={`text-[14px] font-semibold ${companionDate ? 'text-slate-900' : 'text-slate-400'}`}>
+                                                {formatDateLabel(companionDate)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <ChevronRight size={16} className="text-slate-400" />
+                                </button>
+
+                                <div className="flex h-[58px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                                        <MapPin size={18} />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="도시를 입력하세요"
+                                        value={companionCity}
+                                        onChange={(event) => setCompanionCity(event.target.value)}
+                                        className="w-full bg-transparent text-[14px] font-medium text-slate-900 placeholder:text-slate-400 outline-none"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6">
+                            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">제목</div>
+                            <input
+                                type="text"
+                                placeholder="제목을 입력하세요"
+                                value={title}
+                                onChange={(event) => setTitle(event.target.value)}
+                                className="w-full bg-transparent text-[24px] font-semibold text-slate-900 placeholder:text-slate-300 outline-none md:text-[30px]"
+                            />
+                        </div>
+
+                        <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6 md:py-5">
+                            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">본문</div>
+                            <textarea
+                                placeholder="내용을 정리해서 작성해보세요."
+                                value={content}
+                                onChange={(event) => setContent(event.target.value)}
+                                className="h-[280px] w-full resize-none bg-transparent text-[15px] leading-7 text-slate-800 placeholder:text-slate-300 outline-none md:h-[340px] md:text-[16px]"
+                            />
+                        </div>
+
+                        <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6 md:py-5">
+                            <div className="mb-3 flex items-center justify-between">
+                                <div>
+                                    <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">이미지</div>
+                                    <p className="mt-1 text-[13px] text-slate-500">최대 3장까지 업로드할 수 있습니다.</p>
+                                </div>
+                                <span className="text-[12px] font-semibold text-slate-400">{imageFiles.length}/3</span>
+                            </div>
+
+                            <div className="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
+                                {imageUrls.map((url, index) => (
+                                    <div
+                                        key={index}
+                                        className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                                    >
+                                        <img src={url} alt={`preview ${index + 1}`} className="h-full w-full object-cover" />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(index)}
+                                            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {imageFiles.length < 3 && (
+                                    <label className="flex h-24 w-24 flex-shrink-0 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-slate-400 transition-colors hover:bg-slate-100">
+                                        <ImagePlus size={24} className="mb-1" />
+                                        <span className="text-[11px] font-semibold">추가</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            className="hidden"
+                                            onChange={handleImageChange}
+                                        />
+                                    </label>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </form>
             </div>
 
-            <main className="p-5">
-                {/* Category Selector */}
-                <div className="mb-6 relative">
-                    <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value as any)}
-                        className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-900 text-[15px] font-bold rounded-xl px-4 py-3.5 outline-none focus:border-slate-400 transition-colors"
+            {isDateModalOpen && (
+                <div
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 px-4"
+                    onClick={() => setIsDateModalOpen(false)}
+                >
+                    <div
+                        className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(0,0,0,0.18)] md:p-6"
+                        onClick={(event) => event.stopPropagation()}
                     >
-                        <option value="qna">💡 질문&답변 (궁금해요)</option>
-                        <option value="companion">🤝 동행 구하기 (일정이 맞아요)</option>
-                        <option value="info">🗺️ 현지 꿀팁 (후기/정보글)</option>
-                    </select>
-                    <ChevronDown size={20} className="absolute right-4 top-[15px] text-slate-400 pointer-events-none" />
-                </div>
+                        <div className="mb-5 flex items-start justify-between">
+                            <div>
+                                <h2 className="text-[18px] font-semibold text-slate-900">동행 날짜 선택</h2>
+                                <p className="mt-1 text-[13px] text-slate-500">체험 날짜 선택처럼 달력에서 하루를 고르세요.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsDateModalOpen(false)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
 
-                {/* Companion Fields */}
-                {category === 'companion' && (
-                    <div className="flex gap-3 mb-6">
-                        <input
-                            type="date"
-                            value={companionDate}
-                            onChange={(e) => setCompanionDate(e.target.value)}
-                            className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-[15px] font-medium rounded-xl px-4 py-3 outline-none focus:border-slate-400"
+                        <DatePicker
+                            selectedRange={selectedDateRange}
+                            onChange={(range) => setDraftCompanionDate(range.start ?? null)}
+                            mode="single"
                         />
-                        <input
-                            type="text"
-                            placeholder="도시 (예: 도쿄, 오사카)"
-                            value={companionCity}
-                            onChange={(e) => setCompanionCity(e.target.value)}
-                            className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-[15px] font-medium rounded-xl px-4 py-3 outline-none focus:border-slate-400"
-                        />
-                    </div>
-                )}
 
-                {/* Title */}
-                <input
-                    type="text"
-                    placeholder="제목을 입력하세요."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full text-[22px] font-bold text-slate-900 placeholder:text-slate-300 outline-none mb-6 mt-2"
-                />
-
-                {/* Content */}
-                <textarea
-                    placeholder="내용을 자세히 작성해주세요. 현지 호스트와 여행자들이 답변을 달아줄 거예요!"
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    className="w-full h-[300px] text-[16px] text-slate-800 placeholder:text-slate-300 leading-relaxed outline-none resize-none mb-6"
-                />
-
-                {/* Image Upload Area */}
-                <div>
-                    <div className="flex items-center gap-3 overflow-x-auto pb-4 no-scrollbar">
-                        {imageUrls.map((url, index) => (
-                            <div key={index} className="relative w-24 h-24 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200">
-                                <img src={url} alt={`preview ${index}`} className="w-full h-full object-cover" />
+                        <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => setDraftCompanionDate(null)}
+                                className="text-[13px] font-semibold text-slate-500 underline underline-offset-4"
+                            >
+                                지우기
+                            </button>
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => removeImage(index)}
-                                    className="absolute top-1 right-1 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 backdrop-blur-sm"
+                                    type="button"
+                                    onClick={() => setIsDateModalOpen(false)}
+                                    className="rounded-full border border-slate-200 px-4 py-2 text-[13px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                                 >
-                                    <X size={14} />
+                                    취소
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCompanionDate(formatDateForStorage(draftCompanionDate));
+                                        setIsDateModalOpen(false);
+                                    }}
+                                    className="rounded-full bg-slate-900 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-black"
+                                >
+                                    선택 완료
                                 </button>
                             </div>
-                        ))}
-
-                        {imageFiles.length < 3 && (
-                            <label className="w-24 h-24 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-100 transition-colors flex-shrink-0">
-                                <ImagePlus size={24} className="mb-1" />
-                                <span className="text-[11px] font-semibold">{imageFiles.length}/3</span>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    className="hidden"
-                                    onChange={handleImageChange}
-                                />
-                            </label>
-                        )}
+                        </div>
                     </div>
                 </div>
-
-            </main>
+            )}
         </div>
     );
 }

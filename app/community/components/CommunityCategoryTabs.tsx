@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 const tabs = [
+    { id: 'all', label: '전체보기' },
     { id: 'qna', label: '💡 Q&A' },
     { id: 'companion', label: '🤝 동행 찾기' },
     { id: 'info', label: '🗺️ 현지 꿀팁' },
@@ -13,7 +14,7 @@ const tabs = [
 export default function CommunityCategoryTabs() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const currentCategory = searchParams.get('category') || 'qna';
+    const currentCategory = searchParams.get('category') || 'all';
     const currentQuery = searchParams.get('q') || '';
     const currentSort = searchParams.get('sort') || 'latest';
 

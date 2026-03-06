@@ -3,18 +3,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Search } from 'lucide-react';
-import type { CommunityCategory } from '@/app/types/community';
+import type { CommunityFilterCategory } from '@/app/types/community';
 
 type SortOption = 'latest' | 'popular';
 type OpenLayer = 'category' | 'sort' | null;
 
 interface CommunitySearchControlsProps {
-    currentCategory: CommunityCategory;
+    currentCategory: CommunityFilterCategory;
     currentQuery: string;
     currentSort: SortOption;
 }
 
-const SEARCH_CATEGORIES: { id: CommunityCategory; label: string }[] = [
+const SEARCH_CATEGORIES: { id: CommunityFilterCategory; label: string }[] = [
+    { id: 'all', label: '전체보기' },
     { id: 'qna', label: 'Q&A' },
     { id: 'companion', label: '동행' },
     { id: 'info', label: '꿀팁' },
@@ -71,7 +72,7 @@ export default function CommunitySearchControls({
     const router = useRouter();
     const rootRef = useRef<HTMLFormElement>(null);
     const [query, setQuery] = useState(currentQuery);
-    const [category, setCategory] = useState<CommunityCategory>(currentCategory);
+    const [category, setCategory] = useState<CommunityFilterCategory>(currentCategory);
     const [sort, setSort] = useState<SortOption>(currentSort);
     const [openLayer, setOpenLayer] = useState<OpenLayer>(null);
 
@@ -104,7 +105,7 @@ export default function CommunitySearchControls({
     }, []);
 
     const selectedCategoryLabel = useMemo(
-        () => SEARCH_CATEGORIES.find((item) => item.id === category)?.label || 'Q&A',
+        () => SEARCH_CATEGORIES.find((item) => item.id === category)?.label || '전체보기',
         [category],
     );
 
@@ -113,7 +114,7 @@ export default function CommunitySearchControls({
         [sort],
     );
 
-    const pushSearch = (nextCategory: CommunityCategory, nextQuery: string, nextSort: SortOption) => {
+    const pushSearch = (nextCategory: CommunityFilterCategory, nextQuery: string, nextSort: SortOption) => {
         const params = new URLSearchParams();
         params.set('category', nextCategory);
         if (nextQuery.trim()) params.set('q', nextQuery.trim());
@@ -127,7 +128,7 @@ export default function CommunitySearchControls({
         setOpenLayer(null);
     };
 
-    const handleCategorySelect = (nextCategory: CommunityCategory) => {
+    const handleCategorySelect = (nextCategory: CommunityFilterCategory) => {
         setCategory(nextCategory);
         setOpenLayer(null);
         pushSearch(nextCategory, query, sort);

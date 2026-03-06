@@ -45,7 +45,8 @@ function PostGridSkeleton() {
 
 // ─── Empty State ─────────────────────────────────────────────────────────────
 function EmptyState({ category, query }: { category: string; query: string }) {
-    const writeHref = category ? `/community/write?category=${category}` : '/community/write?category=qna';
+    const writeCategory = category && category !== 'all' ? category : 'qna';
+    const writeHref = `/community/write?category=${writeCategory}`;
     const isSearchMode = Boolean(query.trim());
 
     return (

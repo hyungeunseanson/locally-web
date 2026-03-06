@@ -9,7 +9,7 @@ import CommunitySearchControls from './components/CommunitySearchControls';
 import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
-import type { CommunityCategory } from '@/app/types/community';
+import type { CommunityCategory, CommunityFilterCategory } from '@/app/types/community';
 
 // ✅ Vercel 엣지 캐시 비활성화 — 새 글 등록 후 피드가 구 버전 캐시를 서빙하는 버그 방지
 export const dynamic = 'force-dynamic';
@@ -40,9 +40,9 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     const params = await searchParams;
 
     // 기본 디폴트 탭 (값이 없거나 이상하면 qna)
-    let category = (params?.category as string) || 'qna';
-    if (!['qna', 'companion', 'info', 'locally_content'].includes(category)) {
-        category = 'qna';
+    let category = (params?.category as string) || 'all';
+    if (!['all', 'qna', 'companion', 'info', 'locally_content'].includes(category)) {
+        category = 'all';
     }
     const queryText = ((params?.q as string) || '').trim().replace(/,/g, ' ');
     const sort = (params?.sort as string) === 'popular' ? 'popular' : 'latest';
@@ -55,7 +55,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         .select('*')
         .range(0, limit - 1);
 
-    if (category) {
+    if (category && category !== 'all') {
         query = query.eq('category', category);
     }
 
@@ -104,6 +104,8 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
     const initialNextOffset = (posts && posts.length === limit) ? limit : null;
 
+    const writeCategory = category === 'all' ? 'qna' : category;
+
     return (
         <>
             <SiteHeader />
@@ -121,7 +123,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                             </div>
 
                             <CommunitySearchControls
-                                currentCategory={category as CommunityCategory}
+                                currentCategory={category as CommunityFilterCategory}
                                 currentQuery={queryText}
                                 currentSort={sort}
                             />
@@ -143,14 +145,14 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
                         {/* ─── 우측 사이드바 (4/12, 모바일 hidden) ─── */}
                         <div className="col-span-1 lg:col-span-4 hidden lg:flex flex-col">
-                            <RightSidebar category={category as CommunityCategory} />
+                            <RightSidebar category={writeCategory as CommunityCategory} />
                         </div>
                     </div>
                 </div>
             </div>
 
             <Link
-                href={`/community/write?category=${category}`}
+                href={`/community/write?category=${writeCategory}`}
                 className="block lg:hidden fixed bottom-20 right-4 w-12 h-12 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
                 aria-label="글쓰기"
             >

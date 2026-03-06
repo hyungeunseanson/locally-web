@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient();
-        const allowedCategories = new Set(['qna', 'companion', 'info']);
+        const allowedCategories = new Set(['qna', 'companion', 'info', 'locally_content']);
 
         // Check Authentication
         const { data: { user }, error: authError } = await supabase.auth.getUser();

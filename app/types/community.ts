@@ -1,6 +1,7 @@
 import { Profile, Experience } from './index';
 
 export type CommunityCategory = 'qna' | 'companion' | 'info' | 'locally_content';
+export type CommunityFilterCategory = CommunityCategory | 'all';
 
 export interface CommunityPost {
     id: string;
