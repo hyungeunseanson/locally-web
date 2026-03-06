@@ -241,7 +241,7 @@ export default function ServiceRequestDetailPage() {
           <div className="flex items-center">
             {MATCHING_STEPS.map((step, idx) => {
               const done = idx < currentStepIndex;
-              const active = idx === currentStepIndex - 1 || (currentStepIndex === 0 && idx === 0);
+              const active = idx === currentStepIndex;
               const StepIcon = step.icon;
               return (
                 <React.Fragment key={idx}>
