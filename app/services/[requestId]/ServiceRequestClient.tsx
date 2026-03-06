@@ -488,20 +488,6 @@ export default function ServiceRequestDetailPage() {
           </div>
         )}
 
-        {/* ── [고객 뷰] 매칭 완료 후 호스트에게 메시지 ── */}
-        {isOwner && isActiveServiceRequest(request.status) && request.selected_host_id && (
-          <div className="mb-4 flex justify-center">
-            <button
-              onClick={handleOpenMessage}
-              disabled={sendingMessage}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-[13px] md:text-sm text-white disabled:opacity-60 transition-all active:scale-[0.98]"
-              style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)' }}
-            >
-              <MessageCircle size={14} /> {t('msg_send_to_host')}
-            </button>
-          </div>
-        )}
-
         {/* ── [호스트 뷰] 지원 상태 / CTA ── */}
         {!isOwner && !isSelectedHost && currentUserId && (
           <div className="mb-4">
@@ -640,9 +626,9 @@ export default function ServiceRequestDetailPage() {
               reviewCount: app.review_count,
               rating: app.review_avg,
               joinedYear: app.profiles?.created_at ? new Date(app.profiles.created_at).getFullYear() : undefined,
-              job: app.host_applications?.profession || undefined,
-              dreamDestination: app.host_applications?.dream_destination || undefined,
-              favoriteSong: app.host_applications?.favorite_song || undefined,
+              job: app.host_applications?.profession || app.profiles?.job || undefined,
+              dreamDestination: app.host_applications?.dream_destination || app.profiles?.dream_destination || undefined,
+              favoriteSong: app.host_applications?.favorite_song || app.profiles?.favorite_song || undefined,
               languages: (() => { const names = getLanguageNames(normalizeLanguageLevels(app.host_applications?.language_levels, app.host_applications?.languages ?? app.profiles?.languages)); return names.length > 0 ? names : undefined; })(),
               intro: app.host_applications?.self_intro || app.profiles?.bio || undefined,
               onContactHost: () => {

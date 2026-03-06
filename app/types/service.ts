@@ -111,6 +111,9 @@ export type ServiceApplicationWithProfile = ServiceApplication & {
     bio: string | null;
     languages: string[] | null;
     created_at: string | null;
+    job: string | null;
+    dream_destination: string | null;
+    favorite_song: string | null;
   } | null;
   host_applications?: {
     name: string | null;
