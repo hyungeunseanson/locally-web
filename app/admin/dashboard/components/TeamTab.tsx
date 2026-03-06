@@ -718,8 +718,8 @@ export default function TeamTab() {
                               )}
                             </div>
 
-                            {/* 리치 텍스트 렌더러 기반 뷰어 */}
-                            <div className="flex-1 overflow-y-auto prose prose-slate max-w-none text-[11px] md:text-[13px] [&_p]:text-[11px] md:[&_p]:text-[13px] [&_p]:text-slate-700 [&_p]:leading-relaxed [&_li]:text-[11px] md:[&_li]:text-[13px] [&_li]:text-slate-700 [&_img]:max-w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-xl [&_img]:shadow-sm [&_img]:cursor-pointer hover:[&_img]:opacity-90 [&_img]:transition-opacity [&_img]:my-2 [&_a]:text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
+                            {/* 리치 텍스트 렌더러 기반 뷰어 (본문 높이 고정 유지) */}
+                            <div className="shrink-0 min-h-[150px] md:min-h-[210px] max-h-[32vh] md:h-[210px] md:max-h-[210px] overflow-y-auto prose prose-slate max-w-none text-[11px] md:text-[13px] [&_p]:text-[11px] md:[&_p]:text-[13px] [&_p]:text-slate-700 [&_p]:leading-relaxed [&_li]:text-[11px] md:[&_li]:text-[13px] [&_li]:text-slate-700 [&_img]:max-w-[50%] [&_img]:h-auto [&_img]:object-contain [&_img]:rounded-xl [&_img]:shadow-sm [&_img]:cursor-pointer hover:[&_img]:opacity-90 [&_img]:transition-opacity [&_img]:my-2 [&_a]:text-blue-600 prose-headings:font-bold prose-headings:text-slate-800 prose-blockquote:border-l-4 prose-blockquote:border-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 pr-2 scrollbar-thin">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
@@ -739,8 +739,8 @@ export default function TeamTab() {
                             </div>
 
                             {/* 댓글 구역 */}
-                            <div className="mt-4 pt-5 border-t-2 border-slate-100 shrink-0 space-y-3 bg-slate-50/80 -mx-4 md:-mx-6 -mb-4 md:-mb-6 p-4 md:p-5 rounded-b-2xl shadow-inner">
-                              <div className="max-h-64 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                            <div className="mt-4 pt-5 border-t-2 border-slate-100 shrink-0 flex flex-col h-[260px] md:h-[220px] bg-slate-50/80 -mx-4 md:-mx-6 -mb-4 md:-mb-6 p-4 md:p-5 rounded-b-2xl shadow-inner">
+                              <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                                 {memoComments.length === 0 ? (
                                   <p className="text-[10px] md:text-[11px] text-slate-400/80 text-center py-2 font-medium">작성된 답글이 없습니다.</p>
                                 ) : (
@@ -755,7 +755,7 @@ export default function TeamTab() {
                                   ))
                                 )}
                               </div>
-                              <div className="flex gap-2 pt-2 border-t border-slate-200/50 mt-1">
+                              <div className="flex gap-2 pt-2 border-t border-slate-200/50 mt-2 shrink-0">
                                 <textarea
                                   rows={4}
                                   placeholder="진행 상황이나 의견을 남겨주세요..."
