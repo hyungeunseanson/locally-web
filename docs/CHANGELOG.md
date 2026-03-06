@@ -5,6 +5,17 @@
 
 ---
 
+## v3.36.0 — [맞춤의뢰] 호스트 프로필 모달 연락하기 기능 + 고객센터 커스텀 모달
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 ServiceRequestClient 호스트 프로필 모달 연락하기 | HostProfileModal의 "호스트에게 연락하기" 버튼에 `onContactHost` 콜백 연결. 클릭 시 ExpMainContent와 동일한 textarea 메시지 모달(z-[210], 모바일 bottom sheet h-[88dvh] / 데스크탑 max-w-[560px]) 표시. inquiry(experience_id=null) find-or-create 후 inquiry_messages insert → `/guest/inbox?hostId=X` 이동. |
+| 🔴 고객센터 1:1 문의 커스텀 모달 | `help/page.tsx`의 `prompt()` + `confirm()` 브라우저 네이티브 팝업 제거. 동일한 디자인 커스텀 textarea 모달로 교체. 제출 성공 시 toast + `/guest/inbox` 이동. |
+
+---
+
 ## v3.35.0 — [맞춤의뢰] 매칭 후 1:1 메시지·언어레벨·고객센터 링크 개선
 
 **작업일:** 2026-03-06

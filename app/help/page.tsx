@@ -97,6 +97,9 @@ export default function HelpCenterPage() {
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [helpContent, setHelpContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supabase = createClient();
   const router = useRouter();
@@ -131,19 +134,17 @@ export default function HelpCenterPage() {
     router.push(pathname?.startsWith('/host') ? '/host/menu' : '/account');
   };
 
-  // 1:1 문의 로직 (기존 유지)
-  const handleAdminSupport = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      alert("로그인이 필요한 서비스입니다.");
-      router.push('/login');
-      return;
-    }
-
-    const content = prompt("문의하실 내용을 입력해주세요. 관리자가 확인 후 답변드립니다.");
-    if (!content) return;
-
+  // 1:1 문의 제출
+  const handleHelpSubmit = async () => {
+    if (!helpContent.trim()) return;
+    setIsSubmitting(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
       const { data: whitelistEntries, error: whitelistError } = await supabase
         .from('admin_whitelist')
         .select('email');
@@ -175,7 +176,7 @@ export default function HelpCenterPage() {
         .insert({
           host_id: randomAdmin.id,
           user_id: user.id,
-          content: content,
+          content: helpContent.trim(),
           type: 'admin_support'
         })
         .select()
@@ -188,12 +189,13 @@ export default function HelpCenterPage() {
         .insert({
           inquiry_id: room.id,
           sender_id: user.id,
-          content: content
+          content: helpContent.trim()
         });
 
-      if (confirm("문의가 접수되었습니다. 메시지함으로 이동하시겠습니까?")) {
-        router.push('/guest/inbox');
-      }
+      setHelpModalOpen(false);
+      setHelpContent('');
+      showToast('문의가 접수되었습니다.', 'success');
+      router.push('/guest/inbox');
     } catch (e: unknown) {
       console.error("문의 접수 실패:", e);
       const dbError = e as { code?: string, message?: string };
@@ -204,6 +206,8 @@ export default function HelpCenterPage() {
       }
 
       showToast("문의 접수 실패: " + message, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -309,7 +313,7 @@ export default function HelpCenterPage() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-3 md:gap-6">
             <button
-              onClick={handleAdminSupport}
+              onClick={() => setHelpModalOpen(true)}
               className="bg-black text-white px-6 md:px-8 py-3 md:py-4 text-[12px] md:text-[13px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors flex items-center justify-center gap-2 md:gap-3 shadow-lg"
             >
               <MessageCircle size={18} /> {t('btn_chat_support')}
@@ -323,6 +327,51 @@ export default function HelpCenterPage() {
           </div>
         </div>
       </main>
+
+      {/* ── 1:1 문의 모달 ── */}
+      {helpModalOpen && (
+        <div
+          className="fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end md:items-center md:justify-center md:p-4"
+          onClick={() => { setHelpModalOpen(false); setHelpContent(''); }}
+        >
+          <div
+            className="w-full h-[88dvh] bg-[#fcfcfc] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col md:h-auto md:max-h-[78dvh] md:max-w-[560px] md:rounded-[28px] md:px-7 md:pt-6 md:pb-6 md:shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-end mb-1">
+              <button onClick={() => { setHelpModalOpen(false); setHelpContent(''); }} className="p-1.5 text-slate-600">
+                <span className="sr-only">닫기</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">1:1 문의하기</h3>
+            <p className="text-[11px] md:text-[13px] text-slate-500 leading-snug md:leading-relaxed mb-4 md:mb-5">
+              관리자가 확인 후 <span className="underline underline-offset-2">메시지함으로 답변드립니다.</span>
+            </p>
+            <textarea
+              value={helpContent}
+              onChange={(e) => setHelpContent(e.target.value)}
+              placeholder="문의하실 내용을 입력해주세요."
+              className="w-full h-[122px] md:h-[170px] rounded-2xl border border-slate-300 bg-white px-4 py-3 md:px-5 md:py-4 text-[12px] md:text-[14px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
+            />
+            <div className="mt-auto md:mt-5">
+              <button
+                onClick={handleHelpSubmit}
+                disabled={!helpContent.trim() || isSubmitting}
+                className={`w-full rounded-2xl py-3 md:py-3.5 text-[13px] md:text-[15px] font-medium ${
+                  !helpContent.trim() || isSubmitting
+                    ? 'bg-slate-300 text-slate-50'
+                    : 'bg-[#111827] text-white'
+                }`}
+              >
+                {isSubmitting ? '전송 중...' : '문의 접수'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

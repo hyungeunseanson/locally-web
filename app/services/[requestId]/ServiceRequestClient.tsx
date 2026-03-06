@@ -67,6 +67,9 @@ export default function ServiceRequestDetailPage() {
   const [hostModal, setHostModal] = useState<{ open: boolean; hostId: string | null }>({ open: false, hostId: null });
   const [confirmTarget, setConfirmTarget] = useState<{ applicationId: string; hostName: string } | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [contactModal, setContactModal] = useState<{ hostId: string; hostName: string } | null>(null);
+  const [contactText, setContactText] = useState('');
+  const [sendingContact, setSendingContact] = useState(false);
 
   const isOwner = currentUserId !== null && currentUserId === request?.user_id;
   const isSelectedHost = currentUserId !== null && currentUserId === request?.selected_host_id;
@@ -123,6 +126,49 @@ export default function ServiceRequestDetailPage() {
       showToast(t('server_error'), 'error');
     } finally {
       setSendingMessage(false);
+    }
+  };
+
+  const handleContactSubmit = async () => {
+    if (!contactModal || !contactText.trim()) return;
+    setSendingContact(true);
+    try {
+      const { data: existing } = await supabase
+        .from('inquiries')
+        .select('id')
+        .eq('user_id', currentUserId!)
+        .eq('host_id', contactModal.hostId)
+        .is('experience_id', null)
+        .maybeSingle();
+
+      let inquiryId: string | number;
+      if (existing) {
+        inquiryId = existing.id;
+      } else {
+        const { data: newInq, error: insertError } = await supabase
+          .from('inquiries')
+          .insert({ user_id: currentUserId, host_id: contactModal.hostId, content: contactText.trim(), type: 'general' })
+          .select()
+          .maybeSingle();
+        if (insertError || !newInq) throw insertError;
+        inquiryId = newInq.id;
+      }
+
+      await supabase.from('inquiry_messages').insert({
+        inquiry_id: inquiryId,
+        sender_id: currentUserId,
+        content: contactText.trim(),
+        is_read: false,
+      });
+
+      showToast('메시지를 보냈습니다.', 'success');
+      setContactModal(null);
+      setContactText('');
+      router.push(`/guest/inbox?hostId=${contactModal.hostId}`);
+    } catch {
+      showToast(t('server_error'), 'error');
+    } finally {
+      setSendingContact(false);
     }
   };
 
@@ -534,6 +580,51 @@ export default function ServiceRequestDetailPage() {
         </div>
       )}
 
+      {/* ── 호스트에게 연락하기 메시지 모달 ── */}
+      {contactModal && (
+        <div
+          className="fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end md:items-center md:justify-center md:p-4"
+          onClick={() => { setContactModal(null); setContactText(''); }}
+        >
+          <div
+            className="w-full h-[88dvh] bg-[#fcfcfc] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col md:h-auto md:max-h-[78dvh] md:max-w-[560px] md:rounded-[28px] md:px-7 md:pt-6 md:pb-6 md:shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-end mb-1">
+              <button onClick={() => { setContactModal(null); setContactText(''); }} className="p-1.5 text-slate-600">
+                <span className="sr-only">닫기</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{contactModal.hostName}님에게 메시지 보내기</h3>
+            <p className="text-[11px] md:text-[13px] text-slate-500 leading-snug md:leading-relaxed mb-4 md:mb-5">
+              매칭된 호스트에게 <span className="underline underline-offset-2">메시지를 보내세요.</span>
+            </p>
+            <textarea
+              value={contactText}
+              onChange={(e) => setContactText(e.target.value)}
+              placeholder="호스트에게 전달할 내용을 입력해주세요."
+              className="w-full h-[122px] md:h-[170px] rounded-2xl border border-slate-300 bg-white px-4 py-3 md:px-5 md:py-4 text-[12px] md:text-[14px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
+            />
+            <div className="mt-auto md:mt-5">
+              <button
+                onClick={handleContactSubmit}
+                disabled={!contactText.trim() || sendingContact}
+                className={`w-full rounded-2xl py-3 md:py-3.5 text-[13px] md:text-[15px] font-medium ${
+                  !contactText.trim() || sendingContact
+                    ? 'bg-slate-300 text-slate-50'
+                    : 'bg-[#111827] text-white'
+                }`}
+              >
+                {sendingContact ? '전송 중...' : '메시지 보내기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 호스트 프로필 모달 ── */}
       {(() => {
         const app = hostModal.hostId ? applications.find((a) => a.host_id === hostModal.hostId) : null;
@@ -554,6 +645,10 @@ export default function ServiceRequestDetailPage() {
               favoriteSong: app.host_applications?.favorite_song || undefined,
               languages: (() => { const names = getLanguageNames(normalizeLanguageLevels(app.host_applications?.language_levels, app.host_applications?.languages ?? app.profiles?.languages)); return names.length > 0 ? names : undefined; })(),
               intro: app.host_applications?.self_intro || app.profiles?.bio || undefined,
+              onContactHost: () => {
+                setHostModal({ open: false, hostId: null });
+                setContactModal({ hostId: app.host_id, hostName: modalName });
+              },
             }}
           />
         );
