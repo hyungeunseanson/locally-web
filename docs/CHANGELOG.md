@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.1 — [팀 워크스페이스] Shift+Enter 버그 수정 + 메모 줄바꿈 + 댓글 표시 영역 확장
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Shift+Enter 버그 수정 | 팀 할 일/메모 댓글 textarea onKeyDown에서 `e.shiftKey` → `native.shiftKey` 로 변경. `if (e.key === 'Enter') { if (native.shiftKey) return; ... }` 패턴으로 재구성하여 Shift+Enter 줄바꿈 정상 동작 |
+| 🔴 팀 메모장 내용 줄바꿈 | ReactMarkdown+remarkGfm은 단일 `\n`을 무시 → 렌더링 전 `memo.content.replace(/\n/g, '  \n')` 처리(Markdown 소프트 브레이크) |
+| 🔴 팀 메모장 댓글 표시 영역 확장 | 댓글 목록 컨테이너 `max-h-32` → `max-h-64` (128px → 256px, 2배) |
+
 ## v3.37.0 — [팀 워크스페이스] 줄바꿈 지원 + 메모 댓글 입력 확장
 
 **작업일:** 2026-03-06

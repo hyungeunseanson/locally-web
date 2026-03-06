@@ -599,8 +599,10 @@ export default function TeamTab() {
                               disabled={Boolean(isSubmittingCommentByTaskId[todo.id])}
                               onChange={e => setNewComment(e.target.value)}
                               onKeyDown={e => {
-                                if ((e.nativeEvent as KeyboardEvent).isComposing) return;
-                                if (e.key === 'Enter' && !e.shiftKey) {
+                                const native = e.nativeEvent as KeyboardEvent;
+                                if (native.isComposing) return;
+                                if (e.key === 'Enter') {
+                                  if (native.shiftKey) return;
                                   e.preventDefault();
                                   addComment(todo.id);
                                 }
@@ -717,13 +719,13 @@ export default function TeamTab() {
                                   )
                                 }}
                               >
-                                {memo.content}
+                                {memo.content.replace(/\n/g, '  \n')}
                               </ReactMarkdown>
                             </div>
 
                             {/* 댓글 구역 */}
                             <div className="mt-4 pt-5 border-t-2 border-slate-100 shrink-0 space-y-3 bg-slate-50/80 -mx-4 md:-mx-6 -mb-4 md:-mb-6 p-4 md:p-5 rounded-b-2xl shadow-inner">
-                              <div className="max-h-32 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                              <div className="max-h-64 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                                 {memoComments.length === 0 ? (
                                   <p className="text-[10px] md:text-[11px] text-slate-400/80 text-center py-2 font-medium">작성된 답글이 없습니다.</p>
                                 ) : (
@@ -746,8 +748,10 @@ export default function TeamTab() {
                                   disabled={Boolean(isSubmittingCommentByTaskId[memo.id])}
                                   onChange={e => setMemoCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
                                   onKeyDown={e => {
-                                    if ((e.nativeEvent as KeyboardEvent).isComposing) return;
-                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                    const native = e.nativeEvent as KeyboardEvent;
+                                    if (native.isComposing) return;
+                                    if (e.key === 'Enter') {
+                                      if (native.shiftKey) return;
                                       e.preventDefault();
                                       addMemoComment(memo.id);
                                     }
