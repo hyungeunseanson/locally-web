@@ -544,7 +544,22 @@ export default function TeamTab() {
             <div className="flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-2 md:p-4 overflow-hidden shadow-sm" ref={threadRef}>
               <div className="flex items-center gap-1 mb-2"><CheckSquare size={11} className="text-green-500" /><h3 className="text-[8px] md:text-base font-bold text-slate-800">팀 할 일</h3></div>
               <div className="flex flex-col md:flex-row gap-1.5 mb-2.5">
-                <input type="text" value={newTodo} onChange={e => setNewTodo(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="할 일 추가..." className="flex-1 text-[10px] md:text-sm border border-slate-200 rounded-md px-2 py-2 md:py-1.5 outline-none placeholder:text-slate-400" />
+                <textarea
+                  rows={2}
+                  value={newTodo}
+                  onChange={e => setNewTodo(e.target.value)}
+                  onKeyDown={e => {
+                    const native = e.nativeEvent as KeyboardEvent;
+                    if (native.isComposing) return;
+                    if (e.key === 'Enter') {
+                      if (native.shiftKey) return;
+                      e.preventDefault();
+                      addTodo();
+                    }
+                  }}
+                  placeholder="할 일 추가..."
+                  className="flex-1 text-[10px] md:text-sm border border-slate-200 rounded-md px-2 py-2 md:py-1.5 outline-none placeholder:text-slate-400 resize-none"
+                />
                 <button onClick={addTodo} className="bg-slate-900 text-white p-2 md:p-1.5 text-[10px] md:text-sm flex justify-center items-center rounded-md font-bold hover:bg-slate-800 transition-colors"><Plus size={14} className="md:hidden" /><span className="hidden md:inline">추가</span></button>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
