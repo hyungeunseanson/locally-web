@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Globe, Instagram, ChevronDown, ChevronUp, X } from 'lucide-react';
 // ❗ 아래 경로는 아까 만드신 파일 위치와 정확히 일치해야 합니다.
 import { TERMS_OF_USE, PRIVACY_POLICY, TRAVEL_TERMS, REFUND_POLICY } from '@/app/constants/legalText';
@@ -9,6 +10,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function SiteFooter() {
   const { t, lang } = useLanguage();
+  const pathname = usePathname();
   const [instaOpen, setInstaOpen] = useState(false);
 
 
@@ -46,6 +48,11 @@ export default function SiteFooter() {
       default: return '한국어 (KR)';
     }
   };
+
+  if (pathname?.startsWith('/become-a-host2')) {
+    return null;
+  }
+
   return (
     <>
       <footer className="hidden md:block bg-white border-t border-[#DDDDDD] pt-12 pb-6 text-sm text-[#222222] font-sans">
