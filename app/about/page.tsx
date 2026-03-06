@@ -2,10 +2,43 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Star, Search, CheckCircle2, MessageCircle, Calendar, ShieldCheck, Heart, Globe, Users, MapPin, ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown, CheckCircle2, Compass, Globe, Heart, MessageCircle, MoonStar, Palette, Search, ShieldCheck, ShoppingBag, Sparkles, Star, Trees, Users, UtensilsCrossed } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 
 // --- [Components] ---dd
+
+const tastePillars = [
+  {
+    icon: Compass,
+    title: '동네 산책과 일상 탐방',
+    description: '길 하나, 빵집 하나, 작은 골목 하나까지. 관광보다 생활에 가까운 로컬 무드를 천천히 경험해보세요.',
+  },
+  {
+    icon: UtensilsCrossed,
+    title: '현지 식문화와 테이블',
+    description: '이자카야, 빵집, 시장, 쿠킹 클래스까지. 한 도시의 취향이 음식으로 어떻게 이어지는지 만납니다.',
+  },
+  {
+    icon: ShoppingBag,
+    title: '빈티지와 취향 쇼핑',
+    description: '가이드북 대신 호스트의 감각으로. 오래 머무는 사람만 아는 상점과 동네 취향을 따라갑니다.',
+  },
+  {
+    icon: Trees,
+    title: '도시 밖의 자연 액티비티',
+    description: '조용한 워킹 코스, 바다, 숲과 같은 숨은 장소에서 여행의 리듬을 잠시 늦춰보세요.',
+  },
+  {
+    icon: Palette,
+    title: '아트와 원데이 클래스',
+    description: '창작자와 함께하는 짧은 수업, 전시, 공방 경험으로 여행을 더 오래 남는 기억으로 만듭니다.',
+  },
+  {
+    icon: MoonStar,
+    title: '밤의 로컬 무드',
+    description: '해가 진 뒤에 시작되는 도시의 분위기. 바, 야경, 심야 산책처럼 밤에만 열리는 감정을 소개합니다.',
+  },
+];
 
 function AirbnbCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -167,98 +200,79 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 3. LISTING: 진짜 로컬리 체험 (리얼 데이터 반영) */}
-      <section className="py-14 md:py-32 px-4 md:px-6 max-w-[1600px] mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-8 md:mb-12 gap-4">
-          <div>
-            <h2 className="text-[27px] md:text-4xl font-[900] text-[#222222] mb-2 md:mb-3 tracking-tight">
+      {/* 3. CURATED TASTE SHOWCASE: 상품 리스트 대신 에디토리얼 큐레이션 */}
+      <section className="py-14 md:py-28 px-4 md:px-6 max-w-[1440px] mx-auto">
+        <div className="mb-8 md:mb-12 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5 md:gap-8">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-500 mb-4 md:mb-5">
+              <Sparkles size={14} className="text-rose-500" />
+              Curated on Locally
+            </div>
+            <h2 className="text-[29px] md:text-5xl font-[900] text-[#222222] mb-3 tracking-tight leading-[1.04]">
               당신의 취향을 발견하세요
             </h2>
-            <p className="text-[15px] md:text-lg text-[#717171]">가이드북에는 없는, 오직 로컬리에서만 가능한 경험들.</p>
+            <p className="text-[15px] md:text-[19px] text-[#717171] leading-relaxed max-w-xl">
+              가이드북에는 없는, 오직 로컬리에서만 가능한 경험들. 비교하는 리스트가 아니라 어떤 결의 여행을 좋아하는지부터 보여드립니다.
+            </p>
           </div>
-          <Link href="/" className="text-sm font-bold border-b-2 border-black pb-1 hover:text-rose-600 hover:border-rose-600 transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm md:text-base font-bold text-[#222222] hover:text-rose-600 transition-colors group">
             모든 체험 보기
+            <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
 
-        {/* Real Listing Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-8 md:gap-y-10">
-          {[
-            { 
-               title: "미쿠의 도쿄 기치조지 투어", 
-               host: "Miku", 
-               price: "₩40,000", 
-               rating: "4.9", 
-               review: "(18)",
-               img: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=600&auto=format&fit=crop" 
-            },
-            { 
-               title: "유스케의 도쿄 빈티지 투어", 
-               host: "Yusuke", 
-               price: "₩38,000", 
-               rating: "5.0", 
-               review: "(21)",
-               img: "https://images.unsplash.com/photo-1554797589-7241bb691973?q=80&w=600&auto=format&fit=crop" 
-            },
-            { 
-               title: "사치의 교토 데마치야나기 워킹", 
-               host: "Sachi", 
-               price: "₩33,000", 
-               rating: "4.8", 
-               review: "(5)",
-               img: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop" 
-            },
-            { 
-               title: "마유의 8시간 도쿄 정복 투어", 
-               host: "Mayu", 
-               price: "₩95,000", 
-               rating: "5.0", 
-               review: "(3)",
-               badge: "BEST",
-               img: "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=600&auto=format&fit=crop" 
-            },
-            { 
-               title: "카나의 오사카 텐마 이자카야", 
-               host: "Kana", 
-               price: "₩45,000", 
-               rating: "4.9", 
-               review: "(8)",
-               img: "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=600&auto=format&fit=crop" 
-            },
-            { 
-               title: "유우카의 홋카이도 비에이 워킹", 
-               host: "Yuuka", 
-               price: "₩38,000", 
-               rating: "4.7", 
-               review: "(4)",
-               img: "https://images.unsplash.com/photo-1478860409698-8707f313ee8b?q=80&w=600&auto=format&fit=crop" 
-            }
-          ].map((item, idx) => (
-            <div key={idx} className="group cursor-pointer">
-               <div className="aspect-[4/5] rounded-2xl bg-gray-200 overflow-hidden relative mb-3">
-                  <img src={item.img} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={item.title}/>
-                  <div className="absolute top-3 right-3 p-1.5 bg-transparent group-hover:scale-110 transition">
-                     <Heart size={24} className="text-white/80 fill-black/20 hover:fill-rose-500 hover:text-rose-500 transition"/>
-                  </div>
-                  {item.badge && (
-                     <div className="absolute top-3 left-3 bg-white px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide shadow-sm">
-                        {item.badge}
-                     </div>
-                  )}
-               </div>
-               <h3 className="font-bold text-[#222222] text-[14px] md:text-[15px] mb-1 leading-snug group-hover:underline">{item.title}</h3>
-               <div className="text-[13px] md:text-sm text-[#717171] mb-1">Host {item.host}</div>
-               <div className="flex items-center gap-1 mt-1">
-                  <span className="font-bold text-[13px] md:text-sm text-[#222222]">{item.price}</span>
-                  <span className="text-xs text-[#717171]">/ 인</span>
-               </div>
-               <div className="flex items-center gap-1 mt-1 text-xs">
-                  <Star size={12} className="fill-black text-black"/> 
-                  <span className="font-bold">{item.rating}</span>
-                  <span className="text-gray-400">{item.review}</span>
-               </div>
+        <div className="grid gap-4 md:gap-5 lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)] items-stretch">
+          <article className="relative overflow-hidden rounded-[28px] md:rounded-[36px] bg-[#222222] min-h-[440px] md:min-h-[560px]">
+            <img
+              src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1200&auto=format&fit=crop"
+              alt="도쿄 골목의 로컬한 분위기"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+            <div className="relative flex h-full flex-col justify-between p-6 md:p-9 text-white">
+              <div className="flex flex-wrap gap-2">
+                {['Tokyo morning', 'Neighborhood walk', 'Slow travel'].map((label) => (
+                  <span key={label} className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold tracking-[0.12em] uppercase text-white/90 backdrop-blur-sm">
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <div className="max-w-md">
+                <p className="text-xs md:text-sm font-bold uppercase tracking-[0.22em] text-white/70 mb-3">Editor&apos;s Pick</p>
+                <h3 className="text-[30px] md:text-[46px] font-[900] leading-[0.98] tracking-tight mb-4">
+                  동네의 리듬을
+                  <br />
+                  따라가는 여행
+                </h3>
+                <p className="text-sm md:text-lg leading-relaxed text-white/85 max-w-md">
+                  유명 스팟을 찍고 이동하는 일정이 아니라, 오래 머문 사람만 아는 속도와 취향을 따라가는 여행. 로컬리는 이런 경험을 큐레이션합니다.
+                </p>
+              </div>
             </div>
-          ))}
+          </article>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+            {tastePillars.map((pillar) => {
+              const Icon = pillar.icon;
+
+              return (
+                <article
+                  key={pillar.title}
+                  className="group flex h-full flex-col rounded-[26px] border border-stone-200 bg-white p-5 md:p-6 shadow-[0_12px_40px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-1 hover:shadow-[0_16px_48px_rgba(15,23,42,0.08)]"
+                >
+                  <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50 text-[#222222] transition-colors group-hover:bg-rose-50 group-hover:text-rose-600">
+                    <Icon size={22} strokeWidth={1.9} />
+                  </div>
+                  <h3 className="text-[18px] md:text-[20px] font-[800] leading-[1.2] tracking-tight text-[#222222] mb-3">
+                    {pillar.title}
+                  </h3>
+                  <p className="text-[14px] md:text-[15px] leading-relaxed text-[#717171]">
+                    {pillar.description}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
 
