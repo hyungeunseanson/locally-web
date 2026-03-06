@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.5 — [커뮤니티] 검색바 모던 캡슐형 리디자인
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 검색바 전면 리디자인 | `CommunitySearchControls.tsx`의 `select + input + select + button` 폼 구조를 제거하고, 데스크탑은 단일 캡슐형 검색 오브젝트로 재구성 |
+| 🔴 데스크탑 팝오버 필터 | 카테고리/정렬을 native select 대신 rounded pill trigger + lightweight popover로 교체. `ESC` 및 외부 클릭 닫기 지원 |
+| 🔴 모바일 직접 선택 칩 | 모바일은 1행 검색 입력 + 2행 카테고리 칩 + 정렬 segmented pill 구조로 분리하여 터치성과 가독성 개선 |
+| 🟡 탭 위계 보정 | `CommunityCategoryTabs.tsx` active/non-active 대비를 완화해 검색바가 메인 컨트롤로 읽히도록 조정 |
+| 🟡 기능 계약 유지 | `category/q/sort` URL query, 검색 submit, 카테고리/정렬 즉시 반영 로직은 그대로 유지 |
+
 ## v3.37.4 — [커뮤니티] 검색바 도입 + 카테고리 문맥 유지 + Q&A 잔존 UI 제거
 
 **작업일:** 2026-03-06
