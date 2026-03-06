@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.10 — [Host Landing] `/become-a-host2` 데스크톱 벤치마크 픽셀 복제 재구성
+
+**작업일:** 2026-03-07
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 벤치마크 기반 정적 복제 | 첨부된 참조 스크린샷 기준으로 `/become-a-host2` 본문을 데스크톱 전용 픽셀 복제 형태로 재구성 |
+| 🔴 동적 로직 제거 | 기존 `createClient`, `useRouter`, `LoginModal`, 신청 상태 분기 등 호스트 등록 플로우 로직을 전부 제거하고 순수 프론트엔드 랜딩으로 전환 |
+| 🔴 로컬 자산화 | 벤치마크 스크린샷에서 본문/FAQ 구간을 잘라 `public/images/become-host2/main-desktop.webp`, `faq-desktop.webp`로 저장하고 페이지에서 `next/image`로 렌더링 |
+| 🟡 글로벌 푸터 유지 | 본문 복제는 FAQ 섹션 종료 지점까지 맞추고, 그 아래는 기존 `SiteFooter`가 이어지도록 유지 |
+| ✅ 검증 | `npx tsc --noEmit` 통과 예정 기준으로 페이지를 정적 구성. 실제 렌더 확인은 `/become-a-host2` 데스크톱 비교 기준 |
+
 ## v3.37.9 — [Host Landing] `/become-a-host2` 에어비앤비 레퍼런스형 신규 페이지
 
 **작업일:** 2026-03-06
