@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.7 — [커뮤니티] 기본 썸네일 고정 + 작성자명 fallback 정리
+
+**작업일:** 2026-03-06
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 리스트 썸네일 레이아웃 고정 | `PostListCard.tsx`에서 이미지 유무와 관계없이 동일한 68x68 썸네일 박스를 항상 렌더링하도록 변경. 이미지가 없으면 중성 배경 위에 `/images/logo-black-transparent.png`를 중앙 `object-contain`으로 표시해 제목 시작선이 밀리지 않게 정리 |
+| 🔴 로컬리 콘텐츠 fallback 통일 | `PostGridCard.tsx`의 무이미지 fallback을 제목 텍스트 카드에서 로컬 로고 표시 방식으로 교체해 커뮤니티 전역 기본 이미지 규칙을 통일 |
+| 🔴 작성자명 fallback 보정 | 커뮤니티 목록/상세/댓글/UI 전반에서 `profiles.full_name -> profiles.name -> 로컬리 유저` 우선순위를 공통 헬퍼로 통일. 기존 `익명`, `유저` fallback 제거 |
+| 🟡 프로필 조회 필드 확장 | `community page`, `/api/community`, `/api/community/comments`, 상세 페이지의 profiles 조회에 `full_name` 포함. `Profile` 타입에도 `full_name?: string` 추가 |
+| ✅ 검증 | `npx tsc --noEmit` 통과 |
+
 ## v3.37.6 — [커뮤니티] 전체보기 기본화 + 글쓰기 모던 UI + 동행 날짜 모달
 
 **작업일:** 2026-03-06

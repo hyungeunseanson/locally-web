@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CommunityComment } from '@/app/types/community';
 import { Loader2, Send } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
+import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 
 interface CommentSectionProps {
     postId: string;
@@ -89,12 +90,14 @@ export default function CommentSection({ postId, initialCount, onOpenLogin }: Co
                                 {comment.profiles?.avatar_url ? (
                                     <img src={comment.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">?</div>
+                                    <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">
+                                        {getProfileInitial(comment.profiles)}
+                                    </div>
                                 )}
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[14px] font-bold text-slate-900">{comment.profiles?.name || '유저'}</span>
+                                    <span className="text-[14px] font-bold text-slate-900">{getProfileDisplayName(comment.profiles)}</span>
                                     <span className="text-[12px] text-slate-400 ml-auto">{getTimeAgo(comment.created_at)}</span>
                                 </div>
                                 <p className="text-[15px] text-slate-700 leading-relaxed whitespace-pre-wrap">{comment.content}</p>

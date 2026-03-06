@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         const userIds = [...new Set(comments.map((c: any) => c.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, name, avatar_url')
+            .select('id, name, full_name, avatar_url')
             .in('id', userIds);
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         // ② profile 별도 조회
         const { data: profile } = await supabase
             .from('profiles')
-            .select('id, name, avatar_url')
+            .select('id, name, full_name, avatar_url')
             .eq('id', user.id)
             .maybeSingle();
 

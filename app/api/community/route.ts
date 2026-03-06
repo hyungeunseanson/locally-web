@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         const userIds = [...new Set(posts.map((p: any) => p.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, name, avatar_url')
+            .select('id, name, full_name, avatar_url')
             .in('id', userIds);
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));

@@ -124,6 +124,28 @@ export function formatGenderLabel(value: string | null | undefined, emptyLabel =
   return value;
 }
 
+export function getProfileDisplayName(
+  profile: Pick<AnyProfile, 'full_name' | 'name'> | null | undefined,
+  fallback = '로컬리 유저'
+): string {
+  if (!profile) return fallback;
+
+  const fullName = typeof profile.full_name === 'string' ? profile.full_name.trim() : '';
+  if (fullName) return fullName;
+
+  const name = typeof profile.name === 'string' ? profile.name.trim() : '';
+  if (name) return name;
+
+  return fallback;
+}
+
+export function getProfileInitial(
+  profile: Pick<AnyProfile, 'full_name' | 'name'> | null | undefined,
+  fallback = '로'
+): string {
+  return getProfileDisplayName(profile, fallback).slice(0, 1).toUpperCase();
+}
+
 export function getProfileCompletion(profile: AnyProfile, role: ProfileRole): ProfileCompletionStatus {
   const fields = COMPLETION_FIELDS[role];
   const missingFields = fields

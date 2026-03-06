@@ -39,11 +39,13 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
                         loading="lazy"
                     />
                 ) : (
-                    /* 이미지 없는 콘텐츠: 그라데이션 배경 + 제목 */
-                    <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center p-3">
-                        <p className="text-[12px] font-semibold text-gray-500 text-center line-clamp-3 leading-snug">
-                            {post.title}
-                        </p>
+                    <div className="w-full h-full bg-slate-50 flex items-center justify-center p-3">
+                        <img
+                            src="/images/logo-black-transparent.png"
+                            alt="Locally 로고"
+                            className={`w-16 h-16 object-contain opacity-70 transition-transform duration-500 ${hovered ? 'scale-105' : 'scale-100'}`}
+                            loading="lazy"
+                        />
                     </div>
                 )}
 

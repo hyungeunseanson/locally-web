@@ -10,6 +10,7 @@ import CommentSection from '../components/CommentSection';
 import LikeButton from '../components/LikeButton';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
+import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -71,7 +72,7 @@ export default async function CommunityPostDetail({
     // ② profile 별도 조회
     const { data: profile } = await supabase
         .from('profiles')
-        .select('id, name, avatar_url')
+        .select('id, name, full_name, avatar_url')
         .eq('id', post.user_id)
         .maybeSingle();
 
@@ -105,6 +106,8 @@ export default async function CommunityPostDetail({
     ]);
 
     const isCompanion = post.category === 'companion';
+    const authorName = getProfileDisplayName(profile);
+    const authorInitial = getProfileInitial(profile);
     const pageUrl = `https://locally-web.vercel.app/community/${id}`;
     const fallbackParams = new URLSearchParams();
     fallbackParams.set('category', (detailSearchParams?.category as string) || post.category);
@@ -145,13 +148,13 @@ export default async function CommunityPostDetail({
                                             <img src={profile.avatar_url} alt="profile" className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">
-                                                {profile?.name?.[0]?.toUpperCase() || '?'}
+                                                {authorInitial}
                                             </div>
                                         )}
                                     </div>
                                     <div>
                                         <span className="text-[13px] md:text-[15px] font-semibold md:font-bold text-slate-900 leading-tight block">
-                                            {profile?.name || '로컬리 유저'}
+                                            {authorName}
                                         </span>
                                         <span className="text-[11px] md:text-[12px] font-medium text-slate-400">
                                             {getTimeString(post.created_at)}

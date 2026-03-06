@@ -4,6 +4,7 @@ import { CommunityPost } from '@/app/types/community';
 import LinkedExperienceChip from './LinkedExperienceChip';
 import PostImages from './PostImages';
 import { MessageSquare, Heart, Eye, MapPin, CalendarCheck } from 'lucide-react';
+import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 
 interface PostCardProps {
     post: CommunityPost;
@@ -31,6 +32,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 export default function PostCard({ post }: PostCardProps) {
     const { profiles, linked_experience, category } = post;
     const isCompanion = category === 'companion';
+    const authorName = getProfileDisplayName(profiles);
+    const authorInitial = getProfileInitial(profiles);
 
     return (
         <Link href={`/community/${post.id}`} className="block">
@@ -44,13 +47,13 @@ export default function PostCard({ post }: PostCardProps) {
                                 <img src={profiles.avatar_url} alt="profile" className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold text-sm">
-                                    {profiles?.name?.[0]?.toUpperCase() || '?'}
+                                    {authorInitial}
                                 </div>
                             )}
                         </div>
                         <div>
                             <div className="font-semibold text-gray-900 text-[14px] leading-tight">
-                                {profiles?.name || '로컬리 유저'}
+                                {authorName}
                             </div>
                             <div className="text-sm text-gray-400 mt-0.5">
                                 {getTimeAgo(post.created_at)}

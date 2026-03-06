@@ -22,6 +22,7 @@ export interface Experience {
   export interface Profile {
     id: string;
     name: string;
+    full_name?: string;
     avatar_url: string | null;
     introduction?: string;
     bio?: string;

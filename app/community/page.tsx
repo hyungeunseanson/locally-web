@@ -80,7 +80,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         const userIds = [...new Set(posts.map((p: any) => p.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, name, avatar_url')
+            .select('id, name, full_name, avatar_url')
             .in('id', userIds);
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 

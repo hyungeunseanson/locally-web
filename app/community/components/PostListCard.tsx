@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { CommunityPost } from '@/app/types/community';
 import { MessageSquare, Heart, Eye } from 'lucide-react';
+import { getProfileDisplayName } from '@/app/utils/profile';
 
 interface PostListCardProps {
     post: CommunityPost;
@@ -38,7 +39,7 @@ export default function PostListCard({ post, category, query, sort }: PostListCa
     const badge = CATEGORY_BADGE[postCategory] ?? { label: postCategory, className: 'bg-gray-100 text-gray-500' };
     const thumbnail = post.images?.[0] ?? null;
     const hasCompanionDate = postCategory === 'companion' && post.companion_date;
-    const authorName = profiles?.name || '익명';
+    const authorName = getProfileDisplayName(profiles);
     const params = new URLSearchParams();
     params.set('category', category);
     if (query.trim()) params.set('q', query.trim());
@@ -48,17 +49,26 @@ export default function PostListCard({ post, category, query, sort }: PostListCa
         <Link href={`/community/${post.id}?${params.toString()}`} className="block">
             <article className="flex items-start gap-3 px-5 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
 
-                {/* 좌측: 썸네일 (이미지 있을 때만) */}
-                {thumbnail && (
-                    <div className="w-[68px] h-[68px] rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                {/* 좌측: 썸네일 */}
+                <div className="w-[68px] h-[68px] rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border border-gray-100">
+                    {thumbnail ? (
                         <img
                             src={thumbnail}
                             alt="썸네일"
                             className="w-full h-full object-cover"
                             loading="lazy"
                         />
-                    </div>
-                )}
+                    ) : (
+                        <div className="w-full h-full bg-slate-50 flex items-center justify-center">
+                            <img
+                                src="/images/logo-black-transparent.png"
+                                alt="Locally 로고"
+                                className="w-10 h-10 object-contain opacity-70"
+                                loading="lazy"
+                            />
+                        </div>
+                    )}
+                </div>
 
                 {/* 우측: 정보 */}
                 <div className="flex-1 min-w-0">
