@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient();
+        const allowedCategories = new Set(['qna', 'companion', 'info']);
 
         // Check Authentication
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -18,6 +19,9 @@ export async function POST(request: NextRequest) {
         // Validate Required Fields
         if (!category || !title || !content) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+        if (!allowedCategories.has(category)) {
+            return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
         }
 
         // Insert new post into DB

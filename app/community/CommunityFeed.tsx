@@ -11,6 +11,8 @@ interface CommunityFeedProps {
     initialData: CommunityPost[];
     initialNextOffset: number | null;
     category: string;
+    query: string;
+    sort: 'latest' | 'popular';
 }
 
 // ─── Shimmer Skeleton: 리스트형 ──────────────────────────────────────────────
@@ -42,23 +44,32 @@ function PostGridSkeleton() {
 }
 
 // ─── Empty State ─────────────────────────────────────────────────────────────
-function EmptyState() {
+function EmptyState({ category, query }: { category: string; query: string }) {
+    const writeHref = category ? `/community/write?category=${category}` : '/community/write?category=qna';
+    const isSearchMode = Boolean(query.trim());
+
     return (
         <div className="bg-white rounded-2xl p-12 flex flex-col items-center justify-center border border-dashed border-gray-300 text-center">
             <MessageSquareDashed className="w-12 h-12 text-gray-300 mb-4" strokeWidth={1.5} />
-            <p className="text-gray-500 font-semibold text-[16px] mb-1">아직 게시글이 없어요</p>
-            <p className="text-gray-400 text-sm mb-6">첫 글의 주인공이 되어보세요!</p>
-            <Link
-                href="/community/write"
-                className="px-6 py-2.5 bg-black text-white text-[14px] font-bold rounded-full hover:bg-gray-800 active:scale-95 transition-all"
-            >
-                글 작성하기
-            </Link>
+            <p className="text-gray-500 font-semibold text-[16px] mb-1">
+                {isSearchMode ? '검색 결과가 없어요' : '아직 게시글이 없어요'}
+            </p>
+            <p className="text-gray-400 text-sm mb-6">
+                {isSearchMode ? '다른 키워드나 정렬로 다시 찾아보세요.' : '첫 글의 주인공이 되어보세요!'}
+            </p>
+            {category !== 'locally_content' && !isSearchMode && (
+                <Link
+                    href={writeHref}
+                    className="px-6 py-2.5 bg-black text-white text-[14px] font-bold rounded-full hover:bg-gray-800 active:scale-95 transition-all"
+                >
+                    글 작성하기
+                </Link>
+            )}
         </div>
     );
 }
 
-export default function CommunityFeed({ initialData, initialNextOffset, category }: CommunityFeedProps) {
+export default function CommunityFeed({ initialData, initialNextOffset, category, query, sort }: CommunityFeedProps) {
     const [posts, setPosts] = useState<CommunityPost[]>(initialData);
     const [nextOffset, setNextOffset] = useState<number | null>(initialNextOffset);
     const [isLoading, setIsLoading] = useState(false);
@@ -75,16 +86,19 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
         // 짧은 딜레이로 스켈레톤 UX 시뮬레이션
         const t = setTimeout(() => setIsInitialLoading(false), 200);
         return () => clearTimeout(t);
-    }, [category, initialData, initialNextOffset]);
+    }, [category, initialData, initialNextOffset, query, sort]);
 
     const loadMore = useCallback(async () => {
         if (isLoading || nextOffset === null) return;
 
         setIsLoading(true);
         try {
-            const url = category
-                ? `/api/community?category=${category}&offset=${nextOffset}`
-                : `/api/community?offset=${nextOffset}`;
+            const params = new URLSearchParams();
+            if (category) params.set('category', category);
+            if (query.trim()) params.set('q', query.trim());
+            if (sort !== 'latest') params.set('sort', sort);
+            params.set('offset', String(nextOffset));
+            const url = `/api/community?${params.toString()}`;
 
             const res = await fetch(url);
             const { data, nextOffset: newOffset } = await res.json();
@@ -103,7 +117,7 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
         } finally {
             setIsLoading(false);
         }
-    }, [category, nextOffset, isLoading]);
+    }, [category, nextOffset, isLoading, query, sort]);
 
     useEffect(() => {
         const currentRef = loadMoreRef.current;
@@ -142,21 +156,21 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
             {category === 'locally_content' ? (
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-1">
                     {posts.map((post) => (
-                        <PostGridCard key={`${post.id}`} post={post} />
+                        <PostGridCard key={`${post.id}`} post={post} category={category} query={query} sort={sort} />
                     ))}
                 </div>
             ) : (
                 /* 일반 탭: 리스트형 피드 — 원 블록 화이트 보드 */
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {posts.map((post) => (
-                        <PostListCard key={`${post.id}`} post={post} />
+                        <PostListCard key={`${post.id}`} post={post} category={category} query={query} sort={sort} />
                     ))}
                 </div>
             )}
 
             {/* Empty State */}
             {posts.length === 0 && !isLoading && (
-                <EmptyState />
+                <EmptyState category={category} query={query} />
             )}
 
             {/* 무한 스크롤 트리거 + 로딩 인디케이터 */}

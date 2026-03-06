@@ -5,20 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Edit3, ChevronRight } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
+import type { CommunityCategory } from '@/app/types/community';
 
 // ─── 목업 데이터 ─────────────────────────────────────────────────────────────
 const MOCK_EXPERIENCES = [
     { id: 1, title: '건축가와 함께하는 북촌 골목 산책', image: 'https://images.unsplash.com/photo-1548115184-bc6544d06a58?w=120&h=80&fit=crop', price: '₩45,000', rating: '4.98' },
     { id: 2, title: '현지인과 을지로 힙한 뒷골목 투어', image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=120&h=80&fit=crop', price: '₩38,000', rating: '4.95' },
     { id: 3, title: '서울 전통시장 음식 탐방 & 요리 체험', image: 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=120&h=80&fit=crop', price: '₩52,000', rating: '4.97' },
-];
-
-const MOCK_HOT_POSTS = [
-    '삿포로 3박 4일 맛집 루트 공유합니다 🍜',
-    '도쿄 혼자 여행 처음인데 조언 구해요!',
-    '오사카 → 교토 → 나라 당일치기 가능한가요?',
-    '후쿠오카 고등어 요리 진짜 맛있는 집 찾았어요',
-    '겨울 삿포로 여행 방한 준비물 총정리',
 ];
 
 const getTimeAgo = (dateStr: string) => {
@@ -34,11 +27,13 @@ const getTimeAgo = (dateStr: string) => {
 
 // ─── 실시간 최신글 타입 ───────────────────────────────────────────────────────
 interface RecentPost { id: string; title: string; created_at: string; }
+interface HotPost { id: string; title: string; category: string; }
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
-export default function RightSidebar() {
+export default function RightSidebar({ category }: { category: CommunityCategory }) {
     const router = useRouter();
     const [recentPosts, setRecentPosts] = useState<RecentPost[]>([]);
+    const [hotPosts, setHotPosts] = useState<HotPost[]>([]);
 
     useEffect(() => {
         const supabase = createClient();
@@ -50,12 +45,26 @@ export default function RightSidebar() {
                 .limit(5);
             if (data) setRecentPosts(data);
         };
+        const fetchHotPosts = async () => {
+            const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const { data } = await supabase
+                .from('community_posts')
+                .select('id, title, category')
+                .gte('created_at', since)
+                .order('like_count', { ascending: false })
+                .order('comment_count', { ascending: false })
+                .order('created_at', { ascending: false })
+                .limit(5);
+            if (data) setHotPosts(data);
+        };
         fetchRecent();
+        fetchHotPosts();
 
         // 실시간 신규 글 구독 → 새 글 올라오면 자동 갱신
         const channel = supabase.channel('community_realtime_sidebar')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_posts' }, () => {
                 fetchRecent();
+                fetchHotPosts();
             }).subscribe();
 
         return () => { supabase.removeChannel(channel); };
@@ -66,7 +75,7 @@ export default function RightSidebar() {
 
             {/* 위젯 1: 글쓰기 CTA */}
             <button
-                onClick={() => router.push('/community/write')}
+                onClick={() => router.push(`/community/write?category=${category}`)}
                 className="w-full rounded-xl font-bold py-3.5 bg-gradient-to-r from-[#FF385C] to-[#E31C5F] text-white shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 text-[15px]"
             >
                 <Edit3 size={17} strokeWidth={2.5} />
@@ -108,14 +117,17 @@ export default function RightSidebar() {
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <h3 className="text-[14px] font-extrabold text-gray-900 mb-4">💬 지금 뜨는 라운지 글</h3>
                 <ul className="space-y-2.5">
-                    {MOCK_HOT_POSTS.map((title, idx) => (
+                    {hotPosts.map((post, idx) => (
                         <li key={idx}>
-                            <Link href="/community?category=info" className="flex items-start gap-2 group">
+                            <Link href={`/community/${post.id}?category=${post.category}`} className="flex items-start gap-2 group">
                                 <span className="text-[11px] font-black text-gray-300 mt-[2px] w-4 flex-shrink-0">{idx + 1}</span>
-                                <span className="text-[13px] text-gray-700 leading-snug group-hover:underline group-hover:text-gray-900 transition-colors line-clamp-2">{title}</span>
+                                <span className="text-[13px] text-gray-700 leading-snug group-hover:underline group-hover:text-gray-900 transition-colors line-clamp-2">{post.title}</span>
                             </Link>
                         </li>
                     ))}
+                    {hotPosts.length === 0 && (
+                        <li className="text-[12px] text-gray-400">표시할 인기글이 없습니다.</li>
+                    )}
                 </ul>
             </div>
 

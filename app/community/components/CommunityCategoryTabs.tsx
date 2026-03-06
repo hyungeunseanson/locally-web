@@ -14,9 +14,15 @@ export default function CommunityCategoryTabs() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const currentCategory = searchParams.get('category') || 'qna';
+    const currentQuery = searchParams.get('q') || '';
+    const currentSort = searchParams.get('sort') || 'latest';
 
     const handleTabClick = (id: string) => {
-        router.push(`/community?category=${id}`);
+        const params = new URLSearchParams();
+        params.set('category', id);
+        if (currentQuery.trim()) params.set('q', currentQuery.trim());
+        if (currentSort !== 'latest') params.set('sort', currentSort);
+        router.push(`/community?${params.toString()}`);
     };
 
     return (

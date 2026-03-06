@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { CommunityPost } from '@/app/types/community';
 import LinkedExperienceChip from './LinkedExperienceChip';
 import PostImages from './PostImages';
-import { MessageSquare, Heart, Eye, MapPin, CalendarCheck, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Heart, Eye, MapPin, CalendarCheck } from 'lucide-react';
 
 interface PostCardProps {
     post: CommunityPost;
@@ -31,7 +31,6 @@ const CATEGORY_LABEL: Record<string, string> = {
 export default function PostCard({ post }: PostCardProps) {
     const { profiles, linked_experience, category } = post;
     const isCompanion = category === 'companion';
-    const isQna = category === 'qna';
 
     return (
         <Link href={`/community/${post.id}`} className="block">
@@ -59,16 +58,11 @@ export default function PostCard({ post }: PostCardProps) {
                         </div>
                     </div>
 
-                    {/* 카테고리 + QnA 뱃지 */}
+                    {/* 카테고리 뱃지 */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         {category && (
                             <span className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-md font-medium">
                                 {CATEGORY_LABEL[category] || category}
-                            </span>
-                        )}
-                        {isQna && (
-                            <span className="flex items-center gap-1 border border-gray-200 text-gray-500 text-xs px-2 py-1 rounded-md font-medium">
-                                <CheckCircle2 size={11} /> 답변대기
                             </span>
                         )}
                     </div>

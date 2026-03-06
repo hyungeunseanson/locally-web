@@ -5,9 +5,11 @@ import CommunityCategoryTabs from './components/CommunityCategoryTabs';
 import CommunityFeed from './CommunityFeed';
 import RightSidebar from './components/RightSidebar';
 import MobileWidgetStrip from './components/MobileWidgetStrip';
+import CommunitySearchControls from './components/CommunitySearchControls';
 import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
+import type { CommunityCategory } from '@/app/types/community';
 
 // ✅ Vercel 엣지 캐시 비활성화 — 새 글 등록 후 피드가 구 버전 캐시를 서빙하는 버그 방지
 export const dynamic = 'force-dynamic';
@@ -42,6 +44,8 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     if (!['qna', 'companion', 'info', 'locally_content'].includes(category)) {
         category = 'qna';
     }
+    const queryText = ((params?.q as string) || '').trim().replace(/,/g, ' ');
+    const sort = (params?.sort as string) === 'popular' ? 'popular' : 'latest';
 
     const limit = 15;
 
@@ -49,11 +53,23 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     let query = supabase
         .from('community_posts')
         .select('*')
-        .order('created_at', { ascending: false })
         .range(0, limit - 1);
 
     if (category) {
         query = query.eq('category', category);
+    }
+
+    if (queryText) {
+        query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
+    }
+
+    if (sort === 'popular') {
+        query = query
+            .order('like_count', { ascending: false })
+            .order('comment_count', { ascending: false })
+            .order('created_at', { ascending: false });
+    } else {
+        query = query.order('created_at', { ascending: false });
     }
 
     const { data: posts } = await query;
@@ -104,17 +120,11 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 <CommunityCategoryTabs />
                             </div>
 
-                            {/* 데스크탑 전용 글쓰기 넛지 박스 — 피드 상단 (기존 위치 복구) */}
-                            {category !== 'locally_content' && (
-                                <Link href="/community/write" className="hidden lg:block mb-5">
-                                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text hover:border-gray-200 hover:shadow-md transition-all duration-200">
-                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                            <Edit3 size={16} className="text-gray-400" />
-                                        </div>
-                                        <span className="text-gray-400 text-[15px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
-                                    </div>
-                                </Link>
-                            )}
+                            <CommunitySearchControls
+                                currentCategory={category as CommunityCategory}
+                                currentQuery={queryText}
+                                currentSort={sort}
+                            />
 
                             {/* 모바일 전용 위젯 스트립: 실시간 업데이트 + 지금 뜨는 라운지 글 */}
                             {category !== 'locally_content' && (
@@ -126,31 +136,21 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 initialData={initialData || []}
                                 initialNextOffset={initialNextOffset}
                                 category={category}
+                                query={queryText}
+                                sort={sort}
                             />
-
-                            {/* 글쓰기 넛지 박스 — 피드 최하단 (모바일만, 패딩 축소) */}
-                            {category !== 'locally_content' && (
-                                <Link href="/community/write" className="block lg:hidden mt-4">
-                                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 cursor-text hover:border-gray-200 hover:shadow-md transition-all duration-200">
-                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                            <Edit3 size={14} className="text-gray-400" />
-                                        </div>
-                                        <span className="text-gray-400 text-[13px] font-medium select-none">어떤 여행을 계획 중이신가요?</span>
-                                    </div>
-                                </Link>
-                            )}
                         </div>
 
                         {/* ─── 우측 사이드바 (4/12, 모바일 hidden) ─── */}
                         <div className="col-span-1 lg:col-span-4 hidden lg:flex flex-col">
-                            <RightSidebar />
+                            <RightSidebar category={category as CommunityCategory} />
                         </div>
                     </div>
                 </div>
             </div>
 
             <Link
-                href="/community/write"
+                href={`/community/write?category=${category}`}
                 className="block lg:hidden fixed bottom-20 right-4 w-12 h-12 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
                 aria-label="글쓰기"
             >

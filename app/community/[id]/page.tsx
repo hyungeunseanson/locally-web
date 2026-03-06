@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, CalendarCheck, MoreVertical } from 'lucide-react';
+import { MapPin, CalendarCheck } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
 import PostImages from '../components/PostImages';
 import CommentSection from '../components/CommentSection';
@@ -47,8 +47,15 @@ const getTimeString = (dateStr: string) => {
     });
 };
 
-export default async function CommunityPostDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function CommunityPostDetail({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
     const { id } = await params;
+    const detailSearchParams = await searchParams;
     const supabase = await createClient();
 
     // ① post 단독 조회 (SSR Join 분리 원칙)
@@ -97,10 +104,15 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
             .maybeSingle(),
     ]);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const isOwner = user?.id === post.user_id;
     const isCompanion = post.category === 'companion';
     const pageUrl = `https://locally-web.vercel.app/community/${id}`;
+    const fallbackParams = new URLSearchParams();
+    fallbackParams.set('category', (detailSearchParams?.category as string) || post.category);
+    const fallbackQuery = ((detailSearchParams?.q as string) || '').trim();
+    const fallbackSort = (detailSearchParams?.sort as string) === 'popular' ? 'popular' : 'latest';
+    if (fallbackQuery) fallbackParams.set('q', fallbackQuery);
+    if (fallbackSort !== 'latest') fallbackParams.set('sort', fallbackSort);
+    const fallbackHref = `/community?${fallbackParams.toString()}`;
 
     return (
         // 데스크탑: max-w-7xl 2컬럼 / 모바일: max-w-[768px] 단일 컬럼
@@ -114,10 +126,9 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
 
                             {/* Sticky 헤더 */}
                             <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
-                                <BackButton />
+                                <BackButton href={fallbackHref} />
                                 <div className="flex items-center gap-3 text-slate-400">
                                     <ShareButton title={post.title} url={pageUrl} />
-                                    {isOwner && <button className="hover:text-slate-900 transition-colors"><MoreVertical size={20} /></button>}
                                 </div>
                             </div>
 
@@ -206,13 +217,13 @@ export default async function CommunityPostDetail({ params }: { params: Promise<
                             {(prevPost || nextPost) && (
                                 <div className="border-t border-slate-100 mx-5 pt-5 pb-6 space-y-2">
                                     {prevPost && (
-                                        <Link href={`/community/${prevPost.id}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
+                                        <Link href={`/community/${prevPost.id}?${fallbackParams.toString()}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
                                             <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex-shrink-0">◀ 이전글</span>
                                             <span className="text-[13px] text-slate-700 line-clamp-1 group-hover:underline">{prevPost.title}</span>
                                         </Link>
                                     )}
                                     {nextPost && (
-                                        <Link href={`/community/${nextPost.id}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
+                                        <Link href={`/community/${nextPost.id}?${fallbackParams.toString()}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
                                             <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex-shrink-0">▶ 다음글</span>
                                             <span className="text-[13px] text-slate-700 line-clamp-1 group-hover:underline">{nextPost.title}</span>
                                         </Link>

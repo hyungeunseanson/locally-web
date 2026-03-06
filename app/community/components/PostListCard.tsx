@@ -5,6 +5,9 @@ import { MessageSquare, Heart, Eye } from 'lucide-react';
 
 interface PostListCardProps {
     post: CommunityPost;
+    category: string;
+    query: string;
+    sort: 'latest' | 'popular';
 }
 
 const getTimeAgo = (dateStr: string) => {
@@ -30,15 +33,19 @@ const CATEGORY_BADGE: Record<string, { label: string; className: string }> = {
  * 리스트형 피드 카드 — Q&A / 동행 / 꿀팁 탭 전용
  * F-Pattern 스캔 최적화: 좌측 썸네일 + 우측 정보 수평 배치
  */
-export default function PostListCard({ post }: PostListCardProps) {
-    const { profiles, category } = post;
-    const badge = CATEGORY_BADGE[category] ?? { label: category, className: 'bg-gray-100 text-gray-500' };
+export default function PostListCard({ post, category, query, sort }: PostListCardProps) {
+    const { profiles, category: postCategory } = post;
+    const badge = CATEGORY_BADGE[postCategory] ?? { label: postCategory, className: 'bg-gray-100 text-gray-500' };
     const thumbnail = post.images?.[0] ?? null;
-    const hasCompanionDate = category === 'companion' && post.companion_date;
+    const hasCompanionDate = postCategory === 'companion' && post.companion_date;
     const authorName = profiles?.name || '익명';
+    const params = new URLSearchParams();
+    params.set('category', category);
+    if (query.trim()) params.set('q', query.trim());
+    if (sort !== 'latest') params.set('sort', sort);
 
     return (
-        <Link href={`/community/${post.id}`} className="block">
+        <Link href={`/community/${post.id}?${params.toString()}`} className="block">
             <article className="flex items-start gap-3 px-5 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
 
                 {/* 좌측: 썸네일 (이미지 있을 때만) */}

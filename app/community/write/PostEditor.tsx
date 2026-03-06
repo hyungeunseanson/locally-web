@@ -1,17 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { compressImage, sanitizeFileName, validateImage } from '@/app/utils/image';
 import { ImagePlus, X, Loader2, ArrowLeft, ChevronDown } from 'lucide-react';
+import type { CommunityCategory } from '@/app/types/community';
+
+const WRITABLE_CATEGORIES: CommunityCategory[] = ['qna', 'companion', 'info'];
 
 export default function PostEditor() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const supabase = createClient();
+    const initialCategory = searchParams.get('category');
+    const defaultCategory = WRITABLE_CATEGORIES.includes(initialCategory as CommunityCategory)
+        ? (initialCategory as CommunityCategory)
+        : 'qna';
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [category, setCategory] = useState<'qna' | 'companion' | 'info'>('qna');
+    const [category, setCategory] = useState<'qna' | 'companion' | 'info'>(defaultCategory as 'qna' | 'companion' | 'info');
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [imageFiles, setImageFiles] = useState<File[]>([]);

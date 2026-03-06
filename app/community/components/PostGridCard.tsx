@@ -7,18 +7,25 @@ import { Heart, MessageSquare } from 'lucide-react';
 
 interface PostGridCardProps {
     post: CommunityPost;
+    category: string;
+    query: string;
+    sort: 'latest' | 'popular';
 }
 
 /**
  * 인스타그램형 그리드 카드 — 로컬리 콘텐츠 탭 전용
  * 이미지만 꽉 채워 표시, hover 시 하트/댓글 오버레이
  */
-export default function PostGridCard({ post }: PostGridCardProps) {
+export default function PostGridCard({ post, category, query, sort }: PostGridCardProps) {
     const [hovered, setHovered] = useState(false);
     const thumbnail = post.images?.[0] ?? null;
+    const params = new URLSearchParams();
+    params.set('category', category);
+    if (query.trim()) params.set('q', query.trim());
+    if (sort !== 'latest') params.set('sort', sort);
 
     return (
-        <Link href={`/community/${post.id}`} className="block">
+        <Link href={`/community/${post.id}?${params.toString()}`} className="block">
             <div
                 className="relative aspect-square w-full overflow-hidden bg-gray-100 cursor-pointer"
                 onMouseEnter={() => setHovered(true)}

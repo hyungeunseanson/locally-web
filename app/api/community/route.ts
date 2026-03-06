@@ -6,6 +6,8 @@ export async function GET(request: NextRequest) {
         const supabase = await createClient();
         const { searchParams } = new URL(request.url);
         const category = searchParams.get('category');
+        const queryText = (searchParams.get('q') || '').trim().replace(/,/g, ' ');
+        const sort = searchParams.get('sort') === 'popular' ? 'popular' : 'latest';
         const offset = parseInt(searchParams.get('offset') || '0', 10);
         const limit = 15;
 
@@ -13,11 +15,23 @@ export async function GET(request: NextRequest) {
         let query = supabase
             .from('community_posts')
             .select('*')
-            .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
 
         if (category) {
             query = query.eq('category', category);
+        }
+
+        if (queryText) {
+            query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
+        }
+
+        if (sort === 'popular') {
+            query = query
+                .order('like_count', { ascending: false })
+                .order('comment_count', { ascending: false })
+                .order('created_at', { ascending: false });
+        } else {
+            query = query.order('created_at', { ascending: false });
         }
 
         const { data: posts, error } = await query;

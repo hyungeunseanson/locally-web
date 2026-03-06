@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { CommunityComment } from '@/app/types/community';
-import { Loader2, Send, CheckCircle2 } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 
 interface CommentSectionProps {
@@ -95,11 +95,6 @@ export default function CommentSection({ postId, initialCount, onOpenLogin }: Co
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="text-[14px] font-bold text-slate-900">{comment.profiles?.name || '유저'}</span>
-                                    {comment.is_selected && (
-                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
-                                            <CheckCircle2 size={11} /> 채택된 답변
-                                        </span>
-                                    )}
                                     <span className="text-[12px] text-slate-400 ml-auto">{getTimeAgo(comment.created_at)}</span>
                                 </div>
                                 <p className="text-[15px] text-slate-700 leading-relaxed whitespace-pre-wrap">{comment.content}</p>
