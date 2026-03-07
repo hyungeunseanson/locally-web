@@ -49,10 +49,6 @@ export default function SiteFooter() {
     }
   };
 
-  if (pathname?.startsWith('/become-a-host2')) {
-    return null;
-  }
-
   return (
     <>
       <footer className="hidden md:block bg-white border-t border-[#DDDDDD] pt-12 pb-6 text-sm text-[#222222] font-sans">

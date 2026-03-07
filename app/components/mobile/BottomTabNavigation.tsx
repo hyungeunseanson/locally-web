@@ -32,7 +32,6 @@ export default function BottomTabNavigation() {
         pathname?.startsWith('/admin') ||
         pathname?.startsWith('/login') ||
         pathname?.startsWith('/signup') ||
-        pathname?.startsWith('/become-a-host2') ||
         pathname?.includes('/payment') ||
         (isHostMode && !isHostNavPath)
     ) {
