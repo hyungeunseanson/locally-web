@@ -97,6 +97,8 @@ const faqGroups = [
     },
 ] as const;
 
+const [heroSection, secondSection, ...remainingSections] = sections;
+
 export default function BecomeAHost2Page() {
     return (
         <div className="min-h-screen bg-white text-[#222222] font-sans">
@@ -104,7 +106,33 @@ export default function BecomeAHost2Page() {
 
             <main>
                 <div className="mx-auto w-full max-w-[1440px]">
-                    {sections.map((section, index) => (
+                    <Image
+                        key={heroSection.alt}
+                        src={heroSection.src}
+                        alt={heroSection.alt}
+                        width={heroSection.width}
+                        height={heroSection.height}
+                        className="block h-auto w-full"
+                        priority={true}
+                        sizes="(max-width: 1440px) 100vw, 1440px"
+                        unoptimized
+                    />
+
+                    <HostLandingActionBar compact />
+
+                    <Image
+                        key={secondSection.alt}
+                        src={secondSection.src}
+                        alt={secondSection.alt}
+                        width={secondSection.width}
+                        height={secondSection.height}
+                        className="block h-auto w-full"
+                        priority={true}
+                        sizes="(max-width: 1440px) 100vw, 1440px"
+                        unoptimized
+                    />
+
+                    {remainingSections.map((section) => (
                         <Image
                             key={section.alt}
                             src={section.src}
@@ -112,14 +140,13 @@ export default function BecomeAHost2Page() {
                             width={section.width}
                             height={section.height}
                             className="block h-auto w-full"
-                            priority={index < 2}
                             sizes="(max-width: 1440px) 100vw, 1440px"
                             unoptimized
                         />
                     ))}
                 </div>
 
-                <HostLandingActionBar />
+                <HostLandingActionBar showStatusButton />
 
                 <section className="bg-[#f7f7f7] px-4 py-16 md:px-6 md:py-24">
                     <div className="mx-auto max-w-[1440px]">
