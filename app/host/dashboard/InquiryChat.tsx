@@ -32,15 +32,30 @@ export default function InquiryChat() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
+  const inquiryIdFromUrl = searchParams.get('inquiryId');
   const guestIdFromUrl = searchParams.get('guestId');
   const expIdFromUrl = searchParams.get('expId');
   const [pendingChatCreated, setPendingChatCreated] = useState(false);
 
   const [modalUserId, setModalUserId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setPendingChatCreated(false);
+  }, [guestIdFromUrl, expIdFromUrl, inquiryIdFromUrl]);
+
   // 자동 채팅방 열기 (URL 파라미터)
   useEffect(() => {
-    if (!guestIdFromUrl || isLoading) return;
+    if (isLoading) return;
+
+    if (inquiryIdFromUrl) {
+      const targetById = inquiries.find(inq => String(inq.id) === String(inquiryIdFromUrl));
+      if (targetById && selectedInquiry?.id !== targetById.id) {
+        loadMessages(targetById.id);
+      }
+      return;
+    }
+
+    if (!guestIdFromUrl) return;
 
     const targetInquiry = inquiries.find(inq =>
       String(inq.user_id) === String(guestIdFromUrl) ||
@@ -65,7 +80,7 @@ export default function InquiryChat() {
         })
         .catch(err => console.error('[InquiryChat] start-chat error:', err));
     }
-  }, [guestIdFromUrl, expIdFromUrl, inquiries, selectedInquiry, isLoading, pendingChatCreated, loadMessages, refresh]);
+  }, [guestIdFromUrl, expIdFromUrl, inquiryIdFromUrl, inquiries, selectedInquiry, isLoading, pendingChatCreated, loadMessages, refresh]);
 
   // 스크롤 자동 하단 이동
   useEffect(() => {
@@ -190,7 +205,7 @@ export default function InquiryChat() {
                 className="md:hidden p-1.5 -ml-0.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
                 onClick={() => {
                   clearSelected();
-                  if (guestIdFromUrl) {
+                  if (guestIdFromUrl || inquiryIdFromUrl) {
                     router.replace(`${pathname}?tab=inquiries`, { scroll: false });
                   }
                 }}

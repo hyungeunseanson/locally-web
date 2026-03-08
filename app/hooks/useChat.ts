@@ -107,6 +107,27 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     return url;
   };
 
+  const buildGuestInboxLink = (inquiryId: number | string) => {
+    const params = new URLSearchParams({ inquiryId: String(inquiryId) });
+    return `/guest/inbox?${params.toString()}`;
+  };
+
+  const buildHostInquiryLink = (inquiryId: number | string) => {
+    const params = new URLSearchParams({
+      tab: 'inquiries',
+      inquiryId: String(inquiryId)
+    });
+    return `/host/dashboard?${params.toString()}`;
+  };
+
+  const buildAdminChatLink = (inquiryId: number | string) => {
+    const params = new URLSearchParams({
+      tab: 'CHATS',
+      inquiryId: String(inquiryId)
+    });
+    return `/admin/dashboard?${params.toString()}`;
+  };
+
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user && (!currentUser || currentUser.id !== user.id)) {
@@ -344,7 +365,12 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       await loadMessages(inquiryId);
 
-      const currentInquiry = inquiries.find((i) => i.id === inquiryId);
+      const currentInquiry =
+        (selectedInquiryRef.current && String(selectedInquiryRef.current.id) === String(inquiryId)
+          ? selectedInquiryRef.current
+          : null) ||
+        inquiriesRef.current.find((i) => String(i.id) === String(inquiryId));
+
       if (currentInquiry) {
         const isAdminInquiry = isAdminSupportInquiry(currentInquiry.type);
         const actorIsHost = !!currentInquiry.host_id && actorId === currentInquiry.host_id;
@@ -353,8 +379,12 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           : (actorIsHost ? currentInquiry.user_id : currentInquiry.host_id);
 
         const targetLink = isAdminInquiry
-          ? (role === 'admin' ? '/guest/inbox' : '/host/dashboard?tab=inquiries')
-          : (actorIsHost ? '/guest/inbox' : '/host/dashboard?tab=inquiries');
+          ? (role === 'admin'
+            ? buildGuestInboxLink(inquiryId)
+            : buildAdminChatLink(inquiryId))
+          : (actorIsHost
+            ? buildGuestInboxLink(inquiryId)
+            : buildHostInquiryLink(inquiryId));
 
         const senderName =
           ((currentUser?.user_metadata as { full_name?: string } | undefined)?.full_name) ||

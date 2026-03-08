@@ -46,6 +46,7 @@ function InboxContent() {
 
   const hostId = searchParams.get('hostId');
   const expId = searchParams.get('expId');
+  const inquiryId = searchParams.get('inquiryId');
   const hostName = searchParams.get('hostName');
   const hostAvatar = searchParams.get('hostAvatar');
   const expTitle = searchParams.get('expTitle');
@@ -71,7 +72,27 @@ function InboxContent() {
   }, [messages]);
 
   useEffect(() => {
+    setIsUrlProcessed(false);
+  }, [hostId, expId, inquiryId, hostName, hostAvatar, expTitle]);
+
+  useEffect(() => {
     if (isLoading || isUrlProcessed) return;
+
+    if (inquiryId) {
+      const existingById = inquiries.find(i => String(i.id) === String(inquiryId));
+      if (existingById) {
+        if (selectedInquiry?.id !== existingById.id) {
+          loadMessages(existingById.id);
+        }
+        setIsUrlProcessed(true);
+        return;
+      }
+
+      if (!hostId && !expId) {
+        setIsUrlProcessed(true);
+        return;
+      }
+    }
 
     // hostId만 있고 expId 없는 경우: 서비스 매칭 채팅 자동 선택
     if (hostId && !expId) {
@@ -105,11 +126,11 @@ function InboxContent() {
       }
     }
     setIsUrlProcessed(true);
-  }, [isLoading, inquiries, hostId, expId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
+  }, [isLoading, inquiries, hostId, expId, inquiryId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
 
   const handleSelectInquiry = (inqId: number | string) => {
     loadMessages(inqId);
-    if (hostId || expId) router.replace('/guest/inbox');
+    if (hostId || expId || inquiryId) router.replace('/guest/inbox');
   };
 
   const handleSend = async (file?: File) => {

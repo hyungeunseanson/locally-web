@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.13 — [메시지] 예약 완료·알림 딥링크 직결
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 예약 완료 메시지 직결 | `/experiences/[id]/payment/complete` 하단 CTA가 더 이상 빈 `/guest/inbox`로 가지 않도록 수정. 예약된 `experiences.host_id`, `experiences.id`, `experiences.title`을 사용해 `/guest/inbox?hostId=...&expId=...&expTitle=...` 딥링크로 바로 연결 |
+| 🔴 메시지 알림 스레드 직결 | `useChat.ts`의 `new_message` 알림 링크를 역할별 실제 채팅 화면으로 구체화. 게스트 수신자는 `/guest/inbox?inquiryId=...`, 호스트 수신자는 `/host/dashboard?tab=inquiries&inquiryId=...`, 관리자 CS 수신자는 `/admin/dashboard?tab=CHATS&inquiryId=...`로 이동 |
+| 🟡 Inbox 파라미터 확장 | `guest/inbox`와 `host/dashboard/InquiryChat`이 `inquiryId` URL 파라미터를 받아 해당 문의방을 자동 선택하도록 확장. 기존 `hostId`/`expId` 기반 자동 연결은 유지 |
+| ✅ 검증 | `npx tsc --noEmit` 실행. 현재 베이스라인의 기존 오류 `app/become-a-host2/page.tsx(99,45): Cannot find namespace 'JSX'`로 실패하며, 이번 패치와 직접 관련된 신규 타입 오류는 확인되지 않음 |
+
 ## v3.37.12 — [Host Landing] `/become-a-host2` FAQ 핀셋 폭/톤 조정
 
 **작업일:** 2026-03-07

@@ -13,6 +13,8 @@ import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 
 type BookingExperience = {
+  id?: string | number;
+  host_id?: string | null;
   title?: string;
   location?: string;
   duration?: number;
@@ -113,6 +115,20 @@ function PaymentCompleteContent() {
   if (loading) return <Spinner fullScreen />;
   if (!booking) return <div className="min-h-screen bg-white flex items-center justify-center">예약 정보를 불러올 수 없습니다.</div>;
   const bookingImage = booking.experiences?.photos?.[0] || booking.experiences?.image_url || '/images/logo.png';
+  const messageParams = new URLSearchParams();
+  if (booking.experiences?.host_id) {
+    messageParams.set('hostId', String(booking.experiences.host_id));
+  }
+  if (booking.experiences?.id) {
+    messageParams.set('expId', String(booking.experiences.id));
+  }
+  if (booking.experiences?.title) {
+    messageParams.set('expTitle', booking.experiences.title);
+  }
+  const messageQuery = messageParams.toString();
+  const messageHref = messageQuery
+    ? `/guest/inbox?${messageQuery}`
+    : '/guest/inbox';
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -209,7 +225,7 @@ function PaymentCompleteContent() {
           <div className="text-left">
             <p className="font-bold text-[13px] md:text-base mb-1">호스트에게 메시지를 보내보세요!</p>
             <p className="text-blue-600/80">궁금한 점이 있거나, 미리 알리고 싶은 내용이 있다면 메시지함에서 호스트와 대화할 수 있습니다.</p>
-            <Link href="/guest/inbox" className="inline-block mt-2.5 md:mt-3 text-[11px] md:text-xs font-bold bg-blue-100 hover:bg-blue-200 text-blue-700 px-2.5 md:px-3 py-1.5 rounded-lg transition-colors">
+            <Link href={messageHref} className="inline-block mt-2.5 md:mt-3 text-[11px] md:text-xs font-bold bg-blue-100 hover:bg-blue-200 text-blue-700 px-2.5 md:px-3 py-1.5 rounded-lg transition-colors">
               메시지 보내러 가기 →
             </Link>
           </div>
