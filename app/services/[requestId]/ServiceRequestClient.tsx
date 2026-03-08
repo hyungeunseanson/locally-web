@@ -80,10 +80,19 @@ export default function ServiceRequestDetailPage() {
       const userId = user?.id ?? null;
       setCurrentUserId(userId);
 
-      const { data: req } = await supabase
-        .from('service_requests').select('*').eq('id', requestId).maybeSingle();
-      if (!req) { setLoading(false); return; }
-      setRequest(req as ServiceRequest);
+      try {
+        const reqRes = await fetch(`/api/services/requests?requestId=${encodeURIComponent(requestId)}`);
+        const reqData = await reqRes.json();
+        if (!reqRes.ok || !reqData.success || !reqData.data) {
+          setLoading(false);
+          return;
+        }
+        setRequest(reqData.data as ServiceRequest);
+      } catch (error) {
+        console.error('service request load error:', error);
+        setLoading(false);
+        return;
+      }
 
       if (userId) {
         try {

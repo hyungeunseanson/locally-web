@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.23 — [Services] 의뢰 상세 조회 경로 안정화
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🟡 상세 조회 경로 수정 | `/services/[requestId]`가 브라우저 Supabase 직조회 대신 `/api/services/requests?requestId=...`를 통해 서버에서 의뢰 상세를 확인하도록 변경. 목록은 보이는데 상세에서만 `의뢰를 찾을 수 없습니다.`가 뜨던 권한 불일치 가능성을 제거 |
+| 🟡 번역 누락 보완 | 서비스 상세 빈 상태의 `btn_go_to_list` 키를 `ko/en/ja/zh`에 추가해 raw key가 노출되지 않도록 수정 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 통과 |
+
 ## v3.37.22 — [Host Landing] 첫 compact CTA 중앙 복원
 
 **작업일:** 2026-03-08

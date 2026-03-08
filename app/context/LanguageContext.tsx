@@ -562,6 +562,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // [Services]
     req_not_found: "의뢰를 찾을 수 없습니다.",
+    btn_go_to_list: "목록으로 돌아가기",
     req_apply_title: "서비스 지원하기",
     req_apply_subtitle: "고객에게 나를 어필해보세요",
     req_est_income: "예상 수입",
@@ -1428,6 +1429,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // [Services]
     req_not_found: "Request not found.",
+    btn_go_to_list: "Back to list",
     req_apply_title: "Apply for Request",
     req_apply_subtitle: "Tell the guest why you're the best fit",
     req_est_income: "Est. Income",
@@ -2295,6 +2297,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // [Services]
     req_not_found: "リクエストが見つかりません。",
+    btn_go_to_list: "一覧に戻る",
     req_apply_title: "サービスに申し込む",
     req_apply_subtitle: "あなたの強みをアピールしましょう",
     req_est_income: "予想収入",
@@ -3161,6 +3164,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     // [Services]
     req_not_found: "未找到需求",
+    btn_go_to_list: "返回列表",
     req_apply_title: "申请提供服务",
     req_apply_subtitle: "向游客展示您的优势",
     req_est_income: "预计收入",

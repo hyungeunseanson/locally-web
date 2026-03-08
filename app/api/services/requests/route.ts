@@ -126,20 +126,46 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const supabaseServer = await createServerClient();
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
+    const requestId = searchParams.get('requestId');
     const mode = searchParams.get('mode'); // 'my' | 'board'
     const city = searchParams.get('city');
+
+    const supabaseServer = await createServerClient();
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+    const currentUser = authError ? null : user ?? null;
 
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    if (requestId) {
+      const { data, error } = await supabaseAdmin
+        .from('service_requests')
+        .select('*')
+        .eq('id', requestId)
+        .maybeSingle();
+
+      if (error || !data) {
+        console.error('Service Request Detail Fetch Error:', error);
+        return NextResponse.json({ success: false, error: '의뢰를 찾을 수 없습니다.' }, { status: 404 });
+      }
+
+      const canRead =
+        data.status === 'open' ||
+        currentUser?.id === data.user_id ||
+        currentUser?.id === data.selected_host_id;
+
+      if (!canRead) {
+        return NextResponse.json({ success: false, error: '의뢰를 찾을 수 없습니다.' }, { status: 404 });
+      }
+
+      return NextResponse.json({ success: true, data });
+    }
+
+    if (!currentUser) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
 
     let query = supabaseAdmin
       .from('service_requests')
@@ -148,7 +174,7 @@ export async function GET(request: Request) {
 
     if (mode === 'my') {
       // 내 의뢰 목록
-      query = query.eq('user_id', user.id);
+      query = query.eq('user_id', currentUser.id);
     } else {
       // 잡보드: open 상태만
       query = query.eq('status', 'open');
