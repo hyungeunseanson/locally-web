@@ -6,7 +6,11 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { TERMS_OF_USE, PRIVACY_POLICY } from '@/app/constants/legalText';
+import { getLegalDocument } from '@/app/constants/legalDocuments';
+import {
+  getLoginModalCopy,
+  getLoginModalNationalityOptions,
+} from '@/app/components/loginModalLocalization';
 
 type Gender = 'Male' | 'Female' | '';
 
@@ -22,12 +26,12 @@ interface InputItemProps {
   autoComplete: string;
 }
 
-function getErrorMessage(error: unknown) {
+function getErrorMessage(error: unknown, fallbackMessage: string) {
   if (error instanceof Error) {
     return error.message;
   }
 
-  return '로그인 처리 중 오류가 발생했습니다.';
+  return fallbackMessage;
 }
 
 interface LoginModalProps {
@@ -37,7 +41,7 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
-  const { t } = useLanguage(); // 🟢 번역 기능 사용
+  const { t, lang } = useLanguage();
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
 
   const [email, setEmail] = useState('');
@@ -52,7 +56,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [termsError, setTermsError] = useState(false);
-  const [showLegalText, setShowLegalText] = useState<'TERMS' | 'PRIVACY' | null>(null);
+  const [showLegalText, setShowLegalText] = useState<'terms' | 'privacy' | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState<string | null>(null);
@@ -60,6 +64,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const router = useRouter();
   const supabase = createClient();
   const { showToast } = useToast();
+  const copy = getLoginModalCopy(lang);
+  const nationalityOptions = getLoginModalNationalityOptions(lang);
+  const legalDocument = showLegalText ? getLegalDocument(lang, showLegalText) : null;
 
   const getCurrentAccessToken = async () => {
     const {
@@ -73,26 +80,26 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     if (e) e.preventDefault();
 
     if (!email || !password) {
-      showToast('이메일과 비밀번호를 입력해주세요.', 'error');
+      showToast(copy.emailPasswordRequired, 'error');
       return;
     }
 
     if (mode === 'SIGNUP') {
       if (!fullName || !phone || !birthDate || !gender || !nationality) {
-        showToast('이름, 국적, 연락처, 생년월일, 성별을 모두 입력해주세요.', 'error');
+        showToast(copy.signupFieldsRequired, 'error');
         return;
       }
       if (!birthDate.match(/^(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) {
-        showToast('생년월일 8자리(YYYYMMDD)를 올바르게 입력해주세요.', 'error');
+        showToast(copy.birthDateInvalid, 'error');
         return;
       }
       if (phone.length < 9) {
-        showToast('올바른 연락처를 입력해주세요.', 'error');
+        showToast(copy.phoneInvalid, 'error');
         return;
       }
       if (!termsAgreed || !privacyAgreed) {
         setTermsError(true);
-        showToast('필수 약관에 동의해주세요.', 'error');
+        showToast(copy.agreementsRequired, 'error');
         return;
       }
     }
@@ -117,7 +124,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         if (error) throw error;
 
         if (data.user && data.session) {
-          showToast('회원가입이 완료되었습니다!', 'success');
+          showToast(copy.signupSuccess, 'success');
           if (onLoginSuccess) {
             onLoginSuccess();
           } else {
@@ -125,24 +132,24 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           }
           router.refresh();
         } else {
-          showToast('가입 인증 메일을 보냈습니다! 이메일을 확인해주세요.', 'success');
+          showToast(copy.signupVerificationSent, 'success');
           setMode('LOGIN');
         }
 
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
-            throw new Error('이메일 또는 비밀번호가 일치하지 않습니다.');
+            throw new Error(copy.invalidCredentials);
           }
           if (error.message.includes('Email not confirmed')) {
-            throw new Error('이메일 인증이 완료되지 않았습니다.');
+            throw new Error(copy.emailNotConfirmed);
           }
           throw error;
         }
 
-        showToast('환영합니다! 로그인 되었습니다.', 'success');
+        showToast(copy.loginSuccess, 'success');
         if (onLoginSuccess) {
           onLoginSuccess();
         } else {
@@ -151,14 +158,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         router.refresh();
       }
     } catch (error) {
-      const errorMessage = getErrorMessage(error);
+      const errorMessage = getErrorMessage(error, copy.unknownError);
       const errorStatus =
         typeof error === 'object' && error !== null && 'status' in error
           ? (error as { status?: number }).status
           : undefined;
 
       if (errorMessage.includes('rate limit') || errorStatus === 429) {
-        showToast('너무 많은 가입 요청이 감지되었습니다. 잠시 후 다시 시도하거나 소셜 로그인을 이용해주세요.', 'error');
+        showToast(copy.rateLimit, 'error');
       } else {
         showToast(errorMessage, 'error');
       }
@@ -184,7 +191,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
       <div className={`bg-white w-full ${mode === 'SIGNUP' ? 'max-w-[480px]' : 'max-w-[420px]'} rounded-2xl shadow-2xl overflow-hidden relative z-10 animate-in zoom-in-95 duration-200 transition-all`}>
 
         {/* 🟢 약관 모달 오버레이 */}
-        {showLegalText && (
+        {showLegalText && legalDocument && (
           <div className="absolute inset-0 z-50 bg-white flex flex-col h-full">
             <div className="h-14 flex items-center justify-between px-5 border-b border-gray-100 flex-shrink-0">
               <button
@@ -195,13 +202,18 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                 <X size={18} />
               </button>
               <span className="font-bold text-[15px] text-gray-900">
-                {showLegalText === 'TERMS' ? '서비스 이용약관' : '개인정보 처리방침'}
+                {legalDocument.title}
               </span>
               <div className="w-8"></div>
             </div>
             <div className="flex-1 overflow-y-auto p-5 md:p-6 bg-slate-50">
+              {legalDocument.fallbackNotice && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium leading-relaxed text-amber-900">
+                  {legalDocument.fallbackNotice}
+                </div>
+              )}
               <div className="text-[13px] text-gray-600 leading-relaxed bg-white p-5 rounded-xl border border-gray-200 shadow-sm whitespace-pre-wrap">
-                {showLegalText === 'TERMS' ? TERMS_OF_USE : PRIVACY_POLICY}
+                {legalDocument.body}
               </div>
             </div>
             <div className="p-4 md:p-5 border-t border-gray-100 bg-white flex-shrink-0">
@@ -210,7 +222,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                 onClick={() => setShowLegalText(null)}
                 className="w-full bg-black text-white font-bold h-12 rounded-xl text-[15px] hover:bg-gray-800 transition-all active:scale-[0.98]"
               >
-                확인
+                {t('confirm')}
               </button>
             </div>
           </div>
@@ -230,10 +242,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
           <div className="mb-6">
             <h3 className="text-xl font-bold text-gray-900 mb-1">
-              {mode === 'LOGIN' ? t('welcome_title') : '계정 생성하기'} {/* 🟢 번역 적용 */}
+              {mode === 'LOGIN' ? t('welcome_title') : copy.signupTitle}
             </h3>
             <p className="text-sm text-gray-500 font-medium">
-              {mode === 'LOGIN' ? t('welcome_subtitle') : '빠르고 간편하게 가입하세요.'} {/* 🟢 번역 적용 */}
+              {mode === 'LOGIN' ? t('welcome_subtitle') : copy.signupSubtitle}
             </p>
           </div>
 
@@ -257,7 +269,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                   <div className="flex border-t border-gray-300">
                     <div className="w-1/2 border-r border-gray-300">
                       <InputItem
-                        type="text" label="이름 (실명)" value={fullName} setValue={setFullName}
+                        type="text" label={copy.realNameLabel} value={fullName} setValue={setFullName}
                         isFirst={true} focusKey="NAME" currentFocus={isFocused} setFocus={setIsFocused}
                         autoComplete="name"
                       />
@@ -270,26 +282,22 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                         onFocus={() => setIsFocused('NATION')}
                         onBlur={() => setIsFocused(null)}
                       >
-                        <option value="" disabled className="text-gray-900">국적 선택</option>
-                        <option value="KR" className="text-gray-900">대한민국 (Korea)</option>
-                        <option value="JP" className="text-gray-900">일본 (Japan)</option>
-                        <option value="US" className="text-gray-900">미국 (USA)</option>
-                        <option value="CN" className="text-gray-900">중국 (China)</option>
-                        <option value="TW" className="text-gray-900">대만 (Taiwan)</option>
-                        <option value="HK" className="text-gray-900">홍콩 (Hong Kong)</option>
-                        <option value="SG" className="text-gray-900">싱가포르 (Singapore)</option>
-                        <option value="MY" className="text-gray-900">말레이시아 (Malaysia)</option>
-                        <option value="Other" className="text-gray-900">기타 (Other)</option>
+                        <option value="" disabled className="text-gray-900">{t('select_nationality')}</option>
+                        {nationalityOptions.map((option) => (
+                          <option key={option.value} value={option.value} className="text-gray-900">
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                       <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-4 z-0 origin-[0] left-4 font-medium pointer-events-none ${!nationality ? 'text-gray-500' : 'text-gray-500'}`}>
-                        국적
+                        {t('label_nationality')}
                       </label>
                       <ChevronDown size={16} className="absolute right-3 top-5 text-gray-500 pointer-events-none" />
                     </div>
                   </div>
 
                   <InputItem
-                    type="tel" label="휴대폰 번호 (- 없이 입력)" value={phone} setValue={setPhone}
+                    type="tel" label={copy.phoneFieldLabel} value={phone} setValue={setPhone}
                     isFirst={false} focusKey="PHONE" currentFocus={isFocused} setFocus={setIsFocused}
                     autoComplete="tel"
                   />
@@ -299,7 +307,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                       <input
                         type="text"
                         className="block w-full h-full pt-5 pb-1 px-4 text-[15px] text-gray-900 bg-white appearance-none focus:outline-none placeholder-transparent peer"
-                        placeholder="생년월일 (YYYYMMDD)"
+                        placeholder={copy.birthDateFieldLabel}
                         value={birthDate}
                         onChange={(e) => {
                           const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
@@ -310,7 +318,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                         autoComplete="bday"
                       />
                       <label className="absolute text-gray-500 duration-150 transform -translate-y-3 scale-75 top-4 z-10 origin-[0] left-4 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-3 font-medium pointer-events-none">
-                        생년월일 (8자리)
+                        {copy.birthDateFieldLabel}
                       </label>
                     </div>
 
@@ -323,12 +331,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                         onBlur={() => setIsFocused(null)}
                         autoComplete="sex"
                       >
-                        <option value="" disabled className="text-gray-900">성별 선택</option>
-                        <option value="Male" className="text-gray-900">남성</option>
-                        <option value="Female" className="text-gray-900">여성</option>
+                        <option value="" disabled className="text-gray-900">{t('gender_select')}</option>
+                        <option value="Male" className="text-gray-900">{t('gender_male')}</option>
+                        <option value="Female" className="text-gray-900">{t('gender_female')}</option>
                       </select>
                       <label className={`absolute duration-150 transform -translate-y-3 scale-75 top-4 z-0 origin-[0] left-4 font-medium pointer-events-none ${!gender ? 'text-gray-500' : 'text-gray-500'}`}>
-                        성별
+                        {t('label_gender')}
                       </label>
                       <ChevronDown size={16} className="absolute right-3 top-5 text-gray-500 pointer-events-none" />
                     </div>
@@ -350,7 +358,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                   <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${termsAgreed && privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
                     {(termsAgreed && privacyAgreed) && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                   </div>
-                  <span className="ml-3 font-bold text-sm text-gray-900">전체 동의</span>
+                  <span className="ml-3 font-bold text-sm text-gray-900">{copy.selectAll}</span>
                 </div>
 
                 <div className="p-4 space-y-4">
@@ -362,9 +370,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                       <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${termsAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
                         {termsAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                       </div>
-                      <span className="ml-2.5 text-gray-700 font-medium text-xs">[필수] 서비스 이용약관 동의</span>
+                      <span className="ml-2.5 text-gray-700 font-medium text-xs">{copy.termsAgreement}</span>
                     </div>
-                    <button type="button" onClick={() => setShowLegalText('TERMS')} className="text-gray-400 hover:text-black underline font-medium">보기</button>
+                    <button type="button" onClick={() => setShowLegalText('terms')} className="text-gray-400 hover:text-black underline font-medium">{copy.viewLabel}</button>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -375,9 +383,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
                       <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${privacyAgreed ? 'bg-black border-black text-white' : 'bg-white border-gray-300 group-hover:border-gray-400'}`}>
                         {privacyAgreed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                       </div>
-                      <span className="ml-2.5 text-gray-700 font-medium text-xs">[필수] 개인정보 수집 및 이용 동의</span>
+                      <span className="ml-2.5 text-gray-700 font-medium text-xs">{copy.privacyAgreement}</span>
                     </div>
-                    <button type="button" onClick={() => setShowLegalText('PRIVACY')} className="text-gray-400 hover:text-black underline font-medium">보기</button>
+                    <button type="button" onClick={() => setShowLegalText('privacy')} className="text-gray-400 hover:text-black underline font-medium">{copy.viewLabel}</button>
                   </div>
                 </div>
               </div>
@@ -417,7 +425,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               }}
               className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600 transition-colors"
             >
-              {mode === 'LOGIN' ? `${t('no_account')} ${t('signup')}` : '이미 계정이 있으신가요? 로그인'} {/* 🟢 번역 적용 */}
+              {mode === 'LOGIN' ? `${t('no_account')} ${t('signup')}` : copy.switchToLogin}
             </button>
           </div>
 

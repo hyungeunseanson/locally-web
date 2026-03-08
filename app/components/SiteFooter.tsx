@@ -2,43 +2,27 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Globe, Instagram, ChevronDown, ChevronUp, X } from 'lucide-react';
-// ❗ 아래 경로는 아까 만드신 파일 위치와 정확히 일치해야 합니다.
-import { TERMS_OF_USE, PRIVACY_POLICY, TRAVEL_TERMS, REFUND_POLICY } from '@/app/constants/legalText';
+import { getLegalDocument, type LegalDocType } from '@/app/constants/legalDocuments';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function SiteFooter() {
   const { t, lang } = useLanguage();
-  const pathname = usePathname();
   const [instaOpen, setInstaOpen] = useState(false);
 
-
-  // 모달 상태 관리 ('terms', 'privacy', 'travel', 'refund', null)
-  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [activeModal, setActiveModal] = useState<LegalDocType | null>(null);
 
   // 모달 열렸을 때 배경 스크롤 막기 (UX 필수)
   useEffect(() => {
-    if (activeModal) {
-      document.body.style.overflow = 'hidden';
-    } else {
+    document.body.style.overflow = activeModal ? 'hidden' : 'unset';
+
+    return () => {
       document.body.style.overflow = 'unset';
-    }
+    };
   }, [activeModal]);
 
-  // 선택된 모달에 따른 제목과 내용 가져오기
-  const getModalContent = () => {
-    switch (activeModal) {
-      case 'terms': return { title: '이용약관', content: TERMS_OF_USE };
-      case 'privacy': return { title: '개인정보 처리방침', content: PRIVACY_POLICY };
-      case 'travel': return { title: '여행약관 (국내/국외)', content: TRAVEL_TERMS };
-      case 'refund': return { title: '취소 및 환불 정책', content: REFUND_POLICY };
-      default: return null;
-    }
-  };
+  const modalData = activeModal ? getLegalDocument(lang, activeModal) : null;
 
-  const modalData = getModalContent();
-  // 🟢 [추가] 현재 언어 코드(lang)를 화면에 표시할 텍스트로 변환
   const getLanguageLabel = () => {
     switch (lang) {
       case 'en': return 'English (US)';
@@ -213,8 +197,13 @@ export default function SiteFooter() {
 
             {/* 내용 (스크롤 영역) */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+              {modalData.fallbackNotice && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium leading-relaxed text-amber-900">
+                  {modalData.fallbackNotice}
+                </div>
+              )}
               <div className="prose prose-sm max-w-none text-[#484848] whitespace-pre-wrap leading-relaxed font-light">
-                {modalData.content}
+                {modalData.body}
               </div>
             </div>
 
@@ -224,7 +213,7 @@ export default function SiteFooter() {
                 onClick={() => setActiveModal(null)}
                 className="bg-black text-white px-8 py-3 rounded-lg font-bold text-sm hover:bg-gray-800 transition-colors shadow-lg"
               >
-                확인
+                {t('confirm')}
               </button>
             </div>
           </div>

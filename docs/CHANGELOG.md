@@ -5,6 +5,19 @@
 
 ---
 
+## v3.37.15 — [i18n] 법률 문서 레지스트리 분리 및 로그인 모달 다국어 정리
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 법률 문서 레지스트리 분리 | `app/constants/legalDocuments.ts`를 신설해 `terms/privacy/travel/refund` 문서를 `ko/en/ja/zh` 제목 레지스트리 + 한국어 원문 body fallback 구조로 분리. 기존 `legalText.ts`의 한국어 원문은 유지 |
+| 🔴 푸터 약관 모달 로케일 연동 | `SiteFooter`가 더 이상 한국어 상수 제목을 직접 쓰지 않고 현재 `lang` 기준으로 문서 제목을 읽도록 변경. 비한국어 로케일에서는 한국어 원문이 적용된다는 fallback 안내문을 함께 표시 |
+| 🔴 로그인 모달 약관/회원가입 문구 정리 | `LoginModal`의 약관 뷰어를 동일한 법률 문서 헬퍼로 연결하고, 회원가입 단계의 제목/검증 토스트/국적 옵션/성별 선택/필수 약관 UI를 `ko/en/ja/zh` 기준으로 로컬라이즈. auth payload의 `gender`, `nationality` 값은 기존과 동일하게 유지 |
+| 🟡 기능 전용 로컬라이제이션 분리 | `app/components/loginModalLocalization.ts`를 추가해 로그인 모달 전용 문구와 국적 옵션을 전역 `LanguageContext` 밖으로 분리. 장문/기능 전용 문자열이 전역 사전을 비대화시키지 않도록 정리 |
+| 🟡 안전한 법률 fallback 명시 | 영문/일문/중문 법률 본문은 검수 전 번역을 억지로 넣지 않고, 제목만 현지화한 뒤 한국어 원문 적용 안내를 표기하는 안전한 단계적 전환으로 정리 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 실행 결과 기존 베이스라인 오류 `app/become-a-host2/page.tsx(99,45): Cannot find namespace 'JSX'`만 동일하게 확인되었고, 이번 패치로 인한 신규 타입 오류는 확인되지 않음 |
+
 ## v3.37.14 — [i18n] 일본어 누락 구조 보정 1차
 
 **작업일:** 2026-03-08
