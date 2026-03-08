@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.18 — [Host Landing] `become-a-host2` CTA 바 안전 추가
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 `become-a-host2` 전용 CTA 바 추가 | 새 호스트 랜딩 [`/become-a-host2`]에 얇은 상단 CTA 바를 추가해 `호스트 지원하기`와 신청 상태 기반 `신청현황` 진입 버튼을 페이지 톤에 맞춰 연결. 기존 이미지 중심 랜딩 구조는 유지하고, 페이지 전체를 클라이언트로 전환하지 않도록 CTA만 feature-local client component로 분리 |
+| 🟡 기존 인증/모달 흐름 재사용 | 새 CTA는 `AuthContext`와 기존 `LoginModal`을 그대로 사용해 비로그인 사용자는 로그인 모달, 신청자/승인 호스트는 대시보드, 신규 사용자는 지원서로 분기되도록 정리 |
+| 🟡 `become-a-host2` 타입 베이스라인 오류 정리 | `page.tsx`의 `JSX.Element` 반환 타입을 제거해 기존 `app/become-a-host2/page.tsx`의 `Cannot find namespace 'JSX'` 베이스라인 오류를 함께 해소 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 실행 결과 이번 시점 기준 신규 타입 오류 없이 통과 |
+
 ## v3.37.17 — [Upload] HEIC 명시 차단 및 JPG 변환 안내 팝업
 
 **작업일:** 2026-03-08

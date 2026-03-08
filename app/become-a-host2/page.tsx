@@ -2,6 +2,7 @@ import { ChevronDown } from "lucide-react";
 import Image from "next/image";
 
 import SiteHeader from "@/app/components/SiteHeader";
+import HostLandingActionBar from "./HostLandingActionBar";
 
 const sections = [
     { src: "/images/become-a-host2/1.png", alt: "Become a host design section 1", width: 2880, height: 1260 },
@@ -96,12 +97,14 @@ const faqGroups = [
     },
 ] as const;
 
-export default function BecomeAHost2Page(): JSX.Element {
+export default function BecomeAHost2Page() {
     return (
         <div className="min-h-screen bg-white text-[#222222] font-sans">
             <SiteHeader />
 
             <main>
+                <HostLandingActionBar />
+
                 <div className="mx-auto w-full max-w-[1440px]">
                     {sections.map((section, index) => (
                         <Image
