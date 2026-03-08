@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.35 — [Messaging] 서비스 매칭 채팅 request 단위 식별자 도입 준비
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 서비스 채팅 식별 보강 | `service_request` 컨텍스트의 기존 `(user_id, host_id, experience_id IS NULL)` 재사용 규칙을 정리하고, `service_request_id` 컬럼이 있으면 `(user_id, host_id, service_request_id)` 기준으로만 기존 스레드를 재사용하도록 서버 helper를 확장 |
+| 🟡 무중단 fallback 추가 | 운영 DB에 `inquiries.service_request_id`가 아직 없어도 회귀가 나지 않도록, 서버가 컬럼 존재 여부를 확인해 없을 때는 레거시 규칙으로 안전하게 fallback 하도록 구성 |
+| 🟡 중복 생성 race 완화 | 마이그레이션 후 `service_request_id` 기반 unique index가 있을 때 동시 생성으로 인한 `23505`가 나면 기존 스레드를 다시 조회해 이어붙이도록 보강 |
+| 🟡 DB 마이그레이션 파일 추가 | `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 추가. `inquiries.service_request_id` 컬럼, FK, 인덱스, partial unique index 포함 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 통과. `npx playwright test tests/e2e/05-live-guest-booking-messaging-support.spec.ts --project=chromium --reporter=list` 라이브 통과 |
+
 ## v3.37.34 — [Messaging] 답장 전송 서버 단일 API 통합 2차
 
 **작업일:** 2026-03-08

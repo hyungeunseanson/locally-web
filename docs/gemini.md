@@ -68,7 +68,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 - 결제/보안: NicePay 서명 검증, 결제 확정/취소 API 권한 검증 반영
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합, Postgres Trigger 프로필 100% 일치 동기화.
-- 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다.
+- 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다. 서비스 매칭 채팅은 `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 적용 후 `inquiries.service_request_id` 기준으로 request 단위 분리를 활성화한다.
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 기존 체험(`bookings`) 탭·`useAdminData.ts`는 전혀 변경하지 않음.
 - 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
 - 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
@@ -89,6 +89,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 6. 수정 전 연관 컴포넌트/훅/API 흐름을 교차 검증하고, 핀셋 수정(최소 변경)을 우선한다.
 7. **[SSR Join 분리 원칙]** `page.tsx` 서버 컴포넌트에서 여러 테이블을 join하는 단일 Supabase 쿼리는 쓰지 않는다. join 에러 시 `data=null`이 되어 `notFound()`가 호출되는 문제가 있음. 대신 ① 핵심 테이블 단독 조회 → ② 보조 테이블 별도 조회 패턴으로 분리한다.
 8. **[메시징 서버 단일 API 원칙]** 신규 문의방 생성/첫 메시지는 `/api/inquiries/thread`, 기존 문의방 답장은 `/api/inquiries/message`를 단일 소스로 사용한다. 클라이언트에서 `inquiries`, `inquiry_messages`, `notifications`를 직접 분산 insert/update하지 않는다.
+9. **[서비스 매칭 채팅 식별 원칙]** 서비스 매칭 채팅은 guest-host 조합만으로 기존 스레드를 재사용하지 않는다. `service_request_id` 컬럼이 있는 환경에서는 `(user_id, host_id, service_request_id)` 기준으로 스레드를 찾고, 마이그레이션 전 환경에서만 레거시 fallback을 허용한다.
 
 ### 5.2 DON'T
 - 외부 UI 라이브러리 임의 추가 금지
@@ -177,7 +178,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 | `service_applications` | 호스트 지원. UNIQUE(request_id, host_id) |
 | `service_bookings` | 결제/정산. `SVC-` 접두사 주문번호. service_role 전용 쓰기 |
 
-**마이그레이션 파일:** `supabase_service_matching_migration.sql` (초기), `supabase_service_matching_v2_escrow_migration.sql` (v2 에스크로)
+**마이그레이션 파일:** `supabase_service_matching_migration.sql` (초기), `supabase_service_matching_v2_escrow_migration.sql` (v2 에스크로), `docs/migrations/v3_37_35_service_request_inquiry_key.sql` (서비스 매칭 채팅 request 키)
 
 **상태 플로우 (v2 에스크로):**
 ```

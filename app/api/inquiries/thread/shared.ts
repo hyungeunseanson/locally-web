@@ -57,6 +57,7 @@ type InquiryInsertRow = {
   user_id: string;
   host_id: string | null;
   experience_id?: string | number | null;
+  service_request_id?: string | null;
   type?: string | null;
   content?: string | null;
 };
@@ -78,6 +79,18 @@ type InquiryMessageInsertRow = {
   id: number | string;
 };
 
+type ResolvedInquiryThread = {
+  existing: InquiryInsertRow | null;
+  guestId: string;
+  hostId: string | null;
+  experienceId: string | null;
+  serviceRequestId: string | null;
+  inquiryType: 'general' | 'admin_support';
+  redirectUrl: string;
+  emptyContent: string;
+  allowReuse: boolean;
+};
+
 class InquiryThreadError extends Error {
   status: number;
 
@@ -90,6 +103,22 @@ class InquiryThreadError extends Error {
 const buildGuestInboxLink = (inquiryId: number | string) => `/guest/inbox?inquiryId=${encodeURIComponent(String(inquiryId))}`;
 const buildHostInquiryLink = (inquiryId: number | string) => `/host/dashboard?tab=inquiries&inquiryId=${encodeURIComponent(String(inquiryId))}`;
 const buildAdminChatLink = (inquiryId: number | string) => `/admin/dashboard?tab=CHATS&inquiryId=${encodeURIComponent(String(inquiryId))}`;
+async function hasServiceRequestInquiryKeyColumn() {
+  const supabaseAdmin = createAdminClient();
+  const { error } = await supabaseAdmin
+    .from('inquiries')
+    .select('service_request_id')
+    .limit(1);
+
+  if (!error) return true;
+
+  if (error.code === '42703' || error.message?.includes('service_request_id')) {
+    return false;
+  }
+
+  console.warn('[inquiries/thread] service_request_id capability check failed, fallback to legacy lookup:', error);
+  return false;
+}
 
 async function getActorDisplayName(actorId: string) {
   try {
@@ -216,7 +245,7 @@ async function assertAdminActor(actor: AuthActor) {
 async function resolveExperienceThread(params: {
   actor: AuthActor;
   body: InquiryThreadRequestBody;
-}) {
+}): Promise<ResolvedInquiryThread> {
   const { actor, body } = params;
   const supabaseAdmin = createAdminClient();
   const experienceId = body.experienceId != null ? String(body.experienceId) : '';
@@ -264,6 +293,7 @@ async function resolveExperienceThread(params: {
     guestId,
     hostId,
     experienceId,
+    serviceRequestId: null,
     inquiryType: 'general' as const,
     redirectUrl: body.contextType === 'host_experience'
       ? buildHostInquiryLink(existing?.id || 'pending')
@@ -276,7 +306,7 @@ async function resolveExperienceThread(params: {
 async function resolveServiceRequestThread(params: {
   actor: AuthActor;
   body: InquiryThreadRequestBody;
-}) {
+}): Promise<ResolvedInquiryThread> {
   const { actor, body } = params;
   const supabaseAdmin = createAdminClient();
 
@@ -307,20 +337,31 @@ async function resolveServiceRequestThread(params: {
     throw new InquiryThreadError(403, 'Forbidden');
   }
 
-  const { data: existing } = await supabaseAdmin
-    .from('inquiries')
-    .select('id, user_id, host_id, experience_id, type, content')
-    .eq('user_id', guestId)
-    .eq('host_id', hostId)
-    .is('experience_id', null)
-    .eq('type', 'general')
-    .maybeSingle();
+  const supportsScopedServiceInquiry = await hasServiceRequestInquiryKeyColumn();
+  const { data: existing } = supportsScopedServiceInquiry
+    ? await supabaseAdmin
+      .from('inquiries')
+      .select('id, user_id, host_id, experience_id, service_request_id, type, content')
+      .eq('user_id', guestId)
+      .eq('host_id', hostId)
+      .eq('service_request_id', serviceRequest.id)
+      .eq('type', 'general')
+      .maybeSingle<InquiryInsertRow>()
+    : await supabaseAdmin
+      .from('inquiries')
+      .select('id, user_id, host_id, experience_id, type, content')
+      .eq('user_id', guestId)
+      .eq('host_id', hostId)
+      .is('experience_id', null)
+      .eq('type', 'general')
+      .maybeSingle<InquiryInsertRow>();
 
   return {
     existing,
     guestId,
     hostId,
     experienceId: null,
+    serviceRequestId: supportsScopedServiceInquiry ? serviceRequest.id : null,
     inquiryType: 'general' as const,
     redirectUrl: isCustomer
       ? buildGuestInboxLink(existing?.id || 'pending')
@@ -333,7 +374,7 @@ async function resolveServiceRequestThread(params: {
 async function resolveAdminSupportThread(params: {
   actor: AuthActor;
   body: InquiryThreadRequestBody;
-}) {
+}): Promise<ResolvedInquiryThread> {
   const { actor } = params;
   const adminIds = await getAdminRecipientIds();
   const randomAdminId = adminIds[Math.floor(Math.random() * adminIds.length)];
@@ -343,6 +384,7 @@ async function resolveAdminSupportThread(params: {
     guestId: actor.id,
     hostId: randomAdminId,
     experienceId: null,
+    serviceRequestId: null,
     inquiryType: 'admin_support' as const,
     redirectUrl: buildGuestInboxLink('pending'),
     emptyContent: '',
@@ -353,7 +395,7 @@ async function resolveAdminSupportThread(params: {
 async function resolveAdminInitiatedSupportThread(params: {
   actor: AuthActor;
   body: InquiryThreadRequestBody;
-}) {
+}): Promise<ResolvedInquiryThread> {
   const { actor, body } = params;
   const supabaseAdmin = createAdminClient();
   await assertAdminActor(actor);
@@ -377,6 +419,7 @@ async function resolveAdminInitiatedSupportThread(params: {
     guestId,
     hostId: actor.id,
     experienceId: null,
+    serviceRequestId: null,
     inquiryType: 'admin_support' as const,
     redirectUrl: buildAdminChatLink(existing?.id || 'pending'),
     emptyContent: '관리자가 문의를 시작했습니다.',
@@ -543,7 +586,7 @@ export async function upsertInquiryThread(params: {
     throw new InquiryThreadError(400, 'message is required');
   }
 
-  const resolved = await (async () => {
+  const resolved: ResolvedInquiryThread = await (async () => {
     switch (contextType) {
       case 'experience_general':
       case 'host_experience':
@@ -565,27 +608,53 @@ export async function upsertInquiryThread(params: {
 
   if (!inquiry) {
     const initialContent = cleanMessage || resolved.emptyContent || '';
-    const { data: newInquiry, error: insertError } = await supabaseAdmin
-      .from('inquiries')
-      .insert({
-        user_id: resolved.guestId,
-        host_id: resolved.hostId,
-        experience_id: resolved.experienceId,
-        content: initialContent,
-        type: resolved.inquiryType,
-      })
-      .select('id, user_id, host_id, experience_id, type, content')
-      .maybeSingle();
+    const inquiryInsertPayload = {
+      user_id: resolved.guestId,
+      host_id: resolved.hostId,
+      experience_id: resolved.experienceId,
+      content: initialContent,
+      type: resolved.inquiryType,
+      ...(resolved.serviceRequestId ? { service_request_id: resolved.serviceRequestId } : {}),
+    };
 
-    if (insertError || !newInquiry) {
+    const { data: newInquiry, error: insertError } = resolved.serviceRequestId
+      ? await supabaseAdmin
+        .from('inquiries')
+        .insert(inquiryInsertPayload)
+        .select('id, user_id, host_id, experience_id, service_request_id, type, content')
+        .maybeSingle<InquiryInsertRow>()
+      : await supabaseAdmin
+        .from('inquiries')
+        .insert(inquiryInsertPayload)
+        .select('id, user_id, host_id, experience_id, type, content')
+        .maybeSingle<InquiryInsertRow>();
+
+    if (insertError?.code === '23505' && resolved.serviceRequestId) {
+      const { data: duplicatedInquiry } = await supabaseAdmin
+        .from('inquiries')
+        .select('id, user_id, host_id, experience_id, service_request_id, type, content')
+        .eq('user_id', resolved.guestId)
+        .eq('host_id', resolved.hostId)
+        .eq('service_request_id', resolved.serviceRequestId)
+        .eq('type', resolved.inquiryType)
+        .maybeSingle<InquiryInsertRow>();
+
+      if (duplicatedInquiry) {
+        inquiry = duplicatedInquiry;
+      }
+    }
+
+    if (!inquiry && (insertError || !newInquiry)) {
       if (insertError?.code === '23503' && insertError.message?.includes('profiles')) {
         throw new InquiryThreadError(400, '프로필 동기화가 진행 중입니다. 잠시 후(5초 뒤) 다시 시도해주세요.');
       }
       throw new InquiryThreadError(500, '문의방 생성에 실패했습니다.');
     }
 
-    inquiry = newInquiry;
-    createdThread = true;
+    if (!inquiry && newInquiry) {
+      inquiry = newInquiry;
+      createdThread = true;
+    }
   }
 
   if (!inquiry?.id) {
