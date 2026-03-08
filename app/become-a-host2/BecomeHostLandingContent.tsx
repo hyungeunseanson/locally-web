@@ -99,6 +99,35 @@ const faqGroups = [
 
 const [heroSection, secondSection, ...remainingSections] = sections;
 
+function LandingSectionImage({
+    src,
+    alt,
+    width,
+    height,
+    priority = false,
+}: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    priority?: boolean;
+}) {
+    return (
+        <div className="overflow-hidden md:overflow-visible">
+            <Image
+                src={src}
+                alt={alt}
+                width={width}
+                height={height}
+                className="block h-auto w-[118%] max-w-none -translate-x-[9%] md:w-full md:max-w-full md:translate-x-0"
+                priority={priority}
+                sizes="(max-width: 767px) 118vw, (max-width: 1440px) 100vw, 1440px"
+                unoptimized
+            />
+        </div>
+    );
+}
+
 export default function BecomeHostLandingContent() {
     return (
         <div className="min-h-screen bg-white text-[#222222] font-sans">
@@ -106,42 +135,31 @@ export default function BecomeHostLandingContent() {
 
             <main>
                 <div className="mx-auto w-full max-w-[1440px]">
-                    <Image
-                        key={heroSection.alt}
+                    <LandingSectionImage
                         src={heroSection.src}
                         alt={heroSection.alt}
                         width={heroSection.width}
                         height={heroSection.height}
-                        className="block h-auto w-full"
-                        priority={true}
-                        sizes="(max-width: 1440px) 100vw, 1440px"
-                        unoptimized
+                        priority
                     />
 
                     <HostLandingActionBar compact />
 
-                    <Image
-                        key={secondSection.alt}
+                    <LandingSectionImage
                         src={secondSection.src}
                         alt={secondSection.alt}
                         width={secondSection.width}
                         height={secondSection.height}
-                        className="block h-auto w-full"
-                        priority={true}
-                        sizes="(max-width: 1440px) 100vw, 1440px"
-                        unoptimized
+                        priority
                     />
 
                     {remainingSections.map((section) => (
-                        <Image
+                        <LandingSectionImage
                             key={section.alt}
                             src={section.src}
                             alt={section.alt}
                             width={section.width}
                             height={section.height}
-                            className="block h-auto w-full"
-                            sizes="(max-width: 1440px) 100vw, 1440px"
-                            unoptimized
                         />
                     ))}
                 </div>
