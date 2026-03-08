@@ -12,8 +12,71 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
 export default function HelpCenterPage() {
-  const { t } = useLanguage(); // 🟢 추가
+  const { t, lang } = useLanguage(); // 🟢 추가
   const pathname = usePathname();
+  const supportCopy = (() => {
+    if (lang === 'en') {
+      return {
+        noAdmin: 'There is no available support manager right now.',
+        submitSuccess: 'Your inquiry has been received.',
+        submitFailPrefix: 'Failed to submit inquiry: ',
+        profileSyncDelay: 'Account sync is delayed. Please try again in 5 seconds.',
+        unknownError: 'Unknown error',
+        closeSr: 'Close',
+        modalTitle: 'Contact Support',
+        modalDesc: 'Our team will review it and reply in your inbox.',
+        modalPlaceholder: 'Please enter your inquiry.',
+        modalSubmitting: 'Sending...',
+        modalSubmit: 'Send inquiry',
+      };
+    }
+
+    if (lang === 'ja') {
+      return {
+        noAdmin: '現在対応可能なサポート担当者がいません。',
+        submitSuccess: 'お問い合わせを受け付けました。',
+        submitFailPrefix: 'お問い合わせ受付失敗: ',
+        profileSyncDelay: 'アカウント同期が遅れています。5秒後にもう一度お試しください。',
+        unknownError: '不明なエラー',
+        closeSr: '閉じる',
+        modalTitle: '1:1 お問い合わせ',
+        modalDesc: '担当者が確認後、メッセージボックスで返信します。',
+        modalPlaceholder: 'お問い合わせ内容を入力してください。',
+        modalSubmitting: '送信中...',
+        modalSubmit: 'お問い合わせ送信',
+      };
+    }
+
+    if (lang === 'zh') {
+      return {
+        noAdmin: '当前没有可处理咨询的客服人员。',
+        submitSuccess: '咨询已提交。',
+        submitFailPrefix: '咨询提交失败：',
+        profileSyncDelay: '账号同步稍有延迟，请在 5 秒后重试。',
+        unknownError: '未知错误',
+        closeSr: '关闭',
+        modalTitle: '1:1 咨询',
+        modalDesc: '管理员确认后会在消息箱中回复您。',
+        modalPlaceholder: '请输入咨询内容。',
+        modalSubmitting: '发送中...',
+        modalSubmit: '提交咨询',
+      };
+    }
+
+    return {
+      noAdmin: '현재 상담 가능한 관리자가 없습니다.',
+      submitSuccess: '문의가 접수되었습니다.',
+      submitFailPrefix: '문의 접수 실패: ',
+      profileSyncDelay: '계정 동기화에 지연이 발생했습니다. 5초 뒤 다시 시도해 주시기 바랍니다.',
+      unknownError: '알 수 없는 오류',
+      closeSr: '닫기',
+      modalTitle: '1:1 문의하기',
+      modalDesc: '관리자가 확인 후 메시지함으로 답변드립니다.',
+      modalPlaceholder: '문의하실 내용을 입력해주세요.',
+      modalSubmitting: '전송 중...',
+      modalSubmit: '문의 접수',
+    };
+  })();
 
   // 🟢 FAQ 데이터 (t 함수 사용을 위해 컴포넌트 내부로 이동)
   const FAQ_DATA = {
@@ -156,7 +219,7 @@ export default function HelpCenterPage() {
         .filter(Boolean);
 
       if (adminEmails.length === 0) {
-        throw new Error("현재 상담 가능한 관리자가 없습니다.");
+        throw new Error(supportCopy.noAdmin);
       }
 
       const { data: admins, error: adminError } = await supabase
@@ -166,7 +229,7 @@ export default function HelpCenterPage() {
 
       if (adminError) throw adminError;
       if (!admins || admins.length === 0) {
-        throw new Error("현재 상담 가능한 관리자가 없습니다.");
+        throw new Error(supportCopy.noAdmin);
       }
 
       const randomAdmin = admins[Math.floor(Math.random() * admins.length)];
@@ -194,18 +257,18 @@ export default function HelpCenterPage() {
 
       setHelpModalOpen(false);
       setHelpContent('');
-      showToast('문의가 접수되었습니다.', 'success');
-      router.push('/guest/inbox');
+      showToast(supportCopy.submitSuccess, 'success');
+      router.push(`/guest/inbox?inquiryId=${room.id}`);
     } catch (e: unknown) {
       console.error("문의 접수 실패:", e);
       const dbError = e as { code?: string, message?: string };
-      let message = e instanceof Error ? e.message : '알 수 없는 오류';
+      let message = e instanceof Error ? e.message : supportCopy.unknownError;
 
       if (dbError.code === '23503' && dbError.message?.includes('profiles')) {
-        message = '계정 동기화에 지연이 발생했습니다. 5초 뒤 다시 시도해 주시기 바랍니다.';
+        message = supportCopy.profileSyncDelay;
       }
 
-      showToast("문의 접수 실패: " + message, 'error');
+      showToast(supportCopy.submitFailPrefix + message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -340,20 +403,20 @@ export default function HelpCenterPage() {
           >
             <div className="flex justify-end mb-1">
               <button onClick={() => { setHelpModalOpen(false); setHelpContent(''); }} className="p-1.5 text-slate-600">
-                <span className="sr-only">닫기</span>
+                <span className="sr-only">{supportCopy.closeSr}</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
-            <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">1:1 문의하기</h3>
+            <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{supportCopy.modalTitle}</h3>
             <p className="text-[11px] md:text-[13px] text-slate-500 leading-snug md:leading-relaxed mb-4 md:mb-5">
-              관리자가 확인 후 <span className="underline underline-offset-2">메시지함으로 답변드립니다.</span>
+              {supportCopy.modalDesc}
             </p>
             <textarea
               value={helpContent}
               onChange={(e) => setHelpContent(e.target.value)}
-              placeholder="문의하실 내용을 입력해주세요."
+              placeholder={supportCopy.modalPlaceholder}
               className="w-full h-[122px] md:h-[170px] rounded-2xl border border-slate-300 bg-white px-4 py-3 md:px-5 md:py-4 text-[12px] md:text-[14px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
             />
             <div className="mt-auto md:mt-5">
@@ -366,7 +429,7 @@ export default function HelpCenterPage() {
                     : 'bg-[#111827] text-white'
                 }`}
               >
-                {isSubmitting ? '전송 중...' : '문의 접수'}
+                {isSubmitting ? supportCopy.modalSubmitting : supportCopy.modalSubmit}
               </button>
             </div>
           </div>

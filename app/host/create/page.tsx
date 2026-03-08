@@ -11,10 +11,12 @@ import {
   INITIAL_FORM_DATA,
   MAX_EXPERIENCE_PHOTOS,
   FIXED_REFUND_POLICY,
+  getExperienceFormCopy,
 } from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps';
 import { validateImage, sanitizeFileName, compressImage } from '@/app/utils/image';
 import { getLanguageNames } from '@/app/utils/languageLevels';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 type ItineraryItem = {
   title: string;
@@ -24,6 +26,8 @@ type ItineraryItem = {
 };
 
 export default function CreateExperiencePage() {
+  const { lang } = useLanguage();
+  const copy = getExperienceFormCopy(lang);
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast(); // 🟢 토스트 훅 가져오기
@@ -49,11 +53,11 @@ export default function CreateExperiencePage() {
   const validateCurrentStep = (targetStep: number) => {
     if (targetStep === 1) {
       if (!formData.city?.trim()) {
-        showToast('도시를 선택하거나 직접 입력해주세요.', 'error');
+        showToast(copy.validationCity, 'error');
         return false;
       }
       if (!formData.category?.trim()) {
-        showToast('카테고리를 선택해주세요.', 'error');
+        showToast(copy.validationCategory, 'error');
         return false;
       }
       return true;
@@ -61,11 +65,11 @@ export default function CreateExperiencePage() {
 
     if (targetStep === 2) {
       if (!formData.language_levels || formData.language_levels.length === 0) {
-        showToast('진행 가능한 언어를 1개 이상 선택해주세요.', 'error');
+        showToast(copy.validationLanguages, 'error');
         return false;
       }
       if (formData.language_levels.some((entry: { level?: number }) => !entry?.level || entry.level < 1 || entry.level > 5)) {
-        showToast('선택한 각 언어의 레벨을 설정해주세요.', 'error');
+        showToast(copy.validationLanguageLevels, 'error');
         return false;
       }
       return true;
@@ -73,15 +77,15 @@ export default function CreateExperiencePage() {
 
     if (targetStep === 3) {
       if (!formData.title?.trim() || formData.title.trim().length < 6) {
-        showToast('체험 제목을 6자 이상 입력해주세요.', 'error');
+        showToast(copy.validationTitle, 'error');
         return false;
       }
       if (!formData.photos || formData.photos.length < 1) {
-        showToast('대표 사진을 1장 이상 업로드해주세요.', 'error');
+        showToast(copy.validationPhotos, 'error');
         return false;
       }
       if (formData.photos.length > MAX_EXPERIENCE_PHOTOS) {
-        showToast(`대표 사진은 최대 ${MAX_EXPERIENCE_PHOTOS}장까지 업로드 가능합니다.`, 'error');
+        showToast(copy.validationPhotoLimit(MAX_EXPERIENCE_PHOTOS), 'error');
         return false;
       }
       return true;
@@ -89,16 +93,16 @@ export default function CreateExperiencePage() {
 
     if (targetStep === 4) {
       if (!formData.meeting_point?.trim()) {
-        showToast('만나는 장소 이름을 입력해주세요.', 'error');
+        showToast(copy.validationMeetingPoint, 'error');
         return false;
       }
       if (!formData.location?.trim()) {
-        showToast('정확한 주소를 입력해주세요.', 'error');
+        showToast(copy.validationLocation, 'error');
         return false;
       }
       const hasEmptyItinerary = (formData.itinerary || []).some((item: { title?: string }) => !item.title?.trim());
       if (hasEmptyItinerary) {
-        showToast('이동 동선의 장소 이름을 모두 입력해주세요.', 'error');
+        showToast(copy.validationItineraryTitles, 'error');
         return false;
       }
       return true;
@@ -106,11 +110,11 @@ export default function CreateExperiencePage() {
 
     if (targetStep === 5) {
       if (!formData.description?.trim() || formData.description.trim().length < 30) {
-        showToast('상세 설명을 30자 이상 입력해주세요.', 'error');
+        showToast(copy.validationDescription, 'error');
         return false;
       }
       if (!formData.inclusions || formData.inclusions.length === 0) {
-        showToast('포함 사항을 1개 이상 입력해주세요.', 'error');
+        showToast(copy.validationInclusions, 'error');
         return false;
       }
       return true;
@@ -118,7 +122,7 @@ export default function CreateExperiencePage() {
 
     if (targetStep === 6) {
       if (!formData.rules?.age_limit?.trim()) {
-        showToast('참가 연령 기준을 입력해주세요.', 'error');
+        showToast(copy.validationAgeLimit, 'error');
         return false;
       }
       return true;
@@ -126,11 +130,11 @@ export default function CreateExperiencePage() {
 
     if (targetStep === 7) {
       if (!Number(formData.price) || Number(formData.price) <= 0) {
-        showToast('기본 가격을 올바르게 입력해주세요.', 'error');
+        showToast(copy.validationPrice, 'error');
         return false;
       }
       if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {
-        showToast('단독 투어 가격을 입력해주세요.', 'error');
+        showToast(copy.validationPrivatePrice, 'error');
         return false;
       }
       return true;
@@ -206,7 +210,7 @@ export default function CreateExperiencePage() {
     for (const file of files) {
       const validation = validateImage(file);
       if (!validation.valid) {
-        showToast(validation.message || '이미지 형식이 올바르지 않습니다.', 'error');
+        showToast(validation.message || copy.imageValidationFallback, 'error');
         continue;
       }
 
@@ -216,7 +220,7 @@ export default function CreateExperiencePage() {
         processedFiles.push(compressedFile);
       } catch (err) {
         console.error('Compression error:', err);
-        showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
+        showToast(copy.imageProcessingError, 'error');
       }
     }
 
@@ -229,7 +233,7 @@ export default function CreateExperiencePage() {
     const files = Array.from(e.target.files);
 
     if (formData.photos.length + files.length > MAX_EXPERIENCE_PHOTOS) {
-      showToast(`대표 사진은 최대 ${MAX_EXPERIENCE_PHOTOS}장까지 업로드 가능합니다.`, 'error');
+      showToast(copy.validationPhotoLimit(MAX_EXPERIENCE_PHOTOS), 'error');
       return;
     }
 
@@ -304,7 +308,7 @@ export default function CreateExperiencePage() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요합니다.');
+      if (!user) throw new Error(copy.loginRequired);
 
       const photoUrls: string[] = [];
       for (const file of imageFiles) {
@@ -367,13 +371,13 @@ export default function CreateExperiencePage() {
       if (error) throw error;
 
       // 🟢 [수정됨] 등록 성공 시 알림 띄우고 대시보드로 이동
-      showToast('체험이 성공적으로 등록되었습니다! 🎉', 'success');
+      showToast(copy.submitSuccess, 'success');
       router.push('/host/dashboard?tab=experiences'); // 내 체험 관리 탭으로 이동
 
     } catch (error) {
-      const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+      const message = error instanceof Error ? error.message : copy.unknownError;
       console.error(error);
-      showToast('등록 실패: ' + message, 'error'); // 🟢 에러도 토스트로 표시
+      showToast(copy.submitFailPrefix + message, 'error'); // 🟢 에러도 토스트로 표시
     } finally {
       setLoading(false);
     }
@@ -423,13 +427,13 @@ export default function CreateExperiencePage() {
           className="fixed bottom-0 left-0 right-0 h-[88px] md:h-24 bg-white/90 backdrop-blur-md border-t border-slate-100 flex items-center justify-between px-4 md:px-6 z-50"
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
         >
-          <button onClick={prevStep} disabled={step === 1} className={`px-4 md:px-6 py-2.5 md:py-3 rounded-full font-bold text-xs md:text-sm transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100 underline decoration-2'}`}>이전</button>
+          <button onClick={prevStep} disabled={step === 1} className={`px-4 md:px-6 py-2.5 md:py-3 rounded-full font-bold text-xs md:text-sm transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100 underline decoration-2'}`}>{copy.prevButton}</button>
           {step === TOTAL_STEPS - 1 ? (
             <button onClick={handleSubmit} disabled={loading} className="bg-black text-white px-6 md:px-10 py-3 md:py-4 rounded-full font-bold text-sm md:text-base hover:scale-105 transition-transform shadow-xl shadow-slate-300 disabled:opacity-50 flex items-center gap-2">
-              {loading ? '등록 중...' : '체험 등록하기'}
+              {loading ? copy.submittingButton : copy.submitButton}
             </button>
           ) : (
-            <button onClick={nextStep} className="bg-black text-white px-6 md:px-10 py-3 md:py-4 rounded-full font-bold text-sm md:text-base hover:scale-105 transition-transform flex items-center gap-2 shadow-xl shadow-slate-300">다음 <ChevronRight size={16} className="md:w-[18px] md:h-[18px]" /></button>
+            <button onClick={nextStep} className="bg-black text-white px-6 md:px-10 py-3 md:py-4 rounded-full font-bold text-sm md:text-base hover:scale-105 transition-transform flex items-center gap-2 shadow-xl shadow-slate-300">{copy.nextButton} <ChevronRight size={16} className="md:w-[18px] md:h-[18px]" /></button>
           )}
         </footer>
       )}

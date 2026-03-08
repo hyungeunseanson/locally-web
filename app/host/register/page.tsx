@@ -12,6 +12,8 @@ import {
   normalizeLanguageLevels,
 } from '@/app/utils/languageLevels';
 import { compressImage } from '@/app/utils/image'; // 🟢 이미지 압축 추가
+import { useLanguage } from '@/app/context/LanguageContext';
+import { getHostRegisterCopy } from './localization';
 
 type HostRegisterFormData = {
   languageLevels: LanguageLevelEntry[];
@@ -66,6 +68,8 @@ function getFallbackLevel(value: unknown): LanguageLevel {
 }
 
 export default function HostRegisterPage() {
+  const { lang } = useLanguage();
+  const copy = getHostRegisterCopy(lang);
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast();
@@ -156,11 +160,11 @@ export default function HostRegisterPage() {
   const validateNextStep = () => {
     if (step !== 2) return true;
     if (formData.languageLevels.length < 1) {
-      showToast('구사 가능한 언어를 1개 이상 선택해주세요.', 'error');
+      showToast(copy.validationLanguages, 'error');
       return false;
     }
     if (formData.languageLevels.some((entry) => entry.level < 1 || entry.level > 5)) {
-      showToast('선택한 각 언어의 레벨을 설정해주세요.', 'error');
+      showToast(copy.validationLanguageLevels, 'error');
       return false;
     }
     return true;
@@ -186,11 +190,11 @@ export default function HostRegisterPage() {
 
   const handleSubmit = async () => {
     if (!formData.agreeTerms || !formData.educationCompleted || !formData.agreeSafetyPolicy) {
-      showToast('모든 필수 교육 시청 및 서약에 동의해주세요.', 'error');
+      showToast(copy.validationAgreements, 'error');
       return;
     }
     if (formData.languageLevels.length < 1) {
-      showToast('구사 가능한 언어를 1개 이상 선택해주세요.', 'error');
+      showToast(copy.validationLanguages, 'error');
       return;
     }
 
@@ -200,7 +204,7 @@ export default function HostRegisterPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요합니다.');
+      if (!user) throw new Error(copy.loginRequired);
 
       let profileUrl = formData.profilePhoto;
       let idCardUrl = formData.idCardFile;
@@ -268,12 +272,12 @@ export default function HostRegisterPage() {
 
       if (profileError) throw profileError;
 
-      showToast('신청이 완료되었습니다! 관리자 승인을 기다려주세요.', 'success');
+      showToast(copy.submitSuccess, 'success');
       router.push('/host/dashboard');
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+      const message = error instanceof Error ? error.message : copy.unknownError;
       console.error(error);
-      showToast('신청 중 오류가 발생했습니다: ' + message, 'error');
+      showToast(copy.submitFailPrefix + message, 'error');
     } finally {
       setLoading(false);
     }

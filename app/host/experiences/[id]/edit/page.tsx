@@ -7,10 +7,14 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, Save, MapPin, Plus, Trash2, X, Camera, Check, Globe, Loader2, Type, FileText, Lock } from 'lucide-react';
 import {
-  CATEGORIES,
-  SUPPORTED_LANGUAGES,
+  ACTIVITY_LEVEL_OPTIONS,
+  CATEGORY_OPTIONS,
+  EXPERIENCE_LANGUAGE_OPTIONS,
   MAX_EXPERIENCE_PHOTOS,
   FIXED_REFUND_POLICY,
+  FIXED_REFUND_POLICY_LABELS,
+  getExperienceFormCopy,
+  getLocalizedText,
 } from '@/app/host/create/config';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개선
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
@@ -18,7 +22,8 @@ import { compressImage, sanitizeFileName, validateImage } from '@/app/utils/imag
 import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 
 export default function EditExperiencePage() {
-  const { t } = useLanguage(); // 🟢 2. Hook
+  const { t, lang } = useLanguage(); // 🟢 2. Hook
+  const copy = getExperienceFormCopy(lang);
   const supabase = createClient();
   const router = useRouter();
   const params = useParams();
@@ -107,7 +112,7 @@ export default function EditExperiencePage() {
   const uploadImageFile = async (file: File, folder: 'hero' | 'itinerary') => {
     const validation = validateImage(file);
     if (!validation.valid) {
-      throw new Error(validation.message || '이미지 형식이 올바르지 않습니다.');
+      throw new Error(validation.message || copy.imageValidationFallback);
     }
 
     const compressedFile = await compressImage(file);
@@ -130,7 +135,7 @@ export default function EditExperiencePage() {
       if (!user) throw new Error(t('login_required'));
 
       if (formData.is_private_enabled && (!Number(formData.private_price) || Number(formData.private_price) <= 0)) {
-        throw new Error('단독 투어 가격을 입력해주세요.');
+        throw new Error(copy.validationPrivatePrice);
       }
 
       const cleanedInclusions = (formData.inclusions || []).map((item: string) => item.trim()).filter(Boolean);
@@ -200,7 +205,7 @@ export default function EditExperiencePage() {
     if (!e.target.files || e.target.files.length === 0) return;
 
     if (formData.photos.length >= MAX_EXPERIENCE_PHOTOS) {
-      showToast(`대표 사진은 최대 ${MAX_EXPERIENCE_PHOTOS}장까지 업로드 가능합니다.`, 'error');
+      showToast(copy.validationPhotoLimit(MAX_EXPERIENCE_PHOTOS), 'error');
       e.target.value = '';
       return;
     }
@@ -241,9 +246,9 @@ export default function EditExperiencePage() {
         image_url: publicUrl,
       };
       setFormData({ ...formData, itinerary: newItinerary });
-      showToast('동선 사진이 업로드되었습니다.', 'success');
+      showToast(copy.itineraryPhotoUploadSuccess, 'success');
     } catch (err: any) {
-      showToast('동선 사진 업로드 실패: ' + err.message, 'error');
+      showToast(copy.itineraryPhotoUploadFailPrefix + err.message, 'error');
     } finally {
       setUploadingItineraryIndex(null);
       e.target.value = '';
@@ -257,7 +262,7 @@ export default function EditExperiencePage() {
       image_url: '',
     };
     setFormData({ ...formData, itinerary: newItinerary });
-    showToast('동선 사진이 삭제되었습니다.', 'success');
+    showToast(copy.itineraryPhotoDeleteSuccess, 'success');
   };
 
   // 진행 언어 토글/레벨 편집
@@ -338,14 +343,14 @@ export default function EditExperiencePage() {
             {/* 📸 대표 사진 관리 */}
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
               <div className="flex items-center justify-between gap-3 mb-4">
-                <label className="block text-sm font-bold text-slate-900">대표 사진 관리 ({formData.photos.length}/{MAX_EXPERIENCE_PHOTOS})</label>
-                <span className="text-[11px] text-slate-500">첫 번째 사진이 상세 상단 대표 이미지로 노출됩니다.</span>
+                <label className="block text-sm font-bold text-slate-900">{copy.editPhotoManagerLabel(formData.photos.length, MAX_EXPERIENCE_PHOTOS)}</label>
+                <span className="text-[11px] text-slate-500">{copy.editPhotoManagerDesc}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                 {formData.photos.length < MAX_EXPERIENCE_PHOTOS && (
                   <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-white transition-all bg-white">
                     {uploading ? <Loader2 className="animate-spin text-slate-400 mb-2" /> : <Camera size={24} className="text-slate-400 mb-2" />}
-                    <span className="text-xs font-bold text-slate-500">{uploading ? t('btn_photo_uploading') : '대표사진 추가'}</span>
+                    <span className="text-xs font-bold text-slate-500">{uploading ? t('btn_photo_uploading') : copy.editAddPhoto}</span>
                     <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
                   </label>
                 )}
@@ -355,7 +360,7 @@ export default function EditExperiencePage() {
                     <img src={url} className="w-full h-full object-cover" alt={`experience-${idx}`} />
                     {idx === 0 && (
                       <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-bold text-white">
-                        메인
+                        {copy.mainPhotoBadge}
                       </span>
                     )}
                     <button onClick={() => removePhoto(idx)} className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600">
@@ -400,17 +405,17 @@ export default function EditExperiencePage() {
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-3">{t('label_languages')}</label>
               <div className="space-y-3">
-                {SUPPORTED_LANGUAGES.map((lang) => {
-                  const current = (formData.language_levels || []).find((entry: any) => entry.language === lang);
+                {EXPERIENCE_LANGUAGE_OPTIONS.map((languageOption) => {
+                  const current = (formData.language_levels || []).find((entry: any) => entry.language === languageOption.value);
                   const selected = Boolean(current);
 
                   return (
-                    <div key={lang} className={`rounded-2xl border p-4 ${selected ? 'border-black bg-slate-50' : 'border-slate-200 bg-white'}`}>
+                    <div key={languageOption.value} className={`rounded-2xl border p-4 ${selected ? 'border-black bg-slate-50' : 'border-slate-200 bg-white'}`}>
                       <div className="flex items-center justify-between gap-3">
-                        <button type="button" onClick={() => toggleLanguage(lang)} className="font-bold text-sm text-slate-900">
-                          {lang}
+                        <button type="button" onClick={() => toggleLanguage(languageOption.value)} className="font-bold text-sm text-slate-900">
+                          {getLocalizedText(languageOption.labels, lang)}
                         </button>
-                        <button type="button" onClick={() => toggleLanguage(lang)} className={`w-7 h-7 rounded-full border flex items-center justify-center ${selected ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}>
+                        <button type="button" onClick={() => toggleLanguage(languageOption.value)} className={`w-7 h-7 rounded-full border flex items-center justify-center ${selected ? 'bg-black border-black text-white' : 'border-slate-300 text-transparent'}`}>
                           <Check size={14} strokeWidth={3} />
                         </button>
                       </div>
@@ -420,7 +425,7 @@ export default function EditExperiencePage() {
                             key={level}
                             type="button"
                             disabled={!selected}
-                            onClick={() => updateLanguageLevel(lang, level)}
+                            onClick={() => updateLanguageLevel(languageOption.value, level)}
                             className={`h-9 rounded-xl border text-[11px] font-bold ${!selected ? 'border-slate-200 bg-slate-100 text-slate-300 cursor-not-allowed' : current?.level === level ? 'border-black bg-black text-white' : 'border-slate-200 bg-white text-slate-600'}`}
                           >
                             Lv.{level}
@@ -437,9 +442,9 @@ export default function EditExperiencePage() {
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-3">{t('label_category')}</label>
               <div className="flex flex-wrap gap-2 mb-4">
-                {CATEGORIES.map((cat) => (
-                  <button key={cat} onClick={() => setFormData({ ...formData, category: cat })} className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${formData.category === cat ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-600 hover:border-black'}`}>
-                    {t(cat)} {/* 🟢 번역 적용 */}
+                {CATEGORY_OPTIONS.map((categoryOption) => (
+                  <button key={categoryOption.value} onClick={() => setFormData({ ...formData, category: categoryOption.value })} className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${formData.category === categoryOption.value ? 'bg-black text-white border-black' : 'bg-white border-slate-200 text-slate-600 hover:border-black'}`}>
+                    {getLocalizedText(categoryOption.labels, lang)}
                   </button>
                 ))}
               </div>
@@ -468,7 +473,7 @@ export default function EditExperiencePage() {
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                   <Lock size={18} className="text-slate-900" />
-                  <span className="font-bold text-slate-900">단독 투어 옵션</span>
+                  <span className="font-bold text-slate-900">{copy.privateOptionLabel}</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -482,7 +487,7 @@ export default function EditExperiencePage() {
               </div>
               {formData.is_private_enabled && (
                 <div className="pt-2 border-t border-slate-200">
-                  <label className="block text-xs font-bold text-slate-500 mb-2">단독 투어 금액</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-2">{copy.editPrivatePriceLabel}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₩</span>
                     <input
@@ -497,26 +502,26 @@ export default function EditExperiencePage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2">만나는 장소 이름</label>
+                <label className="block text-xs font-bold text-slate-500 mb-2">{copy.editMeetingPointLabel}</label>
                 <div className="flex items-center gap-2 bg-white border border-slate-200 p-4 rounded-xl focus-within:border-black">
                   <MapPin size={18} className="text-slate-400" />
                   <input
                     className="bg-transparent w-full outline-none font-medium"
                     value={formData.meeting_point || ''}
                     onChange={(e) => setFormData({ ...formData, meeting_point: e.target.value })}
-                    placeholder="예) 스타벅스 홍대역점"
+                    placeholder={copy.meetingPointPlaceholder}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-2">정확한 주소</label>
+                <label className="block text-xs font-bold text-slate-500 mb-2">{copy.editAddressLabel}</label>
                 <div className="flex items-center gap-2 bg-white border border-slate-200 p-4 rounded-xl focus-within:border-black">
                   <Globe size={18} className="text-slate-400" />
                   <input
                     className="bg-transparent w-full outline-none font-medium"
                     value={formData.location || ''}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="예) 서울특별시 마포구 양화로 165"
+                    placeholder={copy.addressPlaceholder}
                   />
                 </div>
               </div>
@@ -557,7 +562,7 @@ export default function EditExperiencePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-2">불포함 사항</label>
+              <label className="block text-xs font-bold text-slate-500 mb-2">{copy.exclusionsLabel}</label>
               <div className="space-y-2">
                 {formData.exclusions.map((item: string, i: number) => (
                   <div key={i} className="flex gap-2">
@@ -593,13 +598,13 @@ export default function EditExperiencePage() {
                       <input className="w-full bg-transparent font-bold mb-2 outline-none placeholder:text-slate-300" placeholder={t('ph_spot_name')} value={item.title} onChange={(e) => updateItinerary(i, 'title', e.target.value)} />
                       <textarea className="w-full bg-transparent text-sm text-slate-600 outline-none resize-none h-16 placeholder:text-slate-300" placeholder={t('ph_activity_desc')} value={item.description} onChange={(e) => updateItinerary(i, 'description', e.target.value)} />
                       <div className="mt-3">
-                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase">장소 사진</label>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase">{copy.itineraryPhotoLabel}</label>
                         {item.image_url ? (
                           <div className="relative h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                             <img src={item.image_url} className="w-full h-full object-cover" alt={`itinerary-${i}`} />
                             <div className="absolute top-2 right-2 flex gap-2">
                               <label className="bg-white/90 px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-700 cursor-pointer">
-                                {uploadingItineraryIndex === i ? '업로드 중...' : '교체'}
+                                {uploadingItineraryIndex === i ? copy.itineraryPhotoUploading : copy.itineraryReplace}
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -616,7 +621,7 @@ export default function EditExperiencePage() {
                         ) : (
                           <label className="flex h-20 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-xs font-bold text-slate-500 cursor-pointer hover:border-black hover:text-black transition-colors">
                             {uploadingItineraryIndex === i ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
-                            장소 사진 추가
+                            {copy.itineraryAddPhoto}
                             <input
                               type="file"
                               accept="image/*"
@@ -646,16 +651,18 @@ export default function EditExperiencePage() {
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('label_activity_level')}</label>
                   <select className="w-full p-2 border rounded-lg text-sm" value={formData.rules?.activity_level} onChange={(e) => setFormData({ ...formData, rules: { ...formData.rules, activity_level: e.target.value } })}>
-                    <option value="가벼움">{t('opt_light')}</option>
-                    <option value="보통">{t('opt_moderate')}</option>
-                    <option value="높음">{t('opt_high')}</option>
+                    {ACTIVITY_LEVEL_OPTIONS.map((levelOption) => (
+                      <option key={levelOption.value} value={levelOption.value}>
+                        {getLocalizedText(levelOption.labels, lang)}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
               <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">환불 정책</p>
-                <p className="text-sm font-semibold text-slate-800">{FIXED_REFUND_POLICY}</p>
-                <p className="text-[11px] text-slate-500 mt-1">환불 정책은 고정으로 자동 적용됩니다.</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{copy.refundPolicyLabel}</p>
+                <p className="text-sm font-semibold text-slate-800">{getLocalizedText(FIXED_REFUND_POLICY_LABELS, lang)}</p>
+                <p className="text-[11px] text-slate-500 mt-1">{copy.refundPolicyHelp}</p>
               </div>
             </div>
           </div>
