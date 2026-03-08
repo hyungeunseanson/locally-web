@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.27 — [Host Landing] `/become-a-host2`를 canonical URL로 정리
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🟡 구주소 redirect 적용 | `/become-a-host2`는 더 이상 본문을 직접 렌더하지 않고 `/become-a-host`로 즉시 redirect되도록 변경 |
+| 🟡 메인 URL 성능 유지 | canonical URL인 `/become-a-host`는 기존처럼 공용 랜딩을 직접 렌더하고, 추가 hop은 구주소(`/become-a-host2`) 진입 시에만 발생하도록 유지 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 통과 |
+
 ## v3.37.26 — [Host Landing] `/become-a-host`를 새 랜딩으로 안전 교체
 
 **작업일:** 2026-03-08
