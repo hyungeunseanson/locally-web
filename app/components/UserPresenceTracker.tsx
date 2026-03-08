@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 
 export default function UserPresenceTracker() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const pathname = usePathname();
   const lastUpdateRef = useRef<number>(0); // 마지막 업데이트 시간 기록 (메모리)
 

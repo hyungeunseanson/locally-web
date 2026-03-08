@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Suspense } from "react";
@@ -42,8 +41,7 @@ const ibmPlexSansKr = localFont({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = await headers();
-  const locale = headersList.get('x-locally-locale') || 'ko';
+  const locale = await getCurrentLocale();
 
   const titleMap: Record<string, string> = {
     ko: 'Locally - 현지인과 함께하는 특별한 여행',

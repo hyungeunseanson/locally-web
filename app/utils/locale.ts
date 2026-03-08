@@ -28,13 +28,18 @@ const detectFromAcceptLanguage = (acceptLanguage: string): Locale | null => {
 };
 
 export async function getCurrentLocale(): Promise<Locale> {
+  const headerStore = await headers();
+  const headerLocale = normalizeLocale(headerStore.get('x-locally-locale'));
+  if (headerLocale) {
+    return headerLocale;
+  }
+
   const cookieStore = await cookies();
   const cookieLocale = normalizeLocale(cookieStore.get('app_lang')?.value);
   if (cookieLocale) {
     return cookieLocale;
   }
 
-  const headerStore = await headers();
   const acceptLanguage = headerStore.get('accept-language') || '';
   const acceptedLocale = detectFromAcceptLanguage(acceptLanguage);
 

@@ -5,6 +5,19 @@
 
 ---
 
+## v3.37.16 — [i18n/QA] 로케일 실QA 정합성 보정
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 로그인 모달 회귀성 렌더 루프 수정 | 실QA 중 홈 로그인 모달을 열 때 `Maximum update depth exceeded`가 반복되던 문제를 수정. `NotificationProvider`, `UserPresenceTracker`의 Supabase client 인스턴스를 `useMemo`로 고정해 effect 재구독 루프를 차단 |
+| 🔴 비로그인 세션 에러 소음 제거 | `AuthContext`가 로그아웃 상태의 `AuthSessionMissingError`를 예외로 간주해 콘솔 에러를 남기던 동작을 정리. 비로그인 상태를 정상 경로로 처리하도록 보정 |
+| 🔴 로케일 경로 메타 기준 정렬 | `app/utils/locale.ts`가 쿠키보다 middleware의 `x-locally-locale` 헤더를 우선 보도록 수정. 직접 `/en`, `/ja`, `/zh` 경로로 진입할 때 서버 메타데이터와 클라이언트 표시 언어 기준이 어긋나지 않도록 정리 |
+| 🟡 4개 언어 실QA 수행 | `/en|ja|zh/help`, `/en|ja|zh/host/register`, `/en|ja|zh/host/create`, 홈 로그인 모달/푸터를 실제 렌더 기준으로 확인. 본문 로케일 전환은 정상 확인되었고, 법률 본문은 기존 정책대로 제목 현지화 + 한국어 원문 fallback 유지 |
+| 🟡 감사 문서 범위 정리 | 사용자 요청에 따라 [docs/2026-03-08_issue_audit_and_implementation_plan.md](/Users/sonhyungeun/Documents/locally-web/docs/2026-03-08_issue_audit_and_implementation_plan.md)에서 일본 계좌 송금 폼 확장 항목을 현재 추진 범위에서 제거 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 실행 결과 기존 베이스라인 오류 `app/become-a-host2/page.tsx(99,45): Cannot find namespace 'JSX'`만 동일하게 확인되었고, 이번 패치로 인한 신규 타입 오류는 확인되지 않음 |
+
 ## v3.37.15 — [i18n] 법률 문서 레지스트리 분리 및 로그인 모달 다국어 정리
 
 **작업일:** 2026-03-08

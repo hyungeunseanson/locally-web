@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { X, Bell, MessageSquare } from 'lucide-react';
 
 interface NotificationDB {
@@ -37,9 +37,8 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationUI[]>([]);
   const [toast, setToast] = useState<ToastData | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const pathname = usePathname();
 
 // 🟢 [추가] 채널 관리를 위해 useRef 사용 (구독 중복 방지)
 const channelRef = useRef<any>(null);

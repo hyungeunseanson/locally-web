@@ -101,7 +101,17 @@ export function AuthProvider({
         setApplicationStatus(null);
       }
     } catch (error) {
-      console.error('Auth Load Error:', error);
+      const isMissingSessionError =
+        error instanceof Error &&
+        (error.name === 'AuthSessionMissingError' || error.message.toLowerCase().includes('auth session missing'));
+
+      if (isMissingSessionError) {
+        setUser(null);
+        setIsHost(false);
+        setApplicationStatus(null);
+      } else {
+        console.error('Auth Load Error:', error);
+      }
     } finally {
       setIsLoading(false);
     }
