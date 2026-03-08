@@ -116,21 +116,21 @@ export default function ServiceRequestDetailPage() {
     if (sendingMessage) return;
     setSendingMessage(true);
     try {
-      const res = await fetch('/api/services/start-chat', {
+      const res = await fetch('/api/inquiries/thread', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId }),
+        body: JSON.stringify({
+          contextType: 'service_request',
+          serviceRequestId: requestId,
+          openOnly: true,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.inquiryId) {
         showToast(data.error || t('server_error'), 'error');
         return;
       }
-      if (isOwner) {
-        router.push(`/guest/inbox?hostId=${data.hostId}`);
-      } else {
-        router.push(`/host/dashboard?tab=inquiries&guestId=${data.guestId}`);
-      }
+      router.push(data.redirectUrl || (isOwner ? `/guest/inbox?inquiryId=${data.inquiryId}` : `/host/dashboard?tab=inquiries&inquiryId=${data.inquiryId}`));
     } catch {
       showToast(t('server_error'), 'error');
     } finally {
@@ -142,38 +142,25 @@ export default function ServiceRequestDetailPage() {
     if (!contactModal || !contactText.trim()) return;
     setSendingContact(true);
     try {
-      const { data: existing } = await supabase
-        .from('inquiries')
-        .select('id')
-        .eq('user_id', currentUserId!)
-        .eq('host_id', contactModal.hostId)
-        .is('experience_id', null)
-        .maybeSingle();
-
-      let inquiryId: string | number;
-      if (existing) {
-        inquiryId = existing.id;
-      } else {
-        const { data: newInq, error: insertError } = await supabase
-          .from('inquiries')
-          .insert({ user_id: currentUserId, host_id: contactModal.hostId, content: contactText.trim(), type: 'general' })
-          .select()
-          .maybeSingle();
-        if (insertError || !newInq) throw insertError;
-        inquiryId = newInq.id;
-      }
-
-      await supabase.from('inquiry_messages').insert({
-        inquiry_id: inquiryId,
-        sender_id: currentUserId,
-        content: contactText.trim(),
-        is_read: false,
+      const res = await fetch('/api/inquiries/thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contextType: 'service_request',
+          serviceRequestId: requestId,
+          message: contactText.trim(),
+        }),
       });
+
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.inquiryId) {
+        throw new Error(data?.error || t('server_error'));
+      }
 
       showToast('메시지를 보냈습니다.', 'success');
       setContactModal(null);
       setContactText('');
-      router.push(`/guest/inbox?hostId=${contactModal.hostId}`);
+      router.push(data.redirectUrl || `/guest/inbox?inquiryId=${data.inquiryId}`);
     } catch {
       showToast(t('server_error'), 'error');
     } finally {

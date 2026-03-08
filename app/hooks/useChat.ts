@@ -432,28 +432,27 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     const authUser = await getAuthenticatedUser();
     if (!authUser) throw new Error('로그인 필요');
 
-    const { data, error } = await supabase
-      .from('inquiries')
-      .insert([{
-        user_id: authUser.id,
-        host_id: hostId,
-        experience_id: String(experienceId),
-        content,
-        type: 'general'
-      }])
-      .select()
-      .maybeSingle();
+    const response = await fetch('/api/inquiries/thread', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contextType: 'experience_general',
+        hostId,
+        experienceId: String(experienceId),
+        message: content,
+      }),
+    });
 
-    if (error) {
-      if (error.code === '23503' && error.message.includes('profiles')) {
-        throw new Error('프로필 동기화가 지연되고 있습니다. 잠시 후 5초 뒤에 다시 시도해주세요.');
-      }
-      throw error;
+    const result = await response.json();
+
+    if (!response.ok || !result?.success || !result?.inquiryId) {
+      throw new Error(result?.error || '문의방 생성에 실패했습니다.');
     }
-    if (!data) throw new Error('문의방 생성에 실패했습니다.');
 
-    await sendMessage(data.id as number | string, content, undefined, authUser.id);
-    return data;
+    await fetchInquiries(false);
+    await loadMessages(result.inquiryId as number | string);
+
+    return result;
   };
 
   const startNewChat = (hostData: { id: string; name: string; avatarUrl?: string }, expData: { id: string; title: string }) => {

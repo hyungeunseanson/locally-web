@@ -7,7 +7,6 @@ import {
   User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, Globe, ArrowLeft
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 
@@ -164,7 +163,6 @@ export default function HelpCenterPage() {
   const [helpContent, setHelpContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -202,63 +200,30 @@ export default function HelpCenterPage() {
     if (!helpContent.trim()) return;
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const response = await fetch('/api/inquiries/thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contextType: 'admin_support',
+          message: helpContent.trim(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.status === 401) {
         router.push('/login');
         return;
       }
 
-      const { data: whitelistEntries, error: whitelistError } = await supabase
-        .from('admin_whitelist')
-        .select('email');
-
-      if (whitelistError) throw whitelistError;
-
-      const adminEmails = (whitelistEntries || [])
-        .map((entry) => entry.email)
-        .filter(Boolean);
-
-      if (adminEmails.length === 0) {
-        throw new Error(supportCopy.noAdmin);
+      if (!response.ok || !result?.success || !result?.inquiryId) {
+        throw new Error(result?.error || supportCopy.noAdmin);
       }
-
-      const { data: admins, error: adminError } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('email', adminEmails);
-
-      if (adminError) throw adminError;
-      if (!admins || admins.length === 0) {
-        throw new Error(supportCopy.noAdmin);
-      }
-
-      const randomAdmin = admins[Math.floor(Math.random() * admins.length)];
-
-      const { data: room, error: roomError } = await supabase
-        .from('inquiries')
-        .insert({
-          host_id: randomAdmin.id,
-          user_id: user.id,
-          content: helpContent.trim(),
-          type: 'admin_support'
-        })
-        .select()
-        .maybeSingle();
-
-      if (roomError) throw roomError;
-
-      await supabase
-        .from('inquiry_messages')
-        .insert({
-          inquiry_id: room.id,
-          sender_id: user.id,
-          content: helpContent.trim()
-        });
 
       setHelpModalOpen(false);
       setHelpContent('');
       showToast(supportCopy.submitSuccess, 'success');
-      router.push(`/guest/inbox?inquiryId=${room.id}`);
+      router.push(result.redirectUrl || `/guest/inbox?inquiryId=${result.inquiryId}`);
     } catch (e: unknown) {
       console.error("문의 접수 실패:", e);
       const dbError = e as { code?: string, message?: string };

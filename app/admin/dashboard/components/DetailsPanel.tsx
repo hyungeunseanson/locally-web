@@ -21,35 +21,22 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
     if (!selectedItem?.id) return;
     setCsLoading(true);
     try {
-      // 기존 admin_support 문의 확인
-      const { data: existing } = await supabase
-        .from('inquiries')
-        .select('id')
-        .eq('user_id', selectedItem.id)
-        .or('type.eq.admin_support,type.eq.admin')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const response = await fetch('/api/inquiries/thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contextType: 'admin_initiated_support',
+          guestId: String(selectedItem.id),
+          openOnly: true,
+        }),
+      });
 
-      if (existing) {
-        router.push(`/admin/dashboard?tab=CHATS&inquiryId=${existing.id}`);
-      } else {
-        // 새 CS 문의 생성
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: newInquiry } = await supabase
-          .from('inquiries')
-          .insert({
-            user_id: selectedItem.id,
-            host_id: user?.id,
-            type: 'admin_support',
-            content: '관리자가 문의를 시작했습니다.',
-          })
-          .select('id')
-          .single();
-        if (newInquiry) {
-          router.push(`/admin/dashboard?tab=CHATS&inquiryId=${newInquiry.id}`);
-        }
+      const result = await response.json();
+      if (!response.ok || !result?.success || !result?.inquiryId) {
+        throw new Error(result?.error || 'CS 채팅 시작에 실패했습니다.');
       }
+
+      router.push(result.redirectUrl || `/admin/dashboard?tab=CHATS&inquiryId=${result.inquiryId}`);
     } catch (e) {
       console.error('CS 채팅 시작 오류:', e);
     } finally {
