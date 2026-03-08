@@ -4,15 +4,45 @@ import Image from "next/image";
 import SiteHeader from "@/app/components/SiteHeader";
 import HostLandingActionBar from "./HostLandingActionBar";
 
+const HOST_LANDING_ASSET_LOCALE = "ko";
+
 const sections = [
-    { src: "/images/become-a-host2/1.png", alt: "Become a host design section 1", width: 2880, height: 1260 },
-    { src: "/images/become-a-host2/2.png", alt: "Become a host design section 2", width: 2880, height: 1434 },
-    { src: "/images/become-a-host2/3.png", alt: "Become a host design section 3", width: 2880, height: 1156 },
-    { src: "/images/become-a-host2/4.png", alt: "Become a host design section 4", width: 2880, height: 1296 },
-    { src: "/images/become-a-host2/5.png", alt: "Become a host design section 5", width: 2880, height: 1542 },
-    { src: "/images/become-a-host2/6.png", alt: "Become a host design section 6", width: 2880, height: 1502 },
-    { src: "/images/become-a-host2/7.png", alt: "Become a host design section 7", width: 2880, height: 2264 },
-];
+    {
+        alt: "Become a host design section 1",
+        desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/1.png`, width: 2880, height: 1260 },
+        mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/1.png`, width: 1740, height: 1688 },
+    },
+    {
+        alt: "Become a host design section 2",
+        desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/2.png`, width: 2880, height: 1434 },
+        mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/2.png`, width: 1740, height: 2394 },
+    },
+    {
+        alt: "Become a host design section 3",
+        desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/3.png`, width: 2880, height: 1156 },
+        mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/3.png`, width: 1740, height: 1156 },
+    },
+    {
+        alt: "Become a host design section 4",
+        desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/4.png`, width: 2880, height: 1296 },
+        mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/4.png`, width: 1740, height: 1296 },
+    },
+    {
+        alt: "Become a host design section 5",
+        desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/5.png`, width: 2880, height: 1542 },
+        mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/5.png`, width: 1740, height: 1542 },
+    },
+    {
+        alt: "Become a host design section 6",
+        desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/6.png`, width: 2880, height: 1502 },
+        mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/6.png`, width: 1740, height: 1502 },
+    },
+    {
+        alt: "Become a host design section 7",
+        desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/7.png`, width: 2880, height: 2264 },
+        mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/7.png`, width: 1740, height: 2264 },
+    },
+] as const;
 
 const faqGroups = [
     {
@@ -100,31 +130,55 @@ const faqGroups = [
 const [heroSection, secondSection, ...remainingSections] = sections;
 
 function LandingSectionImage({
-    src,
+    desktop,
+    mobile,
     alt,
-    width,
-    height,
     priority = false,
 }: {
-    src: string;
+    desktop: { src: string; width: number; height: number };
+    mobile: { src: string; width: number; height: number };
     alt: string;
-    width: number;
-    height: number;
     priority?: boolean;
 }) {
     return (
-        <div className="overflow-hidden md:overflow-visible">
-            <Image
-                src={src}
-                alt={alt}
-                width={width}
-                height={height}
-                className="block h-auto w-[118%] max-w-none -translate-x-[9%] md:w-full md:max-w-full md:translate-x-0"
-                priority={priority}
-                sizes="(max-width: 767px) 118vw, (max-width: 1440px) 100vw, 1440px"
-                unoptimized
-            />
-        </div>
+        <>
+            <div className="md:hidden">
+                <Image
+                    src={mobile.src}
+                    alt={alt}
+                    width={mobile.width}
+                    height={mobile.height}
+                    className="block h-auto w-full"
+                    priority={priority}
+                    sizes="100vw"
+                    unoptimized
+                />
+            </div>
+            <div className="hidden md:block">
+                <Image
+                    src={desktop.src}
+                    alt={alt}
+                    width={desktop.width}
+                    height={desktop.height}
+                    className="block h-auto w-full"
+                    priority={priority}
+                    sizes="(max-width: 1440px) 100vw, 1440px"
+                    unoptimized
+                />
+            </div>
+        </>
+    );
+}
+
+function renderSection(section: typeof sections[number], priority = false) {
+    return (
+        <LandingSectionImage
+            key={section.alt}
+            desktop={section.desktop}
+            mobile={section.mobile}
+            alt={section.alt}
+            priority={priority}
+        />
     );
 }
 
@@ -135,33 +189,13 @@ export default function BecomeHostLandingContent() {
 
             <main>
                 <div className="mx-auto w-full max-w-[1440px]">
-                    <LandingSectionImage
-                        src={heroSection.src}
-                        alt={heroSection.alt}
-                        width={heroSection.width}
-                        height={heroSection.height}
-                        priority
-                    />
+                    {renderSection(heroSection, true)}
 
                     <HostLandingActionBar compact />
 
-                    <LandingSectionImage
-                        src={secondSection.src}
-                        alt={secondSection.alt}
-                        width={secondSection.width}
-                        height={secondSection.height}
-                        priority
-                    />
+                    {renderSection(secondSection, true)}
 
-                    {remainingSections.map((section) => (
-                        <LandingSectionImage
-                            key={section.alt}
-                            src={section.src}
-                            alt={section.alt}
-                            width={section.width}
-                            height={section.height}
-                        />
-                    ))}
+                    {remainingSections.map((section) => renderSection(section))}
                 </div>
 
                 <HostLandingActionBar showStatusButton />
