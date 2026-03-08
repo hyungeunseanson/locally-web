@@ -103,8 +103,6 @@ export default function BecomeAHost2Page() {
             <SiteHeader />
 
             <main>
-                <HostLandingActionBar />
-
                 <div className="mx-auto w-full max-w-[1440px]">
                     {sections.map((section, index) => (
                         <Image
@@ -120,6 +118,8 @@ export default function BecomeAHost2Page() {
                         />
                     ))}
                 </div>
+
+                <HostLandingActionBar />
 
                 <section className="bg-[#f7f7f7] px-4 py-16 md:px-6 md:py-24">
                     <div className="mx-auto max-w-[1440px]">
