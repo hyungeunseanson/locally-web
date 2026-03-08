@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { sendNotification } from '@/app/utils/notification';
 import { sanitizeText } from '@/app/utils/sanitize';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
-import { InquiryType, isAdminSupportInquiry } from '@/app/utils/inquiry';
+import { InquiryType } from '@/app/utils/inquiry';
 
 type ProfileRow = {
   id: string;
@@ -105,27 +104,6 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     if (!url || url === '') return null;
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
-  };
-
-  const buildGuestInboxLink = (inquiryId: number | string) => {
-    const params = new URLSearchParams({ inquiryId: String(inquiryId) });
-    return `/guest/inbox?${params.toString()}`;
-  };
-
-  const buildHostInquiryLink = (inquiryId: number | string) => {
-    const params = new URLSearchParams({
-      tab: 'inquiries',
-      inquiryId: String(inquiryId)
-    });
-    return `/host/dashboard?${params.toString()}`;
-  };
-
-  const buildAdminChatLink = (inquiryId: number | string) => {
-    const params = new URLSearchParams({
-      tab: 'CHATS',
-      inquiryId: String(inquiryId)
-    });
-    return `/admin/dashboard?${params.toString()}`;
   };
 
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
@@ -348,74 +326,40 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
     }
 
-    const displayContent = cleanContent || (type === 'image' ? '📷 사진을 보냈습니다.' : '');
-
-    setInquiries((prev) => prev.map((inq) =>
-      inq.id === inquiryId
-        ? { ...inq, content: displayContent, updated_at: new Date().toISOString() }
-        : inq
-    ).sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime()));
-
     try {
-      const { error } = await supabase.from('inquiry_messages').insert([{
-        inquiry_id: inquiryId,
-        sender_id: actorId,
-        content: cleanContent,
-        image_url: imageUrl,
-        type,
-        is_read: false
-      }]);
+      const response = await fetch('/api/inquiries/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inquiryId,
+          content: cleanContent,
+          imageUrl,
+          type,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      await supabase.from('inquiries').update({
-        content: displayContent,
-        updated_at: new Date().toISOString()
-      }).eq('id', inquiryId);
-
-      await loadMessages(inquiryId);
-
-      const currentInquiry =
-        (selectedInquiryRef.current && String(selectedInquiryRef.current.id) === String(inquiryId)
-          ? selectedInquiryRef.current
-          : null) ||
-        inquiriesRef.current.find((i) => String(i.id) === String(inquiryId));
-
-      if (currentInquiry) {
-        const isAdminInquiry = isAdminSupportInquiry(currentInquiry.type);
-        const actorIsHost = !!currentInquiry.host_id && actorId === currentInquiry.host_id;
-        const recipientId = isAdminInquiry
-          ? (role === 'admin' ? currentInquiry.user_id : currentInquiry.host_id)
-          : (actorIsHost ? currentInquiry.user_id : currentInquiry.host_id);
-
-        const targetLink = isAdminInquiry
-          ? (role === 'admin'
-            ? buildGuestInboxLink(inquiryId)
-            : buildAdminChatLink(inquiryId))
-          : (actorIsHost
-            ? buildGuestInboxLink(inquiryId)
-            : buildHostInquiryLink(inquiryId));
-
-        const senderName =
-          ((currentUser?.user_metadata as { full_name?: string } | undefined)?.full_name) ||
-          ((fallbackUser?.user_metadata as { full_name?: string } | undefined)?.full_name) ||
-          '상대방';
-
-        const numericInquiryId = typeof inquiryId === 'number' ? inquiryId : Number(inquiryId);
-
-        if (recipientId) {
-          await sendNotification({
-            recipient_id: recipientId,
-            senderId: actorId,
-            type: 'new_message',
-            title: `💬 ${senderName}님의 새 메시지`,
-            message: displayContent,
-            link: targetLink,
-            inquiry_id: Number.isFinite(numericInquiryId) ? numericInquiryId : undefined
-          });
-        }
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || '메시지 저장에 실패했습니다.');
       }
 
+      const nextInquiries = inquiriesRef.current
+        .map((inq) =>
+          String(inq.id) === String(inquiryId)
+            ? {
+              ...inq,
+              content: String(result.displayContent || cleanContent || ''),
+              updated_at: String(result.updatedAt || new Date().toISOString()),
+            }
+            : inq
+        )
+        .sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime());
+
+      inquiriesRef.current = nextInquiries;
+      setInquiries(nextInquiries);
+
+      await loadMessages(inquiryId);
     } catch (err: unknown) {
       const dbError = err as { code?: string, message?: string };
       let message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
@@ -425,6 +369,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       }
 
       showToast('메시지 전송 실패: ' + message, 'error');
+      throw err instanceof Error ? err : new Error(message);
     }
   };
 

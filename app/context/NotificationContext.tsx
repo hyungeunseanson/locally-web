@@ -62,7 +62,7 @@ useEffect(() => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     // 2. 리얼타임 구독 — notifications 테이블 INSERT만 감지
-    // (채팅 알림은 useChat.sendMessage()가 sendNotification()을 호출해 DB에 저장 후
+    // (채팅 알림은 /api/inquiries/thread, /api/inquiries/message 서버 경로가 DB에 저장 후
     //  여기 Channel A가 감지하므로, inquiry_messages를 별도 구독할 필요 없음)
     channelRef.current = supabase
       .channel('global-alerts')

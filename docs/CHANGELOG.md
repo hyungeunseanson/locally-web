@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.34 — [Messaging] 답장 전송 서버 단일 API 통합 2차
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 공용 서버 API 추가 | `/api/inquiries/message`를 신설해 기존 문의방에 대한 답장 전송을 서버 단일 경로로 통합 |
+| 🔴 클라이언트 direct insert 제거 | `useChat.sendMessage()`가 더 이상 `inquiry_messages` / `inquiries`를 브라우저에서 직접 갱신하지 않고, 이미지 업로드 후 서버 API에 메시지 저장을 위임하도록 정리 |
+| 🟡 관리자 1:1 문의 상태 전환 보강 | `ChatMonitor`에서 답장 전송을 `await`한 뒤에만 `open → in_progress` 상태를 바꾸도록 수정해, 답장 저장 실패 시 상태만 먼저 변하는 불일치를 방지 |
+| 🟡 알림 서버화 일관화 | 채팅 알림은 `/api/inquiries/thread`, `/api/inquiries/message`가 `notifications`를 기록하고, 클라이언트는 실시간 수신만 담당하도록 정리 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 통과. `npx playwright test tests/e2e/05-live-guest-booking-messaging-support.spec.ts --project=chromium --reporter=list` 라이브 통과 |
+
 ## v3.37.31 — [E2E] 승인된 호스트 라이브 체험 등록 플로우 검증 스펙 추가
 
 ## v3.37.32 — [E2E] 라이브 게스트 무통장 예약·메시지·관리자 문의 플로우 검증 스펙 추가

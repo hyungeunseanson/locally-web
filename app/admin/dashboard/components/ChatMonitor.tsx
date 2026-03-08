@@ -49,7 +49,7 @@ type AdminChatState = {
   messages: MonitorMessage[];
   loadMessages: (inquiryId: number | string) => void;
   clearSelected: () => void;
-  sendMessage: (inquiryId: number | string, content: string) => void;
+  sendMessage: (inquiryId: number | string, content: string) => Promise<void>;
   refresh: () => void;
   isLoading: boolean;
   error?: string;
@@ -98,15 +98,19 @@ export default function ChatMonitor() {
 
   const handleSend = async () => {
     if (selectedInquiry && replyText.trim()) {
-      sendMessage(selectedInquiry.id, replyText);
-      setReplyText('');
+      try {
+        await sendMessage(selectedInquiry.id, replyText);
+        setReplyText('');
 
-      // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
-      if (activeTab === 'admin' && isAdminSupportInquiry(selectedInquiry.type)) {
-        const currentStatus = (selectedInquiry as any).status;
-        if (!currentStatus || currentStatus === 'open') {
-          await handleUpdateCSStatus(selectedInquiry.id, 'in_progress');
+        // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
+        if (activeTab === 'admin' && isAdminSupportInquiry(selectedInquiry.type)) {
+          const currentStatus = (selectedInquiry as any).status;
+          if (!currentStatus || currentStatus === 'open') {
+            await handleUpdateCSStatus(selectedInquiry.id, 'in_progress');
+          }
         }
+      } catch (error) {
+        console.error('[ChatMonitor] sendMessage failed:', error);
       }
     }
   };

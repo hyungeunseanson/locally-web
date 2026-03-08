@@ -37,6 +37,21 @@ export type InquiryThreadResponse = {
   createdMessage: boolean;
 };
 
+export type InquiryMessageRequestBody = {
+  inquiryId?: number | string;
+  content?: string;
+  imageUrl?: string | null;
+  type?: 'text' | 'image';
+};
+
+export type InquiryMessageResponse = {
+  success: true;
+  inquiryId: number | string;
+  messageId: number | string;
+  displayContent: string;
+  updatedAt: string;
+};
+
 type InquiryInsertRow = {
   id: number | string;
   user_id: string;
@@ -50,6 +65,17 @@ type ServiceRequestRow = {
   id: string;
   user_id: string;
   selected_host_id: string | null;
+};
+
+type InquiryMessageAccessRow = {
+  id: number | string;
+  user_id: string;
+  host_id: string | null;
+  type?: string | null;
+};
+
+type InquiryMessageInsertRow = {
+  id: number | string;
 };
 
 class InquiryThreadError extends Error {
@@ -356,6 +382,147 @@ async function resolveAdminInitiatedSupportThread(params: {
     emptyContent: '관리자가 문의를 시작했습니다.',
     allowReuse: true,
   };
+}
+
+function isAdminSupportType(type?: string | null) {
+  return type === 'admin' || type === 'admin_support';
+}
+
+async function resolveInquiryMessageAccess(params: {
+  actor: AuthActor;
+  inquiryId: number | string;
+}) {
+  const { actor, inquiryId } = params;
+  const supabaseAdmin = createAdminClient();
+
+  const { data: inquiry } = await supabaseAdmin
+    .from('inquiries')
+    .select('id, user_id, host_id, type')
+    .eq('id', inquiryId)
+    .maybeSingle<InquiryMessageAccessRow>();
+
+  if (!inquiry) {
+    throw new InquiryThreadError(404, '문의방을 찾을 수 없습니다.');
+  }
+
+  const isParticipant =
+    String(inquiry.user_id) === String(actor.id) ||
+    (inquiry.host_id != null && String(inquiry.host_id) === String(actor.id));
+
+  let actorIsAdmin = false;
+  if (!isParticipant) {
+    await assertAdminActor(actor);
+    actorIsAdmin = true;
+  }
+
+  return {
+    inquiry,
+    actorIsAdmin,
+    isAdminSupport: isAdminSupportType(inquiry.type),
+  };
+}
+
+export async function createInquiryMessage(params: {
+  actor: AuthActor;
+  body: InquiryMessageRequestBody;
+}) {
+  const { actor, body } = params;
+  const supabaseAdmin = createAdminClient();
+  const inquiryId = body.inquiryId != null ? String(body.inquiryId) : '';
+  const cleanContent = sanitizeText(body.content || '').trim();
+  const normalizedType = body.type === 'image' ? 'image' : 'text';
+  const imageUrl = body.imageUrl || null;
+
+  if (!inquiryId) {
+    throw new InquiryThreadError(400, 'inquiryId is required');
+  }
+
+  if (!cleanContent && !imageUrl) {
+    throw new InquiryThreadError(400, 'message is required');
+  }
+
+  const { inquiry, actorIsAdmin, isAdminSupport } = await resolveInquiryMessageAccess({
+    actor,
+    inquiryId,
+  });
+
+  const displayContent = cleanContent || (normalizedType === 'image' ? '📷 사진을 보냈습니다.' : '');
+  const updatedAt = new Date().toISOString();
+
+  const { data: insertedMessage, error: messageError } = await supabaseAdmin
+    .from('inquiry_messages')
+    .insert({
+      inquiry_id: inquiry.id,
+      sender_id: actor.id,
+      content: cleanContent,
+      image_url: imageUrl,
+      type: normalizedType,
+      is_read: false,
+    })
+    .select('id')
+    .maybeSingle<InquiryMessageInsertRow>();
+
+  if (messageError || !insertedMessage) {
+    if (messageError?.code === '23503' && messageError.message?.includes('profiles')) {
+      throw new InquiryThreadError(400, '프로필 동기화가 진행 중입니다. 잠시 후(5초 뒤) 다시 시도해주세요.');
+    }
+    throw new InquiryThreadError(500, '메시지 저장에 실패했습니다.');
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('inquiries')
+    .update({
+      content: displayContent,
+      updated_at: updatedAt,
+    })
+    .eq('id', inquiry.id);
+
+  if (updateError) {
+    throw new InquiryThreadError(500, '문의방 갱신에 실패했습니다.');
+  }
+
+  const actorDisplayName = await getActorDisplayName(actor.id);
+
+  const recipientId = (() => {
+    if (isAdminSupport) {
+      if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
+      return inquiry.user_id;
+    }
+
+    if (String(actor.id) === String(inquiry.host_id)) return inquiry.user_id;
+    if (String(actor.id) === String(inquiry.user_id)) return inquiry.host_id;
+    if (actorIsAdmin) return inquiry.host_id;
+    return inquiry.host_id;
+  })();
+
+  const notificationLink = (() => {
+    if (isAdminSupport) {
+      return actorIsAdmin || String(actor.id) === String(inquiry.host_id)
+        ? buildGuestInboxLink(inquiry.id)
+        : buildAdminChatLink(inquiry.id);
+    }
+
+    return String(actor.id) === String(inquiry.host_id)
+      ? buildGuestInboxLink(inquiry.id)
+      : buildHostInquiryLink(inquiry.id);
+  })();
+
+  if (recipientId && String(recipientId) !== String(actor.id)) {
+    await notifyRecipient({
+      recipientId,
+      title: `💬 ${actorDisplayName}님의 새 메시지`,
+      message: displayContent,
+      link: notificationLink,
+    });
+  }
+
+  return {
+    success: true,
+    inquiryId: inquiry.id,
+    messageId: insertedMessage.id,
+    displayContent,
+    updatedAt,
+  } satisfies InquiryMessageResponse;
 }
 
 export async function upsertInquiryThread(params: {
