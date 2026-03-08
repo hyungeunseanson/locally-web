@@ -102,13 +102,13 @@ export default function HostLandingActionBar({
         <div
           className={`mx-auto flex w-full max-w-[1440px] px-4 md:px-6 ${
             compact
-              ? 'justify-center py-4 md:justify-start md:py-5 md:pl-[54%]'
+              ? 'justify-center py-4 md:py-5'
               : 'justify-center py-5 md:py-6'
           }`}
         >
           <div
             className={`flex w-full items-center justify-center gap-2 ${
-              compact ? 'max-w-none' : 'max-w-[520px]'
+              compact ? 'max-w-[320px]' : 'max-w-[520px]'
             } ${compact ? 'flex-col' : 'flex-col md:flex-row'}`}
           >
             <button
@@ -117,7 +117,7 @@ export default function HostLandingActionBar({
               disabled={isLoading}
               className={`inline-flex w-full items-center justify-center rounded-full bg-[#2f2f2f] text-white transition-colors hover:bg-[#242424] disabled:cursor-not-allowed disabled:opacity-60 ${
                 compact
-                  ? 'w-auto min-w-[176px] px-6 py-3 text-[14px] font-medium tracking-[-0.01em] md:min-w-[192px]'
+                  ? 'w-auto min-w-[148px] px-5 py-3 text-[14px] font-medium tracking-[-0.01em] md:min-w-[160px]'
                   : 'px-5 py-3 text-[14px] font-medium tracking-[-0.01em] md:flex-1'
               }`}
             >
