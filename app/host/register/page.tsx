@@ -11,7 +11,7 @@ import {
   getLanguageNames,
   normalizeLanguageLevels,
 } from '@/app/utils/languageLevels';
-import { compressImage } from '@/app/utils/image'; // 🟢 이미지 압축 추가
+import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getHostRegisterCopy } from './localization';
 
@@ -72,7 +72,7 @@ export default function HostRegisterPage() {
   const copy = getHostRegisterCopy(lang);
   const supabase = createClient();
   const router = useRouter();
-  const { showToast } = useToast();
+  const { showToast, showHeicUnsupportedToast } = useToast();
 
   const [step, setStep] = useState(1);
   const totalSteps = 8;
@@ -183,9 +183,21 @@ export default function HostRegisterPage() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'profile' | 'idCard') => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      if (isHeicValidationResult(validation)) {
+        showHeicUnsupportedToast(validation.message);
+      } else {
+        showToast(validation.message || copy.unknownError, 'error');
+      }
+      e.target.value = '';
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     updateData(fieldName === 'profile' ? 'profilePhoto' : 'idCardFile', url);
     setFiles((prev) => ({ ...prev, [fieldName]: file }));
+    e.target.value = '';
   };
 
   const handleSubmit = async () => {

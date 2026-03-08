@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { sendNotification } from '@/app/utils/notification';
 import { sanitizeText } from '@/app/utils/sanitize';
-import { compressImage, sanitizeFileName } from '@/app/utils/image';
+import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import { InquiryType, isAdminSupportInquiry } from '@/app/utils/inquiry';
 
 type ProfileRow = {
@@ -93,7 +93,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [isLoading, setIsLoading] = useState(true);
 
   const supabase = createClient();
-  const { showToast } = useToast();
+  const { showToast, showHeicUnsupportedToast } = useToast();
 
   // 실시간 이벤트 중복 수신 방지 (메시지 id 단위)
   const processedEventRef = useRef<Set<string>>(new Set());
@@ -320,6 +320,16 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     let type = 'text';
 
     if (file) {
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        if (isHeicValidationResult(validation)) {
+          showHeicUnsupportedToast(validation.message);
+        } else {
+          showToast(validation.message || '이미지 전송 실패', 'error');
+        }
+        return;
+      }
+
       try {
         const compressed = await compressImage(file);
         const fileName = `${inquiryId}/${Date.now()}_${sanitizeFileName(file.name)}`;

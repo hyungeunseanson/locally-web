@@ -5,7 +5,7 @@ import { Star, X, Camera, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
 import { useLanguage } from '@/app/context/LanguageContext';
-import { compressImage } from '@/app/utils/image'; // 🟢 이미지 압축 추가
+import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
 interface ReviewModalProps {
   trip: any;
@@ -15,7 +15,7 @@ interface ReviewModalProps {
 
 export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
   const supabase = createClient();
-  const { showToast } = useToast();
+  const { showToast, showHeicUnsupportedToast } = useToast();
   const { t } = useLanguage();
 
   // [R5] 수정 모드 감지: trip.review가 있으면 수정 모드
@@ -35,13 +35,28 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const totalImages = existingPhotoUrls.length + imageFiles.length;
-      if (totalImages >= 2) return showToast(t('rv_max_photos') as string, 'error');
+      if (totalImages >= 2) {
+        e.target.value = '';
+        return showToast(t('rv_max_photos') as string, 'error');
+      }
 
       const file = e.target.files[0];
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        if (isHeicValidationResult(validation)) {
+          showHeicUnsupportedToast(validation.message);
+        } else {
+          showToast(validation.message || (t('rv_save_fail') as string), 'error');
+        }
+        e.target.value = '';
+        return;
+      }
+
       const imageUrl = URL.createObjectURL(file);
 
       setNewImagePreviews(prev => [...prev, imageUrl]);
       setImageFiles(prev => [...prev, file]);
+      e.target.value = '';
     }
   };
 

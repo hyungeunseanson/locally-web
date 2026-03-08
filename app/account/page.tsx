@@ -15,7 +15,7 @@ import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitch
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
-import { validateImage, compressImage, sanitizeFileName } from '@/app/utils/image';
+import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 type GuestReview = {
@@ -48,7 +48,7 @@ export default function AccountPage() {
     return days;
   };
   const router = useRouter();
-  const { showToast } = useToast();
+  const { showToast, showHeicUnsupportedToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(true);
@@ -261,7 +261,12 @@ export default function AccountPage() {
     // 1. 유효성 검사
     const validation = validateImage(file);
     if (!validation.valid) {
-      alert(validation.message);
+      if (isHeicValidationResult(validation)) {
+        showHeicUnsupportedToast(validation.message);
+      } else {
+        showToast(validation.message || t('profile_photo_fail'), 'error');
+      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -282,10 +287,10 @@ export default function AccountPage() {
 
       setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
-      alert(t('profile_photo_change_done')); // 🟢 번역
+      showToast(t('profile_photo_change_done'), 'success'); // 🟢 번역
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '알 수 없는 오류';
-      alert(t('profile_photo_fail') + ' ' + message); // 🟢 번역
+      showToast(`${t('profile_photo_fail')} ${message}`, 'error'); // 🟢 번역
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = ''; // input 초기화

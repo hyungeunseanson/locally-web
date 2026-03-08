@@ -7,7 +7,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { compressImage } from '@/app/utils/image'; // 🟢 이미지 압축 추가
+import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
 interface HostProfile {
   full_name?: string;
@@ -59,7 +59,7 @@ interface HostProfileFormData {
 }
 
 export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps) {
-  const { showToast } = useToast();
+  const { showToast, showHeicUnsupportedToast } = useToast();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'public' | 'private'>('public');
 
@@ -125,11 +125,22 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      if (isHeicValidationResult(validation)) {
+        showHeicUnsupportedToast(validation.message);
+      } else {
+        showToast(validation.message || '사진 업로드 실패', 'error');
+      }
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const file = e.target.files[0];
       const compressedFile = await compressImage(file); // 🟢 압축 추가
       const fileName = `profile/${user.id}_${Date.now()}`;
       const { error } = await supabase.storage.from('images').upload(fileName, compressedFile);
@@ -142,6 +153,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
       showToast('사진 업로드 실패: ' + message, 'error');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 

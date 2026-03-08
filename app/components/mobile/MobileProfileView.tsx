@@ -12,6 +12,7 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { validateImage, isHeicValidationResult } from '@/app/utils/image';
 
 type GuestReview = {
     id: string | number;
@@ -82,7 +83,7 @@ export default function MobileProfileView({
     const [uploading, setUploading] = useState(false);
     const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 1 });
     const supabase = useMemo(() => createClient(), []);
-    const { showToast } = useToast();
+    const { showToast, showHeicUnsupportedToast } = useToast();
     const { t } = useLanguage();
     const completion = getProfileCompletion(isEditing ? editData : profile, 'guest');
     const missingLabels = completion.missingFields
@@ -115,8 +116,19 @@ export default function MobileProfileView({
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
-        setUploading(true);
         const file = e.target.files[0];
+        const validation = validateImage(file);
+        if (!validation.valid) {
+            if (isHeicValidationResult(validation)) {
+                showHeicUnsupportedToast(validation.message);
+            } else {
+                showToast(validation.message || '사진 업로드 실패', 'error');
+            }
+            e.target.value = '';
+            return;
+        }
+
+        setUploading(true);
         const fileExt = file.name.split('.').pop();
         const filePath = `${userId}-${Math.random()}.${fileExt}`;
         try {
@@ -131,6 +143,7 @@ export default function MobileProfileView({
             showToast('사진 업로드 실패: ' + message, 'error');
         } finally {
             setUploading(false);
+            e.target.value = '';
         }
     };
 

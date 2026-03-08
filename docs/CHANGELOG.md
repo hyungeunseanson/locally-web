@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.17 — [Upload] HEIC 명시 차단 및 JPG 변환 안내 팝업
+
+**작업일:** 2026-03-08
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 HEIC/HEIF 정책 명확화 | `app/utils/image.ts`에서 `HEIC/HEIF`를 MIME 타입과 파일 확장자 기준으로 명시 감지하고, 현재 지원 형식을 `JPG/PNG/WEBP`로 고정. 이미지 검증은 `unsupported_heic` 코드와 안내 메시지를 반환하고, 압축 유틸도 HEIC 원본 fallback 업로드를 막도록 방어 |
+| 🔴 전역 JPG 변환 안내 팝업 추가 | `app/context/ToastContext.tsx`에 액션형 토스트를 확장하고, `showHeicUnsupportedToast()`를 추가. HEIC 업로드 시 `JPG 변환 방법` 버튼이 붙은 에러 토스트를 띄우고, 클릭 시 `ko/en/ja/zh` 안내 모달에서 iPhone 설정 경로와 Mac/Windows 변환 방법을 바로 확인할 수 있도록 구성 |
+| 🟡 주요 업로드 흐름 공통 연결 | 체험 등록/수정, 호스트 지원서, 게스트 계정 사진, 모바일 프로필 사진, 호스트 프로필 편집, 리뷰 사진, 커뮤니티 글쓰기, 메시지 이미지 전송 경로가 HEIC 업로드 시 동일한 차단/안내 UX를 사용하도록 정리 |
+| 🟡 업로드 input 재선택 UX 보정 | HEIC 차단이나 사진 개수 제한으로 업로드가 중단된 뒤에도 동일 파일을 바로 다시 선택할 수 있도록 주요 파일 input 초기화 타이밍을 정리 |
+| ✅ 검증 | `git diff --check` 통과. `npx tsc --noEmit` 실행 결과 기존 베이스라인 오류 `app/become-a-host2/page.tsx(99,45): Cannot find namespace 'JSX'`만 동일하게 확인되었고, 이번 패치로 인한 신규 타입 오류는 확인되지 않음 |
+
 ## v3.37.16 — [i18n/QA] 로케일 실QA 정합성 보정
 
 **작업일:** 2026-03-08

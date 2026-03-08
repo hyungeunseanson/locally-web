@@ -14,7 +14,7 @@ import {
   getExperienceFormCopy,
 } from './config';
 import ExperienceFormSteps from './components/ExperienceFormSteps';
-import { validateImage, sanitizeFileName, compressImage } from '@/app/utils/image';
+import { validateImage, sanitizeFileName, compressImage, isHeicValidationResult } from '@/app/utils/image';
 import { getLanguageNames } from '@/app/utils/languageLevels';
 import { useLanguage } from '@/app/context/LanguageContext';
 
@@ -30,7 +30,7 @@ export default function CreateExperiencePage() {
   const copy = getExperienceFormCopy(lang);
   const supabase = createClient();
   const router = useRouter();
-  const { showToast } = useToast(); // 🟢 토스트 훅 가져오기
+  const { showToast, showHeicUnsupportedToast } = useToast(); // 🟢 토스트 훅 가져오기
 
   // --- 상태 관리 ---
   const [step, setStep] = useState(1);
@@ -210,7 +210,11 @@ export default function CreateExperiencePage() {
     for (const file of files) {
       const validation = validateImage(file);
       if (!validation.valid) {
-        showToast(validation.message || copy.imageValidationFallback, 'error');
+        if (isHeicValidationResult(validation)) {
+          showHeicUnsupportedToast(validation.message);
+        } else {
+          showToast(validation.message || copy.imageValidationFallback, 'error');
+        }
         continue;
       }
 
@@ -234,6 +238,7 @@ export default function CreateExperiencePage() {
 
     if (formData.photos.length + files.length > MAX_EXPERIENCE_PHOTOS) {
       showToast(copy.validationPhotoLimit(MAX_EXPERIENCE_PHOTOS), 'error');
+      e.target.value = '';
       return;
     }
 
@@ -254,7 +259,10 @@ export default function CreateExperiencePage() {
     if (!e.target.files || e.target.files.length === 0) return;
 
     const { previewUrls, processedFiles } = await buildPreviewFiles([e.target.files[0]]);
-    if (previewUrls.length === 0 || processedFiles.length === 0) return;
+    if (previewUrls.length === 0 || processedFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
 
     const newItinerary = [...(formData.itinerary as ItineraryItem[])];
     newItinerary[index] = {

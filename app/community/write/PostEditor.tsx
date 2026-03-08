@@ -3,7 +3,8 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
-import { compressImage, sanitizeFileName, validateImage } from '@/app/utils/image';
+import { useToast } from '@/app/context/ToastContext';
+import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import DatePicker from '@/app/components/DatePicker';
 import { ArrowLeft, CalendarDays, ChevronRight, ImagePlus, Loader2, MapPin, X } from 'lucide-react';
 import type { CommunityCategory } from '@/app/types/community';
@@ -43,6 +44,7 @@ export default function PostEditor() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const supabase = createClient();
+    const { showToast, showHeicUnsupportedToast } = useToast();
     const initialCategory = searchParams.get('category');
     const defaultCategory = WRITABLE_CATEGORIES.includes(initialCategory as CommunityCategory)
         ? (initialCategory as CommunityCategory)
@@ -77,13 +79,25 @@ export default function PostEditor() {
         const files = Array.from(event.target.files);
 
         if (imageFiles.length + files.length > 3) {
-            alert('사진은 최대 3장까지만 업로드 가능합니다.');
+            showToast('사진은 최대 3장까지만 업로드 가능합니다.', 'error');
+            event.target.value = '';
             return;
         }
 
-        const validFiles = files.filter((file) => validateImage(file).valid);
+        const validFiles = files.filter((file) => {
+            const validation = validateImage(file);
+            if (validation.valid) return true;
+
+            if (isHeicValidationResult(validation)) {
+                showHeicUnsupportedToast(validation.message);
+            } else {
+                showToast(validation.message || '이미지 파일만 업로드 가능합니다.', 'error');
+            }
+            return false;
+        });
         setImageFiles((prev) => [...prev, ...validFiles]);
         setImageUrls((prev) => [...prev, ...validFiles.map((file) => URL.createObjectURL(file))]);
+        event.target.value = '';
     };
 
     const removeImage = (index: number) => {

@@ -18,7 +18,7 @@ import {
 } from '@/app/host/create/config';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개선
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
-import { compressImage, sanitizeFileName, validateImage } from '@/app/utils/image';
+import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 
 export default function EditExperiencePage() {
@@ -27,7 +27,7 @@ export default function EditExperiencePage() {
   const supabase = createClient();
   const router = useRouter();
   const params = useParams();
-  const { showToast } = useToast();
+  const { showToast, showHeicUnsupportedToast } = useToast();
 
   const [formData, setFormData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -214,6 +214,16 @@ export default function EditExperiencePage() {
 
     try {
       const file = e.target.files[0];
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        if (isHeicValidationResult(validation)) {
+          showHeicUnsupportedToast(validation.message);
+        } else {
+          showToast(validation.message || copy.imageValidationFallback, 'error');
+        }
+        return;
+      }
+
       const publicUrl = await uploadImageFile(file, 'hero');
       setFormData((prev: any) => ({ ...prev, photos: [...prev.photos, publicUrl] }));
 
@@ -239,7 +249,18 @@ export default function EditExperiencePage() {
     setUploadingItineraryIndex(index);
 
     try {
-      const publicUrl = await uploadImageFile(e.target.files[0], 'itinerary');
+      const file = e.target.files[0];
+      const validation = validateImage(file);
+      if (!validation.valid) {
+        if (isHeicValidationResult(validation)) {
+          showHeicUnsupportedToast(validation.message);
+        } else {
+          showToast(validation.message || copy.imageValidationFallback, 'error');
+        }
+        return;
+      }
+
+      const publicUrl = await uploadImageFile(file, 'itinerary');
       const newItinerary = [...formData.itinerary];
       newItinerary[index] = {
         ...newItinerary[index],
