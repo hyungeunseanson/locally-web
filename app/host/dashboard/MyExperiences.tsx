@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 
@@ -167,26 +167,35 @@ export default function MyExperiences() {
                   </div>
                 </div>
 
-                <div className="flex h-32 min-w-0 flex-1 flex-col rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-                  <h2 className="text-[13px] md:text-lg font-bold leading-[1.35] text-slate-900 line-clamp-2">
-                    {exp.title}
-                  </h2>
+                <div className="flex h-32 min-w-0 flex-1 flex-col justify-between py-0.5">
+                  <div className="space-y-2">
+                    <h2 className="text-[12px] md:text-lg font-bold leading-[1.35] text-slate-900 line-clamp-2">
+                      {exp.title}
+                    </h2>
 
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] md:text-sm font-medium text-slate-500">
-                    <span>{getCityLabel(exp.city)}</span>
-                    <span className="text-slate-300">·</span>
-                    <span>{formatDuration(exp.duration)}</span>
-                    <span className="text-slate-300">·</span>
-                    <span>{t('label_max_guests')} {formatMaxGuests(exp.max_guests)}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] md:text-sm font-medium text-slate-600">
+                        <MapPin size={11} className="shrink-0 text-slate-400" />
+                        <span className="truncate">{getCityLabel(exp.city)}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] md:text-sm font-medium text-slate-600">
+                        <Clock size={11} className="shrink-0 text-slate-400" />
+                        <span>{formatDuration(exp.duration)}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] md:text-sm font-medium text-slate-600">
+                        <Users size={11} className="shrink-0 text-slate-400" />
+                        <span>{formatMaxGuests(exp.max_guests)}</span>
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="mt-auto rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                     <div className="flex items-end justify-between gap-3">
                       <div>
                         <p className="text-[10px] md:text-xs font-semibold text-slate-400">
                           {t('label_price')}
                         </p>
-                        <p className="mt-1 text-[16px] md:text-lg font-black text-slate-900">
+                        <p className="mt-0.5 text-[15px] md:text-lg font-black text-slate-900">
                           {formatPrice(exp.price)}
                         </p>
                       </div>
@@ -194,7 +203,7 @@ export default function MyExperiences() {
                         <p className="text-[10px] md:text-xs font-semibold text-slate-400">
                           {t('exp_booking_count')}
                         </p>
-                        <p className="mt-1 text-[12px] md:text-sm font-semibold text-slate-600">
+                        <p className="mt-0.5 text-[12px] md:text-sm font-semibold text-slate-600">
                           {exp.bookings?.[0]?.count || 0}{t('exp_count_unit')}
                         </p>
                       </div>
