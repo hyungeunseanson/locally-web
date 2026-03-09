@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.45 — [Host Approval] 심사 결과 알림 누락 보정
+
+**작업일:** 2026-03-09
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 승인/보완/거절 알림 추가 | 관리자 `host_applications` 상태 변경 서버 액션이 이제 `approved`, `revision`, `rejected` 전환 시 해당 호스트에게 인앱 알림을 생성하도록 보정 |
+| 🟡 승인 플로우 회귀 방지 | `approved` 시 기존 `users.role='host'` 승격 로직은 유지하고, 알림 insert 실패는 로그만 남기는 best-effort 처리로 상태 변경 자체가 깨지지 않도록 구성 |
+| ✅ 검증 | `npx tsc --noEmit` 통과. `git diff --check` 통과 |
+
 ## v3.37.44 — [Public User Profile] 자기소개 fallback 보정
 
 **작업일:** 2026-03-09

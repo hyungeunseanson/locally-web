@@ -37,6 +37,40 @@ async function getAdminClient() {
   return supabase;
 }
 
+function buildHostApplicationStatusNotification(status: string, comment?: string) {
+  const trimmedComment = comment?.trim();
+
+  if (status === 'approved') {
+    return {
+      title: '🎉 호스트 승인이 완료되었습니다',
+      message: '호스트 신청이 승인되었습니다. 이제 호스트 대시보드와 기능을 이용할 수 있습니다.',
+      link: '/host/dashboard',
+    };
+  }
+
+  if (status === 'revision') {
+    return {
+      title: '🛠️ 호스트 지원서 보완이 필요합니다',
+      message: trimmedComment
+        ? `관리자 코멘트를 확인하고 지원서를 보완해 주세요.\n\n보완 사유: ${trimmedComment}`
+        : '관리자 코멘트를 확인하고 지원서를 보완해 주세요.',
+      link: '/host/dashboard',
+    };
+  }
+
+  if (status === 'rejected') {
+    return {
+      title: '📌 호스트 지원 결과를 확인해 주세요',
+      message: trimmedComment
+        ? `이번 호스트 신청은 승인되지 않았습니다.\n\n사유: ${trimmedComment}`
+        : '이번 호스트 신청은 승인되지 않았습니다.',
+      link: '/host/dashboard',
+    };
+  }
+
+  return null;
+}
+
 // ✅ 상태 변경 (승인/거절)
 export async function updateAdminStatus(table: 'host_applications' | 'experiences', id: string, status: string, comment?: string) {
   const supabase = await getAdminClient();
@@ -61,10 +95,33 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   const { error } = await supabaseAdmin.from(table).update(updateData).eq('id', id);
   if (error) throw new Error(error.message);
 
-  if (table === 'host_applications' && status === 'approved') {
-    const { data: app } = await supabaseAdmin.from('host_applications').select('user_id').eq('id', id).maybeSingle();
+  if (table === 'host_applications' && ['approved', 'revision', 'rejected'].includes(status)) {
+    const { data: app } = await supabaseAdmin
+      .from('host_applications')
+      .select('user_id')
+      .eq('id', id)
+      .maybeSingle();
+
     if (app) {
-      await supabaseAdmin.from('users').update({ role: 'host' }).eq('id', app.user_id);
+      if (status === 'approved') {
+        await supabaseAdmin.from('users').update({ role: 'host' }).eq('id', app.user_id);
+      }
+
+      const notification = buildHostApplicationStatusNotification(status, comment);
+      if (notification) {
+        const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
+          user_id: app.user_id,
+          type: 'admin_alert',
+          title: notification.title,
+          message: notification.message,
+          link: notification.link,
+          is_read: false,
+        });
+
+        if (notificationError) {
+          console.error('Host application status notification insert failed:', notificationError);
+        }
+      }
     }
   }
 
