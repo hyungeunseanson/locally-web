@@ -16,12 +16,10 @@ type ApplicationStatus =
 
 type HostLandingActionBarProps = {
   compact?: boolean;
-  showStatusButton?: boolean;
 };
 
 export default function HostLandingActionBar({
   compact = false,
-  showStatusButton = false,
 }: HostLandingActionBarProps) {
   const router = useRouter();
   const { user, isHost, applicationStatus, isLoading } = useAuth();
@@ -44,25 +42,14 @@ export default function HostLandingActionBar({
   }, [applicationStatus]);
 
   const hasApplication = normalizedStatus !== null;
-  const hasDashboardAccess = isHost || normalizedStatus === 'approved' || normalizedStatus === 'active';
+  const shouldSwitchToHostMode =
+    isHost || normalizedStatus === 'approved' || normalizedStatus === 'active';
 
-  const primaryLabel = compact
-    ? (
-      hasDashboardAccess
-        ? '호스트 대시보드'
-        : normalizedStatus === 'revision'
-          ? '지원서 수정하기'
-          : hasApplication
-            ? '신청현황'
-            : '호스트 지원하기'
-    )
-    : (
-      hasDashboardAccess
-        ? '호스트 대시보드'
-        : normalizedStatus === 'revision'
-          ? '지원서 수정하기'
-          : '호스트 지원하기'
-    );
+  const primaryLabel = shouldSwitchToHostMode
+    ? '호스트 모드로 전환'
+    : hasApplication
+      ? '신청현황'
+      : '호스트 지원하기';
 
   const openLoginIfNeeded = () => {
     if (user) return false;
@@ -74,24 +61,17 @@ export default function HostLandingActionBar({
     if (isLoading) return;
     if (openLoginIfNeeded()) return;
 
-    if (hasDashboardAccess) {
+    if (shouldSwitchToHostMode) {
       router.push('/host/dashboard?tab=reservations');
       return;
     }
 
-    if (compact && hasApplication) {
+    if (hasApplication) {
       router.push('/host/dashboard');
       return;
     }
 
     router.push('/host/register');
-  };
-
-  const handleStatusClick = () => {
-    if (isLoading) return;
-    if (openLoginIfNeeded()) return;
-
-    router.push('/host/dashboard');
   };
 
   return (
@@ -123,17 +103,6 @@ export default function HostLandingActionBar({
             >
               {primaryLabel}
             </button>
-
-            {showStatusButton && (
-              <button
-                type="button"
-                onClick={handleStatusClick}
-                disabled={isLoading}
-                className="inline-flex w-full items-center justify-center rounded-full border border-black/10 bg-white px-5 py-3 text-[14px] font-medium tracking-[-0.01em] text-[#2f2f2f] transition-colors hover:border-black/15 hover:bg-[#f8f8f8] disabled:cursor-not-allowed disabled:opacity-60 md:flex-1"
-              >
-                신청현황
-              </button>
-            )}
           </div>
         </div>
       </section>
