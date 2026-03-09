@@ -157,7 +157,6 @@ export default function MobileProfileView({
             gender: editData.gender,
             phone: editData.phone,
             kakao_id: editData.kakao_id,
-            email: editData.email,
             bio: editData.bio,
             mbti: editData.mbti,
             languages: editData.languages,
@@ -402,19 +401,9 @@ export default function MobileProfileView({
                 {/* 이메일 */}
                 <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
                     <Mail className="w-4 h-4 text-slate-500 shrink-0" />
-                    {isEditing ? (
-                        <input
-                            type="email"
-                            value={editData.email || ''}
-                            onChange={e => setEditData(prev => ({ ...prev, email: e.target.value }))}
-                            placeholder="이메일 입력"
-                            className="flex-1 text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
-                        />
-                    ) : (
-                        <span className="text-[12px] text-slate-700">
-                            이메일: <span className="font-medium">{displayProfile.email || '미입력'}</span>
-                        </span>
-                    )}
+                    <span className="text-[12px] text-slate-700">
+                        이메일: <span className="font-medium">{displayProfile.email || '미입력'}</span>
+                    </span>
                 </div>
 
                 {/* 카카오 ID */}

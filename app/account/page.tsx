@@ -170,7 +170,7 @@ export default function AccountPage() {
       if (data) {
         setProfile({
           full_name: data.full_name || '',
-          email: data.email || user.email || '', // DB 값 우선, 없으면 Auth 값
+          email: user.email || data.email || '',
           nationality: data.nationality || '',
           birth_date: data.birth_date || '',
           gender: data.gender || '',
@@ -309,7 +309,6 @@ export default function AccountPage() {
       phone: profile.phone,
       mbti: profile.mbti,
       kakao_id: profile.kakao_id,
-      email: profile.email, // 수정된 이메일 저장
       avatar_url: profile.avatar_url,
       languages: profile.languages, // 🟢 [추가] 저장 시 포함
       job: profile.job,
@@ -882,8 +881,8 @@ export default function AccountPage() {
                   <input
                     type="email"
                     value={profile.email}
-                    onChange={e => setProfile({ ...profile, email: e.target.value })}
-                    className="w-full p-3 border border-slate-300 rounded-xl focus:border-black outline-none transition-colors"
+                    readOnly
+                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 outline-none"
                   />
                   <p className="text-xs text-slate-400 mt-1">{t('help_email')}</p> {/* 🟢 번역 */}
                 </div>
