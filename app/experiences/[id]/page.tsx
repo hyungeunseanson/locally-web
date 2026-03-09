@@ -4,6 +4,7 @@ import ExperienceClient from './ExperienceClient';
 import { notFound } from 'next/navigation';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { getContent } from '@/app/utils/contentHelper';
+import { getHostPublicProfile } from '@/app/utils/profile';
 import { ExperienceDetail, HostProfileDetail } from './types';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
@@ -107,16 +108,17 @@ export default async function Page({ params }: Props) {
     const hostAverageRating = hostReviewCount > 0
       ? Number(((reviewRows || []).reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
       : null;
+    const publicHostProfile = getHostPublicProfile(profile, app, 'Locally Host');
 
     hostProfile = {
       id: experience.host_id,
-      name: app?.name || profile?.full_name || 'Locally Host',
-      avatar_url: app?.profile_photo || profile?.avatar_url || null,
-      languages: (profile?.languages?.length > 0) ? profile.languages : (app?.languages || []),
-      introduction: app?.self_intro || profile?.bio || profile?.introduction || '안녕하세요! 로컬리 호스트입니다.',
-      job: profile?.job,
-      dream_destination: profile?.dream_destination,
-      favorite_song: profile?.favorite_song,
+      name: publicHostProfile.name,
+      avatar_url: publicHostProfile.avatarUrl || undefined,
+      languages: publicHostProfile.languages,
+      introduction: publicHostProfile.bio || '안녕하세요! 로컬리 호스트입니다.',
+      job: publicHostProfile.job || undefined,
+      dream_destination: publicHostProfile.dreamDestination || undefined,
+      favorite_song: publicHostProfile.favoriteSong || undefined,
       joined_year: joinedYear,
       review_count: hostReviewCount,
       rating: hostAverageRating,

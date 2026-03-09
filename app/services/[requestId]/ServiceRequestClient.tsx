@@ -19,6 +19,7 @@ import {
   isActiveServiceRequest,
 } from '@/app/constants/serviceStatus';
 import { normalizeLanguageLevels, formatLanguageLevelLabel, getLanguageNames } from '@/app/utils/languageLevels';
+import { getHostPublicProfile } from '@/app/utils/profile';
 import type { ServiceRequest, ServiceApplicationWithProfile } from '@/app/types/service';
 import HostProfileModal from '@/app/experiences/[id]/components/HostProfileModal';
 
@@ -366,14 +367,15 @@ export default function ServiceRequestDetailPage() {
             ) : (
               <div className="space-y-3">
                 {applications.map((app) => {
-                  const name = app.profiles?.full_name || app.host_applications?.name || t('host');
-                  const avatar = app.profiles?.avatar_url || app.host_applications?.profile_photo;
+                  const hostPublicProfile = getHostPublicProfile(app.profiles, app.host_applications, t('host'));
+                  const name = hostPublicProfile.name;
+                  const avatar = hostPublicProfile.avatarUrl;
                   // language_levels 우선, 없으면 languages 배열로 정규화 (중복 방지)
                   const langEntries = normalizeLanguageLevels(
                     app.host_applications?.language_levels,
-                    app.host_applications?.languages ?? app.profiles?.languages
+                    app.host_applications?.languages ?? hostPublicProfile.languages
                   );
-                  const bio = app.host_applications?.self_intro || app.profiles?.bio;
+                  const bio = hostPublicProfile.bio;
                   const isSelected = request.selected_application_id === app.id;
 
                   return (
@@ -611,22 +613,23 @@ export default function ServiceRequestDetailPage() {
       {(() => {
         const app = hostModal.hostId ? applications.find((a) => a.host_id === hostModal.hostId) : null;
         if (!app) return null;
-        const modalName = app.profiles?.full_name || app.host_applications?.name || t('host');
+        const hostPublicProfile = getHostPublicProfile(app.profiles, app.host_applications, t('host'));
+        const modalName = hostPublicProfile.name;
         return (
           <HostProfileModal
             isOpen={hostModal.open}
             onClose={() => setHostModal({ open: false, hostId: null })}
             host={{
               name: modalName,
-              avatarUrl: app.profiles?.avatar_url || app.host_applications?.profile_photo || undefined,
+              avatarUrl: hostPublicProfile.avatarUrl || undefined,
               reviewCount: app.review_count,
               rating: app.review_avg,
-              joinedYear: app.profiles?.created_at ? new Date(app.profiles.created_at).getFullYear() : undefined,
-              job: app.host_applications?.profession || app.profiles?.job || undefined,
-              dreamDestination: app.host_applications?.dream_destination || app.profiles?.dream_destination || undefined,
-              favoriteSong: app.host_applications?.favorite_song || app.profiles?.favorite_song || undefined,
-              languages: (() => { const names = getLanguageNames(normalizeLanguageLevels(app.host_applications?.language_levels, app.host_applications?.languages ?? app.profiles?.languages)); return names.length > 0 ? names : undefined; })(),
-              intro: app.host_applications?.self_intro || app.profiles?.bio || undefined,
+              joinedYear: hostPublicProfile.createdAt ? new Date(hostPublicProfile.createdAt).getFullYear() : undefined,
+              job: hostPublicProfile.job || undefined,
+              dreamDestination: hostPublicProfile.dreamDestination || undefined,
+              favoriteSong: hostPublicProfile.favoriteSong || undefined,
+              languages: (() => { const names = getLanguageNames(normalizeLanguageLevels(app.host_applications?.language_levels, app.host_applications?.languages ?? hostPublicProfile.languages)); return names.length > 0 ? names : undefined; })(),
+              intro: hostPublicProfile.bio || undefined,
               onContactHost: () => {
                 setHostModal({ open: false, hostId: null });
                 setContactModal({ hostId: app.host_id, hostName: modalName });

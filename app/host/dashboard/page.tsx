@@ -21,7 +21,7 @@ import HostReviews from './HostReviews';
 import ProfileEditor from './components/ProfileEditor';
 import GuidelinesTab from './components/GuidelinesTab'; // 🟢 필수 교육 및 가이드라인 탭
 import ServiceJobsTab from './components/ServiceJobsTab';
-import { getProfileCompletion } from '@/app/utils/profile';
+import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
 
 interface HostStatusSummary {
   status?: string | null;
@@ -96,24 +96,25 @@ function DashboardContent() {
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
+      const hostPublicProfile = getHostPublicProfile(profileData, hostData, '호스트');
 
       // 정보 병합 (프로필 > 지원서)
       const mergedProfile = {
         ...profileData,
-        name: profileData?.full_name || hostData?.name,
-        avatar_url: hostData?.profile_photo || profileData?.avatar_url,
-        introduction: profileData?.introduction || profileData?.bio || hostData?.self_intro,
-        languages: (profileData?.languages && profileData.languages.length > 0) ? profileData.languages : (hostData?.languages || []),
+        name: hostPublicProfile.name,
+        avatar_url: hostPublicProfile.avatarUrl,
+        introduction: hostPublicProfile.bio,
+        languages: hostPublicProfile.languages,
         phone: profileData?.phone || hostData?.phone || '',
         dob: profileData?.dob || hostData?.dob || '',
-        host_nationality: profileData?.host_nationality || hostData?.host_nationality || '',
+        host_nationality: hostPublicProfile.location || '',
         bank_name: profileData?.bank_name || hostData?.bank_name || '',
         account_number: profileData?.account_number || hostData?.account_number || '',
         account_holder: profileData?.account_holder || hostData?.account_holder || '',
         motivation: profileData?.motivation || hostData?.motivation || '',
-        job: profileData?.job || '',
-        dream_destination: profileData?.dream_destination || '',
-        favorite_song: profileData?.favorite_song || '',
+        job: hostPublicProfile.job || '',
+        dream_destination: hostPublicProfile.dreamDestination || '',
+        favorite_song: hostPublicProfile.favoriteSong || '',
       };
 
       setProfile(mergedProfile);

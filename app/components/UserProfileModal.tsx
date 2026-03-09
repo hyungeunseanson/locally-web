@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { X, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { formatGenderLabel, formatProfileLanguages, normalizeLanguageList } from '@/app/utils/profile';
+import { formatGenderLabel, formatProfileLanguages, getHostPublicProfile, normalizeLanguageList } from '@/app/utils/profile';
 
 interface UserProfileModalProps {
   userId: string;
@@ -61,15 +61,16 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           .select('name, profile_photo, self_intro, host_nationality')
           .eq('user_id', userId)
           .maybeSingle();
+        const hostPublicProfile = getHostPublicProfile(baseProfile, hostData, '호스트');
 
         finalData = {
           ...finalData,
-          display_name: hostData?.name || baseProfile.full_name,
-          display_avatar: hostData?.profile_photo || baseProfile.avatar_url,
-          display_bio: hostData?.self_intro || baseProfile.bio || baseProfile.introduction,
-          location: hostData?.host_nationality || baseProfile.nationality,
+          display_name: hostPublicProfile.name,
+          display_avatar: hostPublicProfile.avatarUrl,
+          display_bio: hostPublicProfile.bio,
+          location: hostPublicProfile.location,
           mbti: baseProfile.mbti,
-          languages: normalizeLanguageList(baseProfile.languages),
+          languages: hostPublicProfile.languages,
           gender: baseProfile.gender,
         };
       } else {

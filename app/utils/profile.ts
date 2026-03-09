@@ -32,6 +32,31 @@ type AnyProfile = {
   mbti?: string | null;
 };
 
+type HostPublicProfileSource = {
+  created_at?: string | null;
+  avatar_url?: string | null;
+  full_name?: string | null;
+  bio?: string | null;
+  introduction?: string | null;
+  languages?: string[] | string | null;
+  job?: string | null;
+  dream_destination?: string | null;
+  favorite_song?: string | null;
+  nationality?: string | null;
+  host_nationality?: string | null;
+};
+
+type HostApplicationPublicSource = {
+  name?: string | null;
+  profile_photo?: string | null;
+  self_intro?: string | null;
+  languages?: string[] | string | null;
+  profession?: string | null;
+  dream_destination?: string | null;
+  favorite_song?: string | null;
+  host_nationality?: string | null;
+};
+
 const COMPLETION_FIELDS: Record<
   ProfileRole,
   Array<{ key: ProfileCompletionFieldKey; required: boolean; getValue: (profile: AnyProfile) => unknown }>
@@ -144,6 +169,35 @@ export function getProfileInitial(
   fallback = '로'
 ): string {
   return getProfileDisplayName(profile, fallback).slice(0, 1).toUpperCase();
+}
+
+export function getHostPublicProfile(
+  profile: HostPublicProfileSource | null | undefined,
+  hostApplication: HostApplicationPublicSource | null | undefined,
+  fallbackName = 'Locally Host'
+) {
+  const name = getProfileDisplayName(
+    {
+      full_name: profile?.full_name,
+      name: hostApplication?.name,
+    },
+    fallbackName
+  );
+
+  return {
+    name,
+    avatarUrl: profile?.avatar_url || hostApplication?.profile_photo || null,
+    bio: profile?.bio || profile?.introduction || hostApplication?.self_intro || null,
+    languages:
+      normalizeLanguageList(profile?.languages).length > 0
+        ? normalizeLanguageList(profile?.languages)
+        : normalizeLanguageList(hostApplication?.languages),
+    job: profile?.job || hostApplication?.profession || null,
+    dreamDestination: profile?.dream_destination || hostApplication?.dream_destination || null,
+    favoriteSong: profile?.favorite_song || hostApplication?.favorite_song || null,
+    location: profile?.host_nationality || profile?.nationality || hostApplication?.host_nationality || null,
+    createdAt: profile?.created_at || null,
+  };
 }
 
 export function getProfileCompletion(profile: AnyProfile, role: ProfileRole): ProfileCompletionStatus {

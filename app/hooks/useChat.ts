@@ -7,6 +7,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { sanitizeText } from '@/app/utils/sanitize';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import { InquiryType } from '@/app/utils/inquiry';
+import { getHostPublicProfile } from '@/app/utils/profile';
 
 type ProfileRow = {
   id: string;
@@ -171,8 +172,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const safeData: InquiryListItem[] = inquiryRows.map((item) => {
           const hostApp = appsMap.get(item.host_id || '');
           const hostProfile = profilesMap.get(item.host_id || '');
-          const hostName = hostApp?.name || hostProfile?.full_name || '호스트';
-          const hostAvatar = hostApp?.profile_photo || hostProfile?.avatar_url;
+          const hostPublicProfile = getHostPublicProfile(hostProfile, hostApp, '호스트');
 
           const guestProfile = guestMap.get(item.user_id);
           const guestName = guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
@@ -190,8 +190,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
             },
             host: {
               id: item.host_id,
-              name: hostName,
-              avatar_url: secureUrl(hostAvatar ?? null)
+              name: hostPublicProfile.name,
+              avatar_url: secureUrl(hostPublicProfile.avatarUrl ?? null)
             },
             experiences: item.experiences
               ? {
@@ -255,8 +255,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => {
           const profile = profileMap.get(msg.sender_id);
           const app = appMap.get(msg.sender_id);
-          const name = app?.name || profile?.full_name || '알 수 없음';
-          const avatar = app?.profile_photo || profile?.avatar_url;
+          const hostPublicProfile = getHostPublicProfile(profile, app, '알 수 없음');
+          const name = hostPublicProfile.name;
+          const avatar = hostPublicProfile.avatarUrl;
 
           return {
             ...msg,

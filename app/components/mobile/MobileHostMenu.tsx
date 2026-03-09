@@ -11,7 +11,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import HostModeTransition from './HostModeTransition';
 import MobileLanguageSwitcher from './MobileLanguageSwitcher';
-import { getProfileCompletion } from '@/app/utils/profile';
+import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
 import { useNotification } from '@/app/context/NotificationContext';
 
 type MobileHostProfile = {
@@ -59,18 +59,17 @@ export default function MobileHostMenu() {
                 ]);
 
                 if (profileRes.data || hostRes.data) {
+                    const hostPublicProfile = getHostPublicProfile(profileRes.data, hostRes.data, '호스트');
                     setProfile({
                         ...(profileRes.data || {}),
-                        avatar_url: hostRes.data?.profile_photo || profileRes.data?.avatar_url,
-                        full_name: profileRes.data?.full_name || hostRes.data?.name,
-                        bio: profileRes.data?.bio || hostRes.data?.self_intro || null,
-                        introduction: profileRes.data?.introduction || hostRes.data?.self_intro || null,
-                        languages: (profileRes.data?.languages && profileRes.data.languages.length > 0)
-                            ? profileRes.data.languages
-                            : (hostRes.data?.languages || []),
+                        avatar_url: hostPublicProfile.avatarUrl,
+                        full_name: hostPublicProfile.name,
+                        bio: hostPublicProfile.bio,
+                        introduction: hostPublicProfile.bio,
+                        languages: hostPublicProfile.languages,
                         job: profileRes.data?.job || null,
                         phone: profileRes.data?.phone || hostRes.data?.phone || null,
-                        host_nationality: profileRes.data?.host_nationality || hostRes.data?.host_nationality || null,
+                        host_nationality: hostPublicProfile.location,
                     });
                 }
 
