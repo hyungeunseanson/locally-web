@@ -143,7 +143,7 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
             className="shrink-0 p-0.5 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200"
           >
             <Heart
-              size={18}
+              size={20}
               strokeWidth={1.75}
               fill={isSaved ? '#F43F5E' : 'none'}
               className={isSaved ? 'text-rose-500' : 'text-white'}
