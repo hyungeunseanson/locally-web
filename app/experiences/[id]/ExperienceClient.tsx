@@ -159,7 +159,12 @@ export default function ExperienceClient({
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-0">
       <SiteHeader />
-      {isCopySuccess && <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2"><Check size={16} className="text-green-400" /> 링크가 복사되었습니다.</div>}
+      {isCopySuccess && (
+        <div className="fixed left-1/2 top-[74px] z-50 flex max-w-[calc(100vw-28px)] -translate-x-1/2 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full bg-black px-4 py-2 text-[11px] font-medium text-white shadow-lg animate-in fade-in slide-in-from-top-2 md:top-24 md:gap-2 md:px-6 md:py-3 md:text-sm">
+          <Check size={14} className="shrink-0 text-green-400 md:h-4 md:w-4" />
+          <span>링크가 복사되었습니다.</span>
+        </div>
+      )}
 
       {/* 📱 모바일 전용 상단 헤더 */}
       <div

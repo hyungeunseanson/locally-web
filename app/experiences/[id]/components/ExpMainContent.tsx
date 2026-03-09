@@ -239,21 +239,24 @@ export default function ExpMainContent({
       </div>
 
       {isMessageModalOpen && (
-        <div className="fixed inset-0 z-[210] bg-black/35 backdrop-blur-[1px] flex items-end md:items-center md:justify-center md:p-4" onClick={() => setIsMessageModalOpen(false)}>
+        <div
+          className="fixed inset-0 z-[210] flex items-end bg-black/35 px-[7px] pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+7px)] pt-4 backdrop-blur-[1px] md:items-center md:justify-center md:p-4"
+          onClick={() => setIsMessageModalOpen(false)}
+        >
           <div
-            className="w-full h-[88dvh] bg-[#fcfcfc] rounded-t-[28px] px-5 pt-5 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+16px)] flex flex-col md:h-auto md:max-h-[78dvh] md:max-w-[560px] md:rounded-[28px] md:px-7 md:pt-6 md:pb-6 md:shadow-2xl"
+            className="flex max-h-[68dvh] w-full max-w-[430px] flex-col overflow-y-auto rounded-[24px] bg-[#fcfcfc] px-4 pt-4 pb-[calc(max(env(safe-area-inset-bottom,0px),0px)+14px)] shadow-[0_18px_48px_rgba(15,23,42,0.22)] md:max-h-[78dvh] md:max-w-[560px] md:rounded-[28px] md:px-7 md:pt-6 md:pb-6 md:shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-end mb-1">
-              <button onClick={() => setIsMessageModalOpen(false)} className="p-1.5 text-slate-600">
+            <div className="mb-1 flex justify-end">
+              <button onClick={() => setIsMessageModalOpen(false)} className="rounded-full p-1.5 text-slate-600 transition-colors hover:bg-slate-100">
                 <span className="sr-only">닫기</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
-            <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{hostProfile?.name || '호스트'}님에게 질문하기</h3>
-            <p className="text-[11px] md:text-[13px] text-slate-500 leading-snug md:leading-relaxed mb-4 md:mb-5">
+            <h3 className="mb-1.5 text-[18px] font-medium leading-tight tracking-[-0.01em] md:text-[24px]">{hostProfile?.name || '호스트'}님에게 질문하기</h3>
+            <p className="mb-4 text-[11px] leading-snug text-slate-500 md:mb-5 md:text-[13px] md:leading-relaxed">
               이 체험에 대해 자세히 알아보려면 호스트에게
               <span className="underline underline-offset-2 ml-1">메시지를 보내세요.</span>
             </p>
@@ -261,13 +264,13 @@ export default function ExpMainContent({
               value={inquiryText}
               onChange={(e) => setInquiryText(e.target.value)}
               placeholder="호스트에게 본인을 소개해 보세요."
-              className="w-full h-[122px] md:h-[170px] rounded-2xl border border-slate-300 bg-white px-4 py-3 md:px-5 md:py-4 text-[12px] md:text-[14px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
+              className="h-[108px] w-full resize-none rounded-[18px] border border-slate-300 bg-white px-3.5 py-3 text-[12px] font-normal text-slate-700 placeholder:text-slate-300 focus:border-slate-500 focus:outline-none md:h-[170px] md:rounded-2xl md:px-5 md:py-4 md:text-[14px]"
             />
-            <div className="mt-auto md:mt-5">
+            <div className="mt-4 md:mt-5">
               <button
                 onClick={handleSubmitMessage}
                 disabled={!inquiryText.trim() || isSubmittingMessage}
-                className={`w-full rounded-2xl py-3 md:py-3.5 text-[13px] md:text-[15px] font-medium ${
+                className={`w-full rounded-[18px] py-3 text-[13px] font-medium md:rounded-2xl md:py-3.5 md:text-[15px] ${
                   !inquiryText.trim() || isSubmittingMessage
                     ? 'bg-slate-300 text-slate-50'
                     : 'bg-[#111827] text-white'
