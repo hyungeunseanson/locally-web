@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 
@@ -15,6 +15,7 @@ interface ExperienceRecord {
   title: string;
   city?: string | null;
   duration?: number | null;
+  max_guests?: number | string | null;
   price?: number | string | null;
   photos?: string[] | null;
   status?: string | null;
@@ -116,6 +117,12 @@ export default function MyExperiences() {
     return `${duration}${t('unit_hours')}`;
   };
 
+  const formatMaxGuests = (maxGuests?: number | string | null) => {
+    const numericGuests = typeof maxGuests === 'number' ? maxGuests : Number(maxGuests);
+    if (!Number.isFinite(numericGuests)) return '-';
+    return `${numericGuests}${t('req_guest_count')}`;
+  };
+
   if (loading) return <div className="py-20 text-center text-slate-400">{t('loading')}</div>;
 
   return (
@@ -148,8 +155,8 @@ export default function MyExperiences() {
 
           <div className="overflow-hidden rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
             <div className="md:hidden p-4">
-              <div className="flex items-start gap-3">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-100">
+              <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-3">
+                <div className="relative h-[112px] w-[88px] overflow-hidden rounded-2xl border border-slate-100 bg-slate-100">
                   {exp.photos && exp.photos.length > 0 ? (
                     <img src={exp.photos[0]} className="h-full w-full object-cover" alt={exp.title} />
                   ) : (
@@ -164,7 +171,7 @@ export default function MyExperiences() {
                   <h2 className="text-[14px] md:text-lg font-bold leading-snug text-slate-900 line-clamp-2">
                     {exp.title}
                   </h2>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] md:text-sm font-medium text-slate-600">
                       <MapPin size={12} className="shrink-0 text-slate-400" />
                       <span className="truncate">{getCityLabel(exp.city)}</span>
@@ -173,16 +180,28 @@ export default function MyExperiences() {
                       <Clock size={12} className="shrink-0 text-slate-400" />
                       <span>{formatDuration(exp.duration)}</span>
                     </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] md:text-sm font-medium text-slate-600">
+                      <Users size={12} className="shrink-0 text-slate-400" />
+                      <span>{formatMaxGuests(exp.max_guests)}</span>
+                    </span>
                   </div>
-                  <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-3">
-                    <p className="text-[10px] md:text-xs font-semibold text-slate-400">
-                      {t('label_price')}
-                    </p>
-                    <div className="mt-1 flex items-end justify-between gap-3">
-                      <p className="text-[15px] md:text-lg font-black text-slate-900">
+                </div>
+
+                <div className="col-span-2 rounded-2xl border border-slate-100 bg-slate-50/80 px-3.5 py-3">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] md:text-xs font-semibold text-slate-400">
+                        {t('label_price')}
+                      </p>
+                      <p className="mt-1 text-[16px] md:text-lg font-black text-slate-900">
                         {formatPrice(exp.price)}
                       </p>
-                      <p className="shrink-0 text-[11px] md:text-sm font-medium text-slate-500">
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] md:text-xs font-semibold text-slate-400">
+                        {t('exp_booking_count')}
+                      </p>
+                      <p className="mt-1 text-[12px] md:text-sm font-semibold text-slate-600">
                         {exp.bookings?.[0]?.count || 0}{t('exp_count_unit')}
                       </p>
                     </div>
@@ -190,7 +209,7 @@ export default function MyExperiences() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <Link
                   href={`/host/experiences/${exp.id}/dates`}
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[12px] md:text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
