@@ -6,10 +6,12 @@ import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import Spinner from '@/app/components/ui/Spinner';
 import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
-import { Send, ShieldCheck, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
+import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
+
+const ADMIN_SUPPORT_AVATAR_SRC = '/images/logos/Frame%201545423142.png';
 
 function InboxContent() {
   const { t, lang } = useLanguage(); // 🟢 lang 추가 필수!
@@ -255,8 +257,10 @@ function InboxContent() {
                   className={`relative px-3.5 md:px-5 py-3 md:py-4 cursor-pointer flex gap-2.5 md:gap-3.5 items-center border-b border-gray-100 last:border-b-0 transition-colors active:bg-gray-50 ${selectedInquiry?.id === inq.id ? 'bg-gray-50' : 'bg-white'}`}
                 >
                   {/* 아바타 */}
-                  <div className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative ${isAdminSupport ? 'bg-black text-white' : 'bg-gray-100'}`}>
-                    {isAdminSupport ? <ShieldCheck className="w-4 h-4 md:w-[18px] md:h-[18px] text-white" /> : (
+                  <div className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative ${isAdminSupport ? 'bg-white border border-slate-200' : 'bg-gray-100'}`}>
+                    {isAdminSupport ? (
+                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill className="object-cover" />
+                    ) : (
                       <Image src={secureUrl(display.avatar)} alt="host" fill className="object-cover" />
                     )}
                   </div>
@@ -316,9 +320,7 @@ function InboxContent() {
                 >
                   <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-100 overflow-hidden border border-gray-200 relative shrink-0">
                     {selectedIsAdminSupport ? (
-                      <div className="w-full h-full flex items-center justify-center bg-black text-white">
-                        <ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                      </div>
+                      <Image src={ADMIN_SUPPORT_AVATAR_SRC} alt="Locally support" fill className="object-cover" />
                     ) : (
                       <Image src={secureUrl(currentHostDisplay.avatar)} alt="host" fill className="object-cover" />
                     )}
@@ -345,9 +347,12 @@ function InboxContent() {
                         >
                           <div className="w-[26px] h-[26px] md:w-7 md:h-7 rounded-full bg-gray-200 overflow-hidden relative border border-gray-200 shrink-0">
                             {selectedIsAdminSupport ? (
-                              <div className="w-full h-full flex items-center justify-center bg-black text-white">
-                                <ShieldCheck className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                              </div>
+                              <Image
+                                src={ADMIN_SUPPORT_AVATAR_SRC}
+                                alt="Locally support"
+                                fill
+                                className="object-cover"
+                              />
                             ) : (
                               <Image
                                 src={secureUrl(currentHostDisplay.avatar)}
