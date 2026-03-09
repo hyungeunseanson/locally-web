@@ -35,7 +35,7 @@ export default function HostProfileSection(props: HostProfileProps) {
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="w-full rounded-[18px] border border-white bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(251,251,252,0.99)_100%)] p-5 text-center shadow-[0_2px_10px_rgba(255,255,255,0.92),0_18px_40px_rgba(15,23,42,0.11),0_34px_72px_rgba(148,163,184,0.24)] ring-1 ring-slate-100 transition-shadow hover:shadow-[0_2px_12px_rgba(255,255,255,0.92),0_22px_46px_rgba(15,23,42,0.13),0_40px_84px_rgba(148,163,184,0.28)] md:rounded-[22px] md:p-7"
+          className="w-full rounded-[18px] border border-white bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(251,251,252,0.99)_100%)] p-5 text-center shadow-[0_2px_8px_rgba(255,255,255,0.92),0_10px_22px_rgba(15,23,42,0.12),0_16px_30px_rgba(148,163,184,0.22)] ring-1 ring-slate-100 transition-shadow hover:shadow-[0_2px_10px_rgba(255,255,255,0.92),0_12px_24px_rgba(15,23,42,0.14),0_18px_34px_rgba(148,163,184,0.24)] md:rounded-[22px] md:p-7"
         >
           <div className="relative w-[80px] h-[80px] md:w-[96px] md:h-[96px] rounded-full overflow-hidden bg-slate-200 border border-slate-200 mx-auto mb-3 md:mb-4 flex items-center justify-center">
             {props.avatarUrl ? (
@@ -61,7 +61,7 @@ export default function HostProfileSection(props: HostProfileProps) {
         <button
           type="button"
           onClick={props.onMessageHost}
-          className="mt-4 w-full min-h-[44px] rounded-xl border border-slate-300/80 bg-[#e7e7e9] px-4 py-3 text-[11px] font-medium text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-[#dddddf] md:mt-5 md:py-2.5 md:text-[14px]"
+          className="mt-4 w-full min-h-[44px] rounded-xl bg-[#e7e7e9] px-4 py-3 text-[11px] font-medium text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition-colors hover:bg-[#dddddf] md:mt-5 md:py-2.5 md:text-[14px]"
         >
           {props.name}님에게 메시지 보내기
         </button>
