@@ -200,34 +200,34 @@ export default function BecomeHostLandingContent() {
 
                 <HostLandingActionBar />
 
-                <section className="bg-[#f7f7f7] px-4 py-16 md:px-6 md:py-24">
+                <section className="bg-[#f7f7f7] px-[7px] py-12 md:px-6 md:py-24">
                     <div className="mx-auto max-w-[1440px]">
-                        <div className="mx-auto max-w-[790px]">
-                            <h2 className="text-center text-[34px] font-semibold tracking-[-0.05em] text-[#2f2f2f] md:text-[54px]">
+                        <div className="mx-auto max-w-[760px] md:max-w-[790px]">
+                            <h2 className="text-center text-[24px] font-semibold tracking-[-0.04em] text-[#2f2f2f] md:text-[54px]">
                                 자주 묻는 질문과 답변
                             </h2>
 
-                            <div className="mt-10 border-t border-black/8 md:mt-14">
+                            <div className="mt-7 border-t border-black/8 md:mt-14">
                                 {faqGroups.map((group, index) => (
                                     <details
                                         key={group.title}
                                         className="group border-b border-black/8"
                                         open={index === 0}
                                     >
-                                        <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-left md:py-7 [&::-webkit-details-marker]:hidden">
-                                            <h3 className="text-[22px] font-medium tracking-[-0.03em] text-[#2f2f2f] md:text-[30px]">
+                                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-left md:gap-6 md:py-7 [&::-webkit-details-marker]:hidden">
+                                            <h3 className="text-[18px] font-medium tracking-[-0.03em] text-[#2f2f2f] md:text-[30px]">
                                                 {group.title}
                                             </h3>
-                                            <ChevronDown className="h-5 w-5 shrink-0 text-[#4b4b4b] transition-transform duration-200 group-open:rotate-180 md:h-6 md:w-6" />
+                                            <ChevronDown className="h-4 w-4 shrink-0 text-[#4b4b4b] transition-transform duration-200 group-open:rotate-180 md:h-6 md:w-6" />
                                         </summary>
 
-                                        <div className="space-y-8 pb-7 pr-4 text-[#757575] md:space-y-10 md:pb-9 md:pr-0">
+                                        <div className="space-y-5 pb-5 pr-0 text-[#757575] md:space-y-10 md:pb-9">
                                             {group.items.map((item) => (
                                                 <div key={item.question}>
-                                                    <h4 className="text-[17px] font-medium leading-snug text-[#4a4a4a] md:text-[21px]">
+                                                    <h4 className="text-[14px] font-medium leading-snug text-[#4a4a4a] md:text-[21px]">
                                                         {item.question}
                                                     </h4>
-                                                    <p className="mt-2.5 text-[14px] leading-7 md:mt-3 md:text-[16px] md:leading-[1.8]">
+                                                    <p className="mt-2 text-[12px] leading-6 md:mt-3 md:text-[16px] md:leading-[1.8]">
                                                         {item.answer}
                                                     </p>
                                                 </div>
