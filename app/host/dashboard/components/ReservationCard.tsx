@@ -236,16 +236,13 @@ export default function ReservationCard({
             label={t('res_message_btn')}
             onClick={onMessage}
             primary
-            fullWidth={!isConfirmed && !canReview}
           />
 
-          {isConfirmed && (
-            <MobileActionButton
-              icon={<CalendarPlus size={15} />}
-              label={t('res_add_calendar')}
-              onClick={onCalendar}
-            />
-          )}
+          <MobileActionButton
+            icon={<CalendarPlus size={15} />}
+            label={t('res_add_calendar')}
+            onClick={onCalendar}
+          />
 
           {canReview && (
             <MobileActionButton

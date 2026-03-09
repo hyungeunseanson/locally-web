@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, User, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Lock, User, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 
 export default function GuidelinesTab() {
@@ -82,7 +82,7 @@ export default function GuidelinesTab() {
                 <div className="absolute -right-10 top-0 h-28 w-28 rounded-full bg-slate-200/40 blur-3xl md:h-40 md:w-40" />
                 <div className="absolute -bottom-12 left-0 h-24 w-24 rounded-full bg-slate-100/80 blur-3xl md:h-32 md:w-32" />
 
-                <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="relative z-10">
                     <div className="max-w-2xl">
                         <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 ring-1 ring-slate-200 md:text-[11px]">
                             {t('hg_footer_eyebrow')}
@@ -93,10 +93,6 @@ export default function GuidelinesTab() {
                         <p className="mt-2 text-[12px] leading-relaxed text-slate-600 md:text-[14px] md:leading-7">
                             {t('hg_footer_desc')}
                         </p>
-                    </div>
-
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200 md:h-14 md:w-14">
-                        <CheckCircle2 size={20} />
                     </div>
                 </div>
 
