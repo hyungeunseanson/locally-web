@@ -53,7 +53,11 @@ type ReservationRecord = {
   date: string;
   time?: string | null;
   guests?: number | null;
+  amount?: number | null;
   status: string;
+  cancel_reason?: string | null;
+  refund_amount?: number | null;
+  host_payout_amount?: number | null;
   guest?: ReservationGuest | null;
   experiences?: ReservationExperience | null;
 };
@@ -302,9 +306,9 @@ guest:profiles!bookings_user_id_fkey (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] md:min-h-[750px] h-full flex flex-col">
 
       {/* 헤더 */}
-      <div className="px-4 py-3 md:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 md:gap-4 bg-white sticky top-0 z-10">
+      <div className="px-4 py-4 md:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4 bg-white sticky top-0 z-10">
         <div>
-          <h3 className="text-[14px] md:text-xl font-black text-slate-900 flex items-center gap-1.5">
+          <h3 className="text-[15px] md:text-xl font-black text-slate-900 flex items-center gap-1.5">
             {t('res_status')}
             <button
               onClick={() => fetchReservations()}
@@ -317,7 +321,7 @@ guest:profiles!bookings_user_id_fkey (
           <p className="hidden md:block text-sm text-slate-500 mt-1">{t('res_desc')}</p>
         </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-xl">
+        <div className="flex w-full sm:w-auto bg-slate-100 p-1 rounded-2xl">
           {[
             { id: 'upcoming', label: 'tab_upcoming' },
             { id: 'completed', label: 'tab_past' },
@@ -335,7 +339,7 @@ guest:profiles!bookings_user_id_fkey (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as 'upcoming' | 'completed' | 'cancelled')}
-                className={`relative px-3 py-1.5 text-[11px] md:text-sm font-bold rounded-lg transition-all flex items-center gap-1 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                className={`relative flex-1 sm:flex-none px-3.5 py-2 text-[12px] md:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
                   }`}
               >
                 {t(tab.label)}
@@ -357,7 +361,7 @@ guest:profiles!bookings_user_id_fkey (
       )}
 
       {/* 리스트 영역 */}
-      <div className="flex-1 overflow-y-auto p-3 md:p-6 bg-slate-50">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
         {loading && reservations.length === 0 ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -388,7 +392,7 @@ guest:profiles!bookings_user_id_fkey (
             {filteredList.map(res => (
               <ReservationCard
                 key={res.id}
-                res={res as any}
+                res={res}
                 isNew={isNew(res.created_at, res.id)}
                 isProcessing={processingId === res.id}
                 onApproveCancel={() => handleApproveCancel(res)}
