@@ -78,13 +78,13 @@ export default function GuidelinesTab() {
             </div>
 
             {/* 브랜드형 엔딩 섹션 */}
-            <div className="relative overflow-hidden rounded-[28px] border border-[#eadfd4] bg-[linear-gradient(135deg,#fff8f3_0%,#ffffff_52%,#f6eee8_100%)] px-5 py-6 md:mt-12 md:px-8 md:py-8">
-                <div className="absolute -right-10 top-0 h-28 w-28 rounded-full bg-[#f0c9ab]/25 blur-3xl md:h-40 md:w-40" />
-                <div className="absolute -bottom-12 left-0 h-24 w-24 rounded-full bg-[#f4dfcf]/40 blur-3xl md:h-32 md:w-32" />
+            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm md:rounded-3xl md:p-8">
+                <div className="absolute -right-10 top-0 h-28 w-28 rounded-full bg-slate-200/40 blur-3xl md:h-40 md:w-40" />
+                <div className="absolute -bottom-12 left-0 h-24 w-24 rounded-full bg-slate-100/80 blur-3xl md:h-32 md:w-32" />
 
                 <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div className="max-w-2xl">
-                        <span className="inline-flex rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b5e3c] shadow-sm ring-1 ring-[#eadfd4] md:text-[11px]">
+                        <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 ring-1 ring-slate-200 md:text-[11px]">
                             {t('hg_footer_eyebrow')}
                         </span>
                         <h3 className="mt-3 text-[20px] font-black tracking-[-0.03em] text-slate-900 md:text-[30px]">
@@ -95,7 +95,7 @@ export default function GuidelinesTab() {
                         </p>
                     </div>
 
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#8b5e3c] shadow-[0_10px_30px_rgba(15,23,42,0.08)] ring-1 ring-[#eadfd4] md:h-14 md:w-14">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200 md:h-14 md:w-14">
                         <CheckCircle2 size={20} />
                     </div>
                 </div>
@@ -104,7 +104,7 @@ export default function GuidelinesTab() {
                     {[t('hg_footer_chip1'), t('hg_footer_chip2'), t('hg_footer_chip3')].map((item) => (
                         <span
                             key={item}
-                            className="rounded-full bg-white/85 px-3 py-1.5 text-[11px] font-medium text-slate-600 ring-1 ring-black/5 md:text-xs"
+                            className="rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200 md:text-xs"
                         >
                             {item}
                         </span>
