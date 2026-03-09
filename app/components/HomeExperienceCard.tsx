@@ -125,8 +125,8 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
         />
 
-        <div className="absolute inset-x-3 top-3 z-10 flex items-start justify-between md:inset-x-4 md:top-4">
-          <div className="max-w-[66%] rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)] md:max-w-[70%] md:px-3 md:py-[5px] md:text-[10px]">
+        <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-between md:hidden">
+          <div className="max-w-[66%] rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)]">
             <span className="flex items-center gap-1.5">
               {renderCategoryIcon(String(category))}
               <span className="block truncate">{category}</span>
@@ -140,16 +140,40 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
             onClick={(e) => {
               void toggleWishlist(e);
             }}
-            className="shrink-0 p-0.5 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 md:p-1 md:hover:scale-105"
+            className="shrink-0 p-0.5 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200"
           >
             <Heart
-              size={19}
-              strokeWidth={1.9}
+              size={18}
+              strokeWidth={1.75}
               fill={isSaved ? '#F43F5E' : 'none'}
-              className={isSaved ? 'text-rose-500 md:h-[21px] md:w-[21px]' : 'text-white md:h-[21px] md:w-[21px]'}
+              className={isSaved ? 'text-rose-500' : 'text-white'}
             />
           </button>
         </div>
+
+        <div className="absolute left-4 top-4 z-10 hidden max-w-[70%] rounded-full bg-white px-3 py-[5px] text-[10px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)] md:block">
+          <span className="flex items-center gap-1.5">
+            {renderCategoryIcon(String(category))}
+            <span className="block truncate">{category}</span>
+          </span>
+        </div>
+
+        <button
+          type="button"
+          aria-label="위시리스트 토글"
+          disabled={isLoading}
+          onClick={(e) => {
+            void toggleWishlist(e);
+          }}
+          className="absolute right-3 top-3 z-10 hidden p-1 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 md:block md:hover:scale-105"
+        >
+          <Heart
+            size={20}
+            strokeWidth={2.2}
+            fill={isSaved ? '#F43F5E' : 'none'}
+            className={isSaved ? 'text-rose-500' : 'text-white'}
+          />
+        </button>
       </div>
 
       <div className="space-y-0.5 px-0.5 md:space-y-1">
