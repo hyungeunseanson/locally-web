@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Globe, MessageSquare, Briefcase } from 'lucide-react';
+import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -12,6 +11,7 @@ import Spinner from '@/app/components/ui/Spinner';
 import MobileProfileView from '@/app/components/mobile/MobileProfileView';
 import HostModeTransition from '@/app/components/mobile/HostModeTransition';
 import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitcher';
+import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
@@ -59,8 +59,11 @@ export default function AccountPage() {
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
   const [activeLinkModal, setActiveLinkModal] = useState<null | 'notices' | 'community' | 'news' | 'social'>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [pendingModalActionHref, setPendingModalActionHref] = useState<string | null>(null);
   // 프로필 카드용 통계
   const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 0 });
+  const { pendingHref, isNavigating, navigate } = usePendingNavigation();
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -113,6 +116,12 @@ export default function AccountPage() {
 
   useEffect(() => {
     document.body.style.overflow = activeLinkModal ? 'hidden' : 'unset';
+  }, [activeLinkModal]);
+
+  useEffect(() => {
+    if (!activeLinkModal) {
+      setPendingModalActionHref(null);
+    }
   }, [activeLinkModal]);
 
   const linkModalConfig = {
@@ -353,12 +362,13 @@ export default function AccountPage() {
   };
 
   const handleOpenLink = (href: string, external: boolean) => {
+    setPendingModalActionHref(href);
+
     if (external) {
-      window.location.href = href;
+      window.location.assign(href);
     } else {
-      router.push(href);
+      navigate(href);
     }
-    setActiveLinkModal(null);
   };
 
   const activeLinkConfig = activeLinkModal ? linkModalConfig[activeLinkModal] : null;
@@ -396,16 +406,25 @@ export default function AccountPage() {
           <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">프로필</h1>
           <div className="flex items-center gap-2">
             <MobileLanguageSwitcher />
-            <a href="/notifications" className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
-              <Bell className="w-4 h-4 text-gray-600" />
-            </a>
+            <button
+              type="button"
+              onClick={() => navigate('/notifications')}
+              disabled={isNavigating}
+              aria-busy={pendingHref === '/notifications'}
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 active:scale-[0.96] disabled:cursor-not-allowed ${pendingHref === '/notifications' ? 'bg-gray-200' : 'bg-gray-100 active:bg-gray-200'}`}
+            >
+              {pendingHref === '/notifications'
+                ? <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+                : <Bell className="w-4 h-4 text-gray-600" />
+              }
+            </button>
           </div>
         </div>
 
         {/* ── 프로필 카드 (이미지 3) ── */}
         <button
           onClick={() => setShowProfileView(true)}
-          className="relative mx-4 mb-4 w-[calc(100%-32px)] bg-white border border-gray-100 rounded-xl md:rounded-2xl shadow-sm p-4 flex items-end gap-4 text-left active:scale-[0.98] transition-transform"
+          className="relative mx-4 mb-4 flex w-[calc(100%-32px)] items-end gap-4 rounded-xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-all duration-150 active:scale-[0.98] active:bg-gray-50 md:rounded-2xl"
         >
           {profileCompletion.percent < 100 && (
             <span className="absolute right-4 top-4 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
@@ -459,30 +478,30 @@ export default function AccountPage() {
 
         {/* ── 메뉴 그룹 1: 기본 메뉴 ── */}
         <div className="px-4">
-          <MobileMenuItem icon={<MessageSquare className="w-4 h-4" />} label="메시지" href="/guest/inbox" />
-          <MobileMenuItem icon={<Smile className="w-4 h-4" />} label="나의 여행" href="/guest/trips" />
-          <MobileMenuItem icon={<Star className="w-4 h-4" />} label="위시리스트" href="/guest/wishlists" />
-          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" href="/community" />
+          <MobileMenuItem icon={<MessageSquare className="w-4 h-4" />} label="메시지" onPress={() => navigate('/guest/inbox')} isPending={pendingHref === '/guest/inbox'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Smile className="w-4 h-4" />} label="나의 여행" onPress={() => navigate('/guest/trips')} isPending={pendingHref === '/guest/trips'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Star className="w-4 h-4" />} label="위시리스트" onPress={() => navigate('/guest/wishlists')} isPending={pendingHref === '/guest/wishlists'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" onPress={() => navigate('/community')} isPending={pendingHref === '/community'} disabled={isNavigating} />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
 
         {/* ── 메뉴 그룹 2: 설정 ── */}
         <div className="px-4">
-          <MobileMenuItem icon={<Settings className="w-4 h-4" />} label="계정 관리" href="#" onClick={(e) => { e.preventDefault(); setShowProfileView(true); }} />
-          {isAdminWhitelisted && <MobileMenuItem icon={<Shield className="w-4 h-4" />} label="Admin" href="/admin/dashboard" />}
-          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="호스트 되기" href="/become-a-host" />
-          <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label="도움말 센터" href="/help" />
+          <MobileMenuItem icon={<Settings className="w-4 h-4" />} label="계정 관리" onPress={() => setShowProfileView(true)} />
+          {isAdminWhitelisted && <MobileMenuItem icon={<Shield className="w-4 h-4" />} label="Admin" onPress={() => navigate('/admin/dashboard')} isPending={pendingHref === '/admin/dashboard'} disabled={isNavigating} />}
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="호스트 되기" onPress={() => navigate('/become-a-host')} isPending={pendingHref === '/become-a-host'} disabled={isNavigating} />
+          <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label="도움말 센터" onPress={() => navigate('/help')} isPending={pendingHref === '/help'} disabled={isNavigating} />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
 
         {/* ── 메뉴 그룹 3: Locally ── */}
         <div className="px-4">
-          <MobileMenuItem icon={<FileText className="w-4 h-4" />} label="로컬리 소개" href="/about" />
-          <MobileMenuItem icon={<Bell className="w-4 h-4" />} label="공지사항" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('notices'); }} />
-          <MobileMenuItem icon={<BookOpen className="w-4 h-4" />} label="뉴스" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('news'); }} />
-          <MobileMenuItem icon={<Globe className="w-4 h-4" />} label="소셜 미디어" href="#" onClick={(e) => { e.preventDefault(); setActiveLinkModal('social'); }} />
+          <MobileMenuItem icon={<FileText className="w-4 h-4" />} label="로컬리 소개" onPress={() => navigate('/about')} isPending={pendingHref === '/about'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Bell className="w-4 h-4" />} label="공지사항" onPress={() => setActiveLinkModal('notices')} />
+          <MobileMenuItem icon={<BookOpen className="w-4 h-4" />} label="뉴스" onPress={() => setActiveLinkModal('news')} />
+          <MobileMenuItem icon={<Globe className="w-4 h-4" />} label="소셜 미디어" onPress={() => setActiveLinkModal('social')} />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
@@ -491,11 +510,15 @@ export default function AccountPage() {
         <div className="px-4 pb-4">
           <button
             onClick={async () => {
+              if (signingOut) return;
+              setSigningOut(true);
               await supabase.auth.signOut();
               router.push('/');
             }}
-            className="text-[12px] font-semibold text-gray-500 py-1"
+            disabled={signingOut}
+            className="inline-flex items-center gap-2 py-1 text-[12px] font-semibold text-gray-500 disabled:opacity-60"
           >
+            {signingOut ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             로그아웃
           </button>
         </div>
@@ -919,7 +942,10 @@ export default function AccountPage() {
         <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center">
           <div
             className="absolute inset-0 bg-black/40"
-            onClick={() => setActiveLinkModal(null)}
+            onClick={() => {
+              setPendingModalActionHref(null);
+              setActiveLinkModal(null);
+            }}
           />
           <div className="relative w-full md:max-w-md bg-white rounded-t-3xl md:rounded-3xl p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-3 duration-200">
             <div className="flex items-start justify-between gap-4">
@@ -928,7 +954,10 @@ export default function AccountPage() {
                 <p className="text-sm text-slate-500 mt-1">{activeLinkConfig.desc}</p>
               </div>
               <button
-                onClick={() => setActiveLinkModal(null)}
+                onClick={() => {
+                  setPendingModalActionHref(null);
+                  setActiveLinkModal(null);
+                }}
                 className="w-8 h-8 rounded-full border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-50"
                 aria-label="닫기"
               >
@@ -941,10 +970,15 @@ export default function AccountPage() {
                 <button
                   key={action.label}
                   onClick={() => handleOpenLink(action.href, action.external)}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
+                  disabled={pendingModalActionHref !== null}
+                  aria-busy={pendingModalActionHref === action.href}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {action.label}
-                  <ChevronRight size={16} className="text-slate-400" />
+                  {pendingModalActionHref === action.href
+                    ? <Loader2 size={16} className="animate-spin text-slate-400" />
+                    : <ChevronRight size={16} className="text-slate-400" />
+                  }
                 </button>
               ))}
             </div>
@@ -999,38 +1033,33 @@ export default function AccountPage() {
 function MobileMenuItem({
   icon,
   label,
-  href,
-  onClick,
+  onPress,
+  isPending = false,
+  disabled = false,
 }: {
   icon: React.ReactNode;
   label: string;
-  href: string;
-  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
+  onPress: () => void;
+  isPending?: boolean;
+  disabled?: boolean;
 }) {
-  const inner = (
-    <>
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      disabled={disabled}
+      aria-busy={isPending}
+      className={`flex w-full items-center gap-3 border-b border-gray-100 py-3 text-left transition-all duration-150 active:scale-[0.995] disabled:cursor-not-allowed ${isPending ? 'bg-gray-50/80' : 'active:bg-gray-50'}`}
+    >
       <span className="text-gray-500 shrink-0">{icon}</span>
       <span className="flex-1 text-[12px] font-medium text-gray-800">{label}</span>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
-        <path d="M9 18l6-6-6-6" />
-      </svg>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        onClick={onClick}
-        className="w-full flex items-center gap-3 py-3 border-b border-gray-100 text-left"
-      >
-        {inner}
-      </button>
-    );
-  }
-
-  return (
-    <Link href={href} className="flex items-center gap-3 py-3 border-b border-gray-100">
-      {inner}
-    </Link>
+      {isPending ? (
+        <Loader2 className="w-[15px] h-[15px] animate-spin text-gray-400" />
+      ) : (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      )}
+    </button>
   );
 }

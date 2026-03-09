@@ -202,19 +202,19 @@ export default function MobileProfileView({
     const displayProfile = isEditing ? editData : profile;
 
     return (
-        <div className="fixed inset-0 bg-white z-[200] flex flex-col overflow-y-auto">
+        <div className="fixed inset-0 z-[200] flex flex-col overflow-y-auto bg-white animate-in fade-in slide-in-from-right-4 duration-200">
             {/* 헤더 */}
             <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-2.5 border-b border-gray-100 sticky top-0 bg-white z-10">
                 <button
                     onClick={onBack}
-                    className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-all hover:bg-gray-100 active:scale-[0.96] md:h-9 md:w-9"
                 >
                     <ArrowLeft className="w-[18px] h-[18px] md:w-5 md:h-5" strokeWidth={2} />
                 </button>
                 <button
                     onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                     disabled={saving}
-                    className="text-[12px] font-semibold text-gray-800 px-3.5 py-1.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="rounded-full border border-gray-200 px-3.5 py-1.5 text-[12px] font-semibold text-gray-800 transition-all hover:bg-gray-50 active:scale-[0.96] disabled:opacity-50"
                 >
                     {saving ? '저장 중...' : isEditing ? '완료' : '수정하기'}
                 </button>
