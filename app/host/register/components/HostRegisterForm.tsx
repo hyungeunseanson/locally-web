@@ -151,6 +151,30 @@ export default function HostRegisterForm({
     checkCircle: CheckCircle2,
   } as const;
 
+  const getSafetyTheme = (accentClass: string) => {
+    if (accentClass.includes('red')) {
+      return {
+        border: 'border-rose-100 md:hover:border-rose-300',
+        bar: 'bg-rose-500',
+        surface: 'bg-rose-50',
+      };
+    }
+
+    if (accentClass.includes('green')) {
+      return {
+        border: 'border-emerald-100 md:hover:border-emerald-300',
+        bar: 'bg-emerald-500',
+        surface: 'bg-emerald-50',
+      };
+    }
+
+    return {
+      border: 'border-sky-100 md:hover:border-sky-300',
+      bar: 'bg-sky-500',
+      surface: 'bg-sky-50',
+    };
+  };
+
   const renderMultilineText = (text: string) =>
     text.split('\n').map((line, index) => (
       <React.Fragment key={`${line}-${index}`}>
@@ -367,48 +391,65 @@ export default function HostRegisterForm({
         )}
 
         {step === 8 && (
-          <div className="w-full space-y-8 animate-in slide-in-from-right-8 fade-in duration-500">
-            <div className="text-center">
-              <span className="bg-red-50 text-red-600 font-bold px-2.5 py-1 rounded-full text-[10px] animate-pulse">{copy.step8Badge}</span>
-              <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">{renderMultilineText(copy.step8Title)}</h1>
-              <p className="text-sm text-slate-500">{copy.step8Desc}</p>
+          <div className="w-full space-y-4 md:space-y-6 animate-in slide-in-from-right-8 fade-in duration-500">
+            <div className="bg-slate-900 text-white px-5 py-6 md:p-8 rounded-2xl md:rounded-3xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 md:w-52 md:h-52 bg-rose-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+              <div className="relative z-10">
+                <span className="bg-rose-500 text-white font-bold px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs inline-block">{copy.step8Badge}</span>
+                <h1 className="text-[20px] md:text-3xl font-black mt-3 md:mt-4 mb-2 md:mb-3 leading-tight">{renderMultilineText(copy.step8Title)}</h1>
+                <p className="text-slate-300 text-[12px] md:text-sm leading-relaxed md:max-w-lg">{copy.step8Desc}</p>
+              </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 h-64 w-full text-sm text-slate-700 space-y-6 shadow-inner relative overflow-y-auto">
-              {copy.safetyPolicies.map((policy, index) => {
+            <div className="space-y-3 md:space-y-4">
+              {copy.safetyPolicies.map((policy) => {
                 const Icon = safetyIconMap[policy.icon];
+                const theme = getSafetyTheme(policy.accentClass);
                 return (
-                  <React.Fragment key={policy.title}>
-                    <div>
-                      <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><Icon size={16} className={policy.accentClass} /> {policy.title}</h3>
-                      <p className="leading-relaxed text-xs">{policy.description}</p>
+                  <div
+                    key={policy.title}
+                    className={`bg-white px-4 py-4 md:p-6 rounded-2xl md:rounded-3xl border shadow-sm relative overflow-hidden transition-colors ${theme.border}`}
+                  >
+                    <div className={`absolute top-0 left-0 w-1.5 md:w-2 h-full ${theme.bar}`} />
+                    <h3 className="text-[13px] md:text-lg font-bold flex items-center gap-2 mb-2.5 md:mb-3 text-slate-900 pl-1">
+                      <Icon className={`${policy.accentClass} shrink-0`} size={18} />
+                      {policy.title}
+                    </h3>
+                    <div className={`ml-1 rounded-xl md:rounded-2xl px-3 py-3 md:px-4 md:py-4 ${theme.surface}`}>
+                      <p className="text-[11px] md:text-sm leading-relaxed text-slate-700 font-medium">{policy.description}</p>
                     </div>
-                    {index < copy.safetyPolicies.length - 1 && <div className="h-px bg-slate-200 w-full"></div>}
-                  </React.Fragment>
+                  </div>
                 );
               })}
             </div>
 
-            <div className="space-y-3 pt-2">
-              <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border transition-all hover:bg-slate-50 border-slate-200">
+            <div className="text-center bg-slate-50 py-5 px-4 md:px-6 md:py-7 rounded-2xl md:rounded-3xl border border-slate-100">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-sm border border-slate-200">
+                <CheckCircle2 className="text-slate-800" size={18} />
+              </div>
+              <p className="text-[11px] md:text-sm text-slate-500 font-bold mb-4 md:mb-5">{copy.step8Desc}</p>
+
+              <div className="space-y-3 text-left">
+                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl md:rounded-2xl border transition-all hover:bg-white border-slate-200 bg-white">
                 <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${formData.educationCompleted ? 'bg-black border-black text-white' : 'border-slate-300 bg-white'}`}>
                   <CheckCircle2 size={14} className={formData.educationCompleted ? 'opacity-100' : 'opacity-0'} />
                 </div>
                 <input type="checkbox" className="hidden" checked={formData.educationCompleted} onChange={(e) => updateData('educationCompleted', e.target.checked)} />
-                <span className="text-xs text-slate-600 font-bold leading-relaxed">
+                <span className="text-xs md:text-sm text-slate-700 font-bold leading-relaxed">
                   {renderMultilineText(copy.policyReadCheckbox)}
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100/50 transition-all">
-                <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${formData.agreeSafetyPolicy ? 'bg-red-600 border-red-600 text-white' : 'border-red-300 bg-white'}`}>
+                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl md:rounded-2xl border border-rose-100 bg-rose-50 hover:bg-rose-100/60 transition-all">
+                <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${formData.agreeSafetyPolicy ? 'bg-rose-600 border-rose-600 text-white' : 'border-rose-300 bg-white'}`}>
                   <CheckCircle2 size={14} className={formData.agreeSafetyPolicy ? 'opacity-100' : 'opacity-0'} />
                 </div>
                 <input type="checkbox" className="hidden" checked={formData.agreeSafetyPolicy} onChange={(e) => updateData('agreeSafetyPolicy', e.target.checked)} />
-                <span className="text-xs text-slate-900 font-bold leading-relaxed">
+                <span className="text-xs md:text-sm text-slate-900 font-bold leading-relaxed">
                   {renderMultilineText(copy.policyAgreeCheckbox)}
                 </span>
               </label>
+              </div>
             </div>
           </div>
         )}
