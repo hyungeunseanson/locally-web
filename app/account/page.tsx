@@ -373,7 +373,16 @@ export default function AccountPage() {
 
   const activeLinkConfig = activeLinkModal ? linkModalConfig[activeLinkModal] : null;
 
-  if (loading) return <Spinner fullScreen />;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white text-slate-900 font-sans">
+        <SiteHeader />
+        <div className="min-h-[60vh] flex items-center justify-center px-4">
+          <Spinner size={32} variant="muted" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">

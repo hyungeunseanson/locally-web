@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
+import Spinner from '@/app/components/ui/Spinner';
 
 interface WishlistExperience {
   id: number;
@@ -165,7 +166,7 @@ export default function WishlistsPage() {
         <h1 className="text-[18px] md:text-3xl font-black mb-3 md:mb-8">{t('wishlist')}</h1>
         {loading ? (
           <div className="flex justify-center py-28 md:py-40">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
+            <Spinner size={32} variant="muted" />
           </div>
         ) : wishlists.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 md:py-20 border-2 border-dashed border-slate-100 rounded-2xl md:rounded-3xl bg-slate-50">

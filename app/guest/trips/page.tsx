@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Ghost, AlertCircle, History, ArrowLeft, Briefcase, ChevronRight, Clock, MapPin, Users, Calendar, Plus } from 'lucide-react';
+import { Ghost, AlertCircle, History, ArrowLeft, Briefcase, ChevronRight, Clock, MapPin, Users, Calendar, Plus } from 'lucide-react';
 import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import ReviewModal from '@/app/components/ReviewModal';
+import Spinner from '@/app/components/ui/Spinner';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -12,7 +13,7 @@ import { useNotification } from '@/app/context/NotificationContext';
 
 // 분리된 컴포넌트 & 훅 import
 import { useGuestTrips } from './hooks/useGuestTrips';
-import TripCard from './components/TripCard';
+import TripCard, { type GuestTrip } from './components/TripCard';
 import ReceiptModal from './components/ReceiptModal';
 import PastTripCard from './components/PastTripCard';
 import { getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
@@ -60,7 +61,7 @@ export default function GuestTripsPage() {
   // UI 상태 관리 (모달 등)
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [selectedTrip, setSelectedTrip] = useState<GuestTrip | null>(null);
 
   // 맞춤 의뢰 목록
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestCard[]>([]);
@@ -83,8 +84,8 @@ export default function GuestTripsPage() {
     void loadServices();
   }, [supabase]);
 
-  const openReceipt = (trip: any) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
-  const openReview = (trip: any) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
+  const openReceipt = (trip: GuestTrip) => { setSelectedTrip(trip); setIsReceiptModalOpen(true); };
+  const openReview = (trip: GuestTrip) => { setSelectedTrip(trip); setIsReviewModalOpen(true); };
   const handleMobileBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
@@ -93,7 +94,16 @@ export default function GuestTripsPage() {
     router.push('/account');
   };
 
-  if (isLoading) return <div className="min-h-screen bg-white flex items-center justify-center"><Loader2 className="animate-spin text-slate-400" size={32} /></div>;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white text-slate-900 font-sans">
+        <SiteHeader />
+        <div className="min-h-[60vh] flex items-center justify-center px-4">
+          <Spinner size={32} variant="muted" />
+        </div>
+      </div>
+    );
+  }
 
   // ─── 맞춤 의뢰 섹션 (공통, 모바일+데스크탑) ───────────────────────────
   const ServiceRequestsSection = () => (
@@ -195,7 +205,7 @@ export default function GuestTripsPage() {
           {/* ── 예정된 여행 ── */}
           <div className="flex flex-col gap-3 mb-6">
             {upcomingTrips.length > 0 ? (
-              upcomingTrips.map((trip: any) => (
+              upcomingTrips.map((trip) => (
                 <TripCard key={trip.id} trip={trip} onRequestCancel={requestCancel} isProcessing={isProcessing} onOpenReceipt={openReceipt} />
               ))
             ) : (
@@ -216,7 +226,7 @@ export default function GuestTripsPage() {
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
               <div className="space-y-2.5 md:space-y-3">
-                {pastTrips.map((trip: any) => (
+                {pastTrips.map((trip) => (
                   <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
                 ))}
               </div>
@@ -245,7 +255,7 @@ export default function GuestTripsPage() {
 
             <div className="flex flex-col gap-8">
               {upcomingTrips.length > 0 ? (
-                upcomingTrips.map((trip: any) => (
+                upcomingTrips.map((trip) => (
                   <TripCard
                     key={trip.id}
                     trip={trip}
@@ -275,7 +285,7 @@ export default function GuestTripsPage() {
 
               {pastTrips.length > 0 ? (
                 <div className="space-y-4">
-                  {pastTrips.map((trip: any) => (
+                  {pastTrips.map((trip) => (
                     <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
                   ))}
                 </div>

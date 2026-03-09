@@ -9,7 +9,7 @@ import CancellationModal from './CancellationModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 
-interface GuestTrip {
+export interface GuestTrip {
   id: number;
   orderId?: string | number;
   expId: string | number;

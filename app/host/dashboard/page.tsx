@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
+import Spinner from '@/app/components/ui/Spinner';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
 
@@ -19,6 +20,7 @@ import InquiryChat from './InquiryChat';
 import Earnings from './Earnings';
 import HostReviews from './HostReviews';
 import ProfileEditor from './components/ProfileEditor';
+import type { HostProfile } from './components/ProfileEditor';
 import GuidelinesTab from './components/GuidelinesTab'; // 🟢 필수 교육 및 가이드라인 탭
 import ServiceJobsTab from './components/ServiceJobsTab';
 import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
@@ -26,21 +28,6 @@ import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile'
 interface HostStatusSummary {
   status?: string | null;
   admin_comment?: string | null;
-}
-
-interface HostDashboardProfile {
-  avatar_url?: string | null;
-  full_name?: string | null;
-  name?: string | null;
-  birth_date?: string | null;
-  introduction?: string | null;
-  bio?: string | null;
-  languages?: string[] | null;
-  host_nationality?: string | null;
-  phone?: string | null;
-  job?: string | null;
-  dream_destination?: string | null;
-  favorite_song?: string | null;
 }
 
 // 실제 대시보드 로직
@@ -57,7 +44,7 @@ function DashboardContent() {
   );
   const [activeTab, setActiveTab] = useState('reservations');
   const [hostStatus, setHostStatus] = useState<HostStatusSummary | null>(null);
-  const [profile, setProfile] = useState<HostDashboardProfile | null>(null);
+  const [profile, setProfile] = useState<HostProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const supabase = useMemo(() => createClient(), []);
@@ -138,8 +125,8 @@ function DashboardContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black"></div>
+      <div className="min-h-[60vh] bg-white flex items-center justify-center">
+        <Spinner size={32} variant="muted" />
       </div>
     );
   }
@@ -318,7 +305,7 @@ function DashboardContent() {
         {activeTab === 'service-jobs' && <ServiceJobsTab />}
         {activeTab === 'earnings' && <Earnings />}
         {activeTab === 'reviews' && <HostReviews />}
-        {activeTab === 'profile' && <ProfileEditor profile={profile as any} onUpdate={fetchData} />}
+        {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}
         {activeTab === 'guidelines' && <GuidelinesTab />}
       </main>
     </div>
@@ -331,8 +318,8 @@ export default function HostDashboardPage() {
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-slate-900"></div>
+        <div className="min-h-[60vh] flex items-center justify-center px-4">
+          <Spinner size={32} variant="muted" />
         </div>
       }>
         <DashboardContent />

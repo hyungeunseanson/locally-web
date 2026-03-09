@@ -11,9 +11,9 @@ import {
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import SiteHeader from '@/app/components/SiteHeader';
+import Spinner from '@/app/components/ui/Spinner';
 import { useLanguage } from '@/app/context/LanguageContext';
 import {
-  getServiceRequestStatusLabel,
   isOpenServiceRequest,
   isPendingPaymentServiceRequest,
   isActiveServiceRequest,
@@ -193,8 +193,11 @@ export default function ServiceRequestDetailPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-100 border-t-slate-900" />
+    <div className="min-h-screen bg-white text-slate-900 font-sans">
+      <SiteHeader />
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <Spinner size={30} variant="muted" />
+      </div>
     </div>
   );
 
@@ -437,7 +440,7 @@ export default function ServiceRequestDetailPage() {
                       {/* ─ 자기소개 ─ */}
                       {bio && (
                         <div className="px-4 pb-3">
-                          <p className="text-[11px] md:text-[12px] text-slate-400 italic line-clamp-2">"{bio}"</p>
+                          <p className="text-[11px] md:text-[12px] text-slate-400 italic line-clamp-2">&ldquo;{bio}&rdquo;</p>
                         </div>
                       )}
 

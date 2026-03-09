@@ -6,9 +6,14 @@ import { ReactNode } from 'react';
 
 export default function PageTransition({ children }: { children: ReactNode }) {
     const pathname = usePathname();
+    const shouldAnimate =
+        pathname === '/' ||
+        pathname?.startsWith('/about') ||
+        pathname?.startsWith('/become-a-host') ||
+        pathname?.startsWith('/company') ||
+        pathname?.startsWith('/site-map');
 
-    // 관리자 대쉬보드 경로는 애니메이션 제외
-    if (pathname?.startsWith('/admin')) {
+    if (!shouldAnimate) {
         return <>{children}</>;
     }
 

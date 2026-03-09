@@ -9,22 +9,23 @@ import { getProfileCompletion, normalizeLanguageList, PROFILE_COMPLETION_FIELD_L
 import { useLanguage } from '@/app/context/LanguageContext';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
-interface HostProfile {
-  full_name?: string;
-  job?: string;
-  dream_destination?: string;
-  favorite_song?: string;
-  languages?: string[] | string;
-  introduction?: string;
-  bio?: string;
-  phone?: string;
-  dob?: string;
-  birth_date?: string;
-  host_nationality?: string;
-  bank_name?: string;
-  account_number?: string;
-  account_holder?: string;
-  motivation?: string;
+export interface HostProfile {
+  full_name?: string | null;
+  name?: string | null;
+  job?: string | null;
+  dream_destination?: string | null;
+  favorite_song?: string | null;
+  languages?: string[] | string | null;
+  introduction?: string | null;
+  bio?: string | null;
+  phone?: string | null;
+  dob?: string | null;
+  birth_date?: string | null;
+  host_nationality?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_holder?: string | null;
+  motivation?: string | null;
   avatar_url?: string | null;
 }
 

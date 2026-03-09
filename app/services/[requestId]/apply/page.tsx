@@ -7,6 +7,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import SiteHeader from '@/app/components/SiteHeader';
+import Spinner from '@/app/components/ui/Spinner';
 import type { ServiceRequest } from '@/app/types/service';
 
 export default function ServiceApplyPage() {
@@ -85,8 +86,11 @@ export default function ServiceApplyPage() {
 
   if (!request) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-slate-900" />
+      <div className="min-h-screen bg-white text-slate-900 font-sans">
+        <SiteHeader />
+        <div className="min-h-[60vh] flex items-center justify-center px-4">
+          <Spinner size={30} variant="muted" />
+        </div>
       </div>
     );
   }

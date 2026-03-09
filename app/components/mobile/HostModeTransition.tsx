@@ -19,7 +19,7 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
             } else {
                 router.push('/account');
             }
-        }, 2500);
+        }, 900);
 
         return () => {
             clearTimeout(t1);

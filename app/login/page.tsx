@@ -6,6 +6,7 @@ import SiteHeader from '@/app/components/SiteHeader';
 import LoginModal from '@/app/components/LoginModal';
 import { Suspense } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
+import Spinner from '@/app/components/ui/Spinner';
 
 /**
  * 로그인 전용 페이지
@@ -51,7 +52,7 @@ function LoginPageContent() {
   if (checking) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black" />
+        <Spinner size={34} variant="muted" />
       </div>
     );
   }
@@ -85,7 +86,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-black" />
+        <Spinner size={34} variant="muted" />
       </div>
     }>
       <LoginPageContent />
