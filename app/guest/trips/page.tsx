@@ -205,7 +205,7 @@ export default function GuestTripsPage() {
           {/* ── 예정된 여행 ── */}
           <div className="flex flex-col gap-3 mb-6">
             {upcomingTrips.length > 0 ? (
-              upcomingTrips.map((trip) => (
+              upcomingTrips.map((trip: GuestTrip) => (
                 <TripCard key={trip.id} trip={trip} onRequestCancel={requestCancel} isProcessing={isProcessing} onOpenReceipt={openReceipt} />
               ))
             ) : (
@@ -226,7 +226,7 @@ export default function GuestTripsPage() {
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
               <div className="space-y-2.5 md:space-y-3">
-                {pastTrips.map((trip) => (
+                {pastTrips.map((trip: GuestTrip) => (
                   <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
                 ))}
               </div>
@@ -255,7 +255,7 @@ export default function GuestTripsPage() {
 
             <div className="flex flex-col gap-8">
               {upcomingTrips.length > 0 ? (
-                upcomingTrips.map((trip) => (
+                upcomingTrips.map((trip: GuestTrip) => (
                   <TripCard
                     key={trip.id}
                     trip={trip}
@@ -285,7 +285,7 @@ export default function GuestTripsPage() {
 
               {pastTrips.length > 0 ? (
                 <div className="space-y-4">
-                  {pastTrips.map((trip) => (
+                  {pastTrips.map((trip: GuestTrip) => (
                     <PastTripCard key={trip.id} trip={trip} onOpenReview={openReview} />
                   ))}
                 </div>

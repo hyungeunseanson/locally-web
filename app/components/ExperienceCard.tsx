@@ -8,8 +8,28 @@ import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 
-export default function ExperienceCard({ data }: { data: any }) {
-  const { isSaved, toggleWishlist } = useWishlist(data.id);
+type ExperienceCardData = {
+  id: number | string;
+  title?: string | null;
+  title_en?: string | null;
+  title_ja?: string | null;
+  title_zh?: string | null;
+  category?: string | null;
+  category_en?: string | null;
+  category_ja?: string | null;
+  category_zh?: string | null;
+  city?: string | null;
+  subCity?: string | null;
+  location?: string | null;
+  image_url?: string | null;
+  photos?: string[] | null;
+  rating?: number | null;
+  review_count?: number | null;
+  price?: number | string | null;
+};
+
+export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
+  const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
   const { lang } = useLanguage();
 
   // 🟢 [기능 유지] 다국어 데이터 가져오기 (LanguageContext의 lang 사용)
@@ -23,6 +43,8 @@ export default function ExperienceCard({ data }: { data: any }) {
 
   // 지역 정보 (없으면 기본값)
   const location = [data.city, data.subCity].filter(Boolean).map(s => String(s).trim()).filter(Boolean).join(', ') || data.location || '서울';
+  const rating = Number(data.rating || 0);
+  const reviewCount = Number(data.review_count || 0);
 
   return (
     <Link href={`/experiences/${data.id}`} className="block group active:scale-[0.98] transition-transform duration-200">
@@ -38,10 +60,10 @@ export default function ExperienceCard({ data }: { data: any }) {
 
         {/* ❤️ 하트 버튼 (우측 상단 고정 원본 복구) */}
         <button
+          type="button"
+          disabled={isLoading}
           onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleWishlist();
+            void toggleWishlist(e);
           }}
           className="absolute top-3 right-3 text-white/70 hover:text-white hover:scale-110 transition-all z-10"
         >
@@ -63,9 +85,9 @@ export default function ExperienceCard({ data }: { data: any }) {
             {location} · {category}
           </h3>
           <div className="flex items-center gap-0.5 md:gap-1 text-[11px] md:text-sm shrink-0">
-            <Star size={11} className="md:w-[14px] md:h-[14px]" fill={data.rating > 0 ? "black" : "none"} />
-            <span>{data.rating > 0 ? data.rating.toFixed(2) : "New"}</span>
-            {data.review_count > 0 && <span className="text-slate-400 font-normal">({data.review_count})</span>}
+            <Star size={11} className="md:w-[14px] md:h-[14px]" fill={rating > 0 ? "black" : "none"} />
+            <span>{rating > 0 ? rating.toFixed(2) : "New"}</span>
+            {reviewCount > 0 && <span className="text-slate-400 font-normal">({reviewCount})</span>}
           </div>
         </div>
 
