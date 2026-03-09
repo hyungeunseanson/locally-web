@@ -195,7 +195,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         {/* 🟢 약관 모달 오버레이 */}
         {showLegalText && legalDocument && (
           <div className="absolute inset-0 z-50 bg-white flex flex-col h-full">
-            <div className="h-12 md:h-14 flex items-center justify-between px-3.5 md:px-5 border-b border-gray-100 flex-shrink-0">
+            <div className="h-12 md:h-14 flex items-center justify-between px-4 md:px-5 border-b border-gray-100 flex-shrink-0">
               <button
                 onClick={() => setShowLegalText(null)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2 text-gray-900"
@@ -208,7 +208,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               </span>
               <div className="w-8"></div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3.5 md:p-6 bg-slate-50">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
               {legalDocument.fallbackNotice && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] md:text-xs font-medium leading-relaxed text-amber-900">
                   {legalDocument.fallbackNotice}
@@ -230,7 +230,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           </div>
         )}
 
-        <div className="h-12 md:h-14 flex items-center justify-between px-3.5 md:px-5 border-b border-gray-100">
+        <div className="h-12 md:h-14 flex items-center justify-between px-4 md:px-5 border-b border-gray-100">
           <button onClick={onClose} type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2">
             <X size={18} className="text-gray-900" />
           </button>
@@ -240,7 +240,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           <div className="w-8"></div>
         </div>
 
-        <div className={`p-3.5 md:p-6 ${mode === 'SIGNUP' ? 'max-h-[76dvh] md:max-h-[80vh] overflow-y-auto' : ''}`}>
+        <div className={`p-4 md:p-6 ${mode === 'SIGNUP' ? 'max-h-[76dvh] md:max-h-[80vh] overflow-y-auto' : ''}`}>
 
           <div className="mb-5 md:mb-6">
             <h3 className="text-[18px] md:text-xl font-bold text-gray-900 mb-1">
