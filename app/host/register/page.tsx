@@ -67,6 +67,14 @@ function getFallbackLevel(value: unknown): LanguageLevel {
   return 3;
 }
 
+function hasTextValue(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasLanguageValues(value: unknown): boolean {
+  return Array.isArray(value) && value.some((item) => String(item).trim().length > 0);
+}
+
 export default function HostRegisterPage() {
   const { lang } = useLanguage();
   const copy = getHostRegisterCopy(lang);
@@ -272,17 +280,44 @@ export default function HostRegisterPage() {
 
       if (error) throw error;
 
-      const { error: profileError } = await supabase
+      const { data: currentProfile, error: profileLoadError } = await supabase
         .from('profiles')
-        .update({
-          languages: languageNames,
-          bio: formData.selfIntro,
-          full_name: formData.name,
-          avatar_url: profileUrl,
-        })
-        .eq('id', user.id);
+        .select('full_name, avatar_url, bio, introduction, languages')
+        .eq('id', user.id)
+        .maybeSingle();
 
-      if (profileError) throw profileError;
+      if (profileLoadError) throw profileLoadError;
+
+      const profileSeedUpdates: Record<string, unknown> = {};
+
+      if (!hasTextValue(currentProfile?.full_name) && hasTextValue(formData.name)) {
+        profileSeedUpdates.full_name = formData.name.trim();
+      }
+
+      if (!hasTextValue(currentProfile?.avatar_url) && profileUrl) {
+        profileSeedUpdates.avatar_url = profileUrl;
+      }
+
+      if (
+        !hasTextValue(currentProfile?.bio) &&
+        !hasTextValue(currentProfile?.introduction) &&
+        hasTextValue(formData.selfIntro)
+      ) {
+        profileSeedUpdates.bio = formData.selfIntro.trim();
+      }
+
+      if (!hasLanguageValues(currentProfile?.languages) && languageNames.length > 0) {
+        profileSeedUpdates.languages = languageNames;
+      }
+
+      if (Object.keys(profileSeedUpdates).length > 0) {
+        const { error: profileSeedError } = await supabase
+          .from('profiles')
+          .update(profileSeedUpdates)
+          .eq('id', user.id);
+
+        if (profileSeedError) throw profileSeedError;
+      }
 
       showToast(copy.submitSuccess, 'success');
       router.push('/host/dashboard');
