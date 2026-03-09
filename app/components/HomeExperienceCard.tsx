@@ -2,11 +2,26 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart } from 'lucide-react';
+import {
+  Heart,
+  Utensils,
+  Coffee,
+  TreePine,
+  ShoppingBag,
+  Landmark,
+  Dumbbell,
+  MoonStar,
+  Building2,
+  Ticket,
+  Flag,
+  Palette,
+  Sparkles,
+} from 'lucide-react';
 
 import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
+import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 
 export interface HomeExperienceCardData {
   id: number | string;
@@ -45,6 +60,45 @@ function formatLocation(data: HomeExperienceCardData) {
   return fallbackLocation || '서울';
 }
 
+function renderCategoryIcon(categoryLabel: string) {
+  const normalizedLabel = categoryLabel.trim().toLowerCase();
+  const matchedOption = CATEGORY_OPTIONS.find((option) => {
+    const labels = Object.values(option.labels).map((label) => label.trim().toLowerCase());
+    return option.value.trim().toLowerCase() === normalizedLabel || labels.includes(normalizedLabel);
+  });
+
+  if (!matchedOption) {
+    return <Sparkles size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+  }
+
+  switch (matchedOption.icon) {
+    case 'utensils':
+      return <Utensils size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'coffee':
+      return <Coffee size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'treePine':
+      return <TreePine size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'shoppingBag':
+      return <ShoppingBag size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'landmark':
+      return <Landmark size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'dumbbell':
+      return <Dumbbell size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'moonStar':
+      return <MoonStar size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'building2':
+      return <Building2 size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'ticket':
+      return <Ticket size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'flag':
+      return <Flag size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    case 'palette':
+      return <Palette size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+    default:
+      return <Sparkles size={11} strokeWidth={2.1} className="shrink-0 text-[#4A4A4A] md:h-[12px] md:w-[12px]" />;
+  }
+}
+
 export default function HomeExperienceCard({ data }: { data: HomeExperienceCardData }) {
   const { lang } = useLanguage();
   const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
@@ -57,7 +111,6 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
   const ratingValue = Number(data.rating || 0);
   const ratingText = ratingValue > 0 ? `★${ratingValue.toFixed(1)}` : 'New';
   const imageUrl = data.photos?.[0] || data.image_url || 'https://images.unsplash.com/photo-1542051841857-5f90071e7989';
-
   return (
     <Link
       href={`/experiences/${data.id}`}
@@ -72,8 +125,11 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
         />
 
-        <div className="absolute left-3 top-3 z-10 max-w-[68%] rounded-full bg-white px-3 py-1.5 text-[10px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)] md:left-4 md:top-4 md:max-w-[72%] md:px-3.5 md:py-1.5 md:text-[11px]">
-          <span className="block truncate">{category}</span>
+        <div className="absolute left-3 top-3 z-10 max-w-[66%] rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[-0.01em] text-[#2B2B2B] shadow-[0_2px_6px_rgba(0,0,0,0.08)] md:left-4 md:top-4 md:max-w-[70%] md:px-3 md:py-[5px] md:text-[10px]">
+          <span className="flex items-center gap-1.5">
+            {renderCategoryIcon(String(category))}
+            <span className="block truncate">{category}</span>
+          </span>
         </div>
 
         <button
@@ -83,12 +139,12 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           onClick={(e) => {
             void toggleWishlist(e);
           }}
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-black/15 text-white shadow-[0_2px_8px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-transform duration-200 md:right-4 md:top-4 md:h-9 md:w-9 md:hover:scale-105"
+          className="absolute right-2.5 top-2.5 z-10 p-1 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 md:right-3 md:top-3 md:p-1.5 md:hover:scale-105"
         >
           <Heart
-            size={16}
+            size={20}
             strokeWidth={2.2}
-            fill={isSaved ? '#F43F5E' : 'rgba(255,255,255,0.08)'}
+            fill={isSaved ? '#F43F5E' : 'none'}
             className={isSaved ? 'text-rose-500' : 'text-white'}
           />
         </button>
