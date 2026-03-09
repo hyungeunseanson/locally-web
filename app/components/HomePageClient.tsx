@@ -4,15 +4,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Ghost } from 'lucide-react';
 import Link from 'next/link';
 import HomeHero from '@/app/components/HomeHero';
-import ExperienceCard from '@/app/components/ExperienceCard';
+import HomeExperienceCard, { type HomeExperienceCardData } from '@/app/components/HomeExperienceCard';
 import ServiceCard from '@/app/components/ServiceCard';
 import { LOCALLY_SERVICES } from '@/app/constants';
 import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
-import { ExperienceCardSkeleton } from '@/app/components/skeletons/ExperienceCardSkeleton';
+import { HomeExperienceCardSkeleton } from '@/app/components/skeletons/HomeExperienceCardSkeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
 
-type HomeExperience = {
-  id: number | string;
+type HomeExperience = HomeExperienceCardData & {
   created_at?: string | null;
   languages?: string[] | null;
 };
@@ -100,10 +99,8 @@ export default function HomePageClient() {
               <div className="md:hidden px-5 pb-6">
                 <div className="flex gap-3 overflow-x-auto no-scrollbar">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="min-w-[43vw] shrink-0 animate-pulse">
-                      <div className="bg-slate-100 aspect-square rounded-xl mb-2"></div>
-                      <div className="h-3 bg-slate-100 rounded w-3/4 mb-1.5"></div>
-                      <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                    <div key={i} className="min-w-[42vw] max-w-[42vw] shrink-0">
+                      <HomeExperienceCardSkeleton />
                     </div>
                   ))}
                 </div>
@@ -111,7 +108,7 @@ export default function HomePageClient() {
               {/* 데스크탑 스켈레톤 */}
               <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                  <ExperienceCardSkeleton key={i} />
+                  <HomeExperienceCardSkeleton key={i} />
                 ))}
               </div>
             </>
@@ -181,7 +178,7 @@ export default function HomePageClient() {
                       <div className="flex gap-[10px] overflow-x-auto no-scrollbar px-5 pb-5">
                         {section.data.map((item) => (
                           <div key={item.id} className="min-w-[42vw] max-w-[42vw] shrink-0">
-                            <ExperienceCard data={item} />
+                            <HomeExperienceCard data={item} />
                           </div>
                         ))}
                       </div>
@@ -193,7 +190,7 @@ export default function HomePageClient() {
               {/* 🖥️ 데스크탑: 기존 그리드 */}
               <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
                 {(filteredExperiences as HomeExperience[]).map((item) => (
-                  <ExperienceCard key={item.id} data={item} />
+                  <HomeExperienceCard key={item.id} data={item} />
                 ))}
               </div>
             </>
