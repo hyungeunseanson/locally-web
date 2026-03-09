@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import {
     Bell, Settings, HelpCircle, Star,
     ChevronRight, BookOpen, CornerUpRight, Loader2,
@@ -13,6 +12,7 @@ import HostModeTransition from './HostModeTransition';
 import MobileLanguageSwitcher from './MobileLanguageSwitcher';
 import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
 import { useNotification } from '@/app/context/NotificationContext';
+import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 
 type MobileHostProfile = {
     avatar_url?: string | null;
@@ -34,6 +34,7 @@ export default function MobileHostMenu() {
 
     const supabase = useMemo(() => createClient(), []);
     const profileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
+    const { pendingHref, isNavigating, navigate } = usePendingNavigation();
 
     const { notifications } = useNotification();
     const serviceUnread = notifications.some(
@@ -125,9 +126,18 @@ export default function MobileHostMenu() {
                 <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">메뉴</h1>
                 <div className="flex items-center gap-2">
                     <MobileLanguageSwitcher />
-                    <Link href="/host/notifications" className="relative w-9 h-9 flex items-center justify-center rounded-full bg-gray-100">
-                        <Bell size={17} className="text-gray-600" />
-                    </Link>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/host/notifications')}
+                        disabled={isNavigating}
+                        aria-busy={pendingHref === '/host/notifications'}
+                        className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 active:scale-[0.96] disabled:cursor-not-allowed ${pendingHref === '/host/notifications' ? 'bg-gray-200' : 'bg-gray-100 active:bg-gray-200'}`}
+                    >
+                        {pendingHref === '/host/notifications'
+                            ? <Loader2 size={16} className="animate-spin text-gray-600" />
+                            : <Bell size={17} className="text-gray-600" />
+                        }
+                    </button>
                     <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
                         {profile?.avatar_url
                             ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="profile" />
@@ -141,18 +151,26 @@ export default function MobileHostMenu() {
 
             {/* ── 수입/인사이트 카드 ── */}
             <div className="px-5 mb-5 grid grid-cols-2 gap-3">
-                <Link href="/host/dashboard?tab=earnings" className="bg-gray-50 rounded-2xl p-4 active:scale-[0.98] transition-transform block">
-                    <p className="text-[10px] font-semibold text-gray-500 mb-1">호스팅 수입</p>
-                    <p className="text-[9px] text-gray-400 mb-2">{earnings?.month || '-'}</p>
+                <DashboardShortcutCard
+                    title="호스팅 수입"
+                    subtitle={earnings?.month || '-'}
+                    href="/host/dashboard?tab=earnings"
+                    isPending={pendingHref === '/host/dashboard?tab=earnings'}
+                    disabled={isNavigating}
+                    onNavigate={navigate}
+                >
                     <p className="text-[18px] font-black text-gray-900">
                         ₩{(earnings?.amount || 0).toLocaleString()}
                     </p>
-                </Link>
-                <Link href="/host/dashboard?tab=reviews" className="bg-gray-50 rounded-2xl p-4 active:scale-[0.98] transition-transform block">
-                    <p className="text-[10px] font-semibold text-gray-500 mb-1">인사이트</p>
-                    <p className="text-[9px] text-gray-400 mb-2">
-                        {reviewSummary.count > 0 ? `${reviewSummary.count}개의 후기` : '아직 후기 없음'}
-                    </p>
+                </DashboardShortcutCard>
+                <DashboardShortcutCard
+                    title="인사이트"
+                    subtitle={reviewSummary.count > 0 ? `${reviewSummary.count}개의 후기` : '아직 후기 없음'}
+                    href="/host/dashboard?tab=reviews"
+                    isPending={pendingHref === '/host/dashboard?tab=reviews'}
+                    disabled={isNavigating}
+                    onNavigate={navigate}
+                >
                     <div className="flex gap-0.5">
                         {[1, 2, 3, 4, 5].map(i => (
                             <Star
@@ -162,24 +180,24 @@ export default function MobileHostMenu() {
                             />
                         ))}
                     </div>
-                </Link>
+                </DashboardShortcutCard>
             </div>
 
             {/* ── 메뉴 그룹 1 ── */}
             <div className="px-5 mb-1">
-                <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label="예약 관리" />
-                <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label="내 체험 관리" />
-                <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label="문의함" />
-                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label="서비스 매칭" showDot={serviceUnread} />
+                <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label="예약 관리" isPending={pendingHref === '/host/dashboard?tab=reservations'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label="내 체험 관리" isPending={pendingHref === '/host/dashboard?tab=experiences'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label="문의함" isPending={pendingHref === '/host/dashboard?tab=inquiries'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label="서비스 매칭" showDot={serviceUnread} isPending={pendingHref === '/host/dashboard?tab=service-jobs'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />
 
             {/* ── 메뉴 그룹 2 ── */}
             <div className="px-5 mb-1">
-                <HostMenuItem href="/host/dashboard?tab=earnings" icon={<CircleDollarSign size={17} />} label="수익 및 정산" />
-                <HostMenuItem href="/host/dashboard?tab=reviews" icon={<Star size={17} />} label="받은 후기" />
-                <HostMenuItem href="/host/dashboard?tab=guidelines" icon={<BookOpen size={17} />} label="교육 및 가이드라인" />
+                <HostMenuItem href="/host/dashboard?tab=earnings" icon={<CircleDollarSign size={17} />} label="수익 및 정산" isPending={pendingHref === '/host/dashboard?tab=earnings'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=reviews" icon={<Star size={17} />} label="받은 후기" isPending={pendingHref === '/host/dashboard?tab=reviews'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=guidelines" icon={<BookOpen size={17} />} label="교육 및 가이드라인" isPending={pendingHref === '/host/dashboard?tab=guidelines'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />
@@ -191,8 +209,11 @@ export default function MobileHostMenu() {
                     icon={<Settings size={17} />}
                     label="프로필 설정"
                     badge={profileCompletion && profileCompletion.percent < 100 ? `${profileCompletion.percent}%` : null}
+                    isPending={pendingHref === '/host/dashboard?tab=profile'}
+                    disabled={isNavigating}
+                    onNavigate={navigate}
                 />
-                <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label="도움말 센터" />
+                <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label="도움말 센터" isPending={pendingHref === '/host/help'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             {/* ── 게스트 모드 전환 플로팅 버튼 ── */}
@@ -209,21 +230,68 @@ export default function MobileHostMenu() {
     );
 }
 
+function DashboardShortcutCard({
+    title,
+    subtitle,
+    href,
+    isPending,
+    disabled,
+    onNavigate,
+    children,
+}: {
+    title: string;
+    subtitle: string;
+    href: string;
+    isPending: boolean;
+    disabled: boolean;
+    onNavigate: (href: string) => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={() => onNavigate(href)}
+            disabled={disabled}
+            aria-busy={isPending}
+            className={`relative block rounded-2xl p-4 text-left transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed ${isPending ? 'bg-gray-100 ring-1 ring-gray-200' : 'bg-gray-50 active:bg-gray-100'}`}
+        >
+            <div className="absolute right-4 top-4">
+                {isPending ? <Loader2 size={15} className="animate-spin text-gray-400" /> : null}
+            </div>
+            <p className="mb-1 text-[10px] font-semibold text-gray-500">{title}</p>
+            <p className="mb-2 text-[9px] text-gray-400">{subtitle}</p>
+            {children}
+        </button>
+    );
+}
+
 function HostMenuItem({
     href,
     icon,
     label,
     badge,
     showDot,
+    isPending,
+    disabled,
+    onNavigate,
 }: {
     href: string;
     icon: React.ReactNode;
     label: string;
     badge?: string | null;
     showDot?: boolean;
+    isPending: boolean;
+    disabled: boolean;
+    onNavigate: (href: string) => void;
 }) {
     return (
-        <Link href={href} className="flex items-center gap-3.5 py-3.5 border-b border-gray-100">
+        <button
+            type="button"
+            onClick={() => onNavigate(href)}
+            disabled={disabled}
+            aria-busy={isPending}
+            className={`flex w-full items-center gap-3.5 border-b border-gray-100 py-3.5 text-left transition-all duration-150 active:scale-[0.995] disabled:cursor-not-allowed ${isPending ? 'bg-gray-50/80' : ''}`}
+        >
             <span className="text-gray-500 shrink-0">{icon}</span>
             <span className="flex-1 text-[13px] font-medium text-gray-800">{label}</span>
             {showDot && (
@@ -234,7 +302,10 @@ function HostMenuItem({
                     {badge}
                 </span>
             ) : null}
-            <ChevronRight size={15} className="text-gray-300" />
-        </Link>
+            {isPending
+                ? <Loader2 size={15} className="animate-spin text-gray-400" />
+                : <ChevronRight size={15} className="text-gray-300" />
+            }
+        </button>
     );
 }

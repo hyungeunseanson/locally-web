@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
@@ -59,6 +59,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [showLegalText, setShowLegalText] = useState<'terms' | 'privacy' | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [socialLoadingProvider, setSocialLoadingProvider] = useState<'google' | 'kakao' | null>(null);
   const [isFocused, setIsFocused] = useState<string | null>(null);
 
   const router = useRouter();
@@ -68,16 +69,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const nationalityOptions = getLoginModalNationalityOptions(lang);
   const legalDocument = showLegalText ? getLegalDocument(lang, showLegalText) : null;
 
-  const getCurrentAccessToken = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    return session?.access_token;
-  };
-
   const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (loading || socialLoadingProvider) return;
 
     if (!email || !password) {
       showToast(copy.emailPasswordRequired, 'error');
@@ -175,11 +169,19 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   };
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
+    if (loading || socialLoadingProvider) return;
+
+    setSocialLoadingProvider(provider);
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
-    if (error) showToast(error.message, 'error');
+
+    if (error) {
+      setSocialLoadingProvider(null);
+      showToast(error.message, 'error');
+    }
   };
 
   if (!isOpen) return null;
@@ -398,10 +400,14 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-[#111] hover:bg-black text-white font-bold h-12 rounded-xl text-[15px] transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed mb-6 shadow-md"
+              disabled={loading || socialLoadingProvider !== null}
+              aria-busy={loading}
+              className="mb-6 h-12 w-full rounded-xl bg-[#111] text-[15px] font-bold text-white shadow-md transition-all active:scale-[0.98] active:brightness-95 hover:bg-black disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? t('loading') : (mode === 'LOGIN' ? t('login_button') : t('signup'))} {/* 🟢 번역 적용 */}
+              <span className="inline-flex items-center justify-center gap-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                {mode === 'LOGIN' ? t('login_button') : t('signup')}
+              </span>
             </button>
           </form>
 
@@ -412,18 +418,20 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
           </div>
 
           <div className="space-y-3">
-            <SocialButton provider="kakao" label={t('continue_kakao')} onClick={() => handleSocialLogin('kakao')} /> {/* 🟢 번역 적용 */}
-            <SocialButton provider="google" label={t('continue_google')} onClick={() => handleSocialLogin('google')} /> {/* 🟢 번역 적용 */}
+            <SocialButton provider="kakao" label={t('continue_kakao')} onClick={() => handleSocialLogin('kakao')} isLoading={socialLoadingProvider === 'kakao'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
+            <SocialButton provider="google" label={t('continue_google')} onClick={() => handleSocialLogin('google')} isLoading={socialLoadingProvider === 'google'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
           </div>
 
           <div className="mt-6 text-center text-sm">
             <button
               type="button"
               onClick={() => {
+                if (loading || socialLoadingProvider) return;
                 setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN');
                 setIsFocused(null);
               }}
-              className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600 transition-colors"
+              disabled={loading || socialLoadingProvider !== null}
+              className="text-gray-900 font-semibold underline decoration-1 underline-offset-4 hover:text-gray-600 transition-colors disabled:opacity-50"
             >
               {mode === 'LOGIN' ? `${t('no_account')} ${t('signup')}` : copy.switchToLogin}
             </button>
@@ -457,16 +465,32 @@ function InputItem({ type, label, value, setValue, isFirst, focusKey, currentFoc
   );
 }
 
-function SocialButton({ provider, label, onClick }: { provider: 'kakao' | 'google', label: string, onClick: () => void }) {
+function SocialButton({
+  provider,
+  label,
+  onClick,
+  isLoading,
+  disabled,
+}: {
+  provider: 'kakao' | 'google',
+  label: string,
+  onClick: () => void,
+  isLoading?: boolean,
+  disabled?: boolean,
+}) {
   const isKakao = provider === 'kakao';
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full h-12 border border-gray-900 hover:bg-gray-50 rounded-xl flex items-center relative transition-all active:scale-[0.98]"
+      disabled={disabled}
+      aria-busy={isLoading}
+      className={`relative flex h-12 w-full items-center rounded-xl border border-gray-900 transition-all active:scale-[0.98] ${isLoading ? 'bg-gray-50' : 'hover:bg-gray-50'} disabled:cursor-not-allowed disabled:opacity-70`}
     >
       <div className="absolute left-4">
-        {isKakao ? (
+        {isLoading ? (
+          <Loader2 size={18} className="animate-spin text-gray-500" />
+        ) : isKakao ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
             <path fillRule="evenodd" clipRule="evenodd" d="M12 4C7.02944 4 3 7.35786 3 11.5C3 14.078 4.66428 16.3685 7.23438 17.707L6.2125 21.465C6.12656 21.782 6.47891 22.029 6.75781 21.845L11.2969 18.845C11.5297 18.868 11.7641 18.88 12 18.88C16.9706 18.88 21 15.522 21 11.38C21 7.238 16.9706 4 12 4Z" />
           </svg>

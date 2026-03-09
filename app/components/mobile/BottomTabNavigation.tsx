@@ -1,18 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
     Search, Heart, MessageSquare, User,
-    CalendarCheck, LayoutList, BookOpen, AlignJustify
+    CalendarCheck, LayoutList, BookOpen, AlignJustify, Loader2
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import LoginModal from '@/app/components/LoginModal';
+import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 
 export default function BottomTabNavigation() {
     const pathname = usePathname();
-    const router = useRouter();
     const searchParams = useSearchParams();
     const isHostMode = pathname?.startsWith('/host');
     const isHostNavPath =
@@ -25,6 +24,7 @@ export default function BottomTabNavigation() {
     const { user } = useAuth();
     const avatarUrl = user?.user_metadata?.avatar_url;
     const [showLogin, setShowLogin] = useState(false);
+    const { pendingHref, isNavigating, navigate } = usePendingNavigation();
 
     // 어드민/인증/결제 플로우에서는 하단 탭바 숨김
     // 호스트 모드에서는 dashboard/menu에서만 노출해 생성/수정 화면과 충돌 방지
@@ -38,13 +38,17 @@ export default function BottomTabNavigation() {
         return null;
     }
 
-    const handleAuthRequired = (e: React.MouseEvent, href: string) => {
-        if (!user) {
-            e.preventDefault();
-            setShowLogin(true);
-        } else {
-            router.push(href);
+    const handleTabPress = (href: string, requireAuth: boolean) => {
+        if (isNavigating) {
+            return;
         }
+
+        if (requireAuth && !user) {
+            setShowLogin(true);
+            return;
+        }
+
+        navigate(href);
     };
 
     const guestTabs = [
@@ -156,8 +160,9 @@ export default function BottomTabNavigation() {
                         return (
                             <button
                                 key={idx}
-                                onClick={(e) => handleAuthRequired(e, tab.href)}
-                                className="flex flex-col items-center justify-center gap-0.5 min-w-[50px] py-1"
+                                type="button"
+                                onClick={() => handleTabPress(tab.href, tab.requireAuth)}
+                                className="flex min-w-[50px] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 transition-all duration-150 active:scale-[0.96] active:bg-slate-50"
                             >
                                 {tab.icon(false)}
                                 <span className="text-[10px] font-medium text-gray-400">
@@ -167,13 +172,25 @@ export default function BottomTabNavigation() {
                         );
                     }
 
+                    const isPending = pendingHref === tab.href;
+
                     return (
-                        <Link key={idx} href={tab.href} className="flex flex-col items-center justify-center gap-0.5 min-w-[50px] py-1">
-                            {tab.icon(isActive)}
-                            <span className={`text-[10px] font-medium ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                        <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleTabPress(tab.href, tab.requireAuth)}
+                            disabled={isNavigating}
+                            aria-busy={isPending}
+                            className={`flex min-w-[50px] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 transition-all duration-150 active:scale-[0.96] disabled:cursor-not-allowed ${isPending ? 'bg-slate-100/90' : 'active:bg-slate-50'}`}
+                        >
+                            {isPending
+                                ? <Loader2 size={20} className="animate-spin text-slate-500" />
+                                : tab.icon(isActive)
+                            }
+                            <span className={`text-[10px] font-medium ${isPending || isActive ? 'text-gray-900' : 'text-gray-400'}`}>
                                 {tab.name}
                             </span>
-                        </Link>
+                        </button>
                     );
                 })}
             </nav>
