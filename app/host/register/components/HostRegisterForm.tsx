@@ -151,33 +151,6 @@ export default function HostRegisterForm({
     checkCircle: CheckCircle2,
   } as const;
 
-  const getSafetyTheme = (accentClass: string) => {
-    if (accentClass.includes('red')) {
-      return {
-        border: 'border-rose-100 hover:border-rose-200',
-        iconWrap: 'bg-rose-100 text-rose-600',
-        chip: 'bg-rose-50 text-rose-600',
-        surface: 'bg-rose-50/70',
-      };
-    }
-
-    if (accentClass.includes('green')) {
-      return {
-        border: 'border-emerald-100 hover:border-emerald-200',
-        iconWrap: 'bg-emerald-100 text-emerald-600',
-        chip: 'bg-emerald-50 text-emerald-600',
-        surface: 'bg-emerald-50/70',
-      };
-    }
-
-    return {
-      border: 'border-sky-100 hover:border-sky-200',
-      iconWrap: 'bg-sky-100 text-sky-600',
-      chip: 'bg-sky-50 text-sky-600',
-      surface: 'bg-sky-50/70',
-    };
-  };
-
   const renderMultilineText = (text: string) =>
     text.split('\n').map((line, index) => (
       <React.Fragment key={`${line}-${index}`}>
@@ -394,83 +367,48 @@ export default function HostRegisterForm({
         )}
 
         {step === 8 && (
-          <div className="w-full space-y-5 md:space-y-6 animate-in slide-in-from-right-8 fade-in duration-500">
+          <div className="w-full space-y-8 animate-in slide-in-from-right-8 fade-in duration-500">
             <div className="text-center">
-              <span className="bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full text-[10px]">{copy.step8Badge}</span>
+              <span className="bg-red-50 text-red-600 font-bold px-2.5 py-1 rounded-full text-[10px] animate-pulse">{copy.step8Badge}</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">{renderMultilineText(copy.step8Title)}</h1>
               <p className="text-sm text-slate-500">{copy.step8Desc}</p>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-gradient-to-b from-white to-slate-50/80 p-4 md:p-6 shadow-sm">
-              <div className="flex flex-wrap items-center gap-2 mb-4 md:mb-5">
-                <span className="rounded-full bg-black px-3 py-1 text-[10px] font-bold text-white">FINAL CHECK</span>
-                <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-500 border border-slate-200">6 GUIDELINES</span>
-                <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-500 border border-slate-200">2 REQUIRED CONSENTS</span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
-                {copy.safetyPolicies.map((policy, index) => {
-                  const Icon = safetyIconMap[policy.icon];
-                  const theme = getSafetyTheme(policy.accentClass);
-                  return (
-                    <div
-                      key={policy.title}
-                      className={`rounded-2xl border bg-white p-4 transition-all ${theme.border}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${theme.iconWrap}`}>
-                          <Icon size={18} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${theme.chip}`}>
-                              Rule {index + 1}
-                            </span>
-                          </div>
-                          <h3 className="text-[13px] font-bold text-slate-900 leading-snug mb-2">{policy.title}</h3>
-                          <div className={`rounded-xl px-3 py-3 ${theme.surface}`}>
-                            <p className="text-[11px] leading-relaxed text-slate-600">{policy.description}</p>
-                          </div>
-                        </div>
-                      </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 h-64 w-full text-sm text-slate-700 space-y-6 shadow-inner relative overflow-y-auto">
+              {copy.safetyPolicies.map((policy, index) => {
+                const Icon = safetyIconMap[policy.icon];
+                return (
+                  <React.Fragment key={policy.title}>
+                    <div>
+                      <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><Icon size={16} className={policy.accentClass} /> {policy.title}</h3>
+                      <p className="leading-relaxed text-xs">{policy.description}</p>
                     </div>
-                  );
-                })}
-              </div>
+                    {index < copy.safetyPolicies.length - 1 && <div className="h-px bg-slate-200 w-full"></div>}
+                  </React.Fragment>
+                );
+              })}
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-white p-4 md:p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-                  <ShieldCheck size={20} />
+            <div className="space-y-3 pt-2">
+              <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border transition-all hover:bg-slate-50 border-slate-200">
+                <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${formData.educationCompleted ? 'bg-black border-black text-white' : 'border-slate-300 bg-white'}`}>
+                  <CheckCircle2 size={14} className={formData.educationCompleted ? 'opacity-100' : 'opacity-0'} />
                 </div>
-                <div className="text-left">
-                  <p className="text-[11px] font-bold tracking-[0.18em] text-slate-400 uppercase">Host Commitment</p>
-                  <p className="text-sm font-bold text-slate-900">마지막 확인만 완료하면 신청이 제출됩니다.</p>
+                <input type="checkbox" className="hidden" checked={formData.educationCompleted} onChange={(e) => updateData('educationCompleted', e.target.checked)} />
+                <span className="text-xs text-slate-600 font-bold leading-relaxed">
+                  {renderMultilineText(copy.policyReadCheckbox)}
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100/50 transition-all">
+                <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${formData.agreeSafetyPolicy ? 'bg-red-600 border-red-600 text-white' : 'border-red-300 bg-white'}`}>
+                  <CheckCircle2 size={14} className={formData.agreeSafetyPolicy ? 'opacity-100' : 'opacity-0'} />
                 </div>
-              </div>
-
-              <div className="space-y-3 text-left">
-                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-2xl border transition-all hover:border-slate-300 hover:bg-slate-50 border-slate-200 bg-slate-50/60">
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${formData.educationCompleted ? 'bg-black border-black text-white' : 'border-slate-300 bg-white'}`}>
-                    <CheckCircle2 size={14} className={formData.educationCompleted ? 'opacity-100' : 'opacity-0'} />
-                  </div>
-                  <input type="checkbox" className="hidden" checked={formData.educationCompleted} onChange={(e) => updateData('educationCompleted', e.target.checked)} />
-                  <span className="text-xs md:text-sm text-slate-700 font-bold leading-relaxed">
-                    {renderMultilineText(copy.policyReadCheckbox)}
-                  </span>
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-2xl border border-rose-200 bg-rose-50 transition-all hover:bg-rose-100/70">
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${formData.agreeSafetyPolicy ? 'bg-rose-600 border-rose-600 text-white' : 'border-rose-300 bg-white'}`}>
-                    <CheckCircle2 size={14} className={formData.agreeSafetyPolicy ? 'opacity-100' : 'opacity-0'} />
-                  </div>
-                  <input type="checkbox" className="hidden" checked={formData.agreeSafetyPolicy} onChange={(e) => updateData('agreeSafetyPolicy', e.target.checked)} />
-                  <span className="text-xs md:text-sm text-slate-900 font-bold leading-relaxed">
-                    {renderMultilineText(copy.policyAgreeCheckbox)}
-                  </span>
-                </label>
-              </div>
+                <input type="checkbox" className="hidden" checked={formData.agreeSafetyPolicy} onChange={(e) => updateData('agreeSafetyPolicy', e.target.checked)} />
+                <span className="text-xs text-slate-900 font-bold leading-relaxed">
+                  {renderMultilineText(copy.policyAgreeCheckbox)}
+                </span>
+              </label>
             </div>
           </div>
         )}
