@@ -634,7 +634,14 @@ export default function TeamTab() {
                             </div>
                           </div>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', todo.id); }} className="text-slate-200 hover:text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={11} /></button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteTask('admin_tasks', todo.id); }}
+                          className="shrink-0 rounded-md p-1 text-slate-400 hover:text-rose-500 md:text-slate-200 md:opacity-0 md:group-hover:opacity-100"
+                          aria-label="할 일 삭제"
+                          title="할 일 삭제"
+                        >
+                          <Trash2 size={11} />
+                        </button>
                       </div>
 
                       {expandedTodo === todo.id && (
@@ -740,10 +747,11 @@ export default function TeamTab() {
                                 </div>
                               </div>
                               {memo.author_id === currentUser?.id && (
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <div className="flex shrink-0 items-center gap-1 transition-all md:opacity-0 md:group-hover:opacity-100">
                                   <button
                                     onClick={() => { setEditingMemo(memo); setIsComposingMemo(true); }}
                                     className="text-slate-400 hover:text-blue-500 bg-white p-2 rounded-full hover:bg-blue-50 shadow-sm border border-transparent hover:border-blue-100"
+                                    aria-label="메모 수정"
                                     title="메모 수정"
                                   >
                                     <Edit2 size={16} />
@@ -751,6 +759,7 @@ export default function TeamTab() {
                                   <button
                                     onClick={() => deleteTask('admin_tasks', memo.id)}
                                     className="text-slate-400 hover:text-rose-500 bg-white p-2 rounded-full hover:bg-rose-50 shadow-sm border border-transparent hover:border-rose-100"
+                                    aria-label="메모 삭제"
                                     title="메모 삭제"
                                   >
                                     <Trash2 size={16} />
