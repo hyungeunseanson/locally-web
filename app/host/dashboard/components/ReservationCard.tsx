@@ -139,17 +139,19 @@ export default function ReservationCard({
       {/* 모바일 레이아웃 */}
       <div className="md:hidden px-4 py-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-[11px] font-semibold text-slate-500">
               {res.experiences?.title || '-'}
             </p>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
+            <div className="mt-1 flex items-center gap-1.5 min-w-0">
+              <span className="shrink-0 text-[9px] uppercase tracking-[0.14em] text-slate-400">
                 {t('res_order_number')}
               </span>
-              <span className="font-mono text-[13px] font-bold text-slate-900">#{orderDisplay}</span>
+              <span className="min-w-0 truncate font-mono text-[11px] font-medium text-slate-500">
+                #{orderDisplay}
+              </span>
               {isNew && (
-                <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-bold text-white animate-pulse">
+                <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-bold text-white animate-pulse">
                   N
                 </span>
               )}
