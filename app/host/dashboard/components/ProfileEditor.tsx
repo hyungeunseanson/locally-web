@@ -19,6 +19,7 @@ interface HostProfile {
   bio?: string;
   phone?: string;
   dob?: string;
+  birth_date?: string;
   host_nationality?: string;
   bank_name?: string;
   account_number?: string;
@@ -94,7 +95,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         languages: normalizeLanguageList(profile.languages),
         introduction: profile.introduction || profile.bio || '',
         phone: profile.phone || '',
-        dob: profile.dob || '',
+        dob: profile.dob || profile.birth_date || '',
         host_nationality: profile.host_nationality || '',
         bank_name: profile.bank_name || '',
         account_number: profile.account_number || '',

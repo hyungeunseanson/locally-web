@@ -32,6 +32,7 @@ interface HostDashboardProfile {
   avatar_url?: string | null;
   full_name?: string | null;
   name?: string | null;
+  birth_date?: string | null;
   introduction?: string | null;
   bio?: string | null;
   languages?: string[] | null;
@@ -97,16 +98,18 @@ function DashboardContent() {
         .eq('id', user.id)
         .maybeSingle();
       const hostPublicProfile = getHostPublicProfile(profileData, hostData, '호스트');
+      const resolvedBirthDate = profileData?.birth_date || profileData?.dob || hostData?.dob || '';
 
       // 정보 병합 (프로필 > 지원서)
       const mergedProfile = {
         ...profileData,
         name: hostPublicProfile.name,
         avatar_url: hostPublicProfile.avatarUrl,
+        birth_date: resolvedBirthDate,
         introduction: hostPublicProfile.bio,
         languages: hostPublicProfile.languages,
         phone: profileData?.phone || hostData?.phone || '',
-        dob: profileData?.dob || hostData?.dob || '',
+        dob: resolvedBirthDate,
         host_nationality: hostPublicProfile.location || '',
         bank_name: profileData?.bank_name || hostData?.bank_name || '',
         account_number: profileData?.account_number || hostData?.account_number || '',
