@@ -87,19 +87,13 @@ export default function HostLandingActionBar({
           }`}
         >
           <div
-            className={`flex w-full items-center justify-center gap-2 ${
-              compact ? 'max-w-[320px]' : 'max-w-[520px]'
-            } ${compact ? 'flex-col' : 'flex-col md:flex-row'}`}
+            className="flex w-full max-w-[320px] flex-col items-center justify-center gap-2"
           >
             <button
               type="button"
               onClick={handlePrimaryClick}
               disabled={isLoading}
-              className={`inline-flex items-center justify-center rounded-full bg-[#2f2f2f] text-white transition-colors hover:bg-[#242424] disabled:cursor-not-allowed disabled:opacity-60 ${
-                compact
-                  ? 'w-[164px] px-0 py-3 text-[14px] font-medium tracking-[-0.01em] md:w-[172px]'
-                  : 'w-full px-5 py-3 text-[14px] font-medium tracking-[-0.01em] md:flex-1'
-              }`}
+              className="inline-flex w-[164px] items-center justify-center rounded-full bg-[#2f2f2f] px-0 py-3 text-[14px] font-medium tracking-[-0.01em] text-white transition-colors hover:bg-[#242424] disabled:cursor-not-allowed disabled:opacity-60 md:w-[172px]"
             >
               {primaryLabel}
             </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import SiteHeader from '@/app/components/SiteHeader';
 import {
   Search, ChevronDown, ChevronUp, MessageCircle, Mail,
@@ -373,6 +374,16 @@ export default function HelpCenterPage() {
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
+            </div>
+            <div className="mb-3 flex justify-center md:mb-4">
+              <Image
+                src="/images/logos/Frame%201545423142.png"
+                alt="Locally support"
+                width={68}
+                height={68}
+                className="h-[58px] w-auto md:h-[68px]"
+                priority
+              />
             </div>
             <h3 className="text-[19px] md:text-[24px] font-medium leading-tight tracking-[-0.01em] mb-1.5">{supportCopy.modalTitle}</h3>
             <p className="text-[11px] md:text-[13px] text-slate-500 leading-snug md:leading-relaxed mb-4 md:mb-5">
