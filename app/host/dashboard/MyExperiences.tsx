@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle, Users } from 'lucide-react';
+import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 
@@ -167,12 +167,20 @@ export default function MyExperiences() {
                   </div>
                 </div>
 
-                <div className="flex min-h-32 min-w-0 flex-1 flex-col rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-                  <h2 className="text-[14px] md:text-lg font-bold leading-snug text-slate-900 line-clamp-2">
+                <div className="flex h-32 min-w-0 flex-1 flex-col rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                  <h2 className="text-[13px] md:text-lg font-bold leading-[1.35] text-slate-900 line-clamp-2">
                     {exp.title}
                   </h2>
 
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] md:text-sm font-medium text-slate-500">
+                    <span>{getCityLabel(exp.city)}</span>
+                    <span className="text-slate-300">·</span>
+                    <span>{formatDuration(exp.duration)}</span>
+                    <span className="text-slate-300">·</span>
+                    <span>{t('label_max_guests')} {formatMaxGuests(exp.max_guests)}</span>
+                  </div>
+
+                  <div className="mt-auto rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                     <div className="flex items-end justify-between gap-3">
                       <div>
                         <p className="text-[10px] md:text-xs font-semibold text-slate-400">
@@ -190,21 +198,6 @@ export default function MyExperiences() {
                           {exp.bookings?.[0]?.count || 0}{t('exp_count_unit')}
                         </p>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex-1 space-y-1.5 text-[11px] md:text-sm text-slate-600">
-                    <div className="flex items-center gap-1.5 rounded-lg bg-white/80 px-2.5 py-1.5">
-                      <MapPin size={12} className="shrink-0 text-slate-400" />
-                      <span className="truncate">{getCityLabel(exp.city)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 rounded-lg bg-white/80 px-2.5 py-1.5">
-                      <Clock size={12} className="shrink-0 text-slate-400" />
-                      <span>{formatDuration(exp.duration)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 rounded-lg bg-white/80 px-2.5 py-1.5">
-                      <Users size={12} className="shrink-0 text-slate-400" />
-                      <span>{t('label_max_guests')} · {formatMaxGuests(exp.max_guests)}</span>
                     </div>
                   </div>
                 </div>
