@@ -95,7 +95,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
               <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">호스트 소개</h2>
               <div className="prose prose-slate max-w-none">
                 <p className="text-base md:text-lg leading-relaxed text-slate-700">
-                  {profile?.introduction || "아직 자기소개가 없습니다."}
+                  {profile?.introduction || profile?.bio || "아직 자기소개가 없습니다."}
                 </p>
                 {/* 여기에 아까 만든 HostProfileCard의 상세 정보(직업, 취미 등)를 다시 보여줄 수도 있습니다. */}
               </div>

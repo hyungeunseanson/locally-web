@@ -5,6 +5,15 @@
 
 ---
 
+## v3.37.44 — [Public User Profile] 자기소개 fallback 보정
+
+**작업일:** 2026-03-09
+
+| 항목 | 내용 |
+|------|------|
+| 🟡 공개 프로필 소개 누락 완화 | `/users/[id]` 공개 유저 프로필이 `introduction`만 보던 경로에 `bio` fallback을 추가해, `bio`만 저장된 사용자도 소개가 비어 보이지 않도록 보정 |
+| ✅ 검증 | `npx tsc --noEmit` 통과. `git diff --check` 통과 |
+
 ## v3.37.43 — [Host Dashboard] 생년월일 읽기 경로 보정
 
 **작업일:** 2026-03-09
