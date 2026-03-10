@@ -16,6 +16,8 @@ import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
 import { ExperienceDetail, HostProfileDetail } from './types';
+import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
+import { getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
 
 type AuthUser = {
   id?: string;
@@ -43,7 +45,7 @@ export default function ExperienceClient({
   const router = useRouter();
   const params = useParams();
   const { createInquiry } = useChat();
-  const { lang } = useLanguage(); // 🟢 현재 언어 (LanguageContext는 lang 제공)
+  const { lang, t } = useLanguage(); // 🟢 현재 언어 (LanguageContext는 lang 제공)
 
   const experienceId = params?.id as string;
   const { isSaved, toggleWishlist, isLoading: isSaveLoading } = useWishlist(experienceId);
@@ -62,19 +64,28 @@ export default function ExperienceClient({
   // 🟢 [핵심] 제목을 언어에 맞춰서 변환!
   const translatedTitle = getContent(experience, 'title', lang);
   const translatedDescription = getContent(experience, 'description', lang);
-  const category = getContent(experience, 'category', lang) || experience.category || '문화 체험';
-  const meetingPoint = getLocalizedExperienceText(experience, 'meeting_point', lang) || experience.location || 'Locally';
-  const compactLocation = [experience.city, experience.subCity].filter(Boolean).map(s => String(s).trim()).filter(Boolean).join(', ') || meetingPoint?.split(',')?.[0]?.trim() || 'Locally';
+  const category = getContent(experience, 'category', lang) || experience.category || t('cat_exp');
+  const meetingPoint = getLocalizedExperienceText(experience, 'meeting_point', lang) || experience.location || t('exp_card_location_fallback');
+  const compactLocation =
+    formatLocalizedExperienceLocation(
+      {
+        city: experience.city,
+        subCity: experience.subCity,
+        country: typeof experience.country === 'string' ? experience.country : null,
+        location: meetingPoint?.split(',')?.[0]?.trim() || experience.location,
+      },
+      lang
+    ) || t('exp_card_location_fallback');
   const headerLabel = `${compactLocation} · ${category}`;
   const addressLine = experience.location || compactLocation;
-  const hostJob = hostProfile?.job?.trim() || '로컬리 호스트';
+  const hostJob = hostProfile?.job?.trim() || t('exp_host_default_job');
   const hostLanguages = Array.isArray(hostProfile?.languages)
-    ? Array.from(new Set(hostProfile.languages.map((language) => String(language).trim()).filter(Boolean)))
+    ? Array.from(new Set(hostProfile.languages.map((language) => getLocalizedLanguageLabel(String(language).trim(), lang)).filter(Boolean)))
     : [];
   const hostLanguageSummary = hostLanguages.length > 0 ? hostLanguages.join(', ') : '';
   const desktopHostMeta = [hostJob, hostLanguageSummary].filter(Boolean).join('  |  ');
   const ratingValue = Number(experience.rating || 0);
-  const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : 'New';
+  const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : t('exp_card_new');
   const reviewCount = Number(experience.review_count || 0);
 
   // 🟢 체험 상세페이지 진입 시 조회(view) 이벤트 기록
@@ -103,34 +114,34 @@ export default function ExperienceClient({
 
   const handleInquiry = async (): Promise<boolean> => {
     if (!user) {
-      showToast('로그인이 필요합니다.', 'error');
+      showToast(t('login_required'), 'error');
       return false;
     }
     if (!inquiryText.trim()) {
-      showToast('내용을 입력해주세요.', 'error');
+      showToast(t('exp_detail_message_required'), 'error');
       return false;
     }
 
     try {
       if (!experience?.host_id) {
-        showToast('호스트 정보를 불러올 수 없습니다.', 'error');
+        showToast(t('exp_detail_host_missing'), 'error');
         return false;
       }
       await createInquiry(experience.host_id, String(experience.id), inquiryText);
-      showToast('메시지가 발송되었습니다.', 'success');
+      showToast(t('exp_detail_message_sent'), 'success');
       setInquiryText('');
       return true;
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.';
-      showToast('문의 전송 실패: ' + message, 'error');
+      const message = e instanceof Error ? e.message : t('exp_detail_unknown_error');
+      showToast(t('exp_detail_message_failed', { message }), 'error');
       return false;
     }
   };
 
   const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean) => {
-    if (!user) return showToast("로그인이 필요합니다.", 'error');
-    if (!date) return showToast("날짜를 선택해주세요.", 'error');
-    if (!time) return showToast("시간을 선택해주세요.", 'error');
+    if (!user) return showToast(t('login_required'), 'error');
+    if (!date) return showToast(t('exp_detail_select_date'), 'error');
+    if (!time) return showToast(t('exp_detail_select_time'), 'error');
 
     // 🟢 결제하기 버튼 클릭 기록 (퍼널 2단계: 클릭)
     supabase.from('analytics_events').insert([{
@@ -145,7 +156,7 @@ export default function ExperienceClient({
     router.push(`/experiences/${experienceId}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
   };
 
-  if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">체험을 찾을 수 없습니다.</div>;
+  if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">{t('exp_detail_not_found')}</div>;
 
   const heroPhotos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
@@ -163,7 +174,7 @@ export default function ExperienceClient({
       {isCopySuccess && (
         <div className="fixed left-1/2 top-[74px] z-50 flex max-w-[calc(100vw-28px)] -translate-x-1/2 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full bg-black px-4 py-2 text-[11px] font-medium text-white shadow-lg animate-in fade-in slide-in-from-top-2 md:top-24 md:gap-2 md:px-6 md:py-3 md:text-sm">
           <Check size={14} className="shrink-0 text-green-400 md:h-4 md:w-4" />
-          <span>링크가 복사되었습니다.</span>
+          <span>{t('exp_detail_link_copied')}</span>
         </div>
       )}
 
@@ -177,10 +188,10 @@ export default function ExperienceClient({
         </button>
         <p className="absolute left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500 truncate max-w-[58%]">{headerLabel}</p>
         <div className="flex items-center gap-1">
-          <button onClick={handleShare} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button onClick={handleShare} aria-label={t('trip_share')} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <Share size={16} className="text-slate-900" />
           </button>
-          <button onClick={toggleWishlist} disabled={isSaveLoading} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button onClick={toggleWishlist} aria-label={t('exp_card_wishlist_toggle')} disabled={isSaveLoading} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
           </button>
         </div>
@@ -215,7 +226,7 @@ export default function ExperienceClient({
             onClick={(e) => { e.stopPropagation(); setIsGalleryOpen(true); }}
             className="absolute bottom-6 right-6 bg-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-black/10 flex items-center gap-2 hover:scale-105 transition-transform z-10"
           >
-            <Grid size={16} /> 사진 모두 보기
+            <Grid size={16} /> {t('exp_detail_gallery_view_all')}
           </button>
         </section>
 
@@ -225,11 +236,11 @@ export default function ExperienceClient({
               <h1 className="text-[40px] leading-[1.15] font-black tracking-tight text-slate-900">{translatedTitle}</h1>
               <div className="flex shrink-0 gap-2 pt-1">
                 <button onClick={handleShare} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
-                  <Share size={16} /> 공유하기
+                  <Share size={16} /> {t('trip_share')}
                 </button>
                 <button onClick={toggleWishlist} disabled={isSaveLoading} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg text-sm font-semibold underline decoration-1">
                   <Heart size={16} fill={isSaved ? '#F43F5E' : 'none'} className={isSaved ? 'text-rose-500' : 'text-slate-900'} />
-                  {isSaved ? '저장됨' : '저장'}
+                  {isSaved ? t('si_saved') : t('si_save')}
                 </button>
               </div>
             </div>
@@ -238,7 +249,7 @@ export default function ExperienceClient({
             <div className="mt-5 flex flex-wrap items-center gap-3 text-sm font-medium text-slate-800">
               <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
                 <span className="font-bold">★ {ratingText}</span>
-                {reviewCount > 0 && <span className="text-slate-500 underline">후기 {reviewCount}개</span>}
+                {reviewCount > 0 && <span className="text-slate-500 underline">{t('exp_detail_reviews_count', { count: reviewCount })}</span>}
               </button>
             </div>
             <p className="mt-3 text-[15px] text-slate-500">{headerLabel}</p>
@@ -256,7 +267,7 @@ export default function ExperienceClient({
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-[18px] font-semibold truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
+                <p className="text-[18px] font-semibold truncate">{t('exp_detail_host_line', { name: hostProfile?.name || t('exp_detail_host_default_name') })}</p>
                 {desktopHostMeta && (
                   <p className="mt-1 text-[14px] text-slate-500 truncate">{desktopHostMeta}</p>
                 )}
@@ -308,7 +319,7 @@ export default function ExperienceClient({
               <span>{ratingText}</span>
               <span className="text-slate-300">·</span>
               <button onClick={() => scrollToSection('reviews')} className="underline underline-offset-2">
-                후기 {reviewCount}개
+                {t('exp_detail_reviews_count', { count: reviewCount })}
               </button>
             </div>
           </div>
@@ -325,7 +336,7 @@ export default function ExperienceClient({
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-medium truncate">호스트: {hostProfile?.name || 'Locally Host'} 님</p>
+                <p className="text-[13px] font-medium truncate">{t('exp_detail_host_line', { name: hostProfile?.name || t('exp_detail_host_default_name') })}</p>
                 <p className="text-[12px] text-slate-500 truncate">{hostJob}</p>
                 {hostLanguageSummary && (
                   <p className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400 truncate">
@@ -379,7 +390,7 @@ export default function ExperienceClient({
         <div className="fixed inset-0 z-[150] bg-white animate-in fade-in duration-200 flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <button onClick={() => setIsGalleryOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button>
-            <h3 className="font-bold text-lg">사진 모두 보기</h3>
+            <h3 className="font-bold text-lg">{t('exp_detail_gallery_title')}</h3>
             <div className="w-10"></div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 md:p-10 bg-slate-50">

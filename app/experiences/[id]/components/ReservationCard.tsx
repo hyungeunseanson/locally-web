@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 interface ReservationCardProps {
   price: number;
@@ -20,6 +21,7 @@ export default function ReservationCard({
   duration, availableDates, dateToTimeMap, onReserve, 
   maxGuests = 10, remainingSeatsMap = {} 
 }: ReservationCardProps) {
+  const { t } = useLanguage();
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState("");
@@ -46,8 +48,11 @@ export default function ReservationCard({
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    return `${date.getMonth() + 1}월 ${date.getDate()}일 (${days[date.getDay()]})`;
+    return t('exp_reservation_date_display', {
+      month: t(`month_${date.getMonth() + 1}`),
+      day: date.getDate(),
+      weekday: t(`day_${date.getDay()}`),
+    });
   };
   const calculateEndTime = (startTime: string) => {
     if (!startTime) return '';
@@ -90,7 +95,7 @@ export default function ReservationCard({
       <div className="flex justify-between items-end mb-5">
         <div>
           <span className="text-xl md:text-2xl font-semibold">₩{isPrivate ? privatePrice.toLocaleString() : price.toLocaleString()}</span> 
-          <span className="text-slate-500 text-xs md:text-sm"> {isPrivate ? '/ 팀 (단독)' : '/ 인'}</span>
+          <span className="text-slate-500 text-xs md:text-sm"> {isPrivate ? t('exp_reservation_price_team_private') : t('exp_reservation_price_per_person')}</span>
         </div>
       </div>
 
@@ -99,11 +104,11 @@ export default function ReservationCard({
         <div className="p-3.5 md:p-4 border-b border-slate-200 bg-white">
           <div className="flex justify-between items-center mb-3">
             <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}><ChevronLeft size={16}/></button>
-            <span className="font-semibold text-xs md:text-sm">{currentDate.getFullYear()}년 {currentDate.getMonth()+1}월</span>
+            <span className="font-semibold text-xs md:text-sm">{t('exp_reservation_calendar_header', { year: currentDate.getFullYear(), month: t(`month_${currentDate.getMonth() + 1}`) })}</span>
             <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}><ChevronRight size={16}/></button>
           </div>
           <div className="grid grid-cols-7 text-center mb-2">
-            {['일','월','화','수','목','금','토'].map(d=><span key={d} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{d}</span>)}
+            {[0, 1, 2, 3, 4, 5, 6].map((day) => <span key={day} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{t(`day_${day}`)}</span>)}
           </div>
           <div className="grid grid-cols-7 gap-y-1 justify-items-center">
             {renderCalendar()}
@@ -114,10 +119,10 @@ export default function ReservationCard({
         <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
           <div className="flex flex-col w-full">
             <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-bold uppercase text-slate-800">인원</span>
+              <span className="text-[10px] font-bold uppercase text-slate-800">{t('exp_reservation_guest_count')}</span>
               {selectedTime && (
                 <span className="text-[10px] text-rose-500 font-bold">
-                  {remainingSeats <= 0 ? '매진' : remainingSeats <= 3 ? `${remainingSeats}자리 남음` : ''}
+                  {remainingSeats <= 0 ? t('exp_reservation_sold_out') : remainingSeats <= 3 ? t('exp_reservation_seats_left', { count: remainingSeats }) : ''}
                 </span>
               )}
             </div>
@@ -127,15 +132,15 @@ export default function ReservationCard({
               onChange={(e)=>setGuestSelection(e.target.value)} 
               className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
             >
-              <optgroup label="일반 예약">
+              <optgroup label={t('exp_reservation_regular_booking')}>
                 {/* 🟢 남은 자리까지만 선택 가능하게 제한 (최대 6명 UI 제한 유지) */}
                 {Array.from({ length: Math.min(maxSelectable, 6) }, (_, i) => i + 1).map(n => (
-                  <option key={n} value={String(n)}>게스트 {n}명</option>
+                  <option key={n} value={String(n)}>{t('exp_reservation_guest_option', { count: n })}</option>
                 ))}
               </optgroup>
               {isPrivateEnabled && (
-                <optgroup label="프라이빗 옵션">
-                  <option value="private">🔒 단독 투어 (우리끼리만)</option>
+                <optgroup label={t('exp_reservation_private_option')}>
+                  <option value="private">{t('exp_reservation_private_option_label')}</option>
                 </optgroup>
               )}
             </select>
@@ -146,7 +151,7 @@ export default function ReservationCard({
       {/* 시간 선택 */}
       {selectedDate && (
         <div className="mb-4 animate-in fade-in zoom-in-95 duration-200">
-          <p className="text-[11px] md:text-xs font-semibold text-slate-500 mb-2">시간 선택 ({formatDateDisplay(selectedDate)})</p>
+          <p className="text-[11px] md:text-xs font-semibold text-slate-500 mb-2">{t('exp_reservation_time_select', { date: formatDateDisplay(selectedDate) })}</p>
           <div className="grid grid-cols-2 gap-2">
             {dateToTimeMap[selectedDate]?.map(time => {
               // 🟢 시간대별 잔여석 확인 및 매진 처리
@@ -166,16 +171,16 @@ export default function ReservationCard({
                 >
                   <span>{time}</span>
                   <span className={`text-[10px] md:text-[10px] font-normal ${selectedTime === tClean ? 'text-slate-300' : 'text-slate-400'}`}>
-                    {tSeats <= 0 ? '매진' : `~ ${calculateEndTime(time)}`} 
+                    {tSeats <= 0 ? t('exp_reservation_sold_out') : t('exp_reservation_end_time_prefix', { time: calculateEndTime(time) })}
                     {/* 🟢 5석 이하 시 강조 */}
-                    {tSeats > 0 && tSeats <= 5 && <span className="ml-1 text-rose-500">({tSeats}석)</span>}
+                    {tSeats > 0 && tSeats <= 5 && <span className="ml-1 text-rose-500">{t('exp_reservation_remaining_short', { count: tSeats })}</span>}
                   </span>
                 </button>
               );
             })}
           </div>
           {(!dateToTimeMap[selectedDate] || dateToTimeMap[selectedDate].length === 0) && (
-            <div className="text-center text-xs text-slate-400 py-4 bg-slate-50 rounded-lg">예약 가능한 시간이 없습니다.</div>
+            <div className="text-center text-xs text-slate-400 py-4 bg-slate-50 rounded-lg">{t('exp_reservation_time_empty')}</div>
           )}
         </div>
       )}
@@ -188,8 +193,8 @@ export default function ReservationCard({
               {isSoloGuaranteed && <Check size={12} className="text-white" strokeWidth={4}/>}
             </div>
             <div>
-              <div className="font-semibold text-[13px] md:text-sm mb-1">1인 출발 확정 옵션</div>
-              <div className="text-[11px] md:text-xs text-slate-500 leading-tight">최소 인원 미달 시에도 취소 없이 출발합니다. <br/><span className="text-rose-500 font-semibold">*추가 인원 모객 시 자동 환불</span></div>
+              <div className="font-semibold text-[13px] md:text-sm mb-1">{t('exp_reservation_solo_option_title')}</div>
+              <div className="text-[11px] md:text-xs text-slate-500 leading-tight">{t('exp_reservation_solo_option_desc')} <br/><span className="text-rose-500 font-semibold">{t('exp_reservation_solo_option_refund_note')}</span></div>
               <div className="font-semibold text-[13px] md:text-sm mt-2 text-slate-900">+ ₩{SOLO_GUARANTEE_PRICE.toLocaleString()}</div>
             </div>
           </div>
@@ -197,18 +202,18 @@ export default function ReservationCard({
       )}
 
       <button onClick={() => onReserve(selectedDate, selectedTime, guestCount, isPrivate)} className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4">
-        {isPrivate ? '단독 투어 예약하기' : '예약하기'}
+        {isPrivate ? t('exp_reservation_book_private') : t('exp_reservation_book_shared')}
       </button>
       
       <div className="space-y-2 pt-4 border-t border-slate-100 text-[12px] md:text-sm">
         <div className="flex justify-between text-slate-600">
-          <span className="underline">{isPrivate ? '프라이빗 단독 요금' : `₩${price.toLocaleString()} x ${guestCount}명`}</span>
+          <span className="underline">{isPrivate ? t('exp_reservation_private_rate') : t('exp_reservation_guest_rate', { price: price.toLocaleString(), count: guestCount })}</span>
           <span>₩{basePrice.toLocaleString()}</span>
         </div>
-        {!isPrivate && guestCount === 1 && isSoloGuaranteed && <div className="flex justify-between text-slate-600"><span className="underline">1인 출발 확정비</span><span>₩{optionPrice.toLocaleString()}</span></div>}
+        {!isPrivate && guestCount === 1 && isSoloGuaranteed && <div className="flex justify-between text-slate-600"><span className="underline">{t('exp_reservation_solo_fee')}</span><span>₩{optionPrice.toLocaleString()}</span></div>}
       </div>
       
-      <div className="flex justify-between font-semibold pt-4 border-t border-slate-100 mt-4 text-base md:text-lg"><span>총 합계</span><span>₩{totalPrice.toLocaleString()}</span></div>
+      <div className="flex justify-between font-semibold pt-4 border-t border-slate-100 mt-4 text-base md:text-lg"><span>{t('exp_reservation_total')}</span><span>₩{totalPrice.toLocaleString()}</span></div>
     </div>
   );
 }

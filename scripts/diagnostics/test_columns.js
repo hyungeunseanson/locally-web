@@ -1,8 +1,7 @@
-const fs = require('fs');
+require('./loadEnv.cjs');
 
-const envFile = fs.readFileSync('.env.local', 'utf8');
-const SUPABASE_URL = envFile.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/)[1];
-const SUPABASE_KEY = envFile.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)/)[1];
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 async function checkColumns() {
     console.log('--- Checking host_applications columns ---');

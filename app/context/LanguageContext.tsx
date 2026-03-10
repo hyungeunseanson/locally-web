@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { experienceUiDictionary } from './experienceUiDictionary';
 
 type Locale = 'ko' | 'en' | 'ja' | 'zh';
 const SUPPORTED_LOCALES: Locale[] = ['ko', 'en', 'ja', 'zh'];
@@ -3563,10 +3564,18 @@ const dictionary: Record<Locale, Record<string, string>> = {
 type LanguageContextValue = {
   lang: Locale;
   setLang: (newLang: Locale) => void;
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+const interpolate = (template: string, vars?: Record<string, string | number>) => {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (_, token: string) => {
+    const value = vars[token];
+    return value === undefined || value === null ? `{${token}}` : String(value);
+  });
+};
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Locale>('ko');
@@ -3600,8 +3609,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     persistLocale(newLang);
   };
 
-  const t = (key: string) => {
-    return dictionary[lang]?.[key] || key;
+  const t = (key: string, vars?: Record<string, string | number>) => {
+    const template = dictionary[lang]?.[key] ?? experienceUiDictionary[lang]?.[key] ?? key;
+    return interpolate(template, vars);
   };
 
   return (

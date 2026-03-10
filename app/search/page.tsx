@@ -32,6 +32,7 @@ import {
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
+import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 
 interface SearchExperience {
   id: string;
@@ -210,7 +211,7 @@ function SearchResults() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
 
   const [experiences, setExperiences] = useState<SearchExperience[]>([]);
   const [loading, setLoading] = useState(true);
@@ -381,9 +382,13 @@ function SearchResults() {
       item.photos?.[0] ||
       item.image_url ||
       'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=800&q=80';
-    const title = getContent(item, 'title', lang) || '로컬 체험';
-    const city = item.city || location || '도쿄';
-    const rating = item.rating && item.rating > 0 ? item.rating.toFixed(2) : '4.99';
+    const title = getContent(item, 'title', lang) || t('exp_card_title_fallback');
+    const city =
+      formatLocalizedExperienceLocation(
+        { city: item.city, country: item.country, location: location || undefined },
+        lang
+      ) || t('exp_card_location_fallback');
+    const rating = item.rating && item.rating > 0 ? item.rating.toFixed(2) : t('exp_card_new');
     const rawPrice = typeof item.price === 'number' ? item.price : Number(item.price);
     const price = Number.isFinite(rawPrice) ? Number(rawPrice).toLocaleString() : '45,000';
 
@@ -391,15 +396,20 @@ function SearchResults() {
       <Link key={item.id} href={`/experiences/${item.id}`} className="w-[168px] shrink-0">
         <div className="relative w-full aspect-[0.95] rounded-[16px] overflow-hidden bg-slate-200">
           <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
-          <button className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/20 backdrop-blur-[1px] border border-white/70 flex items-center justify-center">
+          <button
+            className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/20 backdrop-blur-[1px] border border-white/70 flex items-center justify-center"
+            aria-label={t('exp_card_wishlist_toggle')}
+          >
             <Heart size={16} className="text-white" />
           </button>
         </div>
         <div className="pt-2">
           <p className="text-[11px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
-          <p className="mt-0.5 text-[11px] text-[#6B6B6B] line-clamp-1">{city} · 6시간</p>
+          <p className="mt-0.5 text-[11px] text-[#6B6B6B] line-clamp-1">
+            {city} · {t('exp_card_duration_hours', { hours: 6 })}
+          </p>
           <p className="mt-0.5 text-[11px] text-[#3E3E3E]">
-            1인당 <span className="font-semibold">₩{price}부터</span> · ★ {rating}
+            {t('exp_card_per_person')} <span className="font-semibold">₩{price}{t('exp_card_price_from')}</span> · ★ {rating}
           </p>
         </div>
       </Link>

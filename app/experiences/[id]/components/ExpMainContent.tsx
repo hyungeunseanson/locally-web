@@ -9,8 +9,9 @@ import HostProfileSection from './HostProfileSection';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { ExperienceDetail, ExperienceItineraryItem, HostProfileDetail } from '../types';
-import { formatLanguageLevelSummary, normalizeLanguageLevels } from '@/app/utils/languageLevels';
+import { formatLanguageLevelSummary, getLocalizedLanguageLabel, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 import {
+  getLocalizedActivityLevelLabel,
   getLocalizedExperienceItinerary,
   getLocalizedExperienceList,
   getLocalizedExperienceRules,
@@ -31,7 +32,7 @@ type MainContentProps = {
 export default function ExpMainContent({
   experience, hostProfile, handleInquiry, inquiryText, setInquiryText, translatedDescription, translatedCategory
 }: MainContentProps) {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const fixedRefundPolicy = getLocalizedRefundPolicyLabel(lang);
   const { showToast } = useToast();
   const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
@@ -48,14 +49,6 @@ export default function ExpMainContent({
   const heroPhotos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
-  const mapLanguageLabel = (language: string) => {
-    const normalized = language.toLowerCase();
-    if (normalized.includes('english') || normalized.includes('영어')) return '영어';
-    if (normalized.includes('korean') || normalized.includes('한국어')) return '한국어';
-    if (normalized.includes('japanese') || normalized.includes('일본어')) return '일본어';
-    if (normalized.includes('chinese') || normalized.includes('중국어')) return '중국어';
-    return language;
-  };
   const rawLanguages = Array.isArray(experience.languages) && experience.languages.length > 0
     ? experience.languages
     : Array.isArray(hostProfile?.languages)
@@ -64,18 +57,20 @@ export default function ExpMainContent({
   const experienceLanguageLevels = normalizeLanguageLevels(experience.language_levels, experience.languages, 3);
   const normalizedLanguages = rawLanguages.length > 0
     ? rawLanguages
-      .map((language) => mapLanguageLabel(String(language)))
+      .map((language) => getLocalizedLanguageLabel(String(language), lang))
       .filter(Boolean)
     : [];
+  const languageJoiner = lang === 'ko' ? ' 및 ' : lang === 'ja' ? '・' : lang === 'zh' ? '、' : ', ';
   const languageText = experienceLanguageLevels.length > 0
-    ? `${formatLanguageLevelSummary(experienceLanguageLevels)}로 진행되는 체험입니다.`
+    ? t('exp_language_summary_levels', { summary: formatLanguageLevelSummary(experienceLanguageLevels, lang) })
     : normalizedLanguages.length > 0
-    ? `${Array.from(new Set(normalizedLanguages)).join(' 및 ')}로 진행되는 체험입니다.`
-    : '영어 및 한국어로 진행되는 체험입니다.';
+    ? t('exp_language_summary_list', { summary: Array.from(new Set(normalizedLanguages)).join(languageJoiner) })
+    : t('exp_language_summary_default');
+  const activityLevel = getLocalizedActivityLevelLabel(rules.activity_level || '보통', lang);
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(copyTarget);
-    showToast('주소가 복사되었습니다.', 'success');
+    showToast(t('trip_copy_address_done'), 'success');
   };
 
   const openHostMessage = () => {
@@ -94,7 +89,7 @@ export default function ExpMainContent({
     <div className="flex-1 space-y-8 md:space-y-14">
       {/* 체험 내용 */}
       <div className="border-b border-slate-200 pb-8 md:pb-10">
-        <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-5">체험 내용</h3>
+        <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-5">{t('exp_content_title')}</h3>
         <div className="space-y-4">
           {itinerary.length > 0 ? itinerary.map((item, idx: number) => {
             const imageSrc = item?.image_url || heroPhotos[idx % heroPhotos.length];
@@ -106,7 +101,7 @@ export default function ExpMainContent({
                   </div>
                 </div>
                 <div className="min-h-[72px] md:min-h-[100px] flex-1 flex flex-col justify-center overflow-hidden">
-                  <h4 className="text-[12px] md:text-[15px] font-medium leading-[1.3] mb-1">{item?.title || `코스 ${idx + 1}`}</h4>
+                  <h4 className="text-[12px] md:text-[15px] font-medium leading-[1.3] mb-1">{item?.title || t('exp_itinerary_fallback_title', { index: idx + 1 })}</h4>
                   <p className="text-[11px] md:text-[13px] leading-[1.45] text-slate-500 whitespace-pre-wrap line-clamp-4">{item?.description || ''}</p>
                 </div>
               </div>
@@ -128,7 +123,7 @@ export default function ExpMainContent({
 
       {/* 만나는 장소 */}
       <div id="location" className="border-b border-slate-200 pb-8 md:pb-10 scroll-mt-24">
-        <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-3">만나는 장소</h3>
+        <h3 className="text-[18px] md:text-[27px] font-semibold tracking-[-0.01em] mb-3">{t('exp_location_title')}</h3>
         {meetingPoint ? (
           <p className="text-[12px] md:text-[15px] text-slate-700 font-medium mb-1">{meetingPoint}</p>
         ) : null}
@@ -159,7 +154,7 @@ export default function ExpMainContent({
             onClick={handleCopyAddress}
             className="absolute bottom-4 left-4 bg-slate-900/90 text-white px-4 py-2 rounded-full text-[13px] font-bold items-center gap-1.5 hidden md:flex"
           >
-            <Copy size={13} /> 주소 복사
+            <Copy size={13} /> {t('exp_copy_address')}
           </button>
         </div>
       </div>
@@ -167,30 +162,33 @@ export default function ExpMainContent({
       {/* 자기소개 */}
       <HostProfileSection
         hostId={experience.host_id}
-        name={hostProfile?.name || 'Locally Host'}
+        name={hostProfile?.name || t('exp_detail_host_default_name')}
         avatarUrl={hostProfile?.avatar_url}
         reviewCount={hostProfile?.review_count}
         rating={hostProfile?.rating}
-        job={hostProfile?.job || "로컬리 호스트"}
-        dreamDestination={hostProfile?.dream_destination || "여행"}
-        favoriteSong={hostProfile?.favorite_song || "음악"}
+        job={hostProfile?.job}
+        dreamDestination={hostProfile?.dream_destination}
+        favoriteSong={hostProfile?.favorite_song}
         languages={hostProfile?.languages || []}
-        intro={hostProfile?.introduction || hostProfile?.bio || "안녕하세요! 로컬리 호스트입니다."}
+        intro={hostProfile?.introduction || hostProfile?.bio}
         joinedYear={hostProfile?.joined_year}
-        category={translatedCategory || experience.category || '문화 체험'}
+        category={translatedCategory || experience.category || t('cat_exp')}
         onMessageHost={openHostMessage}
       />
 
       {/* 알아두어야 할 사항 */}
       <div className="pt-8 pb-12 border-t border-slate-200">
-        <h3 className="text-[20px] md:text-[30px] font-semibold tracking-[-0.01em] mb-5">알아두어야 할 사항</h3>
+        <h3 className="text-[20px] md:text-[30px] font-semibold tracking-[-0.01em] mb-5">{t('exp_things_to_know_title')}</h3>
         <div className="space-y-5">
           <div className="flex gap-3">
             <Users size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">게스트 필수조건</h4>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_guest_requirements')}</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
-                {rules.age_limit || '14세 이상'} 게스트만 참가할 수 있습니다. 최대 인원은 {experience.max_guests || 10}명입니다.
+                {t('exp_guest_requirements_body', {
+                  ageLimit: rules.age_limit || '14+',
+                  maxGuests: experience.max_guests || 10,
+                })}
               </p>
             </div>
           </div>
@@ -198,9 +196,9 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <PersonStanding size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">활동 강도</h4>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_activity_level')}</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
-                신체 활동 강도: {rules.activity_level || '보통'}
+                {t('exp_activity_level_body', { level: activityLevel })}
               </p>
             </div>
           </div>
@@ -208,11 +206,11 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <CheckCircle2 size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">포함 사항</h4>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_included')}</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {inclusions.length > 0
                   ? inclusions.join(', ')
-                  : '현장 안내를 참고해주세요.'}
+                  : t('exp_included_fallback')}
               </p>
             </div>
           </div>
@@ -220,11 +218,11 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <X size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">불포함 사항</h4>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_excluded')}</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {exclusions.length > 0
                   ? exclusions.join(', ')
-                  : '별도 구매가 필요한 항목은 현장에서 안내됩니다.'}
+                  : t('exp_excluded_fallback')}
               </p>
             </div>
           </div>
@@ -232,9 +230,9 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <Backpack size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">준비물</h4>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_supplies')}</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
-                {supplies || '편한 복장과 개인 물품을 준비해주세요.'}
+                {supplies || t('exp_supplies_fallback')}
               </p>
             </div>
           </div>
@@ -242,7 +240,7 @@ export default function ExpMainContent({
           <div className="flex gap-3">
             <CalendarX size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">환불 정책</h4>
+              <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_refund_policy')}</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
                 {fixedRefundPolicy}
               </p>
@@ -262,21 +260,18 @@ export default function ExpMainContent({
           >
             <div className="mb-1 flex justify-end">
               <button onClick={() => setIsMessageModalOpen(false)} className="rounded-full p-1.5 text-slate-600 transition-colors hover:bg-slate-100">
-                <span className="sr-only">닫기</span>
+                <span className="sr-only">{t('common_close')}</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
-            <h3 className="mb-1.5 text-[18px] font-medium leading-tight tracking-[-0.01em] md:text-[24px]">{hostProfile?.name || '호스트'}님에게 질문하기</h3>
-            <p className="mb-4 text-[11px] leading-snug text-slate-500 md:mb-5 md:text-[13px] md:leading-relaxed">
-              이 체험에 대해 자세히 알아보려면 호스트에게
-              <span className="underline underline-offset-2 ml-1">메시지를 보내세요.</span>
-            </p>
+            <h3 className="mb-1.5 text-[18px] font-medium leading-tight tracking-[-0.01em] md:text-[24px]">{t('exp_message_modal_title', { name: hostProfile?.name || t('exp_detail_host_default_name') })}</h3>
+            <p className="mb-4 text-[11px] leading-snug text-slate-500 md:mb-5 md:text-[13px] md:leading-relaxed">{t('exp_message_modal_body')}</p>
             <textarea
               value={inquiryText}
               onChange={(e) => setInquiryText(e.target.value)}
-              placeholder="호스트에게 본인을 소개해 보세요."
+              placeholder={t('exp_message_modal_placeholder')}
               className="h-[108px] w-full resize-none rounded-[18px] border border-slate-300 bg-white px-3.5 py-3 text-[12px] font-normal text-slate-700 placeholder:text-slate-300 focus:border-slate-500 focus:outline-none md:h-[170px] md:rounded-2xl md:px-5 md:py-4 md:text-[14px]"
             />
             <div className="mt-4 md:mt-5">
@@ -289,7 +284,7 @@ export default function ExpMainContent({
                     : 'bg-[#111827] text-white'
                 }`}
               >
-                {isSubmittingMessage ? '전송 중...' : '메시지 보내기'}
+                {isSubmittingMessage ? t('exp_message_modal_sending') : t('exp_message_modal_send')}
               </button>
             </div>
           </div>

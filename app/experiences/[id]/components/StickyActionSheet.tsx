@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 type StickyActionSheetProps = {
     experience: {
@@ -10,6 +11,7 @@ type StickyActionSheetProps = {
 
 export default function StickyActionSheet({ experience }: StickyActionSheetProps) {
     const [isVisible, setIsVisible] = useState(true);
+    const { t } = useLanguage();
 
     // IntersectionObserver to hide the sticky bar when the actual ReservationCard is in view.
     useEffect(() => {
@@ -56,19 +58,19 @@ export default function StickyActionSheet({ experience }: StickyActionSheetProps
             <div className="flex justify-between items-center max-w-sm mx-auto rounded-full border border-slate-200 bg-white shadow-[0_12px_24px_rgba(15,23,42,0.12)] px-4 py-[11px]">
                 <div className="flex flex-col pl-1">
                     <span className="leading-none">
-                        <span className="text-[10px] text-slate-500 font-medium mr-1.5">1인당</span>
+                        <span className="text-[10px] text-slate-500 font-medium mr-1.5">{t('exp_card_per_person')}</span>
                         <span className="text-slate-900 font-semibold text-[15px]">
                             <span className="underline decoration-slate-700 underline-offset-[2px]">₩{Number(experience.price).toLocaleString()}</span>
-                            <span className="ml-1">부터</span>
+                            <span className="ml-1">{t('exp_card_price_from')}</span>
                         </span>
                     </span>
-                    <span className="text-[#E00B41] font-medium text-[10px] tracking-tight mt-[3px]">7일 전 취소 시 수수료 없음</span>
+                    <span className="text-[#E00B41] font-medium text-[10px] tracking-tight mt-[3px]">{t('exp_reservation_free_cancel_note')}</span>
                 </div>
                 <button
                     onClick={handleBookingClick}
                     className="bg-[#E5006D] text-white min-w-[102px] px-4 py-2 rounded-full text-[13px] font-semibold hover:scale-[1.02] transition-transform shadow-[0_4px_10px_rgba(229,0,109,0.3)]"
                 >
-                    날짜 표시
+                    {t('exp_reservation_show_dates')}
                 </button>
             </div>
         </div>

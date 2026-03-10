@@ -166,3 +166,30 @@ openssl rand -hex 32
 - 평소에는 자동 실행에 맡깁니다.
 - 번역이 안 된 것 같으면 GitHub `Actions`에서 직접 `Run workflow` 누릅니다.
 - 헷갈리면 그냥 `repeat_count=5`로 실행하면 됩니다.
+
+---
+
+## 10. 남은 작업 한 줄로 보는 SQL
+
+`Supabase -> SQL Editor`에서 이 한 줄만 실행하면 됩니다.
+
+```sql
+select count(*) as remaining_tasks from public.experience_translation_tasks where status in ('queued','retryable','leased','processing');
+```
+
+- `0`이면 지금 남아 있는 번역 작업이 없습니다.
+- `1` 이상이면 아직 처리 안 끝난 작업이 있다는 뜻입니다.
+
+---
+
+## 11. 수동으로 다시 queue에 올려야 하는 경우
+
+- `queued`, `retryable`, `leased`, `processing`:
+  - 아직 살아 있는 작업입니다
+  - 그냥 나중에 workflow를 다시 돌리면 됩니다
+- `failed`:
+  - DB에는 남아 있지만 active queue에서는 빠진 상태입니다
+  - 이때만 SQL로 다시 `queued`로 바꿔줘야 합니다
+
+즉, 매번 수동으로 다시 올리는 건 아닙니다.
+`failed`일 때만 다시 올리면 됩니다.

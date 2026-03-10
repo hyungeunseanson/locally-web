@@ -10,13 +10,23 @@ import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import Spinner from '@/app/components/ui/Spinner';
+import { getContent } from '@/app/utils/contentHelper';
+import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 
 interface WishlistExperience {
   id: number;
   title: string;
+  title_en?: string | null;
+  title_ja?: string | null;
+  title_zh?: string | null;
   city?: string | null;
+  country?: string | null;
+  subCity?: string | null;
   location?: string | null;
   category?: string | null;
+  category_en?: string | null;
+  category_ja?: string | null;
+  category_zh?: string | null;
   rating?: number | null;
   price?: number | string | null;
   image_url?: string | null;
@@ -45,9 +55,17 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
         experiences: {
           id: exp.id,
           title: exp.title,
+          title_en: exp.title_en ?? null,
+          title_ja: exp.title_ja ?? null,
+          title_zh: exp.title_zh ?? null,
           city: exp.city ?? null,
+          country: exp.country ?? null,
+          subCity: exp.subCity ?? null,
           location: exp.location ?? null,
           category: exp.category ?? null,
+          category_en: exp.category_en ?? null,
+          category_ja: exp.category_ja ?? null,
+          category_zh: exp.category_zh ?? null,
           rating: exp.rating ?? null,
           price: exp.price ?? null,
           image_url: exp.image_url ?? null,
@@ -59,7 +77,7 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
 };
 
 export default function WishlistsPage() {
-  const { t } = useLanguage(); // 🟢 추가
+  const { lang, t } = useLanguage(); // 🟢 추가
   const supabase = createClient();
   const router = useRouter();
   const { showToast } = useToast();
@@ -122,17 +140,17 @@ export default function WishlistsPage() {
     }
   };
 
-  const handleShare = async (e: React.MouseEvent, exp: WishlistExperience) => {
+  const handleShare = async (e: React.MouseEvent, exp: WishlistExperience, shareTitle: string) => {
     e.preventDefault();
     e.stopPropagation();
 
     const tripUrl = `${window.location.origin}/experiences/${exp.id}`;
-    const shareText = `[Locally] ${exp.title}\n${tripUrl}`;
+    const shareText = `[Locally] ${shareTitle}\n${tripUrl}`;
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: exp.title,
+          title: shareTitle,
           text: shareText,
           url: tripUrl,
         });
@@ -187,6 +205,9 @@ export default function WishlistsPage() {
               const imageUrl = exp.photos && exp.photos.length > 0 ? exp.photos[0] : (exp.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
               const ratingValue = Number(exp.rating ?? 0);
               const hasRating = Number.isFinite(ratingValue) && ratingValue > 0;
+              const title = getContent(exp, 'title', lang) || exp.title || t('exp_card_title_fallback');
+              const category = getContent(exp, 'category', lang) || exp.category || t('cat_exp');
+              const location = formatLocalizedExperienceLocation(exp, lang) || t('exp_card_location_fallback');
 
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
@@ -198,7 +219,7 @@ export default function WishlistsPage() {
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <button
-                      onClick={(e) => handleShare(e, exp)}
+                      onClick={(e) => handleShare(e, exp, title)}
                       className="absolute top-1.5 md:top-2 left-1.5 md:left-2 text-white bg-black/35 hover:bg-black/45 backdrop-blur-sm rounded-full p-1.5 md:p-[7px] transition-all z-10"
                       aria-label={t('trip_share')}
                     >
@@ -215,16 +236,16 @@ export default function WishlistsPage() {
 
                   <div className="space-y-0.5 px-0.5">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-slate-900 text-[11px] md:text-[12px] truncate pr-1">{exp.city || exp.location || '서울'} · {exp.category}</h3>
+                      <h3 className="font-semibold text-slate-900 text-[11px] md:text-[12px] truncate pr-1">{location} · {category}</h3>
                       <div className="flex items-center gap-0.5 text-[10px] md:text-[11px] shrink-0">
                         <Star className={`w-[10px] h-[10px] md:w-[11px] md:h-[11px] ${hasRating ? "" : "text-slate-300"}`} fill={hasRating ? "black" : "none"} />
-                        <span>{hasRating ? ratingValue.toFixed(1) : "New"}</span>
+                        <span>{hasRating ? ratingValue.toFixed(1) : t('exp_card_new')}</span>
                       </div>
                     </div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{exp.title}</p>
+                    <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{title}</p>
                     <div className="mt-0.5">
                       <span className="font-bold text-slate-900 text-[11px] md:text-[12px]">₩{Number(exp.price).toLocaleString()}</span>
-                      <span className="text-[10px] md:text-[11px] text-slate-500 font-normal"> {t('per_person')}</span>
+                      <span className="text-[10px] md:text-[11px] text-slate-500 font-normal"> {t('exp_card_per_person')}</span>
                     </div>
                   </div>
                 </Link>

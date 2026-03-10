@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '.env.local' });
+require('./loadEnv.cjs');
 const { createClient } = require('@supabase/supabase-js');
 
 // Create admin client overriding auth headers if possible, or use service role

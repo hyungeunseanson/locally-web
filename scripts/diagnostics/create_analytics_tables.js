@@ -1,5 +1,7 @@
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
+const { rootDir } = require('./loadEnv.cjs');
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -43,8 +45,9 @@ CREATE POLICY "Enable insert for everyone" ON public.analytics_events FOR INSERT
 CREATE POLICY "Enable read for admin" ON public.analytics_events FOR SELECT USING (true);
   `;
 
-    fs.writeFileSync('supabase_analytics_migration.sql', sql);
-    console.log('Wrote supabase_analytics_migration.sql');
+    const outputPath = path.join(rootDir, 'supabase_analytics_migration.sql');
+    fs.writeFileSync(outputPath, sql);
+    console.log(`Wrote ${outputPath}`);
 }
 
 run();

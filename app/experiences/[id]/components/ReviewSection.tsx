@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 interface ReviewSectionProps {
   experienceId: number | string;
@@ -39,6 +40,8 @@ type ReviewView = ReviewRow & {
 
 export default function ReviewSection({ experienceId, hostName }: ReviewSectionProps) {
   const supabase = createClient();
+  const { t } = useLanguage();
+  const guestLabel = t('exp_review_guest_label');
   const [reviews, setReviews] = useState<ReviewView[]>([]);
   const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
@@ -108,11 +111,11 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         const combinedReviews: ReviewView[] = typedReviews.map((review) => {
           const userProfile = profileMap.get(review.user_id);
           
-          let displayName = '익명 게스트';
+          let displayName = guestLabel;
           let avatarUrl = null;
 
           if (userProfile) {
-             displayName = userProfile.full_name || userProfile.name || userProfile.username || userProfile.email?.split('@')[0] || '게스트';
+             displayName = userProfile.full_name || userProfile.name || userProfile.username || userProfile.email?.split('@')[0] || guestLabel;
              avatarUrl = userProfile.avatar_url || null;
           }
 
@@ -135,14 +138,14 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
     };
 
     fetchReviews();
-  }, [experienceId, supabase]);
+  }, [experienceId, guestLabel, supabase]);
 
-  if (loading) return <div className="py-10 text-center text-slate-400">후기를 불러오는 중...</div>;
+  if (loading) return <div className="py-10 text-center text-slate-400">{t('exp_review_loading')}</div>;
 
   return (
     <div id="reviews" className="border-b border-slate-200 pb-8 md:pb-10 scroll-mt-24">
       <h3 className="text-[18px] md:text-[28px] font-semibold tracking-[-0.01em] mb-5 flex items-center gap-1.5">
-        <Star size={15} fill="black"/> {averageRating} · 후기 {reviews.length}개
+        <Star size={15} fill="black"/> {averageRating} · {t('exp_review_count', { count: reviews.length })}
       </h3>
       
       {reviews.length > 0 ? (
@@ -175,12 +178,12 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                     <p className="text-[12px] text-slate-700 leading-[1.4] line-clamp-4 mb-1.5">{review.content}</p>
                     {review.reply && (
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2">
-                        <div className="text-[11px] font-bold text-slate-800 mb-1">호스트 답글</div>
+                        <div className="text-[11px] font-bold text-slate-800 mb-1">{t('hr_host_reply')}</div>
                         <p className="text-[11px] text-slate-600 line-clamp-2">{review.reply}</p>
                       </div>
                     )}
                     <button onClick={() => setIsReviewsExpanded(true)} className="text-[12px] font-semibold underline underline-offset-2 mt-2">
-                      더 보기
+                      {t('exp_review_more')}
                     </button>
                   </article>
                 );
@@ -214,18 +217,18 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         </>
       ) : (
         <div className="text-slate-400 text-[12px] py-5 bg-slate-50 rounded-xl text-center border border-dashed border-slate-200">
-          아직 작성된 후기가 없습니다.
+          {t('exp_review_empty_title')}
           <br />
-          {hostName} 체험의 첫 후기를 남겨보세요.
+          {t('exp_review_empty_body', { hostName })}
         </div>
       )}
       
       {reviews.length > 0 && (
         <button onClick={() => setIsReviewsExpanded(true)} className="mt-5 w-full rounded-2xl bg-[#ececec] py-3 text-[13px] md:text-[15px] font-medium text-slate-700 hover:bg-[#e5e5e5] transition-colors">
-          모든 후기 보기
+          {t('exp_review_view_all')}
         </button>
       )}
-      <button onClick={() => setIsPolicyOpen(true)} className="w-full text-center text-[11px] text-slate-400 mt-3 underline underline-offset-2">후기 운영 방식 알아보기</button>
+      <button onClick={() => setIsPolicyOpen(true)} className="w-full text-center text-[11px] text-slate-400 mt-3 underline underline-offset-2">{t('exp_review_policy_link')}</button>
 
       {isReviewsExpanded && (
         <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsReviewsExpanded(false)}>
@@ -240,15 +243,15 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                 {averageRating}
               </h3>
               <div className="mt-3 flex items-center justify-between">
-                <p className="text-[14px] md:text-[14px] font-medium tracking-[-0.01em]">후기 {reviews.length}개</p>
+                <p className="text-[14px] md:text-[14px] font-medium tracking-[-0.01em]">{t('exp_review_count', { count: reviews.length })}</p>
                 <div className="relative">
                   <select
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value as 'latest' | 'oldest')}
                     className="appearance-none rounded-full border border-slate-300 bg-white pl-3.5 pr-7 py-1.5 text-[10px] font-normal text-slate-700"
                   >
-                    <option value="latest">최신순</option>
-                    <option value="oldest">오래된 순</option>
+                    <option value="latest">{t('exp_review_sort_latest')}</option>
+                    <option value="oldest">{t('exp_review_sort_oldest')}</option>
                   </select>
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[10px]">⌄</span>
                 </div>
@@ -272,12 +275,18 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
                         <div className="flex-1 min-w-0">
                           <div>
                             <div className="font-medium text-[11px] md:text-[11px] text-slate-900 leading-none">{review.user.name}</div>
-                            <div className="text-[10px] md:text-[10px] text-slate-500 mt-1">게스트</div>
+                            <div className="text-[10px] md:text-[10px] text-slate-500 mt-1">{t('exp_review_guest_label')}</div>
                             <div className="flex items-center gap-1 text-slate-700 mt-2 mb-2">
                               {[...Array(5)].map((_, idx) => (
                                 <Star key={idx} size={10} fill={idx < review.rating ? "currentColor" : "none"} className={idx < review.rating ? "" : "text-slate-300"} />
                               ))}
-                              <span className="text-[10px] text-slate-500 ml-1">{review.created_at ? `${Math.max(1, Math.floor((Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24)))}일 전` : ''}</span>
+                              <span className="text-[10px] text-slate-500 ml-1">
+                                {review.created_at
+                                  ? t('exp_review_days_ago', {
+                                      days: Math.max(1, Math.floor((Date.now() - new Date(review.created_at).getTime()) / (1000 * 60 * 60 * 24))),
+                                    })
+                                  : ''}
+                              </span>
                             </div>
                             <p className="text-[10px] md:text-[10px] font-normal text-slate-700 leading-[1.45] whitespace-pre-wrap mb-1.5">
                               {review.content}
@@ -297,15 +306,15 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
       {isPolicyOpen && (
         <div className="fixed inset-0 z-[210] bg-black/45 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsPolicyOpen(false)}>
           <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
-            <h4 className="text-[15px] font-semibold mb-3">후기 운영 방식</h4>
+            <h4 className="text-[15px] font-semibold mb-3">{t('exp_review_policy_title')}</h4>
             <div className="space-y-2 text-[12px] text-slate-600 leading-relaxed">
-              <p>체험에 실제 참여한 게스트만 후기를 작성할 수 있습니다.</p>
-              <p>후기는 자동 필터와 운영 정책 검수를 거쳐 노출됩니다.</p>
-              <p>욕설, 혐오 표현, 광고성 문구는 노출이 제한될 수 있습니다.</p>
-              <p>호스트는 후기에 답글을 달 수 있지만 원문을 수정할 수는 없습니다.</p>
+              <p>{t('exp_review_policy_line_1')}</p>
+              <p>{t('exp_review_policy_line_2')}</p>
+              <p>{t('exp_review_policy_line_3')}</p>
+              <p>{t('exp_review_policy_line_4')}</p>
             </div>
             <button onClick={() => setIsPolicyOpen(false)} className="mt-4 w-full rounded-xl bg-slate-100 py-2.5 text-[12px] font-medium text-slate-700 hover:bg-slate-200">
-              닫기
+              {t('common_close')}
             </button>
           </div>
         </div>

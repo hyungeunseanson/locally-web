@@ -22,6 +22,7 @@ import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { CATEGORY_OPTIONS } from '@/app/host/create/config';
+import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 
 export interface HomeExperienceCardData {
   id: number | string;
@@ -41,23 +42,6 @@ export interface HomeExperienceCardData {
   review_count?: number | null;
   photos?: string[] | null;
   image_url?: string | null;
-}
-
-function formatLocation(data: HomeExperienceCardData) {
-  const parts = Array.from(
-    new Set(
-      [data.city, data.country]
-        .map((value) => String(value || '').trim())
-        .filter(Boolean)
-    )
-  );
-
-  if (parts.length > 0) {
-    return parts.join(', ');
-  }
-
-  const fallbackLocation = String(data.location || '').trim();
-  return fallbackLocation || '서울';
 }
 
 function renderCategoryIcon(categoryLabel: string) {
@@ -100,16 +84,16 @@ function renderCategoryIcon(categoryLabel: string) {
 }
 
 export default function HomeExperienceCard({ data }: { data: HomeExperienceCardData }) {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
 
-  const title = getContent(data, 'title', lang) || '로컬 체험';
-  const category = getContent(data, 'category', lang) || data.category || '체험';
-  const location = formatLocation(data);
+  const title = getContent(data, 'title', lang) || t('exp_card_title_fallback');
+  const category = getContent(data, 'category', lang) || data.category || t('cat_exp');
+  const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
   const rawPrice = typeof data.price === 'number' ? data.price : Number(data.price);
   const price = Number.isFinite(rawPrice) ? rawPrice.toLocaleString() : '45,000';
   const ratingValue = Number(data.rating || 0);
-  const ratingText = ratingValue > 0 ? `★${ratingValue.toFixed(1)}` : 'New';
+  const ratingText = ratingValue > 0 ? `★${ratingValue.toFixed(1)}` : t('exp_card_new');
   const imageUrl = data.photos?.[0] || data.image_url || 'https://images.unsplash.com/photo-1542051841857-5f90071e7989';
   return (
     <Link
@@ -135,7 +119,7 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
 
           <button
             type="button"
-            aria-label="위시리스트 토글"
+            aria-label={t('exp_card_wishlist_toggle')}
             disabled={isLoading}
             onClick={(e) => {
               void toggleWishlist(e);
@@ -160,7 +144,7 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
 
         <button
           type="button"
-          aria-label="위시리스트 토글"
+          aria-label={t('exp_card_wishlist_toggle')}
           disabled={isLoading}
           onClick={(e) => {
             void toggleWishlist(e);
@@ -184,8 +168,11 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
           {location}
         </p>
         <div className="mt-0.5 flex items-center gap-1 overflow-hidden whitespace-nowrap text-[10px] text-slate-500 md:text-[14px]">
-          <span className="shrink-0">1인당</span>
-          <span className="truncate font-semibold text-slate-900">₩{price}부터</span>
+          <span className="shrink-0">{t('exp_card_per_person')}</span>
+          <span className="truncate font-semibold text-slate-900">
+            ₩{price}
+            {t('exp_card_price_from')}
+          </span>
           <span className="shrink-0 text-slate-300">·</span>
           <span className="shrink-0 font-medium">{ratingText}</span>
         </div>

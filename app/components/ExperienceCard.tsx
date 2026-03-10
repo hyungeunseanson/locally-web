@@ -7,6 +7,7 @@ import { Heart, Star } from 'lucide-react';
 import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
+import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 
 type ExperienceCardData = {
   id: number | string;
@@ -30,11 +31,11 @@ type ExperienceCardData = {
 
 export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
   const { isSaved, toggleWishlist, isLoading } = useWishlist(String(data.id));
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
 
   // 🟢 [기능 유지] 다국어 데이터 가져오기 (LanguageContext의 lang 사용)
-  const title = getContent(data, 'title', lang);
-  const category = getContent(data, 'category', lang);
+  const title = getContent(data, 'title', lang) || t('exp_card_title_fallback');
+  const category = getContent(data, 'category', lang) || data.category || t('cat_exp');
 
   // 이미지 주소 처리
   const imageUrl = (data.photos && data.photos.length > 0)
@@ -42,7 +43,7 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
     : (data.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
 
   // 지역 정보 (없으면 기본값)
-  const location = [data.city, data.subCity].filter(Boolean).map(s => String(s).trim()).filter(Boolean).join(', ') || data.location || '서울';
+  const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
   const rating = Number(data.rating || 0);
   const reviewCount = Number(data.review_count || 0);
 
@@ -61,6 +62,7 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
         {/* ❤️ 하트 버튼 (우측 상단 고정 원본 복구) */}
         <button
           type="button"
+          aria-label={t('exp_card_wishlist_toggle')}
           disabled={isLoading}
           onClick={(e) => {
             void toggleWishlist(e);
@@ -86,7 +88,7 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
           </h3>
           <div className="flex items-center gap-0.5 md:gap-1 text-[11px] md:text-sm shrink-0">
             <Star size={11} className="md:w-[14px] md:h-[14px]" fill={rating > 0 ? "black" : "none"} />
-            <span>{rating > 0 ? rating.toFixed(2) : "New"}</span>
+            <span>{rating > 0 ? rating.toFixed(2) : t('exp_card_new')}</span>
             {reviewCount > 0 && <span className="text-slate-400 font-normal">({reviewCount})</span>}
           </div>
         </div>
@@ -98,9 +100,9 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
 
         {/* 3열: 가격 */}
         <div className="mt-0.5 md:mt-1">
-          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">1인당 </span>
+          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{t('exp_card_per_person')} </span>
           <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
-            ₩{Number(data.price).toLocaleString()}부터
+            ₩{Number(data.price).toLocaleString()}{t('exp_card_price_from')}
           </span>
         </div>
       </div>

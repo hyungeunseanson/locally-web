@@ -3,6 +3,8 @@
 import React from 'react';
 import Image from 'next/image';
 import { X, Star, Briefcase, Globe, Music, MessageCircle, User } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext';
+import { formatLanguageLevelLabel, getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
 
 type HostModalData = {
   name: string;
@@ -26,27 +28,16 @@ type HostProfileModalProps = {
 };
 
 export default function HostProfileModal({ isOpen, onClose, host }: HostProfileModalProps) {
+  const { lang, t } = useLanguage();
   if (!isOpen) return null;
   const hasStats = host.reviewCount !== undefined || host.rating !== undefined;
   const hasInterestingFacts = Boolean(
     host.job || host.dreamDestination || host.favoriteSong || (host.languages && host.languages.length > 0)
   );
-  const languageLevelLabel = (() => {
-    switch (host.languageLevel) {
-      case 1:
-        return 'Lv.1 기초 단계';
-      case 2:
-        return 'Lv.2 초급 회화';
-      case 3:
-        return 'Lv.3 일상 회화';
-      case 4:
-        return 'Lv.4 비즈니스 회화';
-      case 5:
-        return 'Lv.5 원어민 수준';
-      default:
-        return '';
-    }
-  })();
+  const languageLevelLabel = formatLanguageLevelLabel(host.languageLevel, lang);
+  const localizedLanguages = Array.isArray(host.languages)
+    ? host.languages.map((language) => getLocalizedLanguageLabel(String(language), lang)).filter(Boolean)
+    : [];
 
   const handleContactHost = () => {
     onClose();
@@ -78,7 +69,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
                     src={host.avatarUrl}
                     className="object-cover"
                     fill
-                    alt={`${host.name} 프로필`}
+                    alt={`${host.name} ${t('exp_host_modal_title')}`}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300">
@@ -89,7 +80,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
             </div>
             <h2 className="text-[22px] md:text-3xl font-black text-slate-900 mb-1">{host.name}</h2>
             <div className="flex items-center gap-2 text-[12px] md:text-sm font-bold text-slate-500">
-              <span>{host.joinedYear ? `${host.joinedYear}년부터 활동` : 'Locally 호스트'}</span>
+              <span>{host.joinedYear ? t('exp_host_active_since', { year: host.joinedYear }) : t('exp_host_default_status')}</span>
             </div>
           </div>
 
@@ -98,7 +89,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
               {host.reviewCount !== undefined && (
                 <div className="text-center">
                   <div className="font-black text-[16px] md:text-lg">{host.reviewCount}</div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">후기</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">{t('exp_host_reviews_label')}</div>
                 </div>
               )}
               {host.reviewCount !== undefined && host.rating !== undefined && (
@@ -110,7 +101,7 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
                     {host.rating != null ? Number(host.rating).toFixed(2) : '-'}
                     {host.rating != null ? <Star size={12} fill="black" /> : null}
                   </div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">평점</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">{t('exp_host_rating_label')}</div>
                 </div>
               )}
             </div>
@@ -119,35 +110,35 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
 
         {/* 🟢 오른쪽: 상세 소개 (스크롤 영역) */}
         <div className="flex-1 p-5 md:p-12 overflow-y-auto bg-white">
-          <h3 className="text-[20px] md:text-2xl font-bold mb-6 md:mb-8">호스트 소개</h3>
+          <h3 className="text-[20px] md:text-2xl font-bold mb-6 md:mb-8">{t('exp_host_modal_title')}</h3>
 
           {hasInterestingFacts && (
             <div className="bg-slate-50 p-4 md:p-6 rounded-xl md:rounded-2xl mb-6 md:mb-8">
-              <h4 className="font-bold text-[14px] md:text-base mb-3 md:mb-4 text-slate-900 flex items-center gap-2">👀 {host.name}님에 대한 재미있는 사실</h4>
+              <h4 className="font-bold text-[14px] md:text-base mb-3 md:mb-4 text-slate-900 flex items-center gap-2">{t('exp_host_fun_facts_title', { name: host.name })}</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 md:gap-y-4 gap-x-4 md:gap-x-8">
                 {host.job && (
                   <div className="flex items-start gap-3">
                     <Briefcase className="text-slate-400 mt-0.5" size={18} />
-                    <div className="text-[13px] md:text-sm">직업: <span className="font-bold text-slate-900">{host.job}</span></div>
+                    <div className="text-[13px] md:text-sm">{t('exp_host_fact_job')}: <span className="font-bold text-slate-900">{host.job}</span></div>
                   </div>
                 )}
                 {host.dreamDestination && (
                   <div className="flex items-start gap-3">
                     <Globe className="text-slate-400 mt-0.5" size={18} />
-                    <div className="text-[13px] md:text-sm">여행하고 싶은 곳: <span className="font-bold text-slate-900">{host.dreamDestination}</span></div>
+                    <div className="text-[13px] md:text-sm">{t('exp_host_fact_dream_destination')}: <span className="font-bold text-slate-900">{host.dreamDestination}</span></div>
                   </div>
                 )}
                 {host.favoriteSong && (
                   <div className="flex items-start gap-3">
                     <Music className="text-slate-400 mt-0.5" size={18} />
-                    <div className="text-[13px] md:text-sm">최애 노래: <span className="font-bold text-slate-900">{host.favoriteSong}</span></div>
+                    <div className="text-[13px] md:text-sm">{t('exp_host_fact_favorite_song')}: <span className="font-bold text-slate-900">{host.favoriteSong}</span></div>
                   </div>
                 )}
-                {!!host.languages?.length && (
+                {!!localizedLanguages.length && (
                   <div className="flex items-start gap-3">
                     <MessageCircle className="text-slate-400 mt-0.5" size={18} />
                     <div className="text-[13px] md:text-sm">
-                      구사 언어: <span className="font-bold text-slate-900">{host.languages.join(', ')}</span>
+                      {t('exp_host_fact_languages')}: <span className="font-bold text-slate-900">{localizedLanguages.join(', ')}</span>
                       {languageLevelLabel ? <span className="text-slate-500 font-medium"> · {languageLevelLabel}</span> : null}
                     </div>
                   </div>
@@ -157,15 +148,15 @@ export default function HostProfileModal({ isOpen, onClose, host }: HostProfileM
           )}
 
           <div className="space-y-3 md:space-y-4">
-            <h4 className="font-bold text-[15px] md:text-lg">소개</h4>
+            <h4 className="font-bold text-[15px] md:text-lg">{t('exp_host_about_title')}</h4>
             <p className="text-slate-600 leading-relaxed md:leading-loose text-[13px] md:text-base whitespace-pre-wrap">
-              {host.intro || '안녕하세요! 여행과 새로운 만남을 사랑하는 호스트입니다. 저와 함께 잊지 못할 추억을 만들어보세요.'}
+              {host.intro || t('exp_host_default_intro_long')}
             </p>
           </div>
 
           <div className="mt-8 md:mt-12 pt-5 md:pt-8 border-t border-slate-100">
             <button onClick={handleContactHost} className="w-full md:w-auto bg-black text-white px-6 md:px-8 py-3 md:py-4 rounded-lg md:rounded-xl text-[14px] md:text-base font-bold hover:scale-105 transition-transform shadow-lg">
-              호스트에게 연락하기
+              {t('exp_host_contact_button')}
             </button>
           </div>
         </div>
