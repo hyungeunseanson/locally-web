@@ -307,3 +307,42 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - 잡보드 GET API: `status='open'` 필터 고정 — `pending_payment` 절대 노출 금지
 - IMP 클라이언트 콜백 시 `signData`/`ediDate` 비어있을 수 있음 → 비어있으면 서명 검증 건너뜀 (금액 검증으로 대체)
 - 기존 `/api/payment/nicepay-callback` 및 `experiences/bookings` 로직 일절 미변경
+
+---
+
+## 12. Experience Translation System
+
+### 12.1 canonical content 기준
+
+- `experiences.title` / `description`는 대표 원문(`source_locale`)의 canonical 텍스트를 담는 기준 필드다.
+- locale별 노출 필드는 `title_ko`, `title_en`, `title_ja`, `title_zh`, `description_ko`, `description_en`, `description_ja`, `description_zh` 컬럼으로 유지한다.
+- `manual_locales`는 호스트가 직접 입력한 언어 코드 목록만 담는다.
+- `translation_meta`는 locale별 `mode/status/version` 상태를 담는 JSON 오브젝트다.
+- `meeting_point_i18n`, `supplies_i18n`, `inclusions_i18n`, `exclusions_i18n`, `itinerary_i18n`, `rules_i18n`는 제목/소개글 외 guest-facing 본문을 locale별 JSON으로 저장한다.
+- 호스트 생성/수정 폼은 이제 `manual_content + source_locale` 구조를 사용하고, 호스트가 선택한 구사 언어에 대해서만 직접 title/description을 입력한다.
+- host write path는 더 이상 클라이언트 `supabase.from('experiences')` direct write를 사용하지 않고 `POST /api/host/experiences`, `PATCH /api/host/experiences/:id` 서버 API로 이관한다.
+- PATCH 저장 시에는 기존 `manual_locales`를 보존 병합하고, `title/description/source_locale/manual_locales + meeting_point/itinerary/inclusions/exclusions/supplies/rules` 중 실제 변경이 있을 때만 `translation_version`을 증가시킨다.
+
+### 12.2 queue 테이블
+
+- `experience_translation_jobs`: 체험 1건의 번역 배치를 표현한다. 유니크 키는 `(experience_id, translation_version)`이다.
+- `experience_translation_tasks`: locale별 실제 번역 단위를 표현한다. 유니크 키는 `(experience_id, translation_version, target_locale)`이다.
+- create/update API는 save 시 manual locale을 제외한 지원 언어에 대해 `gemini` provider task를 enqueue 한다.
+- worker는 한 locale task 안에서 `title`, `description`, `meeting_point`, `supplies`, `inclusions`, `exclusions`, `itinerary`, `rules`를 함께 번역하고, 완료 시 해당 locale의 i18n JSON/컬럼을 한 번에 갱신한다.
+- host는 자동 번역본을 수정 UI에서 직접 보지 않는다. 비수동 locale 컬럼은 저장 시 clear 되고, 이후 worker가 다시 채운다.
+
+### 12.3 provider rate-limit 상태
+
+- `translation_provider_state`는 Gemini / Grok 호출 창(window), cooldown, dispatched count를 DB에서 단일 관리한다.
+- worker는 provider row를 `FOR UPDATE`로 lease하여 RPM / 동시성 제한을 강제한다.
+- 기본 seed는 `gemini-2.5-flash` 8 RPM / concurrency 1, `grok-3-fast` 60 RPM / concurrency 2다.
+- 운영 환경에서는 model / RPM 값을 환경변수 override로 조정한다.
+- lease RPC는 RPM뿐 아니라 reserved token 기반 TPM도 함께 체크하고, outcome RPC에서 reserved token을 실제 사용 token으로 정산한다.
+
+### 12.4 worker / fallback
+
+- cron route는 `GET /api/cron/experience-translations` 이고 `CRON_SECRET`으로 보호한다.
+- worker는 `lease_experience_translation_task()` RPC로 provider-aware task lease를 수행해 DB 단에서 RPM / concurrency를 강제한다.
+- Gemini task 처리 중 retryable / quota / 5xx 오류가 나면 task provider를 `grok`으로 바꾸고 같은 queue에서 재시도한다.
+- Grok 실패 시에는 backoff 후 `retryable`, 최대 시도 수 초과 시 `failed`로 종료한다.
+- provider token/cooldown bookkeeping은 `record_translation_provider_outcome()` RPC로 반영한다.

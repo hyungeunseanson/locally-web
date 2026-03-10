@@ -13,6 +13,7 @@ import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
+import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
 import { ExperienceDetail, HostProfileDetail } from './types';
 
@@ -62,7 +63,7 @@ export default function ExperienceClient({
   const translatedTitle = getContent(experience, 'title', lang);
   const translatedDescription = getContent(experience, 'description', lang);
   const category = getContent(experience, 'category', lang) || experience.category || '문화 체험';
-  const meetingPoint = experience.meeting_point || experience.location || 'Locally';
+  const meetingPoint = getLocalizedExperienceText(experience, 'meeting_point', lang) || experience.location || 'Locally';
   const compactLocation = [experience.city, experience.subCity].filter(Boolean).map(s => String(s).trim()).filter(Boolean).join(', ') || meetingPoint?.split(',')?.[0]?.trim() || 'Locally';
   const headerLabel = `${compactLocation} · ${category}`;
   const addressLine = experience.location || compactLocation;

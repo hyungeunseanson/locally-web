@@ -3,6 +3,7 @@ import { LanguageLevelEntry } from '@/app/utils/languageLevels';
 export type ExperienceItineraryItem = {
   title?: string;
   description?: string;
+  type?: string;
   image_url?: string;
 };
 
@@ -24,6 +25,7 @@ export type ExperienceDetail = {
   languages?: string[];
   language_levels?: LanguageLevelEntry[];
   meeting_point?: string;
+  meeting_point_i18n?: Record<string, string>;
   location?: string;
   rating?: number;
   review_count?: number;
@@ -35,10 +37,15 @@ export type ExperienceDetail = {
   max_guests?: number;
   duration?: number;
   supplies?: string;
+  supplies_i18n?: Record<string, string>;
   inclusions?: string[];
+  inclusions_i18n?: Record<string, string[]>;
   exclusions?: string[];
+  exclusions_i18n?: Record<string, string[]>;
   itinerary?: ExperienceItineraryItem[];
+  itinerary_i18n?: Record<string, ExperienceItineraryItem[]>;
   rules?: ExperienceRules;
+  rules_i18n?: Record<string, ExperienceRules>;
   [key: string]: unknown;
 };
 

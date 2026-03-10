@@ -151,16 +151,17 @@ export const INITIAL_FORM_DATA = {
 
   languages: [] as string[],
   language_levels: [] as import('@/app/utils/languageLevels').LanguageLevelEntry[],
+  source_locale: 'ko' as FormLocale,
+  manual_content: {
+    ko: { title: '', description: '' },
+  } as Partial<Record<FormLocale, { title: string; description: string }>>,
 
-  title: '',
   photos: [] as string[],
   location: '',
 
   itinerary: [
     { title: '만남', description: '', type: 'meet', image_url: '' },
   ] as { title: string; description: string; type: 'meet' | 'spot' | 'end'; image_url?: string }[],
-
-  description: '',
 
   inclusions: [] as string[],
   exclusions: [] as string[],
@@ -185,9 +186,13 @@ type ExperienceFormCopy = {
   categoryLabel: string;
   step2Title: string;
   step2Desc: string;
+  sourceLocaleLabel: string;
+  sourceLocaleHelp: string;
+  sourceLocaleBadge: string;
   step3Title: string;
   step3Desc: (maxPhotos: number) => string;
   titlePlaceholder: string;
+  titleSectionLabel: string;
   firstPhotoNotice: string;
   addHeroPhoto: string;
   mainPhotoBadge: string;
@@ -207,6 +212,7 @@ type ExperienceFormCopy = {
   step5Title: string;
   step5Desc: string;
   descriptionPlaceholder: string;
+  descriptionSectionLabel: string;
   inclusionsLabel: string;
   inclusionsPlaceholder: string;
   exclusionsLabel: string;
@@ -241,6 +247,7 @@ type ExperienceFormCopy = {
   validationCategory: string;
   validationLanguages: string;
   validationLanguageLevels: string;
+  validationSourceLocale: string;
   validationTitle: string;
   validationPhotos: string;
   validationPhotoLimit: (maxPhotos: number) => string;
@@ -278,9 +285,13 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     categoryLabel: '카테고리',
     step2Title: '진행 가능한 언어',
     step2Desc: '이 체험을 어떤 언어로 진행할 수 있나요?',
+    sourceLocaleLabel: '대표 원문 언어',
+    sourceLocaleHelp: '선택한 언어 중 자동 번역의 기준이 될 메인 언어를 골라주세요.',
+    sourceLocaleBadge: '원문',
     step3Title: '체험의 첫인상',
-    step3Desc: (maxPhotos) => `체험의 대표사진을 올려주세요. (최대 ${maxPhotos}장)`,
+    step3Desc: (maxPhotos) => `선택한 언어별 제목을 입력하고 대표사진을 올려주세요. (최대 ${maxPhotos}장)`,
     titlePlaceholder: '체험 제목을 입력하세요',
+    titleSectionLabel: '언어별 제목',
     firstPhotoNotice: '첫 번째 대표사진이 체험 상세 페이지 상단에서 가장 먼저 보여집니다.',
     addHeroPhoto: '대표사진 추가',
     mainPhotoBadge: '메인',
@@ -300,6 +311,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Title: '상세 소개 및 포함 사항',
     step5Desc: '체험을 더 설득력 있게 설명하고, 게스트가 받는 혜택을 정리해주세요.',
     descriptionPlaceholder: '상세 소개글을 입력하세요. (최소 50자 이상)',
+    descriptionSectionLabel: '언어별 소개글',
     inclusionsLabel: '포함 사항',
     inclusionsPlaceholder: '예) 음료',
     exclusionsLabel: '불포함 사항',
@@ -334,6 +346,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationCategory: '카테고리를 선택해주세요.',
     validationLanguages: '진행 가능한 언어를 1개 이상 선택해주세요.',
     validationLanguageLevels: '선택한 각 언어의 레벨을 설정해주세요.',
+    validationSourceLocale: '대표 원문 언어를 선택해주세요.',
     validationTitle: '체험 제목을 6자 이상 입력해주세요.',
     validationPhotos: '대표 사진을 1장 이상 업로드해주세요.',
     validationPhotoLimit: (maxPhotos) => `대표 사진은 최대 ${maxPhotos}장까지 업로드 가능합니다.`,
@@ -369,9 +382,13 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     categoryLabel: 'Category',
     step2Title: 'Available languages',
     step2Desc: 'Which languages can you host this experience in?',
+    sourceLocaleLabel: 'Source language',
+    sourceLocaleHelp: 'Choose the main language that AI translations will be based on.',
+    sourceLocaleBadge: 'Source',
     step3Title: 'First impression of your experience',
-    step3Desc: (maxPhotos) => `Upload hero photos for your experience. (Up to ${maxPhotos})`,
+    step3Desc: (maxPhotos) => `Add titles for each selected language and upload hero photos. (Up to ${maxPhotos})`,
     titlePlaceholder: 'Enter experience title',
+    titleSectionLabel: 'Titles by language',
     firstPhotoNotice: 'The first hero photo appears at the top of the experience detail page.',
     addHeroPhoto: 'Add hero photo',
     mainPhotoBadge: 'Main',
@@ -391,6 +408,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Title: 'Detailed intro & inclusions',
     step5Desc: 'Explain the experience clearly and summarize what guests receive.',
     descriptionPlaceholder: 'Enter a detailed description. (At least 50 characters)',
+    descriptionSectionLabel: 'Descriptions by language',
     inclusionsLabel: 'Inclusions',
     inclusionsPlaceholder: 'e.g. Drink',
     exclusionsLabel: 'Exclusions',
@@ -425,6 +443,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationCategory: 'Choose a category.',
     validationLanguages: 'Select at least one available language.',
     validationLanguageLevels: 'Set a level for each selected language.',
+    validationSourceLocale: 'Choose the source language.',
     validationTitle: 'Enter a title with at least 6 characters.',
     validationPhotos: 'Upload at least one hero photo.',
     validationPhotoLimit: (maxPhotos) => `You can upload up to ${maxPhotos} hero photos.`,
@@ -460,9 +479,13 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     categoryLabel: 'カテゴリ',
     step2Title: '対応可能な言語',
     step2Desc: 'この体験はどの言語で進行できますか？',
+    sourceLocaleLabel: '原文の基準言語',
+    sourceLocaleHelp: '自動翻訳の基準になるメイン言語を選択してください。',
+    sourceLocaleBadge: '原文',
     step3Title: '体験の第一印象',
-    step3Desc: (maxPhotos) => `体験の代表写真をアップロードしてください。（最大${maxPhotos}枚）`,
+    step3Desc: (maxPhotos) => `選択した各言語のタイトルを入力し、代表写真をアップロードしてください。（最大${maxPhotos}枚）`,
     titlePlaceholder: '体験タイトルを入力してください',
+    titleSectionLabel: '言語別タイトル',
     firstPhotoNotice: '最初の代表写真が体験詳細ページ上部に最初に表示されます。',
     addHeroPhoto: '代表写真を追加',
     mainPhotoBadge: 'メイン',
@@ -482,6 +505,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Title: '詳細紹介と含まれる内容',
     step5Desc: '体験をより魅力的に説明し、ゲストが受け取る内容を整理してください。',
     descriptionPlaceholder: '詳細紹介文を入力してください。（50文字以上推奨）',
+    descriptionSectionLabel: '言語別紹介文',
     inclusionsLabel: '含まれるもの',
     inclusionsPlaceholder: '例）ドリンク',
     exclusionsLabel: '含まれないもの',
@@ -516,6 +540,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationCategory: 'カテゴリを選択してください。',
     validationLanguages: '対応可能な言語を1つ以上選択してください。',
     validationLanguageLevels: '選択した各言語のレベルを設定してください。',
+    validationSourceLocale: '原文の基準言語を選択してください。',
     validationTitle: '体験タイトルを6文字以上入力してください。',
     validationPhotos: '代表写真を1枚以上アップロードしてください。',
     validationPhotoLimit: (maxPhotos) => `代表写真は最大${maxPhotos}枚までアップロードできます。`,
@@ -551,9 +576,13 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     categoryLabel: '类别',
     step2Title: '可使用语言',
     step2Desc: '这个体验可以用哪些语言进行？',
+    sourceLocaleLabel: '原文主语言',
+    sourceLocaleHelp: '请选择 AI 自动翻译时要参考的主语言。',
+    sourceLocaleBadge: '原文',
     step3Title: '体验的第一印象',
-    step3Desc: (maxPhotos) => `请上传体验代表照片。（最多${maxPhotos}张）`,
+    step3Desc: (maxPhotos) => `请填写所选语言的标题并上传代表照片。（最多${maxPhotos}张）`,
     titlePlaceholder: '请输入体验标题',
+    titleSectionLabel: '按语言填写标题',
     firstPhotoNotice: '第一张代表照片会显示在体验详情页顶部。',
     addHeroPhoto: '添加代表照片',
     mainPhotoBadge: '主图',
@@ -573,6 +602,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Title: '详细介绍与包含内容',
     step5Desc: '更有说服力地介绍体验，并整理房客可获得的内容。',
     descriptionPlaceholder: '请输入详细介绍。（建议至少50字）',
+    descriptionSectionLabel: '按语言填写介绍',
     inclusionsLabel: '包含内容',
     inclusionsPlaceholder: '例如：饮品',
     exclusionsLabel: '不包含内容',
@@ -607,6 +637,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationCategory: '请选择类别。',
     validationLanguages: '请至少选择一种可使用语言。',
     validationLanguageLevels: '请为每种已选语言设置等级。',
+    validationSourceLocale: '请选择原文主语言。',
     validationTitle: '请输入至少6个字的体验标题。',
     validationPhotos: '请至少上传一张代表照片。',
     validationPhotoLimit: (maxPhotos) => `代表照片最多可上传${maxPhotos}张。`,

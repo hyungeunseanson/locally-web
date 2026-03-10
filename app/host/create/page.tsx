@@ -17,13 +17,8 @@ import ExperienceFormSteps from './components/ExperienceFormSteps';
 import { validateImage, sanitizeFileName, compressImage, isHeicValidationResult } from '@/app/utils/image';
 import { getLanguageNames } from '@/app/utils/languageLevels';
 import { useLanguage } from '@/app/context/LanguageContext';
-
-type ItineraryItem = {
-  title: string;
-  description: string;
-  type: 'meet' | 'spot' | 'end';
-  image_url?: string;
-};
+import { buildExperienceWritePayload, syncManualContentWithLocales, type ExperienceFormState, type ItineraryItem } from './experienceFormState';
+import { getManualLocalesFromLanguageLevels, isExperienceLocale } from '@/app/utils/experienceTranslation';
 
 export default function CreateExperiencePage() {
   const { lang } = useLanguage();
@@ -35,7 +30,7 @@ export default function CreateExperiencePage() {
   // --- 상태 관리 ---
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ExperienceFormState>({
     ...INITIAL_FORM_DATA,
     is_private_enabled: false,
     private_price: 0,
@@ -51,6 +46,8 @@ export default function CreateExperiencePage() {
   const [tempExclusion, setTempExclusion] = useState('');
 
   const validateCurrentStep = (targetStep: number) => {
+    const manualLocales = getManualLocalesFromLanguageLevels(formData.language_levels || []);
+
     if (targetStep === 1) {
       if (!formData.city?.trim()) {
         showToast(copy.validationCity, 'error');
@@ -72,11 +69,19 @@ export default function CreateExperiencePage() {
         showToast(copy.validationLanguageLevels, 'error');
         return false;
       }
+      if (!formData.source_locale || !manualLocales.includes(formData.source_locale)) {
+        showToast(copy.validationSourceLocale, 'error');
+        return false;
+      }
       return true;
     }
 
     if (targetStep === 3) {
-      if (!formData.title?.trim() || formData.title.trim().length < 6) {
+      const hasInvalidTitle = manualLocales.some((locale) => {
+        const title = formData.manual_content?.[locale]?.title || '';
+        return title.trim().length < 6;
+      });
+      if (hasInvalidTitle) {
         showToast(copy.validationTitle, 'error');
         return false;
       }
@@ -109,7 +114,11 @@ export default function CreateExperiencePage() {
     }
 
     if (targetStep === 5) {
-      if (!formData.description?.trim() || formData.description.trim().length < 30) {
+      const hasInvalidDescription = manualLocales.some((locale) => {
+        const description = formData.manual_content?.[locale]?.description || '';
+        return description.trim().length < 30;
+      });
+      if (hasInvalidDescription) {
         showToast(copy.validationDescription, 'error');
         return false;
       }
@@ -153,7 +162,39 @@ export default function CreateExperiencePage() {
 
   // --- 데이터 업데이트 함수들 ---
   const updateData = (key: string, value: unknown) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData((prev) => {
+      if (key === 'language_levels') {
+        const nextLanguageLevels = Array.isArray(value) ? value as typeof prev.language_levels : [];
+        const manualLocales = getManualLocalesFromLanguageLevels(nextLanguageLevels);
+        const nextSourceLocale = manualLocales.includes(prev.source_locale)
+          ? prev.source_locale
+          : manualLocales[0] || 'ko';
+
+        return {
+          ...prev,
+          language_levels: nextLanguageLevels,
+          languages: getLanguageNames(nextLanguageLevels),
+          source_locale: nextSourceLocale,
+          manual_content: syncManualContentWithLocales(prev.manual_content, manualLocales, nextSourceLocale),
+        };
+      }
+
+      if (key === 'source_locale') {
+        const manualLocales = getManualLocalesFromLanguageLevels(prev.language_levels || []);
+        const requestedLocale = isExperienceLocale(value) ? value : prev.source_locale;
+        const nextSourceLocale = manualLocales.includes(requestedLocale)
+          ? requestedLocale
+          : manualLocales[0] || prev.source_locale;
+
+        return {
+          ...prev,
+          source_locale: nextSourceLocale,
+          manual_content: syncManualContentWithLocales(prev.manual_content, manualLocales, nextSourceLocale),
+        };
+      }
+
+      return { ...prev, [key]: value };
+    });
   };
 
   const handleCounter = (key: string, type: 'inc' | 'dec') => {
@@ -342,41 +383,31 @@ export default function CreateExperiencePage() {
         })
       );
 
-      const languageNames = getLanguageNames(formData.language_levels || []);
       const cleanedExclusions = (formData.exclusions || []).map((item: string) => item.trim()).filter(Boolean);
+      const payload = buildExperienceWritePayload({
+        ...formData,
+        photos: photoUrls,
+        exclusions: cleanedExclusions,
+        itinerary: itineraryWithPhotos,
+        meeting_point: formData.meeting_point || itineraryWithPhotos[0]?.title || '',
+        rules: {
+          ...formData.rules,
+          refund_policy: FIXED_REFUND_POLICY,
+        },
+      });
 
-      const { error } = await supabase.from('experiences').insert([
-        {
-          host_id: user.id,
-          country: formData.country,
-          city: formData.city,
-          title: formData.title,
-          category: formData.category,
-          languages: languageNames,
-          language_levels: formData.language_levels,
-          duration: formData.duration,
-          max_guests: formData.maxGuests,
-          description: formData.description,
-          itinerary: itineraryWithPhotos,
-          spots: itineraryWithPhotos.map((i) => i.title).join(' -> '),
-          meeting_point: formData.meeting_point || itineraryWithPhotos[0]?.title || '',
-          location: formData.location,
-          photos: photoUrls,
-          price: formData.price,
-          inclusions: formData.inclusions,
-          exclusions: cleanedExclusions,
-          supplies: formData.supplies,
-          rules: {
-            ...formData.rules,
-            refund_policy: FIXED_REFUND_POLICY,
-          },
-          status: 'pending',
-          is_private_enabled: formData.is_private_enabled,
-          private_price: formData.private_price
-        }
-      ]);
+      const response = await fetch('/api/host/experiences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || copy.unknownError);
+      }
 
       // 🟢 [수정됨] 등록 성공 시 알림 띄우고 대시보드로 이동
       showToast(copy.submitSuccess, 'success');

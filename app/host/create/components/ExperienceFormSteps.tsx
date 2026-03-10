@@ -38,44 +38,12 @@ import {
 } from '../config';
 import { type LanguageLevel, type LanguageLevelEntry } from '@/app/utils/languageLevels';
 import { useLanguage } from '@/app/context/LanguageContext';
-
-type ItineraryItem = {
-  title: string;
-  description: string;
-  type: 'meet' | 'spot' | 'end';
-  image_url?: string;
-};
-
-interface ExperienceFormData {
-  country: string;
-  city: string;
-  category: string;
-  languages: string[];
-  language_levels: LanguageLevelEntry[];
-  title: string;
-  photos: string[];
-  location: string;
-  itinerary: ItineraryItem[];
-  description: string;
-  inclusions: string[];
-  exclusions: string[];
-  supplies: string;
-  price: number;
-  duration: number;
-  maxGuests: number;
-  meeting_point?: string;
-  is_private_enabled?: boolean;
-  private_price?: number;
-  rules: {
-    age_limit: string;
-    activity_level: string;
-    refund_policy: string;
-  };
-}
+import { getManualFieldValue, setManualFieldValue, type ExperienceFormState, type ItineraryItem } from '../experienceFormState';
+import { getManualLocalesFromLanguageLevels } from '@/app/utils/experienceTranslation';
 
 interface ExperienceFormStepsProps {
   step: number;
-  formData: ExperienceFormData;
+  formData: ExperienceFormState;
   updateData: (key: string, value: unknown) => void;
   handleCounter: (key: 'duration' | 'maxGuests', type: 'inc' | 'dec') => void;
   handlePhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -190,6 +158,8 @@ export default function ExperienceFormSteps({
 }: ExperienceFormStepsProps) {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
+  const manualLocales = getManualLocalesFromLanguageLevels(formData.language_levels || []);
+  const selectedLanguageOptions = EXPERIENCE_LANGUAGE_OPTIONS.filter((option) => manualLocales.includes(option.code));
   const categoryIconMap: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
     utensils: Utensils,
     coffee: Coffee,
@@ -286,6 +256,30 @@ export default function ExperienceFormSteps({
           <p className="text-[13px] md:text-base text-slate-500">{copy.step2Desc}</p>
         </div>
         <LanguageLevelSelector entries={formData.language_levels || []} updateData={updateData} />
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{copy.sourceLocaleLabel}</label>
+            <p className="text-sm text-slate-500">{copy.sourceLocaleHelp}</p>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            {selectedLanguageOptions.map((option) => {
+              const selected = formData.source_locale === option.code;
+              return (
+                <button
+                  key={option.code}
+                  type="button"
+                  onClick={() => updateData('source_locale', option.code)}
+                  className={`rounded-full border px-4 py-2 text-sm font-bold transition-all ${selected ? 'border-black bg-black text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-black'}`}
+                >
+                  {option.flag} {getLocalizedText(option.labels, lang)}
+                </button>
+              );
+            })}
+            {selectedLanguageOptions.length === 0 && (
+              <p className="text-sm text-slate-400">{copy.validationLanguages}</p>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -299,13 +293,37 @@ export default function ExperienceFormSteps({
         </div>
 
         <div className="space-y-6 md:space-y-8">
-          <input
-            type="text"
-            placeholder={copy.titlePlaceholder}
-            value={formData.title}
-            onChange={(e) => updateData('title', e.target.value)}
-            className="w-full py-3 md:py-3.5 text-xl md:text-2xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300"
-          />
+          <div className="space-y-4">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{copy.titleSectionLabel}</label>
+            <div className="space-y-4">
+              {selectedLanguageOptions.map((option) => {
+                const isSourceLocale = formData.source_locale === option.code;
+                const inputValue = getManualFieldValue(formData.manual_content, option.code, 'title');
+
+                return (
+                  <div key={option.code} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        {option.flag} {getLocalizedText(option.labels, lang)}
+                      </span>
+                      {isSourceLocale && (
+                        <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-bold text-white">
+                          {copy.sourceLocaleBadge}
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={copy.titlePlaceholder}
+                      value={inputValue}
+                      onChange={(e) => updateData('manual_content', setManualFieldValue(formData.manual_content, option.code, 'title', e.target.value))}
+                      className="w-full py-2 text-lg md:text-xl font-black border-b-2 border-slate-200 focus:border-black outline-none bg-transparent placeholder:text-slate-300"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <p className="text-[12px] md:text-sm text-slate-500 leading-relaxed">
             {copy.firstPhotoNotice}
@@ -458,12 +476,34 @@ export default function ExperienceFormSteps({
         </div>
 
         <div className="space-y-6">
-          <textarea
-            placeholder={copy.descriptionPlaceholder}
-            value={formData.description}
-            onChange={(e) => updateData('description', e.target.value)}
-            className="w-full p-4 md:p-5 h-40 md:h-48 bg-slate-50 rounded-2xl outline-none resize-none text-sm md:text-base border border-slate-200 focus:border-black"
-          />
+          <div className="space-y-4">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{copy.descriptionSectionLabel}</label>
+            {selectedLanguageOptions.map((option) => {
+              const isSourceLocale = formData.source_locale === option.code;
+              const inputValue = getManualFieldValue(formData.manual_content, option.code, 'description');
+
+              return (
+                <div key={option.code} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900">
+                      {option.flag} {getLocalizedText(option.labels, lang)}
+                    </span>
+                    {isSourceLocale && (
+                      <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-bold text-white">
+                        {copy.sourceLocaleBadge}
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    placeholder={copy.descriptionPlaceholder}
+                    value={inputValue}
+                    onChange={(e) => updateData('manual_content', setManualFieldValue(formData.manual_content, option.code, 'description', e.target.value))}
+                    className="w-full p-4 h-32 md:h-36 bg-slate-50 rounded-2xl outline-none resize-none text-sm md:text-base border border-slate-200 focus:border-black"
+                  />
+                </div>
+              );
+            })}
+          </div>
 
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">{copy.inclusionsLabel}</label>

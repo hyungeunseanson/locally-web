@@ -20,6 +20,15 @@ import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개�
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
+import { buildExperienceWritePayload, getManualFieldValue, setManualFieldValue, syncManualContentWithLocales } from '@/app/host/create/experienceFormState';
+import {
+  buildManualContentFromExperience,
+  getManualLocalesFromLanguageLevels,
+  getManualLocalesFromManualContent,
+  isExperienceLocale,
+  mergeExperienceLocales,
+  normalizeExperienceLocaleArray,
+} from '@/app/utils/experienceTranslation';
 
 export default function EditExperiencePage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
@@ -35,7 +44,6 @@ export default function EditExperiencePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadingItineraryIndex, setUploadingItineraryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'course'>('basic');
-  const [isAdminUser, setIsAdminUser] = useState(false);
 
   // 데이터 불러오기
   useEffect(() => {
@@ -54,7 +62,6 @@ export default function EditExperiencePage() {
           supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
         ]);
         const isAdmin = profileRes.data?.role === 'admin' || !!whitelistRes.data;
-        setIsAdminUser(isAdmin);
 
         let query = supabase.from('experiences').select('*').eq('id', params.id);
         if (!isAdmin) {
@@ -70,6 +77,14 @@ export default function EditExperiencePage() {
         }
 
         const normalizedLanguageLevels = normalizeLanguageLevels(data.language_levels, data.languages || [], 3);
+        const manualLocales = mergeExperienceLocales(
+          normalizeExperienceLocaleArray(data.manual_locales),
+          getManualLocalesFromLanguageLevels(normalizedLanguageLevels)
+        );
+        const sourceLocale = isExperienceLocale(data.source_locale)
+          ? data.source_locale
+          : (manualLocales[0] || 'ko');
+        const manualContent = buildManualContentFromExperience(data, manualLocales, sourceLocale);
 
         setFormData({
           ...data,
@@ -77,6 +92,8 @@ export default function EditExperiencePage() {
           photos: data.photos || [],
           languages: getLanguageNames(normalizedLanguageLevels),
           language_levels: normalizedLanguageLevels,
+          source_locale: sourceLocale,
+          manual_content: manualContent,
           inclusions: data.inclusions || [],
           exclusions: data.exclusions || [],
           location: data.location || '',
@@ -90,17 +107,6 @@ export default function EditExperiencePage() {
             activity_level: data.rules?.activity_level || '보통',
             refund_policy: FIXED_REFUND_POLICY,
           },
-
-          // 🟢 [추가됨] 다국어 필드 초기화
-          title_en: data.title_en || '',
-          title_ja: data.title_ja || '',
-          title_zh: data.title_zh || '',
-          description_en: data.description_en || '',
-          description_ja: data.description_ja || '',
-          description_zh: data.description_zh || '',
-          category_en: data.category_en || '',
-          category_ja: data.category_ja || '',
-          category_zh: data.category_zh || '',
         });
       } finally {
         setLoading(false);
@@ -141,56 +147,33 @@ export default function EditExperiencePage() {
       const cleanedInclusions = (formData.inclusions || []).map((item: string) => item.trim()).filter(Boolean);
       const cleanedExclusions = (formData.exclusions || []).map((item: string) => item.trim()).filter(Boolean);
       const normalizedLanguageLevels = normalizeLanguageLevels(formData.language_levels, formData.languages || [], 3);
-      const languageNames = getLanguageNames(normalizedLanguageLevels);
+      const payload = buildExperienceWritePayload({
+        ...formData,
+        language_levels: normalizedLanguageLevels,
+        languages: getLanguageNames(normalizedLanguageLevels),
+        inclusions: cleanedInclusions,
+        exclusions: cleanedExclusions,
+        meeting_point: formData.meeting_point || formData.itinerary?.[0]?.title || '',
+        maxGuests: Number(formData.max_guests || formData.maxGuests || 0),
+        rules: {
+          ...formData.rules,
+          refund_policy: FIXED_REFUND_POLICY,
+        },
+      });
 
-      let updateQuery = supabase
-        .from('experiences')
-        .update({
-          // ✅ 기존 필드
-          title: formData.title,
-          price: formData.price,
-          country: formData.country,
-          city: formData.city,
-          category: formData.category,
-          languages: languageNames,
-          language_levels: normalizedLanguageLevels,
-          description: formData.description,
-          photos: formData.photos,
-          inclusions: cleanedInclusions,
-          exclusions: cleanedExclusions,
-          itinerary: formData.itinerary,
-          supplies: formData.supplies,
-          rules: {
-            ...formData.rules,
-            refund_policy: FIXED_REFUND_POLICY,
-          },
-          meeting_point: formData.meeting_point,
-          location: formData.location,
-          max_guests: formData.max_guests,
-          duration: formData.duration,
-          is_private_enabled: Boolean(formData.is_private_enabled),
-          private_price: formData.is_private_enabled ? Number(formData.private_price || 0) : 0,
+      const response = await fetch(`/api/host/experiences/${params.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
 
-          // 🟢 [추가됨] 다국어 필드 업데이트
-          title_en: formData.title_en,
-          title_ja: formData.title_ja,
-          title_zh: formData.title_zh,
-          description_en: formData.description_en,
-          description_ja: formData.description_ja,
-          description_zh: formData.description_zh,
-          category_en: formData.category_en,
-          category_ja: formData.category_ja,
-          category_zh: formData.category_zh,
-        })
-        .eq('id', params.id);
-
-      if (!isAdminUser) {
-        updateQuery = updateQuery.eq('host_id', user.id);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || t('msg_edit_permission_fail'));
       }
 
-      const { data, error } = await updateQuery.select('id').maybeSingle();
-
-      if (error || !data) throw new Error(t('msg_edit_permission_fail'));
       showToast(t('msg_save_success'), 'success'); // 🟢 번역
       router.refresh();
     } catch (e: any) {
@@ -292,7 +275,21 @@ export default function EditExperiencePage() {
     const nextLevels = current.some((entry: any) => entry.language === lang)
       ? current.filter((entry: any) => entry.language !== lang)
       : [...current, { language: lang, level: 3 }];
-    setFormData({ ...formData, language_levels: nextLevels, languages: getLanguageNames(nextLevels) });
+    const nextManualLocales = mergeExperienceLocales(
+      getManualLocalesFromManualContent(formData.manual_content || {}),
+      getManualLocalesFromLanguageLevels(nextLevels)
+    );
+    const nextSourceLocale = nextManualLocales.includes(formData.source_locale)
+      ? formData.source_locale
+      : (nextManualLocales[0] || 'ko');
+
+    setFormData({
+      ...formData,
+      language_levels: nextLevels,
+      languages: getLanguageNames(nextLevels),
+      source_locale: nextSourceLocale,
+      manual_content: syncManualContentWithLocales(formData.manual_content || {}, nextManualLocales, nextSourceLocale),
+    });
   };
   const updateLanguageLevel = (lang: string, level: number) => {
     const current = Array.isArray(formData.language_levels) ? formData.language_levels : [];
@@ -321,6 +318,13 @@ export default function EditExperiencePage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-slate-300" /></div>;
   if (!formData) return <div className="p-10 text-center">{t('msg_load_fail')}</div>; // 🟢 번역
 
+  const manualLocales = mergeExperienceLocales(
+    getManualLocalesFromManualContent(formData.manual_content || {}),
+    getManualLocalesFromLanguageLevels(formData.language_levels || [])
+  );
+  const selectedLanguageOptions = EXPERIENCE_LANGUAGE_OPTIONS.filter((option) => manualLocales.includes(option.code));
+  const sourceTitle = getManualFieldValue(formData.manual_content || {}, formData.source_locale || 'ko', 'title') || formData.title;
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-20 md:pb-0">
       <SiteHeader />
@@ -339,7 +343,7 @@ export default function EditExperiencePage() {
           </button>
         </div>
 
-        <h1 className="text-lg md:text-2xl font-black text-slate-900 leading-tight mb-4 md:mb-6 line-clamp-2">{formData.title}</h1>
+        <h1 className="text-lg md:text-2xl font-black text-slate-900 leading-tight mb-4 md:mb-6 line-clamp-2">{sourceTitle}</h1>
 
         {/* 탭 메뉴 */}
         <div className="flex gap-1.5 md:gap-2 mb-4 md:mb-8 bg-slate-100 p-1 rounded-xl w-fit overflow-x-auto">
@@ -392,18 +396,62 @@ export default function EditExperiencePage() {
               </div>
             </div>
 
-            {/* 🟢 제목 (다국어 지원) */}
+            {/* 제목 / 원문 언어 */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h3 className="font-bold text-sm mb-4 flex items-center gap-2"><Type size={16} /> {t('label_title_ko')}</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_title_ko')}</label>
-                  <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:border-black outline-none" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} />
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2"><Type size={16} /> {copy.titleSectionLabel}</h3>
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-500">{copy.sourceLocaleLabel}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedLanguageOptions.map((option) => {
+                      const selected = formData.source_locale === option.code;
+
+                      return (
+                        <button
+                          key={option.code}
+                          type="button"
+                          onClick={() => setFormData({
+                            ...formData,
+                            source_locale: option.code,
+                            manual_content: syncManualContentWithLocales(formData.manual_content || {}, manualLocales, option.code),
+                          })}
+                          className={`rounded-full border px-4 py-2 text-sm font-bold transition-all ${selected ? 'border-black bg-black text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-black'}`}
+                        >
+                          {option.flag} {getLocalizedText(option.labels, lang)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <InputTrans label={t('label_title_en')} value={formData.title_en} onChange={(e: any) => setFormData({ ...formData, title_en: e.target.value })} placeholder={t('ph_title_en')} />
-                  <InputTrans label={t('label_title_ja')} value={formData.title_ja} onChange={(e: any) => setFormData({ ...formData, title_ja: e.target.value })} placeholder={t('ph_title_ja')} />
-                  <InputTrans label={t('label_title_zh')} value={formData.title_zh} onChange={(e: any) => setFormData({ ...formData, title_zh: e.target.value })} placeholder={t('ph_title_zh')} />
+
+                <div className="grid grid-cols-1 gap-4">
+                  {selectedLanguageOptions.map((option) => {
+                    const isSourceLocale = formData.source_locale === option.code;
+
+                    return (
+                      <div key={option.code} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900">
+                            {option.flag} {getLocalizedText(option.labels, lang)}
+                          </span>
+                          {isSourceLocale && (
+                            <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-bold text-white">
+                              {copy.sourceLocaleBadge}
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold focus:border-black outline-none"
+                          value={getManualFieldValue(formData.manual_content || {}, option.code, 'title')}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            manual_content: setManualFieldValue(formData.manual_content || {}, option.code, 'title', e.target.value),
+                          })}
+                          placeholder={copy.titlePlaceholder}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -459,7 +507,7 @@ export default function EditExperiencePage() {
               </div>
             </div>
 
-            {/* 카테고리 (기존 기능 + 다국어) */}
+            {/* 카테고리 */}
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-3">{t('label_category')}</label>
               <div className="flex flex-wrap gap-2 mb-4">
@@ -468,12 +516,6 @@ export default function EditExperiencePage() {
                     {getLocalizedText(categoryOption.labels, lang)}
                   </button>
                 ))}
-              </div>
-              {/* 🟢 카테고리 다국어 입력 (선택사항) */}
-              <div className="grid grid-cols-3 gap-2">
-                <InputTrans label={t('label_cat_en')} value={formData.category_en} onChange={(e: any) => setFormData({ ...formData, category_en: e.target.value })} />
-                <InputTrans label={t('label_cat_ja')} value={formData.category_ja} onChange={(e: any) => setFormData({ ...formData, category_ja: e.target.value })} />
-                <InputTrans label={t('label_cat_zh')} value={formData.category_zh} onChange={(e: any) => setFormData({ ...formData, category_zh: e.target.value })} />
               </div>
             </div>
 
@@ -553,19 +595,37 @@ export default function EditExperiencePage() {
         {/* 2. 상세 설명 탭 */}
         {activeTab === 'detail' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* 🟢 설명 (다국어 지원) */}
+            {/* 설명 */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h3 className="font-bold text-sm mb-4 flex items-center gap-2"><FileText size={16} /> {t('label_desc_title')}</h3>
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2"><FileText size={16} /> {copy.descriptionSectionLabel}</h3>
               <div className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2">{t('label_desc_ko')}</label>
-                  <textarea className="w-full p-4 h-40 bg-slate-50 border border-slate-200 rounded-xl leading-relaxed focus:border-black outline-none resize-none" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
-                </div>
-                <div className="space-y-4">
-                  <TextAreaTrans label={t('label_desc_en')} value={formData.description_en} onChange={(e: any) => setFormData({ ...formData, description_en: e.target.value })} />
-                  <TextAreaTrans label={t('label_desc_ja')} value={formData.description_ja} onChange={(e: any) => setFormData({ ...formData, description_ja: e.target.value })} />
-                  <TextAreaTrans label={t('label_desc_zh')} value={formData.description_zh} onChange={(e: any) => setFormData({ ...formData, description_zh: e.target.value })} />
-                </div>
+                {selectedLanguageOptions.map((option) => {
+                  const isSourceLocale = formData.source_locale === option.code;
+
+                  return (
+                    <div key={option.code} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-900">
+                          {option.flag} {getLocalizedText(option.labels, lang)}
+                        </span>
+                        {isSourceLocale && (
+                          <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-bold text-white">
+                            {copy.sourceLocaleBadge}
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        className="w-full p-4 h-40 bg-white border border-slate-200 rounded-xl leading-relaxed focus:border-black outline-none resize-none"
+                        value={getManualFieldValue(formData.manual_content || {}, option.code, 'description')}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          manual_content: setManualFieldValue(formData.manual_content || {}, option.code, 'description', e.target.value),
+                        })}
+                        placeholder={copy.descriptionPlaceholder}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -690,25 +750,6 @@ export default function EditExperiencePage() {
         )}
 
       </main>
-    </div>
-  );
-}
-
-// 🟡 헬퍼 컴포넌트
-function InputTrans({ label, value, onChange, placeholder }: any) {
-  return (
-    <div>
-      <label className="block text-[10px] font-bold text-slate-400 mb-1">{label}</label>
-      <input className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-black outline-none" value={value || ''} onChange={onChange} placeholder={placeholder} />
-    </div>
-  );
-}
-
-function TextAreaTrans({ label, value, onChange }: any) {
-  return (
-    <div>
-      <label className="block text-[10px] font-bold text-slate-400 mb-1">{label}</label>
-      <textarea className="w-full p-3 h-24 bg-white border border-slate-200 rounded-lg text-sm focus:border-black outline-none resize-none" value={value || ''} onChange={onChange} />
     </div>
   );
 }

@@ -5,6 +5,54 @@
 
 ---
 
+## v3.37.62 — [Experience Translation] guest-facing 본문 필드 자동번역 확장
+
+**작업일:** 2026-03-10
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 번역 범위 확장 | 기존 title/description만 번역하던 worker를 확장해 `meeting_point`, `supplies`, `inclusions`, `exclusions`, `itinerary`, `rules`까지 locale별 JSON으로 함께 생성하도록 정리 |
+| 🟡 additive migration 추가 | `supabase_experience_translation_content_migration.sql`을 추가해 `meeting_point_i18n`, `supplies_i18n`, `inclusions_i18n`, `exclusions_i18n`, `itinerary_i18n`, `rules_i18n` 컬럼과 기존 데이터 source-locale backfill을 준비 |
+| 🟡 dirty-check 범위 보강 | PATCH 저장 시 제목/소개글뿐 아니라 일정/포함사항/준비물/규칙 등 본문 필드가 바뀌어도 재번역이 정확히 enqueue 되도록 범위를 확장 |
+| 🟡 상세 노출 연결 | 체험 상세의 만나는 장소, itinerary, 포함/불포함 사항, 준비물, 규칙이 locale별 i18n JSON을 우선 읽도록 연결 |
+| ✅ 검증 | `npx tsc --noEmit`, 대상 파일 `eslint`, `git diff --check` 통과 |
+
+## v3.37.61 — [Experience Translation] 회귀 방지 보강
+
+**작업일:** 2026-03-10
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 manual locale 보존 | edit 화면과 PATCH 저장이 기존 DB `manual_locales`를 `language_levels`와 병합해 인식하도록 수정해, 과거 수동 번역 컬럼이 첫 수정 저장에서 사라지던 회귀를 방지 |
+| 🟡 dirty-check 추가 | title/description/source_locale/manual_locales 중 실제 변경이 있을 때만 `translation_version` 증가 및 queue enqueue가 일어나도록 수정해, 가격/사진/규칙만 바꿀 때 불필요한 재번역과 번역 컬럼 clear를 차단 |
+| 🟡 TPM rate-limit 보완 | worker RPC와 cron route에 reserved token 기반 TPM 체크/정산을 추가해 RPM뿐 아니라 token window도 provider state에서 함께 제어하도록 정리 |
+| ✅ 검증 | `npx tsc --noEmit`, `git diff --check` 통과. 대상 파일 `eslint`는 기존 `<img>` 경고만 잔존 |
+
+## v3.37.60 — [Experience Translation] host write path/API 전환 및 worker 초안
+
+**작업일:** 2026-03-10
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 host 저장 경로 이관 | 체험 생성/수정이 더 이상 클라이언트 direct `experiences` write를 사용하지 않고 `POST /api/host/experiences`, `PATCH /api/host/experiences/:id` 서버 API를 통해 canonical locale / manual locale / queue payload를 일관 계산하도록 변경 |
+| 🟡 생성/수정 폼 전환 | host create/edit 화면을 `source_locale + manual_content` 구조로 재구성해, 호스트가 선택한 구사 언어에 대해서만 제목/소개글을 직접 입력하고 자동 번역 대상 언어는 UI에서 숨김 |
+| 🟡 read fallback 보정 | `getContent()`가 `ko`에서도 `field_ko`를 우선 읽도록 변경해 새 canonical/locale 컬럼 구조와 노출 로직을 맞춤 |
+| 🟡 worker / provider layer 추가 | `app/api/cron/experience-translations/route.ts`와 Gemini/Grok provider adapter를 추가해 queued task 처리, Gemini 실패 시 Grok fallback, task/job 상태 갱신 흐름을 구현 |
+| 🟡 RPC migration 추가 | `supabase_experience_translation_worker_functions.sql`에 `lease_experience_translation_task`, `record_translation_provider_outcome` RPC를 추가해 provider-aware lease 및 cooldown/token bookkeeping을 DB 중심으로 처리할 수 있게 정리 |
+| ✅ 검증 | 대상 파일 `eslint`는 `<img>` 기존 경고만 남기고 통과, `npx tsc --noEmit` 통과, `git diff --check` 통과 |
+
+## v3.37.59 — [Experience Translation] DB scaffold 및 backfill baseline
+
+**작업일:** 2026-03-10
+
+| 항목 | 내용 |
+|------|------|
+| 🟡 additive migration 추가 | `supabase_experience_translation_queue_migration.sql`을 추가해 `experiences`에 `title_ko`, `description_ko`, `source_locale`, `manual_locales`, `translation_version`, `translation_meta`를 안전하게 확장 |
+| 🟡 queue / provider state 도입 | `experience_translation_jobs`, `experience_translation_tasks`, `translation_provider_state` 테이블과 dispatch index, Gemini/Grok 기본 seed를 추가해 후속 worker가 DB 중심 rate-limit 제어를 사용할 수 있게 준비 |
+| 🟡 기존 데이터 backfill | 기존 `title/description`을 `*_ko`로 복제하고, 비어 있는 `manual_locales` / `translation_meta`만 채우는 보수적 backfill을 적용하도록 설계해 재실행 시 운영값을 최대한 덮어쓰지 않도록 정리 |
+| 🟡 기준 문서 갱신 | `docs/gemini.md`에 Experience translation canonical/queue/rate-limit 원칙을 추가 |
+| ✅ 검증 | `git diff --check` 통과. 이 환경에는 `psql`/`supabase` CLI와 DB admin 연결 정보가 없어 원격 Supabase 실제 적용은 미실행 |
+
 ## v3.37.58 — [Wishlist] 하트 즉시 반응 및 다중 카드 pending 동기화
 
 **작업일:** 2026-03-09

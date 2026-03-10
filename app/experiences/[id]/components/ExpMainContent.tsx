@@ -7,8 +7,16 @@ import Image from 'next/image';
 import ReviewSection from './ReviewSection';
 import HostProfileSection from './HostProfileSection';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { ExperienceDetail, ExperienceItineraryItem, HostProfileDetail } from '../types';
 import { formatLanguageLevelSummary, normalizeLanguageLevels } from '@/app/utils/languageLevels';
+import {
+  getLocalizedExperienceItinerary,
+  getLocalizedExperienceList,
+  getLocalizedExperienceRules,
+  getLocalizedExperienceText,
+  getLocalizedRefundPolicyLabel,
+} from '@/app/utils/experienceTranslation';
 
 type MainContentProps = {
   experience: ExperienceDetail;
@@ -23,15 +31,20 @@ type MainContentProps = {
 export default function ExpMainContent({
   experience, hostProfile, handleInquiry, inquiryText, setInquiryText, translatedDescription, translatedCategory
 }: MainContentProps) {
-  const fixedRefundPolicy = '표준 정책 (7일 전 무료 취소)';
+  const { lang } = useLanguage();
+  const fixedRefundPolicy = getLocalizedRefundPolicyLabel(lang);
   const { showToast } = useToast();
   const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
   const [isSubmittingMessage, setIsSubmittingMessage] = React.useState(false);
-  const meetingPoint = (experience.meeting_point || '').trim();
+  const meetingPoint = getLocalizedExperienceText(experience, 'meeting_point', lang).trim();
   const addressLine = (experience.location || '').trim();
   const mapQuery = addressLine || meetingPoint || String(experience.city || 'Seoul');
   const copyTarget = addressLine || meetingPoint || mapQuery;
-  const itinerary: ExperienceItineraryItem[] = Array.isArray(experience.itinerary) ? experience.itinerary : [];
+  const itinerary: ExperienceItineraryItem[] = getLocalizedExperienceItinerary(experience, lang);
+  const inclusions = getLocalizedExperienceList(experience, 'inclusions', lang);
+  const exclusions = getLocalizedExperienceList(experience, 'exclusions', lang);
+  const supplies = getLocalizedExperienceText(experience, 'supplies', lang);
+  const rules = getLocalizedExperienceRules(experience, lang);
   const heroPhotos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
@@ -177,7 +190,7 @@ export default function ExpMainContent({
             <div>
               <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">게스트 필수조건</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
-                {experience.rules?.age_limit || '14세 이상'} 게스트만 참가할 수 있습니다. 최대 인원은 {experience.max_guests || 10}명입니다.
+                {rules.age_limit || '14세 이상'} 게스트만 참가할 수 있습니다. 최대 인원은 {experience.max_guests || 10}명입니다.
               </p>
             </div>
           </div>
@@ -187,7 +200,7 @@ export default function ExpMainContent({
             <div>
               <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">활동 강도</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
-                신체 활동 강도: {experience.rules?.activity_level || '보통'}
+                신체 활동 강도: {rules.activity_level || '보통'}
               </p>
             </div>
           </div>
@@ -197,8 +210,8 @@ export default function ExpMainContent({
             <div>
               <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">포함 사항</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
-                {Array.isArray(experience.inclusions) && experience.inclusions.length > 0
-                  ? experience.inclusions.join(', ')
+                {inclusions.length > 0
+                  ? inclusions.join(', ')
                   : '현장 안내를 참고해주세요.'}
               </p>
             </div>
@@ -209,8 +222,8 @@ export default function ExpMainContent({
             <div>
               <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">불포함 사항</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
-                {Array.isArray(experience.exclusions) && experience.exclusions.length > 0
-                  ? experience.exclusions.join(', ')
+                {exclusions.length > 0
+                  ? exclusions.join(', ')
                   : '별도 구매가 필요한 항목은 현장에서 안내됩니다.'}
               </p>
             </div>
@@ -221,7 +234,7 @@ export default function ExpMainContent({
             <div>
               <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">준비물</h4>
               <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
-                {experience.supplies || '편한 복장과 개인 물품을 준비해주세요.'}
+                {supplies || '편한 복장과 개인 물품을 준비해주세요.'}
               </p>
             </div>
           </div>
