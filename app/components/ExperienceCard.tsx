@@ -90,19 +90,19 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
         <div className="flex justify-between items-start">
           <div className="min-w-0 pr-2">
             <div className="flex items-center gap-1 overflow-hidden">
-              <h3 className="font-bold text-slate-900 text-[12px] md:text-[15px] truncate tracking-tight">
+              <h3 className="font-bold text-slate-900 text-[11px] md:text-[13px] truncate leading-none tracking-tight">
                 {location}
               </h3>
               {languageBadges.visible.map((label) => (
                 <span
                   key={label}
-                  className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]"
+                  className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]"
                 >
                   {label}
                 </span>
               ))}
               {languageBadges.hiddenCount > 0 && (
-                <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]">
+                <span className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]">
                   {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
                 </span>
               )}

@@ -409,15 +409,15 @@ function SearchResults() {
         </div>
         <div className="pt-2">
           <p className="text-[11px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
-          <div className="mt-0.5 flex items-center gap-1 overflow-hidden text-[11px] text-[#6B6B6B]">
-            <span className="truncate">{city}</span>
+          <div className="mt-0.5 flex items-center gap-1 overflow-hidden text-[10px] text-[#6B6B6B]">
+            <span className="truncate leading-none">{city}</span>
             {languageBadges.visible.map((label) => (
-              <span key={label} className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600">
+              <span key={label} className="inline-flex h-[14px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600">
                 {label}
               </span>
             ))}
             {languageBadges.hiddenCount > 0 && (
-              <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600">
+              <span className="inline-flex h-[14px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600">
                 {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
               </span>
             )}

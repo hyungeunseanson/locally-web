@@ -168,18 +168,18 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
         <h3 className="line-clamp-2 text-[11px] font-semibold leading-[1.28] tracking-[-0.01em] text-[#1F1F1F] md:text-[15px] md:leading-[1.3]">
           {title}
         </h3>
-        <div className="flex items-center gap-1 overflow-hidden text-[10px] text-slate-500 md:text-[14px]">
-          <span className="truncate">{location}</span>
+        <div className="flex items-center gap-1 overflow-hidden text-[9px] text-slate-500 md:text-[12px]">
+          <span className="truncate leading-none">{location}</span>
           {languageBadges.visible.map((label) => (
             <span
               key={label}
-              className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]"
+              className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]"
             >
               {label}
             </span>
           ))}
           {languageBadges.hiddenCount > 0 && (
-            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]">
+            <span className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]">
               {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
             </span>
           )}
