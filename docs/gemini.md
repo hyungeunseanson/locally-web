@@ -337,12 +337,15 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - worker는 provider row를 `FOR UPDATE`로 lease하여 RPM / 동시성 제한을 강제한다.
 - 기본 seed는 `gemini-2.5-flash` 8 RPM / concurrency 1, `grok-3-fast` 60 RPM / concurrency 2다.
 - 운영 환경에서는 model / RPM 값을 환경변수 override로 조정한다.
+- Gemini 2.5 Flash가 `503/high demand/rate-limit`류의 일시 오류를 내면 provider 내부에서 `gemini-2.5-flash-lite`를 한 번 더 시도하고, 그 뒤에도 retryable이면 queue 규칙으로 넘긴다.
 - lease RPC는 RPM뿐 아니라 reserved token 기반 TPM도 함께 체크하고, outcome RPC에서 reserved token을 실제 사용 token으로 정산한다.
 
 ### 12.4 worker / fallback
 
 - cron route는 `GET /api/cron/experience-translations` 이고 `CRON_SECRET`으로 보호한다.
 - worker는 `lease_experience_translation_task()` RPC로 provider-aware task lease를 수행해 DB 단에서 RPM / concurrency를 강제한다.
-- Gemini task 처리 중 retryable / quota / 5xx 오류가 나면 task provider를 `grok`으로 바꾸고 같은 queue에서 재시도한다.
+- Gemini task 처리 중 retryable / quota / 5xx 오류가 나면, 먼저 Gemini 내부 `Flash -> Flash-Lite` fallback을 1회 시도한다.
+- 그 뒤에도 retryable이면 `XAI_API_KEY`가 있을 때만 task provider를 `grok`으로 바꾸고 같은 queue에서 재시도한다.
+- `XAI_API_KEY`가 없으면 Gemini provider로 backoff 후 `retryable` 상태를 유지한다.
 - Grok 실패 시에는 backoff 후 `retryable`, 최대 시도 수 초과 시 `failed`로 종료한다.
 - provider token/cooldown bookkeeping은 `record_translation_provider_outcome()` RPC로 반영한다.

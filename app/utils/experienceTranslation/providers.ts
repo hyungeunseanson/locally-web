@@ -258,6 +258,42 @@ function parseRetryAfterSeconds(value: string | null): number | null {
   return null;
 }
 
+function getGeminiFallbackModel(primaryModel: string) {
+  const normalizedPrimary = primaryModel.trim().toLowerCase();
+  if (!normalizedPrimary.includes('flash') || normalizedPrimary.includes('lite')) {
+    return null;
+  }
+
+  const fallbackModel = (process.env.TRANSLATION_GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash-lite').trim();
+  if (!fallbackModel || fallbackModel === primaryModel) {
+    return null;
+  }
+
+  return fallbackModel;
+}
+
+function shouldUseGeminiFallbackModel(
+  primaryModel: string,
+  error: TranslationProviderError
+) {
+  const fallbackModel = getGeminiFallbackModel(primaryModel);
+  if (!fallbackModel || !error.retryable) {
+    return null;
+  }
+
+  const normalizedMessage = error.message.toLowerCase();
+  const inferredStatus = inferStatusFromMessage(normalizedMessage);
+  const isTemporaryOverload = inferredStatus === 429
+    || inferredStatus === 503
+    || normalizedMessage.includes('service unavailable')
+    || normalizedMessage.includes('currently experiencing high demand')
+    || normalizedMessage.includes('please try again later')
+    || normalizedMessage.includes('rate limit')
+    || normalizedMessage.includes('too many requests');
+
+  return isTemporaryOverload ? fallbackModel : null;
+}
+
 function parseProviderError(
   provider: 'gemini' | 'grok',
   status: number | null,
@@ -323,6 +359,40 @@ function toProviderError(
   });
 }
 
+function normalizeGeminiProviderError(error: unknown) {
+  if (error instanceof TranslationProviderError) {
+    return error;
+  }
+
+  const message = error instanceof Error ? error.message : 'Gemini translation failed';
+  const parsed = parseProviderError('gemini', null, message);
+
+  return new TranslationProviderError({
+    provider: 'gemini',
+    message,
+    retryable: parsed.retryable,
+    quota: parsed.quota,
+    cooldownSeconds: parsed.cooldownSeconds,
+  });
+}
+
+async function generateGeminiTranslation(
+  request: TranslationRequest,
+  model: string
+): Promise<TranslationResult> {
+  const geminiModel = genAI.getGenerativeModel({ model });
+  const result = await geminiModel.generateContent(buildTranslationPrompt(request));
+  const response = result.response;
+  const usage = response.usageMetadata;
+  const text = response.text().trim();
+  const parsed = parseTranslationJson(text, 'gemini', request);
+
+  return {
+    ...parsed,
+    totalTokens: Number(usage?.totalTokenCount || 0),
+  };
+}
+
 export async function translateWithGemini(request: TranslationRequest): Promise<TranslationResult> {
   if (!process.env.GEMINI_API_KEY) {
     throw new TranslationProviderError({
@@ -333,32 +403,26 @@ export async function translateWithGemini(request: TranslationRequest): Promise<
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: request.model });
-    const result = await model.generateContent(buildTranslationPrompt(request));
-    const response = result.response;
-    const usage = response.usageMetadata;
-    const text = response.text().trim();
-    const parsed = parseTranslationJson(text, 'gemini', request);
-
-    return {
-      ...parsed,
-      totalTokens: Number(usage?.totalTokenCount || 0),
-    };
+    return await generateGeminiTranslation(request, request.model);
   } catch (error) {
-    if (error instanceof TranslationProviderError) {
-      throw error;
+    const providerError = normalizeGeminiProviderError(error);
+    const fallbackModel = shouldUseGeminiFallbackModel(request.model, providerError);
+
+    if (fallbackModel) {
+      try {
+        return await generateGeminiTranslation(
+          {
+            ...request,
+            model: fallbackModel,
+          },
+          fallbackModel
+        );
+      } catch (fallbackError) {
+        throw normalizeGeminiProviderError(fallbackError);
+      }
     }
 
-    const message = error instanceof Error ? error.message : 'Gemini translation failed';
-    const parsed = parseProviderError('gemini', null, message);
-
-    throw new TranslationProviderError({
-      provider: 'gemini',
-      message,
-      retryable: parsed.retryable,
-      quota: parsed.quota,
-      cooldownSeconds: parsed.cooldownSeconds,
-    });
+    throw providerError;
   }
 }
 

@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.63 — [Experience Translation] Gemini Flash-Lite fallback 보강
+
+**작업일:** 2026-03-10
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Gemini 과부하 완화 | `gemini-2.5-flash`가 `503 Service Unavailable`, `high demand`, rate-limit류 일시 오류를 반환할 때 provider 내부에서 `gemini-2.5-flash-lite`를 한 번 더 시도하도록 보강 |
+| 🟡 queue 회귀 방지 | `XAI_API_KEY`가 없는 환경에서는 Gemini retryable 오류를 무조건 Grok으로 넘기지 않고, 기존 provider로 backoff 후 `retryable` 유지하도록 조정 |
+| 🟡 운영 문서 갱신 | `docs/gemini.md`에 Flash → Flash-Lite → Grok fallback 순서를 반영 |
+| ✅ 검증 | `npx tsc --noEmit`, `git diff --check` 통과 |
+
 ## v3.37.62 — [Experience Translation] guest-facing 본문 필드 자동번역 확장
 
 **작업일:** 2026-03-10
