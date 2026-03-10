@@ -1,0 +1,59 @@
+name: Experience Translation Queue
+
+on:
+  schedule:
+    # 매일 한국 시간 새벽 4시 17분 (UTC 19:17)에 queued / retryable 번역 task 복구
+    - cron: '17 19 * * *'
+
+  workflow_dispatch:
+    inputs:
+      repeat_count:
+        description: '번역 큐 처리 API를 최대 몇 번 연속 호출할지 선택'
+        required: true
+        default: '10'
+        type: choice
+        options:
+          - '1'
+          - '3'
+          - '5'
+          - '10'
+
+concurrency:
+  group: experience-translation-queue
+  cancel-in-progress: false
+
+jobs:
+  run-translation-queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Process queued translation tasks
+        env:
+          PROD_URL: ${{ secrets.PROD_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          REPEAT_COUNT: ${{ github.event.inputs.repeat_count || '10' }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 "$REPEAT_COUNT"); do
+            echo "Translation queue attempt $attempt/$REPEAT_COUNT"
+
+            response=$(curl --silent --show-error --fail-with-body \
+              -X GET "${PROD_URL}/api/cron/experience-translations" \
+              -H "Authorization: Bearer ${CRON_SECRET}")
+
+            echo "$response"
+
+            success=$(echo "$response" | jq -r '.success // false')
+            processed=$(echo "$response" | jq -r '.processed // 0')
+
+            if [ "$success" != "true" ]; then
+              echo "Translation cron route returned success=false"
+              exit 1
+            fi
+
+            if [ "$processed" = "0" ]; then
+              echo "No more queued translation tasks detected; stopping early."
+              break
+            fi
+          done
