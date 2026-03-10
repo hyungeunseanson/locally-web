@@ -23,6 +23,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
+import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 
 export interface HomeExperienceCardData {
   id: number | string;
@@ -37,6 +38,7 @@ export interface HomeExperienceCardData {
   city?: string | null;
   country?: string | null;
   location?: string | null;
+  languages?: string[] | null;
   price?: number | string | null;
   rating?: number | null;
   review_count?: number | null;
@@ -92,6 +94,8 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
   const rawPrice = typeof data.price === 'number' ? data.price : Number(data.price);
   const price = Number.isFinite(rawPrice) ? rawPrice.toLocaleString() : '45,000';
+  const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
+  const languageBadges = getExperienceLanguageBadges(data.languages, lang);
   const ratingValue = Number(data.rating || 0);
   const ratingText = ratingValue > 0 ? `★${ratingValue.toFixed(1)}` : t('exp_card_new');
   const imageUrl = data.photos?.[0] || data.image_url || 'https://images.unsplash.com/photo-1542051841857-5f90071e7989';
@@ -164,15 +168,25 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
         <h3 className="line-clamp-2 text-[11px] font-semibold leading-[1.28] tracking-[-0.01em] text-[#1F1F1F] md:text-[15px] md:leading-[1.3]">
           {title}
         </h3>
-        <p className="line-clamp-1 text-[10px] text-slate-500 md:text-[14px]">
-          {location}
-        </p>
+        <div className="flex items-center gap-1 overflow-hidden text-[10px] text-slate-500 md:text-[14px]">
+          <span className="truncate">{location}</span>
+          {languageBadges.visible.map((label) => (
+            <span
+              key={label}
+              className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]"
+            >
+              {label}
+            </span>
+          ))}
+          {languageBadges.hiddenCount > 0 && (
+            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]">
+              {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
+            </span>
+          )}
+        </div>
         <div className="mt-0.5 flex items-center gap-1 overflow-hidden whitespace-nowrap text-[10px] text-slate-500 md:text-[14px]">
-          <span className="shrink-0">{t('exp_card_per_person')}</span>
-          <span className="truncate font-semibold text-slate-900">
-            ₩{price}
-            {t('exp_card_price_from')}
-          </span>
+          <span className="shrink-0">{pricePrefix}</span>
+          <span className="truncate font-semibold text-slate-900">₩{price}{priceSuffix}</span>
           <span className="shrink-0 text-slate-300">·</span>
           <span className="shrink-0 font-medium">{ratingText}</span>
         </div>

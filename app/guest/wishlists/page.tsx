@@ -12,6 +12,7 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import Spinner from '@/app/components/ui/Spinner';
 import { getContent } from '@/app/utils/contentHelper';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
+import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 
 interface WishlistExperience {
   id: number;
@@ -23,6 +24,7 @@ interface WishlistExperience {
   country?: string | null;
   subCity?: string | null;
   location?: string | null;
+  languages?: string[] | null;
   category?: string | null;
   category_en?: string | null;
   category_ja?: string | null;
@@ -62,6 +64,7 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
           country: exp.country ?? null,
           subCity: exp.subCity ?? null,
           location: exp.location ?? null,
+          languages: exp.languages ?? null,
           category: exp.category ?? null,
           category_en: exp.category_en ?? null,
           category_ja: exp.category_ja ?? null,
@@ -208,6 +211,8 @@ export default function WishlistsPage() {
               const title = getContent(exp, 'title', lang) || exp.title || t('exp_card_title_fallback');
               const category = getContent(exp, 'category', lang) || exp.category || t('cat_exp');
               const location = formatLocalizedExperienceLocation(exp, lang) || t('exp_card_location_fallback');
+              const languageBadges = getExperienceLanguageBadges(exp.languages, lang);
+              const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
 
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
@@ -236,7 +241,22 @@ export default function WishlistsPage() {
 
                   <div className="space-y-0.5 px-0.5">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-slate-900 text-[11px] md:text-[12px] truncate pr-1">{location} · {category}</h3>
+                      <div className="min-w-0 pr-1">
+                        <div className="flex items-center gap-1 overflow-hidden">
+                          <h3 className="font-semibold text-slate-900 text-[11px] md:text-[12px] truncate">{location}</h3>
+                          {languageBadges.visible.map((label) => (
+                            <span key={label} className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[10px]">
+                              {label}
+                            </span>
+                          ))}
+                          {languageBadges.hiddenCount > 0 && (
+                            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[10px]">
+                              {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{category}</p>
+                      </div>
                       <div className="flex items-center gap-0.5 text-[10px] md:text-[11px] shrink-0">
                         <Star className={`w-[10px] h-[10px] md:w-[11px] md:h-[11px] ${hasRating ? "" : "text-slate-300"}`} fill={hasRating ? "black" : "none"} />
                         <span>{hasRating ? ratingValue.toFixed(1) : t('exp_card_new')}</span>
@@ -244,8 +264,8 @@ export default function WishlistsPage() {
                     </div>
                     <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{title}</p>
                     <div className="mt-0.5">
-                      <span className="font-bold text-slate-900 text-[11px] md:text-[12px]">₩{Number(exp.price).toLocaleString()}</span>
-                      <span className="text-[10px] md:text-[11px] text-slate-500 font-normal"> {t('exp_card_per_person')}</span>
+                      <span className="text-[10px] md:text-[11px] text-slate-500 font-normal">{pricePrefix}</span>
+                      <span className="font-bold text-slate-900 text-[11px] md:text-[12px]">₩{Number(exp.price).toLocaleString()}{priceSuffix}</span>
                     </div>
                   </div>
                 </Link>

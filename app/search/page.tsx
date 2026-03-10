@@ -33,6 +33,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
+import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 
 interface SearchExperience {
   id: string;
@@ -40,6 +41,7 @@ interface SearchExperience {
   category?: string;
   city?: string;
   country?: string;
+  languages?: string[];
   image_url?: string;
   photos?: string[];
   rating?: number;
@@ -388,6 +390,8 @@ function SearchResults() {
         { city: item.city, country: item.country, location: location || undefined },
         lang
       ) || t('exp_card_location_fallback');
+    const languageBadges = getExperienceLanguageBadges(item.languages, lang);
+    const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
     const rating = item.rating && item.rating > 0 ? item.rating.toFixed(2) : t('exp_card_new');
     const rawPrice = typeof item.price === 'number' ? item.price : Number(item.price);
     const price = Number.isFinite(rawPrice) ? Number(rawPrice).toLocaleString() : '45,000';
@@ -405,11 +409,21 @@ function SearchResults() {
         </div>
         <div className="pt-2">
           <p className="text-[11px] font-semibold text-[#222] leading-[1.35] line-clamp-2">{title}</p>
-          <p className="mt-0.5 text-[11px] text-[#6B6B6B] line-clamp-1">
-            {city} · {t('exp_card_duration_hours', { hours: 6 })}
-          </p>
+          <div className="mt-0.5 flex items-center gap-1 overflow-hidden text-[11px] text-[#6B6B6B]">
+            <span className="truncate">{city}</span>
+            {languageBadges.visible.map((label) => (
+              <span key={label} className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600">
+                {label}
+              </span>
+            ))}
+            {languageBadges.hiddenCount > 0 && (
+              <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600">
+                {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-[11px] text-[#3E3E3E]">
-            {t('exp_card_per_person')} <span className="font-semibold">₩{price}{t('exp_card_price_from')}</span> · ★ {rating}
+            {pricePrefix}<span className="font-semibold">₩{price}{priceSuffix}</span> · ★ {rating}
           </p>
         </div>
       </Link>

@@ -4,6 +4,7 @@ export const experienceUiDictionary: Record<Locale, Record<string, string>> = {
   ko: {
     exp_card_location_fallback: 'Locally',
     exp_card_title_fallback: '로컬 체험',
+    exp_card_languages_more: '+{count}',
     exp_card_new: '신규',
     exp_card_wishlist_toggle: '위시리스트 저장',
     exp_card_per_person: '1인당',
@@ -112,6 +113,7 @@ export const experienceUiDictionary: Record<Locale, Record<string, string>> = {
   en: {
     exp_card_location_fallback: 'Locally',
     exp_card_title_fallback: 'Local experience',
+    exp_card_languages_more: '+{count}',
     exp_card_new: 'New',
     exp_card_wishlist_toggle: 'Save to wishlist',
     exp_card_per_person: 'Per person',
@@ -220,6 +222,7 @@ export const experienceUiDictionary: Record<Locale, Record<string, string>> = {
   ja: {
     exp_card_location_fallback: 'Locally',
     exp_card_title_fallback: 'ローカル体験',
+    exp_card_languages_more: '+{count}',
     exp_card_new: '新着',
     exp_card_wishlist_toggle: 'ウィッシュリストに保存',
     exp_card_per_person: '1人あたり',
@@ -328,6 +331,7 @@ export const experienceUiDictionary: Record<Locale, Record<string, string>> = {
   zh: {
     exp_card_location_fallback: 'Locally',
     exp_card_title_fallback: '本地体验',
+    exp_card_languages_more: '+{count}',
     exp_card_new: '新上架',
     exp_card_wishlist_toggle: '保存到心愿单',
     exp_card_per_person: '每人',

@@ -8,6 +8,7 @@ import { useWishlist } from '@/app/hooks/useWishlist';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
+import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
 
 type ExperienceCardData = {
   id: number | string;
@@ -21,7 +22,9 @@ type ExperienceCardData = {
   category_zh?: string | null;
   city?: string | null;
   subCity?: string | null;
+  country?: string | null;
   location?: string | null;
+  languages?: string[] | null;
   image_url?: string | null;
   photos?: string[] | null;
   rating?: number | null;
@@ -44,6 +47,8 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
 
   // 지역 정보 (없으면 기본값)
   const location = formatLocalizedExperienceLocation(data, lang) || t('exp_card_location_fallback');
+  const languageBadges = getExperienceLanguageBadges(data.languages, lang);
+  const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
   const rating = Number(data.rating || 0);
   const reviewCount = Number(data.review_count || 0);
 
@@ -83,9 +88,27 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
 
         {/* 1열: [지역 · 카테고리] --------- [별점] */}
         <div className="flex justify-between items-start">
-          <h3 className="font-bold text-slate-900 text-[12px] md:text-[15px] truncate pr-2 tracking-tight">
-            {location} · {category}
-          </h3>
+          <div className="min-w-0 pr-2">
+            <div className="flex items-center gap-1 overflow-hidden">
+              <h3 className="font-bold text-slate-900 text-[12px] md:text-[15px] truncate tracking-tight">
+                {location}
+              </h3>
+              {languageBadges.visible.map((label) => (
+                <span
+                  key={label}
+                  className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]"
+                >
+                  {label}
+                </span>
+              ))}
+              {languageBadges.hiddenCount > 0 && (
+                <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-[1px] text-[9px] font-medium text-slate-600 md:px-2 md:py-0.5 md:text-[11px]">
+                  {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-[10px] md:text-[13px] text-slate-500 truncate">{category}</p>
+          </div>
           <div className="flex items-center gap-0.5 md:gap-1 text-[11px] md:text-sm shrink-0">
             <Star size={11} className="md:w-[14px] md:h-[14px]" fill={rating > 0 ? "black" : "none"} />
             <span>{rating > 0 ? rating.toFixed(2) : t('exp_card_new')}</span>
@@ -100,9 +123,9 @@ export default function ExperienceCard({ data }: { data: ExperienceCardData }) {
 
         {/* 3열: 가격 */}
         <div className="mt-0.5 md:mt-1">
-          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{t('exp_card_per_person')} </span>
+          <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{pricePrefix}</span>
           <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
-            ₩{Number(data.price).toLocaleString()}{t('exp_card_price_from')}
+            ₩{Number(data.price).toLocaleString()}{priceSuffix}
           </span>
         </div>
       </div>
