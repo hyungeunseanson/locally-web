@@ -475,7 +475,7 @@ async function processTask(
       RESERVED_TOKENS[task.provider]
     );
 
-    if (task.provider === 'gemini' && providerError.retryable) {
+    if (task.provider === 'gemini' && providerError.retryable && process.env.XAI_API_KEY) {
       await markTaskRetryable(supabaseAdmin, task, 'grok', 0, providerError.message);
       return 'retried' as const;
     }

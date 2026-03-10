@@ -96,7 +96,8 @@ openssl rand -hex 32
 
 - Name: `PROD_URL`
 - Secret: 운영 주소
-- 예: `https://your-production-domain.com`
+- 예: `https://locally-web.vercel.app`
+- 커스텀 도메인을 쓰면 그 주소를 넣으면 됩니다
 
 ---
 
@@ -113,6 +114,16 @@ openssl rand -hex 32
 7. 저장합니다.
 8. 필요하면 재배포합니다.
 
+번역이 실제로 돌려면 `GEMINI_API_KEY`도 Vercel에 있어야 합니다.
+
+추가로 확인:
+- Key: `GEMINI_API_KEY`
+- Value: 네 Gemini API 키
+
+중요:
+- `.env.local`에만 있으면 로컬에서만 보입니다
+- GitHub Actions가 호출하는 것은 `Vercel 서버`라서, Vercel에도 있어야 합니다
+
 ---
 
 ## 8. 언제 이 설정이 필요한가
@@ -120,6 +131,7 @@ openssl rand -hex 32
 아래 같은 에러가 나오면 이 설정부터 보면 됩니다.
 
 - `Unauthorized`
+- `exit code 3`
 
 이 뜻은 거의 항상 아래 둘 중 하나입니다.
 
@@ -127,6 +139,25 @@ openssl rand -hex 32
 - Vercel의 `CRON_SECRET` 값이 틀림
 
 즉, 두 곳 값이 서로 정확히 같아야 합니다.
+
+`exit code 3`는 보통 `PROD_URL`이 비어 있거나 잘못 적힌 경우입니다.
+
+예:
+- `https://locally-web.vercel.app`
+- `https://내-커스텀-도메인.com`
+
+틀린 예:
+- `locally-web.vercel.app`
+- `/api/cron/experience-translations`
+
+만약 `last_error`에 `GEMINI_API_KEY is not set`가 보이면:
+
+1. Vercel `Settings`
+2. `Environment Variables`
+3. `GEMINI_API_KEY` 추가
+4. 저장
+5. 재배포
+6. 그 다음 GitHub `Actions`에서 다시 `Run workflow`
 
 ---
 

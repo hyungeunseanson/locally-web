@@ -265,19 +265,45 @@ function parseProviderError(
   retryAfterSeconds?: number | null
 ): ParsedProviderError {
   const normalizedMessage = message.toLowerCase();
-  const isQuota = status === 429
+  const inferredStatus = status ?? inferStatusFromMessage(normalizedMessage);
+  const isTemporaryOverload = normalizedMessage.includes('service unavailable')
+    || normalizedMessage.includes('currently experiencing high demand')
+    || normalizedMessage.includes('please try again later');
+  const isQuota = inferredStatus === 429
     || normalizedMessage.includes('quota')
     || normalizedMessage.includes('rate limit')
     || normalizedMessage.includes('too many requests');
-  const retryable = isQuota || status === 408 || status === 409 || status === 425 || status === 500 || status === 502 || status === 503 || status === 504;
+  const retryable = isQuota
+    || isTemporaryOverload
+    || inferredStatus === 408
+    || inferredStatus === 409
+    || inferredStatus === 425
+    || inferredStatus === 500
+    || inferredStatus === 502
+    || inferredStatus === 503
+    || inferredStatus === 504;
   const defaultCooldown = provider === 'gemini' ? 90 : 30;
 
   return {
-    status,
+    status: inferredStatus,
     retryable,
     quota: isQuota,
-    cooldownSeconds: isQuota ? (retryAfterSeconds ?? defaultCooldown) : null,
+    cooldownSeconds: isQuota || isTemporaryOverload ? (retryAfterSeconds ?? defaultCooldown) : null,
   };
+}
+
+function inferStatusFromMessage(message: string): number | null {
+  const bracketedMatch = message.match(/\[(\d{3})\b/);
+  if (bracketedMatch) {
+    return Number(bracketedMatch[1]);
+  }
+
+  const statusMatch = message.match(/\b(408|409|425|429|500|502|503|504)\b/);
+  if (statusMatch) {
+    return Number(statusMatch[1]);
+  }
+
+  return null;
 }
 
 function toProviderError(

@@ -35,11 +35,35 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ -z "${PROD_URL:-}" ]; then
+            echo "Missing GitHub secret: PROD_URL"
+            echo "Add your production URL in GitHub -> Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing GitHub secret: CRON_SECRET"
+            echo "Add the same CRON_SECRET value used in Vercel"
+            exit 1
+          fi
+
+          case "$PROD_URL" in
+            http://*|https://*)
+              ;;
+            *)
+              echo "Invalid PROD_URL: must start with http:// or https://"
+              echo "Current PROD_URL value is malformed or empty."
+              exit 1
+              ;;
+          esac
+
+          BASE_URL="${PROD_URL%/}"
+
           for attempt in $(seq 1 "$REPEAT_COUNT"); do
             echo "Translation queue attempt $attempt/$REPEAT_COUNT"
 
             response=$(curl --silent --show-error --fail-with-body \
-              -X GET "${PROD_URL}/api/cron/experience-translations" \
+              -X GET "${BASE_URL}/api/cron/experience-translations" \
               -H "Authorization: Bearer ${CRON_SECRET}")
 
             echo "$response"
