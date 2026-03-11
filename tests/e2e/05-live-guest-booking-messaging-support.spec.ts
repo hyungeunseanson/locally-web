@@ -216,7 +216,16 @@ async function findInquiryMessage(inquiryId: string, content: string) {
 
 async function signUpGuest(page: Page, guest: ReturnType<typeof createUniqueGuest>) {
   await page.goto('/login', { waitUntil: 'networkidle' });
-  await page.locator('div.mt-6.text-center.text-sm > button').click();
+
+  const signupToggle = page.getByRole('button', {
+    name: /Don't have an account\?|계정 생성|회원가입|Sign up|登録|注册/
+  });
+
+  if (await signupToggle.first().isVisible().catch(() => false)) {
+    await signupToggle.first().click();
+  } else {
+    await page.locator('div.mt-6.text-center.text-sm > button').click();
+  }
 
   const signupResponsePromise = page.waitForResponse(
     (response) =>
