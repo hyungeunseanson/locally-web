@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.66 — [Team Email] 메모 전용 즉시 메일 + 팀채팅 첫 unread 배치 1회
+
+**작업일:** 2026-03-11
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 팀 메일 범위 축소 | `/api/admin/notify-team`이 더 이상 팀스페이스 전체 이벤트에 메일을 보내지 않고, `team_memo`, `team_memo_comment`, `team_chat`만 메일 대상으로 제한 |
+| 🟡 팀채팅 1회 메일 | `team_chat`은 `admin_task_comments.read_by`를 기준으로 수신자별 unread 수를 계산해, 읽지 않은 배치가 새로 시작될 때 첫 메일 1회만 발송하도록 조정 |
+| 🟡 TODO 메일 제거 | `team_todo`, `team_task_comment`는 인앱/실시간만 유지하고 이메일은 더 이상 보내지 않도록 정리 |
+| ✅ 검증 | `npx tsc --noEmit`, 대상 파일 `eslint`, `git diff --check` 예정 |
+
 ## v3.37.65 — [Email Notifications] queue cron 롤백 및 즉시 메일 복귀
 
 **작업일:** 2026-03-11
