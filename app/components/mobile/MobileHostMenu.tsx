@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Bell, Settings, HelpCircle, Star,
     ChevronRight, BookOpen, CornerUpRight, Loader2,
-    CalendarCheck, LayoutList, MessageSquare, CircleDollarSign, User, Briefcase
+    CalendarCheck, LayoutList, MessageSquare, CircleDollarSign, User, Briefcase, Users
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
@@ -186,6 +186,7 @@ export default function MobileHostMenu() {
 
             {/* ── 메뉴 그룹 1 ── */}
             <div className="px-5 mb-1">
+                <HostMenuItem href="/community" icon={<Users size={17} />} label="커뮤니티" isPending={pendingHref === '/community'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label="예약 관리" isPending={pendingHref === '/host/dashboard?tab=reservations'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label="내 체험 관리" isPending={pendingHref === '/host/dashboard?tab=experiences'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label="문의함" isPending={pendingHref === '/host/dashboard?tab=inquiries'} disabled={isNavigating} onNavigate={navigate} />

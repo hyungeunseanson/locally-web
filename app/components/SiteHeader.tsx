@@ -2,7 +2,24 @@
 
 import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import Link from 'next/link';
-import { Menu, User, LogOut, Briefcase, Heart, MessageSquare, Settings, HelpCircle, Bell, ShieldCheck, Users2 } from 'lucide-react';
+import {
+  Menu,
+  User,
+  LogOut,
+  Briefcase,
+  Heart,
+  MessageSquare,
+  Settings,
+  HelpCircle,
+  Bell,
+  ShieldCheck,
+  Users2,
+  CalendarCheck,
+  LayoutList,
+  CircleDollarSign,
+  Star,
+  BookOpen,
+} from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -38,6 +55,7 @@ function SiteHeaderContent() {
   const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
+  const isHostMode = pathname?.startsWith('/host');
 
   // 🟢 [수정] 로그아웃은 AuthContext의 signOut 호출
   const handleLogout = async () => {
@@ -112,7 +130,7 @@ function SiteHeaderContent() {
   };
 
   const handleMainHeaderButtonClick = () => {
-    if (pathname?.startsWith('/host')) {
+    if (isHostMode) {
       startDesktopModeTransition('/account', 'guest');
     } else {
       router.push('/become-a-host');
@@ -120,7 +138,7 @@ function SiteHeaderContent() {
   };
 
   const handleDropdownMenuClick = () => {
-    if (pathname?.startsWith('/host')) {
+    if (isHostMode) {
       startDesktopModeTransition('/account', 'guest');
       return;
     }
@@ -133,7 +151,7 @@ function SiteHeaderContent() {
   };
 
   const getButtonLabel = () => {
-    if (pathname?.startsWith('/host')) return t('guest_mode');
+    if (isHostMode) return t('guest_mode');
     return t('become_host');
   };
 
@@ -196,43 +214,99 @@ function SiteHeaderContent() {
 
               {!isLoading && user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                  <div className="py-2 border-b border-slate-100">
-                    <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                      <Users2 size={18} /> 커뮤니티
-                    </Link>
-                    <Link href="/guest/inbox" className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
-                      <span className="flex items-center gap-3"><MessageSquare size={18} /> {t('messages')}</span>
-                    </Link>
-                    <Link href="/guest/trips" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                      <Briefcase size={18} /> {t('my_trips')}
-                    </Link>
-                    <Link href="/guest/wishlists" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                      <Heart size={18} /> {t('wishlist')}
-                    </Link>
-                  </div>
+                  {isHostMode ? (
+                    <>
+                      <div className="py-2 border-b border-slate-100">
+                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <Users2 size={18} /> 커뮤니티
+                        </Link>
+                        <Link href="/host/dashboard?tab=reservations" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <CalendarCheck size={18} /> 예약 관리
+                        </Link>
+                        <Link href="/host/dashboard?tab=experiences" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <LayoutList size={18} /> 내 체험 관리
+                        </Link>
+                        <Link href="/host/dashboard?tab=inquiries" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <MessageSquare size={18} /> 문의함
+                        </Link>
+                        <Link href="/host/dashboard?tab=service-jobs" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <Briefcase size={18} /> 서비스 매칭
+                        </Link>
+                      </div>
 
-                  <div className="py-2 border-b border-slate-100">
-                    <Link href="/account" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                      <User size={18} /> {t('account')}
-                    </Link>
-                    {isAdminWhitelisted && (
-                      <Link href="/admin/dashboard" className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                        <ShieldCheck size={18} /> Admin
-                      </Link>
-                    )}
-                    <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                      <Settings size={18} /> {pathname?.startsWith('/host') ? t('guest_mode') : t('host_mode')}
-                    </button>
-                  </div>
+                      <div className="py-2 border-b border-slate-100">
+                        <Link href="/host/dashboard?tab=earnings" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <CircleDollarSign size={18} /> 수익 및 정산
+                        </Link>
+                        <Link href="/host/dashboard?tab=reviews" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <Star size={18} /> 받은 후기
+                        </Link>
+                        <Link href="/host/dashboard?tab=guidelines" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <BookOpen size={18} /> 교육 및 가이드라인
+                        </Link>
+                        <Link href="/host/dashboard?tab=profile" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <Settings size={18} /> 프로필 설정
+                        </Link>
+                        {isAdminWhitelisted && (
+                          <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                            <ShieldCheck size={18} /> Admin
+                          </Link>
+                        )}
+                        <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <User size={18} /> {t('guest_mode')}
+                        </button>
+                      </div>
 
-                  <div className="py-2">
-                    <Link href={pathname?.startsWith('/host') ? '/host/help' : '/help'} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                      <HelpCircle size={18} /> {t('help')}
-                    </Link>
-                    <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                      <LogOut size={18} /> {t('logout')}
-                    </button>
-                  </div>
+                      <div className="py-2">
+                        <Link href="/host/help" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <HelpCircle size={18} /> {t('help')}
+                        </Link>
+                        <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <LogOut size={18} /> {t('logout')}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="py-2 border-b border-slate-100">
+                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <Users2 size={18} /> 커뮤니티
+                        </Link>
+                        <Link href="/guest/inbox" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
+                          <span className="flex items-center gap-3"><MessageSquare size={18} /> {t('messages')}</span>
+                        </Link>
+                        <Link href="/guest/trips" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <Briefcase size={18} /> {t('my_trips')}
+                        </Link>
+                        <Link href="/guest/wishlists" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                          <Heart size={18} /> {t('wishlist')}
+                        </Link>
+                      </div>
+
+                      <div className="py-2 border-b border-slate-100">
+                        <Link href="/account" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <User size={18} /> {t('account')}
+                        </Link>
+                        {isAdminWhitelisted && (
+                          <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                            <ShieldCheck size={18} /> Admin
+                          </Link>
+                        )}
+                        <button onClick={handleDropdownMenuClick} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <Settings size={18} /> {t('host_mode')}
+                        </button>
+                      </div>
+
+                      <div className="py-2">
+                        <Link href="/help" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <HelpCircle size={18} /> {t('help')}
+                        </Link>
+                        <button onClick={handleLogout} className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <LogOut size={18} /> {t('logout')}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
