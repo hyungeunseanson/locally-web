@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 export async function POST(request: Request) {
   try {
@@ -115,6 +116,14 @@ export async function POST(request: Request) {
       is_read: false,
     }).then(({ error }) => {
       if (error) console.error('[ADMIN] customer notification error:', error);
+    });
+
+    insertAdminAlerts({
+      title: '서비스 입금 확인이 완료되었습니다',
+      message: `'${requestTitle}' 서비스의 무통장 입금이 확인되어 호스트 모집이 시작되었습니다.`,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    }).catch((adminAlertError) => {
+      console.error('[ADMIN] service payment admin alert error:', adminAlertError);
     });
 
     // 9. Audit log

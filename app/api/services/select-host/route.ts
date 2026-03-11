@@ -92,12 +92,21 @@ export async function POST(request: Request) {
     }
 
     // 5. 나머지 지원서 rejected 처리
-    await supabaseAdmin
+    const { data: rejectedApplications, error: rejectedUpdateError } = await supabaseAdmin
       .from('service_applications')
       .update({ status: 'rejected' })
       .eq('request_id', request_id)
       .neq('id', application_id)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .select('host_id');
+
+    if (rejectedUpdateError) {
+      console.error('Select Host - Rejected Application Update Error:', rejectedUpdateError);
+    }
+
+    const rejectedHostIds = (rejectedApplications || [])
+      .map((row) => row.host_id)
+      .filter((id): id is string => Boolean(id));
 
     // 6. 에스크로 예약에 호스트 정보 채워넣기 (PAID 상태 예약)
     await supabaseAdmin
@@ -131,23 +140,19 @@ export async function POST(request: Request) {
 
     insertAdminAlerts({
       title: '서비스 호스트가 선택되었습니다',
-      message: `'${serviceRequest.title}' 의뢰에서 호스트 선택이 완료되었습니다.`,
+      message: rejectedHostIds.length > 0
+        ? `'${serviceRequest.title}' 의뢰에서 호스트 선택이 완료되었고, 미선택 ${rejectedHostIds.length}건이 함께 처리되었습니다.`
+        : `'${serviceRequest.title}' 의뢰에서 호스트 선택이 완료되었습니다.`,
       link: '/admin/dashboard?tab=SERVICE_REQUESTS',
     }).catch((adminAlertError) => {
       console.error('Select Host Admin Alert Error:', adminAlertError);
     });
 
     // 8. 미선택 호스트들에게 알림 조회 (비동기)
-    supabaseAdmin
-      .from('service_applications')
-      .select('host_id')
-      .eq('request_id', request_id)
-      .eq('status', 'rejected')
-      .then(({ data: rejected }) => {
-        if (!rejected || rejected.length === 0) return;
+    Promise.resolve(rejectedHostIds)
+      .then((rejected) => {
+        if (rejected.length === 0) return;
         const notifications = rejected
-          .map((r) => r.host_id)
-          .filter((id): id is string => !!id)
           .map((hostId) => ({
             user_id: hostId,
             type: 'service_host_rejected',

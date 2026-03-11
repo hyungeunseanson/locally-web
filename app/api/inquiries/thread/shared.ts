@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sanitizeText } from '@/app/utils/sanitize';
 
 type AuthActor = {
@@ -191,6 +192,22 @@ async function notifyRecipient(params: {
     });
   } catch (error) {
     console.warn('[inquiries/thread] message notification email failed:', error);
+  }
+}
+
+async function notifyInquiryToAdminCenter(params: {
+  inquiryId: number | string;
+  actorDisplayName: string;
+  message: string;
+}) {
+  try {
+    await insertAdminAlerts({
+      title: `새 문의 메시지 · ${params.actorDisplayName}`,
+      message: params.message,
+      link: buildAdminChatLink(params.inquiryId),
+    });
+  } catch (error) {
+    console.warn('[inquiries/thread] admin alert insert failed:', error);
   }
 }
 
@@ -559,6 +576,15 @@ export async function createInquiryMessage(params: {
     });
   }
 
+  const isAdminParticipant = isAdminSupport && String(actor.id) === String(inquiry.host_id);
+  if (!actorIsAdmin && !isAdminParticipant) {
+    await notifyInquiryToAdminCenter({
+      inquiryId: inquiry.id,
+      actorDisplayName,
+      message: displayContent,
+    });
+  }
+
   return {
     success: true,
     inquiryId: inquiry.id,
@@ -703,6 +729,15 @@ export async function upsertInquiryThread(params: {
         title: `💬 ${actorDisplayName}님의 새 메시지`,
         message: cleanMessage,
         link: notificationLink,
+      });
+    }
+
+    const shouldNotifyAdminCenter = contextType !== 'admin_initiated_support';
+    if (shouldNotifyAdminCenter) {
+      await notifyInquiryToAdminCenter({
+        inquiryId: inquiry.id,
+        actorDisplayName,
+        message: cleanMessage,
       });
     }
   }

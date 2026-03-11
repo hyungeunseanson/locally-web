@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 function verifySignature(signData: string, ediDate: string, amount: string, mid: string, key: string): boolean {
   try {
@@ -165,6 +166,14 @@ export async function POST(request: Request) {
       is_read: false,
     }).then(({ error }) => {
       if (error) console.error('[SERVICE] Payment Notification Error:', error);
+    });
+
+    insertAdminAlerts({
+      title: '서비스 결제가 완료되었습니다',
+      message: `'${requestTitle}' 서비스 결제가 완료되어 호스트 모집이 시작되었습니다.`,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    }).catch((adminAlertError) => {
+      console.error('[SERVICE] Payment Admin Alert Error:', adminAlertError);
     });
 
     console.log(`✅ [SERVICE] Payment confirmed. Order: ${orderId}`);
