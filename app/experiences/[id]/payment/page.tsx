@@ -427,7 +427,7 @@ function PaymentContent() {
               <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeNoOffPlatform ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
               <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
-                <span className="text-red-600 font-bold">[필수]</span> 호스트와의 직접 연락 및 플랫폼 외부 결제 유도를 단호히 거부하며, 적발 시 계정 영구 정지 처분에 동의합니다.
+                <span className="text-red-600 font-bold">[필수]</span> 호스트와의 직접 연락 및 플랫폼 외부 결제는 금지되며, 적발 시 계정 영구 정지 처분에 동의합니다.
               </div>
             </label>
 
