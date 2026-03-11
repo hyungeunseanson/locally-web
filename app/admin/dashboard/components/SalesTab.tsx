@@ -11,6 +11,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { settleHostPayout } from '@/app/actions/admin';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { createClient } from '@/app/utils/supabase/client';
+import { getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
@@ -99,12 +100,12 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
 
   // 플랫폼 수익: platform_revenue 컬럼이 있으면 쓰고, 없으면(옛날데이터) 대충 계산
   const expPlatformFee = validBookings.reduce((sum, b) => {
-    return sum + (b.platform_revenue || (b.amount - (b.host_payout_amount || (b.amount * 0.8))));
+    return sum + getBookingPlatformRevenue(b);
   }, 0);
   const platformFee = expPlatformFee + svcPlatformFee;
 
   const expHostPayout = validBookings.reduce((sum, b) => {
-    return sum + (b.host_payout_amount || (b.amount * 0.8));
+    return sum + getBookingHostPayout(b);
   }, 0);
   const hostPayout = expHostPayout + svcHostPayout;
 
@@ -143,12 +144,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
       const current = settlementMap.get(hostId);
 
       // 🟢 [중요] 호스트 줄 돈 계산
-      let payout = 0;
-      if (booking.host_payout_amount > 0) {
-        payout = booking.host_payout_amount; // 이미 계산된 값 사용 (위약금 포함)
-      } else {
-        payout = (booking.amount || 0) * 0.8; // 옛날 데이터용 (80%)
-      }
+      const payout = getBookingHostPayout(booking);
 
       // 탭 구분에 따라 필터링 (지급완료된 건은 제외하거나 포함)
       if (settlementTab === 'PENDING' && booking.payout_status === 'paid') return;
@@ -209,16 +205,13 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
 
       const rows = item.bookings.map((b: any) => {
         // 취소된 경우와 완료된 경우의 매출/위약금 계산
-        const gross = b.amount || 0;
+        const gross = getBookingPaidAmount(b);
         let refundPenaltyAmount = 0; // 취소 위약금 발생액
-        let fee = 0; // 플랫폼 수수료
-        const net = b.calculatedPayout || 0; // 호스트 지급액
+        const fee = getBookingPlatformRevenue(b);
+        const net = b.calculatedPayout || getBookingHostPayout(b); // 호스트 지급액
 
         if (isCancelledOnlyBookingStatus(b.status)) {
-          refundPenaltyAmount = gross; // 취소되었는데 리스트에 들어왔다면 전액 위약금이거나 부분 위약금. 
-          fee = gross - net;
-        } else {
-          fee = gross - net;
+          refundPenaltyAmount = Math.max(0, gross - Number(b.refund_amount || 0));
         }
 
         const expTitle = b.experiences?.title || '로컬 가이드 서비스';

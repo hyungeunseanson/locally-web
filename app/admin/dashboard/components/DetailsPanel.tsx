@@ -414,7 +414,7 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
               <div className="grid grid-cols-2 gap-4">
                 <InfoBox label="예약 번호" value={selectedItem.id} />
                 <InfoBox label="상태" value={selectedItem.status} />
-                <InfoBox label="결제 금액" value={`₩${selectedItem.total_price?.toLocaleString() || 0}`} />
+                <InfoBox label="실 결제 금액" value={`₩${Number(selectedItem.amount ?? selectedItem.total_price ?? 0).toLocaleString()}`} />
                 <InfoBox label="인원" value={`${selectedItem.guests}명`} />
               </div>
             </div>

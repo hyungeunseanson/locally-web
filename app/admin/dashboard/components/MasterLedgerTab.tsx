@@ -22,6 +22,7 @@ import {
   isConfirmedBookingStatus,
   isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
+import { getBookingExperienceAmount, getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
@@ -149,14 +150,14 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     // 서비스의뢰: PENDING 상태는 KPI에서 제외 (결제 미확정)
     if (curr._type === 'service' && curr.status === 'PENDING') return acc;
 
-    const paidAmount = Number(curr.amount) || 0;
-    const basePrice = Number(curr.total_experience_price) || paidAmount;
+    const paidAmount = getBookingPaidAmount(curr);
+    const basePrice = getBookingExperienceAmount(curr) || paidAmount;
     const payout = curr._type === 'service'
       ? (Number(curr.host_payout_amount) || 0)
-      : (Number(curr.host_payout_amount) || (basePrice * 0.8));
+      : getBookingHostPayout(curr);
     const profit = curr._type === 'service'
       ? (Number(curr.platform_revenue) || 0)
-      : (Number(curr.platform_revenue) || (paidAmount - (basePrice * 0.8)));
+      : getBookingPlatformRevenue(curr);
 
     acc.totalSales += paidAmount;
     acc.totalBasePrice += basePrice;
@@ -407,7 +408,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                       <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-rose-600 bg-rose-50/30">
                         {b._type === 'service'
                           ? (b.host_payout_amount != null ? Number(b.host_payout_amount).toLocaleString() : '-')
-                          : (Number(b.host_payout_amount) || ((Number(b.total_experience_price) || Number(b.amount) || 0) * 0.8)).toLocaleString()
+                          : getBookingHostPayout(b).toLocaleString()
                         }
                       </td>
                       <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-slate-900 bg-slate-100/50">
@@ -416,7 +417,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                       <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-blue-600">
                         {b._type === 'service'
                           ? (b.platform_revenue != null ? Number(b.platform_revenue).toLocaleString() : '-')
-                          : (Number(b.platform_revenue) || (Number(b.amount) - ((Number(b.total_experience_price) || Number(b.amount) || 0) * 0.8))).toLocaleString()
+                          : getBookingPlatformRevenue(b).toLocaleString()
                         }
                       </td>
                     </tr>
@@ -501,11 +502,11 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 <div className="h-px bg-slate-200 my-0.5 md:my-1"></div>
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] md:text-xs text-slate-500">호스트 정산 (80%)</span>
-                  <span className="text-[11px] md:text-xs font-bold text-rose-500">₩{Number(selectedBooking.host_payout_amount || (selectedBooking.total_experience_price * 0.8)).toLocaleString()}</span>
+                  <span className="text-[11px] md:text-xs font-bold text-rose-500">₩{getBookingHostPayout(selectedBooking).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] md:text-xs text-slate-500">플랫폼 수익 (Net)</span>
-                  <span className="text-[11px] md:text-xs font-bold text-blue-600">₩{Number(selectedBooking.platform_revenue || (selectedBooking.amount - (selectedBooking.total_experience_price * 0.8))).toLocaleString()}</span>
+                  <span className="text-[11px] md:text-xs font-bold text-blue-600">₩{getBookingPlatformRevenue(selectedBooking).toLocaleString()}</span>
                 </div>
               </div>
               <p className="text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right flex justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>

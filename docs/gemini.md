@@ -59,6 +59,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - PG 응답 성공 확인 후 DB 상태 변경
 - 클라이언트 직접 결제 상태 변경 금지
 - **[이메일 결합도 무관찰 원칙]** 결제 콜백(`route.ts`) 라우트 내부에서는 절대 `nodemailer`나 서버 사이드 UI 렌더링(`@react-email`)을 돌리지 않는다. 결제가 확정되면 무조건 `200 OK`를 내어주고, 이메일은 비동기 Fetch(`api/notifications/send-email`)로 백그라운드로 넘긴다.
+- **[체험 예약 금액 의미 원칙]** `bookings.amount`는 게스트 실결제액, `bookings.total_price`/`total_experience_price`는 투어 금액(호스트 기준 원가), `host_payout_amount`는 투어 금액의 80%, `platform_revenue`는 `amount - host_payout_amount`를 기준으로 유지한다. 취소 정산도 이 의미 체계를 깨지 않는다.
 
 ### 3.4 프로필 동기화 원칙 (v3.21.0+)
 - `auth.users`에 레코드가 생성되는 즉시 `profiles` 테이블에 1:1로 레코드가 보장되어야 한다.

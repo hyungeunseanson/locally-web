@@ -5,6 +5,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import { DollarSign, CheckCircle, User, ChevronDown, ChevronUp, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
+import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 
 export default function SettlementTab() {
   const supabase = createClient();
@@ -21,7 +22,7 @@ export default function SettlementTab() {
     const { data: bookings, error } = await supabase
       .from('bookings')
       .select(`
-        id, amount, status, date, title,
+        id, amount, total_price, total_experience_price, status, date, title,
         host_payout_amount, refund_amount, platform_revenue, payout_status,
         experiences ( host_id, title ),
         profiles!bookings_user_id_fkey ( name, email )
@@ -85,13 +86,7 @@ export default function SettlementTab() {
       // 💰 [정산금 계산 로직]
       // 1. DB에 host_payout_amount가 있으면(취소위약금 등) 그걸 씀.
       // 2. 없으면(정상 완료 건), 결제액의 80% (수수료 20% 제외) 지급.
-      let payout = 0;
-      if (b.host_payout_amount > 0) {
-        payout = b.host_payout_amount;
-      } else {
-        // 정상 완료 건: 호스트 수수료 20% 정책 적용
-        payout = Math.floor((b.amount || 0) * 0.8);
-      }
+      const payout = getBookingHostPayout(b);
 
       group.items.push({ ...b, calculated_payout: payout });
       group.totalPayout += payout;

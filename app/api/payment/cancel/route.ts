@@ -3,15 +3,13 @@ import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { toZonedTime } from 'date-fns-tz';
 import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
+import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 
-const TAX_RATE = 1.1;
-const COMMISSION_RATE = 0.2;
 const TIMEZONE = 'Asia/Seoul';
 
 // 환불률 계산기 (Timezone Fixed)
 function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDateStr: string) {
   const now = toZonedTime(new Date(), TIMEZONE);
-  const tourDate = new Date(`${tourDateStr}T${tourTimeStr}:00`); // Assume local time matches server/kst logic or stick to string calc if simple
   // Better: Parse tourDate as KST if it's stored as local string
   const tourDateKST = toZonedTime(new Date(`${tourDateStr}T${tourTimeStr}:00`), TIMEZONE);
   const paymentDate = new Date(paymentDateStr); // UTC usually from DB
@@ -86,20 +84,8 @@ export async function POST(request: Request) {
       reasonText = calc.reason;
     }
 
-    const totalAmount = booking.amount;
-    const refundAmount = Math.floor(totalAmount * (refundRate / 100));
-    const penaltyAmount = totalAmount - refundAmount;
-
-    // 💰 [정산 로직] 위약금 분배 (개선됨)
-    let hostPayout = 0;
-    let platformRevenue = 0;
-
-    if (penaltyAmount > 0) {
-      // 위약금이 발생했다면, 해당 위약금(penaltyAmount)에서 플랫폼이 20%를 가져가고
-      // 나머지(80%)를 호스트수익(hostPayout)으로 명확히 배분.
-      hostPayout = Math.floor(penaltyAmount * 0.8);
-      platformRevenue = penaltyAmount - hostPayout;
-    }
+    const totalAmount = getBookingPaidAmount(booking);
+    const { refundAmount, hostPayout, platformRevenue } = calculateBookingCancellationSettlement(booking, refundRate);
 
     // 3. PG사 취소 요청
     if (refundAmount > 0 && booking.tid) {
@@ -131,7 +117,7 @@ export async function POST(request: Request) {
       let pgJson;
       try {
         pgJson = JSON.parse(pgResult.replace(/'/g, '"'));
-      } catch (parseError) {
+      } catch {
         throw new Error(`PG Format Error: Failed to parse PG response: ${pgResult}`);
       }
 
@@ -197,8 +183,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, refundAmount, hostPayout });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Cancel Error';
     console.error('Cancel Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

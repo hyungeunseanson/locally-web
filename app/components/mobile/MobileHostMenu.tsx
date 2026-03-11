@@ -13,6 +13,7 @@ import MobileLanguageSwitcher from './MobileLanguageSwitcher';
 import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
 import { useNotification } from '@/app/context/NotificationContext';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
+import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 
 type MobileHostProfile = {
     avatar_url?: string | null;
@@ -78,14 +79,14 @@ export default function MobileHostMenu() {
                 const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
                 const { data: bookingData } = await supabase
                     .from('bookings')
-                    .select('amount, host_payout_amount, created_at, experiences!inner(host_id)')
+                    .select('amount, total_price, total_experience_price, host_payout_amount, created_at, experiences!inner(host_id)')
                     .eq('experiences.host_id', user.id)
                     .in('status', [...BOOKING_CONFIRMED_STATUSES])
                     .gte('created_at', monthStart);
 
                 const totalEarning = (bookingData || []).reduce(
-                    (sum: number, b: { amount: number | null; host_payout_amount: number | null }) =>
-                        sum + (b.host_payout_amount || Math.floor((b.amount || 0) * 0.8)),
+                    (sum: number, b: { amount: number | null; total_price?: number | null; total_experience_price?: number | null; host_payout_amount: number | null }) =>
+                        sum + getBookingHostPayout(b),
                     0
                 );
 

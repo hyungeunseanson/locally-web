@@ -37,7 +37,7 @@ export default function RealtimeBookings({ bookings }: { bookings: any[] }) {
               <div className="flex flex-wrap gap-4 text-sm text-slate-600">
                 <span className="flex items-center gap-1"><User size={14}/> 게스트 {booking.guests}명</span>
                 <span className="flex items-center gap-1"><Calendar size={14}/> 예약일: {booking.date}</span>
-                <span className="flex items-center gap-1 font-bold text-rose-500"><DollarSign size={14}/> ₩{Number(booking.total_price).toLocaleString()}</span>
+                <span className="flex items-center gap-1 font-bold text-rose-500"><DollarSign size={14}/> ₩{Number(booking.amount ?? booking.total_price ?? 0).toLocaleString()}</span>
               </div>
             </div>
 

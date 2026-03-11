@@ -352,7 +352,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                     <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
                       <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">총 구매액</div>
                       <div className="font-bold text-[11px] md:text-sm text-slate-900">
-                        ₩{userBookings.reduce((sum, b) => sum + (b.total_price || 0), 0).toLocaleString()}
+                        ₩{userBookings.reduce((sum, b) => sum + Number(b.amount ?? b.total_price ?? 0), 0).toLocaleString()}
                       </div>
                     </div>
                     <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
@@ -386,7 +386,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                               {new Date(b.created_at).toLocaleDateString()}
                             </td>
                             <td className="px-2 md:px-3 py-1.5 md:py-2 text-right font-bold">
-                              ₩{(b.total_price || 0).toLocaleString()}
+                              ₩{Number(b.amount ?? b.total_price ?? 0).toLocaleString()}
                             </td>
                           </tr>
                         ))}

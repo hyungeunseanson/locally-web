@@ -12,6 +12,7 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
 import ReviewsTab from './ReviewsTab';
 import AuditLogTab from './AuditLogTab';
+import { getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
@@ -159,7 +160,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           const amount = Number(b.amount || 0);
           gmv += amount;
 
-          const revenue = Number(b.platform_revenue) || (amount * 0.2);
+          const revenue = getBookingPlatformRevenue(b);
           netRevenue += revenue;
 
           // 가격대 분포
