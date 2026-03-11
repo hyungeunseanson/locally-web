@@ -212,40 +212,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div className="mb-6 px-2">
-        <button
-          onClick={() => handleTabChange('ALERTS')}
-          className={`w-full rounded-2xl border px-4 py-3 text-left transition-all ${
-            activeTab === 'ALERTS'
-              ? 'border-rose-400 bg-rose-500 text-white shadow-lg shadow-rose-500/25'
-              : 'border-slate-800 bg-slate-900/70 text-white hover:border-slate-700 hover:bg-slate-900'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                activeTab === 'ALERTS' ? 'bg-white/15' : 'bg-white/5'
-              }`}>
-                <Bell size={18} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[12px] font-bold truncate">Admin Alerts</p>
-                <p className={`text-[10px] truncate ${activeTab === 'ALERTS' ? 'text-white/80' : 'text-slate-400'}`}>
-                  운영 알림센터
-                </p>
-              </div>
-            </div>
-            {counts.adminAlertsUnread > 0 && (
-              <span className={`text-[10px] px-2 py-1 rounded-full font-bold shrink-0 ${
-                activeTab === 'ALERTS' ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
-              }`}>
-                {counts.adminAlertsUnread}
-              </span>
-            )}
-          </div>
-        </button>
-      </div>
-
       <div className="space-y-8 flex-1 overflow-y-auto scrollbar-hide">
         <div>
           <h2 className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Management</h2>
@@ -265,6 +231,7 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
           <div className="space-y-0.5 md:space-y-1">
+            <NavButton active={activeTab === 'ALERTS'} onClick={() => handleTabChange('ALERTS')} icon={<Bell size={16} className="md:w-[18px] md:h-[18px]" />} label="Admin Alerts" count={activeTab !== 'ALERTS' ? counts.adminAlertsUnread : undefined} />
             <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" count={activeTab !== 'CHATS' ? counts.csUnreadCount : undefined} />
             <NavButton
               active={activeTab === 'TEAM'}
