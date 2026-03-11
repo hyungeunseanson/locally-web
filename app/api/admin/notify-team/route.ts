@@ -98,16 +98,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        if (!shouldSendTeamEmail(eventType)) {
-            return NextResponse.json({
-                success: true,
-                count: 0,
-                mode: 'skipped',
-                skipped: 'event_type_not_enabled',
-            });
-        }
-
-        console.log(`🚀 [Admin Notify API] 팀 메일 발송 준비: ${title} (${eventType || 'unknown'})`);
+        console.log(`🚀 [Admin Notify API] 팀 알림 처리 준비: ${title} (${eventType || 'unknown'})`);
 
         const { data: whitelistData, error: whitelistError } = await supabaseAdmin
             .from('admin_whitelist')
@@ -147,6 +138,37 @@ export async function POST(request: Request) {
             email,
             userId: recipientMap.get(email) || null,
         }));
+
+        const notificationRecipients = recipients
+            .map((recipient) => recipient.userId)
+            .filter((userId): userId is string => Boolean(userId));
+
+        if (notificationRecipients.length > 0) {
+            const { error: notificationError } = await supabaseAdmin
+                .from('notifications')
+                .insert(notificationRecipients.map((recipientUserId) => ({
+                    user_id: recipientUserId,
+                    type: 'admin_alert',
+                    title,
+                    message,
+                    link: notificationLink,
+                    is_read: false,
+                })));
+
+            if (notificationError) {
+                console.error('❌ [Admin Notify API] 인앱 알림 저장 실패:', notificationError);
+            }
+        }
+
+        if (!shouldSendTeamEmail(eventType)) {
+            return NextResponse.json({
+                success: true,
+                count: 0,
+                notifications: notificationRecipients.length,
+                mode: 'in_app_only',
+                skipped: 'event_type_not_enabled',
+            });
+        }
 
         let sentCount = 0;
         let skippedCount = 0;

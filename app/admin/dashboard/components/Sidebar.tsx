@@ -1,15 +1,31 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import {
-  Users, MapPin, CheckCircle2, MessageSquare,
-  Calendar, BarChart2, CreditCard, LayoutDashboard, ShieldCheck,
-  Briefcase, Menu, X, House, ClipboardList, Star
+  Users, CheckCircle2, MessageSquare,
+  BarChart2, CreditCard, LayoutDashboard,
+  Briefcase, Menu, X, House, ClipboardList, Bell
 } from 'lucide-react';
 
-const NavButton = ({ active, onClick, icon, label, count }: any) => (
+type NavButtonProps = {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+  count?: number | string;
+};
+
+type SidebarUser = {
+  email?: string | null;
+} | null;
+
+type PresenceUser = {
+  user_id?: string;
+};
+
+const NavButton = ({ active, onClick, icon, label, count }: NavButtonProps) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${active
@@ -33,12 +49,12 @@ const NavButton = ({ active, onClick, icon, label, count }: any) => (
 export default function Sidebar() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const urlTab = searchParams.get('tab')?.toUpperCase();
   const [activeTab, setActiveTab] = useState<string>('APPS');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<SidebarUser>(null);
 
   useEffect(() => {
     const savedTab = localStorage.getItem('admin_active_tab');
@@ -54,12 +70,13 @@ export default function Sidebar() {
     exps: 0,
     online: 0,
     pendingBookings: 0,
+    adminAlertsUnread: 0,
     teamNewCount: 0,
     servicePendingBank: 0,  // 서비스 무통장 입금 대기 건수
     csUnreadCount: 0,       // CS 미답변 건수
   });
 
-  const fetchCounts = async () => {
+  const fetchCounts = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/sidebar-counts');
 
@@ -83,9 +100,9 @@ export default function Sidebar() {
     } catch (e) {
       console.error('Sidebar counts fetch error:', e);
     }
-  };
+  }, []);
 
-  const fetchTeamCounts = async () => {
+  const fetchTeamCounts = useCallback(async () => {
     try {
       const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
       const res = await fetch(`/api/admin/team-counts?lastViewed=${encodeURIComponent(lastViewed)}`);
@@ -102,20 +119,44 @@ export default function Sidebar() {
     } catch (e) {
       console.error('Sidebar team counts fetch error:', e);
     }
-  };
+  }, []);
 
-  const fetchCurrentUser = async () => {
+  const fetchAdminAlertCount = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false)
+        .eq('type', 'admin_alert');
+
+      if (error) throw error;
+
+      setCounts(prev => ({
+        ...prev,
+        adminAlertsUnread: count || 0,
+      }));
+    } catch (e) {
+      console.error('Sidebar admin alerts count fetch error:', e);
+    }
+  }, [supabase]);
+
+  const fetchCurrentUser = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
     } catch (e) {
       console.log('Error fetching user:', e);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchCounts();
     fetchTeamCounts();
+    fetchAdminAlertCount();
     fetchCurrentUser();
 
     // 열람 상태 변경 감지를 위한 이벤트 리스너
@@ -125,7 +166,12 @@ export default function Sidebar() {
     const channel = supabase.channel('online_users_sidebar')
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
-        const uniqueUsers = new Set(Object.values(state).flat().map((u: any) => u.user_id));
+        const uniqueUsers = new Set(
+          Object.values(state)
+            .flat()
+            .map((presence) => (presence as PresenceUser).user_id)
+            .filter((userId): userId is string => Boolean(userId))
+        );
         setCounts(prev => ({ ...prev, online: uniqueUsers.size }));
       })
       .subscribe();
@@ -135,13 +181,18 @@ export default function Sidebar() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { fetchTeamCounts(); })
       .subscribe();
 
+    const adminAlertsChannel = supabase.channel('admin_alert_notifications_sidebar')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => { fetchAdminAlertCount(); })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(teamChannel);
+      supabase.removeChannel(adminAlertsChannel);
       window.removeEventListener('booking-viewed', fetchCounts);
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [fetchAdminAlertCount, fetchCounts, fetchCurrentUser, fetchTeamCounts, supabase]);
 
   const handleTabChange = (tab: string) => {
     router.push(`/admin/dashboard?tab=${tab}`);
@@ -180,6 +231,7 @@ export default function Sidebar() {
         <div>
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Operation</h2>
           <div className="space-y-0.5 md:space-y-1">
+            <NavButton active={activeTab === 'ALERTS'} onClick={() => handleTabChange('ALERTS')} icon={<Bell size={16} className="md:w-[18px] md:h-[18px]" />} label="Admin Alerts" count={activeTab !== 'ALERTS' ? counts.adminAlertsUnread : undefined} />
             <NavButton active={activeTab === 'CHATS'} onClick={() => handleTabChange('CHATS')} icon={<MessageSquare size={16} className="md:w-[18px] md:h-[18px]" />} label="Message Monitoring" count={activeTab !== 'CHATS' ? counts.csUnreadCount : undefined} />
             <NavButton
               active={activeTab === 'TEAM'}

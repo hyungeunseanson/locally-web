@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense, useEffect } from 'react';
+import React, { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // 컴포넌트 import
@@ -12,9 +12,31 @@ import ChatMonitor from './components/ChatMonitor';
 import MasterLedgerTab from './components/MasterLedgerTab';
 import TeamTab from './components/TeamTab';
 import ServiceAdminTab from './components/ServiceAdminTab';
+import AdminAlertsTab from './components/AdminAlertsTab';
 
 // Custom Hook
 import { useAdminData } from './hooks/useAdminData';
+
+function subscribeToAdminTabStorage(callback: () => void) {
+  if (typeof window === 'undefined') {
+    return () => undefined;
+  }
+
+  window.addEventListener('storage', callback);
+  return () => window.removeEventListener('storage', callback);
+}
+
+function getStoredAdminTab() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return localStorage.getItem('admin_active_tab');
+}
+
+function getServerStoredAdminTab() {
+  return null;
+}
 
 function DataLoadingSkeleton() {
   return (
@@ -76,7 +98,7 @@ function DataDrivenAdminTab({
 
   return (
     <ManagementTab
-      activeTab={activeTab as any}
+      activeTab={activeTab}
       filter={filter}
       setFilter={setFilter}
       apps={apps}
@@ -97,31 +119,27 @@ function AdminDashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlTab = searchParams.get('tab')?.toUpperCase();
-
-  // URL에 탭이 있으면 그걸 우선 사용, 없으면 localStorage 확인해서 복원
-  const [activeTab, setActiveTab] = useState<string>('APPROVALS');
-  const [isTabLoaded, setIsTabLoaded] = useState(false);
+  const savedTab = useSyncExternalStore(
+    subscribeToAdminTabStorage,
+    getStoredAdminTab,
+    getServerStoredAdminTab
+  );
+  const activeTab = urlTab || savedTab?.toUpperCase() || 'APPROVALS';
 
   useEffect(() => {
-    const savedTab = localStorage.getItem('admin_active_tab');
     if (urlTab) {
-      setActiveTab(urlTab);
       localStorage.setItem('admin_active_tab', urlTab);
     } else if (savedTab) {
-      setActiveTab(savedTab);
-      router.replace(`/admin/dashboard?tab=${savedTab}`);
+      router.replace(`/admin/dashboard?tab=${savedTab.toUpperCase()}`);
     }
-    setIsTabLoaded(true);
-  }, [urlTab, router]);
-
-  if (!isTabLoaded) {
-    return <DataLoadingSkeleton />;
-  }
+  }, [urlTab, savedTab, router]);
 
   return (
     <div className="bg-white p-2 md:p-6 rounded-lg md:rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] flex flex-col h-full lg:h-auto overflow-hidden lg:overflow-visible">
       {activeTab === 'TEAM' ? (
         <TeamTab />
+      ) : activeTab === 'ALERTS' ? (
+        <AdminAlertsTab />
       ) : activeTab === 'CHATS' ? (
         <ChatMonitor />
       ) : activeTab === 'SERVICE_REQUESTS' ? (

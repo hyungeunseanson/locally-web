@@ -15,10 +15,11 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 ## 2. 아키텍처 원칙
 
 ### 2.1 Admin 구조
-- `page.tsx`: 뷰/탭 라우팅 (탭: APPROVALS/USERS/LEDGER/SALES/SERVICE_REQUESTS/ANALYTICS/CHATS/LOGS/TEAM)
+- `page.tsx`: 뷰/탭 라우팅 (탭: APPROVALS/USERS/LEDGER/SALES/SERVICE_REQUESTS/ANALYTICS/CHATS/TEAM/ALERTS)
 - `hooks/useAdminData.ts`: 체험/bookings 데이터 페칭 (변경 금지)
 - `hooks/useServiceAdminData.ts`: service_bookings 전용 독립 훅 (v3.9.0 신설, v3.9.3부터 `/api/admin/service-bookings` 경유)
 - `components/ServiceAdminTab.tsx`: 맞춤 의뢰 관리 탭 — 전체 의뢰 / 정산 대기 / 취소·환불 내역 (v3.9.0 신설)
+- `components/AdminAlertsTab.tsx`: 관리자 운영 인앱 알림 누적 탭 (`notifications` 재사용)
 - `types/admin.ts`: 관리자 전용 타입 중앙화 (`AdminServiceBooking` 포함)
 - `/api/admin/service-cancel`: 관리자 강제 취소/환불 API (NicePay error-safe)
 - `/api/admin/service-confirm-payment`: 무통장 입금 확인 API (PENDING→PAID + request→open, v3.9.2)
@@ -50,6 +51,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 관리자: `profiles.role='admin'` 또는 `admin_whitelist` 매칭
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
 - **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
+- **[관리자 알림센터 결정]** 운영 알림센터는 신규 테이블을 만들지 않고 기존 `notifications`를 재사용한다. 관리자 전용 누적 알림은 `type='admin_alert'`로 저장하고, Admin Dashboard `ALERTS` 탭에서 소비한다.
 
 ### 3.3 결제/정합성 원칙
 - 결제 확정/취소는 서버 검증 경로를 단일 소스로 유지

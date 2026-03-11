@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.67 — [Admin Alerts] 관리자 운영 알림센터 추가
+
+**작업일:** 2026-03-11
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 관리자 인앱 스택 추가 | 기존 `notifications` 테이블을 재사용해 Admin Dashboard에 `ALERTS` 탭을 추가하고, 운영 알림을 메일과 별도로 누적 확인할 수 있게 정리 |
+| 🟡 팀 알림 인앱 적재 | `/api/admin/notify-team`이 `admin_whitelist` 기반 수신자에게 팀 이벤트를 `type='admin_alert'` 인앱 알림으로도 함께 저장하도록 확장 |
+| 🟡 사이드바 unread 배지 | 관리자 사이드바 `Admin Alerts` 메뉴에 unread 배지를 추가하고, `notifications` realtime 변경을 받아 카운트를 갱신하도록 연결 |
+| ✅ 검증 | `npx tsc --noEmit`, 대상 파일 `eslint`, `git diff --check` 예정 |
+
 ## v3.37.66 — [Team Email] 메모 전용 즉시 메일 + 팀채팅 첫 unread 배치 1회
 
 **작업일:** 2026-03-11
