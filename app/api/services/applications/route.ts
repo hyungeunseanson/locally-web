@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 type ApplyBody = {
   request_id?: string;
@@ -108,6 +110,25 @@ export async function POST(request: Request) {
       if (error) console.error('Service Application Notification Error:', error);
     });
 
+    sendImmediateGenericEmail({
+      recipientUserId: serviceRequest.user_id,
+      subject: '[Locally] 새로운 호스트 지원자가 있습니다',
+      title: '새로운 호스트 지원자가 있습니다',
+      message: `'${serviceRequest.title}' 의뢰에 새로운 호스트가 지원했습니다. 빠르게 검토해보세요.`,
+      link: `/services/${request_id}`,
+      ctaLabel: '지원자 확인하기',
+    }).catch((emailError) => {
+      console.error('Service Application Email Error:', emailError);
+    });
+
+    insertAdminAlerts({
+      title: '새 지원자가 등록되었습니다',
+      message: `'${serviceRequest.title}' 의뢰에 새 호스트 지원이 접수되었습니다.`,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    }).catch((adminAlertError) => {
+      console.error('Service Application Admin Alert Error:', adminAlertError);
+    });
+
     return NextResponse.json({ success: true });
 
   } catch (error: unknown) {
@@ -186,8 +207,14 @@ export async function GET(request: Request) {
         .in('experiences.host_id', hostIds);
 
       const reviewMap: Record<string, { count: number; sum: number }> = {};
-      (reviewRows ?? []).forEach((r: any) => {
-        const hid = (r.experiences as any)?.host_id;
+      type HostReviewRow = {
+        rating: number | null;
+        experiences?: { host_id?: string | null } | { host_id?: string | null }[] | null;
+      };
+
+      (reviewRows as HostReviewRow[] | null ?? []).forEach((r) => {
+        const experiences = Array.isArray(r.experiences) ? r.experiences[0] : r.experiences;
+        const hid = experiences?.host_id;
         if (!hid) return;
         if (!reviewMap[hid]) reviewMap[hid] = { count: 0, sum: 0 };
         reviewMap[hid].count++;
@@ -228,4 +255,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }
-

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 type SelectHostBody = {
   request_id?: string;
@@ -114,6 +116,25 @@ export async function POST(request: Request) {
       is_read: false,
     }).then(({ error }) => {
       if (error) console.error('Select Host Notification Error:', error);
+    });
+
+    sendImmediateGenericEmail({
+      recipientUserId: selectedHostId,
+      subject: '[Locally] 고객에게 선택되었습니다',
+      title: '고객에게 선택되었습니다',
+      message: `'${serviceRequest.title}' 의뢰에서 선택되셨습니다. 바로 진행을 준비해주세요.`,
+      link: `/services/${request_id}`,
+      ctaLabel: '의뢰 확인하기',
+    }).catch((emailError) => {
+      console.error('Select Host Email Error:', emailError);
+    });
+
+    insertAdminAlerts({
+      title: '서비스 호스트가 선택되었습니다',
+      message: `'${serviceRequest.title}' 의뢰에서 호스트 선택이 완료되었습니다.`,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    }).catch((adminAlertError) => {
+      console.error('Select Host Admin Alert Error:', adminAlertError);
     });
 
     // 8. 미선택 호스트들에게 알림 조회 (비동기)

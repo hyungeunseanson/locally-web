@@ -14,6 +14,9 @@
 | 🔴 관리자 인앱 스택 추가 | 기존 `notifications` 테이블을 재사용해 Admin Dashboard에 `ALERTS` 탭을 추가하고, 운영 알림을 메일과 별도로 누적 확인할 수 있게 정리 |
 | 🟡 팀 알림 인앱 적재 | `/api/admin/notify-team`이 `admin_whitelist` 기반 수신자에게 팀 이벤트를 `type='admin_alert'` 인앱 알림으로도 함께 저장하도록 확장 |
 | 🟡 사이드바 unread 배지 | 관리자 사이드바 `Admin Alerts` 메뉴에 unread 배지를 추가하고, `notifications` realtime 변경을 받아 카운트를 갱신하도록 연결 |
+| 🟡 상단 전용 진입점 | 관리자 사이드바 로고 아래 최상단에 `Admin Alerts` 전용 카드형 진입점을 추가해 일반 메뉴와 분리 |
+| 🟡 운영 이벤트 적재 확대 | 새 후기 등록, 서비스 새 지원자, 서비스 호스트 선택, 서비스 취소 요청/취소 완료가 관리자 알림센터에도 누적되도록 연결 |
+| 🟡 즉시 메일 보강 | 새 후기 등록, 서비스 새 지원자, 서비스 호스트 선택, 서비스 취소 요청/취소 완료에 대한 즉시 메일을 해당 수신자/관리자에게 추가 |
 | ✅ 검증 | `npx tsc --noEmit`, 대상 파일 `eslint`, `git diff --check` 예정 |
 
 ## v3.37.66 — [Team Email] 메모 전용 즉시 메일 + 팀채팅 첫 unread 배치 1회

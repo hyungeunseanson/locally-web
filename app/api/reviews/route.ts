@@ -1,5 +1,7 @@
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -99,6 +101,28 @@ export async function POST(request: Request) {
         is_read: false,
         created_at: new Date().toISOString(),
       });
+
+      sendImmediateGenericEmail({
+        recipientUserId: experience.host_id,
+        subject: '[Locally] 새 후기가 등록되었습니다',
+        title: '새 후기가 등록되었습니다',
+        message: `'${experience.title}'에 새 후기가 작성되었습니다.`,
+        link: '/host/dashboard?tab=reviews',
+        ctaLabel: '후기 확인하기',
+      }).catch((emailError) => {
+        console.error('Review host email error:', emailError);
+      });
+    }
+
+    if (experience?.title) {
+      try {
+        await insertAdminAlerts({
+          title: '새 후기가 등록되었습니다',
+          message: `'${experience.title}' 체험에 새 후기가 작성되었습니다.`,
+        });
+      } catch (adminAlertError) {
+        console.error('Review admin alert error:', adminAlertError);
+      }
     }
 
     // [R6] 호스트 프로필 전체 평점 집계 업데이트
@@ -127,8 +151,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Review Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : '서버 오류가 발생했습니다.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

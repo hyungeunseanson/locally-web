@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import crypto from 'crypto';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 
 type CancelBody = {
   order_id?: string;
@@ -68,6 +69,25 @@ export async function POST(request: Request) {
         .update({ status: 'cancelled' })
         .eq('id', booking.request_id);
 
+      const adminMessage = `'${requestTitle}' 서비스 의뢰가 결제 전 단계에서 취소되었습니다. 주문번호: ${order_id}`;
+      insertAdminAlerts({
+        title: '서비스 의뢰가 취소되었습니다',
+        message: adminMessage,
+        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+      }).catch((adminAlertError) => {
+        console.error('Service Cancel Admin Alert Error:', adminAlertError);
+      });
+
+      sendAdminAlertEmails({
+        subject: '[Locally Admin] 서비스 의뢰 취소',
+        title: '서비스 의뢰가 취소되었습니다',
+        message: adminMessage,
+        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+        ctaLabel: '서비스 요청 보기',
+      }).catch((adminEmailError) => {
+        console.error('Service Cancel Admin Email Error:', adminEmailError);
+      });
+
       return NextResponse.json({ success: true, message: '의뢰가 취소되었습니다.' });
     }
 
@@ -117,6 +137,25 @@ export async function POST(request: Request) {
         .update({ status: 'cancelled' })
         .eq('id', booking.request_id);
 
+      const adminMessage = `'${requestTitle}' 서비스 의뢰가 환불과 함께 취소되었습니다. 주문번호: ${order_id}`;
+      insertAdminAlerts({
+        title: '서비스 환불 취소가 처리되었습니다',
+        message: adminMessage,
+        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+      }).catch((adminAlertError) => {
+        console.error('Service Refund Cancel Admin Alert Error:', adminAlertError);
+      });
+
+      sendAdminAlertEmails({
+        subject: '[Locally Admin] 서비스 환불 취소 완료',
+        title: '서비스 환불 취소가 처리되었습니다',
+        message: adminMessage,
+        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+        ctaLabel: '서비스 요청 보기',
+      }).catch((adminEmailError) => {
+        console.error('Service Refund Cancel Admin Email Error:', adminEmailError);
+      });
+
       return NextResponse.json({ success: true, message: '의뢰가 취소되고 환불이 처리됩니다.' });
     }
 
@@ -139,6 +178,25 @@ export async function POST(request: Request) {
         if (error) console.error('Cancel Notification Error:', error);
       });
     }
+
+    const adminMessage = `'${requestTitle}' 서비스에 취소 요청이 접수되었습니다. 주문번호: ${order_id}`;
+    insertAdminAlerts({
+      title: '서비스 취소 요청이 접수되었습니다',
+      message: adminMessage,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    }).catch((adminAlertError) => {
+      console.error('Service Cancellation Request Admin Alert Error:', adminAlertError);
+    });
+
+    sendAdminAlertEmails({
+      subject: '[Locally Admin] 서비스 취소 요청 접수',
+      title: '서비스 취소 요청이 접수되었습니다',
+      message: adminMessage,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+      ctaLabel: '서비스 요청 보기',
+    }).catch((adminEmailError) => {
+      console.error('Service Cancellation Request Admin Email Error:', adminEmailError);
+    });
 
     return NextResponse.json({ success: true, message: '취소 요청이 접수되었습니다. 관리자 검토 후 환불이 처리됩니다.' });
 
