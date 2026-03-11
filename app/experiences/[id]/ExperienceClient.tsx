@@ -138,7 +138,7 @@ export default function ExperienceClient({
     }
   };
 
-  const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean) => {
+  const handleReserve = (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => {
     if (!user) return showToast(t('login_required'), 'error');
     if (!date) return showToast(t('exp_detail_select_date'), 'error');
     if (!time) return showToast(t('exp_detail_select_time'), 'error');
@@ -152,8 +152,20 @@ export default function ExperienceClient({
       if (error) console.error('Click Event Log Error:', error);
     });
 
-    const typeParam = isPrivate ? '&type=private' : '';
-    router.push(`/experiences/${experienceId}/payment?date=${date}&time=${time}&guests=${guests}${typeParam}`);
+    const query = new URLSearchParams({
+      date,
+      time,
+      guests: String(guests),
+    });
+
+    if (isPrivate) {
+      query.set('type', 'private');
+    }
+    if (isSoloGuaranteed) {
+      query.set('solo', '1');
+    }
+
+    router.push(`/experiences/${experienceId}/payment?${query.toString()}`);
   };
 
   if (!experience) return <div className="min-h-screen bg-white flex items-center justify-center">{t('exp_detail_not_found')}</div>;

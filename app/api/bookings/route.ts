@@ -8,6 +8,7 @@ type BookingRequestBody = {
     time?: string;
     guests?: number | string;
     isPrivate?: boolean;
+    isSoloGuarantee?: boolean;
     customerName?: string;
     customerPhone?: string;
     paymentMethod?: 'card' | 'bank';
@@ -33,14 +34,20 @@ export async function POST(request: Request) {
         const body = (await request.json()) as BookingRequestBody;
         const {
             experienceId, date, time, guests, isPrivate,
-            customerName, customerPhone, paymentMethod
+            isSoloGuarantee, customerName, customerPhone, paymentMethod
         } = body;
         const guestCount = Number(guests);
         const normalizedExperienceId = experienceId != null ? String(experienceId) : '';
+        const normalizedIsPrivate = Boolean(isPrivate);
+        const normalizedIsSoloGuarantee = Boolean(isSoloGuarantee);
 
         // 파라미터 유효성 검사
         if (!normalizedExperienceId || !date || !time || !customerName || !customerPhone || !Number.isFinite(guestCount) || guestCount < 1) {
             return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
+        }
+
+        if (normalizedIsSoloGuarantee && (normalizedIsPrivate || guestCount !== 1)) {
+            return NextResponse.json({ success: false, error: '1인 출발 확정 옵션은 1명 일반 예약에서만 사용할 수 있습니다.' }, { status: 400 });
         }
 
         // 2. 관리자 권한 클라이언트 생성 (DB 제어용)
@@ -56,10 +63,11 @@ export async function POST(request: Request) {
                 p_date: date,
                 p_time: time,
                 p_guests: guestCount,
-                p_is_private: Boolean(isPrivate),
+                p_is_private: normalizedIsPrivate,
                 p_customer_name: customerName,
                 p_customer_phone: customerPhone,
-                p_payment_method: paymentMethod || 'card'
+                p_payment_method: paymentMethod || 'card',
+                p_is_solo_guarantee: normalizedIsSoloGuarantee
             })
             .maybeSingle<AtomicBookingResult>();
 

@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     // 2. 체험 정보 조회
     const { data: experience, error: expError } = await supabase
       .from('experiences')
-      .select('title, host_id, max_guests, price')
+      .select('title, host_id, max_guests, price, private_price')
       .eq('id', booking.experience_id)
       .maybeSingle();
     
@@ -79,9 +79,12 @@ export async function POST(request: Request) {
     }
 
     // 3. 정산 데이터 계산
-    const basePrice = Number(experience.price || 0);
-    const totalExpPrice = basePrice * (Number(booking.guests) || 1);
-    const payoutAmount = totalExpPrice * 0.8;
+    const guestCount = Number(booking.guests || 1);
+    const basePrice = booking.type === 'private'
+      ? Number(experience.private_price || 0)
+      : Number(experience.price || 0) * guestCount;
+    const totalExpPrice = Number(booking.total_price || 0);
+    const payoutAmount = Math.floor(totalExpPrice * 0.8);
     const platformRev = Number(booking.amount || 0) - payoutAmount;
 
     // 4. 업데이트 (확정)

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 
 interface ReservationCardProps {
   price: number;
@@ -13,7 +14,7 @@ interface ReservationCardProps {
   dateToTimeMap: Record<string, string[]>;
   maxGuests?: number; // 🟢 추가됨
   remainingSeatsMap?: Record<string, number>; // 🟢 추가됨
-  onReserve: (date: string, time: string, guests: number, isPrivate: boolean) => void;
+  onReserve: (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => void;
 }
 
 export default function ReservationCard({ 
@@ -28,7 +29,6 @@ export default function ReservationCard({
   const [selectedTime, setSelectedTime] = useState("");
   const [guestSelection, setGuestSelection] = useState<string>("1"); 
   const [isSoloGuaranteed, setIsSoloGuaranteed] = useState(false);
-  const SOLO_GUARANTEE_PRICE = 30000;
 
   // 🟢 [핵심] 잔여석 계산 로직 (시간 문자열 HH:MM 포맷 주의)
   const cleanTime = selectedTime.substring(0, 5); 
@@ -86,8 +86,9 @@ export default function ReservationCard({
   // 가격 계산
   const isPrivate = guestSelection === 'private';
   const guestCount = isPrivate ? 1 : Number(guestSelection);
+  const isSoloEligible = !isPrivate && guestCount === 1;
   const basePrice = isPrivate ? privatePrice : (price * guestCount);
-  const optionPrice = (!isPrivate && guestCount === 1 && isSoloGuaranteed) ? SOLO_GUARANTEE_PRICE : 0;
+  const optionPrice = (isSoloEligible && isSoloGuaranteed) ? SOLO_GUARANTEE_PRICE : 0;
   const totalPrice = basePrice + optionPrice;
 
   return (
@@ -129,7 +130,13 @@ export default function ReservationCard({
             
             <select 
               value={guestSelection} 
-              onChange={(e)=>setGuestSelection(e.target.value)} 
+              onChange={(e) => {
+                const nextSelection = e.target.value;
+                setGuestSelection(nextSelection);
+                if (nextSelection !== '1' && isSoloGuaranteed) {
+                  setIsSoloGuaranteed(false);
+                }
+              }}
               className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
             >
               <optgroup label={t('exp_reservation_regular_booking')}>
@@ -185,8 +192,14 @@ export default function ReservationCard({
         </div>
       )}
 
+      {isSoloEligible && (
+        <p className="mb-3 text-[11px] md:text-xs text-slate-500 leading-relaxed">
+          {t('exp_reservation_shared_join_note')}
+        </p>
+      )}
+
       {/* 1인 옵션 */}
-      {!isPrivate && guestCount === 1 && (
+      {isSoloEligible && (
         <div className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-all ${isSoloGuaranteed ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`} onClick={() => setIsSoloGuaranteed(!isSoloGuaranteed)}>
           <div className="flex items-start gap-3">
             <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${isSoloGuaranteed ? 'bg-black border-black' : 'border-slate-300 bg-white'}`}>
@@ -201,7 +214,7 @@ export default function ReservationCard({
         </div>
       )}
 
-      <button onClick={() => onReserve(selectedDate, selectedTime, guestCount, isPrivate)} className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4">
+      <button onClick={() => onReserve(selectedDate, selectedTime, guestCount, isPrivate, isSoloEligible && isSoloGuaranteed)} className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4">
         {isPrivate ? t('exp_reservation_book_private') : t('exp_reservation_book_shared')}
       </button>
       

@@ -9,7 +9,7 @@ type ExpSidebarProps = {
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
   remainingSeatsMap: Record<string, number>;
-  handleReserve: (date: string, time: string, guests: number, isPrivate: boolean) => void;
+  handleReserve: (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => void;
 };
 
 export default function ExpSidebar({

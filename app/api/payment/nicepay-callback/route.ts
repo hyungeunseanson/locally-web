@@ -94,10 +94,11 @@ export async function POST(request: Request) {
       // 결제를 승인하는 바로 이 순간(0.1초 차이)에 좌석이 남아있는지 최종 확인합니다.
       const { data: existingBookings } = await supabase
         .from('bookings')
-        .select('guests, type')
+        .select('id, guests, type')
         .eq('experience_id', originalBooking.experience_id)
         .eq('date', originalBooking.date)
         .eq('time', originalBooking.time)
+        .neq('id', orderId)
         .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
       const currentBookedCount = existingBookings?.reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
@@ -115,9 +116,12 @@ export async function POST(request: Request) {
 
       // 3. 예약 상태 및 정산 데이터 업데이트 (PAID)
       // 💰 [정산 데이터 박제] 호스트 원가와 수수료 수익을 이 시점에 확정 기록합니다.
-      const basePrice = Number(originalBooking.experiences?.price || 0);
-      const totalExpPrice = basePrice * (originalBooking.guests || 1);
-      const payoutAmount = totalExpPrice * 0.8; // 호스트 정산금 (원가의 80%)
+      const guestCount = Number(originalBooking.guests || 1);
+      const basePrice = originalBooking.type === 'private'
+        ? Number(originalBooking.experiences?.private_price || 0)
+        : Number(originalBooking.experiences?.price || 0) * guestCount;
+      const totalExpPrice = Number(originalBooking.total_price || 0);
+      const payoutAmount = Math.floor(totalExpPrice * 0.8); // 호스트 정산금 (원가의 80%)
       const platformRev = Number(amount) - payoutAmount; // 플랫폼 순수익 (실결제액 - 지급액)
 
       const { data: bookingData, error: dbError } = await supabase

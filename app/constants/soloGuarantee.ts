@@ -1,0 +1,1 @@
+export const SOLO_GUARANTEE_PRICE = 30000;

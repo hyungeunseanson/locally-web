@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_BLOCKING_STATUSES_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 
 type PaymentExperience = {
   title?: string;
@@ -85,9 +86,12 @@ function PaymentContent() {
   const time = searchParams?.get('time') || '시간 미정';
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
+  const isSoloGuarantee = searchParams?.get('solo') === '1' && guests === 1 && !isPrivate;
 
   const expPrice = Number(experience?.price || 50000);
-  const hostPrice = isPrivate ? Number(experience?.private_price || 300000) : expPrice * guests;
+  const baseHostPrice = isPrivate ? Number(experience?.private_price || 300000) : expPrice * guests;
+  const soloGuaranteePrice = isSoloGuarantee ? SOLO_GUARANTEE_PRICE : 0;
+  const hostPrice = baseHostPrice + soloGuaranteePrice;
   const guestFee = Math.floor(hostPrice * 0.1);
   const finalAmount = hostPrice + guestFee;
 
@@ -192,6 +196,7 @@ function PaymentContent() {
           time,
           guests,
           isPrivate,
+          isSoloGuarantee,
           customerName,
           customerPhone,
           paymentMethod
@@ -314,6 +319,12 @@ function PaymentContent() {
             <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Clock className="w-3.5 h-3.5 md:w-4 md:h-4" /> 시간</span><span className="font-bold">{time}</span></div>
             <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Users className="w-3.5 h-3.5 md:w-4 md:h-4" /> 인원</span><span className="font-bold">{guests}명</span></div>
             {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> 타입</span><span className="font-bold text-rose-500">프라이빗 투어</span></div>}
+            {!isPrivate && guests === 1 && (
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] md:text-xs text-slate-500 leading-relaxed">
+                일반 예약은 이후 다른 게스트가 함께 예약할 수 있어요.
+                {isSoloGuarantee && <span className="block mt-1 font-semibold text-slate-700">1인 출발 확정 옵션이 적용되었습니다.</span>}
+              </div>
+            )}
           </div>
 
           <div className="mb-6 md:mb-8 space-y-3 md:space-y-4">
@@ -362,7 +373,10 @@ function PaymentContent() {
           </div>
 
           <div className="px-1 md:px-2 space-y-1.5 md:space-y-2 mb-6 md:mb-8 text-[12px] md:text-sm">
-            <div className="flex justify-between items-center text-slate-600"><span>체험 금액</span><span>₩{hostPrice.toLocaleString()}</span></div>
+            <div className="flex justify-between items-center text-slate-600"><span>체험 금액</span><span>₩{baseHostPrice.toLocaleString()}</span></div>
+            {isSoloGuarantee && (
+              <div className="flex justify-between items-center text-slate-600"><span>1인 출발 확정비</span><span>+ ₩{soloGuaranteePrice.toLocaleString()}</span></div>
+            )}
             <div className="flex justify-between items-center text-blue-600"><span className="flex items-center gap-1">서비스 수수료 (10%) <Info className="w-3 h-3 md:w-3.5 md:h-3.5" /></span><span>+ ₩{guestFee.toLocaleString()}</span></div>
             <div className="border-t border-slate-100 pt-3 md:pt-4 mt-1.5 md:mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-[24px] md:text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
           </div>
