@@ -308,6 +308,7 @@ export default function GlobalTeamChat() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    eventType: 'team_chat',
                     title: `Team Chat에 새로운 메시지가 도착했습니다.`,
                     message: `${currentUser.name}: ${messageText || '(사진)'}`,
                     link: '/admin/dashboard?tab=TEAM'

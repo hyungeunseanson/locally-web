@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 // 🔒 API Route 내부에서 직접 관리자 클라이언트 생성 (의존성 제거)
 const createAdminClient = () => {
@@ -142,14 +143,37 @@ export async function POST(request: Request) {
       if (notifications.length > 0) {
         await supabase.from('notifications').insert(notifications);
       }
+
+      if (experience.host_id) {
+        await sendImmediateGenericEmail({
+          recipientUserId: experience.host_id,
+          subject: `[Locally] 💰 입금 확인 완료!`,
+          title: '입금 확인 완료!',
+          message: `'${experience.title}' 예약의 입금 확인이 완료되었습니다.`,
+          link: '/host/dashboard',
+          ctaLabel: '호스트 대시보드 열기',
+        });
+      }
+
+      if (booking.user_id) {
+        await sendImmediateGenericEmail({
+          recipientUserId: booking.user_id,
+          subject: `[Locally] ✅ 예약이 확정되었습니다`,
+          title: '예약 확정 알림',
+          message: `'${experience.title}' 입금이 확인되어 예약이 확정되었습니다.`,
+          link: '/guest/trips',
+          ctaLabel: '내 여행 보기',
+        });
+      }
     } catch (notiError) {
       console.error('Notification Failed (Ignored):', notiError);
     }
 
     return NextResponse.json({ success: true });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal Server Error';
     console.error('🔥 [API Error]', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

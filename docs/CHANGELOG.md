@@ -5,6 +5,19 @@
 
 ---
 
+## v3.37.64 — [Email Notifications] 팀 digest / 문의 지연 메일 / 즉시 메일 보강
+
+**작업일:** 2026-03-11
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 팀 알림 digest 전환 | `/api/admin/notify-team`이 더 이상 즉시 메일을 보내지 않고 `email_notification_jobs` 큐에 적재하도록 변경. 팀 댓글/메모/채팅은 10분 단위 digest 메일 대상으로 전환 |
+| 🔴 문의 메일 지연 발송 | 게스트↔호스트 문의 메시지는 새 메시지마다 즉시 메일을 보내지 않고, `미읽음 10분 후 1회` 기준의 `inquiry_unread` 큐 잡으로 전환 |
+| 🟡 즉시 메일 보강 | 호스트 신청 승인/보완/거절, 일반 예약 무통장 입금 확인 완료 시 generic 즉시 메일이 함께 발송되도록 보강 |
+| 🟡 스케줄러 추가 | `/api/cron/email-notifications` 크론 라우트와 `.github/workflows/email-notification-queue.yml` 워크플로우를 추가해 10분마다 queued 메일 잡을 처리하도록 연결 |
+| 🟡 migration 추가 | `supabase_email_notification_jobs_migration.sql`로 `email_notification_jobs` 지연 메일 큐 테이블을 추가 |
+| ✅ 검증 | `npx tsc --noEmit`, `git diff --check` 예정 |
+
 ## v3.37.63 — [Experience Translation] Gemini Flash-Lite fallback 보강
 
 **작업일:** 2026-03-10

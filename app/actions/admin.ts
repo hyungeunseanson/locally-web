@@ -3,6 +3,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 // 🔒 관리자 권한 확인
 async function getAdminClient() {
@@ -120,6 +121,19 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
 
         if (notificationError) {
           console.error('Host application status notification insert failed:', notificationError);
+        }
+
+        try {
+          await sendImmediateGenericEmail({
+            recipientUserId: app.user_id,
+            subject: `[Locally] ${notification.title}`,
+            title: notification.title,
+            message: notification.message,
+            link: notification.link,
+            ctaLabel: '호스트 대시보드 열기',
+          });
+        } catch (emailError) {
+          console.error('Host application status email failed:', emailError);
         }
       }
     }

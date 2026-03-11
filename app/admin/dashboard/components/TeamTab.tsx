@@ -288,6 +288,7 @@ export default function TeamTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          eventType: 'team_task_comment',
           title: `할 일에 새로운 댓글이 등록되었습니다.`,
           message: `${currentUser.name}: ${text}`,
           link: '/admin/dashboard?tab=TEAM'
@@ -338,6 +339,7 @@ export default function TeamTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          eventType: 'team_todo',
           title: `새로운 할 일이 등록되었습니다.`,
           message: `${currentUser.name}님이 할 일을 추가했습니다:\n${newTodo}`,
           link: '/admin/dashboard?tab=TEAM'
@@ -375,6 +377,7 @@ export default function TeamTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          eventType: 'team_memo_comment',
           title: `메모에 새로운 답글이 등록되었습니다.`,
           message: `${currentUser.name}: ${text}`,
           link: '/admin/dashboard?tab=TEAM'
@@ -412,6 +415,7 @@ export default function TeamTab() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            eventType: 'team_memo',
             title: `새로운 팀 메모가 등록되었습니다.`,
             message: `${currentUser.name}님이 메모를 작성했습니다.\n대시보드에서 내용을 확인해보세요.`,
             link: '/admin/dashboard?tab=TEAM'

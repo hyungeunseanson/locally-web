@@ -42,7 +42,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 | 사용자/권한 | `profiles`, `admin_whitelist` | `profiles.role` 기반, whitelist 예외 허용 |
 | 상품/예약/결제 | `experiences`, `bookings` | 예약 상태는 서버 검증 기준 |
 | 소통/리뷰 | `inquiries`, `inquiry_messages`, `reviews` | 채팅/리뷰 연동 |
-| 운영 | `admin_tasks`, `admin_task_comments`, `audit_logs` | 협업/로그 |
+| 운영 | `admin_tasks`, `admin_task_comments`, `audit_logs`, `email_notification_jobs` | 협업/로그/지연 메일 큐 |
 | 커뮤니티 | `community_posts`, `community_comments`, `community_likes` | RLS: SELECT USING(true), INSERT/UPDATE/DELETE는 auth 필수 |
 
 ### 3.2 권한 원칙
@@ -50,6 +50,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 관리자: `profiles.role='admin'` 또는 `admin_whitelist` 매칭
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
 - **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
+- **[이메일 정책 아키텍처 결정]** 팀스페이스 메일은 `/api/admin/notify-team`에서 즉시 발송하지 않고 `email_notification_jobs` 큐에 적재한 뒤 `/api/cron/email-notifications`가 10분 digest로 처리한다. 게스트↔호스트 문의 메일도 같은 큐를 사용하되, 메시지 생성 시 즉시 메일을 보내지 않고 `미읽음 10분 후 1회`만 발송한다.
 
 ### 3.3 결제/정합성 원칙
 - 결제 확정/취소는 서버 검증 경로를 단일 소스로 유지
@@ -69,6 +70,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 결제/보안: NicePay 서명 검증, 결제 확정/취소 API 권한 검증 반영
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합, Postgres Trigger 프로필 100% 일치 동기화.
 - 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다. 서비스 매칭 채팅은 `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 적용 후 `inquiries.service_request_id` 기준으로 request 단위 분리를 활성화한다.
+- 이메일 알림 큐(v3.9.4): `supabase_email_notification_jobs_migration.sql`로 `email_notification_jobs` 테이블을 추가하고, `/api/cron/email-notifications` + GitHub Actions 스케줄러가 `team_digest`, `inquiry_unread` 지연 메일을 처리한다. 팀스페이스는 10분 digest, 문의 메시지는 미읽음 10분 후 1회 메일을 기준으로 한다.
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 기존 체험(`bookings`) 탭·`useAdminData.ts`는 전혀 변경하지 않음.
 - 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
 - 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
