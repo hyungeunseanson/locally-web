@@ -911,6 +911,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     res_status_pending: "입금 확인 중",
     res_review_done: "후기 작성됨",
     res_review_write: "게스트 후기",
+    res_review_before_tour: "아직 투어 진행 전입니다.",
 
     // [Review Modal]
     rv_max_photos: "사진은 최대 2장까지 첨부 가능합니다.",
@@ -1785,6 +1786,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     res_status_pending: "Awaiting Payment",
     res_review_done: "Review Written",
     res_review_write: "Write Review",
+    res_review_before_tour: "This tour has not started yet.",
 
     // [Review Modal]
     rv_max_photos: "You can attach up to 2 photos.",
@@ -2660,6 +2662,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     res_status_pending: "入金確認中",
     res_review_done: "レビュー作成済み",
     res_review_write: "ゲストレビュー",
+    res_review_before_tour: "まだツアー開始前です。",
 
     // [Review Modal]
     rv_max_photos: "写真は最大2枚まで添付できます。",
@@ -3534,6 +3537,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     res_status_pending: "等待付款确认",
     res_review_done: "已写评价",
     res_review_write: "房客评价",
+    res_review_before_tour: "行程尚未开始。",
 
     // [Review Modal]
     rv_max_photos: "最多可以附加2张照片。",

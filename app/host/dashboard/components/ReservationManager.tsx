@@ -404,6 +404,16 @@ guest:profiles!bookings_user_id_fkey (
                 // 🟢 [추가] 후기 관련 Props
                 hasReview={reviewedBookingIds.includes(res.id)}
                 onReview={() => {
+                  const [year, month, day] = res.date.split('-').map(Number);
+                  const tripDate = new Date(year, month - 1, day);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+
+                  if (tripDate >= today) {
+                    showToast(t('res_review_before_tour'), 'error');
+                    return;
+                  }
+
                   setSelectedBookingForReview(res);
                   setReviewModalOpen(true);
                 }}

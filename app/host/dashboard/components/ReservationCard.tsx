@@ -109,6 +109,7 @@ export default function ReservationCard({
   today.setHours(0, 0, 0, 0);
   const isPast = targetDate < today;
   const canReview = isPast && !isCancelledBookingStatus(res.status);
+  const showDesktopReviewButton = !isCancelledBookingStatus(res.status);
   const orderDisplay = String(res.order_id || res.id);
   const guestCount = res.guests ?? 0;
   const amountDisplay = res.amount != null ? `₩${res.amount.toLocaleString()}` : '-';
@@ -345,7 +346,7 @@ export default function ReservationCard({
             <MessageSquare size={16} /> {t('res_message_btn')}
           </button>
 
-          {canReview && (
+          {showDesktopReviewButton && (
             <button
               onClick={(e) => { e.stopPropagation(); if (!hasReview) onReview(); }}
               disabled={hasReview}
