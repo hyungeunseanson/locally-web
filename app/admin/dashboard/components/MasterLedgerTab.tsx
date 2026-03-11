@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   Download, Search, Calendar, User,
-  ArrowRight, CreditCard, Wallet, TrendingUp, AlertCircle, X,
-  CheckCircle2, XCircle, Copy, Phone, Mail, AlertTriangle, Clock, Info
+  ArrowRight, CreditCard, X,
+  CheckCircle2, Copy, AlertTriangle, Clock, Info
 } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
-import Image from 'next/image';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import dynamic from 'next/dynamic';
@@ -54,6 +53,17 @@ function normalizeServiceBooking(b: any): any {
   };
 }
 
+type ConfirmDialogState =
+  | {
+      kind: 'confirm-payment' | 'force-cancel';
+      bookingId: string;
+      title: string;
+      description: string;
+      confirmLabel: string;
+      tone: 'blue' | 'red';
+    }
+  | null;
+
 export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any[], onRefresh: () => void }) {
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,12 +77,25 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
 
   useEffect(() => {
     fetch('/api/admin/service-bookings')
       .then(r => r.json())
       .then(res => { if (res.success && res.data) setServiceBookings(res.data); })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
+
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
 
   // 일반 예약 + 서비스 의뢰 통합 (created_at 내림차순)
@@ -195,8 +218,18 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     showToast('장부가 CSV로 다운로드되었습니다.', 'success');
   };
 
-  const handleConfirmPayment = async (bookingId: number) => {
-    if (!confirm('입금이 확인되었습니까? 예약을 확정합니다.')) return;
+  const confirmDialogAction = async () => {
+    if (!confirmDialog) return;
+
+    if (confirmDialog.kind === 'confirm-payment') {
+      await performConfirmPayment(confirmDialog.bookingId);
+      return;
+    }
+
+    await performForceCancel(confirmDialog.bookingId);
+  };
+
+  const performConfirmPayment = async (bookingId: string) => {
     setIsProcessing(true);
     try {
       const res = await fetch('/api/bookings/confirm-payment', {
@@ -208,13 +241,30 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       showToast('입금 확인 완료!', 'success');
       onRefresh();
       setSelectedBooking(null);
+      setConfirmDialog(null);
     } catch (e: any) {
       showToast(e.message, 'error');
     } finally { setIsProcessing(false); }
   };
 
-  const handleForceCancel = async (bookingId: string) => {
-    if (!confirm('⚠️ 정말로 강제 취소(전액 환불)하시겠습니까?')) return;
+  const handleConfirmPayment = async (bookingId: string) => {
+    if (isMobileViewport) {
+      setConfirmDialog({
+        kind: 'confirm-payment',
+        bookingId,
+        title: '입금 확인',
+        description: '입금이 확인되었습니까? 예약을 확정합니다.',
+        confirmLabel: '입금 확인',
+        tone: 'blue',
+      });
+      return;
+    }
+
+    if (!confirm('입금이 확인되었습니까? 예약을 확정합니다.')) return;
+    await performConfirmPayment(bookingId);
+  };
+
+  const performForceCancel = async (bookingId: string) => {
     setIsProcessing(true);
     try {
       const res = await fetch('/api/payment/cancel', {
@@ -226,9 +276,27 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       showToast('취소 처리되었습니다.', 'success');
       onRefresh();
       setSelectedBooking(null);
+      setConfirmDialog(null);
     } catch (e: any) {
       showToast(e.message, 'error');
     } finally { setIsProcessing(false); }
+  };
+
+  const handleForceCancel = async (bookingId: string) => {
+    if (isMobileViewport) {
+      setConfirmDialog({
+        kind: 'force-cancel',
+        bookingId,
+        title: '강제 취소',
+        description: '정말로 강제 취소(전액 환불)하시겠습니까?',
+        confirmLabel: '강제 취소',
+        tone: 'red',
+      });
+      return;
+    }
+
+    if (!confirm('⚠️ 정말로 강제 취소(전액 환불)하시겠습니까?')) return;
+    await performForceCancel(bookingId);
   };
 
   const handleCopy = (text: string) => {
@@ -238,36 +306,36 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
   const renderStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
-    if (isConfirmedBookingStatus(status)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">확정</span>;
-    if (s === 'pending') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 animate-pulse">입금 대기</span>;
-    if (isCancelledBookingStatus(status)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">취소됨</span>;
+    if (isConfirmedBookingStatus(status)) return <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-700 md:px-2 md:text-[10px]">확정</span>;
+    if (s === 'pending') return <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold bg-yellow-100 text-yellow-700 animate-pulse md:px-2 md:text-[10px]">{isMobileViewport ? '입금' : '입금 대기'}</span>;
+    if (isCancelledBookingStatus(status)) return <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold bg-red-100 text-red-700 md:px-2 md:text-[10px]">{isMobileViewport ? '취소' : '취소됨'}</span>;
     return <span className="text-xs text-slate-500">{status}</span>;
   };
 
   return (
-    <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden flex-col md:flex-row">
-      <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
+    <div className="flex h-full gap-3 md:gap-6 relative overflow-hidden flex-col md:flex-row">
+      <div className={`flex-1 flex flex-col gap-3 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 shrink-0">
-          <div className="bg-slate-900 p-3 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Total Sales</div>
-            <div className="text-sm md:text-2xl font-black">₩{totals.totalSales.toLocaleString()}</div>
-            <div className="text-[8px] md:text-[10px] text-slate-500 mt-0.5 md:mt-1">실결제 매출</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-4 shrink-0">
+          <div className="bg-slate-900 p-2.5 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Total Sales</div>
+            <div className="text-[13px] md:text-2xl font-black">₩{totals.totalSales.toLocaleString()}</div>
+            <div className="text-[7px] md:text-[10px] text-slate-500 mt-0.5 md:mt-1">실결제 매출</div>
           </div>
-          <div className="bg-white p-3 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Payout (80%)</div>
-            <div className="text-sm md:text-2xl font-black text-rose-600">₩{totals.totalPayout.toLocaleString()}</div>
-            <div className="text-[8px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">지급 예정액</div>
+          <div className="bg-white p-2.5 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Payout (80%)</div>
+            <div className="text-[13px] md:text-2xl font-black text-rose-600">₩{totals.totalPayout.toLocaleString()}</div>
+            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">지급 예정액</div>
           </div>
-          <div className="bg-white p-3 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Net Revenue</div>
-            <div className="text-sm md:text-2xl font-black text-blue-600">₩{totals.totalProfit.toLocaleString()}</div>
-            <div className="text-[8px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">순수익</div>
+          <div className="bg-white p-2.5 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Net Revenue</div>
+            <div className="text-[13px] md:text-2xl font-black text-blue-600">₩{totals.totalProfit.toLocaleString()}</div>
+            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1">순수익</div>
           </div>
-          <div className="bg-white p-3 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Bookings</div>
-            <div className="text-sm md:text-2xl font-black text-slate-900">{ledgerData.length}건</div>
-            <div className="text-[8px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 truncate">
+          <div className="bg-white p-2.5 md:p-5 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Bookings</div>
+            <div className="text-[13px] md:text-2xl font-black text-slate-900">{ledgerData.length}건</div>
+            <div className="text-[7px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 truncate">
               {dateRange[0].startDate && dateRange[0].endDate ?
                 `${format(dateRange[0].startDate, 'yy.MM.dd')} ~ ${format(dateRange[0].endDate, 'yy.MM.dd')}`
                 : '전체 기간'
@@ -276,14 +344,14 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-2.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm shrink-0 gap-2.5 md:gap-0">
-          <div className="flex flex-col md:flex-row gap-2.5 md:gap-4 md:items-center w-full md:w-auto">
+        <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm shrink-0 gap-2 md:gap-0">
+          <div className="flex flex-col md:flex-row gap-2 md:gap-4 md:items-center w-full md:w-auto">
 
             {/* 🗓️ 통합 달력(DateRangePicker) UI */}
             <div className="relative w-full md:w-auto">
               <button
                 onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                className="flex items-center justify-center md:justify-start w-full md:w-auto gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl text-[11px] md:text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex items-center justify-center md:justify-start w-full md:w-auto gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl text-[10px] md:text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <Calendar size={14} className="text-blue-600 md:w-4 md:h-4" />
                 {dateRange[0].startDate && dateRange[0].endDate
@@ -324,14 +392,14 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <div className="flex flex-wrap bg-slate-100 p-1 rounded-lg w-full md:w-auto justify-center">
               {[
                 { id: 'ALL', label: '전체' },
-                { id: 'PENDING', label: '입금대기' },
-                { id: 'PAID', label: '확정됨' },
-                { id: 'CANCELLED', label: '취소됨' }
+                { id: 'PENDING', label: isMobileViewport ? '입금' : '입금대기' },
+                { id: 'PAID', label: isMobileViewport ? '확정' : '확정됨' },
+                { id: 'CANCELLED', label: isMobileViewport ? '취소' : '취소됨' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id as any)}
-                  className={`flex-1 md:flex-none px-1.5 py-1 md:px-3 text-[10px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`flex-1 md:flex-none px-1.5 py-1 md:px-3 text-[9px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {tab.label}
                 </button>
@@ -343,10 +411,10 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
               <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
               <input
                 type="text"
-                placeholder="검색 (이름, 예약번호)"
+                placeholder={isMobileViewport ? '이름, 예약번호 검색' : '검색 (이름, 예약번호)'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 md:pl-9 pr-3 py-1.5 md:py-2 bg-slate-50 border border-slate-100 rounded-lg md:rounded-xl text-[11px] md:text-xs focus:outline-none"
+                className="w-full pl-8 md:pl-9 pr-3 py-1.5 md:py-2 bg-slate-50 border border-slate-100 rounded-lg md:rounded-xl text-[10px] md:text-xs focus:outline-none"
               />
             </div>
             <button
@@ -360,18 +428,18 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
         <div className="bg-white rounded-xl md:rounded-[24px] border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col">
           <div className="overflow-x-auto overflow-y-auto flex-1 scrollbar-hide">
-            <table className="w-full text-[10px] md:text-[13px] text-left border-collapse min-w-[700px] md:min-w-[800px]">
-              <thead className="bg-slate-50 text-[9px] md:text-[10px] font-black text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
+            <table className="w-full text-[9px] md:text-[13px] text-left border-collapse min-w-[620px] md:min-w-[800px]">
+              <thead className="bg-slate-50 text-[8px] md:text-[10px] font-black text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
                 <tr>
-                  <th className="px-2 md:px-4 py-2 md:py-4 w-16 md:w-24">Status</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4">Type</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4">Date</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4">Host</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4">Tour Item</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4 text-center">Customer</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4 text-right">Price</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4 text-right">Payout</th>
-                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-slate-900 bg-slate-100/50">매출(Paid)</th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4 w-14 md:w-24"><span className="md:hidden">상태</span><span className="hidden md:inline">Status</span></th>
+                  <th className="hidden md:table-cell px-2 md:px-4 py-2 md:py-4">Type</th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">일자</span><span className="hidden md:inline">Date</span></th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">호스트</span><span className="hidden md:inline">Host</span></th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">상품</span><span className="hidden md:inline">Tour Item</span></th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4 text-center"><span className="md:hidden">게스트</span><span className="hidden md:inline">Customer</span></th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4 text-right"><span className="md:hidden">가격</span><span className="hidden md:inline">Price</span></th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4 text-right"><span className="md:hidden">정산</span><span className="hidden md:inline">Payout</span></th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-slate-900 bg-slate-100/50"><span className="md:hidden">매출</span><span className="hidden md:inline">매출(Paid)</span></th>
                   <th className="px-2 md:px-4 py-2 md:py-4 text-right text-blue-600">수익</th>
                 </tr>
               </thead>
@@ -385,36 +453,36 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                       onClick={() => handleSelectBooking(b)}
                       className={`hover:bg-slate-50 transition-colors cursor-pointer group ${selectedBooking?.id === b.id ? 'bg-blue-50/50' : ''}`}
                     >
-                      <td className="px-2 md:px-4 py-2.5 md:py-4">{renderStatusBadge(b.status)}</td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4">
+                      <td className="px-1.5 md:px-4 py-2 md:py-4">{renderStatusBadge(b.status)}</td>
+                      <td className="hidden md:table-cell px-2 md:px-4 py-2.5 md:py-4">
                         {b._type === 'service'
                           ? <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700">서비스의뢰</span>
                           : <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-500">일반예약</span>
                         }
                       </td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4 font-mono text-[9px] md:text-xs text-slate-500">{b.date?.slice(5)}</td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4 font-bold text-slate-900 truncate max-w-[80px]">{b.experiences?.profiles?.name || '-'}</td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4">
-                        <div className="max-w-[120px] md:max-w-[150px] truncate font-medium text-slate-700" title={b.experiences?.title}>
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 font-mono text-[8px] md:text-xs text-slate-500">{b.date?.slice(5)}</td>
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 font-bold text-slate-900 truncate max-w-[72px] md:max-w-[80px]">{b.experiences?.profiles?.name || '-'}</td>
+                      <td className="px-1.5 md:px-4 py-2 md:py-4">
+                        <div className="max-w-[108px] md:max-w-[150px] truncate font-medium text-slate-700" title={b.experiences?.title}>
                           {b.experiences?.title}
                         </div>
                       </td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-center text-[10px] md:text-sm text-slate-600 truncate max-w-[80px]">
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-center text-[9px] md:text-sm text-slate-600 truncate max-w-[72px] md:max-w-[80px]">
                         {b.contact_name}({b.guests})
                       </td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[9px] md:text-sm text-slate-400">
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[8px] md:text-sm text-slate-400">
                         {b.price_at_booking != null ? Number(b.price_at_booking).toLocaleString() : '-'}
                       </td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-rose-600 bg-rose-50/30">
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-rose-600 bg-rose-50/30">
                         {b._type === 'service'
                           ? (b.host_payout_amount != null ? Number(b.host_payout_amount).toLocaleString() : '-')
                           : getBookingHostPayout(b).toLocaleString()
                         }
                       </td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-slate-900 bg-slate-100/50">
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-slate-900 bg-slate-100/50">
                         {Number(b.amount).toLocaleString()}
                       </td>
-                      <td className="px-2 md:px-4 py-2.5 md:py-4 text-right font-mono text-[10px] md:text-sm font-black text-blue-600">
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-blue-600">
                         {b._type === 'service'
                           ? (b.platform_revenue != null ? Number(b.platform_revenue).toLocaleString() : '-')
                           : getBookingPlatformRevenue(b).toLocaleString()
@@ -430,9 +498,16 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       </div>
 
       {selectedBooking && (
-        <div className="absolute inset-0 z-[100] md:z-30 md:relative md:w-[400px] w-full bg-white md:rounded-2xl md:shadow-2xl md:border md:border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-300 right-0 top-0 bottom-0 h-full">
+        <>
+        <button
+          type="button"
+          aria-label="상세 닫기"
+          onClick={() => setSelectedBooking(null)}
+          className="fixed inset-0 z-[90] bg-slate-900/35 md:hidden"
+        />
+        <div className="fixed inset-x-2 bottom-2 top-16 z-[100] rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 duration-300 md:relative md:z-30 md:w-[400px] md:h-full md:rounded-2xl md:border md:border-slate-200">
           {/* Header */}
-          <div className="p-3 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+          <div className="p-2.5 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
             <div className="flex-1 pr-2">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1 md:mb-1.5">
                 <div className={`px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-black uppercase tracking-wider ${selectedBooking.status.toLowerCase() === 'pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
@@ -440,10 +515,10 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   }`}>
                   {selectedBooking.status}
                 </div>
-                <span className="text-[9px] md:text-[10px] text-slate-400 font-bold">#{selectedBooking.id.slice(0, 8)}</span>
+                <span className="text-[8px] md:text-[10px] text-slate-400 font-bold">#{selectedBooking.id.slice(0, 8)}</span>
               </div>
-              <h3 className="text-[13px] md:text-base font-black text-slate-900 leading-tight mb-1.5 md:mb-2 line-clamp-2">{selectedBooking.experiences?.title}</h3>
-              <div className="flex items-center gap-2 md:gap-3 text-[10px] md:text-xs text-slate-600 font-medium">
+              <h3 className="text-[12px] md:text-base font-black text-slate-900 leading-tight mb-1 md:mb-2 line-clamp-2">{selectedBooking.experiences?.title}</h3>
+              <div className="flex items-center gap-1.5 md:gap-3 text-[9px] md:text-xs text-slate-600 font-medium">
                 <span>{selectedBooking.date} {selectedBooking.time}</span>
                 <span className="w-0.5 h-0.5 md:w-1 md:h-1 bg-slate-300 rounded-full"></span>
                 <span>게스트 {selectedBooking.guests}명</span>
@@ -452,9 +527,9 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <button onClick={() => setSelectedBooking(null)} className="text-slate-400 hover:text-slate-900 p-1 md:bg-white rounded-full bg-slate-200/50 md:border md:border-slate-100 md:shadow-sm"><X size={14} className="md:w-4 md:h-4" /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 md:space-y-6 scrollbar-hide bg-white pb-10">
+          <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-6 scrollbar-hide bg-white pb-6 md:pb-10">
             {/* 예약/결제 시점 */}
-            <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-[11px] text-slate-500 bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100">
+            <div className="flex items-center gap-1.5 md:gap-2 text-[9px] md:text-[11px] text-slate-500 bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100">
               <Clock size={12} className="text-slate-400 md:w-3.5 md:h-3.5" />
               <span>접수: <span className="font-bold text-slate-700">{format(new Date(selectedBooking.created_at), 'yyyy.MM.dd HH:mm:ss', { locale: ko })}</span></span>
             </div>
@@ -463,21 +538,21 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <div>
               <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 md:mb-2 flex items-center gap-1"><User size={10} /> Guest Info</h4>
               <div className="grid grid-cols-1 gap-0 text-xs md:text-sm border border-slate-100 rounded-lg md:rounded-xl overflow-hidden">
-                <div className="flex justify-between items-center px-2.5 md:px-3 py-2 md:py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <span className="text-slate-500 text-[11px] md:text-xs">Name</span>
-                  <span className="font-bold text-[11px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_name)}>
+                <div className="flex justify-between items-center px-2.5 md:px-3 py-1.5 md:py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <span className="text-slate-500 text-[10px] md:text-xs">Name</span>
+                  <span className="font-bold text-[10px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_name)}>
                     {selectedBooking.contact_name} <Copy size={10} className="text-slate-300 md:w-3 md:h-3" />
                   </span>
                 </div>
-                <div className="flex justify-between items-center px-2.5 md:px-3 py-2 md:py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <span className="text-slate-500 text-[11px] md:text-xs">Phone</span>
-                  <span className="font-bold text-[11px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_phone)}>
+                <div className="flex justify-between items-center px-2.5 md:px-3 py-1.5 md:py-2.5 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <span className="text-slate-500 text-[10px] md:text-xs">Phone</span>
+                  <span className="font-bold text-[10px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600" onClick={() => handleCopy(selectedBooking.contact_phone)}>
                     {selectedBooking.contact_phone} <Copy size={10} className="text-slate-300 md:w-3 md:h-3" />
                   </span>
                 </div>
-                <div className="flex justify-between items-center px-2.5 md:px-3 py-2 md:py-2.5 hover:bg-slate-50 transition-colors">
-                  <span className="text-slate-500 text-[11px] md:text-xs">Email</span>
-                  <span className="font-bold text-[11px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600 truncate max-w-[150px] md:max-w-[200px]" onClick={() => handleCopy(selectedBooking.profiles?.email)}>
+                <div className="flex justify-between items-center px-2.5 md:px-3 py-1.5 md:py-2.5 hover:bg-slate-50 transition-colors">
+                  <span className="text-slate-500 text-[10px] md:text-xs">Email</span>
+                  <span className="font-bold text-[10px] md:text-sm text-slate-900 flex items-center gap-1 cursor-pointer hover:text-blue-600 truncate max-w-[150px] md:max-w-[200px]" onClick={() => handleCopy(selectedBooking.profiles?.email)}>
                     {selectedBooking.profiles?.email} <Copy size={10} className="text-slate-300 md:w-3 md:h-3" />
                   </span>
                 </div>
@@ -487,29 +562,29 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             {/* 결제 및 정산 (Compact List) */}
             <div>
               <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 md:mb-2 flex items-center gap-1"><CreditCard size={10} /> Payment Breakdown</h4>
-              <div className="bg-slate-50 rounded-xl p-2.5 md:p-3 space-y-1.5 md:space-y-2 border border-slate-100">
+              <div className="bg-slate-50 rounded-xl p-2.5 md:p-3 space-y-1 md:space-y-2 border border-slate-100">
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] md:text-xs text-slate-500">결제 수단</span>
-                  <span className="text-[11px] md:text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <span className="text-[10px] md:text-xs text-slate-500">결제 수단</span>
+                  <span className="text-[10px] md:text-xs font-bold text-slate-700 flex items-center gap-1">
                     {/* 결제수단 로직 개선: payment_method 필드 자체를 확인 */}
                     {selectedBooking.payment_method === 'bank' || (selectedBooking.payment_method && selectedBooking.payment_method.includes('bank')) ? '🏛️ 무통장 입금' : '💳 카드 결제'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] md:text-xs text-slate-500">결제 금액</span>
-                  <span className="text-xs md:text-sm font-black text-slate-900">₩{Number(selectedBooking.amount).toLocaleString()}</span>
+                  <span className="text-[10px] md:text-xs text-slate-500">결제 금액</span>
+                  <span className="text-[11px] md:text-sm font-black text-slate-900">₩{Number(selectedBooking.amount).toLocaleString()}</span>
                 </div>
                 <div className="h-px bg-slate-200 my-0.5 md:my-1"></div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] md:text-xs text-slate-500">호스트 정산 (80%)</span>
-                  <span className="text-[11px] md:text-xs font-bold text-rose-500">₩{getBookingHostPayout(selectedBooking).toLocaleString()}</span>
+                  <span className="text-[10px] md:text-xs text-slate-500">호스트 정산 (80%)</span>
+                  <span className="text-[10px] md:text-xs font-bold text-rose-500">₩{getBookingHostPayout(selectedBooking).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] md:text-xs text-slate-500">플랫폼 수익 (Net)</span>
-                  <span className="text-[11px] md:text-xs font-bold text-blue-600">₩{getBookingPlatformRevenue(selectedBooking).toLocaleString()}</span>
+                  <span className="text-[10px] md:text-xs text-slate-500">플랫폼 수익 (Net)</span>
+                  <span className="text-[10px] md:text-xs font-bold text-blue-600">₩{getBookingPlatformRevenue(selectedBooking).toLocaleString()}</span>
                 </div>
               </div>
-              <p className="text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right flex justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
+              <p className="hidden md:flex text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
             </div>
 
             {/* 관리자 액션 — 일반 예약만 */}
@@ -519,11 +594,11 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   <button
                     onClick={() => handleConfirmPayment(selectedBooking.id)}
                     disabled={isProcessing}
-                    className="w-full py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] md:text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
+                    className="w-full py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] md:text-xs font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
                   >
                     {isProcessing ? '처리 중...' : (
                       <>
-                        <span>💰 입금 확인 (예약 확정)</span>
+                        <span>{isMobileViewport ? '💰 입금 확인' : '💰 입금 확인 (예약 확정)'}</span>
                         <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                       </>
                     )}
@@ -534,9 +609,9 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   <button
                     onClick={() => handleForceCancel(selectedBooking.id)}
                     disabled={isProcessing}
-                    className="w-full py-2.5 md:py-3 bg-white hover:bg-red-50 text-red-600 rounded-xl text-[11px] md:text-xs font-bold transition-all border border-red-100 flex items-center justify-center gap-2"
+                    className="w-full py-2.5 md:py-3 bg-white hover:bg-red-50 text-red-600 rounded-xl text-[10px] md:text-xs font-bold transition-all border border-red-100 flex items-center justify-center gap-2"
                   >
-                    {isProcessing ? '처리 중...' : '⚠️ 예약 강제 취소 (전액 환불)'}
+                    {isProcessing ? '처리 중...' : (isMobileViewport ? '⚠️ 강제 취소' : '⚠️ 예약 강제 취소 (전액 환불)')}
                   </button>
                 )}
               </div>
@@ -548,6 +623,47 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 </p>
               </div>
             )}
+          </div>
+        </div>
+        </>
+      )}
+
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[120] md:hidden">
+          <button
+            type="button"
+            aria-label="확인 모달 닫기"
+            onClick={() => !isProcessing && setConfirmDialog(null)}
+            className="absolute inset-0 bg-slate-900/45"
+          />
+          <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-white p-4 shadow-2xl border border-slate-200">
+            <div className="flex items-start gap-3">
+              <div className={`mt-0.5 rounded-full p-2 ${confirmDialog.tone === 'red' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                {confirmDialog.tone === 'red' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-black text-slate-900">{confirmDialog.title}</h4>
+                <p className="mt-1 text-[12px] leading-5 text-slate-600">{confirmDialog.description}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                disabled={isProcessing}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmDialogAction}
+                disabled={isProcessing}
+                className={`flex-1 rounded-xl px-4 py-3 text-xs font-bold text-white ${confirmDialog.tone === 'red' ? 'bg-red-600' : 'bg-blue-600'}`}
+              >
+                {isProcessing ? '처리 중...' : confirmDialog.confirmLabel}
+              </button>
+            </div>
           </div>
         </div>
       )}
