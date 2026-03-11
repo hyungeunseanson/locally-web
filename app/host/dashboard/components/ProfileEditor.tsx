@@ -163,23 +163,30 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const updates: Record<string, unknown> = {
+      const profileUpdates: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
         full_name: formData.name,
         job: formData.job,
         dream_destination: formData.dream_destination,
         favorite_song: formData.favorite_song,
         languages: formData.languages,
-        introduction: formData.introduction,
-        bio: formData.introduction,
         avatar_url: avatarUrl,
       };
 
-      const { data: existingProfile, error: loadError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
+      const [{ data: existingProfile, error: loadError }, { data: latestApplication, error: applicationLoadError }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('host_applications')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
       if (loadError || !existingProfile) {
         showToast('저장 중 오류가 발생했습니다: 프로필을 찾을 수 없습니다.', 'error');
@@ -188,26 +195,36 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
         return;
       }
 
-      let error: { message: string } | null = null;
+      if (applicationLoadError || !latestApplication?.id) {
+        showToast('저장 중 오류가 발생했습니다: 호스트 지원 정보를 찾을 수 없습니다.', 'error');
+        console.error(applicationLoadError);
+        setLoading(false);
+        return;
+      }
 
       // Postgres DB Trigger가 이미 seed를 생성했으므로 update만 수행합니다.
       const allowedColumns = new Set(Object.keys(existingProfile));
       const filteredUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
+        Object.entries(profileUpdates).filter(([key, value]) => allowedColumns.has(key) && value !== undefined)
       );
 
-      const updateRes = await supabase
-        .from('profiles')
-        .update(filteredUpdates)
-        .eq('id', user.id);
-      error = updateRes.error;
+      const [profileUpdateRes, hostApplicationUpdateRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .update(filteredUpdates)
+          .eq('id', user.id),
+        supabase
+          .from('host_applications')
+          .update({ self_intro: formData.introduction })
+          .eq('id', latestApplication.id),
+      ]);
 
-      if (!error) {
+      if (!profileUpdateRes.error && !hostApplicationUpdateRes.error) {
         showToast('정보가 성공적으로 저장되었습니다!', 'success');
         if (onUpdate) onUpdate();
       } else {
         showToast('저장 중 오류가 발생했습니다.', 'error');
-        console.error(error);
+        console.error(profileUpdateRes.error || hostApplicationUpdateRes.error);
       }
     }
     setLoading(false);

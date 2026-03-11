@@ -284,7 +284,7 @@ export default function HostRegisterPage() {
 
       const { data: currentProfile, error: profileLoadError } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url, bio, introduction, languages')
+        .select('full_name, avatar_url, languages')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -298,14 +298,6 @@ export default function HostRegisterPage() {
 
       if (!hasTextValue(currentProfile?.avatar_url) && profileUrl) {
         profileSeedUpdates.avatar_url = profileUrl;
-      }
-
-      if (
-        !hasTextValue(currentProfile?.bio) &&
-        !hasTextValue(currentProfile?.introduction) &&
-        hasTextValue(formData.selfIntro)
-      ) {
-        profileSeedUpdates.bio = formData.selfIntro.trim();
       }
 
       if (!hasLanguageValues(currentProfile?.languages) && languageNames.length > 0) {
