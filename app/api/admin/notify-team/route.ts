@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { queueTeamDigestEmails } from '@/app/utils/emailNotificationJobs';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 export async function POST(request: Request) {
     try {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         const supabaseAdmin = createAdminClient();
 
         const body = await request.json();
-        const { title, message, link, eventType } = body;
+        const { title, message, link } = body;
 
         if (!title || !message) {
             return NextResponse.json({ error: 'Title and message are required' }, { status: 400 });
@@ -29,25 +29,51 @@ export async function POST(request: Request) {
 
         const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
         if (!isAdmin) {
-            console.warn(`🚨 Unauthorized team digest queue attempt by ${user.email}`);
+            console.warn(`🚨 Unauthorized team notify attempt by ${user.email}`);
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        console.log(`🚀 [Admin Notify API] 팀 digest 큐 적재 준비: ${title}`);
+        console.log(`🚀 [Admin Notify API] 팀 협업 즉시 메일 발송 준비: ${title}`);
 
-        const result = await queueTeamDigestEmails({
-            actorEmail: user.email,
-            title,
-            message,
-            link,
-            eventType,
-        });
+        const { data: whitelistData, error: whitelistError } = await supabaseAdmin
+            .from('admin_whitelist')
+            .select('email');
+
+        if (whitelistError) {
+            throw new Error(whitelistError.message);
+        }
+
+        const targetEmails = (whitelistData || [])
+            .map((entry) => entry.email)
+            .filter((email): email is string => Boolean(email))
+            .filter((email) => email !== user.email);
+
+        if (targetEmails.length === 0) {
+            console.log('ℹ️ [Admin Notify API] 수신 대상자가 없어 발송을 스킵합니다.');
+            return NextResponse.json({ success: true, count: 0, mode: 'immediate' });
+        }
+
+        const notificationLink = link || '/admin/dashboard?tab=TEAM';
+
+        await Promise.all(targetEmails.map(async (recipientEmail) => {
+            try {
+                await sendImmediateGenericEmail({
+                    recipientEmail,
+                    subject: `[Locally Admin] ${title}`,
+                    title,
+                    message,
+                    link: notificationLink,
+                    ctaLabel: '대시보드에서 확인하기',
+                });
+            } catch (emailError) {
+                console.error(`❌ [Admin Notify API] 이메일 발송 실패 (${recipientEmail}):`, emailError);
+            }
+        }));
 
         return NextResponse.json({
             success: true,
-            count: result.queuedRecipients,
-            mode: 'digest_queued',
-            skipped: result.skipped || null,
+            count: targetEmails.length,
+            mode: 'immediate',
         });
 
     } catch (error: unknown) {

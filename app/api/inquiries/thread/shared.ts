@@ -1,5 +1,6 @@
+import nodemailer from 'nodemailer';
+
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { queueInquiryUnreadEmail } from '@/app/utils/emailNotificationJobs';
 import { sanitizeText } from '@/app/utils/sanitize';
 
 type AuthActor = {
@@ -139,16 +140,29 @@ async function getActorDisplayName(actorId: string) {
   }
 }
 
+async function findRecipientEmail(recipientId: string) {
+  const supabaseAdmin = createAdminClient();
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('email')
+    .eq('id', recipientId)
+    .maybeSingle();
+
+  if (profile?.email) return profile.email;
+
+  const { data: authData } = await supabaseAdmin.auth.admin.getUserById(recipientId);
+  return authData?.user?.email || '';
+}
+
 async function notifyRecipient(params: {
   recipientId: string;
-  inquiryId: number | string;
   title: string;
   message: string;
   link: string;
 }) {
   try {
     const supabaseAdmin = createAdminClient();
-    const { recipientId, inquiryId, title, message, link } = params;
+    const { recipientId, title, message, link } = params;
 
     await supabaseAdmin.from('notifications').insert({
       user_id: recipientId,
@@ -159,12 +173,21 @@ async function notifyRecipient(params: {
       is_read: false,
     });
 
-    await queueInquiryUnreadEmail({
-      recipientId,
-      inquiryId,
-      title,
-      message,
-      link,
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;
+
+    const email = await findRecipientEmail(recipientId);
+    if (!email) return;
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+    });
+
+    await transporter.sendMail({
+      from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: `[Locally] ${title}`,
+      html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${link}">확인하기</a>`,
     });
   } catch (error) {
     console.warn('[inquiries/thread] message notification email failed:', error);
@@ -530,7 +553,6 @@ export async function createInquiryMessage(params: {
   if (recipientId && String(recipientId) !== String(actor.id)) {
     await notifyRecipient({
       recipientId,
-      inquiryId: inquiry.id,
       title: `💬 ${actorDisplayName}님의 새 메시지`,
       message: displayContent,
       link: notificationLink,
@@ -678,7 +700,6 @@ export async function upsertInquiryThread(params: {
     if (recipientId && recipientId !== actor.id) {
       await notifyRecipient({
         recipientId,
-        inquiryId: inquiry.id,
         title: `💬 ${actorDisplayName}님의 새 메시지`,
         message: cleanMessage,
         link: notificationLink,

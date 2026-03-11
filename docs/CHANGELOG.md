@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.65 — [Email Notifications] queue cron 롤백 및 즉시 메일 복귀
+
+**작업일:** 2026-03-11
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 email queue 롤백 | `email_notification_jobs` 기반 queue 처리와 `/api/cron/email-notifications`, `.github/workflows/email-notification-queue.yml`를 제거해 GitHub Actions 10분 스케줄 의존을 해제 |
+| 🟡 팀 알림 즉시 메일 복귀 | `/api/admin/notify-team`을 digest 큐 적재 방식에서 즉시 메일 발송 방식으로 복귀하되, 수신자 수집은 기존 원칙대로 `admin_whitelist` 단일 소스를 유지 |
+| 🟡 문의 메일 즉시 발송 복귀 | 게스트↔호스트 문의 메시지 알림을 `미읽음 10분 후 1회` 큐 방식에서 메시지당 즉시 메일 방식으로 복귀 |
+| 🟢 즉시 메일 보강 유지 | 호스트 신청 승인/보완/거절, 일반 예약 무통장 입금 확인 완료 시 추가한 즉시 메일 발송 로직은 유지 |
+| ✅ 검증 | `npx tsc --noEmit`, 대상 파일 `eslint`, `git diff --check` 예정 |
+
 ## v3.37.64 — [Email Notifications] 팀 digest / 문의 지연 메일 / 즉시 메일 보강
 
 **작업일:** 2026-03-11
