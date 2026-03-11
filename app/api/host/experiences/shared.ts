@@ -191,6 +191,25 @@ function buildFailedTranslationMeta(
   return meta;
 }
 
+function getQueuedTranslationLocales(params: {
+  sourceLocale: ExperienceLocale;
+  manualLocales: ExperienceLocale[];
+  existingManualLocales?: ExperienceLocale[];
+  sourceContentDirty: boolean;
+}) {
+  const manualContentLocales = params.manualLocales.filter((locale) => locale !== params.sourceLocale);
+  const existingManualLocales = params.existingManualLocales ?? [];
+
+  const manualContentTargets = manualContentLocales.filter((locale) => (
+    params.sourceContentDirty || !existingManualLocales.includes(locale)
+  ));
+  const autoLocales = EXPERIENCE_LOCALES.filter((locale) => !params.manualLocales.includes(locale));
+
+  return mergeExperienceLocales(autoLocales, manualContentTargets).filter(
+    (locale) => locale !== params.sourceLocale
+  );
+}
+
 function mergeManualContentWithExisting(params: {
   locales: ExperienceLocale[];
   writableLocales: ExperienceLocale[];
@@ -454,12 +473,18 @@ async function markTranslationQueueFailure(params: {
 export async function createExperienceFromBody(body: ExperienceWriteBody, actor: RouteActor) {
   const input = normalizeExperienceWriteBody(body);
   const translationVersion = 1;
+  const queuedLocales = getQueuedTranslationLocales({
+    sourceLocale: input.sourceLocale,
+    manualLocales: input.requestedManualLocales,
+    sourceContentDirty: true,
+  });
   const translationState = buildExperienceTranslationState({
     sourceLocale: input.sourceLocale,
     manualContent: input.manualContent,
     manualLocales: input.requestedManualLocales,
     sourceContent: input.sourceContent,
     translationVersion,
+    queuedLocales,
   });
   const supabaseAdmin = createAdminClient();
   const languageNames = getLanguageNames(input.languageLevels);
@@ -504,14 +529,14 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
     throw error ?? new Error('Failed to create experience.');
   }
 
-  if (translationState.autoLocales.length > 0) {
+  if (translationState.queuedLocales.length > 0) {
     try {
       await enqueueTranslationJob({
         supabaseAdmin,
         experienceId: data.id,
         sourceLocale: input.sourceLocale,
         translationVersion,
-        targetLocales: translationState.autoLocales,
+        targetLocales: translationState.queuedLocales,
       });
     } catch (queueError) {
       console.error('[Experience API] Failed to enqueue translation job:', queueError);
@@ -527,7 +552,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
 
   return {
     id: data.id,
-    queuedLocales: translationState.autoLocales,
+    queuedLocales: translationState.queuedLocales,
   };
 }
 
@@ -573,19 +598,28 @@ export async function updateExperienceFromBody(params: {
     incomingContent: input.manualContent,
   });
   const nextSourceContent = input.sourceContent;
+  const sourceContentDirty = existingSourceLocale !== input.sourceLocale
+    || didSourceTranslationContentChange(existingSourceContent, nextSourceContent);
   const translationDirty = existingSourceLocale !== input.sourceLocale
     || !areExperienceLocaleArraysEqual(existingManualLocales, mergedManualLocales)
     || didManualContentChange(existingManualContent, nextManualContent, mergedManualLocales)
-    || didSourceTranslationContentChange(existingSourceContent, nextSourceContent);
+    || sourceContentDirty;
   const translationVersion = translationDirty
     ? Math.max(Number(existing.translation_version) || 1, 1) + 1
     : Math.max(Number(existing.translation_version) || 1, 1);
+  const queuedLocales = getQueuedTranslationLocales({
+    sourceLocale: input.sourceLocale,
+    manualLocales: mergedManualLocales,
+    existingManualLocales,
+    sourceContentDirty,
+  });
   const translationState = buildExperienceTranslationState({
     sourceLocale: input.sourceLocale,
     manualContent: nextManualContent,
     manualLocales: mergedManualLocales,
     sourceContent: nextSourceContent,
     translationVersion,
+    queuedLocales,
   });
   const languageNames = getLanguageNames(input.languageLevels);
 
@@ -639,14 +673,14 @@ export async function updateExperienceFromBody(params: {
     throw error ?? new ApiError(500, '체험 저장에 실패했습니다.');
   }
 
-  if (translationDirty && translationState.autoLocales.length > 0) {
+  if (translationDirty && translationState.queuedLocales.length > 0) {
     try {
       await enqueueTranslationJob({
         supabaseAdmin,
         experienceId,
         sourceLocale: input.sourceLocale,
         translationVersion,
-        targetLocales: translationState.autoLocales,
+        targetLocales: translationState.queuedLocales,
       });
     } catch (queueError) {
       console.error('[Experience API] Failed to enqueue translation job:', queueError);
@@ -662,6 +696,6 @@ export async function updateExperienceFromBody(params: {
 
   return {
     id: data.id,
-    queuedLocales: translationDirty ? translationState.autoLocales : [],
+    queuedLocales: translationDirty ? translationState.queuedLocales : [],
   };
 }

@@ -8,6 +8,7 @@ import {
   mergeLocalizedListValue,
   mergeLocalizedRulesValue,
   mergeLocalizedTextValue,
+  normalizeExperienceLocaleArray,
   type ExperienceLocale,
   type ExperienceItineraryTranslationItem,
   type ExperienceRulesTranslationInput,
@@ -66,6 +67,7 @@ type ExperienceRow = {
   description_en?: string | null;
   description_ja?: string | null;
   description_zh?: string | null;
+  manual_locales?: ExperienceLocale[] | null;
   translation_meta?: Record<string, TranslationMetaEntry> | null;
 };
 
@@ -113,6 +115,10 @@ function buildNextTranslationMeta(
     ...getSafeTranslationMeta(currentMeta),
     [locale]: nextEntry,
   };
+}
+
+function isManualTargetLocale(experience: ExperienceRow, locale: ExperienceLocale) {
+  return normalizeExperienceLocaleArray(experience.manual_locales).includes(locale);
 }
 
 function getRetryDelaySeconds(attemptCount: number) {
@@ -317,7 +323,7 @@ async function markTaskFailed(
     })
     .eq('id', task.id);
 
-  if (experience) {
+  if (experience && !isManualTargetLocale(experience, task.target_locale)) {
     await supabaseAdmin
       .from('experiences')
       .update({
@@ -340,7 +346,7 @@ async function fetchExperience(
 ) {
   const { data, error } = await supabaseAdmin
     .from('experiences')
-    .select('id, source_locale, translation_version, category, title, description, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, translation_meta')
+    .select('id, source_locale, translation_version, category, title, description, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, manual_locales, translation_meta')
     .eq('id', experienceId)
     .maybeSingle();
 
@@ -414,27 +420,38 @@ async function processTask(
           model,
         });
 
+    const isManualLocale = isManualTargetLocale(experience, task.target_locale);
     const titleField = getLocalizedColumnName('title', task.target_locale);
     const descriptionField = getLocalizedColumnName('description', task.target_locale);
-    const nextTranslationMeta = buildNextTranslationMeta(experience.translation_meta, task.target_locale, {
-      mode: 'ai',
-      status: 'ready',
-      version: task.translation_version,
-    });
+    const nextTranslationMeta = buildNextTranslationMeta(experience.translation_meta, task.target_locale, isManualLocale
+      ? {
+          mode: 'manual',
+          status: 'ready',
+          version: task.translation_version,
+        }
+      : {
+          mode: 'ai',
+          status: 'ready',
+          version: task.translation_version,
+        });
+    const updatePayload: Record<string, unknown> = {
+      meeting_point_i18n: mergeLocalizedTextValue(experience.meeting_point_i18n, task.target_locale, translation.meetingPoint),
+      supplies_i18n: mergeLocalizedTextValue(experience.supplies_i18n, task.target_locale, translation.supplies),
+      inclusions_i18n: mergeLocalizedListValue(experience.inclusions_i18n, task.target_locale, translation.inclusions),
+      exclusions_i18n: mergeLocalizedListValue(experience.exclusions_i18n, task.target_locale, translation.exclusions),
+      itinerary_i18n: mergeLocalizedItineraryValue(experience.itinerary_i18n, task.target_locale, translation.itinerary),
+      rules_i18n: mergeLocalizedRulesValue(experience.rules_i18n, task.target_locale, translation.rules),
+      translation_meta: nextTranslationMeta,
+    };
+
+    if (!isManualLocale) {
+      updatePayload[titleField] = translation.title;
+      updatePayload[descriptionField] = translation.description;
+    }
 
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('experiences')
-      .update({
-        [titleField]: translation.title,
-        [descriptionField]: translation.description,
-        meeting_point_i18n: mergeLocalizedTextValue(experience.meeting_point_i18n, task.target_locale, translation.meetingPoint),
-        supplies_i18n: mergeLocalizedTextValue(experience.supplies_i18n, task.target_locale, translation.supplies),
-        inclusions_i18n: mergeLocalizedListValue(experience.inclusions_i18n, task.target_locale, translation.inclusions),
-        exclusions_i18n: mergeLocalizedListValue(experience.exclusions_i18n, task.target_locale, translation.exclusions),
-        itinerary_i18n: mergeLocalizedItineraryValue(experience.itinerary_i18n, task.target_locale, translation.itinerary),
-        rules_i18n: mergeLocalizedRulesValue(experience.rules_i18n, task.target_locale, translation.rules),
-        translation_meta: nextTranslationMeta,
-      })
+      .update(updatePayload)
       .eq('id', task.experience_id)
       .eq('translation_version', task.translation_version)
       .select('id')

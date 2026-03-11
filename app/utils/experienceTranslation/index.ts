@@ -63,6 +63,7 @@ export type ExperienceTranslationState = {
   canonicalDescription: string;
   manualLocales: ExperienceLocale[];
   autoLocales: ExperienceLocale[];
+  queuedLocales: ExperienceLocale[];
   localizedColumns: Record<string, string | null>;
   localizedContentColumns: ExperienceLocalizedContentColumns;
   translationMeta: Partial<Record<ExperienceLocale, TranslationMetaEntry>>;
@@ -635,6 +636,7 @@ export function buildExperienceTranslationState(params: {
   manualLocales: ExperienceLocale[];
   sourceContent: ExperienceSourceTranslationContent;
   translationVersion: number;
+  queuedLocales?: ExperienceLocale[];
 }): ExperienceTranslationState {
   const { sourceLocale, manualContent, sourceContent, translationVersion } = params;
   const manualLocales = Array.from(new Set(params.manualLocales.filter((locale) => isExperienceLocale(locale))));
@@ -646,6 +648,9 @@ export function buildExperienceTranslationState(params: {
   const canonicalTitle = getCanonicalField(manualContent, sourceLocale, 'title');
   const canonicalDescription = getCanonicalField(manualContent, sourceLocale, 'description');
   const autoLocales = EXPERIENCE_LOCALES.filter((locale) => !manualLocales.includes(locale));
+  const queuedLocales = mergeExperienceLocales(
+    normalizeExperienceLocaleArray(params.queuedLocales ?? autoLocales)
+  ).filter((locale) => locale !== sourceLocale);
   const localizedColumns: Record<string, string | null> = {};
 
   for (const locale of EXPERIENCE_LOCALES) {
@@ -681,6 +686,7 @@ export function buildExperienceTranslationState(params: {
     canonicalDescription,
     manualLocales,
     autoLocales,
+    queuedLocales,
     localizedColumns,
     localizedContentColumns: buildLocalizedContentColumns({ sourceLocale, sourceContent }),
     translationMeta,
