@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   Download, Search, Calendar, User,
-  ArrowRight, CreditCard, X,
-  CheckCircle2, Copy, AlertTriangle, Clock, Info
+  ArrowRight, CreditCard, Wallet, TrendingUp, AlertCircle, X,
+  CheckCircle2, XCircle, Copy, Phone, Mail, AlertTriangle, Clock, Info
 } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
+import Image from 'next/image';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import dynamic from 'next/dynamic';
@@ -77,7 +78,6 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
 
   useEffect(() => {
@@ -85,17 +85,6 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       .then(r => r.json())
       .then(res => { if (res.success && res.data) setServiceBookings(res.data); })
       .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia('(max-width: 767px)');
-    const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
-
-    syncViewport();
-    mediaQuery.addEventListener('change', syncViewport);
-    return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
 
   // 일반 예약 + 서비스 의뢰 통합 (created_at 내림차순)
@@ -248,7 +237,9 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   };
 
   const handleConfirmPayment = async (bookingId: string) => {
-    if (isMobileViewport) {
+    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+
+    if (isMobileScreen) {
       setConfirmDialog({
         kind: 'confirm-payment',
         bookingId,
@@ -283,7 +274,9 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   };
 
   const handleForceCancel = async (bookingId: string) => {
-    if (isMobileViewport) {
+    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+
+    if (isMobileScreen) {
       setConfirmDialog({
         kind: 'force-cancel',
         bookingId,
@@ -306,15 +299,15 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
 
   const renderStatusBadge = (status: string) => {
     const s = status?.toLowerCase();
-    if (isConfirmedBookingStatus(status)) return <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-700 md:px-2 md:text-[10px]">확정</span>;
-    if (s === 'pending') return <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold bg-yellow-100 text-yellow-700 animate-pulse md:px-2 md:text-[10px]">{isMobileViewport ? '입금' : '입금 대기'}</span>;
-    if (isCancelledBookingStatus(status)) return <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold bg-red-100 text-red-700 md:px-2 md:text-[10px]">{isMobileViewport ? '취소' : '취소됨'}</span>;
+    if (isConfirmedBookingStatus(status)) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">확정</span>;
+    if (s === 'pending') return <span className="inline-flex items-center gap-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-bold text-yellow-700 animate-pulse md:px-2 md:text-[10px]"><span className="md:hidden">입금</span><span className="hidden md:inline">입금 대기</span></span>;
+    if (isCancelledBookingStatus(status)) return <span className="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700 md:px-2 md:text-[10px]"><span className="md:hidden">취소</span><span className="hidden md:inline">취소됨</span></span>;
     return <span className="text-xs text-slate-500">{status}</span>;
   };
 
   return (
-    <div className="flex h-full gap-3 md:gap-6 relative overflow-hidden flex-col md:flex-row">
-      <div className={`flex-1 flex flex-col gap-3 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
+    <div className="flex h-full gap-4 md:gap-6 relative overflow-hidden flex-col md:flex-row">
+      <div className={`flex-1 flex flex-col gap-4 md:gap-6 transition-all duration-300 ${selectedBooking ? 'hidden md:flex md:w-2/3' : 'flex w-full'}`}>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-4 shrink-0">
           <div className="bg-slate-900 p-2.5 md:p-5 rounded-xl md:rounded-2xl text-white shadow-lg shadow-slate-200">
@@ -392,16 +385,31 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <div className="flex flex-wrap bg-slate-100 p-1 rounded-lg w-full md:w-auto justify-center">
               {[
                 { id: 'ALL', label: '전체' },
-                { id: 'PENDING', label: isMobileViewport ? '입금' : '입금대기' },
-                { id: 'PAID', label: isMobileViewport ? '확정' : '확정됨' },
-                { id: 'CANCELLED', label: isMobileViewport ? '취소' : '취소됨' }
+                { id: 'PENDING', label: '입금대기' },
+                { id: 'PAID', label: '확정됨' },
+                { id: 'CANCELLED', label: '취소됨' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id as any)}
                   className={`flex-1 md:flex-none px-1.5 py-1 md:px-3 text-[9px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                  {tab.label}
+                  {tab.id === 'PENDING' ? (
+                    <>
+                      <span className="md:hidden">입금</span>
+                      <span className="hidden md:inline">입금대기</span>
+                    </>
+                  ) : tab.id === 'PAID' ? (
+                    <>
+                      <span className="md:hidden">확정</span>
+                      <span className="hidden md:inline">확정됨</span>
+                    </>
+                  ) : tab.id === 'CANCELLED' ? (
+                    <>
+                      <span className="md:hidden">취소</span>
+                      <span className="hidden md:inline">취소됨</span>
+                    </>
+                  ) : tab.label}
                 </button>
               ))}
             </div>
@@ -411,7 +419,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
               <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
               <input
                 type="text"
-                placeholder={isMobileViewport ? '이름, 예약번호 검색' : '검색 (이름, 예약번호)'}
+                placeholder="검색 (이름, 예약번호)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-8 md:pl-9 pr-3 py-1.5 md:py-2 bg-slate-50 border border-slate-100 rounded-lg md:rounded-xl text-[10px] md:text-xs focus:outline-none"
@@ -431,7 +439,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             <table className="w-full text-[9px] md:text-[13px] text-left border-collapse min-w-[620px] md:min-w-[800px]">
               <thead className="bg-slate-50 text-[8px] md:text-[10px] font-black text-slate-400 uppercase sticky top-0 z-10 border-b border-slate-100">
                 <tr>
-                  <th className="px-1.5 md:px-4 py-2 md:py-4 w-14 md:w-24"><span className="md:hidden">상태</span><span className="hidden md:inline">Status</span></th>
+                  <th className="px-1.5 md:px-4 py-2 md:py-4 w-16 md:w-24"><span className="md:hidden">상태</span><span className="hidden md:inline">Status</span></th>
                   <th className="hidden md:table-cell px-2 md:px-4 py-2 md:py-4">Type</th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">일자</span><span className="hidden md:inline">Date</span></th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4"><span className="md:hidden">호스트</span><span className="hidden md:inline">Host</span></th>
@@ -439,7 +447,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   <th className="px-1.5 md:px-4 py-2 md:py-4 text-center"><span className="md:hidden">게스트</span><span className="hidden md:inline">Customer</span></th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4 text-right"><span className="md:hidden">가격</span><span className="hidden md:inline">Price</span></th>
                   <th className="px-1.5 md:px-4 py-2 md:py-4 text-right"><span className="md:hidden">정산</span><span className="hidden md:inline">Payout</span></th>
-                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-slate-900 bg-slate-100/50"><span className="md:hidden">매출</span><span className="hidden md:inline">매출(Paid)</span></th>
+                  <th className="px-2 md:px-4 py-2 md:py-4 text-right text-slate-900 bg-slate-100/50">매출(Paid)</th>
                   <th className="px-2 md:px-4 py-2 md:py-4 text-right text-blue-600">수익</th>
                 </tr>
               </thead>
@@ -461,13 +469,13 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                         }
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 font-mono text-[8px] md:text-xs text-slate-500">{b.date?.slice(5)}</td>
-                      <td className="px-1.5 md:px-4 py-2 md:py-4 font-bold text-slate-900 truncate max-w-[72px] md:max-w-[80px]">{b.experiences?.profiles?.name || '-'}</td>
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 font-bold text-slate-900 truncate max-w-[76px] md:max-w-[80px]">{b.experiences?.profiles?.name || '-'}</td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4">
-                        <div className="max-w-[108px] md:max-w-[150px] truncate font-medium text-slate-700" title={b.experiences?.title}>
+                        <div className="max-w-[112px] md:max-w-[150px] truncate font-medium text-slate-700" title={b.experiences?.title}>
                           {b.experiences?.title}
                         </div>
                       </td>
-                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-center text-[9px] md:text-sm text-slate-600 truncate max-w-[72px] md:max-w-[80px]">
+                      <td className="px-1.5 md:px-4 py-2 md:py-4 text-center text-[9px] md:text-sm text-slate-600 truncate max-w-[76px] md:max-w-[80px]">
                         {b.contact_name}({b.guests})
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[8px] md:text-sm text-slate-400">
@@ -505,7 +513,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
           onClick={() => setSelectedBooking(null)}
           className="fixed inset-0 z-[90] bg-slate-900/35 md:hidden"
         />
-        <div className="fixed inset-x-2 bottom-2 top-16 z-[100] rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 duration-300 md:relative md:z-30 md:w-[400px] md:h-full md:rounded-2xl md:border md:border-slate-200">
+        <div className="fixed inset-x-2 bottom-2 top-16 z-[100] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-300 md:relative md:inset-auto md:z-30 md:h-full md:w-[400px] md:rounded-2xl md:border md:border-slate-200 md:shadow-2xl">
           {/* Header */}
           <div className="p-2.5 md:p-5 border-b border-slate-100 flex justify-between items-start bg-slate-50">
             <div className="flex-1 pr-2">
@@ -515,7 +523,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   }`}>
                   {selectedBooking.status}
                 </div>
-                <span className="text-[8px] md:text-[10px] text-slate-400 font-bold">#{selectedBooking.id.slice(0, 8)}</span>
+                <span className="text-[8px] md:text-[10px] text-slate-400 font-bold">#{String(selectedBooking.id).slice(0, 8)}</span>
               </div>
               <h3 className="text-[12px] md:text-base font-black text-slate-900 leading-tight mb-1 md:mb-2 line-clamp-2">{selectedBooking.experiences?.title}</h3>
               <div className="flex items-center gap-1.5 md:gap-3 text-[9px] md:text-xs text-slate-600 font-medium">
@@ -598,7 +606,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                   >
                     {isProcessing ? '처리 중...' : (
                       <>
-                        <span>{isMobileViewport ? '💰 입금 확인' : '💰 입금 확인 (예약 확정)'}</span>
+                        <span><span className="md:hidden">💰 입금 확인</span><span className="hidden md:inline">💰 입금 확인 (예약 확정)</span></span>
                         <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                       </>
                     )}
@@ -611,7 +619,12 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                     disabled={isProcessing}
                     className="w-full py-2.5 md:py-3 bg-white hover:bg-red-50 text-red-600 rounded-xl text-[10px] md:text-xs font-bold transition-all border border-red-100 flex items-center justify-center gap-2"
                   >
-                    {isProcessing ? '처리 중...' : (isMobileViewport ? '⚠️ 강제 취소' : '⚠️ 예약 강제 취소 (전액 환불)')}
+                    {isProcessing ? '처리 중...' : (
+                      <>
+                        <span className="md:hidden">⚠️ 강제 취소</span>
+                        <span className="hidden md:inline">⚠️ 예약 강제 취소 (전액 환불)</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -636,7 +649,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             onClick={() => !isProcessing && setConfirmDialog(null)}
             className="absolute inset-0 bg-slate-900/45"
           />
-          <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-white p-4 shadow-2xl border border-slate-200">
+          <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className={`mt-0.5 rounded-full p-2 ${confirmDialog.tone === 'red' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
                 {confirmDialog.tone === 'red' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
