@@ -253,6 +253,9 @@ export default function HostRegisterPage() {
       }
 
       const languageNames = getLanguageNames(formData.languageLevels);
+      const shouldNotifyAdmin =
+        (!applicationId || existingApplicationStatus === 'revision' || existingApplicationStatus === 'rejected')
+        && (applicationId ? existingApplicationStatus !== 'approved' : true);
 
       const payload = {
         user_id: user.id,
@@ -311,6 +314,15 @@ export default function HostRegisterPage() {
           .eq('id', user.id);
 
         if (profileSeedError) throw profileSeedError;
+      }
+
+      if (shouldNotifyAdmin && payload.status === 'pending') {
+        fetch('/api/host/register/admin-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch((notifyError) => {
+          console.error('Host Register Admin Alert Error:', notifyError);
+        });
       }
 
       await refreshAuth();

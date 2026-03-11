@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { FIXED_REFUND_POLICY, MAX_EXPERIENCE_PHOTOS } from '@/app/host/create/config';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { normalizeLanguageLevels, getLanguageNames, type LanguageLevelEntry } from '@/app/utils/languageLevels';
 import {
   areExperienceLocaleArraysEqual,
@@ -548,6 +549,16 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
         autoLocales: translationState.autoLocales,
       });
     }
+  }
+
+  if (!actor.isAdmin) {
+    insertAdminAlerts({
+      title: '새 체험 신청이 접수되었습니다',
+      message: `'${translationState.canonicalTitle}' 체험이 신규 제출되었습니다.`,
+      link: '/admin/dashboard?tab=APPROVALS',
+    }).catch((adminAlertError) => {
+      console.error('[Experience API] Failed to insert admin alert:', adminAlertError);
+    });
   }
 
   return {

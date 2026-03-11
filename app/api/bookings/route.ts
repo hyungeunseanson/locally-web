@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 type BookingRequestBody = {
     experienceId?: string | number;
@@ -113,6 +114,14 @@ export async function POST(request: Request) {
                 if (error) console.error('Host Notification Error:', error);
             });
         }
+
+        insertAdminAlerts({
+            title: paymentMethod === 'bank' ? '새 예약이 접수되었습니다 (입금 대기)' : '새 예약이 생성되었습니다',
+            message: `'${experienceTitle}' 예약이 ${paymentMethod === 'bank' ? '무통장 입금 대기 상태로' : '결제 진행 상태로'} 생성되었습니다.`,
+            link: '/admin/dashboard?tab=LEDGER',
+        }).catch((adminAlertError) => {
+            console.error('Booking Admin Alert Error:', adminAlertError);
+        });
 
         // 8. 성공 시 생성된 OrderId 및 검증된 최종 금액 반환
         return NextResponse.json({ success: true, newOrderId, finalAmount });

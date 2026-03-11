@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 // 🔒 API Route 내부에서 직접 관리자 클라이언트 생성 (의존성 제거)
@@ -168,6 +169,12 @@ export async function POST(request: Request) {
           ctaLabel: '내 여행 보기',
         });
       }
+
+      await insertAdminAlerts({
+        title: '체험 예약 무통장 입금이 확인되었습니다',
+        message: `'${experience.title}' 예약의 무통장 입금 확인이 완료되었습니다.`,
+        link: '/admin/dashboard?tab=LEDGER',
+      });
     } catch (notiError) {
       console.error('Notification Failed (Ignored):', notiError);
     }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import crypto from 'crypto';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 function generateOrderId(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -110,6 +111,13 @@ export async function POST(request: Request) {
     }
 
     // 3. 호스트 알림은 결제 완료(open 전환) 시점에 발송 — 여기서는 생략
+    insertAdminAlerts({
+      title: '새 맞춤 의뢰가 생성되었습니다',
+      message: `'${title.trim()}' 맞춤 의뢰가 생성되었습니다.`,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    }).catch((adminAlertError) => {
+      console.error('Service Request Admin Alert Error:', adminAlertError);
+    });
 
     return NextResponse.json({
       success: true,

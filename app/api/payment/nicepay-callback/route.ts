@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 function verifySignature(signData: string, ediDate: string, amount: string, mid: string, key: string): boolean {
   try {
@@ -186,6 +187,14 @@ export async function POST(request: Request) {
             }).catch(e => console.error('Background fetch to send-email failed:', e));
           }
         }
+
+        insertAdminAlerts({
+          title: '체험 예약 결제가 완료되었습니다',
+          message: `'${expTitle}' 예약 결제가 완료되었습니다. 게스트: ${guestName}`,
+          link: '/admin/dashboard?tab=LEDGER',
+        }).catch((adminAlertError) => {
+          console.error('Booking Payment Admin Alert Error:', adminAlertError);
+        });
       }
 
       return NextResponse.json({ success: true });

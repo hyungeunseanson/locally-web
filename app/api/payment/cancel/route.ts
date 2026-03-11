@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { toZonedTime } from 'date-fns-tz';
 import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
+import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 const TIMEZONE = 'Asia/Seoul';
 
@@ -180,6 +181,12 @@ export async function POST(request: Request) {
         }).catch(e => console.error('Background fetch to send-email failed:', e));
       }
     }
+
+    await insertAdminAlerts({
+      title: '체험 예약이 취소되었습니다',
+      message: `[${expTitle}] 예약이 취소되었습니다. 환불액: ₩${refundAmount.toLocaleString()}`,
+      link: '/admin/dashboard?tab=LEDGER',
+    });
 
     return NextResponse.json({ success: true, refundAmount, hostPayout });
 
