@@ -192,12 +192,6 @@ export default function ReservationCard({
         </div>
       )}
 
-      {isSoloEligible && (
-        <p className="mb-3 text-[11px] md:text-xs text-slate-500 leading-relaxed">
-          {t('exp_reservation_shared_join_note')}
-        </p>
-      )}
-
       {/* 1인 옵션 */}
       {isSoloEligible && (
         <div className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-all ${isSoloGuaranteed ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`} onClick={() => setIsSoloGuaranteed(!isSoloGuaranteed)}>
