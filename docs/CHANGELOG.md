@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.74 — [Admin Alerts / Translation Meta] 재제출 복구 및 manual locale 상태 보정
+
+**작업일:** 2026-03-11
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 체험 재제출 복구 | `revision`/`rejected` 상태의 체험을 호스트가 다시 저장하면 자동으로 `pending`으로 복귀하고, 관리자 알림센터에 재제출 알림이 쌓이도록 보강 |
+| 🟡 호스트 신청 alert 누락 완화 | 호스트 신청 제출 후 관리자 alert 요청을 fire-and-forget으로 날리던 경로를 제거하고, 응답을 기다린 뒤 이동하도록 조정해 누락 가능성을 축소 |
+| 🟡 manual locale 상태값 보정 | manual locale이라도 본문 번역이 queue에 들어간 경우 `translation_meta`를 즉시 `ready`가 아니라 `queued/failed`로 정확히 반영하도록 수정 |
+
 ## v3.37.73 — [Admin Alerts] 일반 예약/신청 이벤트 적재 확대
 
 **작업일:** 2026-03-11

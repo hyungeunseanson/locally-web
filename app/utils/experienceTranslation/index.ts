@@ -664,11 +664,12 @@ export function buildExperienceTranslationState(params: {
   }
 
   const translationMeta: Partial<Record<ExperienceLocale, TranslationMetaEntry>> = {};
+  const queuedSet = new Set(queuedLocales);
 
   for (const locale of manualLocales) {
     translationMeta[locale] = {
       mode: 'manual',
-      status: 'ready',
+      status: queuedSet.has(locale) ? 'queued' : 'ready',
       version: translationVersion,
     };
   }

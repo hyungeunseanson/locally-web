@@ -317,12 +317,18 @@ export default function HostRegisterPage() {
       }
 
       if (shouldNotifyAdmin && payload.status === 'pending') {
-        fetch('/api/host/register/admin-alert', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }).catch((notifyError) => {
+        try {
+          const adminAlertResponse = await fetch('/api/host/register/admin-alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+          if (!adminAlertResponse.ok) {
+            console.error('Host Register Admin Alert Error:', await adminAlertResponse.text());
+          }
+        } catch (notifyError) {
           console.error('Host Register Admin Alert Error:', notifyError);
-        });
+        }
       }
 
       await refreshAuth();

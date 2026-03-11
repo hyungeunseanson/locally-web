@@ -323,12 +323,13 @@ async function markTaskFailed(
     })
     .eq('id', task.id);
 
-  if (experience && !isManualTargetLocale(experience, task.target_locale)) {
+  if (experience) {
+    const isManualLocale = isManualTargetLocale(experience, task.target_locale);
     await supabaseAdmin
       .from('experiences')
       .update({
         translation_meta: buildNextTranslationMeta(experience.translation_meta, task.target_locale, {
-          mode: 'ai',
+          mode: isManualLocale ? 'manual' : 'ai',
           status: 'failed',
           version: task.translation_version,
         }),

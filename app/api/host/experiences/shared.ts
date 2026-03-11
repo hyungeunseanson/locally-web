@@ -169,14 +169,16 @@ function parseItinerary(value: unknown): NormalizedItineraryItem[] {
 function buildFailedTranslationMeta(
   version: number,
   manualLocales: ExperienceLocale[],
-  autoLocales: ExperienceLocale[]
+  autoLocales: ExperienceLocale[],
+  queuedLocales: ExperienceLocale[] = []
 ): Partial<Record<ExperienceLocale, TranslationMetaEntry>> {
   const meta: Partial<Record<ExperienceLocale, TranslationMetaEntry>> = {};
+  const queuedSet = new Set(queuedLocales);
 
   for (const locale of manualLocales) {
     meta[locale] = {
       mode: 'manual',
-      status: 'ready',
+      status: queuedSet.has(locale) ? 'failed' : 'ready',
       version,
     };
   }
@@ -460,13 +462,14 @@ async function markTranslationQueueFailure(params: {
   version: number;
   manualLocales: ExperienceLocale[];
   autoLocales: ExperienceLocale[];
+  queuedLocales: ExperienceLocale[];
 }) {
-  const { supabaseAdmin, experienceId, version, manualLocales, autoLocales } = params;
+  const { supabaseAdmin, experienceId, version, manualLocales, autoLocales, queuedLocales } = params;
 
   await supabaseAdmin
     .from('experiences')
     .update({
-      translation_meta: buildFailedTranslationMeta(version, manualLocales, autoLocales),
+      translation_meta: buildFailedTranslationMeta(version, manualLocales, autoLocales, queuedLocales),
     })
     .eq('id', experienceId);
 }
@@ -547,6 +550,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
         version: translationVersion,
         manualLocales: translationState.manualLocales,
         autoLocales: translationState.autoLocales,
+        queuedLocales: translationState.queuedLocales,
       });
     }
   }
@@ -578,7 +582,7 @@ export async function updateExperienceFromBody(params: {
 
   const { data: existing, error: existingError } = await supabaseAdmin
     .from('experiences')
-    .select('id, host_id, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n')
+    .select('id, host_id, status, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n')
     .eq('id', experienceId)
     .maybeSingle();
 
@@ -633,6 +637,9 @@ export async function updateExperienceFromBody(params: {
     queuedLocales,
   });
   const languageNames = getLanguageNames(input.languageLevels);
+  const existingStatus = typeof existing.status === 'string' ? existing.status : '';
+  const shouldResubmitForReview = !actor.isAdmin
+    && (existingStatus === 'revision' || existingStatus === 'rejected');
 
   const updatePayload: Record<string, unknown> = {
     country: input.country,
@@ -655,6 +662,10 @@ export async function updateExperienceFromBody(params: {
     is_private_enabled: input.isPrivateEnabled,
     private_price: input.privatePrice,
   };
+
+  if (shouldResubmitForReview) {
+    updatePayload.status = 'pending';
+  }
 
   if (translationDirty) {
     Object.assign(updatePayload, {
@@ -701,8 +712,19 @@ export async function updateExperienceFromBody(params: {
         version: translationVersion,
         manualLocales: translationState.manualLocales,
         autoLocales: translationState.autoLocales,
+        queuedLocales: translationState.queuedLocales,
       });
     }
+  }
+
+  if (shouldResubmitForReview) {
+    insertAdminAlerts({
+      title: '보완 요청 체험이 재제출되었습니다',
+      message: `'${translationState.canonicalTitle}' 체험이 다시 제출되었습니다.`,
+      link: '/admin/dashboard?tab=APPROVALS',
+    }).catch((adminAlertError) => {
+      console.error('[Experience API] Failed to insert admin alert on resubmission:', adminAlertError);
+    });
   }
 
   return {
