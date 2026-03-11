@@ -13,6 +13,7 @@ import {
 } from '@/app/utils/languageLevels';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useAuth } from '@/app/context/AuthContext';
 import { getHostRegisterCopy } from './localization';
 
 type HostRegisterFormData = {
@@ -80,6 +81,7 @@ export default function HostRegisterPage() {
   const copy = getHostRegisterCopy(lang);
   const supabase = createClient();
   const router = useRouter();
+  const { refreshAuth } = useAuth();
   const { showToast, showHeicUnsupportedToast } = useToast();
 
   const [step, setStep] = useState(1);
@@ -319,6 +321,7 @@ export default function HostRegisterPage() {
         if (profileSeedError) throw profileSeedError;
       }
 
+      await refreshAuth();
       showToast(copy.submitSuccess, 'success');
       router.push('/host/dashboard');
     } catch (error: unknown) {
