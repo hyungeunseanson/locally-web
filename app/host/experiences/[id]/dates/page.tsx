@@ -26,6 +26,7 @@ export default function ManageDatesPage() {
   const [bookingCounts, setBookingCounts] = useState<BookingCountMap>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
 
   // 1. 데이터 불러오기
   const fetchDates = async () => {
@@ -99,8 +100,7 @@ export default function ManageDatesPage() {
   };
 
   // 🟢 [핵심] 안전한 저장 로직 (Diff Algorithm)
-  const handleSave = async () => {
-    if (!confirm(t('sched_save_confirm'))) return; // 🟢 번역
+  const persistScheduleChanges = async () => {
     setLoading(true);
 
     try {
@@ -169,6 +169,16 @@ export default function ManageDatesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveClick = () => {
+    if (loading) return;
+    setIsSaveModalOpen(true);
+  };
+
+  const handleConfirmSave = async () => {
+    setIsSaveModalOpen(false);
+    await persistScheduleChanges();
   };
 
   // ... (UI 렌더링 부분은 기존 코드와 동일하여 생략, 아래 return 사용) ...
@@ -248,7 +258,7 @@ export default function ManageDatesPage() {
           </button>
           <div className="flex gap-3">
             <button onClick={() => { setAvailability(initialData); setSelectedDate(null); }} className="px-4 py-2 text-sm font-bold text-slate-400 hover:bg-slate-100 rounded-full">{t('btn_undo')}</button> {/* 🟢 번역 */}
-            <button onClick={handleSave} disabled={loading} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
+            <button onClick={handleSaveClick} disabled={loading} className="px-4 md:px-6 py-2 bg-black text-white rounded-full font-bold text-xs md:text-sm hover:scale-105 transition-transform flex items-center gap-1.5 md:gap-2 shadow-lg disabled:opacity-50">
               {loading ? t('saving') : <><Check size={16} /> {t('btn_save_changes')}</>} {/* 🟢 기존 키 활용 */}
             </button>
           </div>
@@ -337,6 +347,43 @@ export default function ManageDatesPage() {
           </div>
         </div>
       </main>
+
+      {isSaveModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/55 backdrop-blur-sm px-4 pb-4 md:p-4"
+          onClick={() => setIsSaveModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 md:px-6 pt-5 md:pt-6 pb-4 border-b border-slate-100">
+              <h3 className="text-[15px] md:text-base font-black text-slate-900">
+                {t('sched_save_confirm')}
+              </h3>
+              <p className="mt-2 text-[12px] md:text-sm text-slate-500">
+                {t('btn_save_changes')}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 px-5 md:px-6 py-4 md:py-5">
+              <button
+                type="button"
+                onClick={() => setIsSaveModalOpen(false)}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[13px] md:text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSave}
+                className="rounded-2xl bg-black px-4 py-3 text-[13px] md:text-sm font-bold text-white hover:bg-slate-800 transition-colors"
+              >
+                {t('confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
