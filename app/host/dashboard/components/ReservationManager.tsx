@@ -249,6 +249,7 @@ guest:profiles!bookings_user_id_fkey (
 
       await sendNotification({
         recipient_id: booking.user_id,
+        booking_id: booking.id,
         type: 'cancellation_approved',
         title: '취소 요청 승인됨',
         content: `'${booking.experiences?.title}' 예약 취소가 승인되어 환불이 진행됩니다.`,

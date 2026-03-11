@@ -28,18 +28,20 @@ export type NotificationType =
     recipient_ids?: string[]; // 🟢 다중 발송용 (관리자 기능)
     userId?: string; 
     senderId?: string;
+    booking_id?: string | number;
+    review_id?: string | number;
     type: NotificationType;
     title: string;          
     message?: string;       
     content?: string;       
     link?: string;          
     link_url?: string;      
-    inquiry_id?: number; 
-    supabaseClient?: any;
-  }
+  inquiry_id?: number;
+}
 
   export const sendNotification = async ({
     recipient_id, recipient_ids, userId, // 🟢 recipient_ids 추가
+    booking_id, review_id,
     type,
     title,
     message, content,
@@ -100,6 +102,8 @@ export type NotificationType =
         title,
         message: finalMessage,
         link: finalLink,
+        booking_id,
+        review_id,
         type, 
         inquiry_id
       })

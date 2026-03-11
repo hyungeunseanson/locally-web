@@ -76,6 +76,7 @@ export default function HostReviews() {
       if (review?.user_id) {
         sendNotification({
           recipient_id: review.user_id,
+          review_id: reviewId,
           type: 'review_reply',
           title: '호스트님이 후기에 답글을 남겼습니다',
           message: `후기에 답글이 달렸습니다: "${replyText.slice(0, 40)}${replyText.length > 40 ? '...' : ''}"`,

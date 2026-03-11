@@ -52,6 +52,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
 - **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
 - **[관리자 알림센터 결정]** 운영 알림센터는 신규 테이블을 만들지 않고 기존 `notifications`를 재사용한다. 관리자 전용 누적 알림은 `type='admin_alert'`로 저장하고, Admin Dashboard `ALERTS` 탭에서 소비한다.
+- **[알림 API 보안 결정]** `/api/notifications/email`의 단일 수신자 경로는 범용 발송 API로 사용하지 않는다. self 알림이나 서버 검증 가능한 소유권 컨텍스트(`review_reply`, `cancellation_approved` 등)만 허용하고, 그 외는 각 도메인 서버 라우트에서 직접 발송한다.
 
 ### 3.3 결제/정합성 원칙
 - 결제 확정/취소는 서버 검증 경로를 단일 소스로 유지

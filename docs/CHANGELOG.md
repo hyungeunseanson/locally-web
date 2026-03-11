@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.70 — [Notification Security] 단일 수신자 알림 권한 검증 추가
+
+**작업일:** 2026-03-11
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 단일 발송 보안 강화 | `/api/notifications/email`의 단일 `recipient_id` 경로가 더 이상 로그인 사용자 누구에게나 열려 있지 않도록, `new_booking`/`booking_cancel_request` self 알림, `review_reply`, `cancellation_approved`만 타입별 소유권 검증 후 허용 |
+| 🟡 호출 컨텍스트 전달 | 후기 답글/취소 승인 알림이 서버 검증에 필요한 `review_id`, `booking_id`를 함께 전달하도록 `sendNotification()` 호출부를 보강 |
+| ✅ 검증 | `npx tsc --noEmit`, 대상 파일 `eslint`, `git diff --check` 통과 |
+
 ## v3.37.69 — [Admin Alerts] 전용 상단 카드 롤백 및 문의 중복 적재 제거
 
 **작업일:** 2026-03-11
