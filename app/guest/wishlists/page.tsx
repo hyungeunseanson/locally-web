@@ -216,7 +216,7 @@ export default function WishlistsPage() {
 
               return (
                 <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
-                  <div className="relative aspect-square overflow-hidden rounded-lg md:rounded-xl bg-slate-200 mb-1.5 md:mb-2 border border-transparent group-hover:shadow-md transition-shadow">
+                  <div className="relative aspect-[5/4] md:aspect-[4/3] overflow-hidden rounded-lg md:rounded-xl bg-slate-200 mb-1.5 md:mb-2 border border-transparent group-hover:shadow-md transition-shadow">
                     <Image
                       src={imageUrl}
                       alt={exp.title}
