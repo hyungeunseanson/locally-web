@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Calendar, Users, ShieldCheck, Clock, Info, CheckCircle2 } from 'lucide-react';
 import Spinner from '@/app/components/ui/Spinner';
@@ -80,6 +80,8 @@ function PaymentContent() {
   const [agreeSafety, setAgreeSafety] = useState(false);
   const [agreeNoOffPlatform, setAgreeNoOffPlatform] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
+  const [isFeeInfoOpen, setIsFeeInfoOpen] = useState(false);
+  const feeInfoRef = useRef<HTMLDivElement | null>(null);
 
   const experienceId = params?.id as string;
   const date = searchParams?.get('date') || '날짜 미정';
@@ -94,6 +96,17 @@ function PaymentContent() {
   const hostPrice = baseHostPrice + soloGuaranteePrice;
   const guestFee = Math.floor(hostPrice * 0.1);
   const finalAmount = hostPrice + guestFee;
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!feeInfoRef.current?.contains(event.target as Node)) {
+        setIsFeeInfoOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, []);
 
   useEffect(() => {
     const fetchExp = async () => {
@@ -377,7 +390,34 @@ function PaymentContent() {
             {isSoloGuarantee && (
               <div className="flex justify-between items-center text-slate-600"><span>1인 출발 확정비</span><span>+ ₩{soloGuaranteePrice.toLocaleString()}</span></div>
             )}
-            <div className="flex justify-between items-center text-blue-600"><span className="flex items-center gap-1">서비스 수수료 (10%) <Info className="w-3 h-3 md:w-3.5 md:h-3.5" /></span><span>+ ₩{guestFee.toLocaleString()}</span></div>
+            <div className="flex justify-between items-center text-blue-600">
+              <span className="flex items-center gap-1">
+                서비스 수수료 (10%)
+                <span
+                  ref={feeInfoRef}
+                  className="relative inline-flex"
+                  onMouseEnter={() => setIsFeeInfoOpen(true)}
+                  onMouseLeave={() => setIsFeeInfoOpen(false)}
+                >
+                  <button
+                    type="button"
+                    aria-label="서비스 수수료 안내"
+                    aria-expanded={isFeeInfoOpen}
+                    onClick={() => setIsFeeInfoOpen((prev) => !prev)}
+                    onFocus={() => setIsFeeInfoOpen(true)}
+                    className="inline-flex items-center justify-center rounded-full text-blue-600 transition-colors hover:text-blue-700 focus:outline-none"
+                  >
+                    <Info className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                  </button>
+                  {isFeeInfoOpen && (
+                    <div className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl md:w-64 md:text-xs">
+                      서비스 수수료는 결제 처리, 고객 지원, 플랫폼 운영에 사용됩니다.
+                    </div>
+                  )}
+                </span>
+              </span>
+              <span>+ ₩{guestFee.toLocaleString()}</span>
+            </div>
             <div className="border-t border-slate-100 pt-3 md:pt-4 mt-1.5 md:mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-[24px] md:text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
           </div>
 
