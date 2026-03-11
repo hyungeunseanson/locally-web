@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Heart, Star, Share2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Heart, Share2, ArrowRight, ArrowLeft } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -201,71 +201,82 @@ export default function WishlistsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-x-6 sm:gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-x-6 md:gap-y-10 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {wishlists.map((item) => {
               const exp = item.experiences;
               if (!exp) return null;
               const imageUrl = exp.photos && exp.photos.length > 0 ? exp.photos[0] : (exp.image_url || "https://images.unsplash.com/photo-1542051841857-5f90071e7989");
               const ratingValue = Number(exp.rating ?? 0);
-              const hasRating = Number.isFinite(ratingValue) && ratingValue > 0;
+              const ratingText = Number.isFinite(ratingValue) && ratingValue > 0
+                ? `★${ratingValue.toFixed(1)}`
+                : t('exp_card_new');
               const title = getContent(exp, 'title', lang) || exp.title || t('exp_card_title_fallback');
-              const category = getContent(exp, 'category', lang) || exp.category || t('cat_exp');
               const location = formatLocalizedExperienceLocation(exp, lang) || t('exp_card_location_fallback');
               const languageBadges = getExperienceLanguageBadges(exp.languages, lang);
               const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
 
               return (
-                <Link href={`/experiences/${exp.id}`} key={item.id} className="block group">
-                  <div className="relative aspect-[5/4] md:aspect-[4/3] overflow-hidden rounded-lg md:rounded-xl bg-slate-200 mb-1.5 md:mb-2 border border-transparent group-hover:shadow-md transition-shadow">
+                <Link
+                  href={`/experiences/${exp.id}`}
+                  key={item.id}
+                  className="group block transition-transform duration-200 active:scale-[0.985] md:hover:-translate-y-[2px] md:active:scale-100"
+                >
+                  <div className="relative mb-2.5 overflow-hidden rounded-[22px] bg-slate-200 aspect-square border border-black/5 md:mb-3 md:rounded-[24px] shadow-[0_4px_12px_rgba(15,23,42,0.06)] md:shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
                     <Image
                       src={imageUrl}
-                      alt={exp.title}
+                      alt={title}
                       fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="object-cover transition-transform duration-500 ease-out md:group-hover:scale-[1.04]"
+                      sizes="(max-width: 768px) 42vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 18vw"
                     />
                     <button
                       onClick={(e) => handleShare(e, exp, title)}
-                      className="absolute top-1.5 md:top-2 left-1.5 md:left-2 text-white bg-black/35 hover:bg-black/45 backdrop-blur-sm rounded-full p-1.5 md:p-[7px] transition-all z-10"
+                      className="absolute left-3 top-3 z-10 rounded-full bg-black/35 p-1.5 text-white backdrop-blur-sm transition-all hover:bg-black/45 md:left-4 md:top-4 md:p-[7px]"
                       aria-label={t('trip_share')}
                     >
-                      <Share2 className="w-3.5 h-3.5 md:w-4 md:h-4" strokeWidth={2.3} />
+                      <Share2 className="h-3.5 w-3.5 md:h-4 md:w-4" strokeWidth={2.3} />
                     </button>
-                    {/* 찜 해제 버튼 */}
                     <button
                       onClick={(e) => handleRemove(e, item.id)}
-                      className="absolute top-1.5 md:top-2 right-1.5 md:right-2 text-rose-500 hover:scale-110 transition-all z-10"
+                      className="absolute right-3 top-3 z-10 p-0.5 text-white [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.34))] transition-transform duration-200 md:right-4 md:top-4 md:hover:scale-105"
+                      aria-label={t('exp_card_wishlist_toggle')}
                     >
-                      <Heart className="w-4 h-4 md:w-[18px] md:h-[18px]" fill="#F43F5E" strokeWidth={2} />
+                      <Heart
+                        size={20}
+                        strokeWidth={1.9}
+                        fill="#F43F5E"
+                        className="text-rose-500"
+                      />
                     </button>
                   </div>
 
-                  <div className="space-y-0.5 px-0.5">
-                    <div className="flex justify-between items-start">
-                      <div className="min-w-0 pr-1">
-                        <div className="flex items-center gap-1 overflow-hidden">
-                          <h3 className="font-semibold text-slate-900 text-[10px] md:text-[11px] truncate leading-none">{location}</h3>
-                          {languageBadges.visible.map((label) => (
-                            <span key={label} className="inline-flex h-[14px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[16px] md:px-1.5 md:text-[8px]">
-                              {label}
-                            </span>
-                          ))}
-                          {languageBadges.hiddenCount > 0 && (
-                            <span className="inline-flex h-[14px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[16px] md:px-1.5 md:text-[8px]">
-                              {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{category}</p>
-                      </div>
-                      <div className="flex items-center gap-0.5 text-[10px] md:text-[11px] shrink-0">
-                        <Star className={`w-[10px] h-[10px] md:w-[11px] md:h-[11px] ${hasRating ? "" : "text-slate-300"}`} fill={hasRating ? "black" : "none"} />
-                        <span>{hasRating ? ratingValue.toFixed(1) : t('exp_card_new')}</span>
-                      </div>
+                  <div className="space-y-0.5 px-0.5 md:space-y-1">
+                    <h3 className="line-clamp-2 text-[11px] font-semibold leading-[1.28] tracking-[-0.01em] text-[#1F1F1F] md:text-[15px] md:leading-[1.3]">
+                      {title}
+                    </h3>
+                    <div className="flex items-center gap-1 overflow-hidden text-[9px] text-slate-500 md:text-[12px]">
+                      <span className="truncate leading-none">{location}</span>
+                      {languageBadges.visible.map((label) => (
+                        <span
+                          key={label}
+                          className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                      {languageBadges.hiddenCount > 0 && (
+                        <span className="inline-flex h-[15px] shrink-0 items-center self-center rounded-full border border-slate-200 bg-slate-50 px-1.5 text-[8px] font-medium leading-none text-slate-600 md:h-[18px] md:px-1.5 md:text-[9px]">
+                          {t('exp_card_languages_more', { count: languageBadges.hiddenCount })}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 line-clamp-1">{title}</p>
-                    <div className="mt-0.5">
-                      <span className="text-[10px] md:text-[11px] text-slate-500 font-normal">{pricePrefix}</span>
-                      <span className="font-bold text-slate-900 text-[11px] md:text-[12px]">₩{Number(exp.price).toLocaleString()}{priceSuffix}</span>
+                    <div className="mt-0.5 flex items-center gap-1 overflow-hidden whitespace-nowrap text-[10px] text-slate-500 md:text-[14px]">
+                      <span className="shrink-0">{pricePrefix}</span>
+                      <span className="truncate font-semibold text-slate-900">
+                        ₩{Number(exp.price).toLocaleString()}{priceSuffix}
+                      </span>
+                      <span className="shrink-0 text-slate-300">·</span>
+                      <span className="shrink-0 font-medium">{ratingText}</span>
                     </div>
                   </div>
                 </Link>
