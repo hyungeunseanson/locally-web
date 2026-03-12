@@ -86,10 +86,16 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
     return () => clearInterval(timer);
   }, []);
   // 검색 필터링
-  const filteredUsers = users.filter((u: any) =>
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredUsers = users.filter((u: any) => {
+    if (!normalizedSearchTerm) return true;
+
+    return (
+      u.email?.toLowerCase().includes(normalizedSearchTerm) ||
+      u.full_name?.toLowerCase().includes(normalizedSearchTerm) ||
+      u.name?.toLowerCase().includes(normalizedSearchTerm)
+    );
+  });
 
   // 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
   const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
