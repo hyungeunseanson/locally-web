@@ -30,6 +30,7 @@ type ReviewRow = {
 type InquiryRow = {
   id: string;
   created_at: string;
+  updated_at: string | null;
   type: string | null;
   status: string | null;
   experience_id: number | null;
@@ -47,6 +48,7 @@ type ServiceRequestRow = {
   service_date: string | null;
   status: string;
   created_at: string;
+  updated_at: string;
 };
 
 type ServiceBookingRow = {
@@ -55,6 +57,13 @@ type ServiceBookingRow = {
   amount: number | null;
   status: string | null;
   refund_amount: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type InquiryMessageRow = {
+  inquiry_id: string;
+  sender_id: string | null;
   created_at: string;
 };
 
@@ -76,7 +85,7 @@ const BOOKING_STATUS_LABELS: Record<string, string> = {
   declined: '거절됨',
 };
 
-const TIMELINE_LIMIT = 25;
+const TIMELINE_LIMIT = 40;
 const PER_SOURCE_LIMIT = 20;
 
 function truncateText(value: string | null | undefined, maxLength = 48) {
@@ -93,6 +102,11 @@ function getInquiryStatusLabel(status: string | null) {
   if (!status) return null;
   const normalized = status.toLowerCase() as InquiryStatus;
   return INQUIRY_STATUS_LABELS[normalized] ?? status;
+}
+
+function isLaterThan(createdAt: string, updatedAt: string | null | undefined) {
+  if (!createdAt || !updatedAt) return false;
+  return new Date(updatedAt).getTime() > new Date(createdAt).getTime();
 }
 
 export async function GET(
@@ -143,19 +157,19 @@ export async function GET(
         .limit(PER_SOURCE_LIMIT),
       supabaseAdmin
         .from('inquiries')
-        .select('id, created_at, type, status, experience_id')
+        .select('id, created_at, updated_at, type, status, experience_id')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(PER_SOURCE_LIMIT),
       supabaseAdmin
         .from('service_requests')
-        .select('id, title, city, service_date, status, created_at')
+        .select('id, title, city, service_date, status, created_at, updated_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(PER_SOURCE_LIMIT),
       supabaseAdmin
         .from('service_bookings')
-        .select('id, request_id, amount, status, refund_amount, created_at')
+        .select('id, request_id, amount, status, refund_amount, created_at, updated_at')
         .eq('customer_id', userId)
         .order('created_at', { ascending: false })
         .limit(PER_SOURCE_LIMIT),
@@ -173,6 +187,9 @@ export async function GET(
     const serviceRequestRows = (serviceRequestsRes.data || []) as ServiceRequestRow[];
     const serviceBookingRows = (serviceBookingsRes.data || []) as ServiceBookingRow[];
 
+    const inquiryIds = new Set(inquiryRows.map((row) => row.id));
+    const firstReplyMap = new Map<string, InquiryMessageRow>();
+
     const experienceIds = Array.from(
       new Set([
         ...bookingRows.map((row) => row.experience_id),
@@ -188,17 +205,27 @@ export async function GET(
       ].filter(Boolean))
     ) as string[];
 
-    const [experiencesRes, serviceRequestLookupRes] = await Promise.all([
+    const [experiencesRes, serviceRequestLookupRes, inquiryMessagesRes] = await Promise.all([
       experienceIds.length > 0
         ? supabaseAdmin.from('experiences').select('id, title').in('id', experienceIds)
         : Promise.resolve({ data: [] as ExperienceTitleRow[], error: null }),
       requestIds.length > 0
         ? supabaseAdmin.from('service_requests').select('id, title, city, service_date, status, created_at').in('id', requestIds)
         : Promise.resolve({ data: [] as ServiceRequestRow[], error: null }),
+      inquiryIds.size > 0
+        ? supabaseAdmin
+            .from('inquiry_messages')
+            .select('inquiry_id, sender_id, created_at')
+            .in('inquiry_id', Array.from(inquiryIds))
+            .order('created_at', { ascending: true })
+        : Promise.resolve({ data: [] as InquiryMessageRow[], error: null }),
     ]);
 
     if (experiencesRes.error) throw experiencesRes.error;
     if (serviceRequestLookupRes.error) throw serviceRequestLookupRes.error;
+    if (inquiryMessagesRes.error) throw inquiryMessagesRes.error;
+
+    const inquiryMessageRows = (inquiryMessagesRes.data || []) as InquiryMessageRow[];
 
     const experienceMap = new Map<number, ExperienceTitleRow>(
       ((experiencesRes.data || []) as ExperienceTitleRow[]).map((row) => [row.id, row])
@@ -207,6 +234,13 @@ export async function GET(
     const serviceRequestMap = new Map<string, ServiceRequestRow>(
       ((serviceRequestLookupRes.data || []) as ServiceRequestRow[]).map((row) => [row.id, row])
     );
+
+    inquiryMessageRows.forEach((row) => {
+      if (!row.sender_id || row.sender_id === userId) return;
+      if (!firstReplyMap.has(row.inquiry_id)) {
+        firstReplyMap.set(row.inquiry_id, row);
+      }
+    });
 
     const bookings: AdminUserActivityBooking[] = bookingRows.map((row) => ({
       id: row.id,
@@ -268,6 +302,46 @@ export async function GET(
           amount: null,
         };
       }),
+      ...inquiryRows.flatMap((row) => {
+        const experienceTitle = row.experience_id ? experienceMap.get(row.experience_id)?.title ?? null : null;
+        const isAdminSupport = isAdminSupportInquiry(row.type);
+        const reply = firstReplyMap.get(row.id);
+        const events: AdminUserTimelineItem[] = [];
+
+        if (reply) {
+          events.push({
+            id: `inquiry_reply:${row.id}`,
+            occurred_at: reply.created_at,
+            kind: 'inquiry' as const,
+            title: isAdminSupport
+              ? '운영팀 답변 도착'
+              : `문의 답변 도착 · ${experienceTitle || '일반 문의'}`,
+            description: isAdminSupport
+              ? '운영팀이 문의에 답변했습니다.'
+              : '호스트 또는 운영팀이 문의에 답변했습니다.',
+            status: row.status,
+            status_label: null,
+            amount: null,
+          });
+        }
+
+        if ((row.status || '').toLowerCase() === 'resolved' && isLaterThan(row.created_at, row.updated_at)) {
+          events.push({
+            id: `inquiry_resolved:${row.id}`,
+            occurred_at: row.updated_at || row.created_at,
+            kind: 'inquiry' as const,
+            title: isAdminSupport
+              ? '관리자 문의 해결 완료'
+              : `문의 해결 완료 · ${experienceTitle || '일반 문의'}`,
+            description: '문의가 해결 완료 상태로 변경되었습니다.',
+            status: row.status,
+            status_label: getInquiryStatusLabel(row.status),
+            amount: null,
+          });
+        }
+
+        return events;
+      }),
       ...serviceRequestRows.map((row) => ({
         id: `service_request:${row.id}`,
         occurred_at: row.created_at,
@@ -278,6 +352,23 @@ export async function GET(
         status_label: getServiceRequestStatusLabel(row.status as ServiceRequestStatus),
         amount: null,
       })),
+      ...serviceRequestRows.flatMap((row) => {
+        if (!isLaterThan(row.created_at, row.updated_at)) return [];
+
+        const normalizedStatus = row.status.toLowerCase();
+        if (normalizedStatus === 'pending_payment' || normalizedStatus === 'open') return [];
+
+        return [{
+          id: `service_request_status:${row.id}`,
+          occurred_at: row.updated_at,
+          kind: 'service_request' as const,
+          title: `맞춤 의뢰 상태 변경 · ${row.title || '맞춤 의뢰'}`,
+          description: `${row.city || '지역 미정'} · ${row.service_date || '날짜 미정'}`,
+          status: row.status,
+          status_label: getServiceRequestStatusLabel(row.status as ServiceRequestStatus),
+          amount: null,
+        }];
+      }),
       ...serviceBookingRows.map((row) => {
         const request = row.request_id ? serviceRequestMap.get(row.request_id) ?? null : null;
         return {
@@ -290,6 +381,27 @@ export async function GET(
           status_label: row.status ? getServiceBookingStatusLabel(row.status as ServiceBookingStatus) : null,
           amount: row.amount ?? null,
         };
+      }),
+      ...serviceBookingRows.flatMap((row) => {
+        if (!isLaterThan(row.created_at, row.updated_at) || !row.status) return [];
+
+        if (row.status === 'PENDING' || row.status === 'PAID') return [];
+
+        const request = row.request_id ? serviceRequestMap.get(row.request_id) ?? null : null;
+        const statusDescription = row.refund_amount && row.refund_amount > 0
+          ? `${request?.city || '지역 미정'} · 환불액 ₩${Number(row.refund_amount).toLocaleString()}`
+          : `${request?.city || '지역 미정'} · ${request?.service_date || '날짜 미정'}`;
+
+        return [{
+          id: `service_booking_status:${row.id}`,
+          occurred_at: row.updated_at,
+          kind: 'service_booking' as const,
+          title: `맞춤 의뢰 결제 상태 변경 · ${request?.title || '맞춤 의뢰'}`,
+          description: statusDescription,
+          status: row.status,
+          status_label: getServiceBookingStatusLabel(row.status as ServiceBookingStatus),
+          amount: row.refund_amount && row.refund_amount > 0 ? row.refund_amount : row.amount ?? null,
+        }];
       }),
     ]
       .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
