@@ -37,6 +37,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 복잡 Join은 Raw fetch + JS 조립(Manual Join)을 기본으로 한다.
 - service_bookings와 bookings는 완전히 별도 데이터 소스 — 훅/컴포넌트를 분리 유지한다.
 - 수수료율(%) Admin UI 어디에도 노출 금지 — 금액(amount)만 표시한다.
+- Billing/Sales 탭의 체험 정산은 자동 지급이 아니라 `운영자 수동 송금 → 정산 완료 클릭` 흐름을 기준으로 한다. 누적 정산 가능액이 `₩100,000` 이상일 때만 `정산 가능`, 미만 금액은 누적 보류한다.
 
 ---
 

@@ -30,10 +30,10 @@ export function useServiceAdminData() {
       // Map the backend unified keys to the expected AdminServiceBooking keys
       const mappedBookings: AdminServiceBooking[] = ((json.data || []) as ServiceAdminBookingApiRow[]).map((b) => ({
         ...b,
-        service_request: b.request,
-        customer_profile: b.customer,
-        host_profile: b.host,
-        host_application: b.host_application ?? b.application
+        service_request: b.request ?? null,
+        customer_profile: b.customer ?? null,
+        host_profile: b.host ?? null,
+        host_application: b.host_application ?? b.application ?? null
       }));
 
       setBookings(mappedBookings);

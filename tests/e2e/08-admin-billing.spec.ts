@@ -345,7 +345,7 @@ async function openBilling(page: Page, adminUser: TestUser) {
   await expect(page.getByText('매출 및 재무 현황')).toBeVisible({ timeout: 20000 });
   await expect(page.getByText('총 거래액 (GMV)')).toBeVisible();
   await expect(page.getByText('순매출 (Net Revenue)')).toBeVisible();
-  await expect(page.getByText('체험 정산 예정금')).toBeVisible();
+  await expect(page.getByText(/체험 정산 (예정금|가능액)/)).toBeVisible();
   await expect(page.getByText('객단가 (AOV)')).toBeVisible();
   await expect(page.getByRole('button', { name: /일괄 지급 준비중/ })).toBeDisabled();
 }

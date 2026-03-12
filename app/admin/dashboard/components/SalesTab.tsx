@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { Range } from 'react-date-range';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { differenceInCalendarDays, format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
 import { settleHostPayout } from '@/app/actions/admin';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
@@ -15,6 +15,74 @@ import { AdminSalesBooking, AdminServiceBooking } from '@/app/types/admin';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
+const MIN_PAYOUT_THRESHOLD_KRW = 100000;
+const LONG_HOLD_DAYS = 90;
+
+type SettlementState = 'eligible' | 'hold' | 'long_hold' | 'completed';
+
+type SettlementBookingRow = AdminSalesBooking & {
+  calculatedPayout: number;
+};
+
+type SettlementGroup = {
+  id: string;
+  hostName: string;
+  bank: string;
+  accountNumber: string;
+  accountHolder: string;
+  hostNationality: string;
+  totalAmount: number;
+  count: number;
+  status: string;
+  bookings: SettlementBookingRow[];
+  oldestBookingCreatedAt: string | null;
+  settlementState: SettlementState;
+};
+
+const SETTLEMENT_STATE_META: Record<SettlementState, { label: string; className: string }> = {
+  eligible: { label: '정산 가능', className: 'bg-emerald-100 text-emerald-700' },
+  hold: { label: '10만원 미만', className: 'bg-slate-100 text-slate-500' },
+  long_hold: { label: '장기 보류', className: 'bg-amber-100 text-amber-700' },
+  completed: { label: '지급 완료', className: 'bg-blue-100 text-blue-700' },
+};
+
+const PENDING_SETTLEMENT_STATE_ORDER: Record<SettlementState, number> = {
+  eligible: 0,
+  long_hold: 1,
+  hold: 2,
+  completed: 3,
+};
+
+function getSettlementState(group: SettlementGroup): SettlementState {
+  if (group.settlementState === 'completed') {
+    return 'completed';
+  }
+
+  if (group.totalAmount >= MIN_PAYOUT_THRESHOLD_KRW) {
+    return 'eligible';
+  }
+
+  if (group.oldestBookingCreatedAt) {
+    const pendingDays = differenceInCalendarDays(new Date(), new Date(group.oldestBookingCreatedAt));
+    if (pendingDays >= LONG_HOLD_DAYS) {
+      return 'long_hold';
+    }
+  }
+
+  return 'hold';
+}
+
+function getSettlementPolicyNote(group: SettlementGroup) {
+  if (group.settlementState === 'eligible' || group.settlementState === 'completed') {
+    return null;
+  }
+
+  if (group.settlementState === 'long_hold') {
+    return `누적 정산액이 ₩${MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 미만이라 장기 보류 중입니다.`;
+  }
+
+  return `누적 정산액이 ₩${MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상입니다.`;
+}
 
 export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   type ServiceSalesBookingSummary = Pick<
@@ -124,11 +192,6 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const svcPendingHostPayout = validServiceBookings
     .filter((b) => b.payout_status !== 'paid')
     .reduce((sum, b) => sum + (b.host_payout_amount || 0), 0);
-  const serviceSettlementSubtext = validServiceBookings.length === 0
-    ? '체험 호스트 지급액'
-    : svcPendingHostPayout > 0
-      ? `서비스 미지급 정산 ₩${svcPendingHostPayout.toLocaleString()} 별도 탭 관리`
-      : '서비스 정산 대기 없음';
 
   // 🟢 [수정] 매출/수익 계산 (DB 컬럼 기반) — 체험 + 맞춤 의뢰 합산
   const expRevenue = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
@@ -140,16 +203,11 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   }, 0);
   const platformFee = expPlatformFee + svcPlatformFee;
 
-  const expHostPayout = validBookings.reduce((sum, b) => {
-    return sum + getBookingHostPayout(b);
-  }, 0);
-
   const allCount = validBookings.length + validServiceBookings.length;
   const averageOrderValue = allCount > 0 ? totalRevenue / allCount : 0;
 
-  // 🟢 [핵심] 정산 예정 내역 계산 (위약금 포함)
-  const calculateSettlements = () => {
-    const settlementMap = new Map();
+  const buildSettlementGroups = (targetTab: 'PENDING' | 'COMPLETED') => {
+    const settlementMap = new Map<string, SettlementGroup>();
 
     // 정산 대상: 완료된 건 + 취소 위약금 건
     const targetBookings = salesBookings.filter(b =>
@@ -158,6 +216,9 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     );
 
     targetBookings.forEach(booking => {
+      if (targetTab === 'PENDING' && booking.payout_status === 'paid') return;
+      if (targetTab === 'COMPLETED' && booking.payout_status !== 'paid') return;
+
       const hostId = booking.experiences?.host_id;
       if (!hostId) return;
 
@@ -173,28 +234,59 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           totalAmount: 0,
           count: 0,
           status: booking.payout_status || 'pending',
-          bookings: []
+          bookings: [],
+          oldestBookingCreatedAt: booking.created_at,
+          settlementState: targetTab === 'COMPLETED' ? 'completed' : 'hold',
         });
       }
 
       const current = settlementMap.get(hostId);
+      if (!current) return;
 
       // 🟢 [중요] 호스트 줄 돈 계산
       const payout = getBookingHostPayout(booking);
 
-      // 탭 구분에 따라 필터링 (지급완료된 건은 제외하거나 포함)
-      if (settlementTab === 'PENDING' && booking.payout_status === 'paid') return;
-      if (settlementTab === 'COMPLETED' && booking.payout_status !== 'paid') return;
-
       current.totalAmount += payout;
       current.count += 1;
-      current.bookings.push({ ...booking, calculatedPayout: payout });
+      current.bookings.push({ ...booking, calculatedPayout: payout } as SettlementBookingRow);
+      if (!current.oldestBookingCreatedAt || new Date(booking.created_at) < new Date(current.oldestBookingCreatedAt)) {
+        current.oldestBookingCreatedAt = booking.created_at;
+      }
     });
 
-    return Array.from(settlementMap.values()).filter((i: any) => i.count > 0);
+    const groups = Array.from(settlementMap.values())
+      .filter((item) => item.count > 0)
+      .map((item) => {
+        const settlementState = targetTab === 'COMPLETED' ? 'completed' : getSettlementState(item);
+        return {
+          ...item,
+          settlementState,
+        };
+      });
+
+    if (targetTab === 'PENDING') {
+      groups.sort((a, b) => {
+        const orderDiff = PENDING_SETTLEMENT_STATE_ORDER[a.settlementState] - PENDING_SETTLEMENT_STATE_ORDER[b.settlementState];
+        if (orderDiff !== 0) return orderDiff;
+        return b.totalAmount - a.totalAmount;
+      });
+    }
+
+    return groups;
   };
 
-  const settlementList = calculateSettlements();
+  const pendingSettlementList = buildSettlementGroups('PENDING');
+  const completedSettlementList = buildSettlementGroups('COMPLETED');
+  const settlementList = settlementTab === 'PENDING' ? pendingSettlementList : completedSettlementList;
+  const eligibleSettlementList = pendingSettlementList.filter((item) => item.settlementState === 'eligible');
+  const holdSettlementList = pendingSettlementList.filter((item) => item.settlementState !== 'eligible');
+  const eligibleSettlementAmount = eligibleSettlementList.reduce((sum, item) => sum + item.totalAmount, 0);
+  const holdSettlementAmount = holdSettlementList.reduce((sum, item) => sum + item.totalAmount, 0);
+  const longHoldCount = pendingSettlementList.filter((item) => item.settlementState === 'long_hold').length;
+  const expSettlementCardSubtext = [
+    holdSettlementAmount > 0 ? `보류 ₩${holdSettlementAmount.toLocaleString()} (10만원 미만)` : null,
+    svcPendingHostPayout > 0 ? `서비스 미지급 ₩${svcPendingHostPayout.toLocaleString()}` : '서비스 정산 대기 없음',
+  ].filter(Boolean).join(' · ');
 
   const toggleExpand = (hostId: string) => {
     setExpandedHostId(prev => prev === hostId ? null : hostId);
@@ -426,9 +518,9 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         <StatCard title="총 거래액 (GMV)" value={`₩${totalRevenue.toLocaleString()}`} sub={`체험 ₩${expRevenue.toLocaleString()} | 의뢰 ₩${svcRevenue.toLocaleString()}`} icon={<DollarSign size={16} className="text-white md:w-5 md:h-5" />} bg="bg-slate-900" />
         <StatCard title="순매출 (Net Revenue)" value={`₩${platformFee.toLocaleString()}`} sub="플랫폼 수익 (수수료)" icon={<TrendingUp size={16} className="text-white md:w-5 md:h-5" />} bg="bg-blue-600" />
         <StatCard
-          title="체험 정산 예정금"
-          value={`₩${expHostPayout.toLocaleString()}`}
-          sub={serviceSettlementSubtext}
+          title="체험 정산 가능액"
+          value={`₩${eligibleSettlementAmount.toLocaleString()}`}
+          sub={expSettlementCardSubtext || `₩${MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상`}
           icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />}
           bg="bg-purple-600"
         />
@@ -461,6 +553,27 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           </div>
         </div>
 
+        {settlementTab === 'PENDING' && (
+          <div className="px-4 md:px-6 py-3 bg-purple-50 border-b border-purple-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div className="flex flex-wrap gap-2 md:gap-3 text-[10px] md:text-xs font-bold">
+              <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                정산 가능 {eligibleSettlementList.length}명 · ₩{eligibleSettlementAmount.toLocaleString()}
+              </span>
+              <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600">
+                정산 보류 {holdSettlementList.length}명 · ₩{holdSettlementAmount.toLocaleString()}
+              </span>
+              {longHoldCount > 0 && (
+                <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                  장기 보류 {longHoldCount}명
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] md:text-xs text-slate-500 font-medium">
+              ₩{MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상이며, 미만 금액은 누적 보류됩니다.
+            </p>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs md:text-sm text-left min-w-[600px]">
             <thead className="bg-white text-slate-500 text-[10px] md:text-xs uppercase border-b border-slate-100">
@@ -473,7 +586,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {settlementList.length > 0 ? settlementList.map((item: any, idx: number) => (
+              {settlementList.length > 0 ? settlementList.map((item: SettlementGroup, idx: number) => (
                 <React.Fragment key={idx}>
                   <tr
                     className={`hover:bg-slate-50 cursor-pointer transition-colors ${expandedHostId === item.id ? 'bg-slate-50' : ''}`}
@@ -495,8 +608,8 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                     </td>
                     <td className="px-4 md:px-6 py-3 md:py-4 text-slate-500 text-xs md:text-sm">{item.count}건</td>
                     <td className="px-4 md:px-6 py-3 md:py-4 text-right">
-                      <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-[9px] md:text-[10px] font-bold uppercase ${item.bank === '계좌 미등록' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {item.bank === '계좌 미등록' ? '계좌 필요' : (settlementTab === 'PENDING' ? '지급 대기' : '지급 완료')}
+                      <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-[9px] md:text-[10px] font-bold uppercase ${item.bank === '계좌 미등록' ? 'bg-red-100 text-red-600' : SETTLEMENT_STATE_META[item.settlementState].className}`}>
+                        {item.bank === '계좌 미등록' ? '계좌 필요' : SETTLEMENT_STATE_META[item.settlementState].label}
                       </span>
                     </td>
                   </tr>
@@ -518,9 +631,9 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                               >
                                 <Download size={14} /> 명세서 다운로드
                               </button>
-                              {settlementTab === 'PENDING' && (
+                              {settlementTab === 'PENDING' && item.settlementState === 'eligible' && (
                                 <button
-                                  onClick={() => handleSettlePayout(item.id, item.bookings.map((b: any) => b.id))}
+                                  onClick={() => handleSettlePayout(item.id, item.bookings.map((b: SettlementBookingRow) => b.id))}
                                   disabled={isProcessing}
                                   className={`flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg transition-colors shadow-sm w-full sm:w-auto ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-800'}`}
                                 >
@@ -529,6 +642,11 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                               )}
                             </div>
                           </div>
+                          {settlementTab === 'PENDING' && getSettlementPolicyNote(item) && (
+                            <p className="mb-3 md:mb-4 text-[10px] md:text-xs font-medium text-slate-500">
+                              {getSettlementPolicyNote(item)}
+                            </p>
+                          )}
                           <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto shadow-sm">
                             <table className="w-full text-[10px] md:text-xs text-left min-w-[500px]">
                               <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
@@ -542,7 +660,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-50">
-                                {item.bookings.map((b: any) => (
+                                {item.bookings.map((b: SettlementBookingRow) => (
                                   <tr key={b.id} className="hover:bg-slate-50">
                                     <td className="px-3 md:px-4 py-2 md:py-3 text-slate-500">{format(new Date(b.created_at), 'yy.MM.dd')} <span className="text-[9px]">{format(new Date(b.created_at), 'HH:mm')}</span></td>
                                     <td className="px-3 md:px-4 py-2 md:py-3 font-mono text-slate-400">{b.id.split('-').pop()}</td>
