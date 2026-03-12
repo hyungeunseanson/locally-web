@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DollarSign, TrendingUp, CreditCard, Wallet, AlertTriangle, CheckCircle, Calendar as CalendarIcon, ChevronDown, ChevronRight, ChevronUp, Download, Check } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css';
@@ -10,7 +10,6 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
 import { settleHostPayout } from '@/app/actions/admin';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
-import { createClient } from '@/app/utils/supabase/client';
 import { getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 import { AdminSalesBooking, AdminServiceBooking } from '@/app/types/admin';
 
@@ -39,7 +38,6 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
-  const supabase = useMemo(() => createClient(), []);
 
   const fetchSalesBookings = useCallback(async () => {
     setIsSalesLoading(true);
@@ -62,34 +60,37 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     void fetchSalesBookings();
   }, [fetchSalesBookings]);
 
+  const fetchServiceBookings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/service-bookings');
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || '서비스 정산 KPI를 불러오지 못했습니다.');
+      }
+
+      const summaryRows = ((result.data || []) as AdminServiceBooking[])
+        .filter((booking) => ['PAID', 'confirmed', 'completed'].includes(booking.status))
+        .map((booking) => ({
+          amount: booking.amount,
+          host_payout_amount: booking.host_payout_amount,
+          platform_revenue: booking.platform_revenue,
+          status: booking.status,
+          created_at: booking.created_at,
+          payout_status: booking.payout_status,
+        }));
+
+      setServiceBookings(summaryRows);
+    } catch (error: unknown) {
+      console.error('Service bookings KPI fetch error:', error);
+      showToast(error instanceof Error ? error.message : '서비스 정산 KPI를 불러오지 못했습니다.', 'error');
+    }
+  }, [showToast]);
+
   // Fetch service_bookings once for KPI aggregation
   useEffect(() => {
-    let isMounted = true;
-
-    void (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('service_bookings')
-          .select('amount, host_payout_amount, platform_revenue, status, created_at, payout_status')
-          .in('status', ['PAID', 'confirmed', 'completed']);
-
-        if (error) throw error;
-
-        if (isMounted && data) {
-          setServiceBookings(data as ServiceSalesBookingSummary[]);
-        }
-      } catch (error: unknown) {
-        console.error('Service bookings KPI fetch error:', error);
-        if (isMounted) {
-          showToast('서비스 정산 KPI를 불러오지 못했습니다.', 'error');
-        }
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [showToast, supabase]);
+    void fetchServiceBookings();
+  }, [fetchServiceBookings]);
 
   // 달력 외부 클릭 시 닫기
   useEffect(() => {

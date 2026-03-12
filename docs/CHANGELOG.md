@@ -58,6 +58,16 @@
 | 🟡 운영 핵심 UI 확인 | KPI 카드 렌더, `맞춤 의뢰 명세서` 버튼, `일괄 지급 준비중` 비활성 상태까지 함께 확인해 Billing 탭 회귀를 조기에 감지 |
 | 🟡 CSV route 안정화 | `/api/admin/service-bookings-csv`가 복합 join 대신 raw `service_bookings` 조회 후 `service_requests`, `profiles`, `host_applications`를 따로 조립하도록 바꿔 기간 필터 + 응답 안정성을 높임 |
 
+## v3.38.04 — [Billing] 서비스 KPI 관리자 API 정렬
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 브라우저 직접 조회 제거 | `SalesTab`의 서비스 KPI가 더 이상 브라우저 Supabase client로 `service_bookings`를 직접 읽지 않고 `/api/admin/service-bookings`를 재사용하도록 변경 |
+| 🟠 RLS 영향 축소 | 관리자 KPI가 브라우저 RLS 상태에 따라 0처럼 보이거나 토스트만 띄우고 비는 위험을 줄이고, 이미 검증된 admin API 권한 경로로 정렬 |
+| ✅ UI 의미 유지 | KPI 계산식과 `서비스 미지급 정산` 문구는 유지하고, 데이터 source만 안전한 관리자 read 경로로 교체 |
+
 ## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
 
 **작업일:** 2026-03-12
