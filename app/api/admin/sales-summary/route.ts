@@ -49,6 +49,15 @@ type SalesHostApplicationRow = {
   created_at: string;
 };
 
+type SalesServiceSummaryRow = {
+  amount: number;
+  host_payout_amount: number | null;
+  platform_revenue: number | null;
+  status: string;
+  created_at: string;
+  payout_status: string | null;
+};
+
 export async function GET() {
   try {
     const supabaseServer = await createServerClient();
@@ -68,19 +77,28 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data: salesBookings, error: bookingsError } = await supabaseAdmin
-      .from('bookings')
-      .select(
-        'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price'
-      )
-      .in('status', ['completed', 'cancelled'])
-      .order('created_at', { ascending: false });
+    const [{ data: salesBookings, error: bookingsError }, { data: serviceSummaryRows, error: serviceSummaryError }] = await Promise.all([
+      supabaseAdmin
+        .from('bookings')
+        .select(
+          'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price'
+        )
+        .in('status', ['completed', 'cancelled'])
+        .order('created_at', { ascending: false }),
+      supabaseAdmin
+        .from('service_bookings')
+        .select('amount, host_payout_amount, platform_revenue, status, created_at, payout_status')
+        .in('status', ['PAID', 'confirmed', 'completed'])
+        .order('created_at', { ascending: false }),
+    ]);
 
     if (bookingsError) throw bookingsError;
+    if (serviceSummaryError) throw serviceSummaryError;
 
     const bookingRows = (salesBookings || []) as SalesBookingRow[];
+    const serviceRows = (serviceSummaryRows || []) as SalesServiceSummaryRow[];
     if (bookingRows.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
+      return NextResponse.json({ success: true, data: [], serviceSummaryRows: serviceRows });
     }
 
     const experienceIds = Array.from(new Set(bookingRows.map((booking) => booking.experience_id).filter(Boolean)));
@@ -158,7 +176,7 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ success: true, data: enriched });
+    return NextResponse.json({ success: true, data: enriched, serviceSummaryRows: serviceRows });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Server error';
     console.error('[ADMIN] /api/admin/sales-summary error:', error);

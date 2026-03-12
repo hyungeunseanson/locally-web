@@ -68,6 +68,16 @@
 | 🟠 RLS 영향 축소 | 관리자 KPI가 브라우저 RLS 상태에 따라 0처럼 보이거나 토스트만 띄우고 비는 위험을 줄이고, 이미 검증된 admin API 권한 경로로 정렬 |
 | ✅ UI 의미 유지 | KPI 계산식과 `서비스 미지급 정산` 문구는 유지하고, 데이터 source만 안전한 관리자 read 경로로 교체 |
 
+## v3.38.05 — [Billing] 상단 카드 데이터 소스 단일화
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 단일 응답 정렬 | `/api/admin/sales-summary`가 이제 체험 정산 행과 함께 서비스 KPI 요약행도 같이 내려주도록 확장 |
+| 🟠 SalesTab 단순화 | `SalesTab`이 상단 카드 계산을 위해 별도 `/api/admin/service-bookings` fetch를 하지 않고 `sales-summary` 한 응답만 사용하도록 정리 |
+| ✅ 회귀 범위 제한 | 정산 리스트/서비스 CSV/지급 액션은 그대로 두고, 상단 Billing KPI source만 한 군데로 맞춤 |
+
 ## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
 
 **작업일:** 2026-03-12

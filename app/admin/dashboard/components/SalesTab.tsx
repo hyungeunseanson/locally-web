@@ -48,6 +48,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         throw new Error(result.error || '매출 데이터를 불러오지 못했습니다.');
       }
       setSalesBookings((result.data || []) as AdminSalesBooking[]);
+      setServiceBookings((result.serviceSummaryRows || []) as ServiceSalesBookingSummary[]);
     } catch (error: unknown) {
       console.error('Sales summary fetch error:', error);
       showToast(error instanceof Error ? error.message : '매출 데이터를 불러오지 못했습니다.', 'error');
@@ -59,38 +60,6 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   useEffect(() => {
     void fetchSalesBookings();
   }, [fetchSalesBookings]);
-
-  const fetchServiceBookings = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/service-bookings');
-      const result = await res.json();
-
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || '서비스 정산 KPI를 불러오지 못했습니다.');
-      }
-
-      const summaryRows = ((result.data || []) as AdminServiceBooking[])
-        .filter((booking) => ['PAID', 'confirmed', 'completed'].includes(booking.status))
-        .map((booking) => ({
-          amount: booking.amount,
-          host_payout_amount: booking.host_payout_amount,
-          platform_revenue: booking.platform_revenue,
-          status: booking.status,
-          created_at: booking.created_at,
-          payout_status: booking.payout_status,
-        }));
-
-      setServiceBookings(summaryRows);
-    } catch (error: unknown) {
-      console.error('Service bookings KPI fetch error:', error);
-      showToast(error instanceof Error ? error.message : '서비스 정산 KPI를 불러오지 못했습니다.', 'error');
-    }
-  }, [showToast]);
-
-  // Fetch service_bookings once for KPI aggregation
-  useEffect(() => {
-    void fetchServiceBookings();
-  }, [fetchServiceBookings]);
 
   // 달력 외부 클릭 시 닫기
   useEffect(() => {
