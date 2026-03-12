@@ -21,6 +21,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `components/ServiceAdminTab.tsx`: 맞춤 의뢰 관리 탭 — 전체 의뢰 / 정산 대기 / 취소·환불 내역 (v3.9.0 신설)
 - `components/AdminAlertsTab.tsx`: 관리자 운영 인앱 알림 누적 탭 (`notifications` 재사용)
 - `types/admin.ts`: 관리자 전용 타입 중앙화 (`AdminServiceBooking` 포함)
+- `/api/admin/users-summary`: User Management/Analytics 공용 회원 목록 요약 API (`users.role` + 회원별 운영 summary 병합)
 - `/api/admin/users/[userId]/timeline`: User Management 상세 패널용 회원 활동 타임라인 API (예약/리뷰/문의/맞춤 의뢰 조립)
 - `/api/admin/service-cancel`: 관리자 강제 취소/환불 API (NicePay error-safe)
 - `/api/admin/service-confirm-payment`: 무통장 입금 확인 API (PENDING→PAID + request→open, v3.9.2)

@@ -25,6 +25,10 @@ function timeAgo(dateString: string | null) {
   return past.toLocaleDateString(); // 오래된 건 날짜로 표시
 }
 
+function formatWon(amount: number | null | undefined) {
+  return `₩${Number(amount || 0).toLocaleString()}`;
+}
+
 export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const { showToast } = useToast(); // 🟢 추가
   const [searchTerm, setSearchTerm] = useState('');
@@ -226,7 +230,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
             </div>
           </div>
           <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-xs md:text-sm text-left min-w-[600px]">
+            <table className="w-full text-xs md:text-sm text-left min-w-[980px]">
               <thead className="text-[10px] md:text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   {/* 🟢 [추가] 전체 선택 체크박스 */}
@@ -239,7 +243,10 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                   </th>
                   <th className="px-2 md:px-6 py-2 md:py-3">유저 정보</th>
                   <th className="px-2 md:px-6 py-2 md:py-3">연락처</th>
-                  <th className="px-2 md:px-6 py-2 md:py-3">최근 접속</th> {/* 🟢 추가됨 */}
+                  <th className="px-2 md:px-6 py-2 md:py-3">총 결제액</th>
+                  <th className="px-2 md:px-6 py-2 md:py-3">예약/의뢰</th>
+                  <th className="px-2 md:px-6 py-2 md:py-3">최근 활동</th>
+                  <th className="px-2 md:px-6 py-2 md:py-3">최근 접속</th>
                   <th className="px-2 md:px-6 py-2 md:py-3">구분</th>
                 </tr>
               </thead>
@@ -273,8 +280,27 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                         </div>
                       </td>
                       <td className="px-2 md:px-6 py-2.5 md:py-4 text-slate-500 text-[10px] md:text-sm">{user.phone || '-'}</td>
+                      <td className="px-2 md:px-6 py-2.5 md:py-4">
+                        <div className="font-bold text-[10px] md:text-sm text-slate-900">{formatWon(user.total_spent)}</div>
+                        <div className="text-[9px] md:text-[10px] text-slate-400">확정 결제 기준</div>
+                      </td>
+                      <td className="px-2 md:px-6 py-2.5 md:py-4">
+                        <div className="font-bold text-[10px] md:text-sm text-slate-900">
+                          예약 {user.experience_booking_count || 0} · 의뢰 {user.service_request_count || 0}
+                        </div>
+                        <div className="text-[9px] md:text-[10px] text-slate-400">누적 생성 건수</div>
+                      </td>
+                      <td className="px-2 md:px-6 py-2.5 md:py-4">
+                        {user.recent_activity_at ? (
+                          <div className="flex flex-col">
+                            <span className="text-slate-900 font-bold text-[9px] md:text-xs">{timeAgo(user.recent_activity_at)}</span>
+                            <span className="text-[9px] md:text-[10px] text-slate-400">{new Date(user.recent_activity_at).toLocaleDateString()}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[9px] md:text-[10px]">활동 없음</span>
+                        )}
+                      </td>
 
-                      {/* 🟢 최근 접속 시간 표시 (수정됨) */}
                       <td className="px-2 md:px-6 py-2.5 md:py-4">
                         {isOnline ? (
                           <span className="text-green-600 font-bold text-[9px] md:text-xs bg-green-50 px-1.5 md:px-2 py-0.5 md:py-1 rounded">Online</span>

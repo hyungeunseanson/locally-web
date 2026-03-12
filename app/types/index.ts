@@ -32,6 +32,10 @@ export interface Experience {
     languages?: string[];
     phone?: string;
     role?: string;
+    total_spent?: number;
+    experience_booking_count?: number;
+    service_request_count?: number;
+    recent_activity_at?: string | null;
   }
 
   // 👇 새로 추가: Booking 인터페이스
