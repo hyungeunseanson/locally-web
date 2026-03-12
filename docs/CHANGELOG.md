@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.82 — [Admin Sidebar] Finance 정렬 및 홈 버튼 구조 변경
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Service Requests 재배치 | 관리자 좌측 사이드바에서 `Service Requests`를 `Management` 섹션에서 제거하고 `Finance` 섹션의 `Master Ledger` 바로 아래로 이동 |
+| 🟡 Home 버튼 제거 | `Finance` 섹션 하단의 별도 `Home` 탭 버튼을 제거해 중복 진입 경로를 정리 |
+| 🟡 상단 브랜드 홈화 | 최상단 `Locally / Admin console` 브랜드 블록 전체를 `APPROVALS`로 이동하는 홈 버튼으로 변경해 사이드바 상단을 홈 진입점으로 통일 |
+
 ## v3.37.81 — [Desktop Host Transition] 전환 멘트 및 지연시간 복구
 
 **작업일:** 2026-03-12

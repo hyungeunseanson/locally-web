@@ -6,7 +6,7 @@ import { createClient } from '@/app/utils/supabase/client';
 import {
   Users, CheckCircle2, MessageSquare,
   BarChart2, CreditCard, LayoutDashboard,
-  Briefcase, Menu, X, House, ClipboardList, Bell
+  Briefcase, Menu, X, ClipboardList, Bell
 } from 'lucide-react';
 
 type NavButtonProps = {
@@ -202,7 +202,11 @@ export default function Sidebar() {
   // 🟢 사이드바 내부 콘텐츠 (데스크탑 / 모바일 오버레이 공용)
   const sidebarContent = (
     <>
-      <div className="mb-10 px-2 mt-4 flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => handleTabChange('APPROVALS')}
+        className="mb-10 px-2 mt-4 w-full flex items-center gap-3 rounded-2xl text-left transition-colors hover:bg-slate-950/70 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+      >
         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden">
           <img src="/images/logo-new-white.png" alt="Locally Logo" className="w-8 h-8 object-contain" />
         </div>
@@ -210,7 +214,7 @@ export default function Sidebar() {
           <h1 className="text-[19px] font-bold text-white tracking-tight leading-none mb-0.5">Locally</h1>
           <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Admin console</p>
         </div>
-      </div>
+      </button>
 
       <div className="space-y-8 flex-1 overflow-y-auto scrollbar-hide">
         <div>
@@ -224,7 +228,6 @@ export default function Sidebar() {
               count={counts.apps + counts.exps}
             />
             <NavButton active={activeTab === 'USERS'} onClick={() => handleTabChange('USERS')} icon={<Users size={16} className="md:w-[18px] md:h-[18px]" />} label="User Management" count={counts.online > 0 ? `${counts.online} 접속` : undefined} />
-            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="Service Requests" count={counts.servicePendingBank} />
           </div>
         </div>
 
@@ -247,9 +250,9 @@ export default function Sidebar() {
           <h2 className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 md:mb-3 px-2">Finance</h2>
           <div className="space-y-0.5 md:space-y-1">
             <NavButton active={activeTab === 'LEDGER'} onClick={() => handleTabChange('LEDGER')} icon={<LayoutDashboard size={16} className="md:w-[18px] md:h-[18px]" />} label="Master Ledger" count={counts.pendingBookings} />
+            <NavButton active={activeTab === 'SERVICE_REQUESTS'} onClick={() => handleTabChange('SERVICE_REQUESTS')} icon={<ClipboardList size={16} className="md:w-[18px] md:h-[18px]" />} label="Service Requests" count={counts.servicePendingBank} />
             <NavButton active={activeTab === 'SALES'} onClick={() => handleTabChange('SALES')} icon={<CreditCard size={16} className="md:w-[18px] md:h-[18px]" />} label="Billing & Revenue" />
             <NavButton active={activeTab === 'ANALYTICS'} onClick={() => handleTabChange('ANALYTICS')} icon={<BarChart2 size={16} className="md:w-[18px] md:h-[18px]" />} label="Data Analytics" />
-            <NavButton active={false} onClick={() => router.push('/')} icon={<House size={16} className="md:w-[18px] md:h-[18px]" />} label="Home" />
           </div>
         </div>
       </div>
