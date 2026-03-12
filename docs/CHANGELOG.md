@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.91 — [Master Ledger] 전용 E2E 스모크 추가
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 전용 Ledger 시나리오 추가 | `tests/e2e/06-admin-master-ledger.spec.ts`를 추가해 Master Ledger 전용 스모크를 독립 spec으로 분리 |
+| 🟡 실제 운영 흐름 기준 검증 | 테스트가 fresh 게스트/관리자 계정과 미래 슬롯을 준비한 뒤 무통장 예약 생성 → Ledger 검색 → 날짜 필터 → 입금 확인 → 강제 취소까지 순차 검증 |
+| 🟡 회귀성 높은 포인트 보호 | 날짜 필터, 관리자 액션 API 응답, 상태 변경, Base Price 안전값(`0 <= price <= sales`)을 한 spec 안에서 확인해 최근 Ledger 보강 사항 회귀를 방지 |
+| ✅ 기존 대시보드 구조 유지 | `useAdminData`, Ledger UI, 관리자 액션 구현은 건드리지 않고 테스트 보호막만 추가 |
+
 ## v3.37.90 — [Master Ledger] 레거시 Base Price fallback 보정
 
 **작업일:** 2026-03-12
