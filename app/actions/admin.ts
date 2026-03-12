@@ -105,7 +105,18 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
 
     if (app) {
       if (status === 'approved') {
-        await supabaseAdmin.from('users').update({ role: 'host' }).eq('id', app.user_id);
+        const [userRoleResult, profileRoleResult] = await Promise.all([
+          supabaseAdmin.from('users').update({ role: 'host' }).eq('id', app.user_id),
+          supabaseAdmin.from('profiles').update({ role: 'host' }).eq('id', app.user_id),
+        ]);
+
+        if (userRoleResult.error) {
+          console.error('Host application users.role update failed:', userRoleResult.error);
+        }
+
+        if (profileRoleResult.error) {
+          console.error('Host application profiles.role update failed:', profileRoleResult.error);
+        }
       }
 
       const notification = buildHostApplicationStatusNotification(status, comment);

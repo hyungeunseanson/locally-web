@@ -57,11 +57,26 @@ export interface HostApplication {
   created_at: string;
   user_id: string;
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   status: 'pending' | 'approved' | 'rejected' | 'revision';
+  host_nationality?: string;
+  profile_photo?: string | null;
   languages?: string[];
   language_levels?: LanguageLevelEntry[];
+  target_language?: string | null;
   language_cert?: string | null;
+  dob?: string | null;
+  instagram?: string | null;
+  source?: string | null;
+  self_intro?: string | null;
+  motivation?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_holder?: string | null;
+  id_card_file?: string | null;
+  id_card_signed_url?: string | null;
+  admin_comment?: string | null;
   content: Record<string, unknown> | null;
 }
 

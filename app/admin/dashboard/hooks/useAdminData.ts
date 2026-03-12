@@ -7,6 +7,7 @@ import { updateAdminStatus } from '@/app/actions/admin';
 import { AdminDashboardState, AdminBooking } from '@/app/types/admin';
 
 const ITEMS_PER_PAGE = 20;
+const HOST_APPLICATION_SUMMARY_SELECT = 'id,user_id,created_at,name,status,host_nationality,profile_photo,languages,language_levels,target_language';
 
 export function useAdminData() {
   const { showToast } = useToast();
@@ -109,7 +110,7 @@ export function useAdminData() {
         { data: inquiryMessagesData }, // 🟢 추가
         bookingRawData, // 🔒 /api/admin/bookings fetch 결과
       ] = await Promise.all([
-        fetch('/api/admin/host-applications').then(r => r.ok ? r.json() : { data: [] }), // 🔒 service_role API 사용
+        fetch(`/api/admin/host-applications?select=${encodeURIComponent(HOST_APPLICATION_SUMMARY_SELECT)}`).then(r => r.ok ? r.json() : { data: [] }), // 🔒 service_role API 사용
         supabase.from('experiences').select('*, profiles!experiences_host_id_fkey(full_name, email)').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
         supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('reviews').select('rating, experience_id, created_at').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한

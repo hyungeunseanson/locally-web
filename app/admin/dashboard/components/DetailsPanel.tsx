@@ -8,17 +8,17 @@ import {
   MapPin, Cake, CheckCircle2, ShoppingBag, StickyNote, Star, Trash2, Link as LinkIcon, Edit,
   CreditCard, FileText, Camera, Shield, Download, AlertTriangle, Check, X
 } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 
-export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem, updateStatus, deleteItem }: any) {
-  const supabase = createClient();
+export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem, setSelectedItem, updateStatus, deleteItem }: any) {
   const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [csLoading, setCsLoading] = useState(false);
+  const [appDetails, setAppDetails] = useState<any>(null);
+  const [appDetailsLoading, setAppDetailsLoading] = useState(false);
 
   const handleStartCSChat = async () => {
-    if (!selectedItem?.id) return;
+    if (!rawSelectedItem?.id) return;
     setCsLoading(true);
     try {
       const response = await fetch('/api/inquiries/thread', {
@@ -26,7 +26,7 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contextType: 'admin_initiated_support',
-          guestId: String(selectedItem.id),
+          guestId: String(rawSelectedItem.id),
           openOnly: true,
         }),
       });
@@ -43,6 +43,50 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
       setCsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab !== 'APPS' || !rawSelectedItem?.id) {
+      setAppDetails(null);
+      setAppDetailsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchAppDetails = async () => {
+      setAppDetailsLoading(true);
+
+      try {
+        const response = await fetch(`/api/admin/host-applications?id=${rawSelectedItem.id}`);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.error || '지원서 상세를 불러오지 못했습니다.');
+        }
+
+        if (isMounted) {
+          setAppDetails(result?.data || null);
+        }
+      } catch (error) {
+        console.error('Host application detail fetch error:', error);
+        if (isMounted) {
+          setAppDetails(null);
+        }
+      } finally {
+        if (isMounted) {
+          setAppDetailsLoading(false);
+        }
+      }
+    };
+
+    fetchAppDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, rawSelectedItem?.id]);
+
+  const selectedItem = activeTab === 'APPS' ? (appDetails || rawSelectedItem) : rawSelectedItem;
   const applicationLanguageLevels = normalizeLanguageLevels(
     selectedItem?.language_levels,
     selectedItem?.languages,
@@ -50,71 +94,24 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
   );
   const applicationLanguageNames = getLanguageNames(applicationLanguageLevels);
 
-  // 🟢 [추가됨] 신분증 보안 URL 발급 로직
-  // 'verification-docs' 버킷에 있는 파일은 그냥 <img> 태그로 못 봅니다. (403 에러)
-  // 관리자 권한으로 '서명된 URL(Signed URL)'을 받아와야 볼 수 있습니다.
-  // 🟢 [수정됨] 보안 버킷(verification-docs) 연결 로직
-  // 🟢 [최종 수정] 신분증 보안 URL 발급 (확장자 자동 매칭)
-  // 🟢 [스마트 수정] 파일명이 조금 달라도 찾아내는 로직
   useEffect(() => {
-    if (activeTab === 'APPS' && selectedItem?.id_card_file) {
-      const fetchSignedUrl = async () => {
-        try {
-          // 1. DB에 저장된 ID(UUID) 부분만 추출 (예: "1c10eb86-...")
-          // 파일명이 "UUID_시간값" 형태라고 가정
-          const originalName = selectedItem.id_card_file.split('/').pop();
-          const userUUID = originalName.split('_')[0];
-
-          console.log("🔍 검색할 사용자 ID:", userUUID);
-
-          // 2. 스토리지의 'id_card' 폴더 파일 목록 조회
-          const { data: fileList, error: listError } = await supabase
-            .storage
-            .from('verification-docs')
-            .list('id_card');
-
-          if (listError || !fileList) {
-            console.error("🔥 목록 조회 실패:", listError);
-            return;
-          }
-
-          // 3. 해당 UUID로 시작하는 파일이 실제로 있는지 찾기
-          const foundFile = fileList.find(f => f.name.includes(userUUID));
-
-          if (foundFile) {
-            console.log("✅ 실제 파일 찾음:", foundFile.name);
-
-            // 4. 찾은 파일명으로 서명된 URL 생성
-            const { data: signedData, error: signError } = await supabase
-              .storage
-              .from('verification-docs')
-              .createSignedUrl(`id_card/${foundFile.name}`, 3600);
-
-            if (signedData?.signedUrl) {
-              setSignedUrl(signedData.signedUrl);
-            } else if (selectedItem.id_card_file.startsWith('http')) {
-              setSignedUrl(selectedItem.id_card_file);
-            } else {
-              setSignedUrl(null);
-            }
-          } else {
-            console.warn("⚠️ 해당 유저의 파일이 스토리지에 없습니다. Fallback URL 사용 시도");
-            if (selectedItem.id_card_file.startsWith('http')) {
-              setSignedUrl(selectedItem.id_card_file);
-            } else {
-              setSignedUrl(null);
-            }
-          }
-
-        } catch (e) {
-          console.error("로직 에러:", e);
-        }
-      };
-      fetchSignedUrl();
-    } else {
+    if (activeTab !== 'APPS') {
       setSignedUrl(null);
+      return;
     }
-  }, [selectedItem, activeTab]);
+
+    if (selectedItem?.id_card_signed_url) {
+      setSignedUrl(selectedItem.id_card_signed_url);
+      return;
+    }
+
+    if (typeof selectedItem?.id_card_file === 'string' && selectedItem.id_card_file.startsWith('http')) {
+      setSignedUrl(selectedItem.id_card_file);
+      return;
+    }
+
+    setSignedUrl(null);
+  }, [activeTab, selectedItem?.id_card_file, selectedItem?.id_card_signed_url]);
 
   if (!selectedItem) {
     return (
@@ -212,6 +209,12 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
         {/* 🟠 [APPS] 호스트 지원서 상세 */}
         {activeTab === 'APPS' && (
           <div className="space-y-5 md:space-y-6">
+            {appDetailsLoading && !appDetails ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-500">
+                지원서 상세 정보를 불러오는 중입니다.
+              </div>
+            ) : (
+              <>
             <div className="grid grid-cols-2 gap-2 md:gap-3">
               <InfoBox label="연락처" value={selectedItem.phone} icon={<Phone size={14} />} />
               <InfoBox label="이메일" value={selectedItem.email} icon={<Mail size={14} />} />
@@ -303,6 +306,8 @@ export default function DetailsPanel({ activeTab, selectedItem, setSelectedItem,
               <button onClick={() => updateStatus('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2"><Check size={16} /> 승인 (호스트 권한 부여)</button>
               <button onClick={() => deleteItem('host_applications', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 영구 삭제</button>
             </div>
+              </>
+            )}
           </div>
         )}
 

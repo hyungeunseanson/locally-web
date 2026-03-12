@@ -7,6 +7,15 @@ import { getLanguageNames } from '@/app/utils/languageLevels';
 export default function ListPanel({
   activeTab, filter, setFilter, listItems, selectedItem, setSelectedItem
 }: any) {
+  const filterOptions = [
+    { value: 'ALL', label: 'ALL' },
+    { value: 'PENDING', label: 'PENDING' },
+    {
+      value: 'APPROVED',
+      label: activeTab === 'APPS' ? '처리완료' : activeTab === 'EXPS' ? '승인완료' : 'APPROVED'
+    },
+  ];
+
   const getAppLanguageSummary = (item: any) => {
     if (Array.isArray(item.languages) && item.languages.length > 0) {
       return item.languages.join(', ');
@@ -32,8 +41,8 @@ export default function ListPanel({
         {/* 채팅/유저 탭이 아닐 때만 필터 표시 */}
         {activeTab !== 'CHATS' && activeTab !== 'USERS' && (
           <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-            {['ALL', 'PENDING', 'APPROVED'].map(f => (
-              <button key={f} onClick={() => setFilter(f)} className={`px-2 py-1 text-[9px] md:text-[10px] font-bold rounded-md transition-all ${filter === f ? 'bg-white text-black shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{f}</button>
+            {filterOptions.map((option) => (
+              <button key={option.value} onClick={() => setFilter(option.value)} className={`px-2 py-1 text-[9px] md:text-[10px] font-bold rounded-md transition-all ${filter === option.value ? 'bg-white text-black shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{option.label}</button>
             ))}
           </div>
         )}
