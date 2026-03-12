@@ -199,12 +199,17 @@ export default function Sidebar() {
     setIsMobileOpen(false); // 🟢 모바일에서 탭 전환 시 사이드바 닫기
   };
 
+  const handleHomeClick = () => {
+    router.push('/');
+    setIsMobileOpen(false);
+  };
+
   // 🟢 사이드바 내부 콘텐츠 (데스크탑 / 모바일 오버레이 공용)
   const sidebarContent = (
     <>
       <button
         type="button"
-        onClick={() => handleTabChange('APPROVALS')}
+        onClick={handleHomeClick}
         className="mb-10 px-2 mt-4 w-full flex items-center gap-3 rounded-2xl text-left transition-colors hover:bg-slate-950/70 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
       >
         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden">
