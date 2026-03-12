@@ -238,24 +238,26 @@ export function useAdminData() {
 
     if (status === 'rejected' || status === 'revision') {
       const input = prompt(`Reason for [${status}]:`);
-      if (input === null) return;
+      if (input === null) return false;
       comment = input;
     } else if (status === 'approved') {
-      if (!confirm('Approve?')) return;
+      if (!confirm('Approve?')) return false;
       if (table === 'experiences') dbStatus = 'active';
     }
 
     try {
       await updateAdminStatus(table, id, dbStatus, comment);
       showToast(`성공적으로 업데이트되었습니다. (${dbStatus})`, 'success');
-      fetchInitialData(); // 상태 변경 시 리프레시
+      await fetchInitialData(); // 상태 변경 시 리프레시
+      return true;
     } catch (err: any) {
       showToast('업데이트 실패: ' + err.message, 'error');
+      return false;
     }
   };
 
   const deleteItem = async (table: string, id: string) => {
-    if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+    if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return false;
     try {
       const res = await fetch('/api/admin/delete', {
         method: 'POST',
@@ -270,10 +272,12 @@ export function useAdminData() {
       if (table === 'users') {
         setState(prev => ({ ...prev, users: prev.users.filter((u: any) => u.id !== id) }));
       } else {
-        fetchInitialData();
+        await fetchInitialData();
       }
+      return true;
     } catch (err: any) {
       showToast('삭제 실패: ' + err.message, 'error');
+      return false;
     }
   };
 

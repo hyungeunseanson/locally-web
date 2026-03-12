@@ -94,6 +94,30 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
   );
   const applicationLanguageNames = getLanguageNames(applicationLanguageLevels);
 
+  const closePanel = () => {
+    setAppDetails(null);
+    setSignedUrl(null);
+    setSelectedItem?.(null);
+  };
+
+  const handleApprovalStatusUpdate = async (
+    table: 'host_applications' | 'experiences',
+    id: string,
+    status: string
+  ) => {
+    const success = await updateStatus(table, id, status);
+    if (success) {
+      closePanel();
+    }
+  };
+
+  const handleApprovalDelete = async (table: 'host_applications' | 'experiences', id: string) => {
+    const success = await deleteItem(table, id);
+    if (success) {
+      closePanel();
+    }
+  };
+
   useEffect(() => {
     if (activeTab !== 'APPS') {
       setSignedUrl(null);
@@ -301,10 +325,10 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
 
             {/* 승인/거절 버튼 */}
             <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-slate-100 grid grid-cols-2 gap-2 md:gap-3 sticky bottom-0 bg-white pb-3 md:pb-4 z-10">
-              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100">보완 요청</button>
-              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100">거절</button>
-              <button onClick={() => updateStatus('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2"><Check size={16} /> 승인 (호스트 권한 부여)</button>
-              <button onClick={() => deleteItem('host_applications', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 영구 삭제</button>
+              <button onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100">보완 요청</button>
+              <button onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100">거절</button>
+              <button onClick={() => handleApprovalStatusUpdate('host_applications', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg flex items-center justify-center gap-2"><Check size={16} /> 승인 (호스트 권한 부여)</button>
+              <button onClick={() => handleApprovalDelete('host_applications', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 영구 삭제</button>
             </div>
               </>
             )}
@@ -403,10 +427,10 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
             </div>
 
             <div className="pt-4 md:pt-6 mt-4 md:mt-6 border-t border-slate-100 grid grid-cols-2 gap-2 md:gap-3 sticky bottom-0 bg-white pb-3 md:pb-4 z-10">
-              <button onClick={() => updateStatus('experiences', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
-              <button onClick={() => updateStatus('experiences', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절</button>
-              <button onClick={() => updateStatus('experiences', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>
-              <button onClick={() => deleteItem('experiences', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 체험 영구 삭제</button>
+              <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'revision')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-orange-600 bg-orange-50 border border-orange-100 hover:bg-orange-100 transition-colors">보완 요청</button>
+              <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'rejected')} className="py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-colors">거절</button>
+              <button onClick={() => handleApprovalStatusUpdate('experiences', selectedItem.id, 'approved')} className="col-span-2 py-2.5 md:py-3.5 rounded-xl font-bold text-xs md:text-sm text-white bg-slate-900 hover:bg-black shadow-lg transition-all">승인</button>
+              <button onClick={() => handleApprovalDelete('experiences', selectedItem.id)} className="col-span-2 text-[10px] md:text-xs text-slate-400 hover:text-red-500 py-1.5 flex items-center justify-center gap-1"><Trash2 size={12} /> 체험 영구 삭제</button>
             </div>
           </div>
         )}
