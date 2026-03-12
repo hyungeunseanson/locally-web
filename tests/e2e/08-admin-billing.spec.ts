@@ -416,6 +416,11 @@ test.describe.serial('Admin billing smoke', () => {
     await openBilling(page, adminUser);
     await expect(page.getByRole('button', { name: /맞춤 의뢰 명세서/ })).toBeVisible({ timeout: 15000 });
 
+    await page.getByRole('button', { name: /정산 완료 \(History\)/ }).click();
+    await page.getByTestId('sales-settlement-card').click();
+    await expect(page.getByRole('button', { name: /정산 대기 \(Pending\)/ })).toHaveClass(/border-slate-900/);
+    await expect(page.getByTestId('sales-settlement-panel')).toContainText('정산 가능');
+
     await page.getByRole('button', { name: '30D' }).click();
     const rangeFiltered = await downloadServiceCsvAndReadResponse(page);
     expect(rangeFiltered.requestUrl).toContain('startAt=');

@@ -105,6 +105,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [serviceBookings, setServiceBookings] = useState<ServiceSalesBookingSummary[]>([]);
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const settlementSectionRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const salesStartAt = dateRange[0].startDate ? startOfDay(dateRange[0].startDate).toISOString() : '';
   const salesEndAt = dateRange[0].endDate ? endOfDay(dateRange[0].endDate).toISOString() : '';
@@ -290,6 +291,12 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 
   const toggleExpand = (hostId: string) => {
     setExpandedHostId(prev => prev === hostId ? null : hostId);
+  };
+
+  const handleOpenSettlementDrilldown = () => {
+    setSettlementTab('PENDING');
+    setExpandedHostId(null);
+    settlementSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleSettlePayout = async (hostId: string, bookingIds: string[]) => {
@@ -523,12 +530,15 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           sub={expSettlementCardSubtext || `₩${MIN_PAYOUT_THRESHOLD_KRW.toLocaleString()} 이상부터 정산 대상`}
           icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />}
           bg="bg-purple-600"
+          onClick={handleOpenSettlementDrilldown}
+          actionLabel="정산 대상 보기"
+          testId="sales-settlement-card"
         />
         <StatCard title="객단가 (AOV)" value={`₩${Math.round(averageOrderValue).toLocaleString()}`} sub="건당 평균 결제액" icon={<Wallet size={16} className="text-slate-900 md:w-5 md:h-5" />} bg="bg-yellow-400" text="text-slate-900" />
       </div>
 
       {/* 정산 리스트 */}
-      <div className="bg-white rounded-xl md:rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div ref={settlementSectionRef} data-testid="sales-settlement-panel" className="bg-white rounded-xl md:rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center bg-slate-50 gap-4 sm:gap-0">
           <div className="flex gap-4 md:gap-6 border-b border-slate-200 sm:border-0">
             <button onClick={() => setSettlementTab('PENDING')} className={`font-bold text-xs md:text-sm pb-2 sm:pb-0 border-b-2 sm:border-b-2 sm:-mb-[17px] md:-mb-[25px] transition-all ${settlementTab === 'PENDING' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'}`}>정산 대기 (Pending)</button>
@@ -694,9 +704,15 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 }
 
 // (StatCard 컴포넌트는 기존과 동일하되 비율 튜닝)
-function StatCard({ title, value, sub, icon, bg, text = 'text-white' }: any) {
-  return (
-    <div className={`p-4 md:p-5 rounded-xl md:rounded-2xl shadow-sm border border-slate-100 bg-white flex flex-col justify-between h-28 md:h-32 relative overflow-hidden group w-full`}>
+function StatCard({ title, value, sub, icon, bg, text = 'text-white', onClick, actionLabel, testId }: any) {
+  const cardClassName = `p-4 md:p-5 rounded-xl md:rounded-2xl shadow-sm border bg-white flex flex-col justify-between h-28 md:h-32 relative overflow-hidden group w-full ${
+    onClick
+      ? 'border-purple-100 hover:border-purple-200 hover:shadow-md transition-all cursor-pointer text-left'
+      : 'border-slate-100'
+  }`;
+
+  const content = (
+    <>
       <div className={`absolute top-4 right-4 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${bg} shadow-md group-hover:scale-110 transition-transform`}>
         {icon}
       </div>
@@ -704,7 +720,27 @@ function StatCard({ title, value, sub, icon, bg, text = 'text-white' }: any) {
       <div>
         <div className={`text-lg md:text-2xl font-black ${text === 'text-white' ? 'text-slate-900' : text} tracking-tight truncate pr-8`}>{value}</div>
         <div className="text-[9px] md:text-[10px] text-slate-400 mt-0.5 md:mt-1 font-medium">{sub}</div>
+        {actionLabel && <div className="text-[9px] md:text-[10px] text-purple-600 mt-2 font-bold">{actionLabel}</div>}
       </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        data-testid={testId}
+        onClick={onClick}
+        className={cardClassName}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div data-testid={testId} className={cardClassName}>
+      {content}
     </div>
   );
 }
