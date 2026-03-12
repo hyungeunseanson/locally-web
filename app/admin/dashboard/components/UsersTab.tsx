@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 // 🟢 [수정] 아이콘 추가 및 유틸리티 import
 import {
-  Wifi, Search, User, Mail, Calendar, MoreHorizontal, X, Phone, Clock, MapPin,
+  Wifi, Search, User, Mail, Calendar, X, Phone, Clock, MapPin,
   MessageCircle, Smile, Trash2, Star, Bell, Send, CheckSquare, Square, CheckCircle
 } from 'lucide-react';
 import { sendNotification } from '@/app/utils/notification';
@@ -219,7 +219,6 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                   <th className="px-2 md:px-6 py-2 md:py-3">연락처</th>
                   <th className="px-2 md:px-6 py-2 md:py-3">최근 접속</th> {/* 🟢 추가됨 */}
                   <th className="px-2 md:px-6 py-2 md:py-3">구분</th>
-                  <th className="px-2 md:px-6 py-2 md:py-3 text-right">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -268,14 +267,6 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                         <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-[8px] md:text-[10px] font-bold uppercase ${user.role === 'host' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
                           {user.role || 'USER'}
                         </span>
-                      </td>
-                      <td className="px-2 md:px-6 py-2.5 md:py-4 text-right">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteItem('profiles', user.id); }}
-                          className="text-slate-400 hover:text-red-500 p-1.5 md:p-2 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                        </button>
                       </td>
                     </tr>
                   );
@@ -403,16 +394,16 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               )}
             </div>
 
-            {/* 4. 등록한 리뷰 (동적 연동) */}
+            {/* 4. 작성한 리뷰 (동적 연동) */}
             <div className="p-4 md:p-6 border-b border-slate-100">
-              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">받은 리뷰 ({userReviews.length}개)</h4>
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">작성한 리뷰 ({userReviews.length}개)</h4>
               {isActivityLoading ? (
                 <div className="flex justify-center items-center py-6">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900"></div>
                 </div>
               ) : userReviews.length === 0 ? (
                 <div className="text-center py-8 bg-slate-50 border border-slate-100 border-dashed rounded-xl">
-                  <p className="text-[11px] md:text-xs font-bold text-slate-500">아직 받은 리뷰가 없습니다</p>
+                  <p className="text-[11px] md:text-xs font-bold text-slate-500">아직 작성한 리뷰가 없습니다</p>
                 </div>
               ) : (
                 <div className="space-y-3 md:space-y-4">
@@ -436,14 +427,6 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               )}
             </div>
 
-            {/* 5. 관리자 메모 (기존 유지) */}
-            <div className="p-4 md:p-6">
-              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-2">관리자 메모</h4>
-              <textarea
-                className="w-full bg-yellow-50 border border-yellow-200 rounded-xl p-2.5 md:p-3 text-[11px] md:text-sm focus:outline-none focus:border-yellow-400 min-h-[60px] md:min-h-[80px]"
-                placeholder="특이사항을 입력하세요..."
-              />
-            </div>
           </div>
 
           {/* 하단 버튼 */}
@@ -456,11 +439,14 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               <Bell className="w-3.5 h-3.5 md:w-4 md:h-4" /> 이 유저에게 알림 보내기
             </button>
 
+            <p className="text-[10px] md:text-xs text-slate-400 text-center mb-2">
+              영구 삭제는 상세 패널에서만 가능합니다.
+            </p>
             <button
               onClick={() => { if (confirm('정말 계정을 영구 삭제하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
               className="w-full bg-slate-900 hover:bg-red-600 text-white font-bold py-2.5 md:py-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 md:gap-2 text-xs md:text-sm"
             >
-              <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /> 계정 영구 삭제
+              <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /> 이 회원 계정 영구 삭제
             </button>
           </div>
         </div>
