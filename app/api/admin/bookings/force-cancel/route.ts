@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { isCancelledOnlyBookingStatus, isPendingBookingStatus } from '@/app/constants/bookingStatus';
 
@@ -126,18 +127,41 @@ export async function POST(request: Request) {
     const experience = Array.isArray(booking.experiences) ? booking.experiences[0] : booking.experiences;
     const hostId = experience?.host_id;
     const expTitle = experience?.title || 'Locally 체험';
+    const guestId = booking.user_id || null;
+    const refundText = settlement.refundAmount > 0
+      ? `환불 금액: ₩${settlement.refundAmount.toLocaleString()}`
+      : '결제 전 예약이 취소되었습니다.';
 
     try {
+      const notifications = [];
+
       if (hostId) {
-        await supabaseAdmin.from('notifications').insert({
+        notifications.push({
           user_id: hostId,
           type: 'cancellation',
           title: '😢 예약이 취소되었습니다.',
-          message: `[${expTitle}] 예약이 취소되었습니다. 환불액: ₩${settlement.refundAmount.toLocaleString()}`,
+          message: `[${expTitle}] 예약이 취소되었습니다. ${refundText}`,
           link: '/host/dashboard',
           is_read: false,
         });
+      }
 
+      if (guestId) {
+        notifications.push({
+          user_id: guestId,
+          type: 'cancellation',
+          title: '예약이 취소되었습니다.',
+          message: `[${expTitle}] 예약이 관리자에 의해 취소되었습니다. ${refundText}`,
+          link: '/guest/trips',
+          is_read: false,
+        });
+      }
+
+      if (notifications.length > 0) {
+        await supabaseAdmin.from('notifications').insert(notifications);
+      }
+
+      if (hostId) {
         fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -150,6 +174,17 @@ export async function POST(request: Request) {
           }),
         }).catch((emailError) => {
           console.error('[ADMIN] booking cancel email error:', emailError);
+        });
+      }
+
+      if (guestId) {
+        await sendImmediateGenericEmail({
+          recipientUserId: guestId,
+          subject: '[Locally] 예약 취소 안내',
+          title: '예약이 취소되었습니다',
+          message: `'${expTitle}' 예약이 관리자에 의해 취소되었습니다.\n${refundText}`,
+          link: '/guest/trips',
+          ctaLabel: '내 여행 보기',
         });
       }
 
