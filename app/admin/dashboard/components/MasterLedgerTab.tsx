@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   AlertTriangle,
@@ -107,7 +107,13 @@ type ConfirmDialogState =
     }
   | null;
 
-export default function MasterLedgerTab({ onRefresh }: { onRefresh: () => void }) {
+export default function MasterLedgerTab({
+  onRefresh,
+  refreshSignal,
+}: {
+  onRefresh: () => void;
+  refreshSignal: string;
+}) {
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -122,6 +128,7 @@ export default function MasterLedgerTab({ onRefresh }: { onRefresh: () => void }
   const [allBookings, setAllBookings] = useState<AdminMasterLedgerEntry[]>([]);
   const [isLoadingLedger, setIsLoadingLedger] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const lastRefreshSignalRef = useRef<string | null>(null);
 
   const fetchLedger = useCallback(async () => {
     setIsLoadingLedger(true);
@@ -144,6 +151,20 @@ export default function MasterLedgerTab({ onRefresh }: { onRefresh: () => void }
   useEffect(() => {
     fetchLedger();
   }, [fetchLedger]);
+
+  useEffect(() => {
+    if (lastRefreshSignalRef.current === null) {
+      lastRefreshSignalRef.current = refreshSignal;
+      return;
+    }
+
+    if (lastRefreshSignalRef.current === refreshSignal) {
+      return;
+    }
+
+    lastRefreshSignalRef.current = refreshSignal;
+    fetchLedger();
+  }, [fetchLedger, refreshSignal]);
 
   // 0. 예약 클릭 시 열람 처리
   const handleSelectBooking = (b: AdminMasterLedgerEntry) => {

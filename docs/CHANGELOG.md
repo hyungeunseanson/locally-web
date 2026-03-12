@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.86 — [Master Ledger] 실시간 반영 회귀 보정
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 LEDGER 재조회 트리거 추가 | 관리자 대시보드 부모의 일반 예약 realtime 흐름은 유지한 채, `MasterLedgerTab`에 `refreshSignal`을 전달해 새 일반 예약 유입 시 장부 목록도 자동 재조회되도록 보정 |
+| 🟡 탭 구조 보존 | `useAdminData`와 대시보드 탭 분기, 새 예약 토스트/구독 구조는 그대로 유지하고 `LEDGER` 목록 stale 현상만 핀셋 수정 |
+| ✅ 회귀 범위 최소화 | `/api/admin/master-ledger`와 관리자 액션 API는 건드리지 않고 `page.tsx`와 `MasterLedgerTab.tsx` 두 파일만 수정 |
+
 ## v3.37.85 — [Master Ledger] 데이터 원천 및 관리자 액션 정합성 보강
 
 **작업일:** 2026-03-12

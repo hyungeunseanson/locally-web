@@ -68,6 +68,7 @@ function DataDrivenAdminTab({
     apps, exps, users, bookings, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages, onlineUsers, isLoading,
     updateStatus, deleteItem, refresh
   } = useAdminData();
+  const ledgerRefreshSignal = `${bookings.length}:${String(bookings[0]?.id ?? '')}`;
 
   if (isLoading) return <DataLoadingSkeleton />;
 
@@ -75,7 +76,7 @@ function DataDrivenAdminTab({
     return <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />;
   }
   if (activeTab === 'LEDGER') {
-    return <MasterLedgerTab onRefresh={refresh} />;
+    return <MasterLedgerTab onRefresh={refresh} refreshSignal={ledgerRefreshSignal} />;
   }
   if (activeTab === 'SALES') {
     return <SalesTab bookings={bookings} apps={apps} onRefresh={refresh} />;
