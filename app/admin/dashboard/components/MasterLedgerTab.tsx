@@ -22,6 +22,7 @@ import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css'; // main style file
 import 'react-date-range/dist/theme/default.css'; // theme css file
 import { Range } from 'react-date-range';
+import { createClient } from '@/app/utils/supabase/client';
 import {
   BOOKING_CANCELLED_STATUSES_UPPER,
   BOOKING_CONFIRMED_STATUSES_UPPER,
@@ -115,6 +116,7 @@ export default function MasterLedgerTab({
   refreshSignal: string;
 }) {
   const { showToast } = useToast();
+  const supabase = useRef(createClient()).current;
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<Range[]>([{
     startDate: undefined,
@@ -165,6 +167,22 @@ export default function MasterLedgerTab({
     lastRefreshSignalRef.current = refreshSignal;
     fetchLedger();
   }, [fetchLedger, refreshSignal]);
+
+  useEffect(() => {
+    const realtimeChannel = supabase
+      .channel('admin_master_ledger_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, () => {
+        void fetchLedger();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'service_bookings' }, () => {
+        void fetchLedger();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(realtimeChannel);
+    };
+  }, [fetchLedger, supabase]);
 
   // 0. 예약 클릭 시 열람 처리
   const handleSelectBooking = (b: AdminMasterLedgerEntry) => {

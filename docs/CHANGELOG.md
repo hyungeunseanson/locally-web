@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.87 — [Master Ledger] UPDATE 실시간 반영 보강
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 UPDATE realtime 재조회 추가 | `MasterLedgerTab`이 `bookings`, `service_bookings`의 `UPDATE` realtime 이벤트를 직접 구독하고 `/api/admin/master-ledger`를 재조회하도록 보강 |
+| 🟡 admin 구조 원칙 유지 | `gemini.md` 기준에 맞춰 `useAdminData.ts`는 건드리지 않고, Ledger 컴포넌트 내부에만 핀셋 적용 |
+| ✅ 기존 INSERT 흐름 보존 | 기존 `refreshSignal` 기반 일반 예약 신규 유입 반영 로직은 그대로 유지하고, 상태 변경 stale 문제만 추가 보완 |
+
 ## v3.37.86 — [Master Ledger] 실시간 반영 회귀 보정
 
 **작업일:** 2026-03-12
