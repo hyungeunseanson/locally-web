@@ -43,9 +43,9 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
-  // DB에서 진짜 관리자인지 확인 (보안 핵심: users.role 또는 whitelist 체크)
+  // DB에서 진짜 관리자인지 확인 (gemini.md 기준: profiles.role 또는 whitelist 체크)
   const [userEntry, whitelistEntry] = await Promise.all([
-    supabase.from("users").select("role").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
     supabase.from("admin_whitelist").select("id").eq("email", user.email || "").maybeSingle()
   ]);
 
@@ -56,7 +56,7 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  // 화이트리스트에 있으나 권한이 admin이 아닌 경우 자동 승급 (DB RLS 우회 목적)
+  // 화이트리스트에 있으나 profiles.role이 admin이 아닌 경우 자동 승급 (레거시 화면 호환)
   if (whitelistEntry.data && userEntry.data?.role !== "admin") {
     // Service Role을 사용하여 RLS 제약을 무시하고 users 업데이트
     const adminSupabase = createServerClient(
@@ -70,7 +70,10 @@ export default async function AdminLayout({
       }
     );
     try {
-      await adminSupabase.from("users").update({ role: "admin" }).eq("id", user.id);
+      await Promise.all([
+        adminSupabase.from("users").update({ role: "admin" }).eq("id", user.id),
+        adminSupabase.from("profiles").update({ role: "admin" }).eq("id", user.id),
+      ]);
     } catch {
       // no-op
     }

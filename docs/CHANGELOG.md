@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.93 — [Admin Auth] 관리자 권한 source 통일
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 승인 액션 권한 기준 정렬 | `app/actions/admin.ts`의 관리자 판정을 `users.role`이 아니라 `profiles.role + admin_whitelist` 기준으로 맞춰 최근 관리자 API들과 같은 source를 보도록 통일 |
+| 🟡 관리자 레이아웃 권한 체크 정렬 | `/admin` 레이아웃도 같은 기준으로 확인하도록 조정해 대시보드 접근과 승인 액션 간 권한 판정 불일치 가능성을 축소 |
+| 🟡 whitelist 자동 승급 동기화 | whitelist 기반 자동 admin 승급 시 `users.role`과 `profiles.role`을 함께 `admin`으로 맞춰 레거시 경로 호환성을 유지 |
+| ✅ 삭제 API 기준 일치 | `/api/admin/delete`도 같은 관리자 판정 source를 사용하도록 정리해 admin 계정별 접근 불일치 가능성을 줄임 |
+
 ## v3.37.92 — [Admin Approvals] 역할 동기화 및 지원서 조회 범위 축소
 
 **작업일:** 2026-03-12

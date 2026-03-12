@@ -27,7 +27,7 @@ async function getAdminClient() {
   if (!user) throw new Error('Unauthorized');
 
   const [userEntry, whitelist] = await Promise.all([
-    supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
     supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
   ]);
 

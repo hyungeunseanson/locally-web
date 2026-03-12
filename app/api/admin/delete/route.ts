@@ -33,11 +33,11 @@ export async function POST(request: Request) {
 
     // 🚨 [보안 패치] 관리자 권한 확인 (Role or Whitelist)
     const [userEntry, whitelistEntry] = await Promise.all([
-      supabaseAdmin.from('users').select('role').eq('id', adminUser.id).maybeSingle(),
+      supabaseAdmin.from('profiles').select('role').eq('id', adminUser.id).maybeSingle(),
       supabaseAdmin.from('admin_whitelist').select('id').eq('email', adminUser.email || '').maybeSingle()
     ]);
 
-    console.log('[AdminDelete] users query result:', {
+    console.log('[AdminDelete] profiles query result:', {
       data: userEntry.data,
       error: userEntry.error ? {
         message: userEntry.error.message,
