@@ -131,11 +131,22 @@ export default function MasterLedgerTab({
   const [isLoadingLedger, setIsLoadingLedger] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const lastRefreshSignalRef = useRef<string | null>(null);
+  const selectedStartDate = dateRange[0].startDate ? format(dateRange[0].startDate, 'yyyy-MM-dd') : '';
+  const selectedEndDate = dateRange[0].endDate ? format(dateRange[0].endDate, 'yyyy-MM-dd') : '';
 
   const fetchLedger = useCallback(async () => {
     setIsLoadingLedger(true);
     try {
-      const response = await fetch('/api/admin/master-ledger');
+      const searchParams = new URLSearchParams();
+      if (selectedStartDate) {
+        searchParams.set('startDate', selectedStartDate);
+      }
+      if (selectedEndDate) {
+        searchParams.set('endDate', selectedEndDate);
+      }
+
+      const queryString = searchParams.toString();
+      const response = await fetch(`/api/admin/master-ledger${queryString ? `?${queryString}` : ''}`);
       const result = await response.json();
 
       if (!response.ok || !result.success) {
@@ -148,7 +159,7 @@ export default function MasterLedgerTab({
     } finally {
       setIsLoadingLedger(false);
     }
-  }, [showToast]);
+  }, [selectedEndDate, selectedStartDate, showToast]);
 
   useEffect(() => {
     fetchLedger();

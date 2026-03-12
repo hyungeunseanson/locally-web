@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.89 — [Master Ledger] 기간 필터 서버 선적용
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 날짜 범위 querystring 연동 | `MasterLedgerTab`이 선택된 시작일/종료일을 `/api/admin/master-ledger`로 전달해 서버가 기간 범위를 먼저 인지하도록 조정 |
+| 🟡 일반 예약 서버 필터 추가 | `bookings.date` 기준 `startDate/endDate` 조건을 서버 쿼리에 반영해 기간 선택 시 불필요한 일반 예약 전체 조회를 줄임 |
+| 🟡 서비스 의뢰 서버 필터 추가 | `service_requests.service_date`를 먼저 필터링한 뒤 해당 `request_id`에 연결된 `service_bookings`만 읽도록 보강 |
+| ✅ UI/CSV/KPI 구조 유지 | 목록, 필터 UI, 상세 패널, KPI, CSV 구조는 유지하고 서버 읽기 범위만 핀셋 최적화 |
+
 ## v3.37.88 — [Admin Cancel] 게스트 취소 알림/메일 보강
 
 **작업일:** 2026-03-12

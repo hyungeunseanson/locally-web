@@ -2,8 +2,39 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 
-export async function GET() {
+type ServiceRequestLedgerRow = {
+  id: string;
+  title: string | null;
+  service_date: string | null;
+  start_time: string | null;
+  guest_count: number | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+};
+
+type ServiceBookingLedgerRow = {
+  id: string;
+  order_id: string | null;
+  request_id: string | null;
+  application_id: string | null;
+  customer_id: string | null;
+  host_id: string | null;
+  amount: number;
+  created_at: string;
+  status: string;
+  [key: string]: unknown;
+};
+
+function normalizeDateParam(value: string | null) {
+  if (!value) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const startDate = normalizeDateParam(searchParams.get('startDate'));
+    const endDate = normalizeDateParam(searchParams.get('endDate'));
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
 
@@ -23,10 +54,64 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    const [{ data: bookings, error: bookingsError }, { data: serviceBookings, error: serviceBookingsError }] = await Promise.all([
-      supabaseAdmin.from('bookings').select('*').order('created_at', { ascending: false }),
-      supabaseAdmin.from('service_bookings').select('*').order('created_at', { ascending: false }),
+    let bookingsQuery = supabaseAdmin.from('bookings').select('*').order('created_at', { ascending: false });
+    if (startDate) {
+      bookingsQuery = bookingsQuery.gte('date', startDate);
+    }
+    if (endDate) {
+      bookingsQuery = bookingsQuery.lte('date', endDate);
+    }
+
+    let filteredServiceRequestsPromise: Promise<{ data: ServiceRequestLedgerRow[] | null; error: unknown }> = Promise.resolve({ data: null, error: null });
+    if (startDate || endDate) {
+      let serviceRequestsQuery = supabaseAdmin
+        .from('service_requests')
+        .select('id, title, service_date, start_time, guest_count, contact_name, contact_phone');
+
+      if (startDate) {
+        serviceRequestsQuery = serviceRequestsQuery.gte('service_date', startDate);
+      }
+      if (endDate) {
+        serviceRequestsQuery = serviceRequestsQuery.lte('service_date', endDate);
+      }
+
+      filteredServiceRequestsPromise = (async () => {
+        const result = await serviceRequestsQuery;
+        return {
+          data: result.data ?? [],
+          error: result.error,
+        };
+      })();
+    }
+
+    const [{ data: bookings, error: bookingsError }, filteredServiceRequestsResult] = await Promise.all([
+      bookingsQuery,
+      filteredServiceRequestsPromise,
     ]);
+
+    if (filteredServiceRequestsResult.error) throw filteredServiceRequestsResult.error;
+
+    const filteredServiceRequests = filteredServiceRequestsResult.data;
+    const filteredServiceRequestIds = Array.from(new Set((filteredServiceRequests || []).map((request) => request.id).filter(Boolean)));
+
+    let serviceBookingsPromise: Promise<{ data: ServiceBookingLedgerRow[] | null; error: unknown }>;
+    if ((startDate || endDate) && filteredServiceRequests && filteredServiceRequestIds.length === 0) {
+      serviceBookingsPromise = Promise.resolve({ data: [], error: null });
+    } else {
+      let serviceBookingsQuery = supabaseAdmin.from('service_bookings').select('*').order('created_at', { ascending: false });
+      if ((startDate || endDate) && filteredServiceRequests && filteredServiceRequestIds.length > 0) {
+        serviceBookingsQuery = serviceBookingsQuery.in('request_id', filteredServiceRequestIds);
+      }
+      serviceBookingsPromise = (async () => {
+        const result = await serviceBookingsQuery;
+        return {
+          data: result.data ?? [],
+          error: result.error,
+        };
+      })();
+    }
+
+    const { data: serviceBookings, error: serviceBookingsError } = await serviceBookingsPromise;
 
     if (bookingsError) throw bookingsError;
     if (serviceBookingsError) throw serviceBookingsError;
@@ -106,12 +191,14 @@ export async function GET() {
     const applicationIds = Array.from(new Set(serviceBookingRows.map((booking) => booking.application_id).filter(Boolean)));
 
     const [serviceRequestsRes, serviceProfilesRes, serviceApplicationsRes] = await Promise.all([
-      requestIds.length > 0
-        ? supabaseAdmin
-            .from('service_requests')
-            .select('id, title, service_date, start_time, guest_count, contact_name, contact_phone')
-            .in('id', requestIds)
-        : Promise.resolve({ data: [], error: null }),
+      filteredServiceRequests
+        ? Promise.resolve({ data: filteredServiceRequests, error: null })
+        : requestIds.length > 0
+          ? supabaseAdmin
+              .from('service_requests')
+              .select('id, title, service_date, start_time, guest_count, contact_name, contact_phone')
+              .in('id', requestIds)
+          : Promise.resolve({ data: [], error: null }),
       serviceUserIds.length > 0
         ? supabaseAdmin.from('profiles').select('id, full_name, email').in('id', serviceUserIds)
         : Promise.resolve({ data: [], error: null }),
