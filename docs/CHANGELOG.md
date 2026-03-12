@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.90 — [Master Ledger] 레거시 Base Price fallback 보정
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Base Price 과장 표시 방지 | `bookingFinance.getBookingBasePrice()`가 더 이상 `amount`를 직접 base price로 간주하지 않고, `price_at_booking`, `total_experience_price`, `total_price`가 있을 때만 base price를 계산하도록 보정 |
+| 🟡 레거시 화면 안전값 유지 | 과거 데이터에서 base price 근거가 없으면 Ledger 표/CSV는 기존 null 처리 규칙에 따라 `-` 또는 빈값으로 보여 과장된 숫자 노출을 방지 |
+| ✅ 신규 저장 흐름 유지 | 카드 콜백/무통장 확정 시 정산 스냅샷 저장 로직은 유지하고, read-time fallback 규칙만 핀셋 조정 |
+
 ## v3.37.89 — [Master Ledger] 기간 필터 서버 선적용
 
 **작업일:** 2026-03-12

@@ -13,6 +13,18 @@ const toNumber = (value: number | string | null | undefined) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const getStoredExperienceAmount = (booking: BookingFinanceInput) => {
+  if (booking.total_experience_price != null) {
+    return toNumber(booking.total_experience_price);
+  }
+
+  if (booking.total_price != null) {
+    return toNumber(booking.total_price);
+  }
+
+  return null;
+};
+
 export function getBookingPaidAmount(booking: BookingFinanceInput) {
   return toNumber(booking.amount);
 }
@@ -26,12 +38,12 @@ export function getBookingBasePrice(booking: BookingFinanceInput) {
     return toNumber(booking.price_at_booking);
   }
 
-  const experienceAmount = getBookingExperienceAmount(booking);
-  if (experienceAmount <= 0) {
-    return 0;
+  const storedExperienceAmount = getStoredExperienceAmount(booking);
+  if (storedExperienceAmount == null || storedExperienceAmount <= 0) {
+    return null;
   }
 
-  return Math.max(0, experienceAmount - toNumber(booking.solo_guarantee_price));
+  return Math.max(0, storedExperienceAmount - toNumber(booking.solo_guarantee_price));
 }
 
 export function getBookingHostPayout(booking: BookingFinanceInput) {
@@ -56,7 +68,7 @@ export function getBookingSettlementSnapshot(booking: BookingFinanceInput) {
   const basePrice = getBookingBasePrice({
     ...booking,
     total_experience_price: totalExperiencePrice,
-  }) || totalExperiencePrice;
+  }) ?? Math.max(0, totalExperiencePrice - toNumber(booking.solo_guarantee_price));
   const hostPayout = booking.host_payout_amount != null
     ? toNumber(booking.host_payout_amount)
     : Math.floor(totalExperiencePrice * 0.8);
