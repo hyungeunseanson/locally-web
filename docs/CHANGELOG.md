@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.08 — [Admin Alerts] whitelist 수신자 매핑 누락 보강
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 수신자 매핑 보강 | `adminAlertCenter`가 이제 `admin_whitelist` 이메일을 기준으로 수신자를 유지하고, 인앱 `user_id`는 `users.email` 우선·`profiles.email` 보조로 해석하도록 보강 |
+| 🟠 이메일 누락 방지 | `sendAdminAlertEmails()`가 더 이상 `profiles` 매핑 실패 때문에 whitelist 관리자 메일까지 함께 누락시키지 않도록 정리 |
+| 🟡 관측성 추가 | whitelist에 있지만 인앱 `user_id`를 찾지 못한 이메일은 warn 로그로 남겨 운영자가 조용한 누락을 추적할 수 있게 보강 |
+
 ## v3.37.99 — [Master Ledger] E2E 행 선택 안정화
 
 **작업일:** 2026-03-12

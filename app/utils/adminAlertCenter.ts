@@ -2,9 +2,18 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 type AdminAlertRecipient = {
-  userId: string;
+  userId: string | null;
   email: string;
 };
+
+type RecipientRow = {
+  id: string | null;
+  email: string | null;
+};
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
 
 async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
   const supabaseAdmin = createAdminClient();
@@ -17,29 +26,69 @@ async function getAdminAlertRecipients(): Promise<AdminAlertRecipient[]> {
     throw new Error(whitelistError.message);
   }
 
-  const emails = (whitelistRows || [])
-    .map((row) => row.email)
-    .filter((email): email is string => Boolean(email));
+  const emails = Array.from(new Set(
+    (whitelistRows || [])
+      .map((row) => row.email)
+      .filter((email): email is string => Boolean(email))
+      .map(normalizeEmail)
+  ));
 
   if (emails.length === 0) {
     return [];
   }
 
-  const { data: profileRows, error: profileError } = await supabaseAdmin
-    .from('profiles')
+  const emailToUserId = new Map<string, string>();
+
+  const { data: userRows, error: userError } = await supabaseAdmin
+    .from('users')
     .select('id, email')
     .in('email', emails);
 
-  if (profileError) {
-    throw new Error(profileError.message);
+  if (userError) {
+    console.warn('[AdminAlertCenter] users email lookup failed, falling back to profiles:', userError.message);
+  } else {
+    const safeUserRows = (userRows || []) as RecipientRow[];
+    safeUserRows.forEach((row) => {
+      if (!row.id || !row.email) return;
+      emailToUserId.set(normalizeEmail(row.email), row.id);
+    });
   }
 
-  return (profileRows || [])
-    .filter((row) => row.id && row.email)
-    .map((row) => ({
-      userId: row.id as string,
-      email: row.email as string,
-    }));
+  const unresolvedEmails = emails.filter((email) => !emailToUserId.has(email));
+
+  if (unresolvedEmails.length > 0) {
+    const { data: profileRows, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email')
+      .in('email', unresolvedEmails);
+
+    if (profileError) {
+      console.warn('[AdminAlertCenter] profiles email fallback failed:', profileError.message);
+    } else {
+      const safeProfileRows = (profileRows || []) as RecipientRow[];
+      safeProfileRows.forEach((row) => {
+        if (!row.id || !row.email) return;
+        emailToUserId.set(normalizeEmail(row.email), row.id);
+      });
+    }
+  }
+
+  const recipients = emails.map((email) => ({
+    userId: emailToUserId.get(email) || null,
+    email,
+  }));
+
+  const missingInAppRecipients = recipients
+    .filter((recipient) => !recipient.userId)
+    .map((recipient) => recipient.email);
+
+  if (missingInAppRecipients.length > 0) {
+    console.warn(
+      `[AdminAlertCenter] Unable to resolve in-app admin recipients for whitelist emails: ${missingInAppRecipients.join(', ')}`
+    );
+  }
+
+  return recipients;
 }
 
 export async function insertAdminAlerts(params: {
@@ -48,15 +97,16 @@ export async function insertAdminAlerts(params: {
   link?: string | null;
 }) {
   const recipients = await getAdminAlertRecipients();
+  const inAppRecipients = recipients.filter((recipient): recipient is AdminAlertRecipient & { userId: string } => Boolean(recipient.userId));
 
-  if (recipients.length === 0) {
+  if (inAppRecipients.length === 0) {
     return { success: true, count: 0 };
   }
 
   const supabaseAdmin = createAdminClient();
   const { error } = await supabaseAdmin
     .from('notifications')
-    .insert(recipients.map((recipient) => ({
+    .insert(inAppRecipients.map((recipient) => ({
       user_id: recipient.userId,
       type: 'admin_alert',
       title: params.title,
@@ -69,7 +119,7 @@ export async function insertAdminAlerts(params: {
     throw new Error(error.message);
   }
 
-  return { success: true, count: recipients.length };
+  return { success: true, count: inAppRecipients.length };
 }
 
 export async function sendAdminAlertEmails(params: {
