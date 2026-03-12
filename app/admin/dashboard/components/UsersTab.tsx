@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 // 🟢 [수정] 아이콘 추가 및 유틸리티 import
 import {
   Wifi, Search, User, Mail, Calendar, X, Phone, Clock, MapPin,
-  MessageCircle, Smile, Trash2, Star, Bell, Send, CheckSquare, Square, CheckCircle
+  MessageCircle, Smile, Trash2, Star, Bell, Send, CheckSquare, Square, CheckCircle, Briefcase
 } from 'lucide-react';
 import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
-import { createClient } from '@/app/utils/supabase/client';
+import type { AdminUserActivityBooking, AdminUserTimelineItem } from '@/app/types/admin';
 
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
 function timeAgo(dateString: string | null) {
@@ -26,7 +26,6 @@ function timeAgo(dateString: string | null) {
 }
 
 export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
-  const supabase = createClient();
   const { showToast } = useToast(); // 🟢 추가
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -38,11 +37,11 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [notiMessage, setNotiMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   // 1분마다 화면을 갱신해서 "몇 분 전" 시간을 최신화하는 코드
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0);
 
-  // 🟢 실제 결제 내역 및 리뷰 상태
-  const [userBookings, setUserBookings] = useState<any[]>([]);
-  const [userReviews, setUserReviews] = useState<any[]>([]);
+  // 🟢 실제 결제 내역 및 회원 타임라인
+  const [userBookings, setUserBookings] = useState<AdminUserActivityBooking[]>([]);
+  const [userTimeline, setUserTimeline] = useState<AdminUserTimelineItem[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(false);
 
   useEffect(() => {
@@ -50,25 +49,23 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
       let isMounted = true;
       const fetchActivity = async () => {
         setIsActivityLoading(true);
+        setUserBookings([]);
+        setUserTimeline([]);
         try {
-          const { data: bData } = await supabase
-            .from('bookings')
-            .select('*, experiences(title)')
-            .eq('user_id', selectedUser.id)
-            .order('created_at', { ascending: false });
+          const response = await fetch(`/api/admin/users/${selectedUser.id}/timeline`);
+          const result = await response.json();
 
-          const { data: rData } = await supabase
-            .from('reviews')
-            .select('*, experiences(title)')
-            .eq('user_id', selectedUser.id)
-            .order('created_at', { ascending: false });
+          if (!response.ok || result?.success === false) {
+            throw new Error(result?.error || '회원 활동 조회 실패');
+          }
 
           if (isMounted) {
-            setUserBookings(bData || []);
-            setUserReviews(rData || []);
+            setUserBookings(result?.data?.bookings || []);
+            setUserTimeline(result?.data?.timeline || []);
           }
         } catch (e) {
           console.error('Failed to fetch user activity', e);
+          showToast('회원 활동을 불러오지 못했습니다.', 'error');
         } finally {
           if (isMounted) setIsActivityLoading(false);
         }
@@ -76,7 +73,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
       fetchActivity();
       return () => { isMounted = false; };
     }
-  }, [selectedUser?.id]);
+  }, [selectedUser?.id, showToast]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -131,6 +128,31 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
       setNotiTitle(''); setNotiMessage(''); setSelectedUserIds([]);
     } catch (e) { console.error(e); showToast('전송 실패', 'error'); }
     finally { setIsSending(false); }
+  };
+
+  const getTimelineIcon = (kind: AdminUserTimelineItem['kind']) => {
+    switch (kind) {
+      case 'booking':
+        return <Calendar className="w-4 h-4 md:w-[18px] md:h-[18px] text-blue-500" />;
+      case 'review':
+        return <Star className="w-4 h-4 md:w-[18px] md:h-[18px] text-amber-500" />;
+      case 'inquiry':
+        return <MessageCircle className="w-4 h-4 md:w-[18px] md:h-[18px] text-slate-500" />;
+      case 'service_request':
+      case 'service_booking':
+        return <Briefcase className="w-4 h-4 md:w-[18px] md:h-[18px] text-violet-500" />;
+      default:
+        return <Clock className="w-4 h-4 md:w-[18px] md:h-[18px] text-slate-400" />;
+    }
+  };
+
+  const getTimelineStatusClassName = (status: string | null) => {
+    if (!status) return 'bg-slate-100 text-slate-500';
+    const normalized = status.toLowerCase();
+    if (normalized.includes('cancel') || normalized.includes('declined')) return 'bg-rose-100 text-rose-600';
+    if (normalized.includes('pending') || normalized === 'open') return 'bg-amber-100 text-amber-700';
+    if (normalized.includes('resolved') || normalized.includes('paid') || normalized.includes('confirm') || normalized.includes('complete')) return 'bg-emerald-100 text-emerald-700';
+    return 'bg-slate-100 text-slate-500';
   };
 
   return (
@@ -377,7 +399,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                         {userBookings.slice(0, 5).map((b) => (
                           <tr key={b.id} className="hover:bg-slate-50">
                             <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-900 truncate max-w-[100px] md:max-w-[120px]">
-                              {b.experiences?.title || '알 수 없음'}
+                              {b.experience_title || '알 수 없음'}
                             </td>
                             <td className="px-2 md:px-3 py-1.5 md:py-2 text-slate-500">
                               {new Date(b.created_at).toLocaleDateString()}
@@ -394,32 +416,51 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
               )}
             </div>
 
-            {/* 4. 작성한 리뷰 (동적 연동) */}
+            {/* 4. 회원 타임라인 */}
             <div className="p-4 md:p-6 border-b border-slate-100">
-              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">작성한 리뷰 ({userReviews.length}개)</h4>
+              <h4 className="text-[10px] md:text-xs font-bold text-slate-900 uppercase mb-3 md:mb-4">회원 타임라인 ({userTimeline.length}개)</h4>
               {isActivityLoading ? (
                 <div className="flex justify-center items-center py-6">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900"></div>
                 </div>
-              ) : userReviews.length === 0 ? (
+              ) : userTimeline.length === 0 ? (
                 <div className="text-center py-8 bg-slate-50 border border-slate-100 border-dashed rounded-xl">
-                  <p className="text-[11px] md:text-xs font-bold text-slate-500">아직 작성한 리뷰가 없습니다</p>
+                  <p className="text-[11px] md:text-xs font-bold text-slate-500">아직 확인할 활동 이력이 없습니다</p>
                 </div>
               ) : (
-                <div className="space-y-3 md:space-y-4">
-                  {userReviews.slice(0, 5).map((r) => (
-                    <div key={r.id} className="bg-slate-50 p-2.5 md:p-3 rounded-xl">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-bold text-[11px] md:text-xs truncate mr-2">
-                          {r.experiences?.title || '알 수 없음'}
-                        </span>
-                        <div className="flex items-center text-[9px] md:text-[10px] font-bold text-orange-500 shrink-0">
-                          <Star size={10} fill="currentColor" className="mr-0.5" /> {(r.rating || 0).toFixed(1)}
+                <div className="space-y-3">
+                  {userTimeline.map((item) => (
+                    <div key={item.id} className="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-100">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0">
+                          {getTimelineIcon(item.kind)}
                         </div>
-                      </div>
-                      <p className="text-[10px] md:text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{r.content || '(내용 없음)'}</p>
-                      <div className="text-[9px] md:text-[10px] text-slate-400 mt-1.5 md:mt-2">
-                        {new Date(r.created_at).toLocaleDateString()}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="font-bold text-[11px] md:text-sm text-slate-900 truncate">{item.title}</div>
+                              {item.description && (
+                                <p className="text-[10px] md:text-xs text-slate-500 leading-relaxed mt-1 whitespace-pre-wrap">
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+
+                            {item.status_label && (
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold whitespace-nowrap ${getTimelineStatusClassName(item.status)}`}>
+                                {item.status_label}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-2 text-[9px] md:text-[10px] text-slate-400">
+                            <span>{new Date(item.occurred_at).toLocaleString()}</span>
+                            {item.amount !== null && (
+                              <span className="font-bold text-slate-600">₩{Number(item.amount).toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}

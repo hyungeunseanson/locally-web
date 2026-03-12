@@ -168,6 +168,29 @@ export interface AdminMasterLedgerEntry {
   };
 }
 
+export interface AdminUserActivityBooking {
+  id: string;
+  created_at: string;
+  amount: number | null;
+  total_price: number | null;
+  status: string | null;
+  guests: number | null;
+  date: string | null;
+  time: string | null;
+  experience_title: string | null;
+}
+
+export interface AdminUserTimelineItem {
+  id: string;
+  occurred_at: string;
+  kind: 'booking' | 'review' | 'service_request' | 'service_booking' | 'inquiry';
+  title: string;
+  description: string | null;
+  status: string | null;
+  status_label: string | null;
+  amount: number | null;
+}
+
 export interface AdminDashboardState {
   apps: HostApplication[];
   exps: unknown[];
