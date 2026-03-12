@@ -15,6 +15,18 @@
 | 🟡 테스트 클릭 경로 보강 | `tests/e2e/06-admin-master-ledger.spec.ts`에서 첫 번째 셀 클릭 대신 행 자체 클릭으로 바꾸고, 상세 패널 미오픈 시 1회 재시도하도록 안정화 |
 | ✅ 회귀 재검증 완료 | `06-admin-master-ledger.spec.ts`, `07-admin-approvals.spec.ts`, `tsc`, `git diff --check`를 모두 다시 통과 |
 
+## v3.38.00 — [Billing] SalesTab 전용 데이터 소스 분리 1차
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 체험 매출 source 분리 | `SalesTab`이 더 이상 `useAdminData`의 최근 20건 `bookings`에 기대지 않고, 신규 `/api/admin/sales-summary` 전용 API에서 전체 정산 대상 체험 예약을 읽도록 분리 |
+| 🔴 호스트 정산 정보 보강 | 전용 API가 `host_applications`의 최신 계좌/예금주/국적을 함께 조립해 정산 리스트가 summary `apps` 누락 컬럼에 의존하지 않도록 정리 |
+| 🟠 AP 의미 정리 | 상단 `정산 예정금` 카드를 `체험 정산 예정금`으로 명확히 바꾸고, 서비스 정산은 별도 탭 관리라는 문구로 혼선을 줄임 |
+| 🟠 기간 기준 정렬 | 하단 체험 정산 리스트도 상단 KPI와 같은 `created_at` 날짜 필터 기준을 쓰도록 맞춤 |
+| 🟡 운영 혼선 제거 | 실제 동작이 없던 헤더 `지급 실행` 버튼을 `일괄 지급 준비중` 비활성 상태로 낮춰 오동작 기대를 제거 |
+
 ## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
 
 **작업일:** 2026-03-12

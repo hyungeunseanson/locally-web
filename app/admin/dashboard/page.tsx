@@ -79,7 +79,7 @@ function DataDrivenAdminTab({
     return <MasterLedgerTab onRefresh={refresh} refreshSignal={ledgerRefreshSignal} />;
   }
   if (activeTab === 'SALES') {
-    return <SalesTab bookings={bookings} apps={apps} onRefresh={refresh} />;
+    return <SalesTab onRefresh={refresh} />;
   }
   if (activeTab === 'ANALYTICS') {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { DollarSign, TrendingUp, CreditCard, Wallet, AlertTriangle, CheckCircle, Calendar as CalendarIcon, ChevronDown, ChevronRight, ChevronUp, Download, Check } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css';
@@ -12,11 +12,12 @@ import { settleHostPayout } from '@/app/actions/admin';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { createClient } from '@/app/utils/supabase/client';
 import { getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
+import { AdminSalesBooking } from '@/app/types/admin';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
 
-export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[], apps: any[], onRefresh?: () => void }) {
+export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [dateRange, setDateRange] = useState<Range[]>([{
     startDate: subDays(new Date(), 30),
     endDate: new Date(),
@@ -27,11 +28,34 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   const [settlementTab, setSettlementTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
   const [expandedHostId, setExpandedHostId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [salesBookings, setSalesBookings] = useState<AdminSalesBooking[]>([]);
+  const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [serviceBookings, setServiceBookings] = useState<any[]>([]);
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const supabase = useMemo(() => createClient(), []);
+
+  const fetchSalesBookings = useCallback(async () => {
+    setIsSalesLoading(true);
+    try {
+      const res = await fetch('/api/admin/sales-summary');
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || '매출 데이터를 불러오지 못했습니다.');
+      }
+      setSalesBookings((result.data || []) as AdminSalesBooking[]);
+    } catch (error: unknown) {
+      console.error('Sales summary fetch error:', error);
+      showToast(error instanceof Error ? error.message : '매출 데이터를 불러오지 못했습니다.', 'error');
+    } finally {
+      setIsSalesLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    void fetchSalesBookings();
+  }, [fetchSalesBookings]);
 
   // Fetch service_bookings once for KPI aggregation
   useEffect(() => {
@@ -83,9 +107,9 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   };
 
   // 🟢 [수정] 유효한 매출 데이터 필터링 (완료됨 + 취소됐는데 위약금 있는거)
-  const validBookings = bookings.filter(b =>
+  const validBookings = salesBookings.filter(b =>
     filterDate(b.created_at) &&
-    (isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && (b.platform_revenue > 0 || b.host_payout_amount > 0)))
+    (isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && ((b.platform_revenue ?? 0) > 0 || (b.host_payout_amount ?? 0) > 0)))
   );
 
   // 맞춤 의뢰 service_bookings KPI (date range 필터 적용)
@@ -107,7 +131,6 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
   const expHostPayout = validBookings.reduce((sum, b) => {
     return sum + getBookingHostPayout(b);
   }, 0);
-  const hostPayout = expHostPayout + svcHostPayout;
 
   const allCount = validBookings.length + validServiceBookings.length;
   const averageOrderValue = allCount > 0 ? totalRevenue / allCount : 0;
@@ -117,8 +140,9 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
     const settlementMap = new Map();
 
     // 정산 대상: 완료된 건 + 취소 위약금 건
-    const targetBookings = bookings.filter(b =>
-      isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && b.host_payout_amount > 0)
+    const targetBookings = salesBookings.filter(b =>
+      filterDate(b.created_at) &&
+      (isCompletedBookingStatus(b.status) || (isCancelledOnlyBookingStatus(b.status) && (b.host_payout_amount ?? 0) > 0))
     );
 
     targetBookings.forEach(booking => {
@@ -126,10 +150,10 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
       if (!hostId) return;
 
       if (!settlementMap.has(hostId)) {
-        const hostInfo = apps.find((a: any) => a.user_id === hostId);
+        const hostInfo = booking.host_application;
         settlementMap.set(hostId, {
           id: hostId,
-          hostName: hostInfo?.name || '알 수 없음',
+          hostName: hostInfo?.name || booking.experiences?.profiles?.name || '알 수 없음',
           bank: hostInfo?.bank_name ? `${hostInfo.bank_name}` : '계좌 미등록',
           accountNumber: hostInfo?.account_number || '',
           accountHolder: hostInfo?.account_holder || '-',
@@ -172,7 +196,10 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
       const res = await settleHostPayout(bookingIds);
       if (res.success) {
         showToast('성공적으로 정산 처리되었습니다.', 'success');
-        if (onRefresh) onRefresh();
+        await Promise.all([
+          fetchSalesBookings(),
+          Promise.resolve(onRefresh?.()),
+        ]);
       } else {
         throw new Error(res.error || 'Server error');
       }
@@ -377,7 +404,13 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard title="총 거래액 (GMV)" value={`₩${totalRevenue.toLocaleString()}`} sub={`체험 ₩${expRevenue.toLocaleString()} | 의뢰 ₩${svcRevenue.toLocaleString()}`} icon={<DollarSign size={16} className="text-white md:w-5 md:h-5" />} bg="bg-slate-900" />
         <StatCard title="순매출 (Net Revenue)" value={`₩${platformFee.toLocaleString()}`} sub="플랫폼 수익 (수수료)" icon={<TrendingUp size={16} className="text-white md:w-5 md:h-5" />} bg="bg-blue-600" />
-        <StatCard title="정산 예정금 (AP)" value={`₩${hostPayout.toLocaleString()}`} sub="호스트 지급액" icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />} bg="bg-purple-600" />
+        <StatCard
+          title="체험 정산 예정금"
+          value={`₩${expHostPayout.toLocaleString()}`}
+          sub={validServiceBookings.length > 0 ? '서비스 정산은 별도 탭 관리' : '체험 호스트 지급액'}
+          icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />}
+          bg="bg-purple-600"
+        />
         <StatCard title="객단가 (AOV)" value={`₩${Math.round(averageOrderValue).toLocaleString()}`} sub="건당 평균 결제액" icon={<Wallet size={16} className="text-slate-900 md:w-5 md:h-5" />} bg="bg-yellow-400" text="text-slate-900" />
       </div>
 
@@ -397,8 +430,11 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
               <Download size={14} /> {serviceCSVLoading ? '생성 중...' : '맞춤 의뢰 명세서 ↓'}
             </button>
             {settlementTab === 'PENDING' && (
-              <button className="bg-slate-900 text-white px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors w-full sm:w-auto">
-                <CheckCircle size={14} /> 지급 실행
+              <button
+                disabled
+                className="bg-slate-200 text-slate-500 px-3 md:px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 cursor-not-allowed w-full sm:w-auto"
+              >
+                <CheckCircle size={14} /> 일괄 지급 준비중
               </button>
             )}
           </div>
@@ -508,7 +544,7 @@ export default function SalesTab({ bookings, apps, onRefresh }: { bookings: any[
                   )}
                 </React.Fragment>
               )) : (
-                <tr><td colSpan={5} className="px-4 md:px-6 py-8 md:py-10 text-center text-xs md:text-sm text-slate-400">내역이 없습니다.</td></tr>
+                <tr><td colSpan={5} className="px-4 md:px-6 py-8 md:py-10 text-center text-xs md:text-sm text-slate-400">{isSalesLoading ? '정산 데이터를 불러오는 중입니다.' : '내역이 없습니다.'}</td></tr>
               )}
             </tbody>
           </table>

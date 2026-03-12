@@ -52,6 +52,26 @@ export interface AdminBooking {
   };
 }
 
+export interface AdminSalesBooking extends AdminBooking {
+  order_id: string | null;
+  payout_status: string | null;
+  host_payout_amount: number | null;
+  platform_revenue: number | null;
+  refund_amount: number | null;
+  payment_method: string | null;
+  total_price?: number | null;
+  total_experience_price?: number | null;
+  price_at_booking?: number | null;
+  solo_guarantee_price?: number | null;
+  host_application: {
+    name: string | null;
+    bank_name: string | null;
+    account_number: string | null;
+    account_holder: string | null;
+    host_nationality: string | null;
+  } | null;
+}
+
 export interface HostApplication {
   id: string;
   created_at: string;
