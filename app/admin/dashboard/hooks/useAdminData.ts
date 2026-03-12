@@ -102,7 +102,7 @@ export function useAdminData() {
       const [
         { data: appData },
         { data: expData },
-        { data: userData },
+        userSummaryData,
         { data: reviewData },
         { data: searchLogsData },
         { data: analyticsEventsData },
@@ -112,7 +112,7 @@ export function useAdminData() {
       ] = await Promise.all([
         fetch(`/api/admin/host-applications?select=${encodeURIComponent(HOST_APPLICATION_SUMMARY_SELECT)}`).then(r => r.ok ? r.json() : { data: [] }), // 🔒 service_role API 사용
         supabase.from('experiences').select('*, profiles!experiences_host_id_fkey(full_name, email)').order('created_at', { ascending: false }).limit(3000), // 🟢 OOM 방지 제한
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
+        fetch('/api/admin/users-summary').then(r => r.ok ? r.json() : { success: false, data: [] }), // 🔒 service_role API 사용 (users.role 병합)
         supabase.from('reviews').select('rating, experience_id, created_at').order('created_at', { ascending: false }).limit(5000), // 🟢 OOM 방지 제한
         supabase.from('search_logs').select('*').order('created_at', { ascending: false }).limit(2000), // 🟢 최근 검색 로그
         supabase.from('analytics_events').select('*').order('created_at', { ascending: false }).limit(10000), // 🟢 이벤트 로그 (퍼널용)
@@ -126,6 +126,9 @@ export function useAdminData() {
       const bookingApiResult = bookingRawData as any;
       if (!bookingApiResult?.success && bookingApiResult?.success !== undefined) throw new Error(bookingApiResult?.error || '예약 로딩 실패');
       const bookingRawArray = Array.isArray(bookingApiResult) ? bookingApiResult : (bookingApiResult?.data || []);
+      const userApiResult = userSummaryData as any;
+      if (!userApiResult?.success && userApiResult?.success !== undefined) throw new Error(userApiResult?.error || '회원 로딩 실패');
+      const usersArray = Array.isArray(userApiResult) ? userApiResult : (userApiResult?.data || []);
 
       const enrichedBookings = await enrichBookings(bookingRawArray);
 
@@ -137,7 +140,7 @@ export function useAdminData() {
         ...prev,
         apps: appsArray,
         exps: expData || [],
-        users: userData || [],
+        users: usersArray,
         bookings: enrichedBookings,
         reviews: reviewData || [],
         searchLogs: searchLogsData || [], // 🟢 저장

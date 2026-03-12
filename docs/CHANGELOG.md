@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.09 — [User Management] 회원 role 표시 source 정렬
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 role source 보정 | `User Management` 탭이 더 이상 `profiles`만 보고 역할을 추정하지 않고, 신규 `/api/admin/users-summary`에서 `profiles + users.role`을 병합한 회원 목록을 읽도록 변경 |
+| 🟠 운영 혼선 완화 | 호스트 승인 후에도 `USER`처럼 보이거나, 관리자 계정이 일반 회원처럼 보일 수 있던 역할 표시 불일치를 줄임 |
+| ✅ 회귀 범위 제한 | `UsersTab` UI 구조와 상세 패널 로직은 유지하고, 사용자 목록 read path만 admin API 경유로 안전하게 교체 |
+
 ## v3.38.08 — [Admin Alerts] whitelist 수신자 매핑 누락 보강
 
 **작업일:** 2026-03-12
