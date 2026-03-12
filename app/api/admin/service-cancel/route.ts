@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import crypto from 'crypto';
 
 type AdminCancelBody = {
   order_id?: string;
   refund_amount?: number;
   cancel_reason?: string;
+};
+
+type NotificationInsertRow = {
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  link: string;
+  is_read: boolean;
 };
 
 export async function POST(request: Request) {
@@ -21,13 +31,10 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = createAdminClient();
 
-    // 2. Admin role check using admin client (bypasses RLS on admin_whitelist)
-    const [userEntry, whitelist] = await Promise.all([
-      supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-      supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-    ]);
-
-    const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
+    const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+      userId: user.id,
+      email: user.email,
+    });
     if (!isAdmin) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
@@ -167,7 +174,7 @@ export async function POST(request: Request) {
       .eq('id', booking.request_id);
 
     // 7. Notify customer + host (non-blocking)
-    const notifs: any[] = [];
+    const notifs: NotificationInsertRow[] = [];
     if (booking.customer_id) {
       notifs.push({
         user_id: booking.customer_id,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 export async function POST(request: Request) {
   try {
@@ -32,31 +33,10 @@ export async function POST(request: Request) {
     }
 
     // 🚨 [보안 패치] 관리자 권한 확인 (Role or Whitelist)
-    const [userEntry, whitelistEntry] = await Promise.all([
-      supabaseAdmin.from('profiles').select('role').eq('id', adminUser.id).maybeSingle(),
-      supabaseAdmin.from('admin_whitelist').select('id').eq('email', adminUser.email || '').maybeSingle()
-    ]);
-
-    console.log('[AdminDelete] profiles query result:', {
-      data: userEntry.data,
-      error: userEntry.error ? {
-        message: userEntry.error.message,
-        code: userEntry.error.code,
-        details: userEntry.error.details,
-        hint: userEntry.error.hint,
-      } : null,
+    const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+      userId: adminUser.id,
+      email: adminUser.email,
     });
-    console.log('[AdminDelete] whitelist query result:', {
-      data: whitelistEntry.data,
-      error: whitelistEntry.error ? {
-        message: whitelistEntry.error.message,
-        code: whitelistEntry.error.code,
-        details: whitelistEntry.error.details,
-        hint: whitelistEntry.error.hint,
-      } : null,
-    });
-
-    const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
 
     console.log('[AdminDelete] final isAdmin:', isAdmin);
 

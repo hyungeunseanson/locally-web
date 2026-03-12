@@ -40,7 +40,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 ### 3.1 핵심 테이블 (요약)
 | 분류 | 테이블 | 비고 |
 | :--- | :--- | :--- |
-| 사용자/권한 | `profiles`, `admin_whitelist` | `profiles.role` 기반, whitelist 예외 허용 |
+| 사용자/권한 | `users`, `profiles`, `admin_whitelist` | 권한 판정은 `users.role`, 프로필 표시는 `profiles`, 관리자 예외는 whitelist |
 | 상품/예약/결제 | `experiences`, `bookings` | 예약 상태는 서버 검증 기준 |
 | 소통/리뷰 | `inquiries`, `inquiry_messages`, `reviews` | 채팅/리뷰 연동 |
 | 운영 | `admin_tasks`, `admin_task_comments`, `audit_logs` | 협업/로그 |
@@ -48,9 +48,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ### 3.2 권한 원칙
 - 기본: 인증 사용자 + 본인 데이터 범위
-- 관리자: `profiles.role='admin'` 또는 `admin_whitelist` 매칭
+- 관리자: `users.role='admin'` 또는 `admin_whitelist` 매칭
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
 - **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
+- **[권한 Source 결정]** 관리자 권한 판정 source는 `users.role + admin_whitelist`다. `profiles`는 표시/프로필 데이터용이며, `profiles.role`을 권한 판정에 사용하지 않는다.
 - **[관리자 알림센터 결정]** 운영 알림센터는 신규 테이블을 만들지 않고 기존 `notifications`를 재사용한다. 관리자 전용 누적 알림은 `type='admin_alert'`로 저장하고, Admin Dashboard `ALERTS` 탭에서 소비한다.
 - **[알림 API 보안 결정]** `/api/notifications/email`의 단일 수신자 경로는 범용 발송 API로 사용하지 않는다. self 알림이나 서버 검증 가능한 소유권 컨텍스트(`review_reply`, `cancellation_approved` 등)만 허용하고, 그 외는 각 도메인 서버 라우트에서 직접 발송한다.
 

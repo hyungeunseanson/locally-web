@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 export async function GET() {
     try {
@@ -13,13 +14,10 @@ export async function GET() {
 
         const supabaseAdmin = createAdminClient(); // bypasses RLS
 
-        // Admin role check using admin client (bypasses RLS on admin_whitelist)
-        const [userEntry, whitelist] = await Promise.all([
-            supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-            supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-        ]);
-
-        const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
+        const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+            userId: user.id,
+            email: user.email,
+        });
         if (!isAdmin) {
             return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
         }
@@ -66,8 +64,9 @@ export async function GET() {
         }));
 
         return NextResponse.json({ success: true, data: enriched });
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Server error';
         console.error('[ADMIN] /api/admin/service-bookings error:', error);
-        return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
+        return NextResponse.json({ success: false, error: message }, { status: 500 });
     }
 }

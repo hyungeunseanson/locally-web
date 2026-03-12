@@ -18,6 +18,7 @@ import {
 } from '@/app/host/create/config';
 import { useToast } from '@/app/context/ToastContext'; // 🟢 Toast로 UX 개선
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 import { buildExperienceWritePayload, getManualFieldValue, setManualFieldValue, syncManualContentWithLocales } from '@/app/host/create/experienceFormState';
@@ -57,11 +58,10 @@ export default function EditExperiencePage() {
         }
 
         // 🟢 어드민 계정 여부 확인
-        const [profileRes, whitelistRes] = await Promise.all([
-          supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-          supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-        ]);
-        const isAdmin = profileRes.data?.role === 'admin' || !!whitelistRes.data;
+        const { isAdmin } = await resolveAdminAccess(supabase, {
+          userId: user.id,
+          email: user.email,
+        });
 
         let query = supabase.from('experiences').select('*').eq('id', params.id);
         if (!isAdmin) {

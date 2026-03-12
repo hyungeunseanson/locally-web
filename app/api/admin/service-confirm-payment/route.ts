@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
 export async function POST(request: Request) {
@@ -15,13 +16,10 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = createAdminClient();
 
-    // 2. Admin role check using admin client (bypasses RLS on admin_whitelist)
-    const [userEntry, whitelist] = await Promise.all([
-      supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-      supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-    ]);
-
-    const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
+    const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+      userId: user.id,
+      email: user.email,
+    });
     if (!isAdmin) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }

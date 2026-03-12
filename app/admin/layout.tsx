@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { ReactNode, Suspense } from "react";
 import Sidebar from "@/app/admin/dashboard/components/Sidebar";
 import GlobalTeamChat from "@/app/admin/dashboard/components/GlobalTeamChat";
+import { createAdminClient } from "@/app/utils/supabase/admin";
+import { resolveAdminAccess } from "@/app/utils/adminAccess";
 
 export default async function AdminLayout({
   children,
@@ -43,37 +45,21 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
-  // DB에서 진짜 관리자인지 확인 (gemini.md 기준: profiles.role 또는 whitelist 체크)
-  const [userEntry, whitelistEntry] = await Promise.all([
-    supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
-    supabase.from("admin_whitelist").select("id").eq("email", user.email || "").maybeSingle()
-  ]);
-
-  const isAdmin = (userEntry.data?.role === "admin") || !!whitelistEntry.data;
+  const adminSupabase = createAdminClient();
+  const { isAdmin, isWhitelisted, userRole } = await resolveAdminAccess(adminSupabase, {
+    userId: user.id,
+    email: user.email,
+  });
 
   // 관리자가 아니면 메인 홈페이지로 쫓아냄
   if (!isAdmin) {
     redirect("/");
   }
 
-  // 화이트리스트에 있으나 profiles.role이 admin이 아닌 경우 자동 승급 (레거시 화면 호환)
-  if (whitelistEntry.data && userEntry.data?.role !== "admin") {
-    // Service Role을 사용하여 RLS 제약을 무시하고 users 업데이트
-    const adminSupabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() { return []; },
-          setAll() { }
-        }
-      }
-    );
+  // 화이트리스트에 있으나 users.role이 admin이 아닌 경우 자동 승급 (레거시 화면 호환)
+  if (isWhitelisted && userRole !== "admin") {
     try {
-      await Promise.all([
-        adminSupabase.from("users").update({ role: "admin" }).eq("id", user.id),
-        adminSupabase.from("profiles").update({ role: "admin" }).eq("id", user.id),
-      ]);
+      await adminSupabase.from("users").update({ role: "admin" }).eq("id", user.id);
     } catch {
       // no-op
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 // PATCH: 어드민이 맞춤 의뢰 제목·내용 수정
 export async function PATCH(req: NextRequest) {
@@ -14,12 +15,10 @@ export async function PATCH(req: NextRequest) {
 
     const supabaseAdmin = createAdminClient();
 
-    const [userEntry, whitelist] = await Promise.all([
-      supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-      supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-    ]);
-
-    const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
+    const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+      userId: user.id,
+      email: user.email,
+    });
     if (!isAdmin) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }

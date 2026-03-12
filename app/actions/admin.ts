@@ -3,6 +3,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 // 🔒 관리자 권한 확인
@@ -26,12 +27,11 @@ async function getAdminClient() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  const [userEntry, whitelist] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-    supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-  ]);
-
-  const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
+  const authAdmin = createAdminClient();
+  const { isAdmin } = await resolveAdminAccess(authAdmin, {
+    userId: user.id,
+    email: user.email,
+  });
 
   if (!isAdmin) throw new Error('Forbidden: Admin access required');
 
@@ -105,17 +105,13 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
 
     if (app) {
       if (status === 'approved') {
-        const [userRoleResult, profileRoleResult] = await Promise.all([
-          supabaseAdmin.from('users').update({ role: 'host' }).eq('id', app.user_id),
-          supabaseAdmin.from('profiles').update({ role: 'host' }).eq('id', app.user_id),
-        ]);
+        const userRoleResult = await supabaseAdmin
+          .from('users')
+          .update({ role: 'host' })
+          .eq('id', app.user_id);
 
         if (userRoleResult.error) {
           console.error('Host application users.role update failed:', userRoleResult.error);
-        }
-
-        if (profileRoleResult.error) {
-          console.error('Host application profiles.role update failed:', profileRoleResult.error);
         }
       }
 

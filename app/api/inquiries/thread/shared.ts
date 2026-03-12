@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sanitizeText } from '@/app/utils/sanitize';
 
 type AuthActor = {
@@ -231,12 +232,10 @@ async function getAdminRecipientIds() {
 
 async function assertAdminActor(actor: AuthActor) {
   const supabaseAdmin = createAdminClient();
-  const [profileRow, whitelistRow] = await Promise.all([
-    supabaseAdmin.from('profiles').select('role').eq('id', actor.id).maybeSingle(),
-    supabaseAdmin.from('admin_whitelist').select('id').eq('email', actor.email || '').maybeSingle(),
-  ]);
-
-  const isAdmin = profileRow.data?.role === 'admin' || Boolean(whitelistRow.data);
+  const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+    userId: actor.id,
+    email: actor.email,
+  });
   if (!isAdmin) {
     throw new InquiryThreadError(403, 'Forbidden');
   }

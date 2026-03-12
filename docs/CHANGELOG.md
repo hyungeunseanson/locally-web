@@ -5,6 +5,18 @@
 
 ---
 
+## v3.37.97 — [Admin Auth] profiles.role 의존 제거 핫픽스
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 관리자 권한 source 긴급 복귀 | live DB에 없는 `profiles.role` 의존을 제거하고, 관리자 판정을 다시 `users.role + admin_whitelist` 기준으로 복귀 |
+| 🔴 잘못된 role 쓰기 제거 | 호스트 승인과 whitelist 자동 admin 승급 시 `profiles.role`을 함께 쓰던 로직을 제거하고 `users.role`만 갱신하도록 정리 |
+| 🟡 admin/ledger/approval 경로 일괄 정렬 | 승인 액션, 관리자 레이아웃, Master Ledger, 서비스 예약 admin API, 문의/호스트 편집 admin 체크까지 같은 helper를 사용하도록 통일 |
+| 🟡 문서 기준 바로잡기 | `gemini.md`의 관리자 권한 기준을 `profiles.role`에서 `users.role + admin_whitelist`로 수정해 재발을 방지 |
+| ✅ notify-team 원칙 유지 | `/api/admin/notify-team`의 수신자 수집은 기존대로 `admin_whitelist` 단일 소스를 유지하고, 이번 수정은 권한 판정 source만 바로잡음 |
+
 ## v3.37.96 — [Admin Approvals] 전용 E2E 스모크 추가
 
 **작업일:** 2026-03-12

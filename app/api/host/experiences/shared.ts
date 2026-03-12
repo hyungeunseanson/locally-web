@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { FIXED_REFUND_POLICY, MAX_EXPERIENCE_PHOTOS } from '@/app/host/create/config';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { normalizeLanguageLevels, getLanguageNames, type LanguageLevelEntry } from '@/app/utils/languageLevels';
@@ -393,16 +394,16 @@ export async function getRouteActor() {
   }
 
   const supabaseAdmin = createAdminClient();
-  const [profileRes, whitelistRes] = await Promise.all([
-    supabaseAdmin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-    supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-  ]);
+  const adminAccess = await resolveAdminAccess(supabaseAdmin, {
+    userId: user.id,
+    email: user.email,
+  });
 
   return {
     actor: {
       id: user.id,
       email: user.email ?? null,
-      isAdmin: profileRes.data?.role === 'admin' || Boolean(whitelistRes.data),
+      isAdmin: adminAccess.isAdmin,
     } satisfies RouteActor,
     supabaseAdmin,
   };
