@@ -58,8 +58,20 @@ type SalesServiceSummaryRow = {
   payout_status: string | null;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const requestUrl = new URL(request.url);
+    const startAt = requestUrl.searchParams.get('startAt');
+    const endAt = requestUrl.searchParams.get('endAt');
+
+    if (startAt && Number.isNaN(Date.parse(startAt))) {
+      return NextResponse.json({ success: false, error: 'Invalid startAt' }, { status: 400 });
+    }
+
+    if (endAt && Number.isNaN(Date.parse(endAt))) {
+      return NextResponse.json({ success: false, error: 'Invalid endAt' }, { status: 400 });
+    }
+
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
 
@@ -77,19 +89,39 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
+    let bookingsQuery = supabaseAdmin
+      .from('bookings')
+      .select(
+        'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price'
+      )
+      .in('status', ['completed', 'cancelled'])
+      .order('created_at', { ascending: false });
+
+    if (startAt) {
+      bookingsQuery = bookingsQuery.gte('created_at', startAt);
+    }
+
+    if (endAt) {
+      bookingsQuery = bookingsQuery.lte('created_at', endAt);
+    }
+
+    let serviceSummaryQuery = supabaseAdmin
+      .from('service_bookings')
+      .select('amount, host_payout_amount, platform_revenue, status, created_at, payout_status')
+      .in('status', ['PAID', 'confirmed', 'completed'])
+      .order('created_at', { ascending: false });
+
+    if (startAt) {
+      serviceSummaryQuery = serviceSummaryQuery.gte('created_at', startAt);
+    }
+
+    if (endAt) {
+      serviceSummaryQuery = serviceSummaryQuery.lte('created_at', endAt);
+    }
+
     const [{ data: salesBookings, error: bookingsError }, { data: serviceSummaryRows, error: serviceSummaryError }] = await Promise.all([
-      supabaseAdmin
-        .from('bookings')
-        .select(
-          'id, order_id, created_at, experience_id, user_id, amount, status, date, time, contact_name, contact_phone, guests, payout_status, host_payout_amount, platform_revenue, refund_amount, payment_method, total_price, total_experience_price, price_at_booking, solo_guarantee_price'
-        )
-        .in('status', ['completed', 'cancelled'])
-        .order('created_at', { ascending: false }),
-      supabaseAdmin
-        .from('service_bookings')
-        .select('amount, host_payout_amount, platform_revenue, status, created_at, payout_status')
-        .in('status', ['PAID', 'confirmed', 'completed'])
-        .order('created_at', { ascending: false }),
+      bookingsQuery,
+      serviceSummaryQuery,
     ]);
 
     if (bookingsError) throw bookingsError;

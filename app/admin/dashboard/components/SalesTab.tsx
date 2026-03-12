@@ -38,11 +38,21 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
+  const salesStartAt = dateRange[0].startDate ? startOfDay(dateRange[0].startDate).toISOString() : '';
+  const salesEndAt = dateRange[0].endDate ? endOfDay(dateRange[0].endDate).toISOString() : '';
 
   const fetchSalesBookings = useCallback(async () => {
     setIsSalesLoading(true);
     try {
-      const res = await fetch('/api/admin/sales-summary');
+      const params = new URLSearchParams();
+      if (salesStartAt) {
+        params.set('startAt', salesStartAt);
+      }
+      if (salesEndAt) {
+        params.set('endAt', salesEndAt);
+      }
+
+      const res = await fetch(`/api/admin/sales-summary${params.toString() ? `?${params.toString()}` : ''}`);
       const result = await res.json();
       if (!res.ok || !result.success) {
         throw new Error(result.error || '매출 데이터를 불러오지 못했습니다.');
@@ -55,7 +65,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     } finally {
       setIsSalesLoading(false);
     }
-  }, [showToast]);
+  }, [salesEndAt, salesStartAt, showToast]);
 
   useEffect(() => {
     void fetchSalesBookings();
@@ -290,11 +300,11 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     try {
       // 🔒 host_applications(계좌 포함 민감 정보)는 service_role API Route로 조회
       const params = new URLSearchParams();
-      if (dateRange[0].startDate) {
-        params.set('startAt', startOfDay(dateRange[0].startDate).toISOString());
+      if (salesStartAt) {
+        params.set('startAt', salesStartAt);
       }
-      if (dateRange[0].endDate) {
-        params.set('endAt', endOfDay(dateRange[0].endDate).toISOString());
+      if (salesEndAt) {
+        params.set('endAt', salesEndAt);
       }
 
       const res = await fetch(`/api/admin/service-bookings-csv?${params.toString()}`);

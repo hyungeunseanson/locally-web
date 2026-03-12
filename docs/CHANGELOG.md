@@ -88,6 +88,16 @@
 | 🟠 권한·감사 로그 일관화 | `/api/admin/service-payouts/mark-paid`를 추가해 관리자 권한 확인, 대상 상태 검증, `admin_audit_logs` 기록을 서버에서 처리 |
 | ✅ 회귀 범위 제한 | 서비스 정산 대기 탭의 목록/CSV/UI는 유지하고, `이체 완료 처리` 버튼의 실행 경로만 안전한 서버 경로로 교체 |
 
+## v3.38.07 — [Billing] sales-summary 서버 날짜 필터 선적용
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 서버 선필터 적용 | `/api/admin/sales-summary`가 `startAt`/`endAt` query를 받아 `bookings.created_at`, `service_bookings.created_at` 범위를 서버에서 먼저 줄이도록 변경 |
+| 🟠 SalesTab 요청 정렬 | `SalesTab`이 현재 선택한 기간을 `sales-summary` 요청에 그대로 넘겨 전체 집계 후 클라이언트 재필터링하던 구조를 완화 |
+| ✅ 회귀 범위 제한 | KPI 의미·정산 리스트·서비스 CSV는 유지하고, Billing 집계 read 경로의 성능 부담만 낮춤 |
+
 ## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
 
 **작업일:** 2026-03-12
