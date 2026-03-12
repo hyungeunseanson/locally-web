@@ -47,6 +47,17 @@
 | 🟠 정산상태 컬럼 추가 | 서비스 CSV에 `정산상태` 컬럼을 추가해 운영자가 `정산대기/정산완료/미선택`을 파일만 보고도 바로 구분할 수 있도록 보강 |
 | 🟡 route 응답 보강 | `/api/admin/service-bookings-csv`가 `payout_status`를 함께 반환해 Billing 화면과 내보내기 파일이 같은 지급 상태 기준을 쓰도록 맞춤 |
 
+## v3.38.03 — [Billing] 전용 E2E 스모크 추가
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Billing 전용 보호막 추가 | `tests/e2e/08-admin-billing.spec.ts`를 추가해 `Billing & Revenue` 탭만 검증하는 독립 Playwright 스모크를 마련 |
+| 🟠 서비스 CSV 기간 기준 검증 | 테스트가 최근/과거 `service_booking` 2건을 직접 준비한 뒤 `30D`와 `ALL`에서 서비스 CSV route 응답이 현재 활성 기간과 일치하는지 검증 |
+| 🟡 운영 핵심 UI 확인 | KPI 카드 렌더, `맞춤 의뢰 명세서` 버튼, `일괄 지급 준비중` 비활성 상태까지 함께 확인해 Billing 탭 회귀를 조기에 감지 |
+| 🟡 CSV route 안정화 | `/api/admin/service-bookings-csv`가 복합 join 대신 raw `service_bookings` 조회 후 `service_requests`, `profiles`, `host_applications`를 따로 조립하도록 바꿔 기간 필터 + 응답 안정성을 높임 |
+
 ## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
 
 **작업일:** 2026-03-12

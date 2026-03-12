@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 type ServiceBookingCsvRow = {
     id: string;
     order_id: string | null;
+    request_id: string | null;
     amount: number | null;
     host_payout_amount: number | null;
     platform_revenue: number | null;
@@ -16,8 +17,8 @@ type ServiceBookingCsvRow = {
     created_at: string;
     customer_id: string | null;
     host_id: string | null;
-    service_requests?: unknown;
-    profiles?: unknown;
+    service_requests?: ServiceRequestCsvRow | null;
+    profiles?: CustomerProfileCsvRow | null;
 };
 
 type HostApplicationBankRow = {
@@ -27,6 +28,20 @@ type HostApplicationBankRow = {
     account_number: string | null;
     account_holder: string | null;
     host_nationality: string | null;
+};
+
+type ServiceRequestCsvRow = {
+    id: string;
+    title: string | null;
+    city: string | null;
+    service_date: string | null;
+    duration_hours: number | null;
+};
+
+type CustomerProfileCsvRow = {
+    id: string;
+    full_name: string | null;
+    email: string | null;
 };
 
 /**
@@ -73,12 +88,9 @@ export async function GET(request: Request) {
 
         let query = supabaseAdmin
             .from('service_bookings')
-            .select(`
-        id, order_id, amount, host_payout_amount, platform_revenue,
-        status, payout_status, payment_method, created_at, customer_id, host_id,
-        service_requests ( title, city, service_date, duration_hours ),
-        profiles!service_bookings_customer_id_fkey ( full_name, email )
-      `)
+            .select(
+                'id, order_id, request_id, amount, host_payout_amount, platform_revenue, status, payout_status, payment_method, created_at, customer_id, host_id'
+            )
             .in('status', ['PAID', 'confirmed', 'completed'])
             .order('created_at', { ascending: false });
 
@@ -96,17 +108,54 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // 3. host_applications 데이터를 별도로 조회 (host_id 기반)
         const rows = (data || []) as ServiceBookingCsvRow[];
+        const requestIds = [...new Set(rows.map((row) => row.request_id).filter(Boolean))] as string[];
+        const customerIds = [...new Set(rows.map((row) => row.customer_id).filter(Boolean))] as string[];
         const hostIds = [...new Set(rows.map((row) => row.host_id).filter(Boolean))] as string[];
+
+        const requestMap = new Map<string, ServiceRequestCsvRow>();
+        if (requestIds.length > 0) {
+            const { data: requests, error: requestsError } = await supabaseAdmin
+                .from('service_requests')
+                .select('id, title, city, service_date, duration_hours')
+                .in('id', requestIds);
+
+            if (requestsError) {
+                return NextResponse.json({ error: requestsError.message }, { status: 500 });
+            }
+
+            for (const request of (requests || []) as ServiceRequestCsvRow[]) {
+                requestMap.set(request.id, request);
+            }
+        }
+
+        const customerMap = new Map<string, CustomerProfileCsvRow>();
+        if (customerIds.length > 0) {
+            const { data: customers, error: customersError } = await supabaseAdmin
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', customerIds);
+
+            if (customersError) {
+                return NextResponse.json({ error: customersError.message }, { status: 500 });
+            }
+
+            for (const customer of (customers || []) as CustomerProfileCsvRow[]) {
+                customerMap.set(customer.id, customer);
+            }
+        }
 
         const hostAppMap = new Map<string, HostApplicationBankRow>();
         if (hostIds.length > 0) {
-            const { data: hostApps } = await supabaseAdmin
+            const { data: hostApps, error: hostAppsError } = await supabaseAdmin
                 .from('host_applications')
                 .select('user_id, name, bank_name, account_number, account_holder, host_nationality')
                 .in('user_id', hostIds)
                 .order('created_at', { ascending: false });
+
+            if (hostAppsError) {
+                return NextResponse.json({ error: hostAppsError.message }, { status: 500 });
+            }
 
             if (hostApps) {
                 for (const app of hostApps) {
@@ -120,6 +169,8 @@ export async function GET(request: Request) {
         // 4. 응답 데이터 조합
         const enriched = rows.map((row) => ({
             ...row,
+            service_requests: row.request_id ? requestMap.get(row.request_id) ?? null : null,
+            profiles: row.customer_id ? customerMap.get(row.customer_id) ?? null : null,
             host_application: row.host_id ? hostAppMap.get(row.host_id) ?? null : null,
         }));
 
