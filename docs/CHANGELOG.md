@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.16 — [Service Requests] 운영 정확도 1차 보정
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 정산 계좌정보 보강 | `/api/admin/service-bookings`가 이제 선택된 호스트의 최신 `host_applications` 계좌정보를 함께 조립해 Service Requests 정산 탭이 실제 계좌 기준으로 동작하도록 보정 |
+| 🟠 환불 이력 날짜 문구 정정 | 취소·환불 내역의 `취소일` 라벨을 실제 사용 값에 맞춰 `주문일`로 바꿔 운영자가 생성시각을 취소시각으로 오해하지 않도록 정리 |
+| 🟠 관리자 수정 통제 + 감사 로그 | `/api/admin/service-requests`가 이제 `pending_payment/open` 상태에서만 수정 가능하고, 제목/내용 변경 시 `admin_audit_logs`에 `ADMIN_SERVICE_REQUEST_UPDATE`를 기록 |
+
 ## v3.38.15 — [User Management] 활동 summary 지연 로딩 분리
 
 **작업일:** 2026-03-12

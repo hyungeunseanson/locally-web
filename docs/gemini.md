@@ -27,7 +27,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/service-cancel`: 관리자 강제 취소/환불 API (NicePay error-safe)
 - `/api/admin/service-confirm-payment`: 무통장 입금 확인 API (PENDING→PAID + request→open, v3.9.2)
 - `/api/admin/service-payouts/mark-paid`: 서비스 정산 완료 처리 API (`service_bookings.payout_status='paid'` + audit log)
-- `/api/admin/service-bookings`: RLS 우회용 맞춤 의뢰 조회 서버 API (v3.9.3)
+- `/api/admin/service-bookings`: RLS 우회용 맞춤 의뢰 조회 서버 API (v3.9.3, 최신 `host_applications` 계좌정보 조립 포함)
+- `/api/admin/service-requests`: 관리자 맞춤 의뢰 수정 API (`pending_payment/open` 상태만 수정 허용 + audit log)
 - `/api/admin/sidebar-counts`: RLS 우회용 사이드바 배지 카운트 서버 API (v3.9.3)
 - `/api/services/payment/mark-bank`: 무통장 선택 시 payment_method='bank' 저장 (v3.9.2)
 

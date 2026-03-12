@@ -49,19 +49,53 @@ export async function GET() {
                 : { data: [] },
         ]);
 
+        const hostIds = Array.from(
+            new Set(
+                serviceBookings
+                    .flatMap((booking) => {
+                        const matchedApplication = (appsRes.data || []).find((application) => application.id === booking.application_id);
+                        return [booking.host_id, matchedApplication?.host_id];
+                    })
+                    .filter(Boolean)
+            )
+        );
+
+        const { data: hostApplications, error: hostApplicationsError } = hostIds.length > 0
+            ? await supabaseAdmin
+                .from('host_applications')
+                .select('user_id, name, bank_name, account_number, account_holder, created_at')
+                .in('user_id', hostIds)
+                .order('created_at', { ascending: false })
+            : { data: [], error: null };
+
+        if (hostApplicationsError) throw hostApplicationsError;
+
         // Build lookup maps
         const requestsMap = new Map((reqsRes.data || []).map((r) => [r.id, r]));
         const usersMap = new Map((usersRes.data || []).map((u) => [u.id, u]));
         const appsMap = new Map((appsRes.data || []).map((a) => [a.id, a]));
+        const hostApplicationsMap = new Map<string, (typeof hostApplications)[number]>();
+
+        for (const application of hostApplications || []) {
+            if (application.user_id && !hostApplicationsMap.has(application.user_id)) {
+                hostApplicationsMap.set(application.user_id, application);
+            }
+        }
 
         // Enrich data
-        const enriched = serviceBookings.map((b) => ({
-            ...b,
-            request: requestsMap.get(b.request_id) || null,
-            customer: usersMap.get(b.customer_id) || null,
-            host: usersMap.get(b.host_id) || null,
-            application: appsMap.get(b.application_id) || null,
-        }));
+        const enriched = serviceBookings.map((b) => {
+            const application = appsMap.get(b.application_id) || null;
+            const hostUserId = b.host_id || application?.host_id || null;
+
+            return {
+                ...b,
+                request: requestsMap.get(b.request_id) || null,
+                customer: usersMap.get(b.customer_id) || null,
+                host: usersMap.get(b.host_id) || null,
+                application,
+                host_application: hostUserId ? hostApplicationsMap.get(hostUserId) || null : null,
+            };
+        });
 
         return NextResponse.json({ success: true, data: enriched });
     } catch (error: unknown) {

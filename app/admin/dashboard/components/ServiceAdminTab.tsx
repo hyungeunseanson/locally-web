@@ -30,6 +30,8 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
   expired: '만료',
 };
 
+const EDITABLE_REQUEST_STATUSES = new Set(['pending_payment', 'open']);
+
 function statusBadge(status: string, map: Record<string, { label: string; cls: string }>) {
   const cfg = map[status] ?? { label: status, cls: 'bg-slate-50 text-slate-500' };
   return (
@@ -363,8 +365,13 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => setEditTarget(b)}
-                        className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-                        title="의뢰 수정"
+                        disabled={!EDITABLE_REQUEST_STATUSES.has(b.service_request?.status ?? '')}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          EDITABLE_REQUEST_STATUSES.has(b.service_request?.status ?? '')
+                            ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                        }`}
+                        title={EDITABLE_REQUEST_STATUSES.has(b.service_request?.status ?? '') ? '의뢰 수정' : '결제 대기/모집 중 상태에서만 수정 가능'}
                       >
                         <Pencil size={12} />
                       </button>
@@ -621,7 +628,7 @@ function RefundHistoryTab({ bookings }: { bookings: AdminServiceBooking[] }) {
               <th className="px-4 py-3">주문번호</th>
               <th className="px-4 py-3">의뢰</th>
               <th className="px-4 py-3">고객</th>
-              <th className="px-4 py-3">취소일</th>
+              <th className="px-4 py-3">주문일</th>
               <th className="px-4 py-3">결제액</th>
               <th className="px-4 py-3">환불액</th>
               <th className="px-4 py-3">취소 사유</th>
