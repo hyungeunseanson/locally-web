@@ -12,12 +12,17 @@ import { settleHostPayout } from '@/app/actions/admin';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { createClient } from '@/app/utils/supabase/client';
 import { getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
-import { AdminSalesBooking } from '@/app/types/admin';
+import { AdminSalesBooking, AdminServiceBooking } from '@/app/types/admin';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
 
 export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
+  type ServiceSalesBookingSummary = Pick<
+    AdminServiceBooking,
+    'amount' | 'host_payout_amount' | 'platform_revenue' | 'status' | 'created_at' | 'payout_status'
+  >;
+
   const [dateRange, setDateRange] = useState<Range[]>([{
     startDate: subDays(new Date(), 30),
     endDate: new Date(),
@@ -30,7 +35,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [salesBookings, setSalesBookings] = useState<AdminSalesBooking[]>([]);
   const [isSalesLoading, setIsSalesLoading] = useState(true);
-  const [serviceBookings, setServiceBookings] = useState<any[]>([]);
+  const [serviceBookings, setServiceBookings] = useState<ServiceSalesBookingSummary[]>([]);
   const [serviceCSVLoading, setServiceCSVLoading] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
@@ -59,12 +64,32 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
 
   // Fetch service_bookings once for KPI aggregation
   useEffect(() => {
-    supabase
-      .from('service_bookings')
-      .select('amount, host_payout_amount, platform_revenue, status, created_at')
-      .in('status', ['PAID', 'confirmed', 'completed'])
-      .then(({ data }) => { if (data) setServiceBookings(data); });
-  }, [supabase]);
+    let isMounted = true;
+
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('service_bookings')
+          .select('amount, host_payout_amount, platform_revenue, status, created_at, payout_status')
+          .in('status', ['PAID', 'confirmed', 'completed']);
+
+        if (error) throw error;
+
+        if (isMounted && data) {
+          setServiceBookings(data as ServiceSalesBookingSummary[]);
+        }
+      } catch (error: unknown) {
+        console.error('Service bookings KPI fetch error:', error);
+        if (isMounted) {
+          showToast('서비스 정산 KPI를 불러오지 못했습니다.', 'error');
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showToast, supabase]);
 
   // 달력 외부 클릭 시 닫기
   useEffect(() => {
@@ -116,7 +141,14 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const validServiceBookings = serviceBookings.filter(b => filterDate(b.created_at));
   const svcRevenue = validServiceBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
   const svcPlatformFee = validServiceBookings.reduce((sum, b) => sum + (b.platform_revenue || 0), 0);
-  const svcHostPayout = validServiceBookings.reduce((sum, b) => sum + (b.host_payout_amount || 0), 0);
+  const svcPendingHostPayout = validServiceBookings
+    .filter((b) => b.payout_status !== 'paid')
+    .reduce((sum, b) => sum + (b.host_payout_amount || 0), 0);
+  const serviceSettlementSubtext = validServiceBookings.length === 0
+    ? '체험 호스트 지급액'
+    : svcPendingHostPayout > 0
+      ? `서비스 미지급 정산 ₩${svcPendingHostPayout.toLocaleString()} 별도 탭 관리`
+      : '서비스 정산 대기 없음';
 
   // 🟢 [수정] 매출/수익 계산 (DB 컬럼 기반) — 체험 + 맞춤 의뢰 합산
   const expRevenue = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
@@ -407,7 +439,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         <StatCard
           title="체험 정산 예정금"
           value={`₩${expHostPayout.toLocaleString()}`}
-          sub={validServiceBookings.length > 0 ? '서비스 정산은 별도 탭 관리' : '체험 호스트 지급액'}
+          sub={serviceSettlementSubtext}
           icon={<CreditCard size={16} className="text-white md:w-5 md:h-5" />}
           bg="bg-purple-600"
         />
