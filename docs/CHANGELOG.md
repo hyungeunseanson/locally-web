@@ -78,6 +78,16 @@
 | 🟠 SalesTab 단순화 | `SalesTab`이 상단 카드 계산을 위해 별도 `/api/admin/service-bookings` fetch를 하지 않고 `sales-summary` 한 응답만 사용하도록 정리 |
 | ✅ 회귀 범위 제한 | 정산 리스트/서비스 CSV/지급 액션은 그대로 두고, 상단 Billing KPI source만 한 군데로 맞춤 |
 
+## v3.38.06 — [Service Admin] 정산 완료 처리 admin API화
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 클라이언트 직접 update 제거 | `ServiceAdminTab`이 더 이상 브라우저 Supabase client로 `service_bookings.payout_status`를 직접 수정하지 않고 admin API를 호출하도록 변경 |
+| 🟠 권한·감사 로그 일관화 | `/api/admin/service-payouts/mark-paid`를 추가해 관리자 권한 확인, 대상 상태 검증, `admin_audit_logs` 기록을 서버에서 처리 |
+| ✅ 회귀 범위 제한 | 서비스 정산 대기 탭의 목록/CSV/UI는 유지하고, `이체 완료 처리` 버튼의 실행 경로만 안전한 서버 경로로 교체 |
+
 ## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
 
 **작업일:** 2026-03-12

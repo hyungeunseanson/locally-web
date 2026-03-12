@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
-import { createClient } from '@/app/utils/supabase/client';
 import { useServiceAdminData } from '../hooks/useServiceAdminData';
 import { AdminServiceBooking } from '@/app/types/admin';
 
@@ -409,7 +408,6 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
 // ── 서브탭 2: 정산 대기 ─────────────────────────────────────────────────────
 function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[]; onRefresh: () => void }) {
   const { showToast } = useToast();
-  const supabase = createClient();
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -469,21 +467,26 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
     URL.revokeObjectURL(url);
   };
 
-  const markAsPaid = async (hostId: string, bookingIds: string[]) => {
+  const markAsPaid = async (bookingIds: string[]) => {
     if (!confirm(`총 ${bookingIds.length}건 이체를 완료하셨습니까?\n확인 시 '정산 완료' 처리됩니다.`)) return;
 
     setIsProcessing(true);
     try {
-      const { error } = await supabase
-        .from('service_bookings')
-        .update({ payout_status: 'paid' })
-        .in('id', bookingIds);
+      const response = await fetch('/api/admin/service-payouts/mark-paid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingIds }),
+      });
+      const result = await response.json();
 
-      if (error) throw error;
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '정산 완료 처리에 실패했습니다.');
+      }
+
       showToast('정산 완료 처리되었습니다.', 'success');
       onRefresh();
-    } catch (err: any) {
-      showToast('처리 오류: ' + (err.message || ''), 'error');
+    } catch (err: unknown) {
+      showToast('처리 오류: ' + (err instanceof Error ? err.message : ''), 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -497,7 +500,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
           <h3 className="text-[13px] md:text-base font-black text-slate-900 flex items-center gap-2">
             <DollarSign size={16} className="text-emerald-600 md:w-5 md:h-5" /> 서비스 정산 대기
           </h3>
-          <p className="text-[10px] md:text-sm text-slate-500 mt-0.5">호스트에게 이체 후 "이체 완료 처리" 버튼을 누르세요.</p>
+          <p className="text-[10px] md:text-sm text-slate-500 mt-0.5">호스트에게 이체 후 &quot;이체 완료 처리&quot; 버튼을 누르세요.</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase mb-0.5">총 지급 대기액</p>
@@ -584,7 +587,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
                     <Download size={14} /> 명세서 CSV
                   </button>
                   <button
-                    onClick={() => markAsPaid(group.hostId, group.items.map(i => i.id))}
+                    onClick={() => markAsPaid(group.items.map(i => i.id))}
                     disabled={isProcessing || group.bank === '계좌 미등록'}
                     className={`px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold text-[12px] md:text-sm flex items-center gap-2 shadow-sm transition-all ${
                       group.bank === '계좌 미등록'
