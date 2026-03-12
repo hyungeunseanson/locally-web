@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React, { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
@@ -199,27 +200,22 @@ export default function Sidebar() {
     setIsMobileOpen(false); // 🟢 모바일에서 탭 전환 시 사이드바 닫기
   };
 
-  const handleHomeClick = () => {
-    router.push('/');
-    setIsMobileOpen(false);
-  };
-
   // 🟢 사이드바 내부 콘텐츠 (데스크탑 / 모바일 오버레이 공용)
   const sidebarContent = (
     <>
-      <button
-        type="button"
-        onClick={handleHomeClick}
-        className="mb-10 px-2 mt-4 w-full flex items-center gap-3 rounded-2xl text-left transition-colors hover:bg-slate-950/70 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+      <Link
+        href="/"
+        onClick={() => setIsMobileOpen(false)}
+        className="mb-10 px-2 mt-4 inline-flex items-center gap-3 group select-none self-start focus:outline-none focus-visible:outline-none"
       >
         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden">
-          <img src="/images/logo-new-white.png" alt="Locally Logo" className="w-8 h-8 object-contain" />
+          <img src="/images/logo-new-white.png" alt="Locally Logo" className="w-8 h-8 object-contain group-hover:scale-105 transition-transform duration-300" />
         </div>
         <div className="flex flex-col">
           <h1 className="text-[19px] font-bold text-white tracking-tight leading-none mb-0.5">Locally</h1>
           <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Admin console</p>
         </div>
-      </button>
+      </Link>
 
       <div className="space-y-8 flex-1 overflow-y-auto scrollbar-hide">
         <div>
