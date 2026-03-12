@@ -11,6 +11,9 @@ export default function DesktopModeTransition({ targetMode }: DesktopModeTransit
   const imageSrc = isHostMode
     ? '/images/host-transition.png'
     : '/images/guest-transition.png';
+  const subtitle = isHostMode
+    ? '여행자들을 만나볼 준비를 해요 ✨'
+    : '새로운 여행을 떠나볼까요 🌍';
   const overlayBackground = isHostMode ? '#fcfefb' : '#fffefc';
   const illustrationSize = isHostMode ? 'clamp(360px, 29vw, 460px)' : 'clamp(340px, 27vw, 430px)';
   const illustrationScale = isHostMode ? 1.04 : 1.015;
@@ -37,6 +40,10 @@ export default function DesktopModeTransition({ targetMode }: DesktopModeTransit
         }
         @keyframes desktop-text-enter {
           0% { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes desktop-subtext-enter {
+          0% { opacity: 0; transform: translateY(10px); }
           100% { opacity: 1; transform: translateY(0); }
         }
         @keyframes desktop-soft-pulse {
@@ -69,6 +76,12 @@ export default function DesktopModeTransition({ targetMode }: DesktopModeTransit
         style={{ animation: 'desktop-text-enter 0.45s ease-out 0.16s both, desktop-soft-pulse 2.8s ease-in-out 0.7s infinite' }}
       >
         {isHostMode ? '호스트 모드로 전환 중' : '게스트 모드로 전환 중'}
+      </p>
+      <p
+        className="mt-2 text-sm lg:text-base text-gray-400 tracking-tight"
+        style={{ animation: 'desktop-subtext-enter 0.5s ease-out 0.28s both' }}
+      >
+        {subtitle}
       </p>
     </div>
   );

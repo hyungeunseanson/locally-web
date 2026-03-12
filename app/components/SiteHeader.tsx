@@ -126,7 +126,7 @@ function SiteHeaderContent() {
 
     transitionTimerRef.current = setTimeout(() => {
       router.push(targetPath);
-    }, 850);
+    }, 900);
   };
 
   const handleMainHeaderButtonClick = () => {
