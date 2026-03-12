@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.15 — [User Management] 활동 summary 지연 로딩 분리
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 users-summary 경량화 | `/api/admin/users-summary`에서 무거운 회원 활동 집계를 제거하고 `profiles + users.role` 병합만 담당하도록 되돌려 Admin 공통 초기 로딩 부담을 줄임 |
+| 🟠 UsersTab 전용 summary 분리 | 신규 `/api/admin/users-activity-summary`를 추가해 `총 결제액`, `예약/의뢰 수`, `최근 활동` 칼럼은 `UsersTab`에서만 지연 로딩하도록 분리 |
+| ✅ 회귀 범위 제한 | User Management 상세 패널, 타임라인, Approval/Billing/Ledger 흐름은 그대로 두고 회원 목록 summary 로딩 경로만 핀셋 수정 |
+
 ## v3.38.14 — [User Management] 회원 타임라인 2차 확장
 
 **작업일:** 2026-03-12

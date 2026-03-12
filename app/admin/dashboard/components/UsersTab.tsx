@@ -9,6 +9,7 @@ import {
 import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
 import type { AdminUserActivityBooking, AdminUserTimelineItem } from '@/app/types/admin';
+import type { Profile } from '@/app/types';
 
 // 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
 function timeAgo(dateString: string | null) {
@@ -29,6 +30,14 @@ function formatWon(amount: number | null | undefined) {
   return `₩${Number(amount || 0).toLocaleString()}`;
 }
 
+type UserActivitySummary = {
+  id: string;
+  total_spent: number;
+  experience_booking_count: number;
+  service_request_count: number;
+  recent_activity_at: string | null;
+};
+
 export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const { showToast } = useToast(); // 🟢 추가
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,6 +56,72 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [userBookings, setUserBookings] = useState<AdminUserActivityBooking[]>([]);
   const [userTimeline, setUserTimeline] = useState<AdminUserTimelineItem[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(false);
+  const [activitySummaryMap, setActivitySummaryMap] = useState<Map<string, UserActivitySummary>>(new Map());
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUserActivitySummary = async () => {
+      if (!Array.isArray(users) || users.length === 0) {
+        if (isMounted) {
+          setActivitySummaryMap(new Map());
+          setIsSummaryLoading(false);
+        }
+        return;
+      }
+
+      setIsSummaryLoading(true);
+
+      try {
+        const response = await fetch('/api/admin/users-activity-summary');
+        const result = await response.json();
+
+        if (!response.ok || result?.success === false) {
+          throw new Error(result?.error || '회원 활동 요약 조회 실패');
+        }
+
+        const nextSummaryMap = new Map<string, UserActivitySummary>();
+
+        (result?.data || []).forEach((summary: UserActivitySummary) => {
+          if (!summary?.id) return;
+          nextSummaryMap.set(summary.id, summary);
+        });
+
+        if (isMounted) {
+          setActivitySummaryMap(nextSummaryMap);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user activity summary', error);
+        if (isMounted) {
+          setActivitySummaryMap(new Map());
+          showToast('회원 활동 요약을 불러오지 못했습니다.', 'error');
+        }
+      } finally {
+        if (isMounted) {
+          setIsSummaryLoading(false);
+        }
+      }
+    };
+
+    fetchUserActivitySummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [users, showToast]);
+
+  const displayUsers: Profile[] = (users || []).map((user: Profile) => {
+    const summary = activitySummaryMap.get(user.id);
+
+    return {
+      ...user,
+      total_spent: summary?.total_spent,
+      experience_booking_count: summary?.experience_booking_count,
+      service_request_count: summary?.service_request_count,
+      recent_activity_at: summary?.recent_activity_at ?? null,
+    };
+  });
 
   useEffect(() => {
     if (selectedUser?.id) {
@@ -88,7 +163,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   }, []);
   // 검색 필터링
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
-  const filteredUsers = users.filter((u: any) => {
+  const filteredUsers = displayUsers.filter((u: any) => {
     if (!normalizedSearchTerm) return true;
 
     return (
@@ -173,7 +248,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
           {onlineUsers.filter((u: any) => !u.is_anonymous).length > 0 ? (
             <div className="flex gap-2.5 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide">
               {onlineUsers.filter((u: any) => !u.is_anonymous).map((u: any, idx: number) => {
-                const matchedUser = users.find((dbUser: any) => dbUser.id === u.user_id);
+                const matchedUser = displayUsers.find((dbUser: any) => dbUser.id === u.user_id);
                 const displayName = matchedUser?.full_name || u.full_name || u.email || '비회원';
                 const displayAvatar = matchedUser?.avatar_url || u.avatar_url;
 
@@ -203,7 +278,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
         {/* 2. 전체 유저 목록 섹션 */}
         <section className="bg-white rounded-lg md:rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
           <div className="p-3 md:p-6 border-b border-slate-100 flex flex-col md:flex-row gap-3 md:gap-0 justify-between md:items-center shrink-0">
-            <h3 className="font-bold text-sm md:text-lg">전체 회원 ({users.length})</h3>
+            <h3 className="font-bold text-sm md:text-lg">전체 회원 ({displayUsers.length})</h3>
 
             <div className="flex items-center gap-2.5 md:gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
               {/* 🟢 [추가] 선택된 유저가 있을 때 버튼 표시 */}
@@ -281,23 +356,37 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                       </td>
                       <td className="px-2 md:px-6 py-2.5 md:py-4 text-slate-500 text-[10px] md:text-sm">{user.phone || '-'}</td>
                       <td className="px-2 md:px-6 py-2.5 md:py-4">
-                        <div className="font-bold text-[10px] md:text-sm text-slate-900">{formatWon(user.total_spent)}</div>
-                        <div className="text-[9px] md:text-[10px] text-slate-400">확정 결제 기준</div>
+                        {activitySummaryMap.has(user.id) ? (
+                          <>
+                            <div className="font-bold text-[10px] md:text-sm text-slate-900">{formatWon(user.total_spent)}</div>
+                            <div className="text-[9px] md:text-[10px] text-slate-400">확정 결제 기준</div>
+                          </>
+                        ) : (
+                          <div className="text-[9px] md:text-[10px] text-slate-400">{isSummaryLoading ? '집계 중...' : '-'}</div>
+                        )}
                       </td>
                       <td className="px-2 md:px-6 py-2.5 md:py-4">
-                        <div className="font-bold text-[10px] md:text-sm text-slate-900">
-                          예약 {user.experience_booking_count || 0} · 의뢰 {user.service_request_count || 0}
-                        </div>
-                        <div className="text-[9px] md:text-[10px] text-slate-400">누적 생성 건수</div>
+                        {activitySummaryMap.has(user.id) ? (
+                          <>
+                            <div className="font-bold text-[10px] md:text-sm text-slate-900">
+                              예약 {user.experience_booking_count || 0} · 의뢰 {user.service_request_count || 0}
+                            </div>
+                            <div className="text-[9px] md:text-[10px] text-slate-400">누적 생성 건수</div>
+                          </>
+                        ) : (
+                          <div className="text-[9px] md:text-[10px] text-slate-400">{isSummaryLoading ? '집계 중...' : '-'}</div>
+                        )}
                       </td>
                       <td className="px-2 md:px-6 py-2.5 md:py-4">
-                        {user.recent_activity_at ? (
+                        {activitySummaryMap.has(user.id) && user.recent_activity_at ? (
                           <div className="flex flex-col">
                             <span className="text-slate-900 font-bold text-[9px] md:text-xs">{timeAgo(user.recent_activity_at)}</span>
                             <span className="text-[9px] md:text-[10px] text-slate-400">{new Date(user.recent_activity_at).toLocaleDateString()}</span>
                           </div>
-                        ) : (
+                        ) : activitySummaryMap.has(user.id) ? (
                           <span className="text-slate-400 text-[9px] md:text-[10px]">활동 없음</span>
+                        ) : (
+                          <span className="text-slate-400 text-[9px] md:text-[10px]">{isSummaryLoading ? '집계 중...' : '-'}</span>
                         )}
                       </td>
 
