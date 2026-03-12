@@ -11,6 +11,7 @@ type ServiceBookingCsvRow = {
     host_payout_amount: number | null;
     platform_revenue: number | null;
     status: string | null;
+    payout_status: string | null;
     payment_method: string | null;
     created_at: string;
     customer_id: string | null;
@@ -33,7 +34,7 @@ type HostApplicationBankRow = {
  * 어드민 전용: 맞춤 의뢰(service_bookings) + host_applications(은행계좌 포함) 데이터 조회
  * service_role 키를 사용해 RLS를 우회하여 민감 데이터 포함 반환
  */
-export async function GET() {
+export async function GET(request: Request) {
     try {
         // 1. 어드민 권한 확인
         const cookieStore = await cookies();
@@ -66,16 +67,30 @@ export async function GET() {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { data, error } = await supabaseAdmin
+        const url = new URL(request.url);
+        const startAt = url.searchParams.get('startAt');
+        const endAt = url.searchParams.get('endAt');
+
+        let query = supabaseAdmin
             .from('service_bookings')
             .select(`
         id, order_id, amount, host_payout_amount, platform_revenue,
-        status, payment_method, created_at, customer_id, host_id,
+        status, payout_status, payment_method, created_at, customer_id, host_id,
         service_requests ( title, city, service_date, duration_hours ),
         profiles!service_bookings_customer_id_fkey ( full_name, email )
       `)
             .in('status', ['PAID', 'confirmed', 'completed'])
             .order('created_at', { ascending: false });
+
+        if (startAt) {
+            query = query.gte('created_at', startAt);
+        }
+
+        if (endAt) {
+            query = query.lte('created_at', endAt);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 });

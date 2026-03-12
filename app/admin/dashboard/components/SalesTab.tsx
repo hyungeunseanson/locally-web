@@ -319,7 +319,15 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     setServiceCSVLoading(true);
     try {
       // 🔒 host_applications(계좌 포함 민감 정보)는 service_role API Route로 조회
-      const res = await fetch('/api/admin/service-bookings-csv');
+      const params = new URLSearchParams();
+      if (dateRange[0].startDate) {
+        params.set('startAt', startOfDay(dateRange[0].startDate).toISOString());
+      }
+      if (dateRange[0].endDate) {
+        params.set('endAt', endOfDay(dateRange[0].endDate).toISOString());
+      }
+
+      const res = await fetch(`/api/admin/service-bookings-csv?${params.toString()}`);
       if (!res.ok) throw new Error('서버 오류: 데이터 조회 실패');
       const { data } = await res.json();
       const rows = (data || []).filter((b: any) => filterDate(b.created_at));
@@ -330,7 +338,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
       }
 
       const escapeCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
-      const headers = ['결제일시', '주문번호', '의뢰명', '도시', '서비스일', '고객명', '호스트명', '결제수단', '결제액', '플랫폼수수료', '호스트지급액', '예금주', '은행', '계좌번호', '상태'];
+      const headers = ['결제일시', '주문번호', '의뢰명', '도시', '서비스일', '고객명', '호스트명', '결제수단', '결제액', '플랫폼수수료', '호스트지급액', '예금주', '은행', '계좌번호', '결제상태', '정산상태'];
 
       const csvRows = rows.map((b: any) => [
         escapeCSV(format(new Date(b.created_at), 'yyyy-MM-dd HH:mm')),
@@ -348,6 +356,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
         escapeCSV(b.host_application?.bank_name || '-'),
         escapeCSV(b.host_application?.account_number || '-'),
         escapeCSV(b.status),
+        escapeCSV(b.payout_status === 'paid' ? '정산완료' : (b.host_id ? '정산대기' : '미선택')),
       ]);
 
       const csv = [headers.join(','), ...csvRows.map((r: any[]) => r.join(','))].join('\n');
