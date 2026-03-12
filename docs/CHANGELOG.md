@@ -5,6 +5,15 @@
 
 ---
 
+## v3.37.95 — [Master Ledger] 서비스 예약 신규 생성 실시간 반영
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 service booking INSERT 구독 추가 | `MasterLedgerTab`이 `service_bookings`의 신규 생성 이벤트도 realtime으로 구독해 Ledger를 열어둔 상태에서 새 서비스 예약이 들어오면 자동 재조회되도록 보강 |
+| ✅ 기존 Ledger 흐름 유지 | 일반 예약 INSERT/UPDATE, 서비스 예약 UPDATE, 장부 API, KPI/CSV 계산 로직은 건드리지 않고 realtime 트리거만 최소 추가 |
+
 ## v3.37.94 — [Admin Approvals] 상세 패널 stale 보정
 
 **작업일:** 2026-03-12

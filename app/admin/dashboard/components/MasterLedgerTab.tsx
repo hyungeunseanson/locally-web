@@ -185,6 +185,9 @@ export default function MasterLedgerTab({
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, () => {
         void fetchLedger();
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'service_bookings' }, () => {
+        void fetchLedger();
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'service_bookings' }, () => {
         void fetchLedger();
       })
