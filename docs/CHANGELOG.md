@@ -5,6 +5,16 @@
 
 ---
 
+## v3.37.99 — [Master Ledger] E2E 행 선택 안정화
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 스모크 실패 원인 정리 | `Master Ledger` 스모크 실패가 제품 로직이 아니라 행 선택 셀렉터 드리프트임을 확인 |
+| 🟡 테스트 클릭 경로 보강 | `tests/e2e/06-admin-master-ledger.spec.ts`에서 첫 번째 셀 클릭 대신 행 자체 클릭으로 바꾸고, 상세 패널 미오픈 시 1회 재시도하도록 안정화 |
+| ✅ 회귀 재검증 완료 | `06-admin-master-ledger.spec.ts`, `07-admin-approvals.spec.ts`, `tsc`, `git diff --check`를 모두 다시 통과 |
+
 ## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
 
 **작업일:** 2026-03-12

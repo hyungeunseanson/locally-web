@@ -271,6 +271,18 @@ async function searchByOrderId(page: Page, orderId: string) {
   return row;
 }
 
+async function openLedgerRow(page: Page, row: ReturnType<Page['locator']>) {
+  await row.click();
+
+  const actionButton = page.getByRole('button', { name: /입금 확인|강제 취소/ }).first();
+  try {
+    await expect(actionButton).toBeVisible({ timeout: 5000 });
+  } catch {
+    await row.click();
+    await expect(actionButton).toBeVisible({ timeout: 10000 });
+  }
+}
+
 async function setOutOfRangeDateFilter(page: Page) {
   await page.getByRole('button', { name: /전체 기간 선택|^\d{4}\.\d{2}\.\d{2} - \d{4}\.\d{2}\.\d{2}$/ }).first().click();
   await page.locator('.rdrCalendarWrapper').waitFor({ state: 'visible', timeout: 10000 });
@@ -329,7 +341,7 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     await resetDateFilter(adminPage);
     row = await searchByOrderId(adminPage, orderId);
 
-    await row.locator('td').first().click();
+    await openLedgerRow(adminPage, row);
     await expect(adminPage.getByRole('button', { name: /입금 확인/ })).toBeVisible({ timeout: 10000 });
 
     const confirmPaymentResponse = adminPage.waitForResponse(
@@ -344,7 +356,7 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     expect(confirmPaymentResult.ok()).toBeTruthy();
     await expect(row.locator('td').first()).toContainText(/확정/, { timeout: 30000 });
 
-    await row.locator('td').first().click();
+    await openLedgerRow(adminPage, row);
     await expect(adminPage.getByRole('button', { name: /강제 취소/ })).toBeVisible({ timeout: 10000 });
     const forceCancelResponse = adminPage.waitForResponse(
       (response) =>
