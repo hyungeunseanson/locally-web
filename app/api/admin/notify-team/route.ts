@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
 const TEAM_CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
@@ -87,12 +88,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Title and message are required' }, { status: 400 });
         }
 
-        const [userEntry, whitelistEntry] = await Promise.all([
-            supabaseAdmin.from('users').select('role').eq('id', user.id).maybeSingle(),
-            supabaseAdmin.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
-        ]);
-
-        const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
+        const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+            userId: user.id,
+            email: user.email,
+        });
         if (!isAdmin) {
             console.warn(`🚨 Unauthorized team notify attempt by ${user.email}`);
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

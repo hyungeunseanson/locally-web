@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
@@ -37,20 +38,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 관리자 권한 확인 (Role or Whitelist)
-    const [userEntry, whitelistEntry] = await Promise.all([
-      supabaseAuth.from('users').select('role').eq('id', user.id).maybeSingle(),
-      supabaseAuth.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
-    ]);
+    const supabase = createAdminClient(); // 🟢 검증 후 관리자 클라이언트 생성
 
-    const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
+    // 관리자 권한 확인 (Role or Whitelist)
+    const { isAdmin } = await resolveAdminAccess(supabase, {
+      userId: user.id,
+      email: user.email,
+    });
 
     if (!isAdmin) {
       console.error(`🚨 [Security Warning] Unauthorized Access Attempt by ${user.email}`);
       return NextResponse.json({ error: 'Forbidden: Admin Access Required' }, { status: 403 });
     }
-
-    const supabase = createAdminClient(); // 🟢 검증 후 관리자 클라이언트 생성
     const { bookingId } = await request.json();
 
     if (!bookingId) throw new Error('Missing bookingId');

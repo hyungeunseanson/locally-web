@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import nodemailer from 'nodemailer';
 
 type NotificationRequestBody = {
@@ -116,12 +117,10 @@ export async function POST(request: Request) {
 
     // 🚨 [보안 패치] 다중 발송은 관리자(Admin)만 가능하도록 제한
     if (recipient_ids && Array.isArray(recipient_ids) && recipient_ids.length > 0) {
-      const [userEntry, whitelistEntry] = await Promise.all([
-        supabaseAuth.from('users').select('role').eq('id', user.id).maybeSingle(),
-        supabaseAuth.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
-      ]);
-
-      const isAdmin = (userEntry.data?.role === 'admin') || !!whitelistEntry.data;
+      const { isAdmin } = await resolveAdminAccess(supabase, {
+        userId: user.id,
+        email: user.email,
+      });
       if (!isAdmin) {
         console.error(`🚨 [Security Warning] Unauthorized Mass Email Attempt by ${user.email}`);
         return NextResponse.json({ error: 'Forbidden: Admin Access Required for mass email' }, { status: 403 });

@@ -1,14 +1,39 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+
+type ServiceBookingCsvRow = {
+    id: string;
+    order_id: string | null;
+    amount: number | null;
+    host_payout_amount: number | null;
+    platform_revenue: number | null;
+    status: string | null;
+    payment_method: string | null;
+    created_at: string;
+    customer_id: string | null;
+    host_id: string | null;
+    service_requests?: unknown;
+    profiles?: unknown;
+};
+
+type HostApplicationBankRow = {
+    user_id: string;
+    name: string | null;
+    bank_name: string | null;
+    account_number: string | null;
+    account_holder: string | null;
+    host_nationality: string | null;
+};
 
 /**
  * GET /api/admin/service-bookings-csv
  * 어드민 전용: 맞춤 의뢰(service_bookings) + host_applications(은행계좌 포함) 데이터 조회
  * service_role 키를 사용해 RLS를 우회하여 민감 데이터 포함 반환
  */
-export async function GET(request: Request) {
+export async function GET() {
     try {
         // 1. 어드민 권한 확인
         const cookieStore = await cookies();
@@ -32,18 +57,14 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const [userEntry, whitelist] = await Promise.all([
-            supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
-            supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle(),
-        ]);
-
-        const isAdmin = userEntry.data?.role === 'admin' || !!whitelist.data;
+        const supabaseAdmin = createAdminClient();
+        const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+            userId: user.id,
+            email: user.email,
+        });
         if (!isAdmin) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
-
-        // 2. service_role 로 service_bookings + host_applications 조회 (RLS 우회)
-        const supabaseAdmin = createAdminClient();
 
         const { data, error } = await supabaseAdmin
             .from('service_bookings')
@@ -61,10 +82,10 @@ export async function GET(request: Request) {
         }
 
         // 3. host_applications 데이터를 별도로 조회 (host_id 기반)
-        const rows = data || [];
-        const hostIds = [...new Set(rows.map((r: any) => r.host_id).filter(Boolean))] as string[];
+        const rows = (data || []) as ServiceBookingCsvRow[];
+        const hostIds = [...new Set(rows.map((row) => row.host_id).filter(Boolean))] as string[];
 
-        let hostAppMap = new Map<string, any>();
+        const hostAppMap = new Map<string, HostApplicationBankRow>();
         if (hostIds.length > 0) {
             const { data: hostApps } = await supabaseAdmin
                 .from('host_applications')
@@ -75,21 +96,21 @@ export async function GET(request: Request) {
             if (hostApps) {
                 for (const app of hostApps) {
                     if (!hostAppMap.has(app.user_id)) {
-                        hostAppMap.set(app.user_id, app);
+                        hostAppMap.set(app.user_id, app as HostApplicationBankRow);
                     }
                 }
             }
         }
 
         // 4. 응답 데이터 조합
-        const enriched = rows.map((b: any) => ({
-            ...b,
-            host_application: hostAppMap.get(b.host_id) ?? null,
+        const enriched = rows.map((row) => ({
+            ...row,
+            host_application: row.host_id ? hostAppMap.get(row.host_id) ?? null : null,
         }));
 
         return NextResponse.json({ data: enriched });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('[Admin service-bookings-csv API Error]', err);
-        return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal Server Error' }, { status: 500 });
     }
 }

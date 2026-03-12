@@ -5,6 +5,17 @@
 
 ---
 
+## v3.37.98 — [Admin Auth] helper 미적용 예외 경로 정리
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 예외 경로 helper 정렬 | `service-bookings-csv`, `/api/notifications/email` 다중발송, 레거시 `/api/bookings/confirm-payment`, `/api/payment/cancel`, `/api/admin/notify-team`, `GlobalTeamChat`의 관리자 체크를 `resolveAdminAccess()`로 통일 |
+| 🟡 RLS 의존 축소 | 일반 서버 클라이언트로 `users/admin_whitelist`를 직접 읽던 경로를 service-role helper 기반으로 정리해 권한 판정 드리프트 가능성을 축소 |
+| 🟡 CSV route 타입 정리 | `service-bookings-csv`의 `any` 기반 행 타입을 최소 타입으로 치환해 lint 검증 안정성을 보강 |
+| ✅ 기존 동작 유지 | 판매 CSV 다운로드, 관리자 다중 알림, 레거시 무통장 확정 로직의 실제 기능은 유지하고 권한 판정 방식만 정리 |
+
 ## v3.37.97 — [Admin Auth] profiles.role 의존 제거 핫픽스
 
 **작업일:** 2026-03-12

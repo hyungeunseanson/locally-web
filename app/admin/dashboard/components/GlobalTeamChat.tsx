@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Paperclip, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -113,12 +114,10 @@ export default function GlobalTeamChat() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const [userData, whitelistData] = await Promise.all([
-                supabase.from('users').select('role').eq('id', user.id).maybeSingle(),
-                supabase.from('admin_whitelist').select('id').eq('email', user.email || '').maybeSingle()
-            ]);
-
-            const isAdmin = userData.data?.role === 'admin' || !!whitelistData.data;
+            const { isAdmin } = await resolveAdminAccess(supabase, {
+                userId: user.id,
+                email: user.email,
+            });
             if (isAdmin) {
                 setCurrentUser({
                     id: user.id,
