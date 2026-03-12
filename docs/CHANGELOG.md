@@ -5,6 +5,19 @@
 
 ---
 
+## v3.37.85 — [Master Ledger] 데이터 원천 및 관리자 액션 정합성 보강
+
+**작업일:** 2026-03-12
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Ledger 전용 통합 API 추가 | `GET /api/admin/master-ledger`를 추가해 일반 예약 전체와 서비스 의뢰 전체를 서버에서 통합 조립하도록 전환 |
+| 🔴 관리자 전용 일반 예약 액션 분리 | 일반 예약 `입금 확인`과 `강제 취소`를 각각 `/api/admin/bookings/confirm-payment`, `/api/admin/bookings/force-cancel`로 분리해 기존 게스트/호스트 취소 경로와 분리 |
+| 🟡 무통장 입금 확인 노출 정리 | `MasterLedgerTab`에서 일반 예약 `PENDING` 전체가 아니라 `payment_method='bank'`인 예약에만 `입금 확인` 버튼을 노출하도록 보정 |
+| 🟡 장부 계산/CSV 정렬 | `bookingFinance`에 base price / settlement snapshot helper를 추가하고, `MasterLedger` 표·상세·CSV가 같은 계산값을 쓰도록 통일 |
+| 🟡 solo guarantee 금액 스냅샷 정렬 | 일반 카드 결제 콜백이 `price_at_booking`을 더 이상 현재 체험가 재계산이 아니라 저장된 `total_price`와 `solo_guarantee_price` 기준으로 확정하도록 보정 |
+| ✅ 회귀 방지 경계 유지 | `useAdminData`와 관리자 대시보드 탭 구조, 일반 예약 realtime/토스트 흐름은 유지하고 `MasterLedger` 내부 데이터/액션만 핀셋 수정 |
+
 ## v3.37.84 — [Admin Sidebar] 상단 홈 버튼 스타일 정리
 
 **작업일:** 2026-03-12

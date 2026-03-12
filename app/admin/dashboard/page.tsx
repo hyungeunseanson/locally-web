@@ -75,7 +75,7 @@ function DataDrivenAdminTab({
     return <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />;
   }
   if (activeTab === 'LEDGER') {
-    return <MasterLedgerTab bookings={bookings} onRefresh={refresh} />;
+    return <MasterLedgerTab onRefresh={refresh} />;
   }
   if (activeTab === 'SALES') {
     return <SalesTab bookings={bookings} apps={apps} onRefresh={refresh} />;

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
 
 function verifySignature(signData: string, ediDate: string, amount: string, mid: string, key: string): boolean {
   try {
@@ -117,23 +118,20 @@ export async function POST(request: Request) {
 
       // 3. 예약 상태 및 정산 데이터 업데이트 (PAID)
       // 💰 [정산 데이터 박제] 호스트 원가와 수수료 수익을 이 시점에 확정 기록합니다.
-      const guestCount = Number(originalBooking.guests || 1);
-      const basePrice = originalBooking.type === 'private'
-        ? Number(originalBooking.experiences?.private_price || 0)
-        : Number(originalBooking.experiences?.price || 0) * guestCount;
-      const totalExpPrice = Number(originalBooking.total_price || 0);
-      const payoutAmount = Math.floor(totalExpPrice * 0.8); // 호스트 정산금 (원가의 80%)
-      const platformRev = Number(amount) - payoutAmount; // 플랫폼 순수익 (실결제액 - 지급액)
+      const snapshot = getBookingSettlementSnapshot({
+        ...originalBooking,
+        amount: Number(amount),
+      });
 
       const { data: bookingData, error: dbError } = await supabase
         .from('bookings')
         .update({
           status: 'PAID',
           tid: tid,
-          price_at_booking: basePrice,
-          total_experience_price: totalExpPrice,
-          host_payout_amount: payoutAmount,
-          platform_revenue: platformRev,
+          price_at_booking: snapshot.basePrice,
+          total_experience_price: snapshot.totalExperiencePrice,
+          host_payout_amount: snapshot.hostPayout,
+          platform_revenue: snapshot.platformRevenue,
           payout_status: 'pending'
         })
         .eq('id', orderId)

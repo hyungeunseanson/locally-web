@@ -26,7 +26,8 @@ export interface AdminComment {
   created_at: string;
 }
 
-export interface AdminBooking extends Omit<any, 'experiences' | 'profiles'> {
+export interface AdminBooking {
+  [key: string]: unknown;
   id: string;
   created_at: string;
   experience_id: number;
@@ -61,7 +62,7 @@ export interface HostApplication {
   languages?: string[];
   language_levels?: LanguageLevelEntry[];
   language_cert?: string | null;
-  content: any;
+  content: Record<string, unknown> | null;
 }
 
 export interface AdminServiceBooking {
@@ -99,16 +100,49 @@ export interface AdminServiceBooking {
   } | null;
 }
 
+export interface AdminMasterLedgerEntry {
+  _type: 'experience' | 'service';
+  id: string;
+  order_id: string | null;
+  created_at: string;
+  date: string;
+  time: string | null;
+  amount: number;
+  status: string;
+  payment_method: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  guests: number | string | null;
+  price_at_booking: number | null;
+  total_experience_price: number | null;
+  host_payout_amount: number | null;
+  platform_revenue: number | null;
+  refund_amount: number | null;
+  cancel_reason: string | null;
+  solo_guarantee_price?: number | null;
+  experiences: {
+    title: string;
+    host_id?: string | null;
+    profiles: {
+      name: string | null;
+    };
+  };
+  profiles: {
+    email: string | null;
+    name?: string | null;
+  };
+}
+
 export interface AdminDashboardState {
   apps: HostApplication[];
-  exps: any[];
+  exps: unknown[];
   users: Profile[];
   bookings: AdminBooking[];
-  reviews: any[];
-  onlineUsers: any[];
+  reviews: unknown[];
+  onlineUsers: unknown[];
   isLoading: boolean;
-  searchLogs?: any[]; // 🟢 추가: 검색 트렌드 분석용
-  analyticsEvents?: any[]; // 🟢 추가: 퍼널 분석용
-  inquiries?: any[]; // 🟢 추가: 호스트 응답률 계산용
-  inquiryMessages?: any[]; // 🟢 추가: 호스트 응답 시간 계산용
+  searchLogs?: unknown[]; // 🟢 추가: 검색 트렌드 분석용
+  analyticsEvents?: unknown[]; // 🟢 추가: 퍼널 분석용
+  inquiries?: unknown[]; // 🟢 추가: 호스트 응답률 계산용
+  inquiryMessages?: unknown[]; // 🟢 추가: 호스트 응답 시간 계산용
 }

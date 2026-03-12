@@ -4,6 +4,8 @@ type BookingFinanceInput = {
   total_experience_price?: number | string | null;
   host_payout_amount?: number | string | null;
   platform_revenue?: number | string | null;
+  price_at_booking?: number | string | null;
+  solo_guarantee_price?: number | string | null;
 };
 
 const toNumber = (value: number | string | null | undefined) => {
@@ -17,6 +19,19 @@ export function getBookingPaidAmount(booking: BookingFinanceInput) {
 
 export function getBookingExperienceAmount(booking: BookingFinanceInput) {
   return toNumber(booking.total_experience_price) || toNumber(booking.total_price) || toNumber(booking.amount);
+}
+
+export function getBookingBasePrice(booking: BookingFinanceInput) {
+  if (booking.price_at_booking != null) {
+    return toNumber(booking.price_at_booking);
+  }
+
+  const experienceAmount = getBookingExperienceAmount(booking);
+  if (experienceAmount <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, experienceAmount - toNumber(booking.solo_guarantee_price));
 }
 
 export function getBookingHostPayout(booking: BookingFinanceInput) {
@@ -33,6 +48,29 @@ export function getBookingPlatformRevenue(booking: BookingFinanceInput) {
   }
 
   return Math.max(0, getBookingPaidAmount(booking) - getBookingHostPayout(booking));
+}
+
+export function getBookingSettlementSnapshot(booking: BookingFinanceInput) {
+  const paidAmount = getBookingPaidAmount(booking);
+  const totalExperiencePrice = getBookingExperienceAmount(booking) || paidAmount;
+  const basePrice = getBookingBasePrice({
+    ...booking,
+    total_experience_price: totalExperiencePrice,
+  }) || totalExperiencePrice;
+  const hostPayout = booking.host_payout_amount != null
+    ? toNumber(booking.host_payout_amount)
+    : Math.floor(totalExperiencePrice * 0.8);
+  const platformRevenue = booking.platform_revenue != null
+    ? toNumber(booking.platform_revenue)
+    : Math.max(0, paidAmount - hostPayout);
+
+  return {
+    basePrice,
+    paidAmount,
+    totalExperiencePrice,
+    hostPayout,
+    platformRevenue,
+  };
 }
 
 export function calculateBookingCancellationSettlement(

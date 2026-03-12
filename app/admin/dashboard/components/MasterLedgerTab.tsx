@@ -1,13 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Download, Search, Calendar, User,
-  ArrowRight, CreditCard, Wallet, TrendingUp, AlertCircle, X,
-  CheckCircle2, XCircle, Copy, Phone, Mail, AlertTriangle, Clock, Info
+  ArrowRight,
+  AlertTriangle,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Copy,
+  CreditCard,
+  Download,
+  Info,
+  Search,
+  User,
+  X,
 } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
-import Image from 'next/image';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import dynamic from 'next/dynamic';
@@ -22,37 +30,71 @@ import {
   isConfirmedBookingStatus,
   isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
-import { getBookingExperienceAmount, getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
+import {
+  getBookingBasePrice,
+  getBookingExperienceAmount,
+  getBookingHostPayout,
+  getBookingPaidAmount,
+  getBookingPlatformRevenue,
+} from '@/app/utils/bookingFinance';
+import { AdminMasterLedgerEntry } from '@/app/types/admin';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
-// service_bookings → 일반 예약과 동일한 shape으로 정규화
-function normalizeServiceBooking(b: any): any {
-  return {
-    _type: 'service',
-    id: b.id,
-    order_id: b.order_id,
-    created_at: b.created_at,
-    date: b.request?.service_date ?? b.created_at?.slice(0, 10) ?? '',
-    time: b.request?.start_time ?? '',
-    experiences: {
-      title: b.request?.title ?? '-',
-      profiles: { name: b.host?.full_name ?? '-' },
-    },
-    contact_name: b.customer?.full_name ?? b.request?.contact_name ?? '-',
-    contact_phone: b.request?.contact_phone ?? null,
-    guests: b.request?.guest_count ?? '-',
-    price_at_booking: null,
-    total_experience_price: b.amount,
-    host_payout_amount: b.host_payout_amount,
-    amount: b.amount,
-    platform_revenue: b.platform_revenue,
-    status: b.status,
-    profiles: { email: b.customer?.email ?? null },
-    payment_method: b.payment_method,
-  };
+function parseDateOnly(value?: string | null) {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
 }
+
+function isBankPaymentMethod(value?: string | null) {
+  return value === 'bank' || Boolean(value && value.includes('bank'));
+}
+
+function getLedgerBasePrice(booking: AdminMasterLedgerEntry) {
+  if (booking._type === 'service') {
+    return null;
+  }
+
+  return getBookingBasePrice(booking);
+}
+
+function getLedgerPayout(booking: AdminMasterLedgerEntry) {
+  if (booking._type === 'service') {
+    return booking.host_payout_amount != null ? Number(booking.host_payout_amount) : null;
+  }
+
+  return getBookingHostPayout(booking);
+}
+
+function getLedgerRevenue(booking: AdminMasterLedgerEntry) {
+  if (booking._type === 'service') {
+    return booking.platform_revenue != null ? Number(booking.platform_revenue) : null;
+  }
+
+  return getBookingPlatformRevenue(booking);
+}
+
+function getLedgerExperiencePrice(booking: AdminMasterLedgerEntry) {
+  if (booking._type === 'service') {
+    return Number(booking.total_experience_price ?? booking.amount ?? 0);
+  }
+
+  return getBookingExperienceAmount(booking) || getBookingPaidAmount(booking);
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+const STATUS_TABS = [
+  { id: 'ALL', label: '전체' },
+  { id: 'PENDING', label: '입금대기' },
+  { id: 'PAID', label: '확정됨' },
+  { id: 'CANCELLED', label: '취소됨' },
+] as const;
 
 type ConfirmDialogState =
   | {
@@ -65,7 +107,7 @@ type ConfirmDialogState =
     }
   | null;
 
-export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any[], onRefresh: () => void }) {
+export default function MasterLedgerTab({ onRefresh }: { onRefresh: () => void }) {
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -75,26 +117,36 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   }]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'PENDING' | 'CANCELLED'>('ALL');
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [selectedBooking, setSelectedBooking] = useState<AdminMasterLedgerEntry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [serviceBookings, setServiceBookings] = useState<any[]>([]);
+  const [allBookings, setAllBookings] = useState<AdminMasterLedgerEntry[]>([]);
+  const [isLoadingLedger, setIsLoadingLedger] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
 
-  useEffect(() => {
-    fetch('/api/admin/service-bookings')
-      .then(r => r.json())
-      .then(res => { if (res.success && res.data) setServiceBookings(res.data); })
-      .catch(() => {});
-  }, []);
+  const fetchLedger = useCallback(async () => {
+    setIsLoadingLedger(true);
+    try {
+      const response = await fetch('/api/admin/master-ledger');
+      const result = await response.json();
 
-  // 일반 예약 + 서비스 의뢰 통합 (created_at 내림차순)
-  const allBookings: any[] = [
-    ...bookings.map(b => ({ ...b, _type: 'experience' })),
-    ...serviceBookings.map(normalizeServiceBooking),
-  ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || '장부 데이터를 불러오지 못했습니다.');
+      }
+
+      setAllBookings((result.data || []) as AdminMasterLedgerEntry[]);
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, '장부 데이터를 불러오지 못했습니다.'), 'error');
+    } finally {
+      setIsLoadingLedger(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger]);
 
   // 0. 예약 클릭 시 열람 처리
-  const handleSelectBooking = (b: any) => {
+  const handleSelectBooking = (b: AdminMasterLedgerEntry) => {
     setSelectedBooking(b);
 
     // 열람 기록 저장
@@ -108,7 +160,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   };
 
   // 1. 장부 데이터 필터링
-  const ledgerData = allBookings.filter(b => {
+  const ledgerData = allBookings.filter((b) => {
     // 날짜 범위 필터
     const sd = dateRange[0].startDate;
     const ed = dateRange[0].endDate;
@@ -117,20 +169,17 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     let endMatch = true;
 
     if (b.date) {
+      const bookingDate = parseDateOnly(b.date);
       if (sd) {
         // 예약 날짜(YYYY-MM-DD)와 필터 Date 비교
-        const bDate = new Date(b.date);
-        bDate.setHours(0, 0, 0, 0);
         const filterSd = new Date(sd);
         filterSd.setHours(0, 0, 0, 0);
-        startMatch = bDate >= filterSd;
+        startMatch = bookingDate ? bookingDate >= filterSd : true;
       }
       if (ed) {
-        const bDate = new Date(b.date);
-        bDate.setHours(0, 0, 0, 0);
         const filterEd = new Date(ed);
         filterEd.setHours(23, 59, 59, 999);
-        endMatch = bDate <= filterEd;
+        endMatch = bookingDate ? bookingDate <= filterEd : true;
       }
     }
 
@@ -163,20 +212,14 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     if (curr._type === 'service' && curr.status === 'PENDING') return acc;
 
     const paidAmount = getBookingPaidAmount(curr);
-    const basePrice = getBookingExperienceAmount(curr) || paidAmount;
-    const payout = curr._type === 'service'
-      ? (Number(curr.host_payout_amount) || 0)
-      : getBookingHostPayout(curr);
-    const profit = curr._type === 'service'
-      ? (Number(curr.platform_revenue) || 0)
-      : getBookingPlatformRevenue(curr);
+    const payout = getLedgerPayout(curr) ?? 0;
+    const profit = getLedgerRevenue(curr) ?? 0;
 
     acc.totalSales += paidAmount;
-    acc.totalBasePrice += basePrice;
     acc.totalPayout += payout;
     acc.totalProfit += profit;
     return acc;
-  }, { totalSales: 0, totalBasePrice: 0, totalPayout: 0, totalProfit: 0 });
+  }, { totalSales: 0, totalPayout: 0, totalProfit: 0 });
 
   // 3. 엑셀 CSV 다운로드
   const downloadLedgerCSV = () => {
@@ -189,11 +232,11 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
       `"${b.experiences?.title}"`,
       `"${b.contact_name}(${b.guests}인)"`,
       b.status,
-      b.price_at_booking ?? '',
-      b.total_experience_price,
-      b.host_payout_amount,
-      b.amount,
-      b.platform_revenue
+      getLedgerBasePrice(b) ?? '',
+      getLedgerExperiencePrice(b),
+      getLedgerPayout(b) ?? '',
+      getBookingPaidAmount(b),
+      getLedgerRevenue(b) ?? ''
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -218,21 +261,29 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     await performForceCancel(confirmDialog.bookingId);
   };
 
+  const refreshAfterMutation = async () => {
+    await Promise.allSettled([
+      fetchLedger(),
+      Promise.resolve(onRefresh()),
+    ]);
+  };
+
   const performConfirmPayment = async (bookingId: string) => {
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/bookings/confirm-payment', {
+      const res = await fetch('/api/admin/bookings/confirm-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId }),
       });
-      if (!res.ok) throw new Error('처리 실패');
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || '처리 실패');
       showToast('입금 확인 완료!', 'success');
-      onRefresh();
+      await refreshAfterMutation();
       setSelectedBooking(null);
       setConfirmDialog(null);
-    } catch (e: any) {
-      showToast(e.message, 'error');
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, '처리 실패'), 'error');
     } finally { setIsProcessing(false); }
   };
 
@@ -258,18 +309,19 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
   const performForceCancel = async (bookingId: string) => {
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/payment/cancel', {
+      const res = await fetch('/api/admin/bookings/force-cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, reason: '관리자 직권 취소', isHostCancel: true }),
+        body: JSON.stringify({ bookingId, reason: '관리자 직권 취소' }),
       });
-      if (!res.ok) throw new Error('취소 실패');
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || '취소 실패');
       showToast('취소 처리되었습니다.', 'success');
-      onRefresh();
+      await refreshAfterMutation();
       setSelectedBooking(null);
       setConfirmDialog(null);
-    } catch (e: any) {
-      showToast(e.message, 'error');
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, '취소 실패'), 'error');
     } finally { setIsProcessing(false); }
   };
 
@@ -292,7 +344,12 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
     await performForceCancel(bookingId);
   };
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text?: string | null) => {
+    if (!text) {
+      showToast('복사할 정보가 없습니다.', 'error');
+      return;
+    }
+
     navigator.clipboard.writeText(text);
     showToast('복사되었습니다.', 'success');
   };
@@ -383,15 +440,10 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             </div>
 
             <div className="flex flex-wrap bg-slate-100 p-1 rounded-lg w-full md:w-auto justify-center">
-              {[
-                { id: 'ALL', label: '전체' },
-                { id: 'PENDING', label: '입금대기' },
-                { id: 'PAID', label: '확정됨' },
-                { id: 'CANCELLED', label: '취소됨' }
-              ].map(tab => (
+              {STATUS_TABS.map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setStatusFilter(tab.id as any)}
+                  onClick={() => setStatusFilter(tab.id)}
                   className={`flex-1 md:flex-none px-1.5 py-1 md:px-3 text-[9px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${statusFilter === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {tab.id === 'PENDING' ? (
@@ -452,7 +504,9 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {ledgerData.length === 0 ? (
+                {isLoadingLedger ? (
+                  <tr><td colSpan={10} className="py-32 text-center text-slate-400">장부 데이터를 불러오는 중입니다.</td></tr>
+                ) : ledgerData.length === 0 ? (
                   <tr><td colSpan={10} className="py-32 text-center text-slate-400">데이터가 없습니다.</td></tr>
                 ) : (
                   ledgerData.map((b) => (
@@ -479,22 +533,16 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                         {b.contact_name}({b.guests})
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[8px] md:text-sm text-slate-400">
-                        {b.price_at_booking != null ? Number(b.price_at_booking).toLocaleString() : '-'}
+                        {getLedgerBasePrice(b) != null ? getLedgerBasePrice(b)?.toLocaleString() : '-'}
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-rose-600 bg-rose-50/30">
-                        {b._type === 'service'
-                          ? (b.host_payout_amount != null ? Number(b.host_payout_amount).toLocaleString() : '-')
-                          : getBookingHostPayout(b).toLocaleString()
-                        }
+                        {getLedgerPayout(b) != null ? getLedgerPayout(b)?.toLocaleString() : '-'}
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-slate-900 bg-slate-100/50">
-                        {Number(b.amount).toLocaleString()}
+                        {getBookingPaidAmount(b).toLocaleString()}
                       </td>
                       <td className="px-1.5 md:px-4 py-2 md:py-4 text-right font-mono text-[9px] md:text-sm font-black text-blue-600">
-                        {b._type === 'service'
-                          ? (b.platform_revenue != null ? Number(b.platform_revenue).toLocaleString() : '-')
-                          : getBookingPlatformRevenue(b).toLocaleString()
-                        }
+                        {getLedgerRevenue(b) != null ? getLedgerRevenue(b)?.toLocaleString() : '-'}
                       </td>
                     </tr>
                   ))
@@ -585,11 +633,15 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
                 <div className="h-px bg-slate-200 my-0.5 md:my-1"></div>
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] md:text-xs text-slate-500">호스트 정산 (80%)</span>
-                  <span className="text-[10px] md:text-xs font-bold text-rose-500">₩{getBookingHostPayout(selectedBooking).toLocaleString()}</span>
+                  <span className="text-[10px] md:text-xs font-bold text-rose-500">
+                    {getLedgerPayout(selectedBooking) != null ? `₩${getLedgerPayout(selectedBooking)?.toLocaleString()}` : '-'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] md:text-xs text-slate-500">플랫폼 수익 (Net)</span>
-                  <span className="text-[10px] md:text-xs font-bold text-blue-600">₩{getBookingPlatformRevenue(selectedBooking).toLocaleString()}</span>
+                  <span className="text-[10px] md:text-xs font-bold text-blue-600">
+                    {getLedgerRevenue(selectedBooking) != null ? `₩${getLedgerRevenue(selectedBooking)?.toLocaleString()}` : '-'}
+                  </span>
                 </div>
               </div>
               <p className="hidden md:flex text-[8px] md:text-[9px] text-slate-400 mt-1.5 md:mt-2 text-right justify-end gap-1 items-center"><Info size={10} /> Order ID: {selectedBooking.order_id || selectedBooking.id}</p>
@@ -598,7 +650,7 @@ export default function MasterLedgerTab({ bookings, onRefresh }: { bookings: any
             {/* 관리자 액션 — 일반 예약만 */}
             {selectedBooking._type !== 'service' && (
               <div className="pt-1 md:pt-2">
-                {isPendingBookingStatus(selectedBooking.status) && (
+                {isPendingBookingStatus(selectedBooking.status) && isBankPaymentMethod(selectedBooking.payment_method) && (
                   <button
                     onClick={() => handleConfirmPayment(selectedBooking.id)}
                     disabled={isProcessing}
