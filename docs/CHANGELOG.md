@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.46 — [Payments] PayPal 체험 결제 UI 연결
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 PayPal 옵션 추가 | `app/experiences/[id]/payment/page.tsx`에 `PayPal` 결제수단을 추가하고, 공개 SDK(`NEXT_PUBLIC_PAYPAL_CLIENT_ID`)가 있을 때만 별도 버튼을 렌더하도록 연결 |
+| 🟠 create/capture 분기 연결 | PayPal 버튼 클릭 시 기존 `/api/bookings`로 `PENDING` 예약을 만든 뒤, `/api/payment/paypal/create-order` → `/api/payment/paypal/capture-order` 경로로만 결제를 확정하도록 분기 |
+| 🟡 기존 결제 보존 | NicePay 카드 결제, 무통장 입금 CTA, 기존 callback/취소 환불 경로는 변경하지 않아 회귀 면적을 최소화 |
+
 ## v3.38.44 — [Payments] PayPal 고객 결제 1단계 공통 기반 추가
 
 | 항목 | 내용 |

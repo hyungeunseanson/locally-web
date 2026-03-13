@@ -12,7 +12,7 @@ type BookingRequestBody = {
     isSoloGuarantee?: boolean;
     customerName?: string;
     customerPhone?: string;
-    paymentMethod?: 'card' | 'bank';
+    paymentMethod?: 'card' | 'bank' | 'paypal';
 };
 
 type AtomicBookingResult = {
