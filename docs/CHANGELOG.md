@@ -13,6 +13,13 @@
 | 🟠 역할 용어/배지 정리 | 기본 역할을 `Guest`로 통일하고 `Guest / Host / Admin` 배지를 각각 다른 색상으로 구분해 목록과 상세 헤더에서 더 쉽게 식별되도록 정리 |
 | 🟡 리스트 정보 우선순위 보정 | 목록에서는 `최근 활동`만 남기고 `최근 접속` 컬럼은 제거해 중복 정보를 줄이고, 접속 상태는 상세 헤더의 `지금 활동 중 / 마지막 접속`으로만 유지 |
 
+## v3.38.40 — [Admin Dashboard] Billing 탭 공통 로딩 게이트 분리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 Sales 독립 렌더 | `Billing & Revenue` 탭을 `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖으로 분리해, shared admin fetch가 느리거나 실패해도 `SalesTab`이 자체 `/api/admin/sales-summary`로 바로 렌더되도록 정리 |
+| 🟠 구조 회귀 방지 | `useAdminData.ts`는 건드리지 않고 `SALES` 분기만 최상위에서 직접 렌더링해 `Users / Ledger / Analytics / Approvals` 기존 흐름에는 영향이 없도록 유지 |
+
 ## v3.38.39 — [User Management] 정렬/필터 및 패널 가시성 보강
 
 | 항목 | 내용 |

@@ -78,9 +78,6 @@ function DataDrivenAdminTab({
   if (activeTab === 'LEDGER') {
     return <MasterLedgerTab onRefresh={refresh} refreshSignal={ledgerRefreshSignal} />;
   }
-  if (activeTab === 'SALES') {
-    return <SalesTab onRefresh={refresh} />;
-  }
   if (activeTab === 'ANALYTICS') {
     return (
       <AnalyticsTab
@@ -145,6 +142,8 @@ function AdminDashboardContent() {
         <ChatMonitor />
       ) : activeTab === 'SERVICE_REQUESTS' ? (
         <ServiceAdminTab />
+      ) : activeTab === 'SALES' ? (
+        <SalesTab />
       ) : (
         <DataDrivenAdminTab
           activeTab={activeTab}
