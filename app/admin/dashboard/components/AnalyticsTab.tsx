@@ -80,6 +80,27 @@ type AnalyticsHostSummary = {
 
 type SummarySource = 'server' | 'cached' | 'fallback';
 
+type SearchIntentItem = {
+  keyword: string;
+  searches: number;
+  recentSearches: number;
+  previousSearches: number;
+  surge: number;
+  matchedActiveExperiences: number;
+};
+
+type AnalyticsSearchIntentSummary = {
+  totalSearches: number;
+  comparisonWindowDays: number;
+  topKeywords: SearchIntentItem[];
+  risingKeywords: SearchIntentItem[];
+  lowSupplyKeywords: SearchIntentItem[];
+  supplyReference: string;
+  conversionAvailable: boolean;
+};
+
+type SearchIntentSource = 'server' | 'cached' | 'unavailable';
+
 export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   const bookings = props.bookings ?? EMPTY_ANALYTICS_ITEMS;
   const users = props.users ?? EMPTY_ANALYTICS_ITEMS;
@@ -98,6 +119,8 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
     business: 'server',
     host: 'server',
   });
+  const [searchIntentSource, setSearchIntentSource] = useState<SearchIntentSource>('server');
+  const [searchIntent, setSearchIntent] = useState<AnalyticsSearchIntentSummary | null>(null);
   const summaryCacheRef = useRef<{
     business: Record<string, AnalyticsBusinessSummary>;
     host: Record<string, AnalyticsHostSummary>;
@@ -105,6 +128,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
     business: {},
     host: {},
   });
+  const searchIntentCacheRef = useRef<Record<string, AnalyticsSearchIntentSummary>>({});
 
   // 날짜 필터 상태 추가
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -216,11 +240,13 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
       const queryString = params.toString();
       const analyticsSummaryUrl = queryString ? `/api/admin/analytics-summary?${queryString}` : '/api/admin/analytics-summary';
       const analyticsHostUrl = queryString ? `/api/admin/analytics-host-summary?${queryString}` : '/api/admin/analytics-host-summary';
+      const analyticsSearchIntentUrl = queryString ? `/api/admin/analytics-search-intent?${queryString}` : '/api/admin/analytics-search-intent';
       const cacheKey = queryString || 'default';
       const cachedBusinessSummary = summaryCacheRef.current.business[cacheKey];
       const cachedHostSummary = summaryCacheRef.current.host[cacheKey];
+      const cachedSearchIntent = searchIntentCacheRef.current[cacheKey];
 
-      const [businessResult, hostResult] = await Promise.allSettled([
+      const [businessResult, hostResult, searchIntentResult] = await Promise.allSettled([
         fetch(analyticsSummaryUrl).then(async (response) => {
           if (!response.ok) {
             throw new Error('Analytics summary fetch failed');
@@ -244,6 +270,18 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
           }
 
           return result.data as AnalyticsHostSummary;
+        }),
+        fetch(analyticsSearchIntentUrl).then(async (response) => {
+          if (!response.ok) {
+            throw new Error('Analytics search intent fetch failed');
+          }
+
+          const result = await response.json();
+          if (!result?.success) {
+            throw new Error(result?.error || 'Analytics search intent fetch failed');
+          }
+
+          return result.data as AnalyticsSearchIntentSummary;
         }),
       ]);
 
@@ -295,9 +333,25 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
         console.error('[AnalyticsTab] analytics-host-summary fallback:', hostResult.reason);
       }
 
+      let nextSearchIntent: AnalyticsSearchIntentSummary | null = null;
+      let nextSearchIntentSource: SearchIntentSource = 'unavailable';
+
+      if (searchIntentResult.status === 'fulfilled') {
+        searchIntentCacheRef.current[cacheKey] = searchIntentResult.value;
+        nextSearchIntent = searchIntentResult.value;
+        nextSearchIntentSource = 'server';
+      } else if (cachedSearchIntent) {
+        nextSearchIntent = cachedSearchIntent;
+        nextSearchIntentSource = 'cached';
+      } else {
+        console.error('[AnalyticsTab] analytics-search-intent unavailable:', searchIntentResult.reason);
+      }
+
       if (!cancelled) {
         setStats(nextStats);
         setSummarySource(nextSummarySource);
+        setSearchIntent(nextSearchIntent);
+        setSearchIntentSource(nextSearchIntentSource);
         setLoading(false);
       }
     };
@@ -994,6 +1048,104 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                 <span className="text-sm text-slate-400">데이터를 수집 중입니다.</span>
               )}
             </div>
+          </section>
+
+          <section className="pt-4 md:pt-6">
+            <div className="flex flex-col gap-3 mb-3 md:mb-4">
+              <div className="flex items-center gap-2">
+                <Search size={16} className="md:w-[18px] md:h-[18px] text-slate-700" />
+                <h2 className="text-base md:text-lg font-bold">고객 검색 수요 분석</h2>
+                {searchIntentSource === 'cached' && (
+                  <span className="text-[10px] md:text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
+                    최근 집계 재사용
+                  </span>
+                )}
+                {searchIntentSource === 'unavailable' && (
+                  <span className="text-[10px] md:text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
+                    일시 불가
+                  </span>
+                )}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs md:text-sm text-slate-600">
+                <div className="font-semibold text-slate-800">고객이 찾는 수요와 현재 공급 부족 신호를 함께 봅니다.</div>
+                <div className="mt-1">검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리/태그 기준 참고용입니다.</div>
+                {searchIntent && !searchIntent.conversionAvailable && (
+                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">검색 후 클릭/결제 전환 분석은 검색 로그와 이벤트 연결 키를 정리한 뒤 추가할 예정입니다.</div>
+                )}
+              </div>
+            </div>
+
+            {searchIntent ? (
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">많이 찾는 키워드</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">총 {searchIntent.totalSearches}회</span>
+                  </div>
+                  <div className="space-y-2">
+                    {searchIntent.topKeywords.length > 0 ? searchIntent.topKeywords.slice(0, 5).map((item, index) => (
+                      <div key={`search-demand-top-${item.keyword}`} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-black text-rose-500">{index + 1}</span>
+                          <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                        </div>
+                        <span className="text-xs font-mono text-slate-500">{item.searches}회</span>
+                      </div>
+                    )) : (
+                      <div className="py-6 text-center text-sm text-slate-400">검색 데이터가 부족합니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">급상승 키워드</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">최근 {searchIntent.comparisonWindowDays}일 비교</span>
+                  </div>
+                  <div className="space-y-2">
+                    {searchIntent.risingKeywords.length > 0 ? searchIntent.risingKeywords.map((item) => (
+                      <div key={`search-demand-rising-${item.keyword}`} className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                          <span className="text-xs font-black text-emerald-700">+{item.surge}</span>
+                        </div>
+                        <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                          최근 {item.recentSearches}회 · 이전 {item.previousSearches}회
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="py-6 text-center text-sm text-slate-400">최근 급상승 키워드가 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">공급 부족 키워드</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">현재 활성 체험 기준</span>
+                  </div>
+                  <div className="space-y-2">
+                    {searchIntent.lowSupplyKeywords.length > 0 ? searchIntent.lowSupplyKeywords.map((item) => (
+                      <div key={`search-demand-low-supply-${item.keyword}`} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                          <span className="text-xs font-mono text-amber-700">{item.searches}회</span>
+                        </div>
+                        <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                          연결 가능한 활성 체험 {item.matchedActiveExperiences}개
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="py-6 text-center text-sm text-slate-400">공급 부족 신호가 강한 키워드가 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
+                검색 수요 분석 데이터를 불러오지 못했습니다.
+              </div>
+            )}
           </section>
 
           {/* 시계열 및 퍼널 차트 섹션 */}

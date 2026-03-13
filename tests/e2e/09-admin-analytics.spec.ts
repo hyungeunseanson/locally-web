@@ -142,10 +142,14 @@ test.describe.serial('Admin analytics smoke', () => {
     const analyticsHostSummaryPromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/analytics-host-summary') && response.request().method() === 'GET'
     );
+    const analyticsSearchIntentPromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/analytics-search-intent') && response.request().method() === 'GET'
+    );
 
     await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=ANALYTICS', { waitUntil: 'networkidle' });
     await analyticsHostSummaryPromise;
+    await analyticsSearchIntentPromise;
 
     await expect(page.getByRole('heading', { name: '데이터 심층 분석' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Business & Guest' })).toBeVisible();
@@ -173,6 +177,9 @@ test.describe.serial('Admin analytics smoke', () => {
       await expect(page.getByText('체험 예약 기준', { exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: /체험 검색 인기 트렌드/ })).toBeVisible();
       await expect(page.getByText('체험 예약 결제 완료 건수 기준', { exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '고객 검색 수요 분석' })).toBeVisible();
+      await expect(page.getByText('고객이 찾는 수요와 현재 공급 부족 신호를 함께 봅니다.')).toBeVisible();
+      await expect(page.getByText('검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리/태그 기준 참고용입니다.')).toBeVisible();
     });
 
     await test.step('Open GMV modal with platform-wide explanation', async () => {

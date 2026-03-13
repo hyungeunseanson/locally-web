@@ -25,6 +25,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/users-activity-summary`: User Management 리스트 전용 활동 summary API (`총 결제액/예약·의뢰 수/최근 활동` 지연 집계)
 - `/api/admin/users/[userId]/timeline`: User Management 상세 패널용 회원 활동 타임라인 API (예약/리뷰/문의 진행/맞춤 의뢰 상태 이벤트 조립)
 - `/api/admin/analytics-summary`: Data Analytics `Business & Guest` 전용 서버 집계 API (상단 비즈니스 KPI, 반복 결제 고객 비율, 결제 고객 인구통계는 체험 예약 + 서비스 결제 기준, 검색/Top 체험은 기존 체험 중심 기준 유지)
+- `/api/admin/analytics-search-intent`: Data Analytics `고객 검색 수요 분석` 전용 서버 집계 API (검색량 TOP 키워드, 최근 급상승 키워드, 공급 부족 키워드 조립)
 - `/api/admin/reviews`: Data Analytics `Review Quality` 전용 서버 읽기 API (리뷰 + 게스트 프로필 + 체험 제목 조립)
 - `/api/admin/audit-logs`: Data Analytics `운영 감사 로그` 전용 서버 읽기 API (최근 100개 admin_audit_logs)
 - `/api/admin/service-cancel`: 관리자 강제 취소/환불 API (NicePay error-safe)
@@ -56,6 +57,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics의 `Review Quality`, `운영 감사 로그`는 이제 브라우저 직접 select 대신 각각 `/api/admin/reviews`, `/api/admin/audit-logs`를 초기 읽기 source로 사용한다. 현재 실시간성은 감사 로그 INSERT 구독만 클라이언트에 남겨둔다.
 - Data Analytics에서 `취소율`, `체험 검색 인기 트렌드`, `Top 체험`은 여전히 체험 예약/체험 검색 기준이다. 플랫폼 전체 KPI와 체험 전용 섹션이 섞여 있으므로 카드/섹션 문구로 기준을 명시한다.
+- Data Analytics `고객 검색 수요 분석`은 `/api/admin/analytics-search-intent`를 전용 source로 사용한다. 1차 범위는 `검색량 TOP`, `급상승`, `공급 부족`까지만 포함하며, 검색 후 클릭/결제 전환은 검색 로그와 이벤트 연결 키가 정리되기 전까지 보류한다.
 - Data Analytics `Host Ecosystem`는 `/api/admin/analytics-host-summary`를 전용 source로 사용한다. 새 API 실패 시에만 기존 로컬 계산 fallback을 유지한다.
 
 ---
