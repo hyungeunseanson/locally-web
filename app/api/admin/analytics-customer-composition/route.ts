@@ -24,6 +24,11 @@ type AnalyticsProfileRow = {
   languages: string[] | string | null;
 };
 
+type AnalyticsSignupProfileRow = {
+  id: string;
+  created_at: string | null;
+};
+
 type AnalyticsEventSourceRow = {
   user_id: string | null;
   created_at: string | null;
@@ -37,6 +42,13 @@ type CompositionBucket = {
   name: string;
   customers: number;
   percent: number;
+};
+
+type SourceFunnelBucket = {
+  name: string;
+  signups: number;
+  payingCustomers: number;
+  conversionRate: number;
 };
 
 type CustomerStats = {
@@ -77,6 +89,24 @@ function getSourceLabel(event: AnalyticsEventSourceRow) {
   }
 
   return '';
+}
+
+function toSourceFunnelBuckets(
+  signups: Record<string, number>,
+  payers: Record<string, number>
+): SourceFunnelBucket[] {
+  return Object.entries(signups)
+    .filter(([, signupCount]) => signupCount > 0)
+    .map(([name, signupCount]) => {
+      const payingCustomers = payers[name] || 0;
+      return {
+        name,
+        signups: signupCount,
+        payingCustomers,
+        conversionRate: signupCount > 0 ? (payingCustomers / signupCount) * 100 : 0,
+      };
+    })
+    .sort((left, right) => right.signups - left.signups);
 }
 
 export async function GET(request: Request) {
@@ -176,6 +206,7 @@ export async function GET(request: Request) {
     const totalPayingCustomers = customerIds.length;
 
     let profileRows: AnalyticsProfileRow[] = [];
+    let signupProfiles: AnalyticsSignupProfileRow[] = [];
 
     if (customerIds.length > 0) {
       const { data: profiles, error: profilesError } = await supabaseAdmin
@@ -186,6 +217,22 @@ export async function GET(request: Request) {
       if (profilesError) throw profilesError;
       profileRows = (profiles || []) as AnalyticsProfileRow[];
     }
+
+    let signupProfilesQuery = supabaseAdmin
+      .from('profiles')
+      .select('id, created_at');
+
+    if (startAt) {
+      signupProfilesQuery = signupProfilesQuery.gte('created_at', startAt);
+    }
+
+    if (endAt) {
+      signupProfilesQuery = signupProfilesQuery.lte('created_at', endAt);
+    }
+
+    const { data: signupProfileRows, error: signupProfilesError } = await signupProfilesQuery;
+    if (signupProfilesError) throw signupProfilesError;
+    signupProfiles = (signupProfileRows || []) as AnalyticsSignupProfileRow[];
 
     const nationalityCounts: Record<string, number> = {};
     const languageCounts: Record<string, number> = {};
@@ -199,7 +246,10 @@ export async function GET(request: Request) {
       '체험 + 서비스': 0,
     };
     const sourceCounts: Record<string, number> = {};
+    const sourceSignupCounts: Record<string, number> = {};
+    const sourcePayingCounts: Record<string, number> = {};
     let sourceTrackedCustomers = 0;
+    let sourceSignupTrackedUsers = 0;
     let sourceStatus: SourceStatus = 'collecting';
 
     customerStats.forEach((stat) => {
@@ -237,12 +287,15 @@ export async function GET(request: Request) {
       });
     });
 
-    if (customerIds.length > 0) {
+    const signupProfileIds = signupProfiles.map((profile) => profile.id).filter(Boolean);
+    const sourceUserIds = Array.from(new Set([...customerIds, ...signupProfileIds]));
+
+    if (sourceUserIds.length > 0) {
       try {
         let sourceEventsQuery = supabaseAdmin
           .from('analytics_events')
           .select('user_id, created_at, utm_source, utm_medium, referrer_host, landing_path')
-          .in('user_id', customerIds)
+          .in('user_id', sourceUserIds)
           .in('event_type', ['view', 'click', 'payment_init']);
 
         if (startAt) {
@@ -257,7 +310,7 @@ export async function GET(request: Request) {
 
         if (sourceEventsError) throw sourceEventsError;
 
-        const firstSourceByCustomer = new Map<string, string>();
+        const firstSourceByUser = new Map<string, string>();
 
         ((sourceEvents || []) as AnalyticsEventSourceRow[])
           .filter((event) => Boolean(event.user_id))
@@ -268,21 +321,33 @@ export async function GET(request: Request) {
           })
           .forEach((event) => {
             const userId = event.user_id;
-            if (!userId || firstSourceByCustomer.has(userId)) return;
+            if (!userId || firstSourceByUser.has(userId)) return;
 
             const label = getSourceLabel(event);
             if (!label) return;
 
-            firstSourceByCustomer.set(userId, label);
+            firstSourceByUser.set(userId, label);
           });
 
-        sourceTrackedCustomers = firstSourceByCustomer.size;
+        customerIds.forEach((userId) => {
+          const label = firstSourceByUser.get(userId);
+          if (!label) return;
+          sourceTrackedCustomers += 1;
+          sourceCounts[label] = (sourceCounts[label] || 0) + 1;
+        });
 
-        if (sourceTrackedCustomers > 0) {
+        signupProfileIds.forEach((userId) => {
+          const label = firstSourceByUser.get(userId);
+          if (!label) return;
+          sourceSignupTrackedUsers += 1;
+          sourceSignupCounts[label] = (sourceSignupCounts[label] || 0) + 1;
+          if (customerStats.has(userId)) {
+            sourcePayingCounts[label] = (sourcePayingCounts[label] || 0) + 1;
+          }
+        });
+
+        if (sourceTrackedCustomers > 0 || sourceSignupTrackedUsers > 0) {
           sourceStatus = 'ready';
-          firstSourceByCustomer.forEach((label) => {
-            sourceCounts[label] = (sourceCounts[label] || 0) + 1;
-          });
         }
       } catch (sourceError) {
         console.warn('[api/admin/analytics-customer-composition] source mix unavailable', sourceError);
@@ -301,7 +366,9 @@ export async function GET(request: Request) {
         sourceAvailable: sourceStatus === 'ready',
         sourceStatus,
         sourceTrackedCustomers,
+        sourceSignupTrackedUsers,
         sourceMix: toBuckets(sourceCounts, sourceTrackedCustomers).slice(0, 6),
+        sourceFunnel: toSourceFunnelBuckets(sourceSignupCounts, sourcePayingCounts).slice(0, 6),
       },
     });
   } catch (error) {

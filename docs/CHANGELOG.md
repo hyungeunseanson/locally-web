@@ -21,6 +21,14 @@
 | 🟠 Analytics 고객 source 블록 추가 | `Data Analytics`의 `고객 구성 분석` 섹션에 `주요 유입 source` 카드를 추가하고, `ready / collecting / unavailable` 상태별 안내 문구를 분리해 운영자가 참고 수준을 바로 읽을 수 있게 정리 |
 | 🟡 안전한 스키마 의존 축소 | 실DB에서 없는 `experiences.tags` 의존을 제거해 새 검색/고객 분석 API가 500 없이 동작하도록 보정하고, source 데이터가 부족하면 다른 고객 구성 지표를 유지한 채 참고용 카드만 보이게 처리 |
 
+## v3.38.56 — [Analytics] 고객 유입 source별 가입→결제 전환 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 source별 가입 cohort 집계 추가 | `/api/admin/analytics-customer-composition`가 선택 기간 내 가입한 `profiles`와 추적된 `analytics_events`를 연결해 source별 가입 수를 별도로 집계하도록 확장 |
+| 🟠 유입 source 카드 고도화 | `고객 구성 분석`의 `주요 유입 source` 카드가 단순 mix뿐 아니라 `가입 n명 · 결제 n명 · 전환율 %`를 바로 보여주도록 보강 |
+| 🟡 참고용 범위 명시 | 가입→결제 전환은 추적 데이터가 남아 있는 가입자 기준 참고용으로만 표시하고, source 데이터가 부족한 경우 기존 mix/collecting 안내로 안전하게 내려가도록 유지 |
+
 ## v3.38.53 — [Analytics] 고객 구성 분석 1차 추가
 
 | 항목 | 내용 |
