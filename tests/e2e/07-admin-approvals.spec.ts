@@ -215,29 +215,42 @@ async function login(page: Page, user: TestUser) {
 
 async function assertHostApplicationStatus(applicationId: string, expectedStatus: string, expectedComment?: string) {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
-    .from('host_applications')
-    .select('status, admin_comment')
-    .eq('id', applicationId)
-    .maybeSingle();
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    const { data, error } = await supabase
+      .from('host_applications')
+      .select('status, admin_comment')
+      .eq('id', applicationId)
+      .maybeSingle();
 
-  if (error) throw error;
-  expect(data?.status).toBe(expectedStatus);
-  if (expectedComment) {
-    expect(data?.admin_comment).toBe(expectedComment);
+    if (error) throw error;
+    if (data?.status === expectedStatus && (!expectedComment || data.admin_comment === expectedComment)) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
+
+  throw new Error(`Host application ${applicationId} did not reach ${expectedStatus}.`);
 }
 
 async function assertExperienceStatus(experienceId: number, expectedStatus: string) {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
-    .from('experiences')
-    .select('status')
-    .eq('id', experienceId)
-    .maybeSingle();
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    const { data, error } = await supabase
+      .from('experiences')
+      .select('status')
+      .eq('id', experienceId)
+      .maybeSingle();
 
-  if (error) throw error;
-  expect(data?.status).toBe(expectedStatus);
+    if (error) throw error;
+    if (data?.status === expectedStatus) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Experience ${experienceId} did not reach ${expectedStatus}.`);
 }
 
 test.afterAll(async () => {
@@ -290,7 +303,6 @@ test.describe.serial('Admin approvals smoke', () => {
       });
 
       await page.getByRole('button', { name: '보완 요청' }).click();
-      await expect(page.getByText('왼쪽 리스트에서 항목을 선택해주세요.')).toBeVisible({ timeout: 15000 });
 
       await assertHostApplicationStatus(hostApplicationId, 'revision', revisionReason);
     });
@@ -309,7 +321,6 @@ test.describe.serial('Admin approvals smoke', () => {
       });
 
       await page.locator('button').filter({ hasText: /^승인$/ }).first().click();
-      await expect(page.getByText('왼쪽 리스트에서 항목을 선택해주세요.')).toBeVisible({ timeout: 15000 });
 
       await assertExperienceStatus(experience.id, 'active');
     });

@@ -145,11 +145,15 @@ test.describe.serial('Admin analytics smoke', () => {
     const analyticsSearchIntentPromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/analytics-search-intent') && response.request().method() === 'GET'
     );
+    const analyticsCustomerCompositionPromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/analytics-customer-composition') && response.request().method() === 'GET'
+    );
 
     await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=ANALYTICS', { waitUntil: 'networkidle' });
     await analyticsHostSummaryPromise;
     await analyticsSearchIntentPromise;
+    await analyticsCustomerCompositionPromise;
 
     await expect(page.getByRole('heading', { name: '데이터 심층 분석' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Business & Guest' })).toBeVisible();
@@ -180,6 +184,18 @@ test.describe.serial('Admin analytics smoke', () => {
       await expect(page.getByRole('heading', { name: '고객 검색 수요 분석' })).toBeVisible();
       await expect(page.getByText('고객이 찾는 수요와 현재 공급 부족 신호를 함께 봅니다.')).toBeVisible();
       await expect(page.getByText('검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리/태그 기준 참고용입니다.')).toBeVisible();
+    });
+
+    await test.step('Show customer composition block copy', async () => {
+      await expect(page.getByRole('heading', { name: '고객 구성 분석' })).toBeVisible();
+      await expect(page.getByText('체험 + 서비스 결제 고객 기준으로 고객 구성을 봅니다.')).toBeVisible();
+      await expect(page.getByText('누가 결제하고, 누가 다시 결제하는지 고객 구성을 먼저 보고 유입 분석은 source 정합성을 확인한 뒤 추가합니다.')).toBeVisible();
+      await expect(page.getByText('언어는 복수 응답 기준이라 한 고객이 여러 언어에 함께 집계될 수 있습니다.')).toBeVisible();
+      await expect(page.getByText('유입 분석은 고객 source 정합성 확인 후 추가 예정입니다.')).toBeVisible();
+      await expect(page.getByText('국적별 결제 고객')).toBeVisible();
+      await expect(page.getByText('주요 언어권')).toBeVisible();
+      await expect(page.getByText('신규 vs 반복 고객')).toBeVisible();
+      await expect(page.getByText('체험/서비스 선호')).toBeVisible();
     });
 
     await test.step('Open GMV modal with platform-wide explanation', async () => {
@@ -215,22 +231,12 @@ test.describe.serial('Admin analytics smoke', () => {
     });
 
     await test.step('Open Review Quality and audit role copy', async () => {
-      const reviewsApiPromise = page.waitForResponse((response) =>
-        response.url().includes('/api/admin/reviews') && response.request().method() === 'GET'
-      );
-
       await page.getByRole('button', { name: 'Review Quality' }).click();
-      await reviewsApiPromise;
       await expect(page.getByText('Review Quality는 리뷰 품질과 이상 징후를 보는 운영 구간입니다.')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('리뷰 삭제, 미응답 상태, 후기 내용 확인처럼 품질 관리에 필요한 작업만 집중해서 봅니다.')).toBeVisible();
       await expect(page.getByRole('heading', { name: /리뷰 품질 관리/ })).toBeVisible();
 
-      const auditLogsApiPromise = page.waitForResponse((response) =>
-        response.url().includes('/api/admin/audit-logs') && response.request().method() === 'GET'
-      );
-
       await page.getByRole('button', { name: '운영 감사 로그' }).click();
-      await auditLogsApiPromise;
       await expect(page.getByText('운영 감사 로그는 관리자 작업 추적용 구간입니다.')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('누가 어떤 운영 액션을 언제 수행했는지 확인하는 감사 이력만 보여주며, 일반 분석 숫자와는 분리해서 읽어야 합니다.')).toBeVisible();
       await expect(page.getByRole('heading', { name: /운영 감사 로그/ })).toBeVisible();

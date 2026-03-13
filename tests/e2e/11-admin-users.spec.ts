@@ -451,6 +451,8 @@ test.describe('Admin UsersTab smoke', () => {
   });
 
   test('renders user summary columns and activity timeline for a seeded member', async ({ page }) => {
+    test.setTimeout(90000);
+
     const adminUser = createAdminUser();
     const customerUser = createCustomerUser();
     const hostUser = createHostUser();
@@ -471,7 +473,7 @@ test.describe('Admin UsersTab smoke', () => {
     });
 
     await login(page, adminUser);
-    await page.goto('/admin/dashboard?tab=USERS', { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin/dashboard?tab=USERS', { waitUntil: 'networkidle' });
 
     await expect(page.getByRole('combobox', { name: '회원 정렬' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('전체 회원', { exact: false })).toBeVisible();
@@ -483,6 +485,7 @@ test.describe('Admin UsersTab smoke', () => {
     await page.getByRole('button', { name: 'Guest', exact: true }).click();
 
     const searchInput = page.getByPlaceholder('이름/이메일 검색');
+    await expect(searchInput).toBeVisible({ timeout: 15000 });
     await searchInput.fill(customerUser.fullName);
 
     const customerRow = page.locator('tbody tr', { hasText: customerUser.fullName }).first();

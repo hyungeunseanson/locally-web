@@ -101,6 +101,23 @@ type AnalyticsSearchIntentSummary = {
 
 type SearchIntentSource = 'server' | 'cached' | 'unavailable';
 
+type CompositionBucket = {
+  name: string;
+  customers: number;
+  percent: number;
+};
+
+type AnalyticsCustomerCompositionSummary = {
+  totalPayingCustomers: number;
+  nationalityMix: CompositionBucket[];
+  languageMix: CompositionBucket[];
+  loyaltyMix: CompositionBucket[];
+  purchaseMix: CompositionBucket[];
+  sourceAvailable: boolean;
+};
+
+type CustomerCompositionSource = 'server' | 'cached' | 'unavailable';
+
 export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   const bookings = props.bookings ?? EMPTY_ANALYTICS_ITEMS;
   const users = props.users ?? EMPTY_ANALYTICS_ITEMS;
@@ -121,6 +138,8 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   });
   const [searchIntentSource, setSearchIntentSource] = useState<SearchIntentSource>('server');
   const [searchIntent, setSearchIntent] = useState<AnalyticsSearchIntentSummary | null>(null);
+  const [customerCompositionSource, setCustomerCompositionSource] = useState<CustomerCompositionSource>('server');
+  const [customerComposition, setCustomerComposition] = useState<AnalyticsCustomerCompositionSummary | null>(null);
   const summaryCacheRef = useRef<{
     business: Record<string, AnalyticsBusinessSummary>;
     host: Record<string, AnalyticsHostSummary>;
@@ -129,6 +148,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
     host: {},
   });
   const searchIntentCacheRef = useRef<Record<string, AnalyticsSearchIntentSummary>>({});
+  const customerCompositionCacheRef = useRef<Record<string, AnalyticsCustomerCompositionSummary>>({});
 
   // 날짜 필터 상태 추가
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -241,12 +261,14 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
       const analyticsSummaryUrl = queryString ? `/api/admin/analytics-summary?${queryString}` : '/api/admin/analytics-summary';
       const analyticsHostUrl = queryString ? `/api/admin/analytics-host-summary?${queryString}` : '/api/admin/analytics-host-summary';
       const analyticsSearchIntentUrl = queryString ? `/api/admin/analytics-search-intent?${queryString}` : '/api/admin/analytics-search-intent';
+      const analyticsCustomerCompositionUrl = queryString ? `/api/admin/analytics-customer-composition?${queryString}` : '/api/admin/analytics-customer-composition';
       const cacheKey = queryString || 'default';
       const cachedBusinessSummary = summaryCacheRef.current.business[cacheKey];
       const cachedHostSummary = summaryCacheRef.current.host[cacheKey];
       const cachedSearchIntent = searchIntentCacheRef.current[cacheKey];
+      const cachedCustomerComposition = customerCompositionCacheRef.current[cacheKey];
 
-      const [businessResult, hostResult, searchIntentResult] = await Promise.allSettled([
+      const [businessResult, hostResult, searchIntentResult, customerCompositionResult] = await Promise.allSettled([
         fetch(analyticsSummaryUrl).then(async (response) => {
           if (!response.ok) {
             throw new Error('Analytics summary fetch failed');
@@ -282,6 +304,18 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
           }
 
           return result.data as AnalyticsSearchIntentSummary;
+        }),
+        fetch(analyticsCustomerCompositionUrl).then(async (response) => {
+          if (!response.ok) {
+            throw new Error('Analytics customer composition fetch failed');
+          }
+
+          const result = await response.json();
+          if (!result?.success) {
+            throw new Error(result?.error || 'Analytics customer composition fetch failed');
+          }
+
+          return result.data as AnalyticsCustomerCompositionSummary;
         }),
       ]);
 
@@ -335,6 +369,8 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
 
       let nextSearchIntent: AnalyticsSearchIntentSummary | null = null;
       let nextSearchIntentSource: SearchIntentSource = 'unavailable';
+      let nextCustomerComposition: AnalyticsCustomerCompositionSummary | null = null;
+      let nextCustomerCompositionSource: CustomerCompositionSource = 'unavailable';
 
       if (searchIntentResult.status === 'fulfilled') {
         searchIntentCacheRef.current[cacheKey] = searchIntentResult.value;
@@ -347,11 +383,24 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
         console.error('[AnalyticsTab] analytics-search-intent unavailable:', searchIntentResult.reason);
       }
 
+      if (customerCompositionResult.status === 'fulfilled') {
+        customerCompositionCacheRef.current[cacheKey] = customerCompositionResult.value;
+        nextCustomerComposition = customerCompositionResult.value;
+        nextCustomerCompositionSource = 'server';
+      } else if (cachedCustomerComposition) {
+        nextCustomerComposition = cachedCustomerComposition;
+        nextCustomerCompositionSource = 'cached';
+      } else {
+        console.error('[AnalyticsTab] analytics-customer-composition unavailable:', customerCompositionResult.reason);
+      }
+
       if (!cancelled) {
         setStats(nextStats);
         setSummarySource(nextSummarySource);
         setSearchIntent(nextSearchIntent);
         setSearchIntentSource(nextSearchIntentSource);
+        setCustomerComposition(nextCustomerComposition);
+        setCustomerCompositionSource(nextCustomerCompositionSource);
         setLoading(false);
       }
     };
@@ -1014,6 +1063,115 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="pt-4 md:pt-6">
+            <div className="flex flex-col gap-3 mb-3 md:mb-4">
+              <div className="flex items-center gap-2">
+                <UserCheck size={16} className="md:w-[18px] md:h-[18px] text-slate-700" />
+                <h2 className="text-base md:text-lg font-bold">고객 구성 분석</h2>
+                {customerCompositionSource === 'cached' && (
+                  <span className="text-[10px] md:text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
+                    최근 집계 재사용
+                  </span>
+                )}
+                {customerCompositionSource === 'unavailable' && (
+                  <span className="text-[10px] md:text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
+                    일시 불가
+                  </span>
+                )}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs md:text-sm text-slate-600">
+                <div className="font-semibold text-slate-800">체험 + 서비스 결제 고객 기준으로 고객 구성을 봅니다.</div>
+                <div className="mt-1">누가 결제하고, 누가 다시 결제하는지 고객 구성을 먼저 보고 유입 분석은 source 정합성을 확인한 뒤 추가합니다.</div>
+                <div className="mt-1">언어는 복수 응답 기준이라 한 고객이 여러 언어에 함께 집계될 수 있습니다.</div>
+                {customerComposition && !customerComposition.sourceAvailable && (
+                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">유입 분석은 고객 source 정합성 확인 후 추가 예정입니다.</div>
+                )}
+              </div>
+            </div>
+
+            {customerComposition ? (
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">국적별 결제 고객</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">총 {customerComposition.totalPayingCustomers}명</span>
+                  </div>
+                  <div className="space-y-2">
+                    {customerComposition.nationalityMix.length > 0 ? customerComposition.nationalityMix.map((item) => (
+                      <div key={`customer-composition-nationality-${item.name}`} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                        <span className="truncate text-sm font-semibold text-slate-800">{item.name}</span>
+                        <span className="text-xs font-mono text-slate-500">{item.percent.toFixed(1)}%</span>
+                      </div>
+                    )) : (
+                      <div className="py-6 text-center text-sm text-slate-400">국적 데이터가 부족합니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">주요 언어권</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">복수 선택 허용</span>
+                  </div>
+                  <div className="space-y-2">
+                    {customerComposition.languageMix.length > 0 ? customerComposition.languageMix.map((item) => (
+                      <div key={`customer-composition-language-${item.name}`} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                        <span className="truncate text-sm font-semibold text-slate-800">{item.name}</span>
+                        <span className="text-xs font-mono text-slate-500">{item.customers}명</span>
+                      </div>
+                    )) : (
+                      <div className="py-6 text-center text-sm text-slate-400">언어 데이터가 부족합니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">신규 vs 반복 고객</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">전체 결제 고객</span>
+                  </div>
+                  <div className="space-y-2">
+                    {customerComposition.loyaltyMix.length > 0 ? customerComposition.loyaltyMix.map((item) => (
+                      <div key={`customer-composition-loyalty-${item.name}`} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-semibold text-slate-800">{item.name}</span>
+                          <span className="text-xs font-mono text-slate-500">{item.percent.toFixed(1)}%</span>
+                        </div>
+                        <div className="mt-1 text-[11px] md:text-xs text-slate-500">{item.customers}명</div>
+                      </div>
+                    )) : (
+                      <div className="py-6 text-center text-sm text-slate-400">반복 결제 데이터가 부족합니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">체험/서비스 선호</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">결제 고객 분포</span>
+                  </div>
+                  <div className="space-y-2">
+                    {customerComposition.purchaseMix.length > 0 ? customerComposition.purchaseMix.map((item) => (
+                      <div key={`customer-composition-purchase-${item.name}`} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-semibold text-slate-800">{item.name}</span>
+                          <span className="text-xs font-mono text-slate-500">{item.percent.toFixed(1)}%</span>
+                        </div>
+                        <div className="mt-1 text-[11px] md:text-xs text-slate-500">{item.customers}명</div>
+                      </div>
+                    )) : (
+                      <div className="py-6 text-center text-sm text-slate-400">구성 데이터가 부족합니다.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
+                고객 구성 분석 데이터를 불러오지 못했습니다.
+              </div>
+            )}
           </section>
 
           <div className="mt-6 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
