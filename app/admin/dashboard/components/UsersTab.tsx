@@ -55,6 +55,10 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
+  const detailPanelRef = useRef<HTMLDivElement | null>(null);
+  const [sortKey, setSortKey] = useState<'recent_activity' | 'recent_access' | 'recent_signup' | 'total_spent'>('recent_activity');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'guest' | 'host' | 'admin'>('all');
+  const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
   // 🟢 [추가] 다중 선택 및 알림 모달 상태
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -139,6 +143,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   useEffect(() => {
     if (selectedUser?.id) {
       detailScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+      detailPanelRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
       let isMounted = true;
       const fetchActivity = async () => {
         setIsActivityLoading(true);
@@ -190,10 +195,45 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   // 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
   const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
 
+  const visibleUsers = filteredUsers
+    .filter((user: any) => {
+      if (roleFilter === 'all') return true;
+      if (roleFilter === 'guest') return !user.role || user.role === 'guest' || user.role === 'user';
+      return user.role === roleFilter;
+    })
+    .filter((user: any) => !showOnlineOnly || onlineUserIds.has(user.id))
+    .sort((a: any, b: any) => {
+      const getTimestamp = (value?: string | null) => {
+        if (!value) return 0;
+        const parsed = new Date(value).getTime();
+        return Number.isNaN(parsed) ? 0 : parsed;
+      };
+
+      if (sortKey === 'total_spent') {
+        return Number(b.total_spent || 0) - Number(a.total_spent || 0);
+      }
+
+      if (sortKey === 'recent_signup') {
+        return getTimestamp(b.created_at) - getTimestamp(a.created_at);
+      }
+
+      if (sortKey === 'recent_access') {
+        return getTimestamp(b.last_active_at) - getTimestamp(a.last_active_at);
+      }
+
+      return getTimestamp(b.recent_activity_at) - getTimestamp(a.recent_activity_at);
+    });
+
   // 🟢 [추가] 전체 선택/해제
+  const visibleSelectedCount = visibleUsers.filter((user: any) => selectedUserIds.includes(user.id)).length;
+
   const toggleSelectAll = () => {
-    if (selectedUserIds.length === filteredUsers.length) setSelectedUserIds([]);
-    else setSelectedUserIds(filteredUsers.map((u: any) => u.id));
+    if (visibleSelectedCount === visibleUsers.length) {
+      setSelectedUserIds((prev) => prev.filter((id) => !visibleUsers.some((user: any) => user.id === id)));
+      return;
+    }
+
+    setSelectedUserIds((prev) => Array.from(new Set([...prev, ...visibleUsers.map((u: any) => u.id)])));
   };
 
   // 🟢 [추가] 개별 선택/해제
@@ -316,6 +356,52 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                   className="w-full pl-8 md:pl-9 pr-3 md:pr-4 py-1.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] md:text-sm focus:outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
+
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
+                className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 md:py-2 text-[11px] md:text-sm text-slate-700 focus:outline-none focus:border-slate-400"
+                aria-label="회원 정렬"
+              >
+                <option value="recent_activity">최근 활동순</option>
+                <option value="recent_access">최근 접속순</option>
+                <option value="recent_signup">최근 가입순</option>
+                <option value="total_spent">결제액순</option>
+              </select>
+
+              <div className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                {([
+                  ['all', '전체'],
+                  ['guest', 'Guest'],
+                  ['host', 'Host'],
+                  ['admin', 'Admin'],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRoleFilter(value)}
+                    className={`rounded-md px-2.5 py-1 text-[10px] md:text-xs font-bold transition-colors ${
+                      roleFilter === value
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowOnlineOnly((prev) => !prev)}
+                className={`shrink-0 rounded-lg border px-3 py-1.5 md:py-2 text-[11px] md:text-sm font-bold transition-colors ${
+                  showOnlineOnly
+                    ? 'border-green-200 bg-green-50 text-green-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                온라인만
+              </button>
             </div>
           </div>
           <div className="overflow-x-auto overflow-y-auto flex-1">
@@ -325,7 +411,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                   {/* 🟢 [추가] 전체 선택 체크박스 */}
                   <th className="px-2 md:px-6 py-2 md:py-3 w-8 md:w-10">
                     <button onClick={toggleSelectAll}>
-                      {filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length
+                      {visibleUsers.length > 0 && visibleSelectedCount === visibleUsers.length
                         ? <CheckSquare className="text-slate-900 w-3.5 h-3.5 md:w-4 md:h-4" />
                         : <Square className="text-slate-300 w-3.5 h-3.5 md:w-4 md:h-4" />}
                     </button>
@@ -339,7 +425,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredUsers.map((user: any) => {
+                {visibleUsers.map((user: any) => {
                   const isOnline = onlineUserIds.has(user.id);
                   const isSelected = selectedUserIds.includes(user.id); // 🟢 추가
 
@@ -419,7 +505,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
 
       {/* 🟢 유저 상세 정보 패널 (우측 슬라이드) - 오버레이 적용됨 */}
       {selectedUser && (
-        <div className="absolute inset-0 z-[100] md:z-30 md:relative md:w-[450px] border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 right-0 top-0">
+        <div ref={detailPanelRef} className="absolute inset-0 z-[100] md:z-30 md:relative md:w-[450px] md:self-start border-l border-slate-200 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 right-0 top-0">
 
           {/* 헤더 */}
           <div className="p-3 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">

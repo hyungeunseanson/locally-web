@@ -103,7 +103,7 @@ async function waitForProfile(userId: string) {
   throw new Error(`Profile was not created for auth user ${userId}.`);
 }
 
-async function createAuthUser(user: TestUser, isAdmin = false) {
+async function createAuthUser(user: TestUser, isAdmin = false, role: 'host' | 'admin' | null = null) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.auth.admin.createUser({
     email: user.email,
@@ -121,6 +121,15 @@ async function createAuthUser(user: TestUser, isAdmin = false) {
 
   createdAuthUserIds.push(data.user.id);
   await waitForProfile(data.user.id);
+
+  if (role) {
+    const { error: roleError } = await supabase
+      .from('users')
+      .update({ role })
+      .eq('id', data.user.id);
+
+    if (roleError) throw roleError;
+  }
 
   if (isAdmin) {
     const { error: whitelistError } = await supabase
@@ -448,7 +457,7 @@ test.describe('Admin UsersTab smoke', () => {
 
     const adminId = await createAuthUser(adminUser, true);
     const customerId = await createAuthUser(customerUser);
-    const hostId = await createAuthUser(hostUser);
+    const hostId = await createAuthUser(hostUser, false, 'host');
 
     expect(adminId).toBeTruthy();
 
@@ -465,6 +474,16 @@ test.describe('Admin UsersTab smoke', () => {
     await page.goto('/admin/dashboard?tab=USERS', { waitUntil: 'networkidle' });
 
     await expect(page.getByText('전체 회원', { exact: false })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: '회원 정렬' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Guest', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Host', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Admin', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '온라인만' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Host', exact: true }).click();
+    await expect(page.locator('tbody tr span').filter({ hasText: 'Host' }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Guest', exact: true }).click();
 
     const searchInput = page.getByPlaceholder('이름/이메일 검색');
     await searchInput.fill(customerUser.fullName);
