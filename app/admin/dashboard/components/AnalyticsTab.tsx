@@ -722,8 +722,8 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         {[
           { id: 'business', label: 'Business & Guest' },
           { id: 'host', label: 'Host Ecosystem' },
-          { id: 'reviews', label: 'Review Management' },
-          { id: 'logs', label: 'Audit Logs' }
+          { id: 'reviews', label: 'Review Quality' },
+          { id: 'logs', label: '운영 감사 로그' }
         ].map(tab => (
           <button
             key={tab.id}

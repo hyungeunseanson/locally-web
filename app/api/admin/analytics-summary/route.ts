@@ -38,7 +38,6 @@ type AnalyticsProfileRow = {
   id: string;
   created_at: string | null;
   full_name: string | null;
-  name: string | null;
   nationality: string | null;
   gender: string | null;
   birth_date: string | null;
@@ -190,7 +189,7 @@ export async function GET(request: Request) {
 
     let newUsersQuery = supabaseAdmin
       .from('profiles')
-      .select('id, created_at, full_name, name, nationality, gender, birth_date, dob')
+      .select('id, created_at, full_name, nationality, gender, birth_date, dob')
       .order('created_at', { ascending: false });
 
     let searchLogsQuery = supabaseAdmin
@@ -488,7 +487,7 @@ export async function GET(request: Request) {
 
     const newUsersList = newUsers.slice(0, 5).map((profile) => ({
       id: profile.id,
-      name: profile.full_name || profile.name || 'Unknown',
+      name: profile.full_name || 'Unknown',
       created_at: profile.created_at,
       nationality: profile.nationality || null,
     }));

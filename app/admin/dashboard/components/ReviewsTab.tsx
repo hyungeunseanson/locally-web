@@ -91,10 +91,10 @@ export default function ReviewsTab() {
         <div>
           <h2 className="text-lg md:text-xl font-bold text-slate-900 flex items-center gap-2">
             <Star size={20} className="text-amber-400" fill="currentColor" />
-            Review Management
+            리뷰 품질 관리
           </h2>
           <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-            전체 {reviews.length}개 · 평균 {avgRating}점
+            플랫폼 전체 후기 품질과 미응답 후기를 운영 관점에서 확인합니다. 전체 {reviews.length}개 · 평균 {avgRating}점
           </p>
         </div>
         <button

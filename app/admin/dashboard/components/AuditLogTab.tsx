@@ -94,9 +94,9 @@ export default function AuditLogTab() {
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 md:gap-0 px-1 md:px-2">
         <div>
           <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
-            <ShieldCheck className="text-rose-500 w-5 h-5 md:w-[26px] md:h-[26px]" /> 활동 로그
+            <ShieldCheck className="text-rose-500 w-5 h-5 md:w-[26px] md:h-[26px]" /> 운영 감사 로그
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium">관리자 작업 내역을 실시간으로 모니터링합니다.</p>
+          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium">관리자 작업 내역과 중요 운영 변경 이력을 실시간으로 확인합니다.</p>
         </div>
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-4 md:h-4" />
@@ -229,7 +229,7 @@ export default function AuditLogTab() {
           </table>
         </div>
         <div className="bg-slate-50 p-3 md:p-4 border-t border-slate-100 flex justify-center">
-          <p className="text-[9px] md:text-[10px] font-bold text-slate-400">활동 로그는 보안을 위해 수정 및 삭제가 불가능합니다.</p>
+          <p className="text-[9px] md:text-[10px] font-bold text-slate-400">운영 감사 로그는 보안을 위해 수정 및 삭제가 불가능합니다.</p>
         </div>
       </div>
     </div>

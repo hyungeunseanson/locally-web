@@ -5,6 +5,17 @@
 
 ---
 
+## v3.38.26 — [Analytics] Review/Audit 섹션 역할 문구 정리
+
+**작업일:** 2026-03-13
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 섹션 라벨 정리 | `Analytics` 내부 탭 라벨을 `Review Quality`, `운영 감사 로그`로 조정해 순수 분석과 운영 품질/감사 성격이 섞여 보이던 인상을 줄임 |
+| 🔴 Analytics API 안전화 | 검증 중 드러난 `profiles.name` 의존을 `analytics-summary`, `analytics-host-summary`에서 제거해 fallback 뒤에 숨어 있던 500 에러를 함께 차단 |
+| 🟠 리뷰 품질 설명 보강 | `ReviewsTab` 헤더에 플랫폼 후기 품질과 미응답 후기 확인용이라는 운영 문구를 추가해 탭 목적을 더 명확히 표시 |
+| 🟡 감사 로그 설명 보강 | `AuditLogTab` 헤더와 안내 문구를 `운영 감사 로그` 기준으로 정리해 활동 기록이 아닌 운영 변경 이력 관점으로 읽히게 조정 |
+
 ## v3.38.25 — [Analytics] Host Ecosystem 서버 집계 분리
 
 **작업일:** 2026-03-13

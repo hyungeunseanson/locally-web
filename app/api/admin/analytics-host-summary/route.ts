@@ -46,7 +46,6 @@ type InquiryMessageRow = {
 
 type ProfileRow = {
   id: string;
-  name: string | null;
   full_name: string | null;
 };
 
@@ -187,7 +186,7 @@ export async function GET(request: Request) {
     if (hostIds.length > 0) {
       const { data: profileRows, error: profilesError } = await supabaseAdmin
         .from('profiles')
-        .select('id, name, full_name')
+        .select('id, full_name')
         .in('id', hostIds);
 
       if (profilesError) throw profilesError;
@@ -251,7 +250,7 @@ export async function GET(request: Request) {
       const ratingNum = stat.reviewCount > 0 ? stat.ratingSum / stat.reviewCount : 0;
       const host = {
         id: hostId,
-        name: profile?.name || profile?.full_name || 'Unknown Host',
+        name: profile?.full_name || 'Unknown Host',
         bookings: stat.bookings,
         cancelCount: stat.cancelCount,
         rating: ratingNum > 0 ? ratingNum.toFixed(1) : 'New',
@@ -360,7 +359,7 @@ export async function GET(request: Request) {
 
         return {
           id: hostId,
-          name: profile?.name || profile?.full_name || 'Unknown',
+          name: profile?.full_name || 'Unknown',
           rate,
           timeMins: Math.round(timeMins),
           total: stat.total,
