@@ -4,6 +4,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
+import { isCompletedServiceBooking, isPaidServiceBooking } from '@/app/constants/serviceStatus';
 import { getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 
 type AnalyticsBookingRow = {
@@ -52,6 +53,16 @@ type AnalyticsSearchLogRow = {
 type AnalyticsEventRow = {
   event_type: string | null;
   created_at: string | null;
+};
+
+type AnalyticsServiceBookingRow = {
+  id: string;
+  created_at: string;
+  customer_id: string | null;
+  amount: number | null;
+  status: string | null;
+  host_payout_amount: number | null;
+  platform_revenue: number | null;
 };
 
 type TrendStat = {
@@ -192,12 +203,19 @@ export async function GET(request: Request) {
       .select('event_type, created_at')
       .order('created_at', { ascending: false });
 
+    let serviceBookingsQuery = supabaseAdmin
+      .from('service_bookings')
+      .select('id, created_at, customer_id, amount, status, host_payout_amount, platform_revenue')
+      .in('status', ['PAID', 'confirmed', 'completed'])
+      .order('created_at', { ascending: false });
+
     if (startAt) {
       bookingsQuery = bookingsQuery.gte('created_at', startAt);
       reviewsQuery = reviewsQuery.gte('created_at', startAt);
       newUsersQuery = newUsersQuery.gte('created_at', startAt);
       searchLogsQuery = searchLogsQuery.gte('created_at', startAt);
       analyticsEventsQuery = analyticsEventsQuery.gte('created_at', startAt);
+      serviceBookingsQuery = serviceBookingsQuery.gte('created_at', startAt);
     }
 
     if (endAt) {
@@ -206,6 +224,7 @@ export async function GET(request: Request) {
       newUsersQuery = newUsersQuery.lte('created_at', endAt);
       searchLogsQuery = searchLogsQuery.lte('created_at', endAt);
       analyticsEventsQuery = analyticsEventsQuery.lte('created_at', endAt);
+      serviceBookingsQuery = serviceBookingsQuery.lte('created_at', endAt);
     }
 
     const [
@@ -215,6 +234,7 @@ export async function GET(request: Request) {
       { data: newUserRows, error: newUsersError },
       { data: searchLogRows, error: searchLogsError },
       { data: analyticsEventRows, error: analyticsEventsError },
+      { data: serviceBookingRows, error: serviceBookingsError },
     ] = await Promise.all([
       bookingsQuery,
       supabaseAdmin.from('experiences').select('id, title, status, created_at').order('created_at', { ascending: false }),
@@ -222,6 +242,7 @@ export async function GET(request: Request) {
       newUsersQuery,
       searchLogsQuery,
       analyticsEventsQuery,
+      serviceBookingsQuery,
     ]);
 
     if (bookingsError) throw bookingsError;
@@ -230,6 +251,7 @@ export async function GET(request: Request) {
     if (newUsersError) throw newUsersError;
     if (searchLogsError) throw searchLogsError;
     if (analyticsEventsError) throw analyticsEventsError;
+    if (serviceBookingsError) throw serviceBookingsError;
 
     const bookings = (bookingRows || []) as AnalyticsBookingRow[];
     const experiences = (experienceRows || []) as AnalyticsExperienceRow[];
@@ -237,6 +259,7 @@ export async function GET(request: Request) {
     const newUsers = (newUserRows || []) as AnalyticsProfileRow[];
     const searchLogs = (searchLogRows || []) as AnalyticsSearchLogRow[];
     const analyticsEvents = (analyticsEventRows || []) as AnalyticsEventRow[];
+    const serviceBookings = (serviceBookingRows || []) as AnalyticsServiceBookingRow[];
 
     const confirmedGuestIds = Array.from(
       new Set(
@@ -304,6 +327,32 @@ export async function GET(request: Request) {
         if ((booking.status || '').toLowerCase() === 'cancelled') userCancel += 1;
         else hostCancel += 1;
       }
+    }
+
+    for (const booking of serviceBookings) {
+      if (!isPaidServiceBooking(booking.status || '') && !isCompletedServiceBooking(booking.status || '')) {
+        continue;
+      }
+
+      completedCount += 1;
+      const amount = Number(booking.amount || 0);
+      const hostPayoutAmount = Number(booking.host_payout_amount || 0);
+      const platformRevenue = booking.platform_revenue != null
+        ? Number(booking.platform_revenue || 0)
+        : Math.max(amount - hostPayoutAmount, 0);
+
+      gmv += amount;
+      netRevenue += platformRevenue;
+
+      if (amount < 30000) priceDistribution.low += 1;
+      else if (amount < 100000) priceDistribution.mid += 1;
+      else priceDistribution.high += 1;
+
+      const dateKey = format(new Date(booking.created_at), 'yyyy-MM-dd');
+      const currentSeries = timeSeriesMap[dateKey] || { label: format(new Date(booking.created_at), 'MM.dd'), amount: 0 };
+      currentSeries.amount += amount;
+      timeSeriesMap[dateKey] = currentSeries;
+
     }
 
     for (const review of reviews) {

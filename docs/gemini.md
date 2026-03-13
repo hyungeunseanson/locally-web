@@ -24,7 +24,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/users-summary`: User Management/Analytics 공용 경량 회원 목록 API (`profiles + users.role` 병합)
 - `/api/admin/users-activity-summary`: User Management 리스트 전용 활동 summary API (`총 결제액/예약·의뢰 수/최근 활동` 지연 집계)
 - `/api/admin/users/[userId]/timeline`: User Management 상세 패널용 회원 활동 타임라인 API (예약/리뷰/문의 진행/맞춤 의뢰 상태 이벤트 조립)
-- `/api/admin/analytics-summary`: Data Analytics `Business & Guest` 전용 서버 집계 API (GMV/순수익/취소율/퍼널/검색/게스트 인구통계)
+- `/api/admin/analytics-summary`: Data Analytics `Business & Guest` 전용 서버 집계 API (상단 비즈니스 KPI는 체험 예약 + 서비스 결제 기준, 검색/게스트 인구통계/Top 체험은 기존 체험 중심 기준 유지)
 - `/api/admin/service-cancel`: 관리자 강제 취소/환불 API (NicePay error-safe)
 - `/api/admin/service-confirm-payment`: 무통장 입금 확인 API (PENDING→PAID + request→open, v3.9.2)
 - `/api/admin/service-payouts/mark-paid`: 서비스 정산 완료 처리 API (`service_bookings.payout_status='paid'` + audit log)
@@ -39,7 +39,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - service_bookings와 bookings는 완전히 별도 데이터 소스 — 훅/컴포넌트를 분리 유지한다.
 - 수수료율(%) Admin UI 어디에도 노출 금지 — 금액(amount)만 표시한다.
 - Billing/Sales 탭의 체험 정산은 자동 지급이 아니라 `운영자 수동 송금 → 정산 완료 클릭` 흐름을 기준으로 한다. 누적 정산 가능액이 `₩100,000` 이상일 때만 `정산 가능`, 미만 금액은 누적 보류한다.
-- Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. `Host Ecosystem`, `Review Management`, `Audit Logs`는 기존 구조를 유지한다.
+- Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 1차 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수)이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색`, `결제 고객 인구통계`는 기존 구조를 유지한다.
 
 ---
 

@@ -702,13 +702,13 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               <SimpleKpi label="활성 체험" value={stats.activeExpsCount} unit="개" onClick={() => setSelectedMetric('exps')} />
 
               {/* 3. 총 거래액 (원복) */}
-              <SimpleKpi label="총 거래액 (GMV)" value={`₩${(stats.gmv / 10000).toFixed(0)}`} unit="만" onClick={() => setSelectedMetric('gmv')} />
+              <SimpleKpi label="총 거래액 (GMV)" value={`₩${(stats.gmv / 10000).toFixed(0)}`} unit="만" sub="체험 + 서비스 결제" onClick={() => setSelectedMetric('gmv')} />
 
               {/* 4. 플랫폼 순수익 (원복) */}
-              <SimpleKpi label="플랫폼 순수익" value={`₩${stats.netRevenue.toLocaleString()}`} unit="" className="text-blue-600" onClick={() => setSelectedMetric('revenue')} />
+              <SimpleKpi label="플랫폼 순수익" value={`₩${stats.netRevenue.toLocaleString()}`} unit="" className="text-blue-600" sub="플랫폼 전체 기준" onClick={() => setSelectedMetric('revenue')} />
 
               {/* 5. 객단가 (AOV) */}
-              <SimpleKpi label="객단가 (AOV)" value={`₩${stats.aov.toLocaleString()}`} onClick={() => setSelectedMetric('aov')} />
+              <SimpleKpi label="객단가 (AOV)" value={`₩${stats.aov.toLocaleString()}`} sub="전체 결제 건 기준" onClick={() => setSelectedMetric('aov')} />
 
               {/* 6. 취소율 */}
               <SimpleKpi label="취소율" value={`${stats.cancellationRate}%`} onClick={() => setSelectedMetric('cancel')} />
@@ -1176,7 +1176,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                     <SimpleBar label="Mid (3~10만)" val={stats.priceDistribution.mid} max={stats.funnel.completed} />
                     <SimpleBar label="High (>10만)" val={stats.priceDistribution.high} max={stats.funnel.completed} />
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 text-center">객단가(AOV)를 높이려면 High 상품군을 늘려보세요.</p>
+                  <p className="text-xs text-slate-400 mt-2 text-center">체험 예약과 서비스 결제를 합친 전체 결제 건 기준 가격대 비중입니다.</p>
                 </div>
               )}
 
@@ -1212,7 +1212,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                   <div className="p-6 bg-rose-50 rounded-2xl border border-rose-100">
                     <div className="text-4xl font-black text-rose-500 tracking-tighter mb-2">₩{stats.topRevenueDate.amount.toLocaleString()}</div>
                     <div className="text-sm font-bold text-slate-600">발생일자: {stats.topRevenueDate.dateStr}</div>
-                    <p className="text-xs text-slate-500 mt-2">선택하신 기간 내 하루 기준 가장 많은 거래액이 발생한 날입니다.</p>
+                    <p className="text-xs text-slate-500 mt-2">선택하신 기간 내 체험 예약과 서비스 결제를 합친 하루 기준 최고 거래액입니다.</p>
                   </div>
                 </div>
               )}
@@ -1472,6 +1472,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                         <div className="text-sm font-black text-slate-700 mt-1">₩{stats.hostPayout.toLocaleString()}</div>
                       </div>
                     </div>
+                    <p className="text-xs text-slate-400 mt-4 text-center">체험 예약과 서비스 결제를 합친 플랫폼 전체 수익 구조입니다.</p>
                   </div>
                 </div>
               )}
