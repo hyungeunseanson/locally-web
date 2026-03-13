@@ -15,6 +15,7 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
+import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 import { ExperienceDetail, HostProfileDetail } from './types';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
@@ -94,7 +95,8 @@ export default function ExperienceClient({
       supabase.from('analytics_events').insert([{
         event_type: 'view',
         target_id: String(experience.id),
-        user_id: user?.id || null
+        user_id: user?.id || null,
+        ...getAnalyticsTrackingMetadata(),
       }]).then(({ error }) => {
         if (error) console.error('View Event Log Error:', error);
       });
@@ -147,7 +149,8 @@ export default function ExperienceClient({
     supabase.from('analytics_events').insert([{
       event_type: 'click',
       target_id: String(experience.id),
-      user_id: user.id
+      user_id: user.id,
+      ...getAnalyticsTrackingMetadata(),
     }]).then(({ error }) => {
       if (error) console.error('Click Event Log Error:', error);
     });

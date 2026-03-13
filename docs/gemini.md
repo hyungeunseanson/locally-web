@@ -60,6 +60,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - Data Analytics에서 `취소율`, `체험 검색 인기 트렌드`, `Top 체험`은 여전히 체험 예약/체험 검색 기준이다. 플랫폼 전체 KPI와 체험 전용 섹션이 섞여 있으므로 카드/섹션 문구로 기준을 명시한다.
 - Data Analytics `고객 검색 수요 분석`은 `/api/admin/analytics-search-intent`를 전용 source로 사용한다. 1차 범위는 `검색량 TOP`, `급상승`, `공급 부족`까지만 포함하며, 검색 후 클릭/결제 전환은 검색 로그와 이벤트 연결 키가 정리되기 전까지 보류한다.
 - Data Analytics `고객 구성 분석`은 `/api/admin/analytics-customer-composition`을 전용 source로 사용한다. 1차 범위는 결제 고객 기준 `국적`, `언어권`, `신규/반복`, `체험/서비스 선호`까지만 포함하며, 유입 source 분석은 정합성이 확인될 때까지 별도 단계로 분리한다.
+- 고객 유입 source 분석을 위해 `search_logs`, `analytics_events`에는 `session_id`, `referrer`, `referrer_host`, `utm_source`, `utm_medium`, `utm_campaign`, `landing_path`를 수집한다. 현재는 검색/체험 상세/결제 시작 이벤트만 이 메타데이터를 기록하며, 실제 source 분석 지표는 데이터가 충분히 쌓인 뒤 별도 단계에서 노출한다.
 - Data Analytics `Host Ecosystem`는 `/api/admin/analytics-host-summary`를 전용 source로 사용한다. 새 API 실패 시에만 기존 로컬 계산 fallback을 유지한다.
 
 ---

@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.54 — [Analytics] 고객 유입 source 추적 기반 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 source attribution 필드 추가 | `supabase_analytics_source_tracking_v3.38.54.sql`를 추가해 `search_logs`, `analytics_events`에 `referrer`, `referrer_host`, `utm_source`, `utm_medium`, `utm_campaign`, `landing_path` 필드를 확장 |
+| 🟠 검색/상세/결제 초기 이벤트 연결 | 메인 검색, 체험 상세 view/click, 결제 시작 이벤트가 같은 세션 기준의 source attribution 메타데이터를 함께 저장하도록 정리 |
+| 🟡 고도화 선행 작업 | 이번 단계는 고객 유입 분석을 위한 데이터 수집 기반만 추가하고, 실제 source 분석 지표는 데이터가 충분히 쌓인 뒤 별도 단계에서 노출하도록 유지 |
+
 ## v3.38.53 — [Analytics] 고객 구성 분석 1차 추가
 
 | 항목 | 내용 |

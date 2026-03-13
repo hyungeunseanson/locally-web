@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchActiveExperiences } from '../utils/api/experiences';
 import { Experience } from '../types';
 import { supabase } from '../lib/supabase';
+import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 
 // 🟢 통역기: 영어 ID가 들어오면 한글 DB 이름으로 바꿔주는 역할 (유지)
 const cityMap: Record<string, string> = {
@@ -52,7 +53,8 @@ export function useExperienceFilter() {
       // 🟢 검색 로그 기록 (Supabase, 비동기로 백그라운드에서 실행)
       supabase.from('search_logs').insert([{
         keyword: locationInput.trim(),
-        route: 'main'
+        route: 'main',
+        ...getAnalyticsTrackingMetadata(),
       }]).then(({ error }) => {
         if (error) console.error('Search Log Insert Error:', error);
       });
