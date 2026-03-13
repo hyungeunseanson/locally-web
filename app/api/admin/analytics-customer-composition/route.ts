@@ -54,6 +54,8 @@ type SourceFunnelBucket = {
   revenue: number;
   repeatCustomers: number;
   repeatRate: number;
+  topNationality: string | null;
+  topLanguage: string | null;
 };
 
 type CustomerStats = {
@@ -101,7 +103,9 @@ function toSourceFunnelBuckets(
   signups: Record<string, number>,
   payers: Record<string, number>,
   revenueBySource: Record<string, number>,
-  repeatCustomersBySource: Record<string, number>
+  repeatCustomersBySource: Record<string, number>,
+  nationalityBySource: Record<string, Record<string, number>>,
+  languageBySource: Record<string, Record<string, number>>
 ): SourceFunnelBucket[] {
   return Object.entries(signups)
     .filter(([, signupCount]) => signupCount > 0)
@@ -116,9 +120,21 @@ function toSourceFunnelBuckets(
         revenue: revenueBySource[name] || 0,
         repeatCustomers,
         repeatRate: payingCustomers > 0 ? (repeatCustomers / payingCustomers) * 100 : 0,
+        topNationality: getTopLabel(nationalityBySource[name]),
+        topLanguage: getTopLabel(languageBySource[name]),
       };
     })
     .sort((left, right) => right.signups - left.signups);
+}
+
+function getTopLabel(counts?: Record<string, number>) {
+  if (!counts) return null;
+
+  const topEntry = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .sort((left, right) => right[1] - left[1])[0];
+
+  return topEntry?.[0] || null;
 }
 
 export async function GET(request: Request) {
@@ -266,6 +282,8 @@ export async function GET(request: Request) {
     const sourcePayingCounts: Record<string, number> = {};
     const sourceRevenueTotals: Record<string, number> = {};
     const sourceRepeatCustomerCounts: Record<string, number> = {};
+    const sourceNationalityCounts: Record<string, Record<string, number>> = {};
+    const sourceLanguageCounts: Record<string, Record<string, number>> = {};
     let sourceTrackedCustomers = 0;
     let sourceSignupTrackedUsers = 0;
     let sourceStatus: SourceStatus = 'collecting';
@@ -306,6 +324,7 @@ export async function GET(request: Request) {
     });
 
     const signupProfileIds = signupProfiles.map((profile) => profile.id).filter(Boolean);
+    const profileById = new Map(profileRows.map((profile) => [profile.id, profile]));
     const sourceUserIds = Array.from(new Set([...customerIds, ...signupProfileIds]));
 
     if (sourceUserIds.length > 0) {
@@ -351,12 +370,27 @@ export async function GET(request: Request) {
           const label = firstSourceByUser.get(userId);
           if (!label) return;
           const stat = customerStats.get(userId);
+          const profile = profileById.get(userId);
           sourceTrackedCustomers += 1;
           sourceCounts[label] = (sourceCounts[label] || 0) + 1;
           sourceRevenueTotals[label] = (sourceRevenueTotals[label] || 0) + Number(stat?.revenue || 0);
           if ((stat?.transactions || 0) >= 2) {
             sourceRepeatCustomerCounts[label] = (sourceRepeatCustomerCounts[label] || 0) + 1;
           }
+
+          const nationality = String(profile?.nationality || '미입력').trim() || '미입력';
+          sourceNationalityCounts[label] = sourceNationalityCounts[label] || {};
+          sourceNationalityCounts[label][nationality] = (sourceNationalityCounts[label][nationality] || 0) + 1;
+
+          const languages = normalizeLanguageList(profile?.languages || null)
+            .map((language) => normalizeProfileLanguageValue(language))
+            .filter(Boolean);
+
+          const uniqueLanguages = Array.from(new Set(languages.length > 0 ? languages : ['미입력']));
+          sourceLanguageCounts[label] = sourceLanguageCounts[label] || {};
+          uniqueLanguages.forEach((language) => {
+            sourceLanguageCounts[label][language] = (sourceLanguageCounts[label][language] || 0) + 1;
+          });
         });
 
         signupProfileIds.forEach((userId) => {
@@ -395,7 +429,9 @@ export async function GET(request: Request) {
           sourceSignupCounts,
           sourcePayingCounts,
           sourceRevenueTotals,
-          sourceRepeatCustomerCounts
+          sourceRepeatCustomerCounts,
+          sourceNationalityCounts,
+          sourceLanguageCounts
         ).slice(0, 6),
       },
     });

@@ -115,6 +115,8 @@ type SourceFunnelBucket = {
   revenue: number;
   repeatCustomers: number;
   repeatRate: number;
+  topNationality: string | null;
+  topLanguage: string | null;
 };
 
 type AnalyticsCustomerCompositionSummary = {
@@ -1222,6 +1224,11 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                           <div className="mt-1 text-[11px] md:text-xs text-slate-500">
                             결제액 {formatKrw(item.revenue)} · 반복 {item.repeatCustomers}명 ({item.repeatRate.toFixed(1)}%)
                           </div>
+                          {(item.topNationality || item.topLanguage) && (
+                            <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                              주요 고객: {[item.topNationality, item.topLanguage].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : customerComposition.sourceAvailable && (customerComposition.sourceMix || []).length > 0 ? (
