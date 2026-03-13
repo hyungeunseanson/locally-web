@@ -5,6 +5,13 @@
 
 ---
 
+## v3.38.51 — [Payments] PayPal 서비스 결제 UI 스모크 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 서비스 PayPal 분기 보호막 | `tests/e2e/12-service-paypal-payment.spec.ts`를 추가해 서비스 결제 페이지의 `PayPal` 선택지, mocked SDK 승인 흐름, `/api/services/payment/paypal/create-order`·`capture-order` 호출, 완료 페이지 이동까지 직접 검증 |
+| 🟠 안전한 mock 전략 | 실제 PayPal 네트워크나 secret 의존 없이 SDK 스크립트와 create/capture API 응답만 mock하고, 런타임에 PayPal 옵션이 꺼져 있으면 명시적으로 skip하도록 구성해 기존 NicePay/무통장 회귀를 차단 |
+
 ## v3.38.50 — [Payments] PayPal 서비스 의뢰 취소·환불 분기 추가
 
 | 항목 | 내용 |
