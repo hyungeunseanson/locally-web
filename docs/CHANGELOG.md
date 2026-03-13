@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.27 — [Service Requests] 전용 스모크 테스트 추가
+
+**작업일:** 2026-03-13
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 실무 보호막 추가 | 신규 `10-admin-service-requests.spec.ts`를 추가해 `SERVICE_REQUESTS` 탭의 핵심 운영 흐름인 무통장 입금 확인, 서비스 정산 대기, 정산 완료 처리, 취소·환불 목록 표시를 직접 검증 |
+| 🟠 운영 fixture 재사용 | 기존 Billing service fixture 패턴을 재사용해 실제 관리자/고객/호스트 계정과 서비스 의뢰/예약 데이터를 안전하게 시드하고 정리하는 구조로 스모크를 구성 |
+| 🟡 회귀 교차 검증 | `SERVICE_REQUESTS` 전용 스모크 추가 후 기존 `Master Ledger`, `Approvals`, `Billing`, `Analytics` 관리자 스모크와 함께 다시 확인하도록 보호 범위를 확장 |
+
 ## v3.38.26 — [Analytics] Review/Audit 섹션 역할 문구 정리
 
 **작업일:** 2026-03-13
