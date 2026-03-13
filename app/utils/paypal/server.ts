@@ -3,6 +3,7 @@ import type {
   PayPalCaptureResult,
   PayPalCreateOrderParams,
   PayPalCreateOrderRequest,
+  PayPalCurrencyCode,
   PayPalEnvironment,
   PayPalOrder,
   PayPalTokenResponse,
@@ -12,6 +13,8 @@ const PAYPAL_API_BASE: Record<PayPalEnvironment, string> = {
   sandbox: 'https://api-m.sandbox.paypal.com',
   live: 'https://api-m.paypal.com',
 };
+
+const ZERO_DECIMAL_CURRENCIES = new Set<PayPalCurrencyCode>(['KRW']);
 
 class PayPalConfigError extends Error {
   constructor(message: string) {
@@ -134,9 +137,13 @@ export async function getPayPalAccessToken(): Promise<string> {
   return token.access_token;
 }
 
-function toPayPalAmountValue(amount: number) {
+function toPayPalAmountValue(amount: number, currencyCode: PayPalCurrencyCode) {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error('PayPal amount must be a positive number.');
+  }
+
+  if (ZERO_DECIMAL_CURRENCIES.has(currencyCode)) {
+    return Math.round(amount).toString();
   }
 
   return amount.toFixed(2);
@@ -145,6 +152,8 @@ function toPayPalAmountValue(amount: number) {
 export function buildPayPalCreateOrderRequest(
   params: PayPalCreateOrderParams
 ): PayPalCreateOrderRequest {
+  const currencyCode = params.currencyCode || 'USD';
+
   return {
     intent: 'CAPTURE',
     purchase_units: [
@@ -153,8 +162,8 @@ export function buildPayPalCreateOrderRequest(
         custom_id: params.orderId,
         description: params.description,
         amount: {
-          currency_code: params.currencyCode || 'USD',
-          value: toPayPalAmountValue(params.amount),
+          currency_code: currencyCode,
+          value: toPayPalAmountValue(params.amount, currencyCode),
         },
       },
     ],

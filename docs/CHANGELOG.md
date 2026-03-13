@@ -13,6 +13,14 @@
 | 🟠 타입 중앙화 | `app/types/paypal.ts`를 추가해 order/token/capture 타입을 중앙화하고 이후 체험/서비스 결제 route에서 재사용 가능하게 준비 |
 | 🟡 NicePay 무변경 원칙 | 이번 단계는 UI, 결제 route, 취소/환불 흐름을 건드리지 않고 공통 기반만 추가해 기존 NicePay 결제 회귀를 차단 |
 
+## v3.38.45 — [Payments] PayPal 체험 결제 서버 route 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 create-order 추가 | `/api/payment/paypal/create-order`를 추가해 로그인 사용자 본인 예약인지, `PENDING` 상태인지, 금액이 유효한지 검증한 뒤 PayPal order를 생성하도록 분리 |
+| 🟠 capture-order 추가 | `/api/payment/paypal/capture-order`를 추가해 PayPal order 참조/custom_id와 금액을 다시 검증하고, capture 성공 시 기존 NicePay와 같은 예약 확정/정산 데이터(`payment_method='paypal'`, `tid=<captureId>`)를 저장 |
+| 🟡 NicePay 경로 보존 | 이번 단계도 기존 체험 결제 UI, NicePay callback, 취소/환불 route는 전혀 변경하지 않아 회귀 면적을 최소화 |
+
 ## v3.38.43 — [Admin Dashboard] Users/Approvals 탭 공통 로딩 게이트 분리
 
 | 항목 | 내용 |
