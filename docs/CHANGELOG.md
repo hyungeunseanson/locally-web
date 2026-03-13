@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.28 — [User Management] 전용 스모크 테스트 추가
+
+**작업일:** 2026-03-13
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Users 보호막 추가 | 신규 `11-admin-users.spec.ts`를 추가해 `User Management` 탭의 회원 검색, 요약 컬럼 렌더, 상세 패널, 회원 타임라인 노출을 직접 검증 |
+| 🟠 운영 fixture 최소화 | 전용 테스트 회원 1명에 예약, 리뷰, 문의 답변, 서비스 의뢰/결제를 안전하게 시드해서 목록 summary와 타임라인이 실제 데이터로 채워지는지 확인 |
+| 🟡 회귀 교차 검증 | Users 전용 스모크 추가 후 기존 `Master Ledger`, `Approvals`, `Billing`, `Analytics`, `Service Requests` 관리자 스모크와 함께 다시 확인하도록 보호 범위를 확장 |
+
 ## v3.38.27 — [Service Requests] 전용 스모크 테스트 추가
 
 **작업일:** 2026-03-13
