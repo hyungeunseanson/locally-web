@@ -14,7 +14,6 @@ type ActiveExperienceRow = {
   city: string | null;
   description: string | null;
   category: string | null;
-  tags: string[] | null;
 };
 
 type SearchIntentItem = {
@@ -49,7 +48,6 @@ function getSearchHaystack(experience: ActiveExperienceRow) {
     experience.city,
     experience.description,
     experience.category,
-    ...(Array.isArray(experience.tags) ? experience.tags : []),
   ].filter(Boolean).join(' '));
 }
 
@@ -123,7 +121,7 @@ export async function GET(request: Request) {
       searchLogsQuery,
       supabaseAdmin
         .from('experiences')
-        .select('id, title, city, description, category, tags')
+        .select('id, title, city, description, category')
         .eq('status', 'active'),
     ]);
 
