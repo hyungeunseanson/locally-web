@@ -48,7 +48,6 @@ type ProfileRow = {
   id: string;
   name: string | null;
   full_name: string | null;
-  email?: string | null;
 };
 
 type DistributionStat = {
@@ -188,7 +187,7 @@ export async function GET(request: Request) {
     if (hostIds.length > 0) {
       const { data: profileRows, error: profilesError } = await supabaseAdmin
         .from('profiles')
-        .select('id, name, full_name, email')
+        .select('id, name, full_name')
         .in('id', hostIds);
 
       if (profilesError) throw profilesError;
@@ -235,7 +234,6 @@ export async function GET(request: Request) {
     const superHosts: Array<{
       id: string;
       name: string;
-      email: string | null;
       bookings: number;
       cancelCount: number;
       rating: string;
@@ -243,7 +241,6 @@ export async function GET(request: Request) {
     const riskHosts: Array<{
       id: string;
       name: string;
-      email: string | null;
       bookings: number;
       cancelCount: number;
       rating: string;
@@ -255,7 +252,6 @@ export async function GET(request: Request) {
       const host = {
         id: hostId,
         name: profile?.name || profile?.full_name || 'Unknown Host',
-        email: profile?.email || null,
         bookings: stat.bookings,
         cancelCount: stat.cancelCount,
         rating: ratingNum > 0 ? ratingNum.toFixed(1) : 'New',
