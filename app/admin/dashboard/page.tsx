@@ -65,7 +65,7 @@ function DataDrivenAdminTab({
   setSelectedItem: React.Dispatch<React.SetStateAction<unknown>>;
 }) {
   const {
-    apps, exps, users, bookings, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages, onlineUsers, isLoading,
+    apps, exps, users, onlineUsers, isLoading,
     updateStatus, deleteItem
   } = useAdminData();
 
@@ -73,21 +73,6 @@ function DataDrivenAdminTab({
 
   if (activeTab === 'USERS') {
     return <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />;
-  }
-  if (activeTab === 'ANALYTICS') {
-    return (
-      <AnalyticsTab
-        bookings={bookings}
-        users={users}
-        exps={exps}
-        apps={apps}
-        reviews={reviews}
-        searchLogs={searchLogs}
-        analyticsEvents={analyticsEvents}
-        inquiries={inquiries}
-        inquiryMessages={inquiryMessages}
-      />
-    );
   }
 
   return (
@@ -142,6 +127,8 @@ function AdminDashboardContent() {
         <SalesTab />
       ) : activeTab === 'LEDGER' ? (
         <MasterLedgerTab />
+      ) : activeTab === 'ANALYTICS' ? (
+        <AnalyticsTab />
       ) : (
         <DataDrivenAdminTab
           activeTab={activeTab}

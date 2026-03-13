@@ -13,6 +13,13 @@
 | 🟠 역할 용어/배지 정리 | 기본 역할을 `Guest`로 통일하고 `Guest / Host / Admin` 배지를 각각 다른 색상으로 구분해 목록과 상세 헤더에서 더 쉽게 식별되도록 정리 |
 | 🟡 리스트 정보 우선순위 보정 | 목록에서는 `최근 활동`만 남기고 `최근 접속` 컬럼은 제거해 중복 정보를 줄이고, 접속 상태는 상세 헤더의 `지금 활동 중 / 마지막 접속`으로만 유지 |
 
+## v3.38.42 — [Admin Dashboard] Analytics 탭 공통 로딩 게이트 분리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 Analytics 독립 렌더 | `Data Analytics` 탭을 `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖으로 분리해, shared admin fetch가 느리거나 실패해도 `AnalyticsTab`이 전용 admin API 기준으로 바로 렌더되도록 정리 |
+| 🟠 fallback 안전망 유지 | `AnalyticsTab`의 shared props를 optional로 낮추고, 서버 집계 실패 시에만 마지막 안전망으로 로컬 계산값을 쓰는 구조를 유지해 회귀 없이 독립성을 높임 |
+
 ## v3.38.40 — [Admin Dashboard] Billing 탭 공통 로딩 게이트 분리
 
 | 항목 | 내용 |

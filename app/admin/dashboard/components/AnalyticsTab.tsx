@@ -17,16 +17,18 @@ import { getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
 interface AnalyticsTabProps {
-  bookings: any[];
-  users: any[];
-  exps: any[];
-  apps: any[];
-  reviews: any[];
+  bookings?: any[];
+  users?: any[];
+  exps?: any[];
+  apps?: any[];
+  reviews?: any[];
   searchLogs?: any[]; // 🟢 추가
   analyticsEvents?: any[]; // 🟢 추가
   inquiries?: any[]; // 🟢 추가
   inquiryMessages?: any[]; // 🟢 추가
 }
+
+const EMPTY_ANALYTICS_ITEMS: any[] = [];
 
 type AnalyticsBusinessSummary = {
   totalUsers: number;
@@ -78,7 +80,16 @@ type AnalyticsHostSummary = {
 
 type SummarySource = 'server' | 'cached' | 'fallback';
 
-export default function AnalyticsTab({ bookings, users, exps, apps, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages }: AnalyticsTabProps) {
+export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
+  const bookings = props.bookings ?? EMPTY_ANALYTICS_ITEMS;
+  const users = props.users ?? EMPTY_ANALYTICS_ITEMS;
+  const exps = props.exps ?? EMPTY_ANALYTICS_ITEMS;
+  const apps = props.apps ?? EMPTY_ANALYTICS_ITEMS;
+  const reviews = props.reviews ?? EMPTY_ANALYTICS_ITEMS;
+  const searchLogs = props.searchLogs ?? EMPTY_ANALYTICS_ITEMS;
+  const analyticsEvents = props.analyticsEvents ?? EMPTY_ANALYTICS_ITEMS;
+  const inquiries = props.inquiries ?? EMPTY_ANALYTICS_ITEMS;
+  const inquiryMessages = props.inquiryMessages ?? EMPTY_ANALYTICS_ITEMS;
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
@@ -184,13 +195,6 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
     let cancelled = false;
 
     const loadAnalyticsData = async () => {
-      if (!bookings || !users || !exps || !apps) {
-        if (!cancelled) {
-          setLoading(false);
-        }
-        return;
-      }
-
       setLoading(true);
 
       let localStats: typeof stats | null = null;
