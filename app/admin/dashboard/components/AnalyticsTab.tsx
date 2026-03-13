@@ -193,8 +193,13 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
       setLoading(true);
 
-      const localStats = buildLocalStats();
-      let nextStats = localStats;
+      let localStats: typeof stats | null = null;
+      const getLocalStats = () => {
+        if (!localStats) {
+          localStats = buildLocalStats();
+        }
+        return localStats;
+      };
 
       const params = new URLSearchParams();
       if (dateRange[0].startDate) {
@@ -242,6 +247,9 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         business: 'fallback',
         host: 'fallback',
       };
+      const needsBusinessFallback = businessResult.status !== 'fulfilled' && !cachedBusinessSummary;
+      const needsHostFallback = hostResult.status !== 'fulfilled' && !cachedHostSummary;
+      let nextStats = (needsBusinessFallback || needsHostFallback) ? getLocalStats() : stats;
 
       if (businessResult.status === 'fulfilled') {
         summaryCacheRef.current.business[cacheKey] = businessResult.value;
@@ -274,6 +282,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         };
         nextSummarySource.host = 'cached';
       } else {
+        nextStats = getLocalStats();
         console.error('[AnalyticsTab] analytics-host-summary fallback:', hostResult.reason);
       }
 
