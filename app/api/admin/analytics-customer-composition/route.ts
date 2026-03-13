@@ -24,6 +24,15 @@ type AnalyticsProfileRow = {
   languages: string[] | string | null;
 };
 
+type AnalyticsEventSourceRow = {
+  user_id: string | null;
+  created_at: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  referrer_host: string | null;
+  landing_path: string | null;
+};
+
 type CompositionBucket = {
   name: string;
   customers: number;
@@ -36,6 +45,8 @@ type CustomerStats = {
   hasServicePurchase: boolean;
 };
 
+type SourceStatus = 'ready' | 'collecting' | 'unavailable';
+
 function toBuckets(counts: Record<string, number>, totalCustomers: number): CompositionBucket[] {
   return Object.entries(counts)
     .filter(([, customers]) => customers > 0)
@@ -45,6 +56,27 @@ function toBuckets(counts: Record<string, number>, totalCustomers: number): Comp
       percent: totalCustomers > 0 ? (customers / totalCustomers) * 100 : 0,
     }))
     .sort((left, right) => right.customers - left.customers);
+}
+
+function getSourceLabel(event: AnalyticsEventSourceRow) {
+  const utmSource = String(event.utm_source || '').trim();
+  const utmMedium = String(event.utm_medium || '').trim();
+  const referrerHost = String(event.referrer_host || '').trim().replace(/^www\./i, '');
+  const landingPath = String(event.landing_path || '').trim();
+
+  if (utmSource) {
+    return utmMedium ? `${utmSource} (${utmMedium})` : utmSource;
+  }
+
+  if (referrerHost) {
+    return referrerHost;
+  }
+
+  if (landingPath) {
+    return '직접 방문';
+  }
+
+  return '';
 }
 
 export async function GET(request: Request) {
@@ -166,6 +198,9 @@ export async function GET(request: Request) {
       '서비스 전용': 0,
       '체험 + 서비스': 0,
     };
+    const sourceCounts: Record<string, number> = {};
+    let sourceTrackedCustomers = 0;
+    let sourceStatus: SourceStatus = 'collecting';
 
     customerStats.forEach((stat) => {
       if (stat.transactions >= 2) {
@@ -202,6 +237,59 @@ export async function GET(request: Request) {
       });
     });
 
+    if (customerIds.length > 0) {
+      try {
+        let sourceEventsQuery = supabaseAdmin
+          .from('analytics_events')
+          .select('user_id, created_at, utm_source, utm_medium, referrer_host, landing_path')
+          .in('user_id', customerIds)
+          .in('event_type', ['view', 'click', 'payment_init']);
+
+        if (startAt) {
+          sourceEventsQuery = sourceEventsQuery.gte('created_at', startAt);
+        }
+
+        if (endAt) {
+          sourceEventsQuery = sourceEventsQuery.lte('created_at', endAt);
+        }
+
+        const { data: sourceEvents, error: sourceEventsError } = await sourceEventsQuery;
+
+        if (sourceEventsError) throw sourceEventsError;
+
+        const firstSourceByCustomer = new Map<string, string>();
+
+        ((sourceEvents || []) as AnalyticsEventSourceRow[])
+          .filter((event) => Boolean(event.user_id))
+          .sort((left, right) => {
+            const leftTime = new Date(left.created_at || 0).getTime();
+            const rightTime = new Date(right.created_at || 0).getTime();
+            return leftTime - rightTime;
+          })
+          .forEach((event) => {
+            const userId = event.user_id;
+            if (!userId || firstSourceByCustomer.has(userId)) return;
+
+            const label = getSourceLabel(event);
+            if (!label) return;
+
+            firstSourceByCustomer.set(userId, label);
+          });
+
+        sourceTrackedCustomers = firstSourceByCustomer.size;
+
+        if (sourceTrackedCustomers > 0) {
+          sourceStatus = 'ready';
+          firstSourceByCustomer.forEach((label) => {
+            sourceCounts[label] = (sourceCounts[label] || 0) + 1;
+          });
+        }
+      } catch (sourceError) {
+        console.warn('[api/admin/analytics-customer-composition] source mix unavailable', sourceError);
+        sourceStatus = 'unavailable';
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -210,7 +298,10 @@ export async function GET(request: Request) {
         languageMix: toBuckets(languageCounts, totalPayingCustomers).slice(0, 6),
         loyaltyMix: toBuckets(loyaltyCounts, totalPayingCustomers),
         purchaseMix: toBuckets(purchaseCounts, totalPayingCustomers),
-        sourceAvailable: false,
+        sourceAvailable: sourceStatus === 'ready',
+        sourceStatus,
+        sourceTrackedCustomers,
+        sourceMix: toBuckets(sourceCounts, sourceTrackedCustomers).slice(0, 6),
       },
     });
   } catch (error) {

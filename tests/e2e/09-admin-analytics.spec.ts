@@ -189,13 +189,16 @@ test.describe.serial('Admin analytics smoke', () => {
     await test.step('Show customer composition block copy', async () => {
       await expect(page.getByRole('heading', { name: '고객 구성 분석' })).toBeVisible();
       await expect(page.getByText('체험 + 서비스 결제 고객 기준으로 고객 구성을 봅니다.')).toBeVisible();
-      await expect(page.getByText('누가 결제하고, 누가 다시 결제하는지 고객 구성을 먼저 보고 유입 분석은 source 정합성을 확인한 뒤 추가합니다.')).toBeVisible();
+      await expect(page.getByText('누가 결제하고, 누가 다시 결제하는지 고객 구성을 먼저 보고, 추적된 고객 기준 유입 source도 함께 참고합니다.')).toBeVisible();
       await expect(page.getByText('언어는 복수 응답 기준이라 한 고객이 여러 언어에 함께 집계될 수 있습니다.')).toBeVisible();
-      await expect(page.getByText('유입 분석은 고객 source 정합성 확인 후 추가 예정입니다.')).toBeVisible();
       await expect(page.getByText('국적별 결제 고객')).toBeVisible();
       await expect(page.getByText('주요 언어권')).toBeVisible();
       await expect(page.getByText('신규 vs 반복 고객')).toBeVisible();
       await expect(page.getByText('체험/서비스 선호')).toBeVisible();
+      await expect(page.getByText('주요 유입 source')).toBeVisible();
+      await expect(
+        page.getByText(/유입 source 데이터가 아직 충분히 쌓이는 중입니다.|유입 source 집계를 현재 불러오지 못해, 다른 고객 구성 지표만 표시하고 있습니다.|유입 source는 추적 데이터가 남아 있는 결제 고객/)
+      ).toBeVisible();
     });
 
     await test.step('Open GMV modal with platform-wide explanation', async () => {

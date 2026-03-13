@@ -114,6 +114,9 @@ type AnalyticsCustomerCompositionSummary = {
   loyaltyMix: CompositionBucket[];
   purchaseMix: CompositionBucket[];
   sourceAvailable: boolean;
+  sourceStatus?: 'ready' | 'collecting' | 'unavailable';
+  sourceTrackedCustomers?: number;
+  sourceMix?: CompositionBucket[];
 };
 
 type CustomerCompositionSource = 'server' | 'cached' | 'unavailable';
@@ -1083,16 +1086,24 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs md:text-sm text-slate-600">
                 <div className="font-semibold text-slate-800">체험 + 서비스 결제 고객 기준으로 고객 구성을 봅니다.</div>
-                <div className="mt-1">누가 결제하고, 누가 다시 결제하는지 고객 구성을 먼저 보고 유입 분석은 source 정합성을 확인한 뒤 추가합니다.</div>
+                <div className="mt-1">누가 결제하고, 누가 다시 결제하는지 고객 구성을 먼저 보고, 추적된 고객 기준 유입 source도 함께 참고합니다.</div>
                 <div className="mt-1">언어는 복수 응답 기준이라 한 고객이 여러 언어에 함께 집계될 수 있습니다.</div>
-                {customerComposition && !customerComposition.sourceAvailable && (
-                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">유입 분석은 고객 source 정합성 확인 후 추가 예정입니다.</div>
+                {customerComposition?.sourceStatus === 'ready' && (
+                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                    유입 source는 추적 데이터가 남아 있는 결제 고객 {customerComposition.sourceTrackedCustomers || 0}명 기준 참고용입니다.
+                  </div>
+                )}
+                {customerComposition?.sourceStatus === 'collecting' && (
+                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">유입 source 데이터가 아직 충분히 쌓이는 중입니다.</div>
+                )}
+                {customerComposition?.sourceStatus === 'unavailable' && (
+                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">유입 source 집계를 현재 불러오지 못해, 다른 고객 구성 지표만 표시하고 있습니다.</div>
                 )}
               </div>
             </div>
 
             {customerComposition ? (
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
                 <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm md:text-base font-bold text-slate-800">국적별 결제 고객</h3>
@@ -1163,6 +1174,36 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                       </div>
                     )) : (
                       <div className="py-6 text-center text-sm text-slate-400">구성 데이터가 부족합니다.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">주요 유입 source</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">
+                      {customerComposition.sourceAvailable
+                        ? `추적 고객 ${customerComposition.sourceTrackedCustomers || 0}명`
+                        : '참고용'}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {customerComposition.sourceAvailable && (customerComposition.sourceMix || []).length > 0 ? (
+                      (customerComposition.sourceMix || []).map((item) => (
+                        <div key={`customer-composition-source-${item.name}`} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.name}</span>
+                            <span className="text-xs font-mono text-slate-500">{item.percent.toFixed(1)}%</span>
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-xs text-slate-500">{item.customers}명</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-sm text-slate-400">
+                        {customerComposition.sourceStatus === 'unavailable'
+                          ? '유입 source 집계를 불러오지 못했습니다.'
+                          : '유입 source 데이터가 더 쌓이면 여기서 볼 수 있습니다.'}
+                      </div>
                     )}
                   </div>
                 </div>

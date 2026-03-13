@@ -13,6 +13,14 @@
 | 🟠 검색/상세/결제 초기 이벤트 연결 | 메인 검색, 체험 상세 view/click, 결제 시작 이벤트가 같은 세션 기준의 source attribution 메타데이터를 함께 저장하도록 정리 |
 | 🟡 고도화 선행 작업 | 이번 단계는 고객 유입 분석을 위한 데이터 수집 기반만 추가하고, 실제 source 분석 지표는 데이터가 충분히 쌓인 뒤 별도 단계에서 노출하도록 유지 |
 
+## v3.38.55 — [Analytics] 고객 유입 source 분석 1차 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 고객 구성 API 확장 | `/api/admin/analytics-customer-composition`가 `analytics_events` 기준으로 추적된 결제 고객의 첫 유입 source를 집계해 `주요 유입 source`를 함께 내려주도록 확장 |
+| 🟠 Analytics 고객 source 블록 추가 | `Data Analytics`의 `고객 구성 분석` 섹션에 `주요 유입 source` 카드를 추가하고, `ready / collecting / unavailable` 상태별 안내 문구를 분리해 운영자가 참고 수준을 바로 읽을 수 있게 정리 |
+| 🟡 안전한 스키마 의존 축소 | 실DB에서 없는 `experiences.tags` 의존을 제거해 새 검색/고객 분석 API가 500 없이 동작하도록 보정하고, source 데이터가 부족하면 다른 고객 구성 지표를 유지한 채 참고용 카드만 보이게 처리 |
+
 ## v3.38.53 — [Analytics] 고객 구성 분석 1차 추가
 
 | 항목 | 내용 |
