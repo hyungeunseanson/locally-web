@@ -394,7 +394,7 @@ test.describe.serial('Admin service requests smoke', () => {
 
     await page.getByRole('button', { name: '정산 대기' }).click();
     await expect(page.getByText('서비스 정산 대기')).toBeVisible();
-    await expect(page.getByText('테스트은행 12345678901234')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('테스트은행 12345678901234').first()).toBeVisible({ timeout: 20000 });
     await page.locator('p.font-bold', { hasText: hostUser.fullName }).first().click();
     await expect(page.getByRole('button', { name: /이체 완료 처리/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /명세서 CSV/ })).toBeVisible();

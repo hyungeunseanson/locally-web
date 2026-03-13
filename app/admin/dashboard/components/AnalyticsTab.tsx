@@ -769,6 +769,13 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
             </div>
           )}
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <CheckCircle size={16} className="mt-0.5 shrink-0 text-slate-500" />
+            <div>
+              <div className="font-semibold">상단 지표와 결제 고객 인구통계는 플랫폼 전체 기준입니다.</div>
+              <div className="text-xs text-slate-500">체험 예약과 서비스 결제를 합친 전체 결제 데이터를 기준으로 집계합니다.</div>
+            </div>
+          </div>
           {/* 1. 핵심 지표 (KPI) - 원본 순서 및 기능 100% 복구 */}
           <section>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -885,6 +892,14 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
             </div>
           </section>
+
+          <div className="mt-6 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-rose-600" />
+            <div>
+              <div className="font-semibold">아래 구간은 체험 예약 전용 분석입니다.</div>
+              <div className="text-xs text-rose-700">취소율, 체험 검색 트렌드, 매출 견인 Top 체험, 예약 퍼널은 서비스 의뢰가 아닌 체험 예약 흐름만 기준으로 표시합니다.</div>
+            </div>
+          </div>
 
           {/* 2. 인기 검색어 (트렌드) */}
           <section className="pt-4 md:pt-6">

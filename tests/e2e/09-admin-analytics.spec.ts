@@ -151,6 +151,8 @@ test.describe.serial('Admin analytics smoke', () => {
     await expect(page.getByRole('button', { name: 'Business & Guest' })).toBeVisible();
 
     await test.step('Show platform-wide KPI scope labels', async () => {
+      await expect(page.getByText('상단 지표와 결제 고객 인구통계는 플랫폼 전체 기준입니다.')).toBeVisible();
+      await expect(page.getByText('체험 예약과 서비스 결제를 합친 전체 결제 데이터를 기준으로 집계합니다.')).toBeVisible();
       await expect(page.getByText('총 거래액 (GMV)')).toBeVisible();
       await expect(page.getByText('체험 + 서비스 결제', { exact: true })).toBeVisible();
       await expect(page.getByText('플랫폼 순수익')).toBeVisible();
@@ -162,7 +164,9 @@ test.describe.serial('Admin analytics smoke', () => {
     });
 
     await test.step('Show experience-only section copy', async () => {
-      await expect(page.getByText('취소율')).toBeVisible();
+      await expect(page.getByText('아래 구간은 체험 예약 전용 분석입니다.')).toBeVisible();
+      await expect(page.getByText('취소율, 체험 검색 트렌드, 매출 견인 Top 체험, 예약 퍼널은 서비스 의뢰가 아닌 체험 예약 흐름만 기준으로 표시합니다.')).toBeVisible();
+      await expect(page.getByText('취소율', { exact: true })).toBeVisible();
       await expect(page.getByText('체험 예약 기준', { exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: /체험 검색 인기 트렌드/ })).toBeVisible();
       await expect(page.getByText('체험 예약 결제 완료 건수 기준', { exact: true })).toBeVisible();
@@ -176,7 +180,7 @@ test.describe.serial('Admin analytics smoke', () => {
     });
 
     await test.step('Open cancellation modal with experience-only explanation', async () => {
-      await page.getByText('취소율').click();
+      await page.getByText('취소율', { exact: true }).click();
       await expect(page.getByRole('heading', { name: '체험 예약 취소 사유 분석' })).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('이 구간은 서비스 의뢰가 아닌 체험 예약 취소 기준입니다. 호스트 거절이 많다면 달력 관리를 독려해야 합니다.')).toBeVisible();
       await closeAnalyticsModal(page);
