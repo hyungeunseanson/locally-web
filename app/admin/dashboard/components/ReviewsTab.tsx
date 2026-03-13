@@ -94,7 +94,7 @@ export default function ReviewsTab() {
             리뷰 품질 관리
           </h2>
           <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-            플랫폼 전체 후기 품질과 미응답 후기를 운영 관점에서 확인합니다. 전체 {reviews.length}개 · 평균 {avgRating}점
+            플랫폼 전체 후기 품질과 이상 징후를 운영 관점에서 확인합니다. 전체 {reviews.length}개 · 평균 {avgRating}점
           </p>
         </div>
         <button

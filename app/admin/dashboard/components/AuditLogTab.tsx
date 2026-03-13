@@ -96,7 +96,7 @@ export default function AuditLogTab() {
           <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
             <ShieldCheck className="text-rose-500 w-5 h-5 md:w-[26px] md:h-[26px]" /> 운영 감사 로그
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium">관리자 작업 내역과 중요 운영 변경 이력을 실시간으로 확인합니다.</p>
+          <p className="text-xs md:text-sm text-slate-500 mt-1 font-medium">관리자 작업 내역과 중요 운영 변경 이력을 실시간으로 추적합니다. 일반 분석 수치가 아니라 감사용 이력 화면입니다.</p>
         </div>
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-4 md:h-4" />

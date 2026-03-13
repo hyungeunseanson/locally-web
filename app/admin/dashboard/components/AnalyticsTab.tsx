@@ -1276,12 +1276,20 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
       {activeMainTab === 'reviews' && (
         <div className="animate-in slide-in-from-bottom-[50px] duration-500">
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            <div className="font-semibold text-slate-800">Review Quality는 리뷰 품질과 이상 징후를 보는 운영 구간입니다.</div>
+            <div className="mt-1">리뷰 삭제, 미응답 상태, 후기 내용 확인처럼 품질 관리에 필요한 작업만 집중해서 봅니다.</div>
+          </div>
           <ReviewsTab />
         </div>
       )}
 
       {activeMainTab === 'logs' && (
         <div className="animate-in slide-in-from-bottom-[50px] duration-500">
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            <div className="font-semibold text-slate-800">운영 감사 로그는 관리자 작업 추적용 구간입니다.</div>
+            <div className="mt-1">누가 어떤 운영 액션을 언제 수행했는지 확인하는 감사 이력만 보여주며, 일반 분석 숫자와는 분리해서 읽어야 합니다.</div>
+          </div>
           <AuditLogTab />
         </div>
       )}
