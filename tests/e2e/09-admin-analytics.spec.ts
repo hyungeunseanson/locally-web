@@ -208,12 +208,22 @@ test.describe.serial('Admin analytics smoke', () => {
     });
 
     await test.step('Open Review Quality and audit role copy', async () => {
+      const reviewsApiPromise = page.waitForResponse((response) =>
+        response.url().includes('/api/admin/reviews') && response.request().method() === 'GET'
+      );
+
       await page.getByRole('button', { name: 'Review Quality' }).click();
+      await reviewsApiPromise;
       await expect(page.getByText('Review Quality는 리뷰 품질과 이상 징후를 보는 운영 구간입니다.')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('리뷰 삭제, 미응답 상태, 후기 내용 확인처럼 품질 관리에 필요한 작업만 집중해서 봅니다.')).toBeVisible();
       await expect(page.getByRole('heading', { name: /리뷰 품질 관리/ })).toBeVisible();
 
+      const auditLogsApiPromise = page.waitForResponse((response) =>
+        response.url().includes('/api/admin/audit-logs') && response.request().method() === 'GET'
+      );
+
       await page.getByRole('button', { name: '운영 감사 로그' }).click();
+      await auditLogsApiPromise;
       await expect(page.getByText('운영 감사 로그는 관리자 작업 추적용 구간입니다.')).toBeVisible({ timeout: 10000 });
       await expect(page.getByText('누가 어떤 운영 액션을 언제 수행했는지 확인하는 감사 이력만 보여주며, 일반 분석 숫자와는 분리해서 읽어야 합니다.')).toBeVisible();
       await expect(page.getByRole('heading', { name: /운영 감사 로그/ })).toBeVisible();

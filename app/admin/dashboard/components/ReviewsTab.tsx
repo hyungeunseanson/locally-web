@@ -31,17 +31,14 @@ export default function ReviewsTab() {
   const fetchReviews = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('reviews')
-        .select(`
-          id, rating, content, reply, created_at, photos, user_id, experience_id,
-          guest:profiles!reviews_user_id_fkey ( full_name, avatar_url ),
-          experiences ( title, host_id )
-        `)
-        .order('created_at', { ascending: false });
+      const response = await fetch('/api/admin/reviews', { cache: 'no-store' });
+      const result = await response.json();
 
-      if (error) throw error;
-      setReviews((data as any[]) || []);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Failed to fetch admin reviews');
+      }
+
+      setReviews((result.data as AdminReview[]) || []);
     } catch (err) {
       console.error(err);
       showToast('리뷰 목록 로드 실패', 'error');
@@ -51,7 +48,7 @@ export default function ReviewsTab() {
   };
 
   useEffect(() => {
-    fetchReviews();
+    void fetchReviews();
   }, []);
 
   const handleDelete = async (reviewId: number) => {

@@ -16,22 +16,24 @@ export default function AuditLogTab() {
 
   const fetchLogs = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('admin_audit_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
+    try {
+      const response = await fetch('/api/admin/audit-logs', { cache: 'no-store' });
+      const result = await response.json();
 
-    if (error) {
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Failed to fetch audit logs');
+      }
+
+      setLogs(result.data || []);
+    } catch (error) {
       console.error('Error fetching audit logs:', error);
-    } else {
-      setLogs(data || []);
+      setLogs([]);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchLogs();
+    void fetchLogs();
     const channel = supabase.channel('realtime_audit_logs')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_audit_logs' }, (payload) => {
         setLogs(prev => [payload.new, ...prev]);
