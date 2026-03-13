@@ -16,6 +16,8 @@ import AdminAlertsTab from './components/AdminAlertsTab';
 
 // Custom Hook
 import { useAdminData } from './hooks/useAdminData';
+import { useAdminUsersData } from './hooks/useAdminUsersData';
+import { useAdminApprovalsData } from './hooks/useAdminApprovalsData';
 
 function subscribeToAdminTabStorage(callback: () => void) {
   if (typeof window === 'undefined') {
@@ -92,6 +94,48 @@ function DataDrivenAdminTab({
   );
 }
 
+function UsersDataTab() {
+  const { users, onlineUsers, isLoading, deleteItem } = useAdminUsersData();
+
+  if (isLoading) return <DataLoadingSkeleton />;
+
+  return <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />;
+}
+
+function ApprovalsDataTab({
+  activeTab,
+  filter,
+  setFilter,
+  selectedItem,
+  setSelectedItem,
+}: {
+  activeTab: string;
+  filter: string;
+  setFilter: React.Dispatch<React.SetStateAction<string>>;
+  selectedItem: unknown;
+  setSelectedItem: React.Dispatch<React.SetStateAction<unknown>>;
+}) {
+  const { apps, exps, isLoading, updateStatus, deleteItem } = useAdminApprovalsData();
+
+  if (isLoading) return <DataLoadingSkeleton />;
+
+  return (
+    <ManagementTab
+      activeTab={activeTab}
+      filter={filter}
+      setFilter={setFilter}
+      apps={apps}
+      exps={exps}
+      users={[]}
+      messages={[]}
+      selectedItem={selectedItem}
+      setSelectedItem={setSelectedItem}
+      updateStatus={updateStatus}
+      deleteItem={deleteItem}
+    />
+  );
+}
+
 function AdminDashboardContent() {
   const [filter, setFilter] = useState('ALL');
   const [selectedItem, setSelectedItem] = useState<unknown>(null);
@@ -129,6 +173,16 @@ function AdminDashboardContent() {
         <MasterLedgerTab />
       ) : activeTab === 'ANALYTICS' ? (
         <AnalyticsTab />
+      ) : activeTab === 'USERS' ? (
+        <UsersDataTab />
+      ) : activeTab === 'APPROVALS' ? (
+        <ApprovalsDataTab
+          activeTab={activeTab}
+          filter={filter}
+          setFilter={setFilter}
+          selectedItem={selectedItem}
+          setSelectedItem={setSelectedItem}
+        />
       ) : (
         <DataDrivenAdminTab
           activeTab={activeTab}

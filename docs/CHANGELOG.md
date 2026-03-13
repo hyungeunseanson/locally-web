@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.43 — [Admin Dashboard] Users/Approvals 탭 공통 로딩 게이트 분리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 Users 독립 렌더 | `User Management`를 `useAdminData()` 공통 로딩 게이트 밖으로 분리하고, `/api/admin/users-summary` + presence 구독만 쓰는 `useAdminUsersData` 경량 훅으로 직접 렌더링하도록 정리 |
+| 🟠 Approvals 독립 렌더 | `Approvals`를 `useAdminData()` 공통 로딩 게이트 밖으로 분리하고, `/api/admin/host-applications` 요약 API + `experiences` 조회만 쓰는 `useAdminApprovalsData` 경량 훅으로 직접 렌더링하도록 정리 |
+| 🟡 공통 훅 불변 유지 | `useAdminData.ts`는 변경하지 않고 남겨, 기존 shared fetch 레거시와 다른 탭 동작에 회귀가 없도록 유지 |
+
 ## v3.38.38 — [User Management] 상세 패널 스크롤 및 역할 UX 정리
 
 | 항목 | 내용 |
