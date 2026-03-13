@@ -28,6 +28,36 @@ interface AnalyticsTabProps {
   inquiryMessages?: any[]; // 🟢 추가
 }
 
+type AnalyticsBusinessSummary = {
+  totalUsers: number;
+  activeExpsCount: number;
+  gmv: number;
+  netRevenue: number;
+  hostPayout: number;
+  conversionRate: string;
+  retentionRate: string;
+  aov: number;
+  cancellationRate: number;
+  topExperiences: any[];
+  allExperiences: any[];
+  funnel: { views: number; clicks: number; paymentInit: number; completed: number };
+  cancelBreakdown: { user: number; host: number };
+  priceDistribution: { low: number; mid: number; high: number };
+  demographics: {
+    nationalities: { name: string; count: number; percent: number }[];
+    ages: { name: string; count: number; percent: number }[];
+    genders: { name: string; count: number; percent: number }[];
+    allNationalities: { name: string; count: number; percent: number }[];
+  };
+  searchTrends: { keyword: string; count: number; percent: number }[];
+  allSearchTrends: { keyword: string; count: number; percent: number }[];
+  timeSeries: { dateStr: string; amount: number; height: number }[];
+  newUsersList: any[];
+  topRevenueDate: { dateStr: string; amount: number };
+  expsBreakdown: { new: number; active: number; pending: number; rejected: number };
+  retentionBreakdown: { once: number; twice: number; threeOrMore: number };
+};
+
 export default function AnalyticsTab({ bookings, users, exps, apps, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages }: AnalyticsTabProps) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -120,17 +150,63 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
   });
 
   useEffect(() => {
-    if (bookings && users && exps && apps) {
-      processData();
-    } else {
-      setLoading(false);
-    }
-  }, [bookings, users, exps, reviews, apps, searchLogs, analyticsEvents, inquiries, inquiryMessages, dateRange]);
+    let cancelled = false;
 
-  const processData = () => {
-    try {
+    const loadAnalyticsData = async () => {
+      if (!bookings || !users || !exps || !apps) {
+        if (!cancelled) {
+          setLoading(false);
+        }
+        return;
+      }
+
       setLoading(true);
 
+      const localStats = buildLocalStats();
+      let nextStats = localStats;
+
+      try {
+        const params = new URLSearchParams();
+        if (dateRange[0].startDate) {
+          params.set('startAt', startOfDay(dateRange[0].startDate).toISOString());
+        }
+        if (dateRange[0].endDate) {
+          params.set('endAt', endOfDay(dateRange[0].endDate).toISOString());
+        }
+
+        const response = await fetch(`/api/admin/analytics-summary?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error('Analytics summary fetch failed');
+        }
+
+        const result = await response.json();
+        if (!result?.success) {
+          throw new Error(result?.error || 'Analytics summary fetch failed');
+        }
+
+        nextStats = {
+          ...localStats,
+          ...(result.data as AnalyticsBusinessSummary),
+        };
+      } catch (error) {
+        console.error('[AnalyticsTab] analytics-summary fallback:', error);
+      }
+
+      if (!cancelled) {
+        setStats(nextStats);
+        setLoading(false);
+      }
+    };
+
+    void loadAnalyticsData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookings, users, exps, reviews, apps, searchLogs, analyticsEvents, inquiries, inquiryMessages, dateRange]);
+
+  const buildLocalStats = () => {
+    try {
       let gmv = 0, netRevenue = 0, cancelledCount = 0, completedCount = 0;
       let userCancel = 0, hostCancel = 0;
       const userBookingCounts: Record<string, number> = {};
@@ -435,7 +511,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       const allHostLangs = Object.entries(hostLangs).map(([name, count]) => ({ name, count, percent: totalLangs ? (count / totalLangs) * 100 : 0 })).sort((a, b) => b.count - a.count);
       const topLangs = allHostLangs.slice(0, 4);
 
-      setStats({
+      return {
         totalUsers: newUsersCount,
         activeExpsCount: exps?.filter((e: any) => e.status === 'active').length || 0,
         gmv,
@@ -479,12 +555,53 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         bottomRespHosts,
         expsBreakdown,
         retentionBreakdown
-      });
-
+      };
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
+      return {
+        totalUsers: 0,
+        activeExpsCount: 0,
+        gmv: 0,
+        netRevenue: 0,
+        hostPayout: 0,
+        conversionRate: '0.0',
+        retentionRate: '0.0',
+        aov: 0,
+        cancellationRate: 0,
+        topExperiences: [],
+        allExperiences: [],
+        superHostCandidates: [],
+        funnel: { views: 0, clicks: 0, paymentInit: 0, completed: 0 },
+        cancelBreakdown: { user: 0, host: 0 },
+        priceDistribution: { low: 0, mid: 0, high: 0 },
+        demographics: {
+          nationalities: [],
+          ages: [],
+          genders: [],
+          allNationalities: [],
+        },
+        searchTrends: [],
+        allSearchTrends: [],
+        timeSeries: [],
+        riskHosts: [],
+        newUsersList: [],
+        topRevenueDate: { dateStr: '', amount: 0 },
+        hostEcosystem: {
+          sources: [],
+          languages: [],
+          nationalities: [],
+          allSources: [],
+          allLanguages: [],
+          allNationalities: [],
+          funnel: { applied: 0, approved: 0, active: 0, booked: 0 },
+        },
+        avgResponseTime: 0,
+        responseRate: 0,
+        topRespHosts: [],
+        bottomRespHosts: [],
+        expsBreakdown: { new: 0, active: 0, pending: 0, rejected: 0 },
+        retentionBreakdown: { once: 0, twice: 0, threeOrMore: 0 },
+      };
     }
   };
 

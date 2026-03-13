@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.19 — [Analytics] Business 지표 서버 집계 분리
+
+**작업일:** 2026-03-13
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Business source 분리 | 신규 `/api/admin/analytics-summary`를 추가해 Data Analytics `Business & Guest` 지표가 더 이상 `useAdminData`의 최근 20건 예약 캐시에 기대지 않고 서버 전체 집계 기준으로 계산되도록 정리 |
+| 🟠 Business UI 회귀 방지 | `AnalyticsTab`은 Host/Reviews/Logs 탭 구조를 그대로 유지하면서 Business 지표만 새 API 응답으로 덮어쓰고, API 실패 시 기존 로컬 계산으로 fallback 하도록 구성 |
+| 🟡 게스트 통계 복구 | 기간 내 확정 예약 고객 기준으로 국적/연령/성별 분포를 서버에서 다시 계산해 기존 비어 있던 게스트 인구통계 섹션의 정확도를 높임 |
+
 ## v3.38.18 — [Billing] 정산 카드 드릴다운 최소화
 
 **작업일:** 2026-03-12
