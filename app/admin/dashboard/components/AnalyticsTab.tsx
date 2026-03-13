@@ -717,7 +717,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               <SimpleKpi label="가입 대비 결제건 비율" value={`${stats.conversionRate}%`} sub="신규 가입자 대비" onClick={() => setSelectedMetric('conversion')} />
 
               {/* 8. 반복 결제 고객 비율 */}
-              <SimpleKpi label="반복 결제 고객 비율" value={`${stats.retentionRate}%`} sub="결제 고객 기준" onClick={() => setSelectedMetric('retention')} />
+              <SimpleKpi label="반복 결제 고객 비율" value={`${stats.retentionRate}%`} sub="체험 + 서비스 결제 고객" onClick={() => setSelectedMetric('retention')} />
             </div>
           </section>
 
@@ -727,7 +727,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           <section>
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                🌍 결제 고객 인구통계 <span className="text-[10px] md:text-xs font-normal text-slate-400">기간 내 결제 완료 고객 기준</span>
+                🌍 결제 고객 인구통계 <span className="text-[10px] md:text-xs font-normal text-slate-400">체험 + 서비스 결제 고객 기준</span>
               </h2>
               <div onClick={() => setSelectedMetric('demographics')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
                 상세보기
@@ -737,7 +737,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               {/* 국적 차트 */}
               <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                  <span>🌍 게스트 국적 비중</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">기간 내 결제 유저 기준</span>
+                  <span>🌍 게스트 국적 비중</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">체험 + 서비스 결제 고객 기준</span>
                 </h3>
                 <div className="space-y-4">
                   {stats.demographics.nationalities.length > 0 ? stats.demographics.nationalities.map((nat) => (
@@ -757,7 +757,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               {/* 연령대 차트 */}
               <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                  <span>👤 게스트 주요 연령대</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">기간 내 결제 유저 기준</span>
+                  <span>👤 게스트 주요 연령대</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">체험 + 서비스 결제 고객 기준</span>
                 </h3>
                 <div className="flex items-end justify-around h-32 md:h-40 mt-4 pb-2 border-b border-slate-100 relative">
                   {/* 눈금선 */}
@@ -1297,6 +1297,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               {selectedMetric === 'demographics' && (
                 <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
                   <h3 className="text-xl font-bold">결제 고객 인구통계 상세</h3>
+                  <p className="text-xs text-slate-400 -mt-3">체험 예약과 서비스 결제를 합친 플랫폼 전체 결제 고객 기준</p>
 
                   <div className="space-y-4">
                     <h4 className="text-sm font-bold text-slate-500 border-b pb-2">국적 분포 (전체)</h4>
@@ -1507,7 +1508,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                       <div className="text-xl font-black text-emerald-700">{stats.retentionBreakdown.threeOrMore}명</div>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 text-center">해당 기간 내 결제한 고객 중 2회 이상 결제한 고객 비율은 {stats.retentionRate}% 입니다.</p>
+                  <p className="text-xs text-slate-400 mt-2 text-center">해당 기간 내 체험 예약과 서비스 결제를 합친 전체 결제 고객 중 2회 이상 결제한 고객 비율은 {stats.retentionRate}% 입니다.</p>
                 </div>
               )}
             </div>

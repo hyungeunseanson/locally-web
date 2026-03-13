@@ -261,20 +261,26 @@ export async function GET(request: Request) {
     const analyticsEvents = (analyticsEventRows || []) as AnalyticsEventRow[];
     const serviceBookings = (serviceBookingRows || []) as AnalyticsServiceBookingRow[];
 
-    const confirmedGuestIds = Array.from(
+    const paidCustomerIds = Array.from(
       new Set(
-        bookings
-          .filter((booking) => isConfirmedBookingStatus(booking.status || '') && booking.user_id)
-          .map((booking) => booking.user_id as string)
+        [
+          ...bookings
+            .filter((booking) => isConfirmedBookingStatus(booking.status || '') && booking.user_id)
+            .map((booking) => booking.user_id as string),
+          ...serviceBookings
+            .filter((booking) => isPaidServiceBooking(booking.status || '') || isCompletedServiceBooking(booking.status || ''))
+            .map((booking) => booking.customer_id)
+            .filter(Boolean) as string[],
+        ]
       )
     );
 
     let guestProfiles: AnalyticsProfileRow[] = [];
-    if (confirmedGuestIds.length > 0) {
+    if (paidCustomerIds.length > 0) {
       const { data: guestProfileRows, error: guestProfilesError } = await supabaseAdmin
         .from('profiles')
         .select('id, nationality, gender, birth_date, dob')
-        .in('id', confirmedGuestIds);
+        .in('id', paidCustomerIds);
 
       if (guestProfilesError) throw guestProfilesError;
       guestProfiles = (guestProfileRows || []) as AnalyticsProfileRow[];
@@ -352,6 +358,10 @@ export async function GET(request: Request) {
       const currentSeries = timeSeriesMap[dateKey] || { label: format(new Date(booking.created_at), 'MM.dd'), amount: 0 };
       currentSeries.amount += amount;
       timeSeriesMap[dateKey] = currentSeries;
+
+      if (booking.customer_id) {
+        userBookingCounts[booking.customer_id] = (userBookingCounts[booking.customer_id] || 0) + 1;
+      }
 
     }
 
