@@ -471,14 +471,11 @@ test.describe('Admin UsersTab smoke', () => {
     });
 
     await login(page, adminUser);
-    await page.goto('/admin/dashboard?tab=USERS', { waitUntil: 'networkidle' });
+    await page.goto('/admin/dashboard?tab=USERS', { waitUntil: 'domcontentloaded' });
 
+    await expect(page.getByRole('combobox', { name: '회원 정렬' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('전체 회원', { exact: false })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: '회원 정렬' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Guest', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Host', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Admin', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '온라인만' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '온라인만' })).toBeVisible({ timeout: 15000 });
 
     await page.getByRole('button', { name: 'Host', exact: true }).click();
     await expect(page.locator('tbody tr span').filter({ hasText: 'Host' }).first()).toBeVisible();

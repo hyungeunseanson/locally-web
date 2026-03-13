@@ -85,3 +85,16 @@ export interface PayPalCaptureResult {
   amount: PayPalAmount | null;
   raw: PayPalOrder;
 }
+
+export interface PayPalRefund {
+  id: string;
+  status: string;
+  amount?: PayPalAmount;
+}
+
+export interface PayPalRefundResult {
+  refundId: string | null;
+  status: string | null;
+  amount: PayPalAmount | null;
+  raw: PayPalRefund | null;
+}

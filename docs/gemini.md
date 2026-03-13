@@ -38,6 +38,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/payment/paypal/create-order`: 체험 예약 PayPal 주문 생성 API (예약 소유권/상태/금액 검증 후 PayPal order 발급)
 - `/api/payment/paypal/capture-order`: 체험 예약 PayPal 승인 확정 API (PayPal order 검증 + capture + 기존 NicePay와 동일한 예약 확정/정산 데이터 반영)
 - `app/experiences/[id]/payment/page.tsx`: PayPal 고객 결제 3단계 UI 연결. 기존 카드/무통장 CTA는 유지하고, `PayPal` 선택 시에만 별도 SDK 버튼/서버 create-order/capture 경로를 사용한다.
+- `utils/paypal/server.ts`: PayPal capture refund 유틸 포함. 체험 예약 취소/환불 시 `payment_method='paypal'`인 예약만 PayPal refund endpoint를 사용하고, 기존 NicePay 취소 흐름은 유지한다.
 
 원칙:
 - Admin page는 비대화하지 않고, 로직은 `hooks/`로 분리한다.
@@ -48,6 +49,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - PayPal 고객 결제는 기존 NicePay 경로를 교체하지 않고 단계적으로 추가한다. 1단계는 환경변수(`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`)와 공통 서버 유틸만 추가하며, 실제 체험/서비스 결제 route 및 UI 연결은 후속 단계에서 진행한다.
 - PayPal 체험 결제 2단계는 `/api/payment/paypal/create-order`, `/api/payment/paypal/capture-order` 서버 route만 추가하고, 기존 NicePay UI/콜백/취소 환불 경로는 건드리지 않는다. `capture-order`는 `payment_method='paypal'`, `tid=<captureId>`와 기존 예약 확정 정산 필드를 저장한다.
 - PayPal 체험 결제 3단계는 `app/experiences/[id]/payment/page.tsx`에만 `PayPal` 결제수단과 SDK 버튼을 연결한다. 기존 카드/NicePay 버튼과 무통장 입금 CTA는 유지하고, PayPal은 별도 버튼에서만 `/api/payment/paypal/create-order`와 `/api/payment/paypal/capture-order`를 사용한다. 공개 client id는 `NEXT_PUBLIC_PAYPAL_CLIENT_ID`만 사용한다.
+- PayPal 체험 결제 4단계는 `/api/payment/cancel`, `/api/admin/bookings/force-cancel`에서 `payment_method='paypal'`인 예약만 PayPal capture refund를 호출한다. 기존 NicePay 카드/무통장 취소 흐름은 유지한다.
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics의 `Review Quality`, `운영 감사 로그`는 이제 브라우저 직접 select 대신 각각 `/api/admin/reviews`, `/api/admin/audit-logs`를 초기 읽기 source로 사용한다. 현재 실시간성은 감사 로그 INSERT 구독만 클라이언트에 남겨둔다.
 - Data Analytics에서 `취소율`, `체험 검색 인기 트렌드`, `Top 체험`은 여전히 체험 예약/체험 검색 기준이다. 플랫폼 전체 KPI와 체험 전용 섹션이 섞여 있으므로 카드/섹션 문구로 기준을 명시한다.

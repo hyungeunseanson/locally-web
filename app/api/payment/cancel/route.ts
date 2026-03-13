@@ -6,6 +6,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { refundPayPalCapture } from '@/app/utils/paypal/server';
 
 const TIMEZONE = 'Asia/Seoul';
 
@@ -90,45 +91,52 @@ export async function POST(request: Request) {
 
     // 3. PG사 취소 요청
     if (refundAmount > 0 && booking.tid) {
-      const MID = process.env.NICEPAY_MID;
-      if (!MID) throw new Error('Server Config Error: NICEPAY_MID missing');
+      if (booking.payment_method === 'paypal') {
+        const refund = await refundPayPalCapture(booking.tid, refundAmount, 'KRW');
+        if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
+          throw new Error(`PayPal refund failed: ${refund.status || 'unknown status'}`);
+        }
+      } else {
+        const MID = process.env.NICEPAY_MID;
+        if (!MID) throw new Error('Server Config Error: NICEPAY_MID missing');
 
-      const isPartial = refundAmount < totalAmount ? '1' : '0';
-      const formBody = new URLSearchParams({
-        TID: booking.tid,
-        MID: MID,
-        Moid: booking.order_id,
-        CancelAmt: refundAmount.toString(),
-        CancelMsg: userReason || reasonText,
-        PartialCancelCode: isPartial,
-      });
+        const isPartial = refundAmount < totalAmount ? '1' : '0';
+        const formBody = new URLSearchParams({
+          TID: booking.tid,
+          MID: MID,
+          Moid: booking.order_id,
+          CancelAmt: refundAmount.toString(),
+          CancelMsg: userReason || reasonText,
+          PartialCancelCode: isPartial,
+        });
 
-      // [H-2] Verify Response (강화된 PG 응답 검열)
-      const pgResponse = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formBody.toString()
-      });
+        // [H-2] Verify Response (강화된 PG 응답 검열)
+        const pgResponse = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formBody.toString()
+        });
 
-      if (!pgResponse.ok) {
-        throw new Error(`PG Network Timeout: ${pgResponse.status} ${pgResponse.statusText}`);
+        if (!pgResponse.ok) {
+          throw new Error(`PG Network Timeout: ${pgResponse.status} ${pgResponse.statusText}`);
+        }
+
+        const pgResult = await pgResponse.text();
+        let pgJson;
+        try {
+          pgJson = JSON.parse(pgResult.replace(/'/g, '"'));
+        } catch {
+          throw new Error(`PG Format Error: Failed to parse PG response: ${pgResult}`);
+        }
+
+        // 🚨 [핵심 보안] PG사에서 승인 취소가 떨어지지 않으면, DB 업데이트 로직으로 절대 못 넘어가게 원천 차단
+        if (pgJson.ResultCode !== '2001' && pgJson.ResultCode !== '2211') {
+          console.error('🔥 [CRITICAL] PG Cancel Failed (DB Callback Blocked):', pgJson);
+          throw new Error(`PG Cancel Failed: [${pgJson.ResultCode}] ${pgJson.ResultMsg}`);
+        }
+
+        console.log(`✅ [INFO] PG Cancel Success (Amount: ${refundAmount}) -> Proceeding to DB Update`);
       }
-
-      const pgResult = await pgResponse.text();
-      let pgJson;
-      try {
-        pgJson = JSON.parse(pgResult.replace(/'/g, '"'));
-      } catch {
-        throw new Error(`PG Format Error: Failed to parse PG response: ${pgResult}`);
-      }
-
-      // 🚨 [핵심 보안] PG사에서 승인 취소가 떨어지지 않으면, DB 업데이트 로직으로 절대 못 넘어가게 원천 차단
-      if (pgJson.ResultCode !== '2001' && pgJson.ResultCode !== '2211') {
-        console.error('🔥 [CRITICAL] PG Cancel Failed (DB Callback Blocked):', pgJson);
-        throw new Error(`PG Cancel Failed: [${pgJson.ResultCode}] ${pgJson.ResultMsg}`);
-      }
-
-      console.log(`✅ [INFO] PG Cancel Success (Amount: ${refundAmount}) -> Proceeding to DB Update`);
     }
 
     // 4. DB 업데이트

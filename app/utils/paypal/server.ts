@@ -6,6 +6,8 @@ import type {
   PayPalCurrencyCode,
   PayPalEnvironment,
   PayPalOrder,
+  PayPalRefund,
+  PayPalRefundResult,
   PayPalTokenResponse,
 } from '@/app/types/paypal';
 
@@ -233,6 +235,38 @@ export async function capturePayPalOrder(orderId: string): Promise<PayPalCapture
     captureId: firstCapture?.id || null,
     amount: firstCapture?.amount || null,
     raw: order,
+  };
+}
+
+export async function refundPayPalCapture(
+  captureId: string,
+  amount: number,
+  currencyCode: PayPalCurrencyCode = 'KRW'
+): Promise<PayPalRefundResult> {
+  if (!captureId) {
+    throw new Error('PayPal capture id is required.');
+  }
+
+  const body = JSON.stringify({
+    amount: {
+      currency_code: currencyCode,
+      value: toPayPalAmountValue(amount, currencyCode),
+    },
+  });
+
+  const refund = await paypalFetch<PayPalRefund>(
+    `/v2/payments/captures/${captureId}/refund`,
+    {
+      method: 'POST',
+      body,
+    }
+  );
+
+  return {
+    refundId: refund.id || null,
+    status: refund.status || null,
+    amount: refund.amount || null,
+    raw: refund,
   };
 }
 

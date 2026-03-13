@@ -6,6 +6,7 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { isCancelledOnlyBookingStatus, isPendingBookingStatus } from '@/app/constants/bookingStatus';
+import { refundPayPalCapture } from '@/app/utils/paypal/server';
 
 type ForceCancelBody = {
   bookingId?: string;
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
         user_id,
         order_id,
         tid,
+        payment_method,
         amount,
         total_price,
         total_experience_price,
@@ -70,41 +72,48 @@ export async function POST(request: Request) {
       : calculateBookingCancellationSettlement(booking, 100);
 
     if (settlement.refundAmount > 0 && booking.tid) {
-      const mid = process.env.NICEPAY_MID;
+      if (booking.payment_method === 'paypal') {
+        const refund = await refundPayPalCapture(booking.tid, settlement.refundAmount, 'KRW');
+        if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
+          throw new Error(`PayPal refund failed: ${refund.status || 'unknown status'}`);
+        }
+      } else {
+        const mid = process.env.NICEPAY_MID;
 
-      if (!mid) {
-        throw new Error('Server Config Error: NICEPAY_MID missing');
-      }
+        if (!mid) {
+          throw new Error('Server Config Error: NICEPAY_MID missing');
+        }
 
-      const formBody = new URLSearchParams({
-        TID: booking.tid,
-        MID: mid,
-        Moid: booking.order_id || booking.id,
-        CancelAmt: settlement.refundAmount.toString(),
-        CancelMsg: cancelReason,
-        PartialCancelCode: settlement.refundAmount < totalAmount ? '1' : '0',
-      });
+        const formBody = new URLSearchParams({
+          TID: booking.tid,
+          MID: mid,
+          Moid: booking.order_id || booking.id,
+          CancelAmt: settlement.refundAmount.toString(),
+          CancelMsg: cancelReason,
+          PartialCancelCode: settlement.refundAmount < totalAmount ? '1' : '0',
+        });
 
-      const pgResponse = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formBody.toString(),
-      });
+        const pgResponse = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formBody.toString(),
+        });
 
-      if (!pgResponse.ok) {
-        throw new Error(`PG Network Timeout: ${pgResponse.status} ${pgResponse.statusText}`);
-      }
+        if (!pgResponse.ok) {
+          throw new Error(`PG Network Timeout: ${pgResponse.status} ${pgResponse.statusText}`);
+        }
 
-      const pgResult = await pgResponse.text();
-      let pgJson;
-      try {
-        pgJson = JSON.parse(pgResult.replace(/'/g, '"'));
-      } catch {
-        throw new Error(`PG Format Error: Failed to parse PG response: ${pgResult}`);
-      }
+        const pgResult = await pgResponse.text();
+        let pgJson;
+        try {
+          pgJson = JSON.parse(pgResult.replace(/'/g, '"'));
+        } catch {
+          throw new Error(`PG Format Error: Failed to parse PG response: ${pgResult}`);
+        }
 
-      if (pgJson.ResultCode !== '2001' && pgJson.ResultCode !== '2211') {
-        throw new Error(`PG Cancel Failed: [${pgJson.ResultCode}] ${pgJson.ResultMsg}`);
+        if (pgJson.ResultCode !== '2001' && pgJson.ResultCode !== '2211') {
+          throw new Error(`PG Cancel Failed: [${pgJson.ResultCode}] ${pgJson.ResultMsg}`);
+        }
       }
     }
 

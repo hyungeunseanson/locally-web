@@ -13,6 +13,14 @@
 | 🟠 create/capture 분기 연결 | PayPal 버튼 클릭 시 기존 `/api/bookings`로 `PENDING` 예약을 만든 뒤, `/api/payment/paypal/create-order` → `/api/payment/paypal/capture-order` 경로로만 결제를 확정하도록 분기 |
 | 🟡 기존 결제 보존 | NicePay 카드 결제, 무통장 입금 CTA, 기존 callback/취소 환불 경로는 변경하지 않아 회귀 면적을 최소화 |
 
+## v3.38.47 — [Payments] PayPal 체험 예약 취소/환불 분기 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 일반 취소 분기 추가 | `/api/payment/cancel`에서 `payment_method='paypal'`인 체험 예약만 PayPal capture refund endpoint를 호출하고, 기존 NicePay 카드/무통장 취소 흐름은 유지 |
+| 🟠 관리자 강제취소 분기 추가 | `/api/admin/bookings/force-cancel`도 같은 조건에서만 PayPal refund를 사용하도록 분기해 관리자 취소와 일반 취소의 정산 결과를 맞춤 |
+| 🟡 공통 helper 확장 | `app/utils/paypal/server.ts`에 capture refund 유틸을 추가해 이후 서비스 결제 PayPal 환불 분기에서도 재사용 가능하게 준비 |
+
 ## v3.38.44 — [Payments] PayPal 고객 결제 1단계 공통 기반 추가
 
 | 항목 | 내용 |
