@@ -803,6 +803,20 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               {/* 8. 반복 결제 고객 비율 */}
               <SimpleKpi label="반복 결제 고객 비율" value={`${stats.retentionRate}%`} sub="체험 + 서비스 결제 고객" onClick={() => setSelectedMetric('retention')} />
             </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                <div className="font-semibold text-slate-800">가입 대비 결제건 비율</div>
+                <div className="mt-1">선택 기간 내 신규 가입자 수 대비 결제 완료 건수 비율입니다.</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                <div className="font-semibold text-slate-800">반복 결제 고객 비율</div>
+                <div className="mt-1">체험과 서비스를 합친 전체 결제 고객 중 2회 이상 결제한 고객 비율입니다.</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                <div className="font-semibold text-slate-800">객단가 (AOV)</div>
+                <div className="mt-1">선택 기간 총 거래액을 전체 결제 건수로 나눈 평균 결제 금액입니다.</div>
+              </div>
+            </div>
           </section>
 
           <div className="w-full h-px bg-slate-100 my-6 md:my-8"></div>

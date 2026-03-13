@@ -157,10 +157,13 @@ test.describe.serial('Admin analytics smoke', () => {
       await expect(page.getByText('체험 + 서비스 결제', { exact: true })).toBeVisible();
       await expect(page.getByText('플랫폼 순수익')).toBeVisible();
       await expect(page.getByText('플랫폼 전체 기준', { exact: true })).toBeVisible();
-      await expect(page.getByText('객단가 (AOV)')).toBeVisible();
+      await expect(page.locator('span.truncate', { hasText: '객단가 (AOV)' }).first()).toBeVisible();
       await expect(page.getByText('전체 결제 건 기준', { exact: true })).toBeVisible();
-      await expect(page.getByText('반복 결제 고객 비율')).toBeVisible();
+      await expect(page.locator('span.truncate', { hasText: '반복 결제 고객 비율' }).first()).toBeVisible();
       await expect(page.getByText('체험 + 서비스 결제 고객', { exact: true })).toBeVisible();
+      await expect(page.getByText('선택 기간 내 신규 가입자 수 대비 결제 완료 건수 비율입니다.')).toBeVisible();
+      await expect(page.getByText('체험과 서비스를 합친 전체 결제 고객 중 2회 이상 결제한 고객 비율입니다.')).toBeVisible();
+      await expect(page.getByText('선택 기간 총 거래액을 전체 결제 건수로 나눈 평균 결제 금액입니다.')).toBeVisible();
     });
 
     await test.step('Show experience-only section copy', async () => {
@@ -187,7 +190,7 @@ test.describe.serial('Admin analytics smoke', () => {
     });
 
     await test.step('Open retention modal with platform-wide explanation', async () => {
-      await page.getByText('반복 결제 고객 비율').click();
+      await page.locator('span.truncate', { hasText: '반복 결제 고객 비율' }).first().click();
       await expect(page.getByRole('heading', { name: '기간 내 반복 결제 고객 비율' })).toBeVisible({ timeout: 10000 });
       await expect(page.getByText(/해당 기간 내 체험 예약과 서비스 결제를 합친 전체 결제 고객 중 2회 이상 결제한 고객 비율/)).toBeVisible();
       await closeAnalyticsModal(page);
