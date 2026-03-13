@@ -473,11 +473,13 @@ test.describe('Admin UsersTab smoke', () => {
     await expect(customerRow).toBeVisible();
     await expect(customerRow).toContainText(fixture.expectedTotalSpent);
     await expect(customerRow).toContainText(fixture.expectedRequestCount);
+    await expect(customerRow).toContainText('Guest');
     await expect(customerRow).not.toContainText('집계 중...');
 
     await customerRow.click();
 
-    await expect(page.getByText('고객 프로필')).toBeVisible();
+    await expect(page.getByText('기본 프로필')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Guest' })).toBeVisible();
     await expect(page.getByText('회원 타임라인', { exact: false })).toBeVisible();
     await expect(page.getByText(`체험 예약 · ${fixture.experienceTitle}`)).toBeVisible();
     await expect(page.getByText(`리뷰 작성 · ${fixture.experienceTitle}`)).toBeVisible();
