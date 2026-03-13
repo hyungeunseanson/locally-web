@@ -161,42 +161,15 @@ export async function GET(request: Request) {
       const { data: messageRows, error: messagesError } = await supabaseAdmin
         .from('inquiry_messages')
         .select('inquiry_id, sender_id, created_at')
-        .in('inquiry_id', inquiryIds)
-        .order('created_at', { ascending: true });
+        .in('inquiry_id', inquiryIds);
 
       if (messagesError) throw messagesError;
       inquiryMessages = (messageRows || []) as InquiryMessageRow[];
     }
 
-    const hostIds = Array.from(
-      new Set(
-        [
-          ...apps.map((app) => app.user_id).filter(Boolean),
-          ...exps.map((exp) => exp.host_id).filter(Boolean),
-          ...inquiries.map((inquiry) => inquiry.host_id).filter(Boolean),
-        ] as string[]
-      )
-    );
-
-    let profiles: ProfileRow[] = [];
-    if (hostIds.length > 0) {
-      const { data: profileRows, error: profilesError } = await supabaseAdmin
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', hostIds);
-
-      if (profilesError) throw profilesError;
-      profiles = (profileRows || []) as ProfileRow[];
-    }
-
     const expById = new Map<number, ExperienceRow>();
     exps.forEach((exp) => {
       expById.set(exp.id, exp);
-    });
-
-    const profileById = new Map<string, ProfileRow>();
-    profiles.forEach((profile) => {
-      profileById.set(profile.id, profile);
     });
 
     const hostStats: Record<string, { bookings: number; ratingSum: number; reviewCount: number; cancelCount: number }> = {};
@@ -224,6 +197,29 @@ export async function GET(request: Request) {
 
       hostStats[exp.host_id].ratingSum += Number(review.rating || 0);
       hostStats[exp.host_id].reviewCount += 1;
+    });
+
+    const labelHostIds = Array.from(
+      new Set([
+        ...Object.keys(hostStats),
+        ...inquiries.map((inquiry) => inquiry.host_id).filter(Boolean) as string[],
+      ])
+    );
+
+    let profiles: ProfileRow[] = [];
+    if (labelHostIds.length > 0) {
+      const { data: profileRows, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', labelHostIds);
+
+      if (profilesError) throw profilesError;
+      profiles = (profileRows || []) as ProfileRow[];
+    }
+
+    const profileById = new Map<string, ProfileRow>();
+    profiles.forEach((profile) => {
+      profileById.set(profile.id, profile);
     });
 
     const superHosts: Array<{
@@ -311,6 +307,14 @@ export async function GET(request: Request) {
         messagesByInquiry[message.inquiry_id] = [];
       }
       messagesByInquiry[message.inquiry_id].push(message);
+    });
+
+    Object.values(messagesByInquiry).forEach((messages) => {
+      messages.sort((left, right) => {
+        const leftMs = left.created_at ? new Date(left.created_at).getTime() : 0;
+        const rightMs = right.created_at ? new Date(right.created_at).getTime() : 0;
+        return leftMs - rightMs;
+      });
     });
 
     const hostCommStats: Record<string, { total: number; answered: number; timeMs: number }> = {};

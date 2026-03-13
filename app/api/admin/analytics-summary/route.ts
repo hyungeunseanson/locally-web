@@ -46,12 +46,6 @@ type AnalyticsProfileRow = {
 
 type AnalyticsSearchLogRow = {
   keyword: string | null;
-  created_at: string | null;
-};
-
-type AnalyticsEventRow = {
-  event_type: string | null;
-  created_at: string | null;
 };
 
 type AnalyticsServiceBookingRow = {
@@ -197,11 +191,22 @@ export async function GET(request: Request) {
 
     let searchLogsQuery = supabaseAdmin
       .from('search_logs')
-      .select('keyword, created_at');
+      .select('keyword');
 
-    let analyticsEventsQuery = supabaseAdmin
+    let viewEventsQuery = supabaseAdmin
       .from('analytics_events')
-      .select('event_type, created_at');
+      .select('id', { count: 'exact', head: true })
+      .eq('event_type', 'view');
+
+    let clickEventsQuery = supabaseAdmin
+      .from('analytics_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_type', 'click');
+
+    let paymentInitEventsQuery = supabaseAdmin
+      .from('analytics_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_type', 'payment_init');
 
     let serviceBookingsQuery = supabaseAdmin
       .from('service_bookings')
@@ -214,7 +219,9 @@ export async function GET(request: Request) {
       newUsersCountQuery = newUsersCountQuery.gte('created_at', startAt);
       newUsersPreviewQuery = newUsersPreviewQuery.gte('created_at', startAt);
       searchLogsQuery = searchLogsQuery.gte('created_at', startAt);
-      analyticsEventsQuery = analyticsEventsQuery.gte('created_at', startAt);
+      viewEventsQuery = viewEventsQuery.gte('created_at', startAt);
+      clickEventsQuery = clickEventsQuery.gte('created_at', startAt);
+      paymentInitEventsQuery = paymentInitEventsQuery.gte('created_at', startAt);
       serviceBookingsQuery = serviceBookingsQuery.gte('created_at', startAt);
     }
 
@@ -224,7 +231,9 @@ export async function GET(request: Request) {
       newUsersCountQuery = newUsersCountQuery.lte('created_at', endAt);
       newUsersPreviewQuery = newUsersPreviewQuery.lte('created_at', endAt);
       searchLogsQuery = searchLogsQuery.lte('created_at', endAt);
-      analyticsEventsQuery = analyticsEventsQuery.lte('created_at', endAt);
+      viewEventsQuery = viewEventsQuery.lte('created_at', endAt);
+      clickEventsQuery = clickEventsQuery.lte('created_at', endAt);
+      paymentInitEventsQuery = paymentInitEventsQuery.lte('created_at', endAt);
       serviceBookingsQuery = serviceBookingsQuery.lte('created_at', endAt);
     }
 
@@ -235,7 +244,9 @@ export async function GET(request: Request) {
       { count: totalUsersCount, error: newUsersCountError },
       { data: newUserPreviewRows, error: newUsersPreviewError },
       { data: searchLogRows, error: searchLogsError },
-      { data: analyticsEventRows, error: analyticsEventsError },
+      { count: viewEventsCount, error: viewEventsError },
+      { count: clickEventsCount, error: clickEventsError },
+      { count: paymentInitEventsCount, error: paymentInitEventsError },
       { data: serviceBookingRows, error: serviceBookingsError },
     ] = await Promise.all([
       bookingsQuery,
@@ -244,7 +255,9 @@ export async function GET(request: Request) {
       newUsersCountQuery,
       newUsersPreviewQuery,
       searchLogsQuery,
-      analyticsEventsQuery,
+      viewEventsQuery,
+      clickEventsQuery,
+      paymentInitEventsQuery,
       serviceBookingsQuery,
     ]);
 
@@ -254,7 +267,9 @@ export async function GET(request: Request) {
     if (newUsersCountError) throw newUsersCountError;
     if (newUsersPreviewError) throw newUsersPreviewError;
     if (searchLogsError) throw searchLogsError;
-    if (analyticsEventsError) throw analyticsEventsError;
+    if (viewEventsError) throw viewEventsError;
+    if (clickEventsError) throw clickEventsError;
+    if (paymentInitEventsError) throw paymentInitEventsError;
     if (serviceBookingsError) throw serviceBookingsError;
 
     const bookings = (bookingRows || []) as AnalyticsBookingRow[];
@@ -263,7 +278,6 @@ export async function GET(request: Request) {
     const newUsers = (newUserPreviewRows || []) as AnalyticsProfileRow[];
     const totalUsers = totalUsersCount || 0;
     const searchLogs = (searchLogRows || []) as AnalyticsSearchLogRow[];
-    const analyticsEvents = (analyticsEventRows || []) as AnalyticsEventRow[];
     const serviceBookings = (serviceBookingRows || []) as AnalyticsServiceBookingRow[];
 
     const paidCustomerIds = Array.from(
@@ -465,14 +479,9 @@ export async function GET(request: Request) {
     const allSearchTrends = toTrendStats(searchKeywordCounts, totalSearches);
     const topSearchTrends = allSearchTrends.slice(0, 10);
 
-    let views = 0;
-    let clicks = 0;
-    let paymentInit = 0;
-    for (const event of analyticsEvents) {
-      if (event.event_type === 'view') views += 1;
-      else if (event.event_type === 'click') clicks += 1;
-      else if (event.event_type === 'payment_init') paymentInit += 1;
-    }
+    const views = viewEventsCount || 0;
+    const clicks = clickEventsCount || 0;
+    const paymentInit = paymentInitEventsCount || 0;
 
     const timeSeriesKeys = Object.keys(timeSeriesMap).sort();
     const recentTimeSeriesKeys = timeSeriesKeys.slice(-7);

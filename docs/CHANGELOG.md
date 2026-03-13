@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.37 — [Analytics] 이벤트/문의 집계 조회 추가 압축
+
+**작업일:** 2026-03-13
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 business 이벤트 집계 경량화 | `analytics-summary`에서 `analytics_events` raw row 전체를 읽지 않고, `view/click/payment_init`를 count query로 바로 집계해 서버 조회량을 축소 |
+| 🟠 host 문의 집계 경량화 | `analytics-host-summary`에서 `inquiry_messages` 전역 정렬을 제거하고, 문의별 메시지만 묶은 뒤 JS에서 정렬하도록 바꿔 DB 정렬 비용을 낮춤 |
+| 🟡 fallback 범위 추가 축소 | `AnalyticsTab`이 실제 fallback 분기 안에서만 로컬 임시 집계를 실행하도록 좁혀, 서버 집계가 정상일 때 불필요한 로컬 계산을 더 줄임 |
+
 ## v3.38.36 — [Analytics] 서버 집계 API 불필요 정렬/전송 축소
 
 **작업일:** 2026-03-13
