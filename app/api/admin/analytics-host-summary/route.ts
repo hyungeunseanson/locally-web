@@ -99,24 +99,20 @@ export async function GET(request: Request) {
 
     let appsQuery = supabaseAdmin
       .from('host_applications')
-      .select('id, user_id, created_at, status, source, host_nationality, languages')
-      .order('created_at', { ascending: false });
+      .select('id, user_id, created_at, status, source, host_nationality, languages');
 
     let bookingsQuery = supabaseAdmin
       .from('bookings')
       .select('created_at, experience_id, status')
-      .in('status', ['PAID', 'confirmed', 'completed', 'cancelled', 'cancellation_requested', 'declined'])
-      .order('created_at', { ascending: false });
+      .in('status', ['PAID', 'confirmed', 'completed', 'cancelled', 'cancellation_requested', 'declined']);
 
     let reviewsQuery = supabaseAdmin
       .from('reviews')
-      .select('experience_id, rating, created_at')
-      .order('created_at', { ascending: false });
+      .select('experience_id, rating, created_at');
 
     let inquiriesQuery = supabaseAdmin
       .from('inquiries')
-      .select('id, host_id, created_at')
-      .order('created_at', { ascending: false });
+      .select('id, host_id, created_at');
 
     if (startAt) {
       appsQuery = appsQuery.gte('created_at', startAt);

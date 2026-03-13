@@ -179,39 +179,40 @@ export async function GET(request: Request) {
     let bookingsQuery = supabaseAdmin
       .from('bookings')
       .select('id, created_at, experience_id, user_id, amount, status, total_price, total_experience_price, host_payout_amount, platform_revenue, solo_guarantee_price')
-      .in('status', ['PAID', 'confirmed', 'completed', 'cancelled', 'declined', 'cancellation_requested'])
-      .order('created_at', { ascending: false });
+      .in('status', ['PAID', 'confirmed', 'completed', 'cancelled', 'declined', 'cancellation_requested']);
 
     let reviewsQuery = supabaseAdmin
       .from('reviews')
-      .select('experience_id, rating, created_at')
-      .order('created_at', { ascending: false });
+      .select('experience_id, rating, created_at');
 
-    let newUsersQuery = supabaseAdmin
+    let newUsersCountQuery = supabaseAdmin
       .from('profiles')
-      .select('id, created_at, full_name, nationality, gender, birth_date, dob')
-      .order('created_at', { ascending: false });
+      .select('id', { count: 'exact', head: true });
+
+    let newUsersPreviewQuery = supabaseAdmin
+      .from('profiles')
+      .select('id, created_at, full_name, nationality')
+      .order('created_at', { ascending: false })
+      .limit(5);
 
     let searchLogsQuery = supabaseAdmin
       .from('search_logs')
-      .select('keyword, created_at')
-      .order('created_at', { ascending: false });
+      .select('keyword, created_at');
 
     let analyticsEventsQuery = supabaseAdmin
       .from('analytics_events')
-      .select('event_type, created_at')
-      .order('created_at', { ascending: false });
+      .select('event_type, created_at');
 
     let serviceBookingsQuery = supabaseAdmin
       .from('service_bookings')
       .select('id, created_at, customer_id, amount, status, host_payout_amount, platform_revenue')
-      .in('status', ['PAID', 'confirmed', 'completed'])
-      .order('created_at', { ascending: false });
+      .in('status', ['PAID', 'confirmed', 'completed']);
 
     if (startAt) {
       bookingsQuery = bookingsQuery.gte('created_at', startAt);
       reviewsQuery = reviewsQuery.gte('created_at', startAt);
-      newUsersQuery = newUsersQuery.gte('created_at', startAt);
+      newUsersCountQuery = newUsersCountQuery.gte('created_at', startAt);
+      newUsersPreviewQuery = newUsersPreviewQuery.gte('created_at', startAt);
       searchLogsQuery = searchLogsQuery.gte('created_at', startAt);
       analyticsEventsQuery = analyticsEventsQuery.gte('created_at', startAt);
       serviceBookingsQuery = serviceBookingsQuery.gte('created_at', startAt);
@@ -220,7 +221,8 @@ export async function GET(request: Request) {
     if (endAt) {
       bookingsQuery = bookingsQuery.lte('created_at', endAt);
       reviewsQuery = reviewsQuery.lte('created_at', endAt);
-      newUsersQuery = newUsersQuery.lte('created_at', endAt);
+      newUsersCountQuery = newUsersCountQuery.lte('created_at', endAt);
+      newUsersPreviewQuery = newUsersPreviewQuery.lte('created_at', endAt);
       searchLogsQuery = searchLogsQuery.lte('created_at', endAt);
       analyticsEventsQuery = analyticsEventsQuery.lte('created_at', endAt);
       serviceBookingsQuery = serviceBookingsQuery.lte('created_at', endAt);
@@ -230,15 +232,17 @@ export async function GET(request: Request) {
       { data: bookingRows, error: bookingsError },
       { data: experienceRows, error: experiencesError },
       { data: reviewRows, error: reviewsError },
-      { data: newUserRows, error: newUsersError },
+      { count: totalUsersCount, error: newUsersCountError },
+      { data: newUserPreviewRows, error: newUsersPreviewError },
       { data: searchLogRows, error: searchLogsError },
       { data: analyticsEventRows, error: analyticsEventsError },
       { data: serviceBookingRows, error: serviceBookingsError },
     ] = await Promise.all([
       bookingsQuery,
-      supabaseAdmin.from('experiences').select('id, title, status, created_at').order('created_at', { ascending: false }),
+      supabaseAdmin.from('experiences').select('id, title, status, created_at'),
       reviewsQuery,
-      newUsersQuery,
+      newUsersCountQuery,
+      newUsersPreviewQuery,
       searchLogsQuery,
       analyticsEventsQuery,
       serviceBookingsQuery,
@@ -247,7 +251,8 @@ export async function GET(request: Request) {
     if (bookingsError) throw bookingsError;
     if (experiencesError) throw experiencesError;
     if (reviewsError) throw reviewsError;
-    if (newUsersError) throw newUsersError;
+    if (newUsersCountError) throw newUsersCountError;
+    if (newUsersPreviewError) throw newUsersPreviewError;
     if (searchLogsError) throw searchLogsError;
     if (analyticsEventsError) throw analyticsEventsError;
     if (serviceBookingsError) throw serviceBookingsError;
@@ -255,7 +260,8 @@ export async function GET(request: Request) {
     const bookings = (bookingRows || []) as AnalyticsBookingRow[];
     const experiences = (experienceRows || []) as AnalyticsExperienceRow[];
     const reviews = (reviewRows || []) as AnalyticsReviewRow[];
-    const newUsers = (newUserRows || []) as AnalyticsProfileRow[];
+    const newUsers = (newUserPreviewRows || []) as AnalyticsProfileRow[];
+    const totalUsers = totalUsersCount || 0;
     const searchLogs = (searchLogRows || []) as AnalyticsSearchLogRow[];
     const analyticsEvents = (analyticsEventRows || []) as AnalyticsEventRow[];
     const serviceBookings = (serviceBookingRows || []) as AnalyticsServiceBookingRow[];
@@ -485,7 +491,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const newUsersList = newUsers.slice(0, 5).map((profile) => ({
+    const newUsersList = newUsers.map((profile) => ({
       id: profile.id,
       name: profile.full_name || 'Unknown',
       created_at: profile.created_at,
@@ -495,12 +501,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        totalUsers: newUsers.length,
+        totalUsers,
         activeExpsCount: experiences.filter((experience) => experience.status === 'active').length,
         gmv,
         netRevenue,
         hostPayout: Math.max(0, gmv - netRevenue),
-        conversionRate: newUsers.length > 0 ? ((completedCount / newUsers.length) * 100).toFixed(1) : '0.0',
+        conversionRate: totalUsers > 0 ? ((completedCount / totalUsers) * 100).toFixed(1) : '0.0',
         retentionRate: Object.keys(userBookingCounts).length > 0
           ? ((returnUsers / Object.keys(userBookingCounts).length) * 100).toFixed(1)
           : '0.0',

@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.36 — [Analytics] 서버 집계 API 불필요 정렬/전송 축소
+
+**작업일:** 2026-03-13
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 summary 조회 경량화 | `analytics-summary`에서 전체 `profiles` 행을 통째로 읽지 않고, 총 사용자 수는 count query, 최근 가입 미리보기는 별도 preview query로 분리해 데이터 전송량을 축소 |
+| 🟠 host 집계 정렬 축소 | `analytics-summary`, `analytics-host-summary`에서 순서가 필요 없는 집계성 조회의 `order(created_at)`를 제거해 불필요한 DB 정렬 비용을 줄임 |
+
 ## v3.38.35 — [Analytics] 서버 집계 성공 시 로컬 계산 지연
 
 **작업일:** 2026-03-13
