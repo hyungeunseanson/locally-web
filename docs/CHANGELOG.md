@@ -5,6 +5,13 @@
 
 ---
 
+## v3.38.50 — [Payments] PayPal 서비스 의뢰 취소·환불 분기 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 고객 취소 PayPal 분기 | `/api/services/cancel`에서 `payment_method='paypal'`인 서비스 예약만 PayPal capture refund endpoint를 호출하고, 기존 NicePay/무통장 취소 의미는 유지 |
+| 🟠 관리자 강제취소 PayPal 분기 | `/api/admin/service-cancel`에서 `payment_method='paypal'`인 서비스 예약만 PayPal refund를 호출하고, 실패 시 DB 상태를 바꾸지 않도록 기존 NicePay error-safe 흐름을 유지 |
+
 ## v3.38.49 — [Payments] PayPal 서비스 의뢰 결제 UI 연결
 
 | 항목 | 내용 |

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import crypto from 'crypto';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
+import { refundPayPalCapture } from '@/app/utils/paypal/server';
 
 type CancelBody = {
   order_id?: string;
@@ -96,7 +97,16 @@ export async function POST(request: Request) {
       const MID = process.env.NICEPAY_MID;
       const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
 
-      if (MID && MER_KEY && booking.tid) {
+      if (booking.payment_method === 'paypal' && booking.tid) {
+        try {
+          const refund = await refundPayPalCapture(booking.tid, Number(booking.amount || 0), 'KRW');
+          if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
+            console.error('[SERVICE] PayPal refund unexpected status:', refund.status);
+          }
+        } catch (e) {
+          console.error('[SERVICE] PayPal refund exception:', e);
+        }
+      } else if (MID && MER_KEY && booking.tid) {
         try {
           const ediDate = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
           const signData = crypto
@@ -124,6 +134,8 @@ export async function POST(request: Request) {
         } catch (e) {
           console.error('[SERVICE] NicePay cancel exception:', e);
         }
+      } else if (booking.payment_method === 'paypal') {
+        console.warn('[SERVICE] PayPal cancel: capture id missing — manual refund required');
       } else {
         console.warn('[SERVICE] NicePay cancel: env vars or TID missing — manual refund required');
       }
