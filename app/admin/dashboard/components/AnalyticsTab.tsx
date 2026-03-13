@@ -87,6 +87,11 @@ type SearchIntentItem = {
   previousSearches: number;
   surge: number;
   matchedActiveExperiences: number;
+  trackedSearches: number;
+  clickConvertedSearches: number;
+  paymentInitConvertedSearches: number;
+  clickConversionRate: number;
+  paymentInitConversionRate: number;
 };
 
 type AnalyticsSearchIntentSummary = {
@@ -95,8 +100,15 @@ type AnalyticsSearchIntentSummary = {
   topKeywords: SearchIntentItem[];
   risingKeywords: SearchIntentItem[];
   lowSupplyKeywords: SearchIntentItem[];
+  clickConversionKeywords: SearchIntentItem[];
+  paymentInitConversionKeywords: SearchIntentItem[];
   supplyReference: string;
   conversionAvailable: boolean;
+  conversionCoverage?: {
+    trackedSearches: number;
+    clickConvertedSearches: number;
+    paymentInitConvertedSearches: number;
+  };
 };
 
 type SearchIntentSource = 'server' | 'cached' | 'unavailable';
@@ -1310,76 +1322,133 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs md:text-sm text-slate-600">
                 <div className="font-semibold text-slate-800">고객이 찾는 수요와 현재 공급 부족 신호를 함께 봅니다.</div>
-                <div className="mt-1">검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리/태그 기준 참고용입니다.</div>
-                {searchIntent && !searchIntent.conversionAvailable && (
-                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">검색 후 클릭/결제 전환 분석은 검색 로그와 이벤트 연결 키를 정리한 뒤 추가할 예정입니다.</div>
+                <div className="mt-1">검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리 기준 참고용입니다.</div>
+                {searchIntent?.conversionAvailable ? (
+                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                    검색 후 클릭/결제 시작은 동일 세션 안에서 다음 검색 전까지 발생한 이벤트를 참고용으로 연결합니다.
+                    {searchIntent.conversionCoverage ? ` (추적 검색 ${searchIntent.conversionCoverage.trackedSearches}건)` : ''}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[11px] md:text-xs text-slate-500">세션 연결 데이터가 충분히 쌓이면 검색→클릭/결제 시작 전환도 함께 표시합니다.</div>
                 )}
               </div>
             </div>
 
             {searchIntent ? (
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm md:text-base font-bold text-slate-800">많이 찾는 키워드</h3>
-                    <span className="text-[10px] md:text-xs text-slate-400">총 {searchIntent.totalSearches}회</span>
-                  </div>
-                  <div className="space-y-2">
-                    {searchIntent.topKeywords.length > 0 ? searchIntent.topKeywords.slice(0, 5).map((item, index) => (
-                      <div key={`search-demand-top-${item.keyword}`} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-black text-rose-500">{index + 1}</span>
-                          <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                  <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm md:text-base font-bold text-slate-800">많이 찾는 키워드</h3>
+                      <span className="text-[10px] md:text-xs text-slate-400">총 {searchIntent.totalSearches}회</span>
+                    </div>
+                    <div className="space-y-2">
+                      {searchIntent.topKeywords.length > 0 ? searchIntent.topKeywords.slice(0, 5).map((item, index) => (
+                        <div key={`search-demand-top-${item.keyword}`} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs font-black text-rose-500">{index + 1}</span>
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                          </div>
+                          <span className="text-xs font-mono text-slate-500">{item.searches}회</span>
                         </div>
-                        <span className="text-xs font-mono text-slate-500">{item.searches}회</span>
-                      </div>
-                    )) : (
-                      <div className="py-6 text-center text-sm text-slate-400">검색 데이터가 부족합니다.</div>
-                    )}
+                      )) : (
+                        <div className="py-6 text-center text-sm text-slate-400">검색 데이터가 부족합니다.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm md:text-base font-bold text-slate-800">급상승 키워드</h3>
+                      <span className="text-[10px] md:text-xs text-slate-400">최근 {searchIntent.comparisonWindowDays}일 비교</span>
+                    </div>
+                    <div className="space-y-2">
+                      {searchIntent.risingKeywords.length > 0 ? searchIntent.risingKeywords.map((item) => (
+                        <div key={`search-demand-rising-${item.keyword}`} className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                            <span className="text-xs font-black text-emerald-700">+{item.surge}</span>
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                            최근 {item.recentSearches}회 · 이전 {item.previousSearches}회
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="py-6 text-center text-sm text-slate-400">최근 급상승 키워드가 없습니다.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm md:text-base font-bold text-slate-800">공급 부족 키워드</h3>
+                      <span className="text-[10px] md:text-xs text-slate-400">현재 활성 체험 기준</span>
+                    </div>
+                    <div className="space-y-2">
+                      {searchIntent.lowSupplyKeywords.length > 0 ? searchIntent.lowSupplyKeywords.map((item) => (
+                        <div key={`search-demand-low-supply-${item.keyword}`} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                            <span className="text-xs font-mono text-amber-700">{item.searches}회</span>
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                            연결 가능한 활성 체험 {item.matchedActiveExperiences}개
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="py-6 text-center text-sm text-slate-400">공급 부족 신호가 강한 키워드가 없습니다.</div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm md:text-base font-bold text-slate-800">급상승 키워드</h3>
-                    <span className="text-[10px] md:text-xs text-slate-400">최근 {searchIntent.comparisonWindowDays}일 비교</span>
-                  </div>
-                  <div className="space-y-2">
-                    {searchIntent.risingKeywords.length > 0 ? searchIntent.risingKeywords.map((item) => (
-                      <div key={`search-demand-rising-${item.keyword}`} className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
-                          <span className="text-xs font-black text-emerald-700">+{item.surge}</span>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm md:text-base font-bold text-slate-800">클릭 전환 키워드</h3>
+                      <span className="text-[10px] md:text-xs text-slate-400">동일 세션 기준 참고용</span>
+                    </div>
+                    <div className="space-y-2">
+                      {searchIntent.conversionAvailable && searchIntent.clickConversionKeywords.length > 0 ? searchIntent.clickConversionKeywords.map((item) => (
+                        <div key={`search-demand-click-${item.keyword}`} className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                            <span className="text-xs font-black text-sky-700">{item.clickConversionRate}%</span>
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                            추적 검색 {item.trackedSearches}건 · 클릭 연결 {item.clickConvertedSearches}건
+                          </div>
                         </div>
-                        <div className="mt-1 text-[11px] md:text-xs text-slate-500">
-                          최근 {item.recentSearches}회 · 이전 {item.previousSearches}회
+                      )) : (
+                        <div className="py-6 text-center text-sm text-slate-400">
+                          {searchIntent.conversionAvailable ? '클릭 전환 참고 데이터가 부족합니다.' : '세션 연결 데이터 수집 중입니다.'}
                         </div>
-                      </div>
-                    )) : (
-                      <div className="py-6 text-center text-sm text-slate-400">최근 급상승 키워드가 없습니다.</div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm md:text-base font-bold text-slate-800">공급 부족 키워드</h3>
-                    <span className="text-[10px] md:text-xs text-slate-400">현재 활성 체험 기준</span>
-                  </div>
-                  <div className="space-y-2">
-                    {searchIntent.lowSupplyKeywords.length > 0 ? searchIntent.lowSupplyKeywords.map((item) => (
-                      <div key={`search-demand-low-supply-${item.keyword}`} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
-                          <span className="text-xs font-mono text-amber-700">{item.searches}회</span>
+                  <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm md:text-base font-bold text-slate-800">결제 시작 전환 키워드</h3>
+                      <span className="text-[10px] md:text-xs text-slate-400">동일 세션 기준 참고용</span>
+                    </div>
+                    <div className="space-y-2">
+                      {searchIntent.conversionAvailable && searchIntent.paymentInitConversionKeywords.length > 0 ? searchIntent.paymentInitConversionKeywords.map((item) => (
+                        <div key={`search-demand-payment-init-${item.keyword}`} className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.keyword}</span>
+                            <span className="text-xs font-black text-violet-700">{item.paymentInitConversionRate}%</span>
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                            추적 검색 {item.trackedSearches}건 · 결제 시작 연결 {item.paymentInitConvertedSearches}건
+                          </div>
                         </div>
-                        <div className="mt-1 text-[11px] md:text-xs text-slate-500">
-                          연결 가능한 활성 체험 {item.matchedActiveExperiences}개
+                      )) : (
+                        <div className="py-6 text-center text-sm text-slate-400">
+                          {searchIntent.conversionAvailable ? '결제 시작 전환 참고 데이터가 부족합니다.' : '세션 연결 데이터 수집 중입니다.'}
                         </div>
-                      </div>
-                    )) : (
-                      <div className="py-6 text-center text-sm text-slate-400">공급 부족 신호가 강한 키워드가 없습니다.</div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

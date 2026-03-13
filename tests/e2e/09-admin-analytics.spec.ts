@@ -183,7 +183,10 @@ test.describe.serial('Admin analytics smoke', () => {
       await expect(page.getByText('체험 예약 결제 완료 건수 기준', { exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: '고객 검색 수요 분석' })).toBeVisible();
       await expect(page.getByText('고객이 찾는 수요와 현재 공급 부족 신호를 함께 봅니다.')).toBeVisible();
-      await expect(page.getByText('검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리/태그 기준 참고용입니다.')).toBeVisible();
+      await expect(page.getByText('검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리 기준 참고용입니다.')).toBeVisible();
+      await expect(
+        page.getByText(/동일 세션 안에서 다음 검색 전까지 발생한 이벤트를 참고용으로 연결합니다.|세션 연결 데이터가 충분히 쌓이면 검색→클릭\/결제 시작 전환도 함께 표시합니다./)
+      ).toBeVisible();
     });
 
     await test.step('Show customer composition block copy', async () => {

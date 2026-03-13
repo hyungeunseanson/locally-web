@@ -6,6 +6,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 type SearchLogRow = {
   keyword: string | null;
   created_at: string | null;
+  session_id: string | null;
 };
 
 type ActiveExperienceRow = {
@@ -23,6 +24,17 @@ type SearchIntentItem = {
   previousSearches: number;
   surge: number;
   matchedActiveExperiences: number;
+  trackedSearches: number;
+  clickConvertedSearches: number;
+  paymentInitConvertedSearches: number;
+  clickConversionRate: number;
+  paymentInitConversionRate: number;
+};
+
+type AnalyticsEventRow = {
+  session_id: string | null;
+  event_type: string | null;
+  created_at: string | null;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -71,6 +83,11 @@ function clampWindowDays(rawDays: number) {
   return Math.max(3, Math.min(14, rawDays));
 }
 
+function roundRate(numerator: number, denominator: number) {
+  if (denominator <= 0) return 0;
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
 export async function GET(request: Request) {
   try {
     const requestUrl = new URL(request.url);
@@ -104,21 +121,30 @@ export async function GET(request: Request) {
 
     let searchLogsQuery = supabaseAdmin
       .from('search_logs')
-      .select('keyword, created_at');
+      .select('keyword, created_at, session_id');
+
+    let analyticsEventsQuery = supabaseAdmin
+      .from('analytics_events')
+      .select('session_id, event_type, created_at')
+      .in('event_type', ['click', 'payment_init']);
 
     if (startAt) {
       searchLogsQuery = searchLogsQuery.gte('created_at', startAt);
+      analyticsEventsQuery = analyticsEventsQuery.gte('created_at', startAt);
     }
 
     if (endAt) {
       searchLogsQuery = searchLogsQuery.lte('created_at', endAt);
+      analyticsEventsQuery = analyticsEventsQuery.lte('created_at', endAt);
     }
 
     const [
       { data: searchLogs, error: searchLogsError },
+      { data: analyticsEvents, error: analyticsEventsError },
       { data: activeExperiences, error: activeExperiencesError },
     ] = await Promise.all([
       searchLogsQuery,
+      analyticsEventsQuery,
       supabaseAdmin
         .from('experiences')
         .select('id, title, city, description, category')
@@ -126,9 +152,11 @@ export async function GET(request: Request) {
     ]);
 
     if (searchLogsError) throw searchLogsError;
+    if (analyticsEventsError) throw analyticsEventsError;
     if (activeExperiencesError) throw activeExperiencesError;
 
     const searchRows = (searchLogs || []) as SearchLogRow[];
+    const analyticsEventRows = (analyticsEvents || []) as AnalyticsEventRow[];
     const activeExperienceRows = (activeExperiences || []) as ActiveExperienceRow[];
 
     const totalSearches = searchRows.reduce((count, row) => {
@@ -147,6 +175,11 @@ export async function GET(request: Request) {
     const totalCounts: Record<string, number> = {};
     const recentCounts: Record<string, number> = {};
     const previousCounts: Record<string, number> = {};
+    const trackedCounts: Record<string, number> = {};
+    const clickConvertedCounts: Record<string, number> = {};
+    const paymentInitConvertedCounts: Record<string, number> = {};
+    const sessionSearchRows = new Map<string, SearchLogRow[]>();
+    const sessionEventRows = new Map<string, AnalyticsEventRow[]>();
 
     for (const row of searchRows) {
       const keyword = String(row.keyword || '').trim();
@@ -162,12 +195,75 @@ export async function GET(request: Request) {
       } else if (createdAtMs >= previousStartMs && createdAtMs <= previousEndMs) {
         previousCounts[keyword] = (previousCounts[keyword] || 0) + 1;
       }
+
+      if (row.session_id) {
+        const rows = sessionSearchRows.get(row.session_id) || [];
+        rows.push(row);
+        sessionSearchRows.set(row.session_id, rows);
+      }
     }
+
+    for (const event of analyticsEventRows) {
+      if (!event.session_id || !event.created_at) continue;
+      const rows = sessionEventRows.get(event.session_id) || [];
+      rows.push(event);
+      sessionEventRows.set(event.session_id, rows);
+    }
+
+    for (const [sessionId, rows] of sessionSearchRows.entries()) {
+      const searchTimeline = rows
+        .filter((row) => row.created_at && String(row.keyword || '').trim())
+        .sort((left, right) => new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime());
+
+      if (searchTimeline.length === 0) continue;
+
+      const eventTimeline = (sessionEventRows.get(sessionId) || [])
+        .filter((event) => event.created_at && event.event_type)
+        .sort((left, right) => new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime());
+
+      for (let index = 0; index < searchTimeline.length; index += 1) {
+        const current = searchTimeline[index];
+        const keyword = String(current.keyword || '').trim();
+        const windowStart = new Date(current.created_at || 0).getTime();
+        const nextSearch = searchTimeline[index + 1];
+        const windowEnd = nextSearch?.created_at ? new Date(nextSearch.created_at).getTime() : Number.POSITIVE_INFINITY;
+
+        if (!keyword || Number.isNaN(windowStart)) continue;
+
+        trackedCounts[keyword] = (trackedCounts[keyword] || 0) + 1;
+
+        let hasClick = false;
+        let hasPaymentInit = false;
+
+        for (const event of eventTimeline) {
+          const eventTime = new Date(event.created_at || 0).getTime();
+          if (Number.isNaN(eventTime) || eventTime < windowStart || eventTime >= windowEnd) continue;
+          if (event.event_type === 'click') hasClick = true;
+          if (event.event_type === 'payment_init') hasPaymentInit = true;
+          if (hasClick && hasPaymentInit) break;
+        }
+
+        if (hasClick) {
+          clickConvertedCounts[keyword] = (clickConvertedCounts[keyword] || 0) + 1;
+        }
+
+        if (hasPaymentInit) {
+          paymentInitConvertedCounts[keyword] = (paymentInitConvertedCounts[keyword] || 0) + 1;
+        }
+      }
+    }
+
+    const totalTrackedSearches = Object.values(trackedCounts).reduce((sum, count) => sum + count, 0);
+    const totalClickConvertedSearches = Object.values(clickConvertedCounts).reduce((sum, count) => sum + count, 0);
+    const totalPaymentInitConvertedSearches = Object.values(paymentInitConvertedCounts).reduce((sum, count) => sum + count, 0);
 
     const keywordItems = Object.entries(totalCounts)
       .map(([keyword, searches]) => {
         const recentSearches = recentCounts[keyword] || 0;
         const previousSearches = previousCounts[keyword] || 0;
+        const trackedSearches = trackedCounts[keyword] || 0;
+        const clickConvertedSearches = clickConvertedCounts[keyword] || 0;
+        const paymentInitConvertedSearches = paymentInitConvertedCounts[keyword] || 0;
         return {
           keyword,
           searches,
@@ -175,6 +271,11 @@ export async function GET(request: Request) {
           previousSearches,
           surge: recentSearches - previousSearches,
           matchedActiveExperiences: countMatchedActiveExperiences(keyword, activeExperienceRows),
+          trackedSearches,
+          clickConvertedSearches,
+          paymentInitConvertedSearches,
+          clickConversionRate: roundRate(clickConvertedSearches, trackedSearches),
+          paymentInitConversionRate: roundRate(paymentInitConvertedSearches, trackedSearches),
         } satisfies SearchIntentItem;
       })
       .sort((left, right) => right.searches - left.searches);
@@ -196,6 +297,26 @@ export async function GET(request: Request) {
       })
       .slice(0, 6);
 
+    const clickConversionKeywords = keywordItems
+      .filter((item) => item.trackedSearches >= 2 && item.clickConvertedSearches > 0)
+      .sort((left, right) => {
+        if (right.clickConversionRate !== left.clickConversionRate) {
+          return right.clickConversionRate - left.clickConversionRate;
+        }
+        return right.trackedSearches - left.trackedSearches;
+      })
+      .slice(0, 6);
+
+    const paymentInitConversionKeywords = keywordItems
+      .filter((item) => item.trackedSearches >= 2 && item.paymentInitConvertedSearches > 0)
+      .sort((left, right) => {
+        if (right.paymentInitConversionRate !== left.paymentInitConversionRate) {
+          return right.paymentInitConversionRate - left.paymentInitConversionRate;
+        }
+        return right.trackedSearches - left.trackedSearches;
+      })
+      .slice(0, 6);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -204,8 +325,15 @@ export async function GET(request: Request) {
         topKeywords,
         risingKeywords,
         lowSupplyKeywords,
-        supplyReference: '현재 활성 체험의 제목/도시/설명/카테고리/태그 기준',
-        conversionAvailable: false,
+        clickConversionKeywords,
+        paymentInitConversionKeywords,
+        supplyReference: '현재 활성 체험의 제목/도시/설명/카테고리 기준',
+        conversionAvailable: totalTrackedSearches > 0,
+        conversionCoverage: {
+          trackedSearches: totalTrackedSearches,
+          clickConvertedSearches: totalClickConvertedSearches,
+          paymentInitConvertedSearches: totalPaymentInitConvertedSearches,
+        },
       },
     });
   } catch (error) {
