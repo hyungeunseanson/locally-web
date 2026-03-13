@@ -112,6 +112,9 @@ type SourceFunnelBucket = {
   signups: number;
   payingCustomers: number;
   conversionRate: number;
+  revenue: number;
+  repeatCustomers: number;
+  repeatRate: number;
 };
 
 type AnalyticsCustomerCompositionSummary = {
@@ -161,6 +164,8 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   });
   const searchIntentCacheRef = useRef<Record<string, AnalyticsSearchIntentSummary>>({});
   const customerCompositionCacheRef = useRef<Record<string, AnalyticsCustomerCompositionSummary>>({});
+
+  const formatKrw = (value: number) => `₩${Math.round(value || 0).toLocaleString()}`;
 
   // 날짜 필터 상태 추가
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -1099,7 +1104,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                 <div className="mt-1">언어는 복수 응답 기준이라 한 고객이 여러 언어에 함께 집계될 수 있습니다.</div>
                 {customerComposition?.sourceFunnel && customerComposition.sourceFunnel.length > 0 && (
                   <div className="mt-1 text-[11px] md:text-xs text-slate-500">
-                    유입 source별 가입→결제 전환은 추적 데이터가 남아 있는 가입자 {customerComposition.sourceSignupTrackedUsers || 0}명 기준 참고용입니다.
+                    유입 source별 가입→결제 전환, 결제액, 반복 고객 비율은 추적 데이터가 남아 있는 가입자 {customerComposition.sourceSignupTrackedUsers || 0}명 기준 참고용입니다.
                   </div>
                 )}
                 {customerComposition?.sourceStatus === 'ready' && !(customerComposition.sourceFunnel && customerComposition.sourceFunnel.length > 0) && (
@@ -1213,6 +1218,9 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                           </div>
                           <div className="mt-1 text-[11px] md:text-xs text-slate-500">
                             가입 {item.signups}명 · 결제 {item.payingCustomers}명
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                            결제액 {formatKrw(item.revenue)} · 반복 {item.repeatCustomers}명 ({item.repeatRate.toFixed(1)}%)
                           </div>
                         </div>
                       ))

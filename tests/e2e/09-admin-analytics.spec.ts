@@ -197,7 +197,7 @@ test.describe.serial('Admin analytics smoke', () => {
       await expect(page.getByText('체험/서비스 선호')).toBeVisible();
       await expect(page.getByText('주요 유입 source')).toBeVisible();
       await expect(
-        page.getByText(/유입 source별 가입→결제 전환은 추적 데이터가 남아 있는 가입자|유입 source 데이터가 아직 충분히 쌓이는 중입니다.|유입 source 집계를 현재 불러오지 못해, 다른 고객 구성 지표만 표시하고 있습니다.|유입 source는 추적 데이터가 남아 있는 결제 고객/)
+        page.getByText(/유입 source별 가입→결제 전환, 결제액, 반복 고객 비율은 추적 데이터가 남아 있는 가입자|유입 source 데이터가 아직 충분히 쌓이는 중입니다.|유입 source 집계를 현재 불러오지 못해, 다른 고객 구성 지표만 표시하고 있습니다.|유입 source는 추적 데이터가 남아 있는 결제 고객/)
       ).toBeVisible();
     });
 

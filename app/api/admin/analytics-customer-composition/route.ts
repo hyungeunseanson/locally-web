@@ -10,12 +10,14 @@ type AnalyticsBookingRow = {
   user_id: string | null;
   status: string | null;
   created_at: string | null;
+  amount: number | null;
 };
 
 type AnalyticsServiceBookingRow = {
   customer_id: string | null;
   status: string | null;
   created_at: string | null;
+  amount: number | null;
 };
 
 type AnalyticsProfileRow = {
@@ -49,12 +51,16 @@ type SourceFunnelBucket = {
   signups: number;
   payingCustomers: number;
   conversionRate: number;
+  revenue: number;
+  repeatCustomers: number;
+  repeatRate: number;
 };
 
 type CustomerStats = {
   transactions: number;
   hasExperiencePurchase: boolean;
   hasServicePurchase: boolean;
+  revenue: number;
 };
 
 type SourceStatus = 'ready' | 'collecting' | 'unavailable';
@@ -93,17 +99,23 @@ function getSourceLabel(event: AnalyticsEventSourceRow) {
 
 function toSourceFunnelBuckets(
   signups: Record<string, number>,
-  payers: Record<string, number>
+  payers: Record<string, number>,
+  revenueBySource: Record<string, number>,
+  repeatCustomersBySource: Record<string, number>
 ): SourceFunnelBucket[] {
   return Object.entries(signups)
     .filter(([, signupCount]) => signupCount > 0)
     .map(([name, signupCount]) => {
       const payingCustomers = payers[name] || 0;
+      const repeatCustomers = repeatCustomersBySource[name] || 0;
       return {
         name,
         signups: signupCount,
         payingCustomers,
         conversionRate: signupCount > 0 ? (payingCustomers / signupCount) * 100 : 0,
+        revenue: revenueBySource[name] || 0,
+        repeatCustomers,
+        repeatRate: payingCustomers > 0 ? (repeatCustomers / payingCustomers) * 100 : 0,
       };
     })
     .sort((left, right) => right.signups - left.signups);
@@ -145,12 +157,12 @@ export async function GET(request: Request) {
 
     let bookingsQuery = supabaseAdmin
       .from('bookings')
-      .select('user_id, status, created_at')
+      .select('user_id, status, created_at, amount')
       .in('status', ['PAID', 'confirmed', 'completed']);
 
     let serviceBookingsQuery = supabaseAdmin
       .from('service_bookings')
-      .select('customer_id, status, created_at')
+      .select('customer_id, status, created_at, amount')
       .in('status', ['PAID', 'confirmed', 'completed']);
 
     if (startAt) {
@@ -180,10 +192,12 @@ export async function GET(request: Request) {
         transactions: 0,
         hasExperiencePurchase: false,
         hasServicePurchase: false,
+        revenue: 0,
       };
 
       current.transactions += 1;
       current.hasExperiencePurchase = true;
+      current.revenue += Number(booking.amount || 0);
       customerStats.set(booking.user_id, current);
     });
 
@@ -195,10 +209,12 @@ export async function GET(request: Request) {
         transactions: 0,
         hasExperiencePurchase: false,
         hasServicePurchase: false,
+        revenue: 0,
       };
 
       current.transactions += 1;
       current.hasServicePurchase = true;
+      current.revenue += Number(booking.amount || 0);
       customerStats.set(booking.customer_id, current);
     });
 
@@ -248,6 +264,8 @@ export async function GET(request: Request) {
     const sourceCounts: Record<string, number> = {};
     const sourceSignupCounts: Record<string, number> = {};
     const sourcePayingCounts: Record<string, number> = {};
+    const sourceRevenueTotals: Record<string, number> = {};
+    const sourceRepeatCustomerCounts: Record<string, number> = {};
     let sourceTrackedCustomers = 0;
     let sourceSignupTrackedUsers = 0;
     let sourceStatus: SourceStatus = 'collecting';
@@ -332,8 +350,13 @@ export async function GET(request: Request) {
         customerIds.forEach((userId) => {
           const label = firstSourceByUser.get(userId);
           if (!label) return;
+          const stat = customerStats.get(userId);
           sourceTrackedCustomers += 1;
           sourceCounts[label] = (sourceCounts[label] || 0) + 1;
+          sourceRevenueTotals[label] = (sourceRevenueTotals[label] || 0) + Number(stat?.revenue || 0);
+          if ((stat?.transactions || 0) >= 2) {
+            sourceRepeatCustomerCounts[label] = (sourceRepeatCustomerCounts[label] || 0) + 1;
+          }
         });
 
         signupProfileIds.forEach((userId) => {
@@ -368,7 +391,12 @@ export async function GET(request: Request) {
         sourceTrackedCustomers,
         sourceSignupTrackedUsers,
         sourceMix: toBuckets(sourceCounts, sourceTrackedCustomers).slice(0, 6),
-        sourceFunnel: toSourceFunnelBuckets(sourceSignupCounts, sourcePayingCounts).slice(0, 6),
+        sourceFunnel: toSourceFunnelBuckets(
+          sourceSignupCounts,
+          sourcePayingCounts,
+          sourceRevenueTotals,
+          sourceRepeatCustomerCounts
+        ).slice(0, 6),
       },
     });
   } catch (error) {
