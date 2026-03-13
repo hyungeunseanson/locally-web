@@ -81,6 +81,10 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<'business' | 'host' | 'reviews' | 'logs'>('business'); // 🟢 서브탭 구분
+  const [summarySource, setSummarySource] = useState<{ business: 'server' | 'fallback'; host: 'server' | 'fallback' }>({
+    business: 'server',
+    host: 'server',
+  });
 
   // 날짜 필터 상태 추가
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -222,6 +226,11 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         }),
       ]);
 
+      const nextSummarySource: { business: 'server' | 'fallback'; host: 'server' | 'fallback' } = {
+        business: businessResult.status === 'fulfilled' ? 'server' : 'fallback',
+        host: hostResult.status === 'fulfilled' ? 'server' : 'fallback',
+      };
+
       if (businessResult.status === 'fulfilled') {
         nextStats = {
           ...nextStats,
@@ -242,6 +251,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
       if (!cancelled) {
         setStats(nextStats);
+        setSummarySource(nextSummarySource);
         setLoading(false);
       }
     };
@@ -733,13 +743,32 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
               }`}
           >
-            {tab.label}
+            <span>{tab.label}</span>
+            {tab.id === 'business' && summarySource.business === 'fallback' && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                임시
+              </span>
+            )}
+            {tab.id === 'host' && summarySource.host === 'fallback' && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                임시
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {activeMainTab === 'business' && (
         <>
+          {summarySource.business === 'fallback' && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+              <div>
+                <div className="font-semibold">일부 수치는 임시 집계값입니다.</div>
+                <div className="text-xs text-amber-700">서버 집계를 불러오지 못해 현재 화면 계산값을 대신 표시 중입니다.</div>
+              </div>
+            </div>
+          )}
           {/* 1. 핵심 지표 (KPI) - 원본 순서 및 기능 100% 복구 */}
           <section>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -980,6 +1009,15 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
       {activeMainTab === 'host' && (
         <div className="space-y-12 animate-in slide-in-from-bottom-[50px] duration-500">
+          {summarySource.host === 'fallback' && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+              <div>
+                <div className="font-semibold">호스트 통계 일부가 임시 집계값입니다.</div>
+                <div className="text-xs text-amber-700">호스트 서버 집계를 불러오지 못해 현재 화면 계산값을 대신 표시 중입니다.</div>
+              </div>
+            </div>
+          )}
           {/* 1. 호스트 활성화 퍼널 (Health Funnel) */}
           <section>
             <div className="flex items-center justify-between mb-4">
