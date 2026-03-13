@@ -58,6 +58,24 @@ type AnalyticsBusinessSummary = {
   retentionBreakdown: { once: number; twice: number; threeOrMore: number };
 };
 
+type AnalyticsHostSummary = {
+  superHostCandidates: any[];
+  riskHosts: any[];
+  hostEcosystem: {
+    sources: { name: string; count: number; percent: number }[];
+    languages: { name: string; count: number; percent: number }[];
+    nationalities: { name: string; count: number; percent: number }[];
+    allSources: { name: string; count: number; percent: number }[];
+    allLanguages: { name: string; count: number; percent: number }[];
+    allNationalities: { name: string; count: number; percent: number }[];
+    funnel: { applied: number; approved: number; active: number; booked: number };
+  };
+  avgResponseTime: number;
+  responseRate: number;
+  topRespHosts: any[];
+  bottomRespHosts: any[];
+};
+
 export default function AnalyticsTab({ bookings, users, exps, apps, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages }: AnalyticsTabProps) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -165,31 +183,61 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       const localStats = buildLocalStats();
       let nextStats = localStats;
 
-      try {
-        const params = new URLSearchParams();
-        if (dateRange[0].startDate) {
-          params.set('startAt', startOfDay(dateRange[0].startDate).toISOString());
-        }
-        if (dateRange[0].endDate) {
-          params.set('endAt', endOfDay(dateRange[0].endDate).toISOString());
-        }
+      const params = new URLSearchParams();
+      if (dateRange[0].startDate) {
+        params.set('startAt', startOfDay(dateRange[0].startDate).toISOString());
+      }
+      if (dateRange[0].endDate) {
+        params.set('endAt', endOfDay(dateRange[0].endDate).toISOString());
+      }
 
-        const response = await fetch(`/api/admin/analytics-summary?${params.toString()}`);
-        if (!response.ok) {
-          throw new Error('Analytics summary fetch failed');
-        }
+      const queryString = params.toString();
+      const analyticsSummaryUrl = queryString ? `/api/admin/analytics-summary?${queryString}` : '/api/admin/analytics-summary';
+      const analyticsHostUrl = queryString ? `/api/admin/analytics-host-summary?${queryString}` : '/api/admin/analytics-host-summary';
 
-        const result = await response.json();
-        if (!result?.success) {
-          throw new Error(result?.error || 'Analytics summary fetch failed');
-        }
+      const [businessResult, hostResult] = await Promise.allSettled([
+        fetch(analyticsSummaryUrl).then(async (response) => {
+          if (!response.ok) {
+            throw new Error('Analytics summary fetch failed');
+          }
 
+          const result = await response.json();
+          if (!result?.success) {
+            throw new Error(result?.error || 'Analytics summary fetch failed');
+          }
+
+          return result.data as AnalyticsBusinessSummary;
+        }),
+        fetch(analyticsHostUrl).then(async (response) => {
+          if (!response.ok) {
+            throw new Error('Analytics host summary fetch failed');
+          }
+
+          const result = await response.json();
+          if (!result?.success) {
+            throw new Error(result?.error || 'Analytics host summary fetch failed');
+          }
+
+          return result.data as AnalyticsHostSummary;
+        }),
+      ]);
+
+      if (businessResult.status === 'fulfilled') {
         nextStats = {
-          ...localStats,
-          ...(result.data as AnalyticsBusinessSummary),
+          ...nextStats,
+          ...businessResult.value,
         };
-      } catch (error) {
-        console.error('[AnalyticsTab] analytics-summary fallback:', error);
+      } else {
+        console.error('[AnalyticsTab] analytics-summary fallback:', businessResult.reason);
+      }
+
+      if (hostResult.status === 'fulfilled') {
+        nextStats = {
+          ...nextStats,
+          ...hostResult.value,
+        };
+      } else {
+        console.error('[AnalyticsTab] analytics-host-summary fallback:', hostResult.reason);
       }
 
       if (!cancelled) {

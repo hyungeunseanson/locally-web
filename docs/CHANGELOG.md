@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.25 — [Analytics] Host Ecosystem 서버 집계 분리
+
+**작업일:** 2026-03-13
+
+| 항목 | 내용 |
+|------|------|
+| 🔴 Host source 분리 | 신규 `/api/admin/analytics-host-summary`를 추가해 `Host Ecosystem` 섹션이 더 이상 브라우저 shared data 계산에만 기대지 않고 서버 집계 기준으로 `호스트 퍼널`, `슈퍼 호스트 유망주`, `집중 관리 호스트`, `응답시간/응답률`, `유입/국적/언어 통계`를 읽도록 정리 |
+| 🟠 회귀 안전 fallback | `AnalyticsTab`은 새 host summary fetch 실패 시 기존 로컬 계산값을 그대로 유지해 `Business & Guest` 및 기존 Host 화면이 깨지지 않도록 보강 |
+| 🟡 Host smoke 보강 | `09-admin-analytics.spec.ts`가 `analytics-host-summary` 호출과 Host Ecosystem 탭 기본 렌더를 함께 검증하도록 확장 |
+
 ## v3.38.24 — [Analytics] 전용 스모크 테스트 추가
 
 **작업일:** 2026-03-13

@@ -41,6 +41,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - Billing/Sales 탭의 체험 정산은 자동 지급이 아니라 `운영자 수동 송금 → 정산 완료 클릭` 흐름을 기준으로 한다. 누적 정산 가능액이 `₩100,000` 이상일 때만 `정산 가능`, 미만 금액은 누적 보류한다.
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics에서 `취소율`, `체험 검색 인기 트렌드`, `Top 체험`은 여전히 체험 예약/체험 검색 기준이다. 플랫폼 전체 KPI와 체험 전용 섹션이 섞여 있으므로 카드/섹션 문구로 기준을 명시한다.
+- Data Analytics `Host Ecosystem`는 `/api/admin/analytics-host-summary`를 전용 source로 사용한다. 새 API 실패 시에만 기존 로컬 계산 fallback을 유지한다.
 
 ---
 

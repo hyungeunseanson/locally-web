@@ -139,8 +139,13 @@ test.describe.serial('Admin analytics smoke', () => {
     const adminUser = createAdminUser();
     await createAuthUser(adminUser);
 
+    const analyticsHostSummaryPromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/analytics-host-summary') && response.request().method() === 'GET'
+    );
+
     await login(page, adminUser);
     await page.goto('/admin/dashboard?tab=ANALYTICS', { waitUntil: 'networkidle' });
+    await analyticsHostSummaryPromise;
 
     await expect(page.getByRole('heading', { name: '데이터 심층 분석' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Business & Guest' })).toBeVisible();
@@ -182,6 +187,13 @@ test.describe.serial('Admin analytics smoke', () => {
       await expect(page.getByRole('heading', { name: '기간 내 반복 결제 고객 비율' })).toBeVisible({ timeout: 10000 });
       await expect(page.getByText(/해당 기간 내 체험 예약과 서비스 결제를 합친 전체 결제 고객 중 2회 이상 결제한 고객 비율/)).toBeVisible();
       await closeAnalyticsModal(page);
+    });
+
+    await test.step('Open Host tab after host summary load', async () => {
+      await page.getByRole('button', { name: 'Host Ecosystem' }).click();
+      await expect(page.getByRole('heading', { name: /호스트 활성화 퍼널/ })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: /커뮤니케이션 현황/ })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /호스트 생태계 통계/ })).toBeVisible();
     });
   });
 });
