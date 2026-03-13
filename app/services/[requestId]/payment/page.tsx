@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Landmark, Loader2, Clock, Users, ShieldCheck, Lock } from 'lucide-react';
 import Script from 'next/script';
@@ -35,13 +35,62 @@ declare global {
       init: (merchantCode: string) => void;
       request_pay: (data: ImpRequestData, callback: (rsp: ImpResponse) => void) => void;
     };
+    paypal?: PayPalNamespace;
   }
 }
 
 type PendingBooking = {
+  id: string;
   order_id: string;
   amount: number;
   status: string;
+};
+
+type PaymentMethod = 'card' | 'bank' | 'paypal';
+
+type PayPalCreateOrderResponse = {
+  success?: boolean;
+  paypalOrderId?: string;
+  error?: string;
+};
+
+type PayPalCaptureResponse = {
+  success?: boolean;
+  captureId?: string | null;
+  paypalOrderId?: string;
+  error?: string;
+};
+
+type PayPalButtonStyle = {
+  layout?: 'vertical' | 'horizontal';
+  color?: 'gold' | 'blue' | 'silver' | 'white' | 'black';
+  shape?: 'rect' | 'pill';
+  label?: 'paypal' | 'checkout' | 'pay' | 'buynow';
+  height?: number;
+};
+
+type PayPalCreateOrderData = {
+  orderID?: string;
+};
+
+type PayPalApproveData = {
+  orderID: string;
+};
+
+type PayPalButtonsComponent = {
+  render: (container: HTMLElement) => Promise<void>;
+};
+
+type PayPalButtonsOptions = {
+  style?: PayPalButtonStyle;
+  createOrder: (data: PayPalCreateOrderData) => Promise<string>;
+  onApprove: (data: PayPalApproveData) => Promise<void>;
+  onCancel?: () => void;
+  onError?: (error: unknown) => void;
+};
+
+type PayPalNamespace = {
+  Buttons: (options: PayPalButtonsOptions) => PayPalButtonsComponent;
 };
 
 function ServicePaymentContent() {
@@ -60,7 +109,25 @@ function ServicePaymentContent() {
   const [contactPhone, setContactPhone] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [paymentError, setPaymentError] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [isPayPalSdkReady, setIsPayPalSdkReady] = useState(false);
+  const [paypalSdkError, setPaypalSdkError] = useState('');
+  const paypalButtonRef = useRef<HTMLDivElement | null>(null);
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
+  const isPayPalEnabled = Boolean(paypalClientId);
+
+  const getCheckoutValidationError = useCallback(() => {
+    if (!contactName.trim() || !contactPhone.trim()) {
+      return t('sp_err_empty') as string;
+    }
+    if (!agreeTerms) {
+      return t('sp_err_terms') as string;
+    }
+    if (!request || !pendingBooking) {
+      return t('sp_err_info') as string;
+    }
+    return null;
+  }, [agreeTerms, contactName, contactPhone, pendingBooking, request, t]);
 
   const fetchData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -79,7 +146,7 @@ function ServicePaymentContent() {
     // v2 에스크로: 사전 생성된 PENDING 예약 조회
     const { data: booking } = await supabase
       .from('service_bookings')
-      .select('order_id, amount, status')
+      .select('id, order_id, amount, status')
       .eq('request_id', requestId)
       .eq('customer_id', user.id)
       .eq('status', 'PENDING')
@@ -105,19 +172,160 @@ function ServicePaymentContent() {
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
+  useEffect(() => {
+    if (!isPayPalEnabled && paymentMethod === 'paypal') {
+      setPaymentMethod('card');
+    }
+  }, [isPayPalEnabled, paymentMethod]);
+
+  useEffect(() => {
+    if (paymentMethod !== 'paypal') {
+      setPaymentError('');
+    }
+  }, [paymentMethod]);
+
+  const createPayPalOrder = useCallback(async () => {
+    setPaymentError('');
+    setIsProcessing(true);
+
+    try {
+      const validationMessage = getCheckoutValidationError();
+      if (validationMessage) {
+        setPaymentError(validationMessage);
+        showToast(validationMessage, 'error');
+        throw new Error(validationMessage);
+      }
+
+      if (!pendingBooking) {
+        const message = t('sp_err_info') as string;
+        setPaymentError(message);
+        showToast(message, 'error');
+        throw new Error(message);
+      }
+
+      const response = await fetch('/api/services/payment/paypal/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: pendingBooking.id }),
+      });
+
+      const result = (await response.json()) as PayPalCreateOrderResponse;
+      if (!response.ok || !result.success || !result.paypalOrderId) {
+        const message = result.error || 'PayPal 주문 생성에 실패했습니다.';
+        setPaymentError(message);
+        showToast(message, 'error');
+        throw new Error(message);
+      }
+
+      return result.paypalOrderId;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [getCheckoutValidationError, pendingBooking, showToast, t]);
+
+  const handlePayPalApprove = useCallback(async (data: PayPalApproveData) => {
+    setPaymentError('');
+    setIsProcessing(true);
+
+    try {
+      if (!pendingBooking) {
+        throw new Error('PayPal 결제 세션을 찾을 수 없습니다. 다시 시도해주세요.');
+      }
+
+      const response = await fetch('/api/services/payment/paypal/capture-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: pendingBooking.id,
+          paypalOrderId: data.orderID,
+        }),
+      });
+
+      const result = (await response.json()) as PayPalCaptureResponse;
+      if (!response.ok || !result.success) {
+        const message = result.error || 'PayPal 결제 승인 처리에 실패했습니다.';
+        setPaymentError(message);
+        showToast(message, 'error');
+        return;
+      }
+
+      router.push(`/services/${requestId}/payment/complete?orderId=${pendingBooking.order_id}&method=paypal`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'PayPal 결제 승인 처리 중 오류가 발생했습니다.';
+      setPaymentError(message);
+      showToast(message, 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [pendingBooking, requestId, router, showToast]);
+
+  useEffect(() => {
+    if (paymentMethod !== 'paypal') {
+      if (paypalButtonRef.current) {
+        paypalButtonRef.current.innerHTML = '';
+      }
+      return;
+    }
+
+    if (!isPayPalEnabled || !isPayPalSdkReady || !paypalButtonRef.current || !window.paypal?.Buttons) {
+      return;
+    }
+
+    const container = paypalButtonRef.current;
+    container.innerHTML = '';
+
+    window.paypal
+      .Buttons({
+        style: {
+          color: 'gold',
+          shape: 'rect',
+          label: 'paypal',
+          layout: 'vertical',
+          height: 48,
+        },
+        createOrder: async () => createPayPalOrder(),
+        onApprove: async (data) => handlePayPalApprove(data),
+        onCancel: () => {
+          setIsProcessing(false);
+          showToast('PayPal 결제가 취소되었습니다.', 'error');
+        },
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : 'PayPal 버튼 처리 중 오류가 발생했습니다.';
+          console.error('[PAYPAL][SERVICE] client button error:', error);
+          setPaymentError(message);
+          setIsProcessing(false);
+          showToast(message, 'error');
+        },
+      })
+      .render(container)
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'PayPal 버튼을 불러오지 못했습니다.';
+        console.error('[PAYPAL][SERVICE] button render error:', error);
+        setPaypalSdkError(message);
+        setPaymentError(message);
+        showToast(message, 'error');
+      });
+
+    return () => {
+      container.innerHTML = '';
+    };
+  }, [createPayPalOrder, handlePayPalApprove, isPayPalEnabled, isPayPalSdkReady, paymentMethod, showToast]);
+
   const handlePayment = async () => {
     setPaymentError('');
 
-    if (!contactName.trim() || !contactPhone.trim()) {
-      showToast(t('sp_err_empty') as string, 'error');
+    const validationMessage = getCheckoutValidationError();
+    if (validationMessage) {
+      showToast(validationMessage, 'error');
       return;
     }
-    if (!agreeTerms) {
-      showToast(t('sp_err_terms') as string, 'error');
-      return;
-    }
-    if (!request || !pendingBooking) {
-      showToast(t('sp_err_info') as string, 'error');
+    if (paymentMethod === 'paypal') return;
+
+    const currentBooking = pendingBooking;
+    const currentRequest = request;
+    if (!currentBooking || !currentRequest) {
+      const message = t('sp_err_info') as string;
+      showToast(message, 'error');
       return;
     }
 
@@ -128,14 +336,14 @@ function ServicePaymentContent() {
         const markRes = await fetch('/api/services/payment/mark-bank', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: pendingBooking.order_id }),
+          body: JSON.stringify({ orderId: currentBooking.order_id }),
         });
         if (!markRes.ok) {
           setPaymentError(t('sp_err_bank_fail') as string);
           setIsProcessing(false);
           return;
         }
-        router.push(`/services/${requestId}/payment/complete?orderId=${pendingBooking.order_id}&method=bank`);
+        router.push(`/services/${requestId}/payment/complete?orderId=${currentBooking.order_id}&method=bank`);
         return;
       }
 
@@ -147,7 +355,7 @@ function ServicePaymentContent() {
       }
 
       // v2 에스크로: 사전 생성된 orderId 사용 (새 예약 생성 불필요)
-      const { order_id: orderId, amount } = pendingBooking;
+      const { order_id: orderId, amount } = currentBooking;
 
       window.IMP.init('imp44607000');
       window.IMP.request_pay(
@@ -155,7 +363,7 @@ function ServicePaymentContent() {
           pg: 'nice_v2',
           pay_method: 'card',
           merchant_uid: orderId,
-          name: request.title,
+          name: currentRequest.title,
           amount,
           buyer_email: user?.email,
           buyer_name: contactName.trim(),
@@ -211,6 +419,22 @@ function ServicePaymentContent() {
   return (
     <>
       <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="lazyOnload" />
+      {isPayPalEnabled && (
+        <Script
+          id="paypal-js-sdk-service"
+          src={`https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=KRW&intent=capture&components=buttons`}
+          strategy="afterInteractive"
+          onLoad={() => {
+            setPaypalSdkError('');
+            setIsPayPalSdkReady(true);
+          }}
+          onError={() => {
+            const message = 'PayPal 결제 모듈을 불러오지 못했습니다.';
+            setPaypalSdkError(message);
+            setIsPayPalSdkReady(false);
+          }}
+        />
+      )}
       <div className="max-w-lg mx-auto px-4 py-6 md:py-10 pb-28 md:pb-12">
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6">
@@ -267,7 +491,7 @@ function ServicePaymentContent() {
         {/* 결제 수단 선택 */}
         <div className="mb-5">
           <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">{t('sp_method_title')}</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <button
               type="button"
               onClick={() => setPaymentMethod('card')}
@@ -290,6 +514,19 @@ function ServicePaymentContent() {
               <Landmark size={20} className={paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'} />
               <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'bank' ? 'text-slate-900' : 'text-slate-400'}`}>{t('sp_method_bank')}</span>
             </button>
+            {isPayPalEnabled && (
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('paypal')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'paypal'
+                    ? 'border-slate-900 bg-slate-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                  }`}
+              >
+                <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PayPal</div>
+                <span className={`text-[12px] md:text-[13px] font-bold ${paymentMethod === 'paypal' ? 'text-slate-900' : 'text-slate-400'}`}>PayPal</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -304,6 +541,26 @@ function ServicePaymentContent() {
             <p className="text-[11px] md:text-xs text-slate-400">
               {t('sp_bank_notice_1')}<span className="text-rose-500 font-bold">{t('sp_bank_notice_hl')}</span>{t('sp_bank_notice_2')}
             </p>
+          </div>
+        )}
+
+        {paymentMethod === 'paypal' && (
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:rounded-xl md:p-4 mb-5 animate-in fade-in zoom-in-95">
+            <div className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
+              PayPal 승인 후 결제가 완료되며, 기존 카드/무통장 결제 흐름에는 영향을 주지 않습니다.
+            </div>
+            {paypalSdkError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] md:text-xs text-rose-600">
+                {paypalSdkError}
+              </div>
+            )}
+            {!isPayPalSdkReady && !paypalSdkError && (
+              <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
+                <Loader2 size={16} className="mr-2 animate-spin" />
+                PayPal 버튼을 불러오는 중입니다.
+              </div>
+            )}
+            <div ref={paypalButtonRef} className={isPayPalSdkReady ? 'min-h-[48px]' : 'hidden'} />
           </div>
         )}
 
@@ -329,19 +586,25 @@ function ServicePaymentContent() {
         )}
 
         {/* 결제 버튼 */}
-        <button
-          onClick={handlePayment}
-          disabled={isProcessing}
-          className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
-        >
-          {isProcessing ? (
-            <><Loader2 size={18} className="animate-spin" /> {t('processing')}</>
-          ) : paymentMethod === 'bank' ? (
-            <><Landmark size={18} /> {t('sp_btn_bank')}</>
-          ) : (
-            <><CreditCard size={18} /> {(t('sp_btn_card') as string).replace('{price}', `₩${request.total_customer_price.toLocaleString()}`)}</>
-          )}
-        </button>
+        {paymentMethod !== 'paypal' ? (
+          <button
+            onClick={handlePayment}
+            disabled={isProcessing}
+            className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
+          >
+            {isProcessing ? (
+              <><Loader2 size={18} className="animate-spin" /> {t('processing')}</>
+            ) : paymentMethod === 'bank' ? (
+              <><Landmark size={18} /> {t('sp_btn_bank')}</>
+            ) : (
+              <><CreditCard size={18} /> {(t('sp_btn_card') as string).replace('{price}', `₩${request.total_customer_price.toLocaleString()}`)}</>
+            )}
+          </button>
+        ) : (
+          <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-[12px] text-slate-500">
+            위 PayPal 버튼에서 승인하면 결제가 완료됩니다.
+          </div>
+        )}
       </div>
     </>
   );

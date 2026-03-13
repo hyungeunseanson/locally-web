@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.49 — [Payments] PayPal 서비스 의뢰 결제 UI 연결
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 PayPal 옵션 추가 | `app/services/[requestId]/payment/page.tsx`에 `PayPal` 결제수단을 추가하고, 공개 SDK(`NEXT_PUBLIC_PAYPAL_CLIENT_ID`)가 있을 때만 별도 버튼을 렌더하도록 연결 |
+| 🟠 create/capture 분기 연결 | PayPal 버튼 클릭 시 기존 pending `service_bookings`를 재사용해 `/api/services/payment/paypal/create-order` → `/api/services/payment/paypal/capture-order` 경로로만 결제를 확정하도록 분기 |
+| 🟡 기존 결제 보존 | 서비스 NicePay 카드 결제 CTA, 무통장 입금 CTA, 완료 페이지 UX는 그대로 유지해 회귀 면적을 최소화 |
+
 ## v3.38.48 — [Payments] PayPal 서비스 의뢰 결제 서버 route 추가
 
 | 항목 | 내용 |
