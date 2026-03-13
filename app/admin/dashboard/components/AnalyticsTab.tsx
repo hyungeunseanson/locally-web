@@ -1047,6 +1047,16 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               </div>
             </div>
           )}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              <div className="font-semibold text-slate-800">호스트 퍼널 / 유망주 / 집중 관리 기준</div>
+              <div className="mt-1">퍼널은 지원부터 첫 결제 창출까지의 흐름이며, 유망주는 평점 4.0 이상·취소 0건, 집중 관리는 취소 누적 또는 저평점 호스트 기준입니다.</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              <div className="font-semibold text-slate-800">응답시간 / 응답률 기준</div>
+              <div className="mt-1">평균 응답 시간은 문의 접수 후 첫 답변까지 걸린 시간이며, 응답률은 전체 문의 중 답변이 남은 비율입니다.</div>
+            </div>
+          </div>
           {/* 1. 호스트 활성화 퍼널 (Health Funnel) */}
           <section>
             <div className="flex items-center justify-between mb-4">
