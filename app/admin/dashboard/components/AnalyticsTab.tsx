@@ -713,11 +713,11 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               {/* 6. 취소율 */}
               <SimpleKpi label="취소율" value={`${stats.cancellationRate}%`} onClick={() => setSelectedMetric('cancel')} />
 
-              {/* 7. 구매 전환율 */}
-              <SimpleKpi label="구매 전환율" value={`${stats.conversionRate}%`} onClick={() => setSelectedMetric('conversion')} />
+              {/* 7. 가입 대비 결제건 비율 */}
+              <SimpleKpi label="가입 대비 결제건 비율" value={`${stats.conversionRate}%`} sub="신규 가입자 대비" onClick={() => setSelectedMetric('conversion')} />
 
-              {/* 8. 재구매율 */}
-              <SimpleKpi label="재구매율" value={`${stats.retentionRate}%`} onClick={() => setSelectedMetric('retention')} />
+              {/* 8. 반복 결제 고객 비율 */}
+              <SimpleKpi label="반복 결제 고객 비율" value={`${stats.retentionRate}%`} sub="결제 고객 기준" onClick={() => setSelectedMetric('retention')} />
             </div>
           </section>
 
@@ -727,7 +727,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           <section>
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                🌍 게스트 인구통계 <span className="text-[10px] md:text-xs font-normal text-slate-400">결제 유저 기준</span>
+                🌍 결제 고객 인구통계 <span className="text-[10px] md:text-xs font-normal text-slate-400">기간 내 결제 완료 고객 기준</span>
               </h2>
               <div onClick={() => setSelectedMetric('demographics')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
                 상세보기
@@ -1296,7 +1296,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
               {selectedMetric === 'demographics' && (
                 <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
-                  <h3 className="text-xl font-bold">게스트 인구통계 상세</h3>
+                  <h3 className="text-xl font-bold">결제 고객 인구통계 상세</h3>
 
                   <div className="space-y-4">
                     <h4 className="text-sm font-bold text-slate-500 border-b pb-2">국적 분포 (전체)</h4>
@@ -1478,20 +1478,20 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
               {selectedMetric === 'conversion' && (
                 <div className="space-y-6">
-                  <h3 className="text-xl font-bold">구매 전환율 (Funnel Drop-off)</h3>
+                  <h3 className="text-xl font-bold">가입 대비 결제건 비율</h3>
                   <div className="space-y-4">
                     <FunnelBar label="상품 노출" value={stats.funnel.views} max={stats.funnel.views} color="bg-slate-200" />
                     <FunnelBar label="상세 클릭" value={stats.funnel.clicks} max={stats.funnel.views} color="bg-slate-300" />
                     <FunnelBar label="결제 시도" value={stats.funnel.paymentInit} max={stats.funnel.views} color="bg-slate-400" />
                     <FunnelBar label="결제 완료" value={stats.funnel.completed} max={stats.funnel.views} isFinal color="bg-emerald-500" />
                   </div>
-                  <p className="text-xs text-slate-400 mt-4 text-center">노출 대비 최종 결제까지 다다른 전환율은 <strong className="text-emerald-500">{stats.conversionRate}%</strong> 입니다.</p>
+                  <p className="text-xs text-slate-400 mt-4 text-center">기간 내 신규 가입자 수 대비 결제 완료 건수 비율은 <strong className="text-emerald-500">{stats.conversionRate}%</strong> 입니다. 동일 고객의 중복 결제 건도 포함됩니다.</p>
                 </div>
               )}
 
               {selectedMetric === 'retention' && (
                 <div className="space-y-6">
-                  <h3 className="text-xl font-bold">고객 재구매율 분포</h3>
+                  <h3 className="text-xl font-bold">기간 내 반복 결제 고객 비율</h3>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="p-3 bg-slate-50 rounded-xl text-center border border-slate-100">
                       <div className="text-[10px] text-slate-500 font-bold mb-1">1회 결제</div>
@@ -1506,7 +1506,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                       <div className="text-xl font-black text-emerald-700">{stats.retentionBreakdown.threeOrMore}명</div>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 text-center">해당 기간 내 재방문 결제를 진행한 고객은 전체의 {stats.retentionRate}% 입니다.</p>
+                  <p className="text-xs text-slate-400 mt-2 text-center">해당 기간 내 결제한 고객 중 2회 이상 결제한 고객 비율은 {stats.retentionRate}% 입니다.</p>
                 </div>
               )}
             </div>
