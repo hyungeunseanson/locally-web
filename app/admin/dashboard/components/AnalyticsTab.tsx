@@ -76,14 +76,23 @@ type AnalyticsHostSummary = {
   bottomRespHosts: any[];
 };
 
+type SummarySource = 'server' | 'cached' | 'fallback';
+
 export default function AnalyticsTab({ bookings, users, exps, apps, reviews, searchLogs, analyticsEvents, inquiries, inquiryMessages }: AnalyticsTabProps) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<'business' | 'host' | 'reviews' | 'logs'>('business'); // 🟢 서브탭 구분
-  const [summarySource, setSummarySource] = useState<{ business: 'server' | 'fallback'; host: 'server' | 'fallback' }>({
+  const [summarySource, setSummarySource] = useState<{ business: SummarySource; host: SummarySource }>({
     business: 'server',
     host: 'server',
+  });
+  const summaryCacheRef = useRef<{
+    business: Record<string, AnalyticsBusinessSummary>;
+    host: Record<string, AnalyticsHostSummary>;
+  }>({
+    business: {},
+    host: {},
   });
 
   // 날짜 필터 상태 추가
@@ -198,6 +207,9 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
       const queryString = params.toString();
       const analyticsSummaryUrl = queryString ? `/api/admin/analytics-summary?${queryString}` : '/api/admin/analytics-summary';
       const analyticsHostUrl = queryString ? `/api/admin/analytics-host-summary?${queryString}` : '/api/admin/analytics-host-summary';
+      const cacheKey = queryString || 'default';
+      const cachedBusinessSummary = summaryCacheRef.current.business[cacheKey];
+      const cachedHostSummary = summaryCacheRef.current.host[cacheKey];
 
       const [businessResult, hostResult] = await Promise.allSettled([
         fetch(analyticsSummaryUrl).then(async (response) => {
@@ -226,25 +238,41 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
         }),
       ]);
 
-      const nextSummarySource: { business: 'server' | 'fallback'; host: 'server' | 'fallback' } = {
-        business: businessResult.status === 'fulfilled' ? 'server' : 'fallback',
-        host: hostResult.status === 'fulfilled' ? 'server' : 'fallback',
+      const nextSummarySource: { business: SummarySource; host: SummarySource } = {
+        business: 'fallback',
+        host: 'fallback',
       };
 
       if (businessResult.status === 'fulfilled') {
+        summaryCacheRef.current.business[cacheKey] = businessResult.value;
         nextStats = {
           ...nextStats,
           ...businessResult.value,
         };
+        nextSummarySource.business = 'server';
+      } else if (cachedBusinessSummary) {
+        nextStats = {
+          ...nextStats,
+          ...cachedBusinessSummary,
+        };
+        nextSummarySource.business = 'cached';
       } else {
         console.error('[AnalyticsTab] analytics-summary fallback:', businessResult.reason);
       }
 
       if (hostResult.status === 'fulfilled') {
+        summaryCacheRef.current.host[cacheKey] = hostResult.value;
         nextStats = {
           ...nextStats,
           ...hostResult.value,
         };
+        nextSummarySource.host = 'server';
+      } else if (cachedHostSummary) {
+        nextStats = {
+          ...nextStats,
+          ...cachedHostSummary,
+        };
+        nextSummarySource.host = 'cached';
       } else {
         console.error('[AnalyticsTab] analytics-host-summary fallback:', hostResult.reason);
       }
@@ -744,12 +772,12 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               }`}
           >
             <span>{tab.label}</span>
-            {tab.id === 'business' && summarySource.business === 'fallback' && (
+            {tab.id === 'business' && summarySource.business !== 'server' && (
               <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
                 임시
               </span>
             )}
-            {tab.id === 'host' && summarySource.host === 'fallback' && (
+            {tab.id === 'host' && summarySource.host !== 'server' && (
               <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
                 임시
               </span>
@@ -760,6 +788,15 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
       {activeMainTab === 'business' && (
         <>
+          {summarySource.business === 'cached' && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+              <div>
+                <div className="font-semibold">최근 정상 서버 집계값을 유지 중입니다.</div>
+                <div className="text-xs text-amber-700">현재 구간의 최신 서버 응답을 다시 받지 못해, 마지막 정상 집계값을 임시로 표시하고 있습니다.</div>
+              </div>
+            </div>
+          )}
           {summarySource.business === 'fallback' && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
@@ -1038,6 +1075,15 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
       {activeMainTab === 'host' && (
         <div className="space-y-12 animate-in slide-in-from-bottom-[50px] duration-500">
+          {summarySource.host === 'cached' && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+              <div>
+                <div className="font-semibold">최근 정상 호스트 집계값을 유지 중입니다.</div>
+                <div className="text-xs text-amber-700">현재 구간의 최신 서버 응답을 다시 받지 못해, 마지막 정상 호스트 집계값을 임시로 표시하고 있습니다.</div>
+              </div>
+            </div>
+          )}
           {summarySource.host === 'fallback' && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
