@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.44 — [Payments] PayPal 고객 결제 1단계 공통 기반 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 공통 서버 유틸 | `app/utils/paypal/server.ts`를 추가해 PayPal access token 발급, order 생성/조회/capture를 공통 서버 유틸로 정리 |
+| 🟠 타입 중앙화 | `app/types/paypal.ts`를 추가해 order/token/capture 타입을 중앙화하고 이후 체험/서비스 결제 route에서 재사용 가능하게 준비 |
+| 🟡 NicePay 무변경 원칙 | 이번 단계는 UI, 결제 route, 취소/환불 흐름을 건드리지 않고 공통 기반만 추가해 기존 NicePay 결제 회귀를 차단 |
+
 ## v3.38.43 — [Admin Dashboard] Users/Approvals 탭 공통 로딩 게이트 분리
 
 | 항목 | 내용 |
