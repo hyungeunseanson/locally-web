@@ -711,7 +711,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               <SimpleKpi label="객단가 (AOV)" value={`₩${stats.aov.toLocaleString()}`} sub="전체 결제 건 기준" onClick={() => setSelectedMetric('aov')} />
 
               {/* 6. 취소율 */}
-              <SimpleKpi label="취소율" value={`${stats.cancellationRate}%`} onClick={() => setSelectedMetric('cancel')} />
+              <SimpleKpi label="취소율" value={`${stats.cancellationRate}%`} sub="체험 예약 기준" onClick={() => setSelectedMetric('cancel')} />
 
               {/* 7. 가입 대비 결제건 비율 */}
               <SimpleKpi label="가입 대비 결제건 비율" value={`${stats.conversionRate}%`} sub="신규 가입자 대비" onClick={() => setSelectedMetric('conversion')} />
@@ -813,7 +813,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
           <section className="pt-4 md:pt-6">
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <h2 className="text-base md:text-lg font-bold flex items-center gap-2">
-                <Search size={16} className="md:w-[18px] md:h-[18px]" /> 실시간 인기 트렌드
+                <Search size={16} className="md:w-[18px] md:h-[18px]" /> 체험 검색 인기 트렌드
               </h2>
               <div onClick={() => setSelectedMetric('searchTrends')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
                 상세보기
@@ -896,7 +896,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
             <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex items-center justify-between mb-4 md:mb-6">
                 <h3 className="text-base md:text-lg font-bold text-slate-800 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                  <span>🏆 매출 견인 Top 5 인기 체험</span> <span className="text-[10px] md:text-xs font-normal text-slate-400">결제 완료 건수 기준</span>
+                  <span>🏆 매출 견인 Top 5 인기 체험</span> <span className="text-[10px] md:text-xs font-normal text-slate-400">체험 예약 결제 완료 건수 기준</span>
                 </h3>
                 <div onClick={() => setSelectedMetric('topExps')} className="text-[10px] md:text-xs font-bold text-blue-500 bg-blue-50 px-2 md:px-3 py-1 md:py-1.5 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors shrink-0">
                   상세보기
@@ -1219,7 +1219,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
               {selectedMetric === 'cancel' && (
                 <div className="space-y-6">
-                  <h3 className="text-xl font-bold">취소 사유 분석</h3>
+                  <h3 className="text-xl font-bold">체험 예약 취소 사유 분석</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-red-50 rounded-xl text-center">
                       <div className="text-sm text-red-500 font-bold mb-1">유저 취소</div>
@@ -1230,7 +1230,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
                       <div className="text-2xl font-black text-slate-900">{stats.cancelBreakdown.host}건</div>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 text-center">호스트 거절이 많다면 달력 관리를 독려해야 합니다.</p>
+                  <p className="text-xs text-slate-400 mt-2 text-center">이 구간은 서비스 의뢰가 아닌 체험 예약 취소 기준입니다. 호스트 거절이 많다면 달력 관리를 독려해야 합니다.</p>
                 </div>
               )}
 
@@ -1343,7 +1343,8 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
 
               {selectedMetric === 'searchTrends' && (
                 <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
-                  <h3 className="text-xl font-bold">인기 검색어 전체 순위</h3>
+                  <h3 className="text-xl font-bold">체험 검색어 전체 순위</h3>
+                  <p className="text-xs text-slate-400 -mt-3">체험 검색 로그 기준</p>
                   <div className="space-y-2">
                     {stats.allSearchTrends.length > 0 ? stats.allSearchTrends.map((trend, i) => (
                       <div key={`trend-${i}`} className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors border border-slate-100">
@@ -1364,6 +1365,7 @@ export default function AnalyticsTab({ bookings, users, exps, apps, reviews, sea
               {selectedMetric === 'topExps' && (
                 <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
                   <h3 className="text-xl font-bold">전체 체험 판매 랭킹</h3>
+                  <p className="text-xs text-slate-400 -mt-3">체험 예약 결제 완료 건수 기준</p>
                   <div className="space-y-3">
                     {stats.allExperiences.length > 0 ? stats.allExperiences.map((exp: any, i: number) => (
                       <div key={exp.id} className="flex gap-4 p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-300 transition-colors">
