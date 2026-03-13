@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.48 — [Payments] PayPal 서비스 의뢰 결제 서버 route 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 create-order 추가 | `/api/services/payment/paypal/create-order`를 추가해 로그인 사용자 본인 서비스 예약인지, `PENDING` 상태인지, 금액이 유효한지 검증한 뒤 PayPal order를 생성하도록 분리 |
+| 🟠 capture-order 추가 | `/api/services/payment/paypal/capture-order`를 추가해 PayPal order 참조/custom_id와 금액을 다시 검증하고, capture 성공 시 `service_bookings=PAID`, `payment_method='paypal'`, `tid=<captureId>`, `service_requests=open`까지 기존 서비스 NicePay callback과 같은 결과를 저장 |
+| 🟡 기존 경로 보존 | 이번 단계는 서비스 NicePay 카드 결제 UI, 무통장 입금, 취소/환불 경로를 전혀 변경하지 않아 회귀 면적을 최소화 |
+
 ## v3.38.46 — [Payments] PayPal 체험 결제 UI 연결
 
 | 항목 | 내용 |
