@@ -112,8 +112,8 @@ export default function MasterLedgerTab({
   onRefresh,
   refreshSignal,
 }: {
-  onRefresh: () => void;
-  refreshSignal: string;
+  onRefresh?: () => void;
+  refreshSignal?: string;
 }) {
   const { showToast } = useToast();
   const supabase = useRef(createClient()).current;
@@ -166,6 +166,10 @@ export default function MasterLedgerTab({
   }, [fetchLedger]);
 
   useEffect(() => {
+    if (!refreshSignal) {
+      return;
+    }
+
     if (lastRefreshSignalRef.current === null) {
       lastRefreshSignalRef.current = refreshSignal;
       return;
@@ -182,6 +186,9 @@ export default function MasterLedgerTab({
   useEffect(() => {
     const realtimeChannel = supabase
       .channel('admin_master_ledger_updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, () => {
+        void fetchLedger();
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, () => {
         void fetchLedger();
       })
@@ -317,7 +324,7 @@ export default function MasterLedgerTab({
   const refreshAfterMutation = async () => {
     await Promise.allSettled([
       fetchLedger(),
-      Promise.resolve(onRefresh()),
+      Promise.resolve(onRefresh?.()),
     ]);
   };
 

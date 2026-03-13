@@ -20,6 +20,13 @@
 | 🔴 Sales 독립 렌더 | `Billing & Revenue` 탭을 `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖으로 분리해, shared admin fetch가 느리거나 실패해도 `SalesTab`이 자체 `/api/admin/sales-summary`로 바로 렌더되도록 정리 |
 | 🟠 구조 회귀 방지 | `useAdminData.ts`는 건드리지 않고 `SALES` 분기만 최상위에서 직접 렌더링해 `Users / Ledger / Analytics / Approvals` 기존 흐름에는 영향이 없도록 유지 |
 
+## v3.38.41 — [Admin Dashboard] Master Ledger 탭 공통 로딩 게이트 분리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 Ledger 독립 렌더 | `Master Ledger` 탭을 `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖으로 분리해, shared admin fetch가 느리거나 실패해도 `MasterLedgerTab`이 자체 `/api/admin/master-ledger`로 바로 렌더되도록 정리 |
+| 🟠 최신성 자립 | 부모 `refreshSignal` 없이도 새 일반 예약이 바로 반영되도록 `MasterLedgerTab`의 자체 realtime 구독에 `bookings INSERT`를 추가하고, 액션 후 부모 refresh 호출은 optional 처리로 회귀 없이 유지 |
+
 ## v3.38.39 — [User Management] 정렬/필터 및 패널 가시성 보강
 
 | 항목 | 내용 |
