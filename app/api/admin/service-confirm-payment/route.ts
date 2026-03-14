@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
 
 export async function POST(request: Request) {
   try {
@@ -81,17 +82,15 @@ export async function POST(request: Request) {
       console.error('[ADMIN] service request update error:', requestUpdateErr);
     }
 
-    // 7. Notify all approved hosts (identical to nicepay-callback)
-    supabaseAdmin
-      .from('host_applications')
-      .select('user_id')
-      .eq('status', 'approved')
-      .then(async ({ data: hosts }) => {
-        if (!hosts || hosts.length === 0) return;
-        const hostIds = hosts
-          .map((h) => h.user_id as string)
-          .filter((id) => !!id && id !== booking.customer_id);
+    // 7. Notify eligible hosts with the same scope as card/PayPal confirmation
+    void (async () => {
+      try {
+        const hostIds = await getEligibleServiceHostIds(supabaseAdmin, {
+          requestCity: reqCity,
+          customerId: booking.customer_id,
+        });
         if (hostIds.length === 0) return;
+
         const notifications = hostIds.map((hostId) => ({
           user_id: hostId,
           type: 'service_request_new',
@@ -102,7 +101,10 @@ export async function POST(request: Request) {
         }));
         const { error: notiErr } = await supabaseAdmin.from('notifications').insert(notifications);
         if (notiErr) console.error('[ADMIN] host notification error:', notiErr);
-      });
+      } catch (hostNotificationError) {
+        console.error('[ADMIN] eligible host notification error:', hostNotificationError);
+      }
+    })();
 
     // 8. Notify customer (identical to nicepay-callback)
     supabaseAdmin.from('notifications').insert({

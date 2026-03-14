@@ -4,6 +4,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
+import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
 
 type CaptureOrderBody = {
   bookingId?: string;
@@ -130,35 +131,12 @@ export async function POST(request: Request) {
       console.error('[SERVICE][PAYPAL] Request status update failed:', requestUpdateErr);
     }
 
-    supabaseAdmin
-      .from('host_applications')
-      .select('user_id')
-      .eq('status', 'approved')
-      .then(async ({ data: hosts }) => {
-        if (!hosts || hosts.length === 0) return;
-
-        let eligibleHostIds: Set<string> | null = null;
-        if (reqCity) {
-          const { data: cityHosts } = await supabaseAdmin
-            .from('experiences')
-            .select('host_id')
-            .ilike('city', `%${reqCity}%`)
-            .eq('is_active', true);
-
-          eligibleHostIds = new Set(
-            (cityHosts ?? []).map((experience) => experience.host_id as string).filter(Boolean)
-          );
-        }
-
-        const hostIds = hosts
-          .map((host) => host.user_id as string)
-          .filter(
-            (hostId) =>
-              !!hostId &&
-              hostId !== booking.customer_id &&
-              (eligibleHostIds === null || eligibleHostIds.has(hostId))
-          );
-
+    void (async () => {
+      try {
+        const hostIds = await getEligibleServiceHostIds(supabaseAdmin, {
+          requestCity: reqCity,
+          customerId: booking.customer_id,
+        });
         if (hostIds.length === 0) return;
 
         const notifications = hostIds.map((hostId) => ({
@@ -172,7 +150,10 @@ export async function POST(request: Request) {
 
         const { error: notiErr } = await supabaseAdmin.from('notifications').insert(notifications);
         if (notiErr) console.error('[SERVICE][PAYPAL] Host Notification Error:', notiErr);
-      });
+      } catch (hostNotificationError) {
+        console.error('[SERVICE][PAYPAL] eligible host notification error:', hostNotificationError);
+      }
+    })();
 
     supabaseAdmin
       .from('notifications')
