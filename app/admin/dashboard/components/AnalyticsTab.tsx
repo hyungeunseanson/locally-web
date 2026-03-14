@@ -102,6 +102,15 @@ type AnalyticsSearchIntentSummary = {
   lowSupplyKeywords: SearchIntentItem[];
   clickConversionKeywords: SearchIntentItem[];
   paymentInitConversionKeywords: SearchIntentItem[];
+  sourceDemand: {
+    name: string;
+    searches: number;
+    uniqueKeywords: number;
+    topKeyword: string | null;
+    topKeywordSearches: number;
+    lowSupplyKeyword: string | null;
+    lowSupplySearches: number;
+  }[];
   supplyReference: string;
   conversionAvailable: boolean;
   conversionCoverage?: {
@@ -109,6 +118,8 @@ type AnalyticsSearchIntentSummary = {
     clickConvertedSearches: number;
     paymentInitConvertedSearches: number;
   };
+  sourceDemandAvailable?: boolean;
+  sourceTrackedSearches?: number;
 };
 
 type SearchIntentSource = 'server' | 'cached' | 'unavailable';
@@ -1320,7 +1331,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                   </span>
                 )}
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs md:text-sm text-slate-600">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs md:text-sm text-slate-600">
                 <div className="font-semibold text-slate-800">고객이 찾는 수요와 현재 공급 부족 신호를 함께 봅니다.</div>
                 <div className="mt-1">검색 로그 기준이며, 공급 부족은 현재 활성 체험의 제목/도시/설명/카테고리 기준 참고용입니다.</div>
                 {searchIntent?.conversionAvailable ? (
@@ -1331,6 +1342,12 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                 ) : (
                   <div className="mt-1 text-[11px] md:text-xs text-slate-500">세션 연결 데이터가 충분히 쌓이면 검색→클릭/결제 시작 전환도 함께 표시합니다.</div>
                 )}
+                <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                  유입 source가 같이 남은 세션은 source별 대표 검색 수요도 참고용으로 함께 보여줍니다.
+                  {searchIntent?.sourceDemandAvailable && searchIntent?.sourceTrackedSearches
+                    ? ` (source 연결 검색 ${searchIntent.sourceTrackedSearches}건)`
+                    : ''}
+                </div>
               </div>
             </div>
 
@@ -1449,6 +1466,37 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-base font-bold text-slate-800">유입별 주요 검색 수요</h3>
+                    <span className="text-[10px] md:text-xs text-slate-400">source + 세션 기준 참고용</span>
+                  </div>
+                  <div className="space-y-2">
+                    {searchIntent.sourceDemandAvailable && searchIntent.sourceDemand.length > 0 ? (
+                      searchIntent.sourceDemand.map((item) => (
+                        <div key={`search-demand-source-${item.name}`} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.name}</span>
+                            <span className="text-xs font-mono text-slate-500">{item.searches}회</span>
+                          </div>
+                          <div className="mt-1 text-[11px] md:text-xs text-slate-500">
+                            검색어 {item.uniqueKeywords}개 · 대표 수요 {item.topKeyword ? `${item.topKeyword} (${item.topKeywordSearches}회)` : '집계 중'}
+                          </div>
+                          {item.lowSupplyKeyword && (
+                            <div className="mt-1 text-[11px] md:text-xs text-amber-700">
+                              공급 부족 신호: {item.lowSupplyKeyword} ({item.lowSupplySearches}회)
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-sm text-slate-400">
+                        source와 연결된 검색 세션이 더 쌓이면 여기서 볼 수 있습니다.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

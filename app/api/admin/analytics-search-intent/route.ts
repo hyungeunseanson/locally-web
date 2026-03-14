@@ -35,6 +35,20 @@ type AnalyticsEventRow = {
   session_id: string | null;
   event_type: string | null;
   created_at: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  referrer_host: string | null;
+  landing_path: string | null;
+};
+
+type SearchIntentSourceItem = {
+  name: string;
+  searches: number;
+  uniqueKeywords: number;
+  topKeyword: string | null;
+  topKeywordSearches: number;
+  lowSupplyKeyword: string | null;
+  lowSupplySearches: number;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -88,6 +102,27 @@ function roundRate(numerator: number, denominator: number) {
   return Math.round((numerator / denominator) * 1000) / 10;
 }
 
+function getSourceLabel(event: AnalyticsEventRow) {
+  const utmSource = String(event.utm_source || '').trim();
+  const utmMedium = String(event.utm_medium || '').trim();
+  const referrerHost = String(event.referrer_host || '').trim().replace(/^www\./i, '');
+  const landingPath = String(event.landing_path || '').trim();
+
+  if (utmSource) {
+    return utmMedium ? `${utmSource} (${utmMedium})` : utmSource;
+  }
+
+  if (referrerHost) {
+    return referrerHost;
+  }
+
+  if (landingPath) {
+    return '직접 방문';
+  }
+
+  return '';
+}
+
 export async function GET(request: Request) {
   try {
     const requestUrl = new URL(request.url);
@@ -125,7 +160,7 @@ export async function GET(request: Request) {
 
     let analyticsEventsQuery = supabaseAdmin
       .from('analytics_events')
-      .select('session_id, event_type, created_at')
+      .select('session_id, event_type, created_at, utm_source, utm_medium, referrer_host, landing_path')
       .in('event_type', ['click', 'payment_init']);
 
     if (startAt) {
@@ -178,6 +213,7 @@ export async function GET(request: Request) {
     const trackedCounts: Record<string, number> = {};
     const clickConvertedCounts: Record<string, number> = {};
     const paymentInitConvertedCounts: Record<string, number> = {};
+    const sourceKeywordCounts: Record<string, Record<string, number>> = {};
     const sessionSearchRows = new Map<string, SearchLogRow[]>();
     const sessionEventRows = new Map<string, AnalyticsEventRow[]>();
 
@@ -221,6 +257,10 @@ export async function GET(request: Request) {
         .filter((event) => event.created_at && event.event_type)
         .sort((left, right) => new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime());
 
+      const sessionSourceLabel = eventTimeline
+        .map((event) => getSourceLabel(event))
+        .find(Boolean);
+
       for (let index = 0; index < searchTimeline.length; index += 1) {
         const current = searchTimeline[index];
         const keyword = String(current.keyword || '').trim();
@@ -231,6 +271,12 @@ export async function GET(request: Request) {
         if (!keyword || Number.isNaN(windowStart)) continue;
 
         trackedCounts[keyword] = (trackedCounts[keyword] || 0) + 1;
+
+        if (sessionSourceLabel) {
+          sourceKeywordCounts[sessionSourceLabel] = sourceKeywordCounts[sessionSourceLabel] || {};
+          sourceKeywordCounts[sessionSourceLabel][keyword] =
+            (sourceKeywordCounts[sessionSourceLabel][keyword] || 0) + 1;
+        }
 
         let hasClick = false;
         let hasPaymentInit = false;
@@ -317,6 +363,41 @@ export async function GET(request: Request) {
       })
       .slice(0, 6);
 
+    const sourceDemand = Object.entries(sourceKeywordCounts)
+      .map(([name, keywordCounts]) => {
+        const sortedKeywords = Object.entries(keywordCounts)
+          .map(([keyword, searches]) => ({
+            keyword,
+            searches,
+            matchedActiveExperiences: countMatchedActiveExperiences(keyword, activeExperienceRows),
+          }))
+          .sort((left, right) => {
+            if (right.searches !== left.searches) return right.searches - left.searches;
+            return left.keyword.localeCompare(right.keyword, 'ko');
+          });
+
+        const topKeyword = sortedKeywords[0];
+        const lowSupplyKeyword = sortedKeywords
+          .filter((item) => item.searches >= 2 && item.matchedActiveExperiences <= 1)
+          .sort((left, right) => {
+            if (right.searches !== left.searches) return right.searches - left.searches;
+            return left.matchedActiveExperiences - right.matchedActiveExperiences;
+          })[0];
+
+        return {
+          name,
+          searches: Object.values(keywordCounts).reduce((sum, count) => sum + count, 0),
+          uniqueKeywords: Object.keys(keywordCounts).length,
+          topKeyword: topKeyword?.keyword || null,
+          topKeywordSearches: topKeyword?.searches || 0,
+          lowSupplyKeyword: lowSupplyKeyword?.keyword || null,
+          lowSupplySearches: lowSupplyKeyword?.searches || 0,
+        } satisfies SearchIntentSourceItem;
+      })
+      .filter((item) => item.searches > 0)
+      .sort((left, right) => right.searches - left.searches)
+      .slice(0, 6);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -327,6 +408,7 @@ export async function GET(request: Request) {
         lowSupplyKeywords,
         clickConversionKeywords,
         paymentInitConversionKeywords,
+        sourceDemand,
         supplyReference: '현재 활성 체험의 제목/도시/설명/카테고리 기준',
         conversionAvailable: totalTrackedSearches > 0,
         conversionCoverage: {
@@ -334,6 +416,9 @@ export async function GET(request: Request) {
           clickConvertedSearches: totalClickConvertedSearches,
           paymentInitConvertedSearches: totalPaymentInitConvertedSearches,
         },
+        sourceDemandAvailable: sourceDemand.length > 0,
+        sourceTrackedSearches: Object.values(sourceKeywordCounts)
+          .reduce((sum, keywordCounts) => sum + Object.values(keywordCounts).reduce((innerSum, count) => innerSum + count, 0), 0),
       },
     });
   } catch (error) {

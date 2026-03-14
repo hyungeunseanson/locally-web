@@ -187,6 +187,7 @@ test.describe.serial('Admin analytics smoke', () => {
       await expect(
         page.getByText(/동일 세션 안에서 다음 검색 전까지 발생한 이벤트를 참고용으로 연결합니다.|세션 연결 데이터가 충분히 쌓이면 검색→클릭\/결제 시작 전환도 함께 표시합니다./)
       ).toBeVisible();
+      await expect(page.getByText(/유입 source가 같이 남은 세션은 source별 대표 검색 수요도 참고용으로 함께 보여줍니다./)).toBeVisible();
     });
 
     await test.step('Show customer composition block copy', async () => {
