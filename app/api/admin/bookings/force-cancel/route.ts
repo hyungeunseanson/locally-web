@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         total_price,
         total_experience_price,
         status,
+        cancel_reason,
         date,
         time,
         created_at,
@@ -65,6 +66,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '이미 취소된 예약입니다.' }, { status: 409 });
     }
 
+    // 🔒 Phase A: 중복 환불 방지 — 환불 진행 중 마커 감지
+    // PG 환불 성공 + DB 업데이트 실패 시 관리자 재시도로 인한 중복 환불 차단
+    const REFUND_IN_PROGRESS_MARKER = '[환불처리중]';
+    if (booking.cancel_reason?.includes(REFUND_IN_PROGRESS_MARKER)) {
+      console.error('[ADMIN] force-cancel: 환불 처리 중인 예약 재시도 감지', { bookingId });
+      return NextResponse.json(
+        { success: false, error: '환불이 이미 처리 중입니다. 잠시 후 예약 상태를 확인해주세요.' },
+        { status: 409 }
+      );
+    }
+
     const cancelReason = (reason || '관리자 직권 취소').trim();
     const totalAmount = getBookingPaidAmount(booking);
     const settlement = isPendingBookingStatus(booking.status)
@@ -72,6 +84,13 @@ export async function POST(request: Request) {
       : calculateBookingCancellationSettlement(booking, 100);
 
     if (settlement.refundAmount > 0 && booking.tid) {
+      // 🔒 Phase A: PG 환불 직전 DB에 진행 중 마커 기록
+      // 이후 PG 성공 + DB update 실패 시, 관리자 재시도를 위에서 차단함
+      await supabaseAdmin
+        .from('bookings')
+        .update({ cancel_reason: `${cancelReason} ${REFUND_IN_PROGRESS_MARKER}` })
+        .eq('id', bookingId);
+
       if (booking.payment_method === 'paypal') {
         const refund = await refundPayPalCapture(booking.tid, settlement.refundAmount, 'KRW');
         if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
@@ -121,6 +140,7 @@ export async function POST(request: Request) {
       .from('bookings')
       .update({
         status: 'cancelled',
+        // 마커 제거 후 최종 취소 사유로 교체
         cancel_reason: `${cancelReason} (관리자 강제 취소)`,
         refund_amount: settlement.refundAmount,
         host_payout_amount: settlement.hostPayout,
