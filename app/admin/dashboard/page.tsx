@@ -15,7 +15,6 @@ import ServiceAdminTab from './components/ServiceAdminTab';
 import AdminAlertsTab from './components/AdminAlertsTab';
 
 // Custom Hook
-import { useAdminData } from './hooks/useAdminData';
 import { useAdminUsersData } from './hooks/useAdminUsersData';
 import { useAdminApprovalsData } from './hooks/useAdminApprovalsData';
 
@@ -66,16 +65,9 @@ function DataDrivenAdminTab({
   selectedItem: unknown;
   setSelectedItem: React.Dispatch<React.SetStateAction<unknown>>;
 }) {
-  const {
-    apps, exps, users, onlineUsers, isLoading,
-    updateStatus, deleteItem
-  } = useAdminData();
+  const { apps, exps, isLoading, updateStatus, deleteItem } = useAdminApprovalsData();
 
   if (isLoading) return <DataLoadingSkeleton />;
-
-  if (activeTab === 'USERS') {
-    return <UsersTab users={users} onlineUsers={onlineUsers} deleteItem={deleteItem} />;
-  }
 
   return (
     <ManagementTab
@@ -84,7 +76,7 @@ function DataDrivenAdminTab({
       setFilter={setFilter}
       apps={apps}
       exps={exps}
-      users={users}
+      users={[]}
       messages={[]}
       selectedItem={selectedItem}
       setSelectedItem={setSelectedItem}
