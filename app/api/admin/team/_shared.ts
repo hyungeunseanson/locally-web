@@ -3,6 +3,8 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
+export const TEAM_CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+
 export function teamError(message: string, status: number) {
   return NextResponse.json({ success: false, error: message }, { status });
 }

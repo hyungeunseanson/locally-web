@@ -26,6 +26,23 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
     const supabase = createClient();
     const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000'; // Using a fixed task_id for general chat
 
+    const requestTeamCommentApi = async (url: string, init: RequestInit = {}) => {
+        const response = await fetch(url, {
+            ...init,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(init.headers || {}),
+            },
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || payload?.success === false) {
+            throw new Error(payload?.error || '채팅 처리 중 오류가 발생했습니다.');
+        }
+
+        return payload;
+    };
+
     const fetchMessages = async () => {
         const { data } = await supabase
             .from('admin_task_comments')
@@ -117,14 +134,15 @@ export default function MiniChatBar({ currentUser }: MiniChatBarProps) {
             if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }, 50);
 
-        const { error } = await supabase.from('admin_task_comments').insert({
-            task_id: CHAT_ROOM_ID,
-            content: messageText,
-            author_id: currentUser.id,
-            author_name: currentUser.name
-        });
-
-        if (error) {
+        try {
+            await requestTeamCommentApi('/api/admin/team/comments', {
+                method: 'POST',
+                body: JSON.stringify({
+                    taskId: CHAT_ROOM_ID,
+                    content: messageText,
+                }),
+            });
+        } catch (error) {
             console.error('Failed to send message:', error);
             // Remove optimistic message on error
             setMessages(prev => prev.filter(m => m.id !== tempId));

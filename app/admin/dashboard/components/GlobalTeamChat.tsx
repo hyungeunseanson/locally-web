@@ -74,6 +74,23 @@ export default function GlobalTeamChat() {
         scroll();
     }, []);
 
+    const requestTeamCommentApi = useCallback(async (url: string, init: RequestInit = {}) => {
+        const response = await fetch(url, {
+            ...init,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(init.headers || {}),
+            },
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || payload?.success === false) {
+            throw new Error(payload?.error || '채팅 처리 중 오류가 발생했습니다.');
+        }
+
+        return payload;
+    }, []);
+
     // ─── Phase 3: 읽음 처리 ──────────────────────────────────────────────────
     const markMessagesRead = useCallback(async (msgs: ChatMessage[], userId: string) => {
         // 자신이 아직 read_by에 없는 메시지들만 업데이트
@@ -293,14 +310,15 @@ export default function GlobalTeamChat() {
                 imageUrl = await uploadImage(imageToUpload.file);
             }
 
-            await supabase.from('admin_task_comments').insert({
-                task_id: CHAT_ROOM_ID,
-                content: messageText || '사진을 1장 보냈습니다.',
-                author_id: currentUser.id,
-                author_name: currentUser.name,
-                metadata: imageUrl ? { image_url: imageUrl } : null,
-                reactions: {},
-                read_by: [currentUser.id]
+            await requestTeamCommentApi('/api/admin/team/comments', {
+                method: 'POST',
+                body: JSON.stringify({
+                    taskId: CHAT_ROOM_ID,
+                    content: messageText || '사진을 1장 보냈습니다.',
+                    metadata: imageUrl ? { image_url: imageUrl } : null,
+                    reactions: {},
+                    readBy: [currentUser.id],
+                }),
             });
 
             fetch('/api/admin/notify-team', {
@@ -349,7 +367,14 @@ export default function GlobalTeamChat() {
         else users.splice(idx, 1);
         reactions[emoji] = users;
 
-        await supabase.from('admin_task_comments').update({ reactions }).eq('id', msgId);
+        try {
+            await requestTeamCommentApi(`/api/admin/team/comments/${msgId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ reactions }),
+            });
+        } catch (error) {
+            console.error('Failed to update team chat reaction:', error);
+        }
     };
 
     // ─── 렌더: 리액션 집계 표시 ──────────────────────────────────────────────
