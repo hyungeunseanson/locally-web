@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
+// LEGACY ROUTE
+// Current service payment flow pre-creates `service_bookings` from `/api/services/requests`
+// and reuses that pending row on `/services/[requestId]/payment`.
+// Keep this route only for compatibility until any unknown legacy callers are retired.
+
 type ServiceBookingAtomicResult = {
   new_order_id: string;
   final_amount: number;

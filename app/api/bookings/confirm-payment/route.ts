@@ -5,6 +5,10 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 
+// LEGACY ROUTE
+// Current admin-confirm path is `/api/admin/bookings/confirm-payment`.
+// Keep this file only for compatibility until legacy callers are fully retired.
+
 // 🔒 API Route 내부에서 직접 관리자 클라이언트 생성 (의존성 제거)
 const createAdminClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

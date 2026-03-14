@@ -1,4 +1,10 @@
 'use client';
+
+// LEGACY PAGE
+// Current booking completion UIs live under `/experiences/[id]/payment/complete`
+// and `/services/[requestId]/payment/complete`.
+// Keep this page only as a compatibility landing page for unknown legacy success links.
+
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import { CheckCircle } from 'lucide-react';
 import Link from 'next/link';
