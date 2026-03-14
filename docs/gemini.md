@@ -16,7 +16,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ### 2.1 Admin 구조
 - `page.tsx`: 뷰/탭 라우팅 (탭: APPROVALS/USERS/LEDGER/SALES/SERVICE_REQUESTS/ANALYTICS/CHATS/TEAM/ALERTS)
-- `hooks/useAdminData.ts`: 체험/bookings 데이터 페칭 (변경 금지)
+- 관리자 대시보드의 레거시 공통 훅 `hooks/useAdminData.ts`는 제거되었고, 탭별 경량 훅/전용 admin API(`useAdminApprovalsData`, `useAdminUsersData`, `/api/admin/*`)가 단일 source다.
 - `hooks/useServiceAdminData.ts`: service_bookings 전용 독립 훅 (v3.9.0 신설, v3.9.3부터 `/api/admin/service-bookings` 경유)
 - `components/ServiceAdminTab.tsx`: 맞춤 의뢰 관리 탭 — 전체 의뢰 / 정산 대기 / 취소·환불 내역 (v3.9.0 신설)
 - `components/AdminAlertsTab.tsx`: 관리자 운영 인앱 알림 누적 탭 (`notifications` 재사용)
@@ -118,12 +118,12 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 결제/보안: NicePay 서명 검증, 결제 확정/취소 API 권한 검증 반영
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합, Postgres Trigger 프로필 100% 일치 동기화.
 - 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다. 서비스 매칭 채팅은 `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 적용 후 `inquiries.service_request_id` 기준으로 request 단위 분리를 활성화한다.
-- Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 기존 체험(`bookings`) 탭·`useAdminData.ts`는 전혀 변경하지 않음.
-- `Billing & Revenue` 탭은 `/api/admin/sales-summary`를 전용 source로 사용하므로, `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖에서 직접 렌더링한다. `useAdminData.ts` 자체는 변경하지 않는다.
-- `Master Ledger` 탭은 `/api/admin/master-ledger`를 전용 source로 사용하므로, `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖에서 직접 렌더링한다. `MasterLedgerTab`은 자체 realtime 구독(`bookings INSERT/UPDATE`, `service_bookings INSERT/UPDATE`)으로 최신성을 유지하고, `useAdminData.ts` 자체는 변경하지 않는다.
-- `Data Analytics` 탭은 `/api/admin/analytics-summary`, `/api/admin/analytics-host-summary`, `/api/admin/reviews`, `/api/admin/audit-logs`를 전용 source로 사용하므로, `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖에서 직접 렌더링한다. `AnalyticsTab`의 shared props는 마지막 fallback 안전망으로만 유지한다.
-- `User Management` 탭은 `/api/admin/users-summary`와 presence 구독을 쓰는 `useAdminUsersData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다. `useAdminData.ts` 공통 로딩을 기다리지 않는다.
-- `Approvals` 탭은 `/api/admin/host-applications` 요약 API + `experiences` 클라이언트 조회를 쓰는 `useAdminApprovalsData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다. `useAdminData.ts` 공통 로딩을 기다리지 않는다.
+- Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 관리자 탭 데이터는 공통 eager load 대신 탭별 전용 훅/API를 기준으로 유지한다.
+- `Billing & Revenue` 탭은 `/api/admin/sales-summary`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다.
+- `Master Ledger` 탭은 `/api/admin/master-ledger`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다. `MasterLedgerTab`은 자체 realtime 구독(`bookings INSERT/UPDATE`, `service_bookings INSERT/UPDATE`)으로 최신성을 유지한다.
+- `Data Analytics` 탭은 `/api/admin/analytics-summary`, `/api/admin/analytics-host-summary`, `/api/admin/reviews`, `/api/admin/audit-logs`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다. `AnalyticsTab`의 shared props는 마지막 fallback 안전망으로만 유지한다.
+- `User Management` 탭은 `/api/admin/users-summary`와 presence 구독을 쓰는 `useAdminUsersData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다.
+- `Approvals` 및 레거시 `APPS`/`EXPS` 경로는 `/api/admin/host-applications` 요약 API + `experiences` 클라이언트 조회를 쓰는 `useAdminApprovalsData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다.
 - `TEAM` 탭은 아직 목록/실시간 읽기는 client Supabase를 유지하지만, `TeamTab`, `GlobalTeamChat`, `MiniChatBar`의 `admin_tasks / admin_task_comments / admin_whitelist` 쓰기(create/update/delete/reaction)는 전용 `/api/admin/team/*` 경로로만 처리한다.
 - `TEAM` 탭 진입 시 `last_viewed_team`을 현재 시각으로 갱신하고 `team-viewed` 이벤트를 발생시켜, 사이드바 `Team Workspace` 배지가 같은 탭 세션에서도 즉시 0으로 돌아가게 유지한다.
 - 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
@@ -138,7 +138,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 ### 5.1 DO
 1. Supabase 단건 조회는 기본적으로 `.maybeSingle()`을 우선 사용한다.
-2. Admin 복잡 Join은 Raw fetch + JS 조립(현행 `useAdminData` 패턴)으로 처리한다.
+2. Admin 복잡 Join은 Raw fetch + JS 조립(Manual Join) 패턴으로 처리한다.
 3. Realtime 구독은 `useEffect` cleanup에서 채널/리스너를 반드시 해제한다.
 4. SSR/CSR 불일치가 생길 수 있는 `window`, `localStorage`, `Date` 접근은 `useEffect` 또는 client guard로 분리한다.
 5. 실패 처리 시 로그만 남기지 말고 사용자 피드백(Toast)을 제공한다.

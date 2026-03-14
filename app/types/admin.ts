@@ -190,17 +190,3 @@ export interface AdminUserTimelineItem {
   status_label: string | null;
   amount: number | null;
 }
-
-export interface AdminDashboardState {
-  apps: HostApplication[];
-  exps: unknown[];
-  users: Profile[];
-  bookings: AdminBooking[];
-  reviews: unknown[];
-  onlineUsers: unknown[];
-  isLoading: boolean;
-  searchLogs?: unknown[]; // 🟢 추가: 검색 트렌드 분석용
-  analyticsEvents?: unknown[]; // 🟢 추가: 퍼널 분석용
-  inquiries?: unknown[]; // 🟢 추가: 호스트 응답률 계산용
-  inquiryMessages?: unknown[]; // 🟢 추가: 호스트 응답 시간 계산용
-}
