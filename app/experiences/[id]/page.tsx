@@ -8,6 +8,7 @@ import { getContent } from '@/app/utils/contentHelper';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { ExperienceDetail, HostProfileDetail } from './types';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -31,6 +32,7 @@ export async function generateMetadata(
   if (!experience) {
     return {
       title: '체험을 찾을 수 없습니다 - Locally',
+      robots: PRIVATE_NOINDEX_METADATA.robots,
     }
   }
 
@@ -38,8 +40,9 @@ export async function generateMetadata(
   const title = getContent(experience, 'title', locale);
   const description = getContent(experience, 'description', locale);
   const imageUrl = experience.photos?.[0] || experience.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
+  const isPublicExperience = experience.status === 'active' && experience.is_active !== false;
 
-  return {
+  const metadata: Metadata = {
     title: `${title} - Locally`,
     description: description?.slice(0, 150) || '현지인과 함께하는 특별한 여행',
     openGraph: {
@@ -64,7 +67,16 @@ export async function generateMetadata(
         'zh': buildLocalizedAbsoluteUrl('zh', `/experiences/${id}`),
       },
     }
+  };
+
+  if (!isPublicExperience) {
+    return {
+      ...metadata,
+      robots: PRIVATE_NOINDEX_METADATA.robots,
+    };
   }
+
+  return metadata;
 }
 
 // 🟢 메인 페이지 컴포넌트 (Server Side Rendering)

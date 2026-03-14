@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-15 (v3.38.86 공개 정보 페이지 메타/사이트맵 1차 정리)
-**Version:** 3.38.86 (Public SEO Metadata & Sitemap Cleanup)
+**Last Updated:** 2026-03-15 (v3.38.87 동적 상세 공개 기준 1차 정리)
+**Version:** 3.38.87 (Dynamic Detail SEO Boundaries)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -394,6 +394,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - private 페이지(`app/account`, `app/guest/*`, `app/notifications`, `app/services`, `app/services/my`)는 `app/utils/seo.ts`의 `PRIVATE_NOINDEX_METADATA`를 단일 source로 사용해 `robots: noindex, nofollow`를 강제한다.
 - `/community`처럼 필터 query를 쓰는 공개 목록은 canonical과 `alternates.languages`를 기본 목록 경로에 고정해 query 조합별 중복 신호를 만들지 않는다.
 - `sitemap.xml`은 dead path를 포함하지 않아야 하며, `/search`, `/community`, `/services/intro`, `/site-map` 같은 주요 공개 진입 페이지를 누락하지 않는다.
+- 동적 상세 중 체험 상세는 `status='active' && is_active !== false`일 때만 indexable 메타를 유지하고, 그 외 상태는 `noindex`로 낮춘다. 서비스 의뢰 상세(`/services/[requestId]`)는 공유용 title/description은 유지하되 항상 `noindex`다.
 
 ---
 

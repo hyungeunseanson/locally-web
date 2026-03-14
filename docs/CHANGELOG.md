@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.87 — [SEO] 동적 상세 공개 기준 1차 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 체험 상세 공개 기준 반영 | `app/experiences/[id]/page.tsx`의 `generateMetadata()`가 `status='active'` 이고 `is_active !== false`인 체험만 indexable 메타를 반환하고, 비활성/비공개 체험과 미존재 체험은 `robots: noindex, nofollow`를 함께 내려주도록 정리 |
+| 🟠 서비스 의뢰 상세 noindex 고정 | `app/services/[requestId]/page.tsx`의 동적 메타에 `PRIVATE_NOINDEX_METADATA.robots`를 연결해, open 상태 여부와 무관하게 서비스 의뢰 상세는 검색엔진 인덱싱 대상에서 제외 |
+| 🟡 보호막 추가 | `tests/e2e/27-dynamic-detail-seo.spec.ts` 추가 — 활성 체험은 canonical만 있고 noindex가 없음을, 비활성 체험과 open 서비스 의뢰 상세는 `robots noindex`가 직접 노출됨을 검증 |
+
 ## v3.38.86 — [SEO] 공개 정보 페이지 메타/사이트맵 1차 정리
 
 | 항목 | 내용 |

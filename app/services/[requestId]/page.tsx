@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
 import ServiceRequestClient from './ServiceRequestClient';
+import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
 
 // OG 이미지: 환경변수 우선, 없으면 사이트 대표 이미지 fallback
 const FALLBACK_OG_IMAGE =
@@ -20,7 +21,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .maybeSingle();
 
   if (!req) {
-    return { title: '의뢰를 찾을 수 없습니다' };
+    return {
+      title: '의뢰를 찾을 수 없습니다',
+      robots: PRIVATE_NOINDEX_METADATA.robots,
+    };
   }
 
   const title = `${req.title} — 현지 호스트 모집 중`;
@@ -29,6 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    robots: PRIVATE_NOINDEX_METADATA.robots,
     openGraph: {
       title: `${title} | Locally`,
       description,
