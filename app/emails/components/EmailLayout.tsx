@@ -17,8 +17,6 @@ interface EmailLayoutProps {
     children: React.ReactNode;
 }
 
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://locally-web.vercel.app';
-
 export default function EmailLayout({ previewText, headerTitle, children }: EmailLayoutProps) {
     return (
         <Html>

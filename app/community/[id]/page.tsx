@@ -11,6 +11,7 @@ import LikeButton from '../components/LikeButton';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
 import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
+import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     }
 
     const snippet = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
-    const defaultImage = post.images && post.images.length > 0 ? post.images[0] : 'https://locally.com/images/og-default.jpg';
+    const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
 
     let prefix = '';
     if (post.category === 'qna') prefix = '[Q&A] ';
@@ -108,7 +109,7 @@ export default async function CommunityPostDetail({
     const isCompanion = post.category === 'companion';
     const authorName = getProfileDisplayName(profile);
     const authorInitial = getProfileInitial(profile);
-    const pageUrl = `https://locally-web.vercel.app/community/${id}`;
+    const pageUrl = buildAbsoluteUrl(`/community/${id}`);
     const fallbackParams = new URLSearchParams();
     fallbackParams.set('category', (detailSearchParams?.category as string) || post.category);
     const fallbackQuery = ((detailSearchParams?.q as string) || '').trim();

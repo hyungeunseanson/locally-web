@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.83 — [SEO] 사이트 URL 단일 source로 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 사이트 URL helper 추가 | `app/utils/siteUrl.ts` 추가 — `NEXT_PUBLIC_SITE_URL`를 메타/OG/canonical/robots/sitemap/이메일 기본 링크의 단일 source로 사용하도록 정리 |
+| 🟡 하드코딩 도메인 제거 | `app/layout.tsx`, `app/page.tsx`, `app/experiences/[id]/page.tsx`, `app/community/[id]/page.tsx`, `app/robots.ts`, `app/sitemap.ts`, 이메일 템플릿 기본 대시보드 링크에서 `locally.vercel.app` / `locally-web.vercel.app` / `locally.com` 하드코딩 제거 |
+| 🟡 locale 차선책 구조 유지 | `next.config.ts` rewrite + `app/middleware.ts` + `app/utils/locale.ts` 기반 locale prefix 전략은 그대로 유지하고, 도메인 기준만 env 중심으로 통일 |
+| 🟡 검증 | `npx eslint`, `npx tsc --noEmit`, `git diff --check`, `npx playwright test tests/e2e/09-admin-analytics.spec.ts --project=chromium`, `npx playwright test tests/e2e/24-experience-card-verification.spec.ts --project=chromium` 기준으로 확인 |
+
 ## v3.38.82 — [Experience Payment] 체험 카드결제 서버 재검증 강화
 
 | 항목 | 내용 |

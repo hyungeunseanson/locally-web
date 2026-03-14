@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Text, Section, Hr, Row, Column } from '@react-email/components';
 import EmailLayout from '../components/EmailLayout';
 import CTAButton from '../components/CTAButton';
+import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 
 interface BookingCancellationEmailProps {
     hostName?: string;
@@ -16,7 +17,7 @@ export default function BookingCancellationEmail({
     experienceTitle = '로컬라이프 체험',
     cancelReason = '게스트 개인 사정',
     refundAmount = 0,
-    dashboardLink = 'https://locally.vercel.app/host/dashboard',
+    dashboardLink = buildAbsoluteUrl('/host/dashboard'),
 }: BookingCancellationEmailProps) {
     return (
         <EmailLayout previewText={`😢 예약이 취소되었습니다: ${experienceTitle}`} headerTitle="Locally">

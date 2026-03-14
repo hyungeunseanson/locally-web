@@ -2,6 +2,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import HomePageClient from '@/app/components/HomePageClient';
 import { getCurrentLocale } from '@/app/utils/locale';
+import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getCurrentLocale();
@@ -29,12 +30,12 @@ export async function generateMetadata(): Promise<Metadata> {
       type: 'website',
     },
     alternates: {
-      canonical: 'https://locally.vercel.app',
+      canonical: buildLocalizedAbsoluteUrl(locale),
       languages: {
-        'ko': 'https://locally.vercel.app',
-        'en': 'https://locally.vercel.app/en',
-        'ja': 'https://locally.vercel.app/ja',
-        'zh': 'https://locally.vercel.app/zh',
+        'ko': buildLocalizedAbsoluteUrl('ko'),
+        'en': buildLocalizedAbsoluteUrl('en'),
+        'ja': buildLocalizedAbsoluteUrl('ja'),
+        'zh': buildLocalizedAbsoluteUrl('zh'),
       },
     }
   };

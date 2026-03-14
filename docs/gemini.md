@@ -384,6 +384,13 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - 체험 카드결제는 `signData`/`ediDate`를 신뢰하지 않는다. 브라우저는 `imp_uid`, `merchant_uid`, `orderId`만 보내고 `/api/payment/nicepay-callback`이 PortOne REST API 재조회로 실제 결제를 검증한 뒤에만 예약을 확정한다.
 - 체험 카드결제 준비 상태는 `/api/payment/card-ready`가 단일 source다. readiness가 false인 환경에서는 카드 버튼을 비활성화하고 무통장/PayPal만 허용한다.
 
+### 11.6 Site URL / SEO 기준
+
+- 사이트 절대 URL은 `NEXT_PUBLIC_SITE_URL`가 단일 source다.
+- 메타데이터(`metadataBase`, canonical, `alternates.languages`, OG URL), `robots`, `sitemap`, 이메일 기본 링크는 모두 `app/utils/siteUrl.ts` helper를 통해 생성한다.
+- `locally.vercel.app`, `locally-web.vercel.app`, `www.locally-travel.com` 같은 배포 도메인을 개별 파일에 하드코딩하지 않는다.
+- staging/transition 기간에는 `NEXT_PUBLIC_SITE_URL`만 현재 배포 도메인으로 유지하고, 최종 도메인 전환 시에는 env만 교체한다.
+
 ---
 
 ## 12. Experience Translation System

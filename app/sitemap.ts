@@ -1,70 +1,69 @@
 import { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 
 // 1시간 캐시: 매 크롤러 요청마다 DB 조회하지 않도록
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://locally-web.vercel.app';
-
   const staticUrls: MetadataRoute.Sitemap = [
     {
-      url: baseUrl,
+      url: buildAbsoluteUrl('/'),
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1,
     },
     {
-      url: `${baseUrl}/about`,
+      url: buildAbsoluteUrl('/about'),
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/become-a-host`,
+      url: buildAbsoluteUrl('/become-a-host'),
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/help`,
+      url: buildAbsoluteUrl('/help'),
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.7,
     },
     // 회사 소개 관련 페이지
     {
-      url: `${baseUrl}/company/notices`,
+      url: buildAbsoluteUrl('/company/notices'),
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/company/news`,
+      url: buildAbsoluteUrl('/company/news'),
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/company/community`,
+      url: buildAbsoluteUrl('/company/community'),
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.7,
     },
     {
-      url: `${baseUrl}/company/careers`,
+      url: buildAbsoluteUrl('/company/careers'),
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.6,
     },
     {
-      url: `${baseUrl}/company/investors`,
+      url: buildAbsoluteUrl('/company/investors'),
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.5,
     },
     {
-      url: `${baseUrl}/company/partnership`,
+      url: buildAbsoluteUrl('/company/partnership'),
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.5,
@@ -84,7 +83,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq('status', 'active');
 
     const experienceUrls: MetadataRoute.Sitemap = (experiences || []).map((exp) => ({
-      url: `${baseUrl}/experiences/${exp.id}`,
+      url: buildAbsoluteUrl(`/experiences/${exp.id}`),
       lastModified: exp.updated_at ? new Date(exp.updated_at) : new Date(),
       changeFrequency: 'weekly',
       priority: 0.9,

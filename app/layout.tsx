@@ -13,6 +13,7 @@ import Script from "next/script";
 import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { getCurrentLocale } from '@/app/utils/locale';
+import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { createClient } from '@/app/utils/supabase/server';
 import type { User } from '@supabase/supabase-js';
 import { Analytics } from "@vercel/analytics/react";
@@ -42,6 +43,8 @@ const ibmPlexSansKr = localFont({
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getCurrentLocale();
+  const siteUrl = getSiteUrl();
+  const localizedHomeUrl = buildLocalizedAbsoluteUrl(locale);
 
   const titleMap: Record<string, string> = {
     ko: 'Locally - 현지인과 함께하는 특별한 여행',
@@ -69,7 +72,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const siteName = siteNameMap[locale] || siteNameMap.ko;
 
   return {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://locally.vercel.app'),
+    metadataBase: new URL(siteUrl),
     title: {
       template: '%s | Locally',
       default: title,
@@ -78,7 +81,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: title,
       description: description,
-      url: 'https://locally.vercel.app',
+      url: localizedHomeUrl,
       siteName: siteName,
       images: [
         {
@@ -100,12 +103,12 @@ export async function generateMetadata(): Promise<Metadata> {
     keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', '일본 동행', '일본 현지 가이드', '맞춤 의뢰', 'Locally'],
     alternates: {
       languages: {
-        'ko': 'https://locally.vercel.app/ko',
-        'en': 'https://locally.vercel.app/en',
-        'ja': 'https://locally.vercel.app/ja',
-        'zh': 'https://locally.vercel.app/zh',
+        'ko': buildAbsoluteUrl('/ko'),
+        'en': buildLocalizedAbsoluteUrl('en'),
+        'ja': buildLocalizedAbsoluteUrl('ja'),
+        'zh': buildLocalizedAbsoluteUrl('zh'),
       },
-      canonical: locale === 'ko' ? 'https://locally.vercel.app' : `https://locally.vercel.app/${locale}`
+      canonical: localizedHomeUrl,
     }
   };
 }

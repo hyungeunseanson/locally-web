@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Text, Section, Hr, Row, Column } from '@react-email/components';
 import EmailLayout from '../components/EmailLayout';
 import CTAButton from '../components/CTAButton';
+import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 
 interface BookingConfirmationEmailProps {
     hostName?: string;
@@ -22,7 +23,7 @@ export default function BookingConfirmationEmail({
     bookingDate = '일정 미정',
     bookingTime = '',
     totalAmount = 0,
-    dashboardLink = 'https://locally.vercel.app/host/dashboard',
+    dashboardLink = buildAbsoluteUrl('/host/dashboard'),
 }: BookingConfirmationEmailProps) {
     return (
         <EmailLayout previewText={`🎉 새로운 예약이 도착했습니다: ${experienceTitle}`} headerTitle="Locally">

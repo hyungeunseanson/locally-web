@@ -3,6 +3,7 @@ import { createClient } from '@/app/utils/supabase/server';
 import ExperienceClient from './ExperienceClient';
 import { notFound } from 'next/navigation';
 import { getCurrentLocale } from '@/app/utils/locale';
+import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { getContent } from '@/app/utils/contentHelper';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { ExperienceDetail, HostProfileDetail } from './types';
@@ -55,12 +56,12 @@ export async function generateMetadata(
       images: [imageUrl],
     },
     alternates: {
-      canonical: `https://locally.vercel.app/experiences/${id}`,
+      canonical: buildLocalizedAbsoluteUrl('ko', `/experiences/${id}`),
       languages: {
-        'ko': `https://locally.vercel.app/experiences/${id}`,
-        'en': `https://locally.vercel.app/en/experiences/${id}`,
-        'ja': `https://locally.vercel.app/ja/experiences/${id}`,
-        'zh': `https://locally.vercel.app/zh/experiences/${id}`,
+        'ko': buildLocalizedAbsoluteUrl('ko', `/experiences/${id}`),
+        'en': buildLocalizedAbsoluteUrl('en', `/experiences/${id}`),
+        'ja': buildLocalizedAbsoluteUrl('ja', `/experiences/${id}`),
+        'zh': buildLocalizedAbsoluteUrl('zh', `/experiences/${id}`),
       },
     }
   }
