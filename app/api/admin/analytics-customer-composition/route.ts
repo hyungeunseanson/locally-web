@@ -137,6 +137,13 @@ function getTopLabel(counts?: Record<string, number>) {
   return topEntry?.[0] || null;
 }
 
+function isMissingColumnError(error: unknown, columnName: string) {
+  if (!error || typeof error !== 'object') return false;
+  const code = 'code' in error ? String((error as { code?: string }).code || '') : '';
+  const message = 'message' in error ? String((error as { message?: string }).message || '') : '';
+  return code === '42703' && message.includes(columnName);
+}
+
 export async function GET(request: Request) {
   try {
     const requestUrl = new URL(request.url);
@@ -407,8 +414,17 @@ export async function GET(request: Request) {
           sourceStatus = 'ready';
         }
       } catch (sourceError) {
-        console.warn('[api/admin/analytics-customer-composition] source mix unavailable', sourceError);
-        sourceStatus = 'unavailable';
+        if (
+          isMissingColumnError(sourceError, 'analytics_events.utm_source')
+          || isMissingColumnError(sourceError, 'analytics_events.utm_medium')
+          || isMissingColumnError(sourceError, 'analytics_events.referrer_host')
+          || isMissingColumnError(sourceError, 'analytics_events.landing_path')
+        ) {
+          sourceStatus = 'unavailable';
+        } else {
+          console.warn('[api/admin/analytics-customer-composition] source mix unavailable', sourceError);
+          sourceStatus = 'unavailable';
+        }
       }
     }
 

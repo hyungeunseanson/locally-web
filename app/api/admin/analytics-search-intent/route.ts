@@ -102,6 +102,13 @@ function roundRate(numerator: number, denominator: number) {
   return Math.round((numerator / denominator) * 1000) / 10;
 }
 
+function isMissingColumnError(error: unknown, columnName: string) {
+  if (!error || typeof error !== 'object') return false;
+  const code = 'code' in error ? String((error as { code?: string }).code || '') : '';
+  const message = 'message' in error ? String((error as { message?: string }).message || '') : '';
+  return code === '42703' && message.includes(columnName);
+}
+
 function getSourceLabel(event: AnalyticsEventRow) {
   const utmSource = String(event.utm_source || '').trim();
   const utmMedium = String(event.utm_medium || '').trim();
@@ -154,45 +161,108 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
+    let supportsSearchSessions = true;
+    let supportsSourceDemand = true;
+    let searchRows: SearchLogRow[] = [];
+    let analyticsEventRows: AnalyticsEventRow[] = [];
+
     let searchLogsQuery = supabaseAdmin
       .from('search_logs')
       .select('keyword, created_at, session_id');
 
-    let analyticsEventsQuery = supabaseAdmin
-      .from('analytics_events')
-      .select('session_id, event_type, created_at, utm_source, utm_medium, referrer_host, landing_path')
-      .in('event_type', ['click', 'payment_init']);
-
     if (startAt) {
       searchLogsQuery = searchLogsQuery.gte('created_at', startAt);
-      analyticsEventsQuery = analyticsEventsQuery.gte('created_at', startAt);
     }
 
     if (endAt) {
       searchLogsQuery = searchLogsQuery.lte('created_at', endAt);
-      analyticsEventsQuery = analyticsEventsQuery.lte('created_at', endAt);
     }
 
-    const [
-      { data: searchLogs, error: searchLogsError },
-      { data: analyticsEvents, error: analyticsEventsError },
-      { data: activeExperiences, error: activeExperiencesError },
-    ] = await Promise.all([
-      searchLogsQuery,
-      analyticsEventsQuery,
+    const [{ data: activeExperiences, error: activeExperiencesError }] = await Promise.all([
       supabaseAdmin
         .from('experiences')
         .select('id, title, city, description, category')
         .eq('status', 'active'),
     ]);
 
-    if (searchLogsError) throw searchLogsError;
-    if (analyticsEventsError) throw analyticsEventsError;
     if (activeExperiencesError) throw activeExperiencesError;
-
-    const searchRows = (searchLogs || []) as SearchLogRow[];
-    const analyticsEventRows = (analyticsEvents || []) as AnalyticsEventRow[];
     const activeExperienceRows = (activeExperiences || []) as ActiveExperienceRow[];
+
+    const { data: searchLogs, error: searchLogsError } = await searchLogsQuery;
+
+    if (searchLogsError && isMissingColumnError(searchLogsError, 'search_logs.session_id')) {
+      supportsSearchSessions = false;
+
+      let fallbackSearchLogsQuery = supabaseAdmin
+        .from('search_logs')
+        .select('keyword, created_at');
+
+      if (startAt) {
+        fallbackSearchLogsQuery = fallbackSearchLogsQuery.gte('created_at', startAt);
+      }
+
+      if (endAt) {
+        fallbackSearchLogsQuery = fallbackSearchLogsQuery.lte('created_at', endAt);
+      }
+
+      const { data: fallbackSearchLogs, error: fallbackSearchLogsError } = await fallbackSearchLogsQuery;
+      if (fallbackSearchLogsError) throw fallbackSearchLogsError;
+      searchRows = (fallbackSearchLogs || []) as SearchLogRow[];
+    } else if (searchLogsError) {
+      throw searchLogsError;
+    } else {
+      searchRows = (searchLogs || []) as SearchLogRow[];
+    }
+
+    if (supportsSearchSessions) {
+      let analyticsEventsQuery = supabaseAdmin
+        .from('analytics_events')
+        .select('session_id, event_type, created_at, utm_source, utm_medium, referrer_host, landing_path')
+        .in('event_type', ['click', 'payment_init']);
+
+      if (startAt) {
+        analyticsEventsQuery = analyticsEventsQuery.gte('created_at', startAt);
+      }
+
+      if (endAt) {
+        analyticsEventsQuery = analyticsEventsQuery.lte('created_at', endAt);
+      }
+
+      const { data: analyticsEvents, error: analyticsEventsError } = await analyticsEventsQuery;
+
+      if (
+        analyticsEventsError
+        && (
+          isMissingColumnError(analyticsEventsError, 'analytics_events.utm_source')
+          || isMissingColumnError(analyticsEventsError, 'analytics_events.utm_medium')
+          || isMissingColumnError(analyticsEventsError, 'analytics_events.referrer_host')
+          || isMissingColumnError(analyticsEventsError, 'analytics_events.landing_path')
+        )
+      ) {
+        supportsSourceDemand = false;
+
+        let fallbackAnalyticsEventsQuery = supabaseAdmin
+          .from('analytics_events')
+          .select('session_id, event_type, created_at')
+          .in('event_type', ['click', 'payment_init']);
+
+        if (startAt) {
+          fallbackAnalyticsEventsQuery = fallbackAnalyticsEventsQuery.gte('created_at', startAt);
+        }
+
+        if (endAt) {
+          fallbackAnalyticsEventsQuery = fallbackAnalyticsEventsQuery.lte('created_at', endAt);
+        }
+
+        const { data: fallbackAnalyticsEvents, error: fallbackAnalyticsEventsError } = await fallbackAnalyticsEventsQuery;
+        if (fallbackAnalyticsEventsError) throw fallbackAnalyticsEventsError;
+        analyticsEventRows = (fallbackAnalyticsEvents || []) as AnalyticsEventRow[];
+      } else if (analyticsEventsError) {
+        throw analyticsEventsError;
+      } else {
+        analyticsEventRows = (analyticsEvents || []) as AnalyticsEventRow[];
+      }
+    }
 
     const totalSearches = searchRows.reduce((count, row) => {
       const keyword = String(row.keyword || '').trim();
@@ -272,7 +342,7 @@ export async function GET(request: Request) {
 
         trackedCounts[keyword] = (trackedCounts[keyword] || 0) + 1;
 
-        if (sessionSourceLabel) {
+        if (supportsSourceDemand && sessionSourceLabel) {
           sourceKeywordCounts[sessionSourceLabel] = sourceKeywordCounts[sessionSourceLabel] || {};
           sourceKeywordCounts[sessionSourceLabel][keyword] =
             (sourceKeywordCounts[sessionSourceLabel][keyword] || 0) + 1;
@@ -410,13 +480,13 @@ export async function GET(request: Request) {
         paymentInitConversionKeywords,
         sourceDemand,
         supplyReference: '현재 활성 체험의 제목/도시/설명/카테고리 기준',
-        conversionAvailable: totalTrackedSearches > 0,
+        conversionAvailable: supportsSearchSessions && totalTrackedSearches > 0,
         conversionCoverage: {
           trackedSearches: totalTrackedSearches,
           clickConvertedSearches: totalClickConvertedSearches,
           paymentInitConvertedSearches: totalPaymentInitConvertedSearches,
         },
-        sourceDemandAvailable: sourceDemand.length > 0,
+        sourceDemandAvailable: supportsSourceDemand && sourceDemand.length > 0,
         sourceTrackedSearches: Object.values(sourceKeywordCounts)
           .reduce((sum, keywordCounts) => sum + Object.values(keywordCounts).reduce((innerSum, count) => innerSum + count, 0), 0),
       },
