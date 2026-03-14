@@ -4,6 +4,7 @@ import Link from 'next/link';
 import React, { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
+import { getUnviewedPendingBookingCount } from '@/app/utils/adminViewedBookings';
 import {
   Users, CheckCircle2, MessageSquare,
   BarChart2, CreditCard, LayoutDashboard,
@@ -86,9 +87,7 @@ export default function Sidebar() {
       const { data, success } = await res.json();
       if (!success || !data) throw new Error('Invalid backend response');
 
-      // 미열람 예약 필터링
-      const viewedIds = JSON.parse(localStorage.getItem('viewed_booking_ids') || '[]');
-      const unviewedPendingBookings = (data.pendingBookingIds || []).filter((id: string) => !viewedIds.includes(id)).length;
+      const unviewedPendingBookings = getUnviewedPendingBookingCount(data.pendingBookingIds || []);
 
       setCounts(prev => ({
         ...prev,

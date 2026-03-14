@@ -38,6 +38,7 @@ import {
   getBookingPaidAmount,
   getBookingPlatformRevenue,
 } from '@/app/utils/bookingFinance';
+import { markBookingViewed } from '@/app/utils/adminViewedBookings';
 import { AdminMasterLedgerEntry } from '@/app/types/admin';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
@@ -209,11 +210,7 @@ export default function MasterLedgerTab({
   const handleSelectBooking = (b: AdminMasterLedgerEntry) => {
     setSelectedBooking(b);
 
-    // 열람 기록 저장
-    const viewedIds = JSON.parse(localStorage.getItem('viewed_booking_ids') || '[]');
-    if (!viewedIds.includes(b.id)) {
-      const newViewed = [...viewedIds, b.id];
-      localStorage.setItem('viewed_booking_ids', JSON.stringify(newViewed));
+    if (markBookingViewed(b.id)) {
       // 사이드바에 알림 (이벤트 발생)
       window.dispatchEvent(new Event('booking-viewed'));
     }

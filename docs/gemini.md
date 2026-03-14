@@ -46,7 +46,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/service-payouts/mark-paid`: 서비스 정산 완료 처리 API (`service_bookings.payout_status='paid'` + audit log)
 - `/api/admin/service-bookings`: RLS 우회용 맞춤 의뢰 조회 서버 API (v3.9.3, 최신 `host_applications` 계좌정보 조립 포함)
 - `/api/admin/service-requests`: 관리자 맞춤 의뢰 수정 API (`pending_payment/open` 상태만 수정 허용 + audit log)
-- `/api/admin/sidebar-counts`: RLS 우회용 사이드바 배지 카운트 서버 API (v3.9.3, 승인/예약/서비스 무통장/CS 미답변 + 현재 로그인 관리자 `admin_alert` unread count 포함)
+- `/api/admin/sidebar-counts`: RLS 우회용 사이드바 배지 카운트 서버 API (v3.9.3, 승인/예약/서비스 무통장/CS 미답변 + 현재 로그인 관리자 `admin_alert` unread count 포함). `pendingBookingIds`는 서버가 내려주고, `Master Ledger` badge의 로컬 열람 상태(`viewed_booking_ids`)는 클라이언트 공용 helper에서 stale id를 정리한 뒤 계산한다.
 - `/api/services/payment/mark-bank`: 무통장 선택 시 payment_method='bank' 저장 (v3.9.2)
 - `utils/paypal/server.ts`: PayPal 고객 결제 1단계 공통 서버 유틸 (access token / order create / order get / order capture). 기존 NicePay 결제 경로와 분리 유지
 - `/api/payment/paypal/create-order`: 체험 예약 PayPal 주문 생성 API (예약 소유권/상태/금액 검증 후 PayPal order 발급)

@@ -17,6 +17,11 @@ type BookableExperience = {
   time: string;
 };
 
+type PendingBookingRow = {
+  id: string;
+  order_id: string | null;
+};
+
 const TEST_PASSWORD = 'LocallyTest!2026';
 
 let adminClient: SupabaseClient | null = null;
@@ -207,6 +212,33 @@ async function prepareBookableExperience(): Promise<BookableExperience> {
   };
 }
 
+async function getPendingBookingIdByOrderId(orderId: string) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('id')
+    .eq('order_id', orderId)
+    .eq('status', 'PENDING')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error(`Pending booking not found for order ${orderId}`);
+
+  return data.id;
+}
+
+async function getAllPendingBookingIds() {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('id, order_id')
+    .eq('status', 'PENDING');
+
+  if (error) throw error;
+
+  return (data || []).map((row: PendingBookingRow) => row.id);
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -306,6 +338,12 @@ function parseNumber(text: string | null) {
   return Number((text ?? '').replace(/[^\d.-]/g, ''));
 }
 
+function parseTrailingCount(text: string | null) {
+  const matches = (text ?? '').match(/\d+/g);
+  if (!matches || matches.length === 0) return 0;
+  return Number(matches[matches.length - 1]);
+}
+
 test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
   test.setTimeout(240000);
 
@@ -322,9 +360,21 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     const orderId = await createBankTransferBooking(guestPage, guest, experience);
     await guestContext.close();
 
+    const targetPendingBookingId = await getPendingBookingIdByOrderId(orderId);
+    const allPendingBookingIds = await getAllPendingBookingIds();
+    const preViewedBookingIds = allPendingBookingIds.filter((bookingId) => bookingId !== targetPendingBookingId);
+
     const adminContext = await browser.newContext();
+    await adminContext.addInitScript((viewedBookingIds: string[]) => {
+      window.localStorage.setItem('viewed_booking_ids', JSON.stringify(viewedBookingIds));
+    }, preViewedBookingIds);
     const adminPage = await adminContext.newPage();
     await openMasterLedger(adminPage, adminUser);
+
+    const masterLedgerButton = adminPage.getByRole('button', { name: /Master Ledger/i });
+    await expect
+      .poll(async () => parseTrailingCount(await masterLedgerButton.textContent()))
+      .toBe(1);
 
     let row = await searchByOrderId(adminPage, orderId);
     const basePriceText = await row.locator('td').nth(6).textContent();
@@ -342,6 +392,9 @@ test.describe.serial('Scenario 6: Admin Master Ledger Smoke', () => {
     row = await searchByOrderId(adminPage, orderId);
 
     await openLedgerRow(adminPage, row);
+    await expect
+      .poll(async () => parseTrailingCount(await masterLedgerButton.textContent()))
+      .toBe(0);
     await expect(adminPage.getByRole('button', { name: /입금 확인/ })).toBeVisible({ timeout: 10000 });
 
     const confirmPaymentResponse = adminPage.waitForResponse(
