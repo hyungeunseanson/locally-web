@@ -1,44 +1,24 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Range } from 'react-date-range';
 import { endOfDay, format, startOfDay } from 'date-fns';
 
 import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
 import type {
-  AnalyticsApplicationInput,
-  AnalyticsBookingInput,
   AnalyticsBusinessSummary,
   AnalyticsCustomerCompositionSummary,
-  AnalyticsEventInput,
-  AnalyticsExperienceInput,
   AnalyticsHostCandidate,
   AnalyticsHostSummary,
-  AnalyticsInquiryInput,
   AnalyticsInquiryMessageInput,
-  AnalyticsReviewInput,
   AnalyticsSearchIntentSummary,
-  AnalyticsSearchLogInput,
+  AnalyticsSummaryDataArgs,
+  AnalyticsSummaryDataResult,
+  AnalyticsSummarySources,
   AnalyticsStats,
-  AnalyticsUserInput,
   CustomerCompositionSource,
   SearchIntentSource,
-  SummarySource,
 } from '../components/analytics/types';
-
-type UseAnalyticsSummaryDataArgs = {
-  bookings: AnalyticsBookingInput[];
-  users: AnalyticsUserInput[];
-  exps: AnalyticsExperienceInput[];
-  apps: AnalyticsApplicationInput[];
-  reviews: AnalyticsReviewInput[];
-  searchLogs: AnalyticsSearchLogInput[];
-  analyticsEvents: AnalyticsEventInput[];
-  inquiries: AnalyticsInquiryInput[];
-  inquiryMessages: AnalyticsInquiryMessageInput[];
-  dateRange: Range[];
-};
 
 const DEFAULT_ANALYTICS_STATS: AnalyticsStats = {
   totalUsers: 0,
@@ -116,9 +96,9 @@ export function useAnalyticsSummaryData({
   inquiries,
   inquiryMessages,
   dateRange,
-}: UseAnalyticsSummaryDataArgs) {
+}: AnalyticsSummaryDataArgs): AnalyticsSummaryDataResult {
   const [loading, setLoading] = useState(true);
-  const [summarySource, setSummarySource] = useState<{ business: SummarySource; host: SummarySource }>({
+  const [summarySource, setSummarySource] = useState<AnalyticsSummarySources>({
     business: 'server',
     host: 'server',
   });
@@ -595,7 +575,7 @@ export function useAnalyticsSummaryData({
         }),
       ]);
 
-      const nextSummarySource: { business: SummarySource; host: SummarySource } = {
+      const nextSummarySource: AnalyticsSummarySources = {
         business: 'fallback',
         host: 'fallback',
       };

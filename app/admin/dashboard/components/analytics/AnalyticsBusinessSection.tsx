@@ -4,16 +4,7 @@ import { Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 import { SimpleKpi, FunnelBar } from './helpers';
 import AnalyticsCustomerCompositionSection from './AnalyticsCustomerCompositionSection';
 import AnalyticsSearchDemandSection from './AnalyticsSearchDemandSection';
-import type {
-  AnalyticsStats,
-  AnalyticsCustomerCompositionSummary,
-  AnalyticsMetricKey,
-  AnalyticsSearchIntentSummary,
-  CustomerCompositionSource,
-  SearchIntentSource,
-  SearchTrendItem,
-  SummarySource,
-} from './types';
+import type { AnalyticsBusinessSectionProps } from './types';
 
 export default function AnalyticsBusinessSection({
   stats,
@@ -24,16 +15,7 @@ export default function AnalyticsBusinessSection({
   searchTrends,
   customerComposition,
   customerCompositionSource,
-}: {
-  stats: AnalyticsStats;
-  summarySource: SummarySource;
-  onSelectMetric: (metric: AnalyticsMetricKey) => void;
-  searchIntent: AnalyticsSearchIntentSummary | null;
-  searchIntentSource: SearchIntentSource;
-  searchTrends: SearchTrendItem[];
-  customerComposition: AnalyticsCustomerCompositionSummary | null;
-  customerCompositionSource: CustomerCompositionSource;
-}) {
+}: AnalyticsBusinessSectionProps) {
   return (
     <>
       {summarySource === 'cached' && (

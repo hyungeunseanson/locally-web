@@ -15,34 +15,14 @@ import AnalyticsHostSection from './analytics/AnalyticsHostSection';
 import AnalyticsMetricModal from './analytics/AnalyticsMetricModal';
 import { useAnalyticsSummaryData } from '../hooks/useAnalyticsSummaryData';
 import type {
-  AnalyticsApplicationInput,
-  AnalyticsBookingInput,
-  AnalyticsEventInput,
-  AnalyticsExperienceInput,
-  AnalyticsInquiryInput,
-  AnalyticsInquiryMessageInput,
+  AnalyticsMainTab,
   AnalyticsMetricKey,
-  AnalyticsReviewInput,
-  AnalyticsSearchLogInput,
-  AnalyticsUserInput,
+  AnalyticsTabProps,
 } from './analytics/types';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
-interface AnalyticsTabProps {
-  bookings?: AnalyticsBookingInput[];
-  users?: AnalyticsUserInput[];
-  exps?: AnalyticsExperienceInput[];
-  apps?: AnalyticsApplicationInput[];
-  reviews?: AnalyticsReviewInput[];
-  searchLogs?: AnalyticsSearchLogInput[];
-  analyticsEvents?: AnalyticsEventInput[];
-  inquiries?: AnalyticsInquiryInput[];
-  inquiryMessages?: AnalyticsInquiryMessageInput[];
-}
-
 const EMPTY_ANALYTICS_ITEMS: never[] = [];
-type AnalyticsMainTab = 'business' | 'host' | 'reviews' | 'logs';
 
 const ANALYTICS_MAIN_TABS: Array<{ id: AnalyticsMainTab; label: string }> = [
   { id: 'business', label: 'Business & Guest' },

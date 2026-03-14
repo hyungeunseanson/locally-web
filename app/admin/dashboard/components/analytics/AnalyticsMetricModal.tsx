@@ -4,13 +4,7 @@ import { format } from 'date-fns';
 import { Star, X } from 'lucide-react';
 
 import { FunnelBar, SimpleBar } from './helpers';
-import type { AnalyticsMetricKey, AnalyticsStats } from './types';
-
-type AnalyticsMetricModalProps = {
-  selectedMetric: AnalyticsMetricKey | null;
-  stats: AnalyticsStats;
-  onClose: () => void;
-};
+import type { AnalyticsMetricModalProps } from './types';
 
 export default function AnalyticsMetricModal({
   selectedMetric,

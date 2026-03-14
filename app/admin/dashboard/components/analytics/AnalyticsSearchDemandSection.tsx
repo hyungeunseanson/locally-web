@@ -2,24 +2,14 @@
 
 import { AlertTriangle, Search } from 'lucide-react';
 
-import type {
-  AnalyticsMetricKey,
-  AnalyticsSearchIntentSummary,
-  SearchIntentSource,
-  SearchTrendItem,
-} from './types';
+import type { AnalyticsSearchDemandSectionProps } from './types';
 
 export default function AnalyticsSearchDemandSection({
   searchIntent,
   searchIntentSource,
   searchTrends,
   onSelectMetric,
-}: {
-  searchIntent: AnalyticsSearchIntentSummary | null;
-  searchIntentSource: SearchIntentSource;
-  searchTrends: SearchTrendItem[];
-  onSelectMetric: (metric: AnalyticsMetricKey) => void;
-}) {
+}: AnalyticsSearchDemandSectionProps) {
   return (
     <>
       <div className="mt-6 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">

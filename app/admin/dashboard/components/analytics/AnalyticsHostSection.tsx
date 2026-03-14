@@ -3,17 +3,13 @@
 import React from 'react';
 import { Activity, AlertTriangle, CheckCircle, Search, Star, TrendingUp, UserCheck } from 'lucide-react';
 import { SimpleKpi } from './helpers';
-import type { AnalyticsMetricKey, AnalyticsStats, SummarySource } from './types';
+import type { AnalyticsHostSectionProps } from './types';
 
 export default function AnalyticsHostSection({
   stats,
   summarySource,
   onSelectMetric,
-}: {
-  stats: AnalyticsStats;
-  summarySource: SummarySource;
-  onSelectMetric: (metric: AnalyticsMetricKey) => void;
-}) {
+}: AnalyticsHostSectionProps) {
   return (
     <div className="space-y-12 animate-in slide-in-from-bottom-[50px] duration-500">
       {summarySource === 'cached' && (

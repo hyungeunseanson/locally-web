@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.80 — [Analytics] 공용 타입 정리로 섹션/훅 경계 고정
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 공용 props/type 중앙화 | `analytics/types.ts`에 `AnalyticsTabProps`, `AnalyticsSummaryDataArgs/Result`, 섹션/모달 props, `AnalyticsSummarySources`, `AnalyticsMainTab` 추가 |
+| 🟡 훅/섹션 타입 연결 | `useAnalyticsSummaryData`, `AnalyticsBusinessSection`, `AnalyticsHostSection`, `AnalyticsSearchDemandSection`, `AnalyticsMetricModal`이 모두 공용 타입 기준으로 연결 |
+| 🟡 검증 | `09-admin-analytics.spec.ts`, `06-admin-master-ledger.spec.ts`, `npx tsc --noEmit`, `git diff --check` 통과 |
+
 ## v3.38.79 — [Analytics] 상세 모달 분리로 본체 책임 축소
 
 | 항목 | 내용 |

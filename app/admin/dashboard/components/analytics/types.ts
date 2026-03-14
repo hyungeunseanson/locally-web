@@ -1,4 +1,5 @@
 export type SummarySource = 'server' | 'cached' | 'fallback';
+export type AnalyticsMainTab = 'business' | 'host' | 'reviews' | 'logs';
 
 export type AnalyticsBookingInput = {
   created_at?: string | null;
@@ -152,6 +153,10 @@ export type AnalyticsSearchIntentSummary = {
 };
 
 export type SearchIntentSource = 'server' | 'cached' | 'unavailable';
+export type AnalyticsSummarySources = {
+  business: SummarySource;
+  host: SummarySource;
+};
 
 export type CompositionBucket = {
   name: string;
@@ -253,3 +258,61 @@ export type AnalyticsCustomerCompositionSummary = {
 };
 
 export type CustomerCompositionSource = 'server' | 'cached' | 'unavailable';
+
+export type AnalyticsTabProps = {
+  bookings?: AnalyticsBookingInput[];
+  users?: AnalyticsUserInput[];
+  exps?: AnalyticsExperienceInput[];
+  apps?: AnalyticsApplicationInput[];
+  reviews?: AnalyticsReviewInput[];
+  searchLogs?: AnalyticsSearchLogInput[];
+  analyticsEvents?: AnalyticsEventInput[];
+  inquiries?: AnalyticsInquiryInput[];
+  inquiryMessages?: AnalyticsInquiryMessageInput[];
+};
+
+export type AnalyticsSummaryDataArgs = Required<AnalyticsTabProps> & {
+  dateRange: import('react-date-range').Range[];
+};
+
+export type AnalyticsSummaryDataResult = {
+  loading: boolean;
+  stats: AnalyticsStats;
+  summarySource: AnalyticsSummarySources;
+  searchIntent: AnalyticsSearchIntentSummary | null;
+  searchIntentSource: SearchIntentSource;
+  customerComposition: AnalyticsCustomerCompositionSummary | null;
+  customerCompositionSource: CustomerCompositionSource;
+};
+
+export type AnalyticsMetricSelectHandler = (metric: AnalyticsMetricKey) => void;
+
+export type AnalyticsBusinessSectionProps = {
+  stats: AnalyticsStats;
+  summarySource: SummarySource;
+  onSelectMetric: AnalyticsMetricSelectHandler;
+  searchIntent: AnalyticsSearchIntentSummary | null;
+  searchIntentSource: SearchIntentSource;
+  searchTrends: SearchTrendItem[];
+  customerComposition: AnalyticsCustomerCompositionSummary | null;
+  customerCompositionSource: CustomerCompositionSource;
+};
+
+export type AnalyticsHostSectionProps = {
+  stats: AnalyticsStats;
+  summarySource: SummarySource;
+  onSelectMetric: AnalyticsMetricSelectHandler;
+};
+
+export type AnalyticsSearchDemandSectionProps = {
+  searchIntent: AnalyticsSearchIntentSummary | null;
+  searchIntentSource: SearchIntentSource;
+  searchTrends: SearchTrendItem[];
+  onSelectMetric: AnalyticsMetricSelectHandler;
+};
+
+export type AnalyticsMetricModalProps = {
+  selectedMetric: AnalyticsMetricKey | null;
+  stats: AnalyticsStats;
+  onClose: () => void;
+};
