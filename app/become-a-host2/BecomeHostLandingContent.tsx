@@ -8,37 +8,37 @@ const HOST_LANDING_ASSET_LOCALE = "ko";
 
 const sections = [
     {
-        alt: "Become a host design section 1",
+        alt: "로컬리 호스트 랜딩 메인 소개 이미지",
         desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/1.png`, width: 2880, height: 1260 },
         mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/1.png`, width: 1740, height: 1688 },
     },
     {
-        alt: "Become a host design section 2",
+        alt: "로컬리 호스트 활동 가치 소개 이미지",
         desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/2.png`, width: 2880, height: 1434 },
         mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/2.png`, width: 1740, height: 2394 },
     },
     {
-        alt: "Become a host design section 3",
+        alt: "로컬리 호스트 경험 예시 소개 이미지",
         desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/3.png`, width: 2880, height: 1156 },
         mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/3.png`, width: 1740, height: 1156 },
     },
     {
-        alt: "Become a host design section 4",
+        alt: "로컬리 호스트 운영 방식 안내 이미지",
         desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/4.png`, width: 2880, height: 1296 },
         mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/4.png`, width: 1740, height: 1296 },
     },
     {
-        alt: "Become a host design section 5",
+        alt: "로컬리 호스트 지원 절차 소개 이미지",
         desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/5.png`, width: 2880, height: 1542 },
         mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/5.png`, width: 1740, height: 1542 },
     },
     {
-        alt: "Become a host design section 6",
+        alt: "로컬리 호스트 정산과 운영 기준 이미지",
         desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/6.png`, width: 2880, height: 1502 },
         mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/6.png`, width: 1740, height: 1502 },
     },
     {
-        alt: "Become a host design section 7",
+        alt: "로컬리 호스트 랜딩 마무리 안내 이미지",
         desktop: { src: `/images/become-a-host/desktop/${HOST_LANDING_ASSET_LOCALE}/7.png`, width: 2880, height: 2264 },
         mobile: { src: `/images/become-a-host/mobile/${HOST_LANDING_ASSET_LOCALE}/7.png`, width: 1740, height: 2264 },
     },

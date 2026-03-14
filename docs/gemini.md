@@ -390,6 +390,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - 메타데이터(`metadataBase`, canonical, `alternates.languages`, OG URL), `robots`, `sitemap`, 이메일 기본 링크는 모두 `app/utils/siteUrl.ts` helper를 통해 생성한다.
 - `locally.vercel.app`, `locally-web.vercel.app`, `www.locally-travel.com` 같은 배포 도메인을 개별 파일에 하드코딩하지 않는다.
 - staging/transition 기간에는 `NEXT_PUBLIC_SITE_URL`만 현재 배포 도메인으로 유지하고, 최종 도메인 전환 시에는 env만 교체한다.
+- `/about`, `/search`, `/become-a-host` 같은 공개 랜딩은 route-level metadata를 직접 가진다. 반대로 로그인 리다이렉트가 있는 `/services` 잡보드류는 공개 SEO 보강 대상이 아니라 private `noindex` 정리 대상으로 본다.
 
 ---
 

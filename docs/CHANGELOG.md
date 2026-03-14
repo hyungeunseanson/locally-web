@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.84 — [SEO] 공개 랜딩 페이지 메타데이터 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 공개 랜딩 메타 추가 | `app/about/layout.tsx`, `app/search/layout.tsx`, `app/become-a-host/page.tsx`에 page-level metadata 추가 — locale별 title/description, canonical, `alternates.languages`, OG 기준을 각 랜딩에 직접 부여 |
+| 🟡 호스트 랜딩 이미지 대체텍스트 보강 | `app/become-a-host2/BecomeHostLandingContent.tsx`의 section 이미지 `alt`를 generic 문구에서 의미 있는 설명으로 교체 |
+| 🟡 공개/비공개 경계 유지 | `/services`는 로그인 리다이렉트가 있는 잡보드라 이번 공개 SEO 보강 대상에서 제외하고, 이후 private `noindex` 단계에서 다루도록 유지 |
+| 🟡 보호막 추가 | `tests/e2e/25-public-metadata.spec.ts` 추가 — `/about`, `/search`, `/become-a-host`의 page title/description 메타가 직접 노출되는지 확인 |
+| 🟡 검증 | `npx eslint`, `npx tsc --noEmit`, `git diff --check`, `npx playwright test tests/e2e/25-public-metadata.spec.ts --project=chromium` 기준으로 확인 |
+
 ## v3.38.83 — [SEO] 사이트 URL 단일 source로 정리
 
 | 항목 | 내용 |
