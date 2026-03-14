@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.81 — [Guest Booking] 예약 후 Trips / Receipt / Inbox 라이브 보호막 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 라이브 후속 플로우 스모크 추가 | 신규 `tests/e2e/23-live-guest-post-booking.spec.ts`를 추가해 새 게스트 계정 생성 → 무통장 체험 예약 → 결제 완료 페이지에서 `내 여행` 진입 → `영수증` 모달 확인 → `메시지` 버튼으로 호스트 채팅 시작까지 실제 브라우저로 검증 |
+| 🟡 직접 보호 범위 | 기존 `05-live-guest-booking-messaging-support.spec.ts`가 놓치던 예약 후 `Guest Trips / Receipt / Inbox ingress` 구간을 별도 live smoke로 고정 |
+| 🟡 검증 | `tests/e2e/23-live-guest-post-booking.spec.ts`, `npx tsc --noEmit`, `git diff --check` 기준으로 확인 |
+
 ## v3.38.80 — [Analytics] 공용 타입 정리로 섹션/훅 경계 고정
 
 | 항목 | 내용 |
