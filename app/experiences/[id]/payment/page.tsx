@@ -36,6 +36,11 @@ type BookingApiResponse = {
 };
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
+type ExperienceCardReadyReason = 'missing_portone_credentials' | 'missing_imp_code';
+type ExperienceCardReadyResponse = {
+  ready?: boolean;
+  reason?: ExperienceCardReadyReason;
+};
 
 type PayPalCreateOrderResponse = {
   success?: boolean;
@@ -143,6 +148,9 @@ function PaymentContent() {
   const [agreeSafety, setAgreeSafety] = useState(false);
   const [agreeNoOffPlatform, setAgreeNoOffPlatform] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [isCardReady, setIsCardReady] = useState(false);
+  const [isCardReadyResolved, setIsCardReadyResolved] = useState(false);
+  const [cardReadyReason, setCardReadyReason] = useState<ExperienceCardReadyReason | ''>('');
   const [isFeeInfoOpen, setIsFeeInfoOpen] = useState(false);
   const [isPayPalSdkReady, setIsPayPalSdkReady] = useState(false);
   const [paypalSdkError, setPaypalSdkError] = useState('');
@@ -172,6 +180,7 @@ function PaymentContent() {
   const finalAmount = hostPrice + guestFee;
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
   const isPayPalEnabled = Boolean(paypalClientId);
+  const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
 
   const buildPayPalSessionKey = useCallback(
     () =>
@@ -220,10 +229,48 @@ function PaymentContent() {
   }, [agreeNoOffPlatform, agreeSafety, agreeTerms, customerName, customerPhone]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchCardReady = async () => {
+      try {
+        const response = await fetch('/api/payment/card-ready', {
+          cache: 'no-store',
+        });
+        const result = (await response.json()) as ExperienceCardReadyResponse;
+
+        if (!isMounted) return;
+
+        setIsCardReady(Boolean(response.ok && result.ready));
+        setCardReadyReason(response.ok && !result.ready ? result.reason || '' : '');
+      } catch {
+        if (!isMounted) return;
+
+        setIsCardReady(false);
+        setCardReadyReason('missing_portone_credentials');
+      } finally {
+        if (isMounted) {
+          setIsCardReadyResolved(true);
+        }
+      }
+    };
+
+    void fetchCardReady();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isPayPalEnabled && paymentMethod === 'paypal') {
-      setPaymentMethod('card');
+      setPaymentMethod(isCardReadyResolved && !isCardReady ? 'bank' : 'card');
+      return;
     }
-  }, [isPayPalEnabled, paymentMethod]);
+
+    if (isCardReadyResolved && !isCardReady && paymentMethod === 'card') {
+      setPaymentMethod(isPayPalEnabled ? 'paypal' : 'bank');
+    }
+  }, [isCardReady, isCardReadyResolved, isPayPalEnabled, paymentMethod]);
 
   useEffect(() => {
     if (paymentMethod !== 'paypal') {
@@ -560,6 +607,14 @@ function PaymentContent() {
         return;
       }
 
+      if (!isCardReady || !portOneImpCode) {
+        const message = '카드 결제를 지금 사용할 수 없습니다. 무통장 또는 PayPal을 이용해주세요.';
+        setPaymentError(message);
+        showToast(message, 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       const imp = window.IMP;
       if (!imp) {
         const message = '결제 모듈을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.';
@@ -569,7 +624,7 @@ function PaymentContent() {
         return;
       }
 
-      imp.init('imp44607000');
+      imp.init(portOneImpCode);
 
       const data: ImpRequestData = {
         pg: 'nice_v2',
@@ -594,11 +649,23 @@ function PaymentContent() {
           return;
         }
 
+        if (!rsp.imp_uid) {
+          const message = '결제 확인용 imp_uid를 받지 못했습니다. 다시 시도해주세요.';
+          setPaymentError(message);
+          showToast(message, 'error');
+          setIsProcessing(false);
+          return;
+        }
+
         try {
           const response = await fetch('/api/payment/nicepay-callback', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(rsp),
+            body: JSON.stringify({
+              imp_uid: rsp.imp_uid,
+              merchant_uid: newOrderId,
+              orderId: newOrderId,
+            }),
           });
           const callbackResult = (await response.json()) as { success?: boolean; error?: string };
 
@@ -696,10 +763,16 @@ function PaymentContent() {
 
           <div className="mb-6 md:mb-8">
             <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">결제 수단</h2>
-            <div className={`grid gap-2 md:gap-3 mb-3 md:mb-4 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`grid gap-2 md:gap-3 mb-3 md:mb-4 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <button
-                onClick={() => setPaymentMethod('card')}
-                className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'card' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                type="button"
+                onClick={() => {
+                  if (isCardReadyResolved && isCardReady) {
+                    setPaymentMethod('card');
+                  }
+                }}
+                disabled={!isCardReadyResolved || !isCardReady}
+                className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'card' ? 'border-black bg-slate-50 text-black' : !isCardReadyResolved || !isCardReady ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
                 <CreditCard className="w-5 h-5 md:w-6 md:h-6" />
                 <span className="font-bold text-[12px] md:text-sm">카드 결제</span>
@@ -721,6 +794,12 @@ function PaymentContent() {
                 </button>
               )}
             </div>
+
+            {isCardReadyResolved && !isCardReady && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] md:text-xs text-amber-700">
+                카드 결제를 지금 사용할 수 없습니다. {cardReadyReason === 'missing_imp_code' ? '결제 설정이 아직 완료되지 않았습니다.' : '무통장 또는 PayPal을 이용해주세요.'}
+              </div>
+            )}
 
             {paymentMethod === 'bank' && (
               <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
@@ -829,7 +908,7 @@ function PaymentContent() {
           {paymentMethod !== 'paypal' ? (
             <button
               onClick={handlePayment}
-              disabled={isProcessing}
+              disabled={isProcessing || (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))}
               className="w-full h-12 md:h-14 rounded-xl md:rounded-2xl font-bold text-[15px] md:text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 md:gap-2 shadow-md md:shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
             >
               {isProcessing ? (

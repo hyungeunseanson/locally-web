@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-14 (v3.38.71 서비스 호스트 알림 범위 정렬)
-**Version:** 3.38.71 (Service Host Notification Scope)
+**Last Updated:** 2026-03-15 (v3.38.82 체험 카드결제 서버 재검증 강화)
+**Version:** 3.38.82 (Experience Card Verification Hardening)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -65,6 +65,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - PayPal 체험 결제 2단계는 `/api/payment/paypal/create-order`, `/api/payment/paypal/capture-order` 서버 route만 추가하고, 기존 NicePay UI/콜백/취소 환불 경로는 건드리지 않는다. `capture-order`는 `payment_method='paypal'`, `tid=<captureId>`와 기존 예약 확정 정산 필드를 저장한다.
 - PayPal 체험 결제 3단계는 `app/experiences/[id]/payment/page.tsx`에만 `PayPal` 결제수단과 SDK 버튼을 연결한다. 기존 카드/NicePay 버튼과 무통장 입금 CTA는 유지하고, PayPal은 별도 버튼에서만 `/api/payment/paypal/create-order`와 `/api/payment/paypal/capture-order`를 사용한다. 공개 client id는 `NEXT_PUBLIC_PAYPAL_CLIENT_ID`만 사용한다.
 - PayPal 체험 결제 4단계는 `/api/payment/cancel`, `/api/admin/bookings/force-cancel`에서 `payment_method='paypal'`인 예약만 PayPal capture refund를 호출한다. 기존 NicePay 카드/무통장 취소 흐름은 유지한다.
+- 체험 NicePay 카드결제는 `/api/payment/nicepay-callback`에서 브라우저 성공 payload를 신뢰하지 않고, PortOne REST API 재조회(`imp_uid`)로 `status=paid`, `merchant_uid=bookings.order_id`, `amount=bookings.amount`를 모두 확인한 뒤에만 `bookings.status='PAID'`, `payment_method='card'`로 확정한다. 기존 좌석 재검증, 정산 스냅샷 저장, 호스트/관리자 알림 의미는 유지한다.
+- `/api/payment/card-ready`는 체험 카드결제 검증 준비 상태를 반환한다. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 체험 결제 페이지는 readiness가 false일 때 카드 결제를 비활성화하고 무통장/PayPal만 허용한다.
 - PayPal 서비스 결제 1단계는 `/api/services/payment/paypal/create-order`, `/api/services/payment/paypal/capture-order` 서버 route만 추가하고, 기존 서비스 NicePay UI/무통장/취소 환불 경로는 건드리지 않는다. `capture-order`는 `service_bookings.status='PAID'`, `payment_method='paypal'`, `tid=<captureId>`를 저장하고 `service_requests.status='open'`으로 전환한다.
 - PayPal 서비스 결제 2단계는 `app/services/[requestId]/payment/page.tsx`에만 `PayPal` 결제수단과 SDK 버튼을 연결한다. 기존 서비스 NicePay 카드 CTA와 무통장 입금 CTA는 유지하고, PayPal은 기존 pending `service_bookings`를 재사용해 `/api/services/payment/paypal/create-order`와 `/api/services/payment/paypal/capture-order`를 별도 버튼에서만 사용한다.
 - PayPal 서비스 결제 3단계는 `/api/services/cancel`, `/api/admin/service-cancel`에서 `payment_method='paypal'`인 서비스 예약만 PayPal capture refund endpoint를 호출한다. 기존 NicePay 카드 취소/무통장 취소 의미는 유지하고, `PAID + open` 상태의 서비스 고객 취소는 관리자 강제취소와 같은 error-safe 기준으로 PG 환불 성공 시에만 DB 상태를 `cancelled`로 바꾼다.
@@ -379,8 +381,8 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 
 - `isPendingPaymentServiceRequest` 유틸 사용 — raw 문자열 비교 금지
 - 잡보드 GET API: `status='open'` 필터 고정 — `pending_payment` 절대 노출 금지
-- IMP 클라이언트 콜백 시 `signData`/`ediDate` 비어있을 수 있음 → 비어있으면 서명 검증 건너뜀 (금액 검증으로 대체)
-- 기존 `/api/payment/nicepay-callback` 및 `experiences/bookings` 로직 일절 미변경
+- 체험 카드결제는 `signData`/`ediDate`를 신뢰하지 않는다. 브라우저는 `imp_uid`, `merchant_uid`, `orderId`만 보내고 `/api/payment/nicepay-callback`이 PortOne REST API 재조회로 실제 결제를 검증한 뒤에만 예약을 확정한다.
+- 체험 카드결제 준비 상태는 `/api/payment/card-ready`가 단일 source다. readiness가 false인 환경에서는 카드 버튼을 비활성화하고 무통장/PayPal만 허용한다.
 
 ---
 

@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.82 — [Experience Payment] 체험 카드결제 서버 재검증 강화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 PortOne 서버 재검증 전환 | `/api/payment/nicepay-callback`이 더 이상 브라우저의 성공 payload(`resCode`, `signData`, `ediDate`, `amount`)를 신뢰하지 않고, `imp_uid` 기준 PortOne REST API 재조회로 실제 결제 상태/주문번호/금액을 확인한 뒤에만 `bookings.status='PAID'`, `payment_method='card'`로 확정하도록 변경 |
+| 🟠 카드 readiness 추가 | 신규 `/api/payment/card-ready` 추가. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 체험 결제 페이지는 readiness가 false일 때 카드 버튼을 비활성화하고 무통장/PayPal로 fallback |
+| 🟠 체험 카드 exploit 보호막 | 신규 `tests/e2e/24-experience-card-verification.spec.ts` 추가 — 비로그인 카드 callback 시도는 401, 로그인 상태에서도 `imp_uid` 없는 fabricated success payload만으로는 `PENDING` 예약이 `PAID` 되지 않는지 직접 검증 |
+| 🟡 회귀 검증 | `tests/e2e/24-experience-card-verification.spec.ts`, `tests/e2e/23-live-guest-post-booking.spec.ts`, `npx tsc --noEmit`, `git diff --check` 기준으로 확인 |
+
 ## v3.38.81 — [Guest Booking] 예약 후 Trips / Receipt / Inbox 라이브 보호막 추가
 
 | 항목 | 내용 |

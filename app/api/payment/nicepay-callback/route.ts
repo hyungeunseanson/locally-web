@@ -1,209 +1,228 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
+
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
+import { getPortOnePayment } from '@/app/utils/portone/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
-function verifySignature(signData: string, ediDate: string, amount: string, mid: string, key: string): boolean {
-  try {
-    const data = ediDate + mid + amount + key;
-    const hash = crypto.createHash('sha256').update(data).digest('hex');
-    return hash === signData;
-  } catch (error) {
-    console.error('Signature verification failed:', error);
-    return false;
-  }
+type BookingNicePayCallbackBody = {
+  imp_uid?: string;
+  merchant_uid?: string;
+  orderId?: string;
+};
+
+function parsePortOneAmount(value: number | string | undefined) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export async function POST(request: Request) {
-  // [L-1] Removed debug log with sensitive info
-  console.log('🔒 [SECURE] Payment Callback Received');
+  console.log('🔒 [SECURE] Experience Payment Callback Received');
 
   try {
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
-    const MID = process.env.NICEPAY_MID;
+    const supabaseServer = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseServer.auth.getUser();
 
-    if (!SUPABASE_URL || !SERVICE_KEY || !MER_KEY || !MID) {
-      console.error('Missing Server Configuration');
-      return NextResponse.json({ error: 'Server Config Error' }, { status: 500 });
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    let resCode: string = '';
-    let amount: string = '';
-    let orderId: string = '';
-    let tid: string = '';
-    let signData: string = '';
-    let ediDate: string = '';
-
+    let impUid = '';
+    let orderId = '';
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('application/json')) {
-      const json = await request.json();
-      resCode = json.resCode || json.resultCode || '';
-      amount = (json.paid_amount || json.amount || '').toString();
-      orderId = json.merchant_uid || json.orderId || '';
-      tid = json.pg_tid || json.imp_uid || '';
-      signData = json.signData || '';
-      ediDate = json.ediDate || '';
+      const body = (await request.json()) as BookingNicePayCallbackBody;
+      impUid = (body.imp_uid || '').trim();
+      orderId = (body.merchant_uid || body.orderId || '').trim();
     } else {
       const formData = await request.formData();
-      resCode = formData.get('resCode')?.toString() || '';
-      amount = formData.get('amt')?.toString() || '';
-      orderId = formData.get('moid')?.toString() || '';
-      tid = formData.get('tid')?.toString() || '';
-      signData = formData.get('signData')?.toString() || '';
-      ediDate = formData.get('ediDate')?.toString() || '';
+      impUid = formData.get('imp_uid')?.toString().trim() || '';
+      orderId =
+        formData.get('merchant_uid')?.toString().trim() ||
+        formData.get('moid')?.toString().trim() ||
+        formData.get('orderId')?.toString().trim() ||
+        '';
     }
 
-    // [C-2] Security: Verify Signature
-    if (!verifySignature(signData, ediDate, amount, MID, MER_KEY)) {
-      console.error(`🚨 [SECURITY] Signature Mismatch! Order: ${orderId}`);
-      throw new Error('Invalid Signature');
+    if (!impUid || !orderId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing imp_uid or orderId' },
+        { status: 400 }
+      );
     }
 
-    if (resCode === '0000') {
-      const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+    const supabaseAdmin = createAdminClient();
+    const { data: originalBooking, error: bookingError } = await supabaseAdmin
+      .from('bookings')
+      .select('*, experiences (price, private_price, max_guests, host_id, title)')
+      .eq('order_id', orderId)
+      .maybeSingle();
 
-      // 1. DB 예약 정보 및 연결된 체험 정보(정원/가격) 조회
-      const { data: originalBooking } = await supabase
-        .from('bookings')
-        .select('*, experiences (price, private_price, max_guests)')
-        .eq('id', orderId)
-        .maybeSingle();
+    if (bookingError || !originalBooking) {
+      return NextResponse.json(
+        { success: false, error: '예약 정보를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
 
-      if (!originalBooking) throw new Error('예약 정보를 찾을 수 없습니다.');
+    if (originalBooking.user_id !== user.id) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
 
-      // 2. 이미 처리된 건인지 확인 (중복 방지)
-      if (BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(originalBooking.status)) {
-        return NextResponse.json({ success: true, message: 'Already processed' });
-      }
+    if (BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(originalBooking.status)) {
+      return NextResponse.json({ success: true, message: 'Already processed' });
+    }
 
-      // 🚨 [핵심 보안 1] 금액 검증 (1원 결제 위변조 원천 차단)
-      // 클라이언트가 보낸 값이 아니라, 예약 시점에 DB에 확정 저장된 금액(bookings.amount)을 기준으로 검증합니다.
-      // (호스트가 가격을 변경하더라도, 이미 예약된 건은 예약 당시 가격을 따라야 하기 때문입니다.)
-      const expectedAmount = Number(originalBooking.amount);
+    if (String(originalBooking.status || '').toUpperCase() !== 'PENDING') {
+      return NextResponse.json(
+        { success: false, error: '이미 처리된 예약이거나 결제 대기 상태가 아닙니다.' },
+        { status: 409 }
+      );
+    }
 
-      // PG사 승인 금액(amount)과 서버 찐 금액(expectedAmount) 비교
-      if (Number(amount) !== expectedAmount) {
-        console.error(`🚨 [보안 경고] 결제 금액 조작 시도! (주문: ${orderId}, 기대금액: ${expectedAmount}, 실제결제: ${amount})`);
-        throw new Error('결제 금액이 위변조되었습니다.');
-      }
+    const normalizedPaymentMethod = String(originalBooking.payment_method || '').toLowerCase();
+    if (normalizedPaymentMethod && normalizedPaymentMethod !== 'card') {
+      return NextResponse.json(
+        { success: false, error: '카드 결제 대기 예약만 카드 결제를 확정할 수 있습니다.' },
+        { status: 409 }
+      );
+    }
 
-      // 🚨 [핵심 보안 2] 잔여 좌석 트랜잭션 체크 (초과 예약 / Race Condition 차단)
-      // 결제를 승인하는 바로 이 순간(0.1초 차이)에 좌석이 남아있는지 최종 확인합니다.
-      const { data: existingBookings } = await supabase
-        .from('bookings')
-        .select('id, guests, type')
-        .eq('experience_id', originalBooking.experience_id)
-        .eq('date', originalBooking.date)
-        .eq('time', originalBooking.time)
-        .neq('id', orderId)
-        .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
+    const payment = await getPortOnePayment(impUid);
+    const verifiedMerchantUid = String(payment.merchant_uid || '').trim();
+    const verifiedAmount = parsePortOneAmount(payment.amount);
 
-      const currentBookedCount = existingBookings?.reduce((sum, b) => sum + (b.guests || 0), 0) || 0;
-      const hasPrivateBooking = existingBookings?.some(b => b.type === 'private');
-      const maxGuests = originalBooking.experiences?.max_guests || 10;
+    if (String(payment.status || '').toLowerCase() !== 'paid') {
+      return NextResponse.json(
+        { success: false, error: 'PortOne 결제 상태가 paid가 아닙니다.' },
+        { status: 400 }
+      );
+    }
 
-      if (hasPrivateBooking ||
-        (originalBooking.type === 'private' && currentBookedCount > 0) ||
-        (originalBooking.type !== 'private' && (currentBookedCount + originalBooking.guests > maxGuests))) {
-        console.error(`🚨 [보안 경고] 초과 예약(Overbooking) 발생! (주문: ${orderId})`);
-        throw new Error('잔여 좌석이 부족하여 예약을 확정할 수 없습니다. (결제 자동 취소 대상)');
-      }
+    const expectedOrderId = originalBooking.order_id || originalBooking.id;
+    const expectedAmount = Number(originalBooking.amount || 0);
 
-      console.log(`✅ [INFO] 금액 및 좌석 검증 완벽 통과 (DB: ${expectedAmount} == PG: ${amount})`);
+    if (verifiedMerchantUid !== expectedOrderId) {
+      return NextResponse.json(
+        { success: false, error: 'PortOne 주문번호가 예약과 일치하지 않습니다.' },
+        { status: 400 }
+      );
+    }
 
-      // 3. 예약 상태 및 정산 데이터 업데이트 (PAID)
-      // 💰 [정산 데이터 박제] 호스트 원가와 수수료 수익을 이 시점에 확정 기록합니다.
-      const snapshot = getBookingSettlementSnapshot({
-        ...originalBooking,
-        amount: Number(amount),
+    if (verifiedAmount !== expectedAmount) {
+      return NextResponse.json(
+        { success: false, error: 'PortOne 결제 금액이 예약 금액과 일치하지 않습니다.' },
+        { status: 400 }
+      );
+    }
+
+    const experienceMeta = Array.isArray(originalBooking.experiences)
+      ? originalBooking.experiences[0]
+      : originalBooking.experiences;
+
+    const { data: existingBookings } = await supabaseAdmin
+      .from('bookings')
+      .select('id, guests, type')
+      .eq('experience_id', originalBooking.experience_id)
+      .eq('date', originalBooking.date)
+      .eq('time', originalBooking.time)
+      .neq('id', originalBooking.id)
+      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
+
+    const currentBookedCount =
+      existingBookings?.reduce((sum, booking) => sum + Number(booking.guests || 0), 0) || 0;
+    const hasPrivateBooking = existingBookings?.some((booking) => booking.type === 'private');
+    const maxGuests = experienceMeta?.max_guests || 10;
+
+    if (
+      hasPrivateBooking ||
+      (originalBooking.type === 'private' && currentBookedCount > 0) ||
+      (originalBooking.type !== 'private' &&
+        currentBookedCount + Number(originalBooking.guests || 0) > maxGuests)
+    ) {
+      return NextResponse.json(
+        { success: false, error: '잔여 좌석이 부족하여 예약을 확정할 수 없습니다.' },
+        { status: 409 }
+      );
+    }
+
+    const snapshot = getBookingSettlementSnapshot({
+      ...originalBooking,
+      amount: expectedAmount,
+    });
+
+    const { data: bookingData, error: updateError } = await supabaseAdmin
+      .from('bookings')
+      .update({
+        status: 'PAID',
+        payment_method: 'card',
+        tid: payment.pg_tid || payment.imp_uid || impUid,
+        price_at_booking: snapshot.basePrice,
+        total_experience_price: snapshot.totalExperiencePrice,
+        host_payout_amount: snapshot.hostPayout,
+        platform_revenue: snapshot.platformRevenue,
+        payout_status: 'pending',
+      })
+      .eq('id', originalBooking.id)
+      .select('*, experiences (host_id, title)')
+      .maybeSingle();
+
+    if (updateError || !bookingData) {
+      throw new Error(updateError?.message || '결제 확정 업데이트에 실패했습니다.');
+    }
+
+    const bookingExperienceMeta = Array.isArray(bookingData.experiences)
+      ? bookingData.experiences[0]
+      : bookingData.experiences;
+    const expTitle = bookingExperienceMeta?.title || 'Locally 체험';
+    const resolvedHostId = bookingExperienceMeta?.host_id;
+    const guestName = bookingData.contact_name || '게스트';
+
+    if (resolvedHostId) {
+      await supabaseAdmin.from('notifications').insert({
+        user_id: resolvedHostId,
+        type: 'new_booking',
+        title: '🎉 새로운 예약 도착!',
+        message: `[${expTitle}] 체험에 ${guestName}님의 예약이 확정되었습니다.`,
+        link: '/host/dashboard',
+        is_read: false,
       });
 
-      const { data: bookingData, error: dbError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'PAID',
-          tid: tid,
-          price_at_booking: snapshot.basePrice,
-          total_experience_price: snapshot.totalExperiencePrice,
-          host_payout_amount: snapshot.hostPayout,
-          platform_revenue: snapshot.platformRevenue,
-          payout_status: 'pending'
-        })
-        .eq('id', orderId)
-        .select(`*, experiences (host_id, title)`)
-        .maybeSingle();
-
-      if (dbError) throw new Error(`DB Error: ${dbError.message}`);
-
-      // 4. 알림 및 이메일 발송 (정상 작동 유지)
-      if (bookingData) {
-        const hostId = bookingData.experiences?.host_id;
-        const expTitle = bookingData.experiences?.title;
-        const guestName = bookingData.contact_name || '게스트';
-
-        if (hostId) {
-          // (A) 알림 저장
-          await supabase.from('notifications').insert({
-            user_id: hostId,
-            type: 'new_booking',
-            title: '🎉 새로운 예약 도착!',
-            message: `[${expTitle}] 체험에 ${guestName}님의 예약이 확정되었습니다.`,
-            link: '/host/dashboard',
-            is_read: false
-          });
-
-          // (B) 이메일 발송 (이전과 동일 로직 복구)
-          let hostEmail = '';
-          const { data: hostProfile } = await supabase.from('profiles').select('email, name').eq('id', hostId).maybeSingle();
-          if (hostProfile?.email) {
-            hostEmail = hostProfile.email;
-          } else {
-            const { data: authData } = await supabase.auth.admin.getUserById(hostId);
-            if (authData?.user?.email) hostEmail = authData.user.email;
-          }
-
-          if (hostEmail) {
-            // Decoupled Email Sending (Non-blocking background push)
-            fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'booking_confirmation',
-                hostId,
-                guestName,
-                experienceTitle: expTitle,
-                guestsCount: bookingData.guests,
-                bookingDate: bookingData.date,
-                bookingTime: bookingData.time,
-                totalAmount: bookingData.amount || Number(amount)
-              })
-            }).catch(e => console.error('Background fetch to send-email failed:', e));
-          }
-        }
-
-        insertAdminAlerts({
-          title: '체험 예약 결제가 완료되었습니다',
-          message: `'${expTitle}' 예약 결제가 완료되었습니다. 게스트: ${guestName}`,
-          link: '/admin/dashboard?tab=LEDGER',
-        }).catch((adminAlertError) => {
-          console.error('Booking Payment Admin Alert Error:', adminAlertError);
-        });
-      }
-
-      return NextResponse.json({ success: true });
-
-    } else {
-      throw new Error(`PG사 응답코드 실패: ${resCode}`);
+      fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'booking_confirmation',
+          hostId: resolvedHostId,
+          guestName,
+          experienceTitle: expTitle,
+          guestsCount: bookingData.guests,
+          bookingDate: bookingData.date,
+          bookingTime: bookingData.time,
+          totalAmount: bookingData.amount || expectedAmount,
+        }),
+      }).catch((mailError) => console.error('Background fetch to send-email failed:', mailError));
     }
 
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Internal Server Error';
-    console.error('🔥 [DEBUG] 시스템 에러:', message);
+    insertAdminAlerts({
+      title: '체험 예약 결제가 완료되었습니다',
+      message: `'${expTitle}' 예약 결제가 완료되었습니다. 게스트: ${guestName}`,
+      link: '/admin/dashboard?tab=LEDGER',
+    }).catch((adminAlertError) => {
+      console.error('Booking Payment Admin Alert Error:', adminAlertError);
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : '결제 처리 중 서버 오류가 발생했습니다.';
+    console.error('🔥 [DEBUG] Experience payment callback error:', error);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

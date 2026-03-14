@@ -24,6 +24,7 @@ type PortOneRuntimeConfig = {
 };
 
 export type PortOnePayment = NonNullable<PortOnePaymentEnvelope['response']>;
+export type PortOneCardReadyReason = 'missing_portone_credentials' | 'missing_imp_code';
 
 export class PortOneConfigError extends Error {
   constructor(message: string) {
@@ -54,7 +55,7 @@ async function parsePortOneJson<T>(response: Response): Promise<T> {
   }
 }
 
-export function isPortOneServiceCardReady() {
+export function isPortOneCardReady() {
   const hasImpCode = Boolean(process.env.NEXT_PUBLIC_PORTONE_IMP_CODE);
   const hasCredentials = Boolean(process.env.PORTONE_API_KEY && process.env.PORTONE_API_SECRET);
 
@@ -75,6 +76,10 @@ export function isPortOneServiceCardReady() {
   return {
     ready: true as const,
   };
+}
+
+export function isPortOneServiceCardReady() {
+  return isPortOneCardReady();
 }
 
 export async function getPortOneAccessToken() {
