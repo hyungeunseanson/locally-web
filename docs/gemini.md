@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-15 (v3.38.90 JSON-LD 구조화 데이터 1차 마감)
-**Version:** 3.38.90 (Structured Data Finalization)
+**Last Updated:** 2026-03-15 (v3.38.91 크롤링 정책 정렬)
+**Version:** 3.38.91 (Crawl Policy Alignment)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -391,12 +391,13 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - `locally.vercel.app`, `locally-web.vercel.app`, `www.locally-travel.com` 같은 배포 도메인을 개별 파일에 하드코딩하지 않는다.
 - staging/transition 기간에는 `NEXT_PUBLIC_SITE_URL`만 현재 배포 도메인으로 유지하고, 최종 도메인 전환 시에는 env만 교체한다.
 - `/about`, `/search`, `/become-a-host`, `/help`, `/site-map`, `company/*`, `/services/intro` 같은 공개 랜딩/정보 페이지는 route-level metadata를 직접 가진다. 반대로 로그인 리다이렉트가 있는 `/services` 잡보드류는 공개 SEO 보강 대상이 아니라 private `noindex` 정리 대상으로 본다.
-- private 페이지(`app/account`, `app/guest/*`, `app/notifications`, `app/services`, `app/services/my`)는 `app/utils/seo.ts`의 `PRIVATE_NOINDEX_METADATA`를 단일 source로 사용해 `robots: noindex, nofollow`를 강제한다.
+- private 페이지(`app/login`, `app/account`, `app/guest/*`, `app/host/*`, `app/admin/*`, `app/notifications`, `app/services`, `app/services/my`)는 `app/utils/seo.ts`의 `PRIVATE_NOINDEX_METADATA`를 단일 source로 사용해 `robots: noindex, nofollow`를 강제한다.
 - `/community`처럼 필터 query를 쓰는 공개 목록은 canonical과 `alternates.languages`를 기본 목록 경로에 고정해 query 조합별 중복 신호를 만들지 않는다.
 - `sitemap.xml`은 dead path를 포함하지 않아야 하며, `/search`, `/community`, `/services/intro`, `/site-map` 같은 주요 공개 진입 페이지를 누락하지 않는다.
 - 정적 공개 URL의 sitemap `lastModified`는 매 요청 시각이 아니라 해당 라우트 소스 파일들의 실제 수정 시각(`fs.stat().mtime`) 기준으로 계산한다. 동적 체험 상세는 DB `updated_at`을 계속 사용한다.
 - 동적 상세 중 체험 상세는 `status='active' && is_active !== false`일 때만 indexable 메타를 유지하고, 그 외 상태는 `noindex`로 낮춘다. 서비스 의뢰 상세(`/services/[requestId]`)는 공유용 title/description은 유지하되 항상 `noindex`다.
 - JSON-LD는 `app/components/seo/JsonLd.tsx`와 `app/utils/structuredData.ts`를 통해 주입한다. 현재 범위는 홈(`Organization`, `WebSite` + `sameAs`), 공개 체험 상세(`Product` + `TouristTrip` 힌트), 커뮤니티 상세(`Article` + `BreadcrumbList`)까지이며, 실제 화면/DB에 존재하는 사실만 구조화 데이터에 넣는다.
+- `robots.txt`는 private UI를 차단하는 용도가 아니라, 크롤 불필요한 `/api/`만 `Disallow`한다. private UI 차단은 route-level `noindex`가 단일 source다.
 
 ---
 

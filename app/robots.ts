@@ -6,8 +6,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      // 관리자 페이지나 개인적인 페이지는 검색엔진 수집 차단
-      disallow: ['/admin/', '/host/dashboard/', '/guest/inbox/', '/api/'],
+      // private UI는 page-level noindex를 우선하고, robots.txt는 크롤 불필요한 API만 차단한다.
+      disallow: ['/api/'],
     },
     sitemap: buildAbsoluteUrl('/sitemap.xml'),
   };

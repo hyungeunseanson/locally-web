@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.91 — [SEO] 크롤링 정책 정렬
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 private UI noindex 범위 확장 | `app/host/layout.tsx` 추가, `app/admin/layout.tsx`와 `app/login/layout.tsx`에 `PRIVATE_NOINDEX_METADATA`를 연결해 host/admin/login UI도 page-level `noindex, nofollow` 기준으로 정렬 |
+| 🟠 robots 정책 단순화 | `app/robots.ts`는 private UI 경로 차단을 제거하고 `/api/`만 `Disallow`하도록 변경 — private 페이지는 robots.txt 차단 대신 page-level noindex를 single source로 사용 |
+| 🟡 private noindex 보호막 확대 | `tests/e2e/26-private-noindex.spec.ts`가 `/login`, `/host/register`까지 `robots noindex,nofollow`를 직접 검증하도록 확장 |
+| 🟡 robots 보호막 추가 | `tests/e2e/30-robots-policy.spec.ts` 추가 — `/robots.txt`가 `/api/`만 차단하고 `/admin/`, `/host/dashboard/`, `/guest/inbox/`를 더 이상 disallow하지 않는지 확인 |
+
 ## v3.38.90 — [SEO] JSON-LD 구조화 데이터 1차 마감
 
 | 항목 | 내용 |

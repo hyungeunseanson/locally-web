@@ -6,6 +6,9 @@ import Sidebar from "@/app/admin/dashboard/components/Sidebar";
 import GlobalTeamChat from "@/app/admin/dashboard/components/GlobalTeamChat";
 import { createAdminClient } from "@/app/utils/supabase/admin";
 import { resolveAdminAccess } from "@/app/utils/adminAccess";
+import { PRIVATE_NOINDEX_METADATA } from "@/app/utils/seo";
+
+export const metadata = PRIVATE_NOINDEX_METADATA;
 
 export default async function AdminLayout({
   children,

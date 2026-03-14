@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 
 const PRIVATE_PATHS = [
+  '/login',
   '/account',
   '/guest/trips',
   '/guest/inbox',
   '/guest/wishlists',
+  '/host/register',
   '/notifications',
   '/services',
   '/services/my',
