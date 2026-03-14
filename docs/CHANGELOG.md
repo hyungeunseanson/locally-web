@@ -5,7 +5,17 @@
 
 ---
 
+## v3.38.72 — [Master Ledger] 강제 취소 중복 환불 방지 (Phase A)
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 중복 환불 방지 마커 | PG 환불 API 호출 **직전** DB `cancel_reason`에 `[환불처리중]` 마커 기록. PG 성공 + DB 업데이트 실패 후 관리자 재시도 시 마커 감지 → 409 차단 → 중복 환불 방지 |
+| 🔴 `cancel_reason` select 추가 | force-cancel select 쿼리에 `cancel_reason` 누락 수정 → 마커 감지 가능 |
+| 🟡 최종 정상 완료 시 | 마커 자동 제거 + `(관리자 강제 취소)` 사유로 교체 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.71 — [Master Ledger] 보안·데이터 정합성 교정 4건
+
 
 | 항목 | 내용 |
 | --- | --- |
