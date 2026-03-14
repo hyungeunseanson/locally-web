@@ -12,3 +12,7 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_user_id ON public.analytics_even
 CREATE INDEX IF NOT EXISTS idx_search_logs_session_id ON public.search_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_search_logs_created_at ON public.search_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_search_logs_user_id ON public.search_logs(user_id);
+
+-- 복합 인덱스: 세션별 시간순 조회 최적화 (analytics-search-intent API)
+CREATE INDEX IF NOT EXISTS idx_analytics_events_session_created ON public.analytics_events(session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_search_logs_session_created ON public.search_logs(session_id, created_at DESC);

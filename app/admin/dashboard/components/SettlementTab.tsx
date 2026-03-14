@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { DollarSign, CheckCircle, User, ChevronDown, ChevronUp, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
+import { settleHostPayout } from '@/app/actions/admin';
 
 export default function SettlementTab() {
   const supabase = createClient();
@@ -14,8 +15,8 @@ export default function SettlementTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
 
-  // 데이터 불러오기 (호스트별 그룹화)
-  const fetchSettlements = async () => {
+  // useCallback으로 감싸 의존성 명시 — React StrictMode 이중 실행 방지
+  const fetchSettlements = useCallback(async () => {
     setIsLoading(true);
 
     // 1. 정산 대상 조회: (완료됨 OR 취소됐는데 줄 돈 있음) AND (아직 미지급)
@@ -84,8 +85,6 @@ export default function SettlementTab() {
       const group = grouped.get(hostId);
 
       // 💰 [정산금 계산 로직]
-      // 1. DB에 host_payout_amount가 있으면(취소위약금 등) 그걸 씀.
-      // 2. 없으면(정상 완료 건), 결제액의 80% (수수료 20% 제외) 지급.
       const payout = getBookingHostPayout(b);
 
       group.items.push({ ...b, calculated_payout: payout });
@@ -94,28 +93,25 @@ export default function SettlementTab() {
 
     setSettlements(Array.from(grouped.values()));
     setIsLoading(false);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchSettlements();
   }, []);
 
-  // 정산 완료 처리 (입금 확인)
+  // 정산 완료 처리: settleHostPayout Server Action 사용 (감사로그 + 이중 정산 방지 내장)
   const markAsPaid = async (hostId: string, itemIds: string[]) => {
     if (!confirm(`총 ${itemIds.length}건에 대해 이체를 완료하셨습니까?\n확인 시 '지급 완료' 상태로 변경되며 목록에서 사라집니다.`)) return;
 
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ payout_status: 'paid' }) // paid로 변경
-        .in('id', itemIds);
-
-      if (error) throw error;
+      const result = await settleHostPayout(itemIds);
+      if (!result.success) throw new Error(result.error || 'Server error');
 
       showToast('정산 완료 처리되었습니다.', 'success');
-      fetchSettlements(); // 목록 새로고침
-    } catch (e) {
-      alert('처리 중 오류가 발생했습니다.');
+      fetchSettlements();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '처리 중 오류가 발생했습니다.';
+      showToast(msg, 'error');
     }
   };
 

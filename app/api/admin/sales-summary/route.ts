@@ -108,7 +108,7 @@ export async function GET(request: Request) {
     let serviceSummaryQuery = supabaseAdmin
       .from('service_bookings')
       .select('amount, host_payout_amount, platform_revenue, status, created_at, payout_status')
-      .in('status', ['PAID', 'confirmed', 'completed'])
+      .in('status', ['confirmed', 'completed'])
       .order('created_at', { ascending: false });
 
     if (startAt) {
@@ -117,6 +117,11 @@ export async function GET(request: Request) {
 
     if (endAt) {
       serviceSummaryQuery = serviceSummaryQuery.lte('created_at', endAt);
+    }
+
+    if (!startAt && !endAt) {
+      bookingsQuery = bookingsQuery.limit(1000);
+      serviceSummaryQuery = serviceSummaryQuery.limit(1000);
     }
 
     const [{ data: salesBookings, error: bookingsError }, { data: serviceSummaryRows, error: serviceSummaryError }] = await Promise.all([

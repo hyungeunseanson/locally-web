@@ -5,6 +5,26 @@
 
 ---
 
+## v3.38.76 — [Analytics] booking_confirmed 사용자 추적 강화 + 복합 인덱스 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 Fix B: booking_confirmed user_id 수정 | `payment/complete/page.tsx`의 `analytics_events` insert에서 `user_id: null` 하드코딩 → `booking.user_id ?? null` 으로 교체. 결제 완료 이벤트에 실제 사용자 ID 포함 |
+| 🟡 Fix C: analytics 복합 인덱스 추가 | `supabase_analytics_indexes.sql`에 `(session_id, created_at DESC)` 복합 인덱스 2개 추가 — `analytics-search-intent` API의 세션별 시간순 조회 최적화 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
+## v3.38.75 — [Analytics] Phase 2 리팩터링 + [Billing] GMV 집계 교정
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 Analytics Phase 2 리팩터링 | `AnalyticsTab.tsx` 1,820줄 → 1,284줄 (-536줄). `AnalyticsBusinessSection.tsx`, `AnalyticsHostSection.tsx` 각각 신규 분리 |
+| 🟠 helpers.tsx 신규 | `SimpleKpi`, `FunnelBar`, `SimpleBar` 컴포넌트를 `analytics/helpers.tsx`로 추출 |
+| 🔴 TDZ 버그 수정 | `searchTrendItems` 변수가 `stats` useState 선언 이전에 위치 → `ReferenceError` 발생. stats 선언 이후로 이동 |
+| 🟡 `customerCompositionCacheRef` 초기값 복원 | 편집 중 `= {}` 누락 → `undefined ref` 타입 오류 발생. `= {}` 복원 |
+| 🟠 GMV 집계 기준 통일 | `sales-summary` API: `service_bookings` 필터에서 `'PAID'` 제거 → `['confirmed', 'completed']`만 포함. 체험 예약 기준과 통일 |
+| 🟡 sales-summary limit 추가 | 날짜 범위 미지정(ALL) 시 `bookings`, `service_bookings` 각 1,000건 limit 적용. 데이터 누적에 따른 무제한 쿼리 방지 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.74 — [Billing & Revenue] settleHostPayout 보안 강화
 
 | 항목 | 내용 |

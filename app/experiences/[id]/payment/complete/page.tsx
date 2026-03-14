@@ -87,7 +87,7 @@ function PaymentCompleteContent() {
           supabase.from('analytics_events').insert([{
             event_type: 'booking_confirmed',
             target_id: String(experienceId),
-            user_id: null,
+            user_id: (data as any).user_id ?? null,
             ...getAnalyticsTrackingMetadata(),
           }]).then(({ error }) => {
             if (error) console.error('booking_confirmed event error:', error);
