@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.90 — [SEO] JSON-LD 구조화 데이터 1차 마감
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 홈 `sameAs` 보강 | `app/utils/structuredData.ts`의 `Organization` JSON-LD에 실제 사이트 푸터/계정 화면과 동일한 Instagram 4개 계정과 Naver Blog를 `sameAs`로 추가 |
+| 🟠 체험 상세 여행형 힌트 확장 | 공개 체험 상세 `Product` JSON-LD에 `additionalType: TouristTrip`, `location`, `audience`를 추가해 로컬 체험/여행 상품 맥락을 더 분명히 전달 |
+| 🟠 커뮤니티 상세 BreadcrumbList 추가 | `app/community/[id]/page.tsx`에 `Home → Community → 게시글` 구조의 `BreadcrumbList` JSON-LD를 추가해 글 상세 문맥을 검색엔진에 명시 |
+| 🟡 보호막 보강 | `tests/e2e/28-json-ld.spec.ts`가 홈 `sameAs`, 체험 상세 `TouristTrip` 힌트, 커뮤니티 상세 `BreadcrumbList`까지 직접 검증하도록 확장 |
+
 ## v3.38.89 — [SEO] Sitemap lastModified 현실화
 
 | 항목 | 내용 |

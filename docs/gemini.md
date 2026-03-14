@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-15 (v3.38.89 Sitemap lastModified 현실화)
-**Version:** 3.38.89 (Sitemap LastModified Realization)
+**Last Updated:** 2026-03-15 (v3.38.90 JSON-LD 구조화 데이터 1차 마감)
+**Version:** 3.38.90 (Structured Data Finalization)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -396,7 +396,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - `sitemap.xml`은 dead path를 포함하지 않아야 하며, `/search`, `/community`, `/services/intro`, `/site-map` 같은 주요 공개 진입 페이지를 누락하지 않는다.
 - 정적 공개 URL의 sitemap `lastModified`는 매 요청 시각이 아니라 해당 라우트 소스 파일들의 실제 수정 시각(`fs.stat().mtime`) 기준으로 계산한다. 동적 체험 상세는 DB `updated_at`을 계속 사용한다.
 - 동적 상세 중 체험 상세는 `status='active' && is_active !== false`일 때만 indexable 메타를 유지하고, 그 외 상태는 `noindex`로 낮춘다. 서비스 의뢰 상세(`/services/[requestId]`)는 공유용 title/description은 유지하되 항상 `noindex`다.
-- JSON-LD는 `app/components/seo/JsonLd.tsx`와 `app/utils/structuredData.ts`를 통해 주입한다. 1차 범위는 홈(`Organization`, `WebSite`), 공개 체험 상세(`Product`), 커뮤니티 상세(`Article`)까지이며, 실제 화면/DB에 존재하는 사실만 구조화 데이터에 넣는다.
+- JSON-LD는 `app/components/seo/JsonLd.tsx`와 `app/utils/structuredData.ts`를 통해 주입한다. 현재 범위는 홈(`Organization`, `WebSite` + `sameAs`), 공개 체험 상세(`Product` + `TouristTrip` 힌트), 커뮤니티 상세(`Article` + `BreadcrumbList`)까지이며, 실제 화면/DB에 존재하는 사실만 구조화 데이터에 넣는다.
 
 ---
 

@@ -203,17 +203,23 @@ test.describe('JSON-LD smoke', () => {
     const homeJsonLd = await page.locator('script[type="application/ld+json"]').allTextContents();
     expect(homeJsonLd.some((content) => content.includes('"@type":"Organization"'))).toBeTruthy();
     expect(homeJsonLd.some((content) => content.includes('"@type":"WebSite"'))).toBeTruthy();
+    expect(homeJsonLd.some((content) => content.includes('instagram.com/locally.official'))).toBeTruthy();
+    expect(homeJsonLd.some((content) => content.includes('blog.naver.com/locally-travel'))).toBeTruthy();
 
     await page.goto(`/experiences/${experience.id}`, { waitUntil: 'domcontentloaded' });
 
     const experienceJsonLd = await page.locator('script[type="application/ld+json"]').allTextContents();
     expect(experienceJsonLd.some((content) => content.includes('"@type":"Product"'))).toBeTruthy();
     expect(experienceJsonLd.some((content) => content.includes(`"sku":"experience-${experience.id}"`))).toBeTruthy();
+    expect(experienceJsonLd.some((content) => content.includes('"additionalType":"https://schema.org/TouristTrip"'))).toBeTruthy();
+    expect(experienceJsonLd.some((content) => content.includes('"audienceType":"Travelers"'))).toBeTruthy();
 
     await page.goto(`/community/${communityPost.id}`, { waitUntil: 'domcontentloaded' });
 
     const articleJsonLd = await page.locator('script[type="application/ld+json"]').allTextContents();
     expect(articleJsonLd.some((content) => content.includes('"@type":"Article"'))).toBeTruthy();
     expect(articleJsonLd.some((content) => content.includes(communityPost.title))).toBeTruthy();
+    expect(articleJsonLd.some((content) => content.includes('"@type":"BreadcrumbList"'))).toBeTruthy();
+    expect(articleJsonLd.some((content) => content.includes('"name":"커뮤니티"'))).toBeTruthy();
   });
 });

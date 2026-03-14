@@ -2,6 +2,14 @@ import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl
 
 type Locale = 'ko' | 'en' | 'ja' | 'zh';
 
+const LOCALLY_SAME_AS = [
+  'https://www.instagram.com/locally.official/',
+  'https://www.instagram.com/locally.experience/',
+  'https://www.instagram.com/locally.japan/',
+  'https://www.instagram.com/locally.partners/',
+  'https://blog.naver.com/locally-travel',
+];
+
 type ExperienceStructuredDataArgs = {
   id: string | number;
   locale: Locale;
@@ -41,6 +49,7 @@ export function buildOrganizationJsonLd(locale: Locale) {
     url: buildAbsoluteUrl('/'),
     logo: buildAbsoluteUrl('/images/logo.png'),
     description: descriptions[locale],
+    sameAs: LOCALLY_SAME_AS,
   };
 }
 
@@ -79,6 +88,7 @@ export function buildExperienceProductJsonLd({
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
+    additionalType: 'https://schema.org/TouristTrip',
     name: title,
     description: description || undefined,
     image: [imageUrl],
@@ -101,6 +111,21 @@ export function buildExperienceProductJsonLd({
           name: country ? `${city}, ${country}` : city,
         }
       : undefined,
+    location:
+      city || country
+        ? {
+            '@type': 'Place',
+            address: {
+              '@type': 'PostalAddress',
+              addressLocality: city || undefined,
+              addressCountry: country || undefined,
+            },
+          }
+        : undefined,
+    audience: {
+      '@type': 'Audience',
+      audienceType: 'Travelers',
+    },
     offers:
       typeof price === 'number'
         ? {
@@ -147,5 +172,18 @@ export function buildCommunityArticleJsonLd({
         url: buildAbsoluteUrl('/images/logo.png'),
       },
     },
+  };
+}
+
+export function buildBreadcrumbJsonLd(items: Array<{ name: string; item: string }>) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((entry, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: entry.name,
+      item: entry.item,
+    })),
   };
 }

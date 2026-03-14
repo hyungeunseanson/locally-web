@@ -13,7 +13,7 @@ import ShareButton from '../components/ShareButton';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
-import { buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
+import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -125,16 +125,23 @@ export default async function CommunityPostDetail({
     return (
         <>
             <JsonLd
-                data={buildCommunityArticleJsonLd({
-                    title: post.title,
-                    description: articleDescription,
-                    url: pageUrl,
-                    imageUrl: articleImage,
-                    authorName,
-                    datePublished: post.created_at,
-                    dateModified: post.updated_at,
-                    section: post.category,
-                })}
+                data={[
+                    buildCommunityArticleJsonLd({
+                        title: post.title,
+                        description: articleDescription,
+                        url: pageUrl,
+                        imageUrl: articleImage,
+                        authorName,
+                        datePublished: post.created_at,
+                        dateModified: post.updated_at,
+                        section: post.category,
+                    }),
+                    buildBreadcrumbJsonLd([
+                        { name: 'Home', item: buildAbsoluteUrl('/') },
+                        { name: '커뮤니티', item: buildAbsoluteUrl('/community') },
+                        { name: post.title, item: pageUrl },
+                    ]),
+                ]}
             />
             {/* 데스크탑: max-w-7xl 2컬럼 / 모바일: max-w-[768px] 단일 컬럼 */}
             <div className="min-h-screen bg-[#F7F7F9]">
