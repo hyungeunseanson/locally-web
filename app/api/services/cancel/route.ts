@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import crypto from 'crypto';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
@@ -9,6 +9,118 @@ type CancelBody = {
   order_id?: string;
   cancel_reason?: string;
 };
+
+type RefundResult =
+  | { ok: true; refundAmount: number }
+  | { ok: false; error: string; status: number };
+
+async function refundPaidOpenServiceBooking(
+  booking: { amount: number | null; order_id: string; payment_method: string | null; tid: string | null },
+  cancelReason: string
+): Promise<RefundResult> {
+  const refundAmount = Number(booking.amount || 0);
+
+  if (refundAmount <= 0) {
+    return { ok: true, refundAmount: 0 };
+  }
+
+  if (booking.payment_method === 'paypal') {
+    if (!booking.tid) {
+      return {
+        ok: false,
+        error: 'PayPal 환불 정보가 없어 취소를 완료할 수 없습니다. 관리자에게 문의해주세요.',
+        status: 400,
+      };
+    }
+
+    try {
+      const refund = await refundPayPalCapture(booking.tid, refundAmount, 'KRW');
+      if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
+        return {
+          ok: false,
+          error: `PayPal 환불 거절: ${refund.status || '알 수 없는 상태'}`,
+          status: 400,
+        };
+      }
+
+      return { ok: true, refundAmount };
+    } catch (error) {
+      console.error('[SERVICE] PayPal refund exception:', error);
+      return {
+        ok: false,
+        error: 'PayPal 환불 오류로 취소를 완료하지 못했습니다. DB 상태는 변경되지 않았습니다.',
+        status: 500,
+      };
+    }
+  }
+
+  const MID = process.env.NICEPAY_MID;
+  const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
+
+  if (!MID || !MER_KEY || !booking.tid) {
+    return {
+      ok: false,
+      error: '카드 환불 정보가 없어 취소를 완료하지 못했습니다. 관리자에게 문의해주세요.',
+      status: 500,
+    };
+  }
+
+  try {
+    const ediDate = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    const signData = crypto
+      .createHash('sha256')
+      .update(ediDate + MID + String(refundAmount) + MER_KEY)
+      .digest('hex');
+
+    const cancelParams = new URLSearchParams({
+      MID,
+      TID: booking.tid,
+      Moid: booking.order_id,
+      CancelAmt: String(refundAmount),
+      CancelMsg: cancelReason,
+      PartialCancelCode: '0',
+      EdiDate: ediDate,
+      SignData: signData,
+    });
+
+    const cancelRes = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: cancelParams.toString(),
+    });
+
+    if (!cancelRes.ok) {
+      console.error('[SERVICE] NicePay cancel HTTP error:', cancelRes.status);
+      return {
+        ok: false,
+        error: `NicePay API 오류 (HTTP ${cancelRes.status}). DB 상태는 변경되지 않았습니다.`,
+        status: 500,
+      };
+    }
+
+    const resText = await cancelRes.text();
+    const resParams = new URLSearchParams(resText);
+    const resultCode = resParams.get('ResultCode');
+    if (resultCode && resultCode !== '2001' && resultCode !== '2030') {
+      const resultMsg = resParams.get('ResultMsg') || '알 수 없는 오류';
+      console.error('[SERVICE] NicePay cancel ResultCode:', resultCode, resultMsg);
+      return {
+        ok: false,
+        error: `NicePay 환불 거절: ${resultMsg}`,
+        status: 400,
+      };
+    }
+
+    return { ok: true, refundAmount };
+  } catch (error) {
+    console.error('[SERVICE] NicePay cancel exception:', error);
+    return {
+      ok: false,
+      error: 'NicePay 환불 네트워크 오류로 취소를 완료하지 못했습니다. DB 상태는 변경되지 않았습니다.',
+      status: 500,
+    };
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -26,9 +138,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '주문 번호가 필요합니다.' }, { status: 400 });
     }
 
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const supabaseAdmin = createAdminClient();
 
     // 1. service_bookings 조회 (service_requests.status 포함)
     const { data: booking, error: bookingError } = await supabaseAdmin
@@ -94,55 +204,23 @@ export async function POST(request: Request) {
 
     // 5. PAID + open (호스트 미선택) → NicePay 전액 환불
     if (booking.status === 'PAID' && requestStatus === 'open') {
-      const MID = process.env.NICEPAY_MID;
-      const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
+      const refundResult = await refundPaidOpenServiceBooking(
+        {
+          amount: booking.amount,
+          order_id: booking.order_id,
+          payment_method: booking.payment_method,
+          tid: booking.tid,
+        },
+        cancel_reason
+      );
 
-      if (booking.payment_method === 'paypal' && booking.tid) {
-        try {
-          const refund = await refundPayPalCapture(booking.tid, Number(booking.amount || 0), 'KRW');
-          if (!refund.status || !['COMPLETED', 'PENDING'].includes(refund.status)) {
-            console.error('[SERVICE] PayPal refund unexpected status:', refund.status);
-          }
-        } catch (e) {
-          console.error('[SERVICE] PayPal refund exception:', e);
-        }
-      } else if (MID && MER_KEY && booking.tid) {
-        try {
-          const ediDate = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-          const signData = crypto
-            .createHash('sha256')
-            .update(ediDate + MID + String(booking.amount) + MER_KEY)
-            .digest('hex');
-          const cancelParams = new URLSearchParams({
-            MID,
-            TID: booking.tid,
-            Moid: booking.order_id,
-            CancelAmt: String(booking.amount),
-            CancelMsg: cancel_reason,
-            PartialCancelCode: '0',
-            EdiDate: ediDate,
-            SignData: signData,
-          });
-          const cancelRes = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: cancelParams.toString(),
-          });
-          if (!cancelRes.ok) {
-            console.error('[SERVICE] NicePay cancel API error:', cancelRes.status);
-          }
-        } catch (e) {
-          console.error('[SERVICE] NicePay cancel exception:', e);
-        }
-      } else if (booking.payment_method === 'paypal') {
-        console.warn('[SERVICE] PayPal cancel: capture id missing — manual refund required');
-      } else {
-        console.warn('[SERVICE] NicePay cancel: env vars or TID missing — manual refund required');
+      if (!refundResult.ok) {
+        return NextResponse.json({ success: false, error: refundResult.error }, { status: refundResult.status });
       }
 
       await supabaseAdmin
         .from('service_bookings')
-        .update({ status: 'cancelled', cancel_reason, refund_amount: booking.amount })
+        .update({ status: 'cancelled', cancel_reason, refund_amount: refundResult.refundAmount })
         .eq('order_id', order_id);
       await supabaseAdmin
         .from('service_requests')
