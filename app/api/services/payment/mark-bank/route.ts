@@ -21,12 +21,24 @@ export async function POST(request: Request) {
     // 본인 소유 PENDING 예약인지 확인
     const { data: booking } = await supabaseAdmin
       .from('service_bookings')
-      .select('id, customer_id, status')
+      .select('id, customer_id, status, payment_method')
       .eq('order_id', orderId)
       .maybeSingle();
 
     if (!booking || booking.customer_id !== user.id || booking.status !== 'PENDING') {
       return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    const currentMethod = (booking.payment_method || '').toLowerCase();
+    if (currentMethod === 'bank') {
+      return NextResponse.json({ success: true, alreadyMarked: true });
+    }
+
+    if (currentMethod && currentMethod !== 'bank') {
+      return NextResponse.json(
+        { success: false, error: '이미 다른 결제수단으로 진행 중인 예약입니다.' },
+        { status: 409 }
+      );
     }
 
     const { error } = await supabaseAdmin

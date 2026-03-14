@@ -60,6 +60,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Already processed' });
     }
 
+    if ((booking.payment_method || '').toLowerCase() === 'bank') {
+      return NextResponse.json(
+        { success: false, error: '무통장 입금 대기 예약에는 PayPal 결제를 확정할 수 없습니다.' },
+        { status: 409 }
+      );
+    }
+
     const expectedOrderId = booking.order_id || booking.id;
     const expectedAmount = Number(booking.amount || 0);
 

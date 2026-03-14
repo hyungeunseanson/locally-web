@@ -76,6 +76,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if ((serviceBooking.payment_method || '').toLowerCase() === 'bank') {
+      return NextResponse.json(
+        { success: false, error: '무통장 입금 대기 예약에는 카드 결제를 확정할 수 없습니다.' },
+        { status: 409 }
+      );
+    }
+
     const payment = await getPortOnePayment(impUid);
     const verifiedMerchantUid = String(payment.merchant_uid || '').trim();
     const verifiedAmount = parsePortOneAmount(payment.amount);

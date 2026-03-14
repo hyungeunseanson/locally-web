@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-14 (v3.38.69 서비스 고객 취소 error-safe 정렬)
-**Version:** 3.38.69 (Service Customer Cancel Error-Safe)
+**Last Updated:** 2026-03-14 (v3.38.70 서비스 결제수단 재진입 락 정렬)
+**Version:** 3.38.70 (Service Payment Method Lock)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -48,7 +48,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/service-requests`: 관리자 맞춤 의뢰 수정 API (`pending_payment/open` 상태만 수정 허용 + audit log)
 - `/api/admin/sidebar-counts`: RLS 우회용 사이드바 배지 카운트 서버 API (v3.9.3, 승인/예약/서비스 무통장/CS 미답변 + 현재 로그인 관리자 `admin_alert` unread count 포함). `pendingBookingIds`는 서버가 내려주고, `Master Ledger` badge의 로컬 열람 상태(`viewed_booking_ids`)는 클라이언트 공용 helper에서 stale id를 정리한 뒤 계산한다.
 - 관리자 대시보드의 핵심/레거시 승인 경로(`APPROVALS`, `APPS`, `EXPS`)는 모두 `useAdminApprovalsData()`를 사용하고, `useAdminData()`는 더 이상 실제 렌더 경로에서 사용하지 않는다.
-- `/api/services/payment/mark-bank`: 무통장 선택 시 payment_method='bank' 저장 (v3.9.2)
+- `/api/services/payment/mark-bank`: 무통장 선택 시 payment_method='bank' 저장 (v3.9.2, 이미 bank면 idempotent success / 다른 결제수단이 지정된 PENDING 예약이면 409)
 - `utils/paypal/server.ts`: PayPal 고객 결제 1단계 공통 서버 유틸 (access token / order create / order get / order capture). 기존 NicePay 결제 경로와 분리 유지
 - `/api/payment/paypal/create-order`: 체험 예약 PayPal 주문 생성 API (예약 소유권/상태/금액 검증 후 PayPal order 발급)
 - `/api/payment/paypal/capture-order`: 체험 예약 PayPal 승인 확정 API (PayPal order 검증 + capture + 기존 NicePay와 동일한 예약 확정/정산 데이터 반영)
@@ -69,6 +69,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - PayPal 서비스 결제 2단계는 `app/services/[requestId]/payment/page.tsx`에만 `PayPal` 결제수단과 SDK 버튼을 연결한다. 기존 서비스 NicePay 카드 CTA와 무통장 입금 CTA는 유지하고, PayPal은 기존 pending `service_bookings`를 재사용해 `/api/services/payment/paypal/create-order`와 `/api/services/payment/paypal/capture-order`를 별도 버튼에서만 사용한다.
 - PayPal 서비스 결제 3단계는 `/api/services/cancel`, `/api/admin/service-cancel`에서 `payment_method='paypal'`인 서비스 예약만 PayPal capture refund endpoint를 호출한다. 기존 NicePay 카드 취소/무통장 취소 의미는 유지하고, `PAID + open` 상태의 서비스 고객 취소는 관리자 강제취소와 같은 error-safe 기준으로 PG 환불 성공 시에만 DB 상태를 `cancelled`로 바꾼다.
 - 서비스 NicePay 카드결제는 `/api/services/payment/nicepay-callback`에서 브라우저 성공 payload를 신뢰하지 않고, PortOne REST API 재조회(`imp_uid`)로 `status=paid`, `merchant_uid=service_bookings.order_id`, `amount=service_bookings.amount`를 모두 확인한 뒤에만 `service_bookings.status='PAID'`, `payment_method='card'`, `service_requests.status='open'`으로 확정한다.
+- 서비스 결제 페이지는 pending `service_bookings.payment_method`를 함께 읽는다. 이미 `payment_method='bank'`로 표시된 `PENDING` 예약은 UI에서 무통장으로 고정되고, `/api/services/payment/nicepay-callback` 및 `/api/services/payment/paypal/capture-order`도 같은 예약에 대한 카드/PayPal 확정을 거부한다.
 - `/api/services/payment/card-ready`는 서비스 카드결제 검증 준비 상태를 반환한다. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 서비스 결제 페이지는 readiness가 false일 때 카드 결제를 비활성화하고 무통장/PayPal만 허용한다.
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics의 `Review Quality`, `운영 감사 로그`는 이제 브라우저 직접 select 대신 각각 `/api/admin/reviews`, `/api/admin/audit-logs`를 초기 읽기 source로 사용한다. 현재 실시간성은 감사 로그 INSERT 구독만 클라이언트에 남겨둔다.

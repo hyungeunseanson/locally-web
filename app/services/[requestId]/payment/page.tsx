@@ -44,6 +44,7 @@ type PendingBooking = {
   order_id: string;
   amount: number;
   status: string;
+  payment_method: string | null;
 };
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
@@ -126,6 +127,7 @@ function ServicePaymentContent() {
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
   const isPayPalEnabled = Boolean(paypalClientId);
   const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
+  const isBankLockedBooking = (pendingBooking?.payment_method || '').toLowerCase() === 'bank';
 
   const getCheckoutValidationError = useCallback(() => {
     if (!contactName.trim() || !contactPhone.trim()) {
@@ -157,7 +159,7 @@ function ServicePaymentContent() {
     // v2 에스크로: 사전 생성된 PENDING 예약 조회
     const { data: booking } = await supabase
       .from('service_bookings')
-      .select('id, order_id, amount, status')
+      .select('id, order_id, amount, status, payment_method')
       .eq('request_id', requestId)
       .eq('customer_id', user.id)
       .eq('status', 'PENDING')
@@ -217,12 +219,21 @@ function ServicePaymentContent() {
   }, []);
 
   useEffect(() => {
+    if (isBankLockedBooking && paymentMethod !== 'bank') {
+      setPaymentMethod('bank');
+      return;
+    }
+
     if (!isPayPalEnabled && paymentMethod === 'paypal') {
       setPaymentMethod('card');
     }
-  }, [isPayPalEnabled, paymentMethod]);
+  }, [isBankLockedBooking, isPayPalEnabled, paymentMethod]);
 
   useEffect(() => {
+    if (isBankLockedBooking) {
+      return;
+    }
+
     if (!isCardReadyResolved || isCardReady || paymentMethod !== 'card') {
       return;
     }
@@ -233,7 +244,7 @@ function ServicePaymentContent() {
     }
 
     setPaymentMethod('bank');
-  }, [isCardReady, isCardReadyResolved, isPayPalEnabled, paymentMethod]);
+  }, [isBankLockedBooking, isCardReady, isCardReadyResolved, isPayPalEnabled, paymentMethod]);
 
   useEffect(() => {
     if (paymentMethod !== 'paypal') {
@@ -255,6 +266,13 @@ function ServicePaymentContent() {
 
       if (!pendingBooking) {
         const message = t('sp_err_info') as string;
+        setPaymentError(message);
+        showToast(message, 'error');
+        throw new Error(message);
+      }
+
+      if ((pendingBooking.payment_method || '').toLowerCase() === 'bank') {
+        const message = '이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.';
         setPaymentError(message);
         showToast(message, 'error');
         throw new Error(message);
@@ -405,6 +423,14 @@ function ServicePaymentContent() {
       }
 
       const { data: { user } } = await supabase.auth.getUser();
+      if ((currentBooking.payment_method || '').toLowerCase() === 'bank') {
+        const message = '이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.';
+        setPaymentError(message);
+        showToast(message, 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       if (!isCardReady || !portOneImpCode) {
         const message = '카드 결제를 지금 사용할 수 없습니다. 무통장 또는 PayPal을 이용해주세요.';
         setPaymentError(message);
@@ -561,18 +587,23 @@ function ServicePaymentContent() {
                 : '카드 결제 검증 준비가 완료되지 않아 무통장 또는 PayPal만 사용할 수 있습니다.'}
             </p>
           )}
+          {isBankLockedBooking && (
+            <p className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-700 md:text-[12px]">
+              이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.
+            </p>
+          )}
           <div className={`grid gap-3 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <button
               type="button"
               onClick={() => {
-                if (isCardReady) {
+                if (!isBankLockedBooking && isCardReady) {
                   setPaymentMethod('card');
                 }
               }}
-              disabled={!isCardReadyResolved || !isCardReady}
+              disabled={isBankLockedBooking || !isCardReadyResolved || !isCardReady}
               className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'card'
                   ? 'border-slate-900 bg-slate-50'
-                  : !isCardReadyResolved || !isCardReady
+                  : isBankLockedBooking || !isCardReadyResolved || !isCardReady
                     ? 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
@@ -594,10 +625,17 @@ function ServicePaymentContent() {
             {isPayPalEnabled && (
               <button
                 type="button"
-                onClick={() => setPaymentMethod('paypal')}
+                onClick={() => {
+                  if (!isBankLockedBooking) {
+                    setPaymentMethod('paypal');
+                  }
+                }}
+                disabled={isBankLockedBooking}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'paypal'
                     ? 'border-slate-900 bg-slate-50'
-                    : 'border-slate-200 hover:border-slate-300'
+                    : isBankLockedBooking
+                      ? 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
+                      : 'border-slate-200 hover:border-slate-300'
                   }`}
               >
                 <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PayPal</div>
