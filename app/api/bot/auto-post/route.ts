@@ -32,10 +32,7 @@ export async function GET(request: Request) {
         if (BOT_UUIDS.length > 0) {
             botId = BOT_UUIDS[Math.floor(Math.random() * BOT_UUIDS.length)];
         } else {
-            // 임시 fallback: profiles에서 아무 admin 계정이나 하나 가져옴
-            const { data: adminUser } = await supabase.from('profiles').select('id').eq('role', 'admin').limit(1).single();
-            if (adminUser) botId = adminUser.id;
-            else return NextResponse.json({ error: 'No bot user available' }, { status: 500 });
+            return NextResponse.json({ skipped: true, reason: 'No bot users configured' });
         }
 
         // 4. 게시물 저장

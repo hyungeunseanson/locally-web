@@ -45,10 +45,11 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'No suitable posts found for commenting' });
         }
 
-        // 3. 봇 계정 무작위 선택 (배열이 비어있으면 작성자 본인이 댓글을 다는 임시 테스트 모드로 동작)
-        const botId = BOT_UUIDS.length > 0
-            ? BOT_UUIDS[Math.floor(Math.random() * BOT_UUIDS.length)]
-            : latestPost.user_id;
+        // 3. 봇 계정 무작위 선택 (BOT_UUIDS 미설정 시 스킵)
+        if (BOT_UUIDS.length === 0) {
+            return NextResponse.json({ skipped: true, reason: 'No bot users configured' });
+        }
+        const botId = BOT_UUIDS[Math.floor(Math.random() * BOT_UUIDS.length)];
 
         // 4. Gemini API를 통해 댓글 생성
         const commentContent = await generateFriendlyComment(latestPost.content, latestPost.title);

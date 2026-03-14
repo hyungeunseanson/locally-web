@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.77 — [Community] 봇 cron 안정화 + RightSidebar 실 DB 연동
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 Fix 1: auto-post BOT fallback 수정 | `app/api/bot/auto-post/route.ts`: `BOT_UUIDS` 비어있을 때 `profiles.role='admin'` 조회(컬럼 미존재)하던 fallback 제거 → `{ skipped: true }` 조기 반환으로 교체. cron 에러 방지 |
+| 🟠 Fix 2: auto-comment fallback 비활성화 | `app/api/bot/auto-comment/route.ts`: `BOT_UUIDS` 비어있을 때 게시글 작성자 본인이 자신에게 댓글 다는 fallback 제거 → `{ skipped: true }` 조기 반환으로 교체 |
+| 🟠 Fix 3: RightSidebar 실 DB 연동 | `app/community/components/RightSidebar.tsx`: `MOCK_EXPERIENCES` (Unsplash 하드코딩 3건) 제거 → `experiences` 테이블에서 `status='active'` 최신순 3건 실시간 조회로 교체 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.76 — [Analytics] booking_confirmed 사용자 추적 강화 + 복합 인덱스 추가
 
 | 항목 | 내용 |

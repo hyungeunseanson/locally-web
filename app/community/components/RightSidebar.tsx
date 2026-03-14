@@ -7,12 +7,9 @@ import { Edit3, ChevronRight } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import type { CommunityCategory } from '@/app/types/community';
 
-// ─── 목업 데이터 ─────────────────────────────────────────────────────────────
-const MOCK_EXPERIENCES = [
-    { id: 1, title: '건축가와 함께하는 북촌 골목 산책', image: 'https://images.unsplash.com/photo-1548115184-bc6544d06a58?w=120&h=80&fit=crop', price: '₩45,000', rating: '4.98' },
-    { id: 2, title: '현지인과 을지로 힙한 뒷골목 투어', image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=120&h=80&fit=crop', price: '₩38,000', rating: '4.95' },
-    { id: 3, title: '서울 전통시장 음식 탐방 & 요리 체험', image: 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=120&h=80&fit=crop', price: '₩52,000', rating: '4.97' },
-];
+// ─── 인기 체험 타입 ───────────────────────────────────────────────────────────
+interface ExperienceItem { id: number; title: string; image_url: string | null; photos: string[] | null; price: number | null; }
+
 
 const getTimeAgo = (dateStr: string) => {
     try {
@@ -34,9 +31,19 @@ export default function RightSidebar({ category }: { category: CommunityCategory
     const router = useRouter();
     const [recentPosts, setRecentPosts] = useState<RecentPost[]>([]);
     const [hotPosts, setHotPosts] = useState<HotPost[]>([]);
+    const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
 
     useEffect(() => {
         const supabase = createClient();
+        const fetchExperiences = async () => {
+            const { data } = await supabase
+                .from('experiences')
+                .select('id, title, image_url, photos, price')
+                .eq('status', 'active')
+                .order('created_at', { ascending: false })
+                .limit(3);
+            if (data) setExperiences(data);
+        };
         const fetchRecent = async () => {
             const { data } = await supabase
                 .from('community_posts')
@@ -57,6 +64,7 @@ export default function RightSidebar({ category }: { category: CommunityCategory
                 .limit(5);
             if (data) setHotPosts(data);
         };
+        fetchExperiences();
         fetchRecent();
         fetchHotPosts();
 
@@ -86,12 +94,14 @@ export default function RightSidebar({ category }: { category: CommunityCategory
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <h3 className="text-[14px] font-extrabold text-gray-900 mb-4">🔥 주간 인기 로컬리 체험</h3>
                 <div className="space-y-3">
-                    {MOCK_EXPERIENCES.map((exp, idx) => (
+                    {experiences.length === 0 ? (
+                        <p className="text-[12px] text-gray-400">표시할 체험이 없습니다.</p>
+                    ) : experiences.map((exp, idx) => (
                         <Link key={exp.id} href={`/experiences/${exp.id}`}>
                             <div className="flex items-center gap-3 group cursor-pointer hover:bg-gray-50 rounded-xl p-2 -mx-2 transition-colors">
                                 <div className="relative flex-shrink-0">
                                     <div className="w-[60px] h-[44px] rounded-lg overflow-hidden bg-gray-100">
-                                        <img src={exp.image} alt={exp.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                        <img src={exp.photos?.[0] || exp.image_url || '/images/logo.png'} alt={exp.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                     </div>
                                     <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-black flex items-center justify-center">
                                         {idx + 1}
@@ -100,8 +110,7 @@ export default function RightSidebar({ category }: { category: CommunityCategory
                                 <div className="flex-1 min-w-0">
                                     <p className="text-[13px] font-semibold text-gray-900 line-clamp-2 leading-snug">{exp.title}</p>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-[11px] font-bold text-[#FF385C]">{exp.price}</span>
-                                        <span className="text-[10px] text-gray-400">· ★ {exp.rating}</span>
+                                        <span className="text-[11px] font-bold text-[#FF385C]">₩{exp.price?.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
