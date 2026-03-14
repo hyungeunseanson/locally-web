@@ -133,6 +133,8 @@ export default function MasterLedgerTab({
   const [isLoadingLedger, setIsLoadingLedger] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const lastRefreshSignalRef = useRef<string | null>(null);
+  // 🔧 Issue #4 Phase A: Realtime 연속 이벤트 벑합 (300ms 디바운스)
+  const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedStartDate = dateRange[0].startDate ? format(dateRange[0].startDate, 'yyyy-MM-dd') : '';
   const selectedEndDate = dateRange[0].endDate ? format(dateRange[0].endDate, 'yyyy-MM-dd') : '';
 
@@ -186,23 +188,21 @@ export default function MasterLedgerTab({
   }, [fetchLedger, refreshSignal]);
 
   useEffect(() => {
+    const scheduleFetchLedger = () => {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+      realtimeDebounceRef.current = setTimeout(() => void fetchLedger(), 300);
+    };
+
     const realtimeChannel = supabase
       .channel('admin_master_ledger_updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, () => {
-        void fetchLedger();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, () => {
-        void fetchLedger();
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'service_bookings' }, () => {
-        void fetchLedger();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'service_bookings' }, () => {
-        void fetchLedger();
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, scheduleFetchLedger)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, scheduleFetchLedger)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'service_bookings' }, scheduleFetchLedger)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'service_bookings' }, scheduleFetchLedger)
       .subscribe();
 
     return () => {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
       supabase.removeChannel(realtimeChannel);
     };
   }, [fetchLedger, supabase]);

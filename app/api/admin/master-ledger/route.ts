@@ -60,6 +60,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
+    // 🔧 Issue #4 Phase A: 날짜 필터 없을 때 최대 500건으로 제한 (무제한 조회 방지)
+    const LEDGER_MAX_ROWS = 500;
     let bookingsQuery = supabaseAdmin
       .from('bookings')
       .select(
@@ -71,6 +73,10 @@ export async function GET(request: Request) {
     }
     if (endDate) {
       bookingsQuery = bookingsQuery.lte('date', endDate);
+    }
+    // 날짜 범위 없을 때만 limit 적용 (날짜 범위 지정 시엔 해당 기간 전체 조회)
+    if (!startDate && !endDate) {
+      bookingsQuery = bookingsQuery.limit(LEDGER_MAX_ROWS);
     }
 
     let filteredServiceRequestsPromise: Promise<{ data: ServiceRequestLedgerRow[] | null; error: unknown }> = Promise.resolve({ data: null, error: null });

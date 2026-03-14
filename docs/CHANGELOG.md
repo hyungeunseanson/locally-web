@@ -5,7 +5,17 @@
 
 ---
 
+## v3.38.73 — [Master Ledger] Realtime 과부하 방지 (Phase A)
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 Realtime 디바운스 | 4개 Realtime 콜백(bookings/service_bookings INSERT/UPDATE)에 300ms 디바운스 적용. 연속 이벤트를 1회 `fetchLedger`로 병합 |
+| 🟠 누수 방지 | 컴포넌트 언마운트 시 타이머 `clearTimeout` 추가 |
+| 🟡 전체 조회 limit | 날짜 필터 미적용 시 `bookings` 최대 500건 제한 — 예약 증가에 따른 무제한 로딩 방지 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.72 — [Master Ledger] 강제 취소 중복 환불 방지 (Phase A)
+
 
 | 항목 | 내용 |
 | --- | --- |
