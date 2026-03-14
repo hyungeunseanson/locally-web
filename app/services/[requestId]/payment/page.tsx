@@ -48,6 +48,13 @@ type PendingBooking = {
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
 
+type ServiceCardReadyReason = 'missing_portone_credentials' | 'missing_imp_code';
+
+type ServiceCardReadyResponse = {
+  ready: boolean;
+  reason?: ServiceCardReadyReason;
+};
+
 type PayPalCreateOrderResponse = {
   success?: boolean;
   paypalOrderId?: string;
@@ -110,11 +117,15 @@ function ServicePaymentContent() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [isCardReady, setIsCardReady] = useState(false);
+  const [isCardReadyResolved, setIsCardReadyResolved] = useState(false);
+  const [cardReadyReason, setCardReadyReason] = useState<ServiceCardReadyReason | ''>('');
   const [isPayPalSdkReady, setIsPayPalSdkReady] = useState(false);
   const [paypalSdkError, setPaypalSdkError] = useState('');
   const paypalButtonRef = useRef<HTMLDivElement | null>(null);
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
   const isPayPalEnabled = Boolean(paypalClientId);
+  const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
 
   const getCheckoutValidationError = useCallback(() => {
     if (!contactName.trim() || !contactPhone.trim()) {
@@ -173,10 +184,56 @@ function ServicePaymentContent() {
   useEffect(() => { void fetchData(); }, [fetchData]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchCardReady = async () => {
+      try {
+        const response = await fetch('/api/services/payment/card-ready', {
+          cache: 'no-store',
+        });
+        const result = (await response.json()) as ServiceCardReadyResponse;
+
+        if (!isMounted) return;
+
+        setIsCardReady(Boolean(response.ok && result.ready));
+        setCardReadyReason(response.ok && !result.ready ? result.reason || '' : '');
+      } catch {
+        if (!isMounted) return;
+
+        setIsCardReady(false);
+        setCardReadyReason('missing_portone_credentials');
+      } finally {
+        if (isMounted) {
+          setIsCardReadyResolved(true);
+        }
+      }
+    };
+
+    void fetchCardReady();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isPayPalEnabled && paymentMethod === 'paypal') {
       setPaymentMethod('card');
     }
   }, [isPayPalEnabled, paymentMethod]);
+
+  useEffect(() => {
+    if (!isCardReadyResolved || isCardReady || paymentMethod !== 'card') {
+      return;
+    }
+
+    if (isPayPalEnabled) {
+      setPaymentMethod('paypal');
+      return;
+    }
+
+    setPaymentMethod('bank');
+  }, [isCardReady, isCardReadyResolved, isPayPalEnabled, paymentMethod]);
 
   useEffect(() => {
     if (paymentMethod !== 'paypal') {
@@ -348,6 +405,14 @@ function ServicePaymentContent() {
       }
 
       const { data: { user } } = await supabase.auth.getUser();
+      if (!isCardReady || !portOneImpCode) {
+        const message = '카드 결제를 지금 사용할 수 없습니다. 무통장 또는 PayPal을 이용해주세요.';
+        setPaymentError(message);
+        showToast(message, 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       if (!window.IMP) {
         setPaymentError(t('sp_err_module') as string);
         setIsProcessing(false);
@@ -357,7 +422,7 @@ function ServicePaymentContent() {
       // v2 에스크로: 사전 생성된 orderId 사용 (새 예약 생성 불필요)
       const { order_id: orderId, amount } = currentBooking;
 
-      window.IMP.init('imp44607000');
+      window.IMP.init(portOneImpCode);
       window.IMP.request_pay(
         {
           pg: 'nice_v2',
@@ -382,19 +447,16 @@ function ServicePaymentContent() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              merchant_uid: orderId,
               imp_uid: rsp.imp_uid,
-              paid_amount: amount,
+              merchant_uid: orderId,
               orderId,
-              amount,
-              resCode: '0000',
-              signData: '',
-              ediDate: '',
             }),
           });
 
-          if (!callbackRes.ok) {
-            setPaymentError(t('sp_err_verify') as string);
+          const callbackResult = (await callbackRes.json()) as { success?: boolean; error?: string };
+
+          if (!callbackRes.ok || !callbackResult.success) {
+            setPaymentError(callbackResult.error || (t('sp_err_verify') as string));
             setIsProcessing(false);
             return;
           }
@@ -402,8 +464,9 @@ function ServicePaymentContent() {
           router.push(`/services/${requestId}/payment/complete?orderId=${orderId}`);
         }
       );
-    } catch {
-      setPaymentError(t('sp_err_process') as string);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : (t('sp_err_process') as string);
+      setPaymentError(message);
       setIsProcessing(false);
     }
   };
@@ -491,13 +554,27 @@ function ServicePaymentContent() {
         {/* 결제 수단 선택 */}
         <div className="mb-5">
           <h3 className="text-[13px] md:text-sm font-bold text-slate-700 mb-3">{t('sp_method_title')}</h3>
+          {isCardReadyResolved && !isCardReady && (
+            <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 md:text-[12px]">
+              {cardReadyReason === 'missing_imp_code'
+                ? '카드 결제 설정이 아직 완료되지 않아 무통장 또는 PayPal만 사용할 수 있습니다.'
+                : '카드 결제 검증 준비가 완료되지 않아 무통장 또는 PayPal만 사용할 수 있습니다.'}
+            </p>
+          )}
           <div className={`grid gap-3 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <button
               type="button"
-              onClick={() => setPaymentMethod('card')}
+              onClick={() => {
+                if (isCardReady) {
+                  setPaymentMethod('card');
+                }
+              }}
+              disabled={!isCardReadyResolved || !isCardReady}
               className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${paymentMethod === 'card'
                   ? 'border-slate-900 bg-slate-50'
-                  : 'border-slate-200 hover:border-slate-300'
+                  : !isCardReadyResolved || !isCardReady
+                    ? 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
+                    : 'border-slate-200 hover:border-slate-300'
                 }`}
             >
               <CreditCard size={20} className={paymentMethod === 'card' ? 'text-slate-900' : 'text-slate-400'} />
@@ -589,7 +666,7 @@ function ServicePaymentContent() {
         {paymentMethod !== 'paypal' ? (
           <button
             onClick={handlePayment}
-            disabled={isProcessing}
+            disabled={isProcessing || (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))}
             className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[14px] md:text-base hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
           >
             {isProcessing ? (
