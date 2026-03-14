@@ -8,22 +8,31 @@ import {
 } from 'lucide-react';
 import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
-import type { AdminUserActivityBooking, AdminUserTimelineItem } from '@/app/types/admin';
+import type { AdminUserActivityBooking, AdminUserTimelineItem, AdminUserDashboardRow, OnlineUser } from '@/app/types/admin';
 import type { Profile } from '@/app/types';
 
-// 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 함수
-function timeAgo(dateString: string | null) {
-  if (!dateString) return '기록 없음';
+// 🟢 [Utility] 시간을 "방금 전", "5분 전" 등으로 변환하는 컴포넌트
+function TimeAgo({ dateString }: { dateString: string | null | undefined }) {
+  const [ticker, setTicker] = useState(0);
+
+  useEffect(() => {
+    if (!dateString) return;
+    // 1분마다 스스로 렌더링 갱신
+    const interval = setInterval(() => setTicker((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, [dateString]);
+
+  if (!dateString) return <span>기록 없음</span>;
 
   const now = new Date();
   const past = new Date(dateString);
   const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return '방금 전';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}일 전`;
-  return past.toLocaleDateString(); // 오래된 건 날짜로 표시
+  if (diffInSeconds < 60) return <span>방금 전</span>;
+  if (diffInSeconds < 3600) return <span>{Math.floor(diffInSeconds / 60)}분 전</span>;
+  if (diffInSeconds < 86400) return <span>{Math.floor(diffInSeconds / 3600)}시간 전</span>;
+  if (diffInSeconds < 604800) return <span>{Math.floor(diffInSeconds / 86400)}일 전</span>;
+  return <span>{past.toLocaleDateString()}</span>;
 }
 
 function formatWon(amount: number | null | undefined) {
@@ -50,10 +59,14 @@ function getUserRoleBadgeClassName(role?: string | null) {
   return 'bg-slate-100 text-slate-600 border border-slate-200';
 }
 
-export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
+export default function UsersTab({ users, onlineUsers, deleteItem }: { 
+  users: AdminUserDashboardRow[]; 
+  onlineUsers: OnlineUser[]; 
+  deleteItem: (table: string, id: string) => void;
+}) {
   const { showToast } = useToast(); // 🟢 추가
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUserDashboardRow | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
   const [sortKey, setSortKey] = useState<'recent_activity' | 'recent_access' | 'recent_signup' | 'total_spent'>('recent_activity');
@@ -66,8 +79,6 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [notiTitle, setNotiTitle] = useState('');
   const [notiMessage, setNotiMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  // 1분마다 화면을 갱신해서 "몇 분 전" 시간을 최신화하는 코드
-  const [, setTick] = useState(0);
 
   // 🟢 실제 결제 내역 및 회원 타임라인
   const [userBookings, setUserBookings] = useState<AdminUserActivityBooking[]>([]);
@@ -75,6 +86,11 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   const [isActivityLoading, setIsActivityLoading] = useState(false);
   const [activitySummaryMap, setActivitySummaryMap] = useState<Map<string, UserActivitySummary>>(new Map());
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+
+  // 🟢 [수정] 검색 필터 변경 시 다중 선택 내용 즉시 초기화
+  useEffect(() => {
+    setSelectedUserIds([]);
+  }, [searchTerm, roleFilter, showOnlineOnly]);
 
   useEffect(() => {
     let isMounted = true;
@@ -128,7 +144,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
     };
   }, [users, showToast]);
 
-  const displayUsers: Profile[] = (users || []).map((user: Profile) => {
+  const displayUsers: AdminUserDashboardRow[] = (users || []).map((user: AdminUserDashboardRow) => {
     const summary = activitySummaryMap.get(user.id);
 
     return {
@@ -173,16 +189,9 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
     }
   }, [selectedUser?.id, showToast]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTick(t => t + 1); // 1분마다 화면을 다시 그리라는 신호
-    }, 60000); // 60초 = 1분
-
-    return () => clearInterval(timer);
-  }, []);
   // 검색 필터링
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
-  const filteredUsers = displayUsers.filter((u: any) => {
+  const filteredUsers = displayUsers.filter((u: AdminUserDashboardRow) => {
     if (!normalizedSearchTerm) return true;
 
     return (
@@ -193,16 +202,16 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
   });
 
   // 🟢 온라인 유저 ID 목록 (Set으로 빠른 조회)
-  const onlineUserIds = new Set(onlineUsers.map((u: any) => u.user_id));
+  const onlineUserIds = new Set(onlineUsers.map((u: OnlineUser) => u.user_id));
 
   const visibleUsers = filteredUsers
-    .filter((user: any) => {
+    .filter((user: AdminUserDashboardRow) => {
       if (roleFilter === 'all') return true;
       if (roleFilter === 'guest') return !user.role || user.role === 'guest' || user.role === 'user';
       return user.role === roleFilter;
     })
-    .filter((user: any) => !showOnlineOnly || onlineUserIds.has(user.id))
-    .sort((a: any, b: any) => {
+    .filter((user: AdminUserDashboardRow) => !showOnlineOnly || onlineUserIds.has(user.id))
+    .sort((a: AdminUserDashboardRow, b: AdminUserDashboardRow) => {
       const getTimestamp = (value?: string | null) => {
         if (!value) return 0;
         const parsed = new Date(value).getTime();
@@ -225,15 +234,15 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
     });
 
   // 🟢 [추가] 전체 선택/해제
-  const visibleSelectedCount = visibleUsers.filter((user: any) => selectedUserIds.includes(user.id)).length;
+  const visibleSelectedCount = visibleUsers.filter((user: AdminUserDashboardRow) => selectedUserIds.includes(user.id)).length;
 
   const toggleSelectAll = () => {
     if (visibleSelectedCount === visibleUsers.length) {
-      setSelectedUserIds((prev) => prev.filter((id) => !visibleUsers.some((user: any) => user.id === id)));
+      setSelectedUserIds((prev) => prev.filter((id) => !visibleUsers.some((user: AdminUserDashboardRow) => user.id === id)));
       return;
     }
 
-    setSelectedUserIds((prev) => Array.from(new Set([...prev, ...visibleUsers.map((u: any) => u.id)])));
+    setSelectedUserIds((prev) => Array.from(new Set([...prev, ...visibleUsers.map((u: AdminUserDashboardRow) => u.id)])));
   };
 
   // 🟢 [추가] 개별 선택/해제
@@ -297,12 +306,12 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
         {/* 1. 실시간 접속자 섹션 */}
         <section className="bg-white rounded-lg md:rounded-2xl border border-slate-200 p-3 md:p-6 mb-3 md:mb-6 shadow-sm shrink-0">
           <h3 className="font-bold text-sm md:text-lg mb-2.5 md:mb-4 flex items-center gap-1.5 md:gap-2">
-            <Wifi size={16} className="text-green-500 animate-pulse md:w-5 md:h-5" /> 실시간 접속 회원 ({onlineUsers.filter((u: any) => !u.is_anonymous).length}명)
+            <Wifi size={16} className="text-green-500 animate-pulse md:w-5 md:h-5" /> 실시간 접속 회원 ({onlineUsers.filter((u: OnlineUser) => !u.is_anonymous).length}명)
           </h3>
-          {onlineUsers.filter((u: any) => !u.is_anonymous).length > 0 ? (
+          {onlineUsers.filter((u: OnlineUser) => !u.is_anonymous).length > 0 ? (
             <div className="flex gap-2.5 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide">
-              {onlineUsers.filter((u: any) => !u.is_anonymous).map((u: any, idx: number) => {
-                const matchedUser = displayUsers.find((dbUser: any) => dbUser.id === u.user_id);
+              {onlineUsers.filter((u: OnlineUser) => !u.is_anonymous).map((u: OnlineUser, idx: number) => {
+                const matchedUser = displayUsers.find((dbUser: AdminUserDashboardRow) => dbUser.id === u.user_id);
                 const displayName = matchedUser?.full_name || u.full_name || u.email || '비회원';
                 const displayAvatar = matchedUser?.avatar_url || u.avatar_url;
 
@@ -425,7 +434,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {visibleUsers.map((user: any) => {
+                {visibleUsers.map((user: AdminUserDashboardRow) => {
                   const isOnline = onlineUserIds.has(user.id);
                   const isSelected = selectedUserIds.includes(user.id); // 🟢 추가
 
@@ -479,7 +488,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                       <td className="px-2 md:px-6 py-2.5 md:py-4">
                         {activitySummaryMap.has(user.id) && user.recent_activity_at ? (
                           <div className="flex flex-col">
-                            <span className="text-slate-900 font-bold text-[9px] md:text-xs">{timeAgo(user.recent_activity_at)}</span>
+                            <span className="text-slate-900 font-bold text-[9px] md:text-xs"><TimeAgo dateString={user.recent_activity_at} /></span>
                             <span className="text-[9px] md:text-[10px] text-slate-400">{new Date(user.recent_activity_at).toLocaleDateString()}</span>
                           </div>
                         ) : activitySummaryMap.has(user.id) ? (
@@ -538,7 +547,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                     </>
                   ) : (
                     <>
-                      <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> 마지막 접속: {timeAgo(selectedUser.last_active_at)}
+                      <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> 마지막 접속: <TimeAgo dateString={selectedUser.last_active_at} />
                     </>
                   )}
                 </div>
@@ -585,7 +594,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: any) {
                     <div className="bg-slate-50 p-2 md:p-3 rounded-lg text-center">
                       <div className="text-[9px] md:text-[10px] text-slate-500 mb-0.5 md:mb-1">마지막 구매</div>
                       <div className="font-bold text-[11px] md:text-sm text-slate-900">
-                        {timeAgo(userBookings[0]?.created_at) || '-'}
+                        <TimeAgo dateString={userBookings[0]?.created_at} />
                       </div>
                     </div>
                   </div>

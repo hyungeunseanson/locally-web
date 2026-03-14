@@ -238,3 +238,27 @@ export interface AdminUserTimelineItem {
   status_label: string | null;
   amount: number | null;
 }
+
+export interface AdminUserDashboardRow extends Omit<Profile, 'role'> {
+  role?: string | null;
+  total_spent?: number;
+  experience_booking_count?: number;
+  service_request_count?: number;
+  recent_activity_at?: string | null;
+  last_active_at?: string | null;
+  created_at?: string | null;
+  email?: string | null;
+  birth_date?: string | null;
+  nationality?: string | null;
+  kakao_id?: string | null;
+  mbti?: string | null;
+}
+
+export interface OnlineUser {
+  user_id: string;
+  is_anonymous?: boolean;
+  avatar_url?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  [key: string]: unknown;
+}

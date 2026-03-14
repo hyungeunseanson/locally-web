@@ -20,6 +20,7 @@ type NavButtonProps = {
 };
 
 type SidebarUser = {
+  id?: string;
   email?: string | null;
 } | null;
 
@@ -139,7 +140,7 @@ export default function Sidebar() {
     // 열람 상태 변경 감지를 위한 이벤트 리스너
     window.addEventListener('booking-viewed', fetchCounts);
     window.addEventListener('team-viewed', fetchTeamCounts);
-    const intervalId = window.setInterval(fetchCounts, 45000);
+    const intervalId = window.setInterval(fetchCounts, 300000); // 45초 -> 5분으로 완화
 
     const channel = supabase.channel('online_users_sidebar')
       .on('presence', { event: 'sync' }, () => {
@@ -159,9 +160,18 @@ export default function Sidebar() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { fetchTeamCounts(); })
       .subscribe();
 
-    const adminAlertsChannel = supabase.channel('admin_alert_notifications_sidebar')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => { fetchCounts(); })
-      .subscribe();
+    const adminAlertsChannel = supabase.channel('admin_alert_notifications_sidebar');
+    
+    if (currentUser?.id) {
+      adminAlertsChannel
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'notifications', 
+          filter: `user_id=eq.${currentUser.id}` 
+        }, () => { fetchCounts(); })
+        .subscribe();
+    }
 
     return () => {
       supabase.removeChannel(channel);

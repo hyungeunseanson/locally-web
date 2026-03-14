@@ -5,15 +5,16 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { updateAdminStatus } from '@/app/actions/admin';
 
+import { HostApplication, ExperienceApprovalItem } from '@/app/types/admin';
+
 const HOST_APPLICATION_SUMMARY_SELECT = 'id,user_id,created_at,name,status,host_nationality,profile_photo,languages,language_levels,target_language';
-type ApprovalListItem = Record<string, unknown>;
 
 export function useAdminApprovalsData() {
   const supabase = createClient();
   const { showToast } = useToast();
 
-  const [apps, setApps] = useState<ApprovalListItem[]>([]);
-  const [exps, setExps] = useState<ApprovalListItem[]>([]);
+  const [apps, setApps] = useState<HostApplication[]>([]);
+  const [exps, setExps] = useState<ExperienceApprovalItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchApprovals = useCallback(async () => {

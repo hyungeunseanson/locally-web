@@ -5,6 +5,23 @@
 
 ---
 
+## v3.38.66 — [User Management] 타입 안정성 및 성능 최적화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 UsersTab 렌더링 최적화 | `TimeAgo` 컴포넌트를 분리하여 1분마다 전체 740줄의 UsersTab이 리렌더링되는 성능 이슈 해결 |
+| 🟠 검색 필터 시 선택 초기화 | 역할/검색 필터 변경 시 숨겨진 유저가 계속 선택된 상태로 남는 치명적 버그 수정 (`selectedUserIds` 초기화 `useEffect` 추가) |
+| 🟡 완벽한 타입 안전성 보장 | `AdminUserDashboardRow`, `OnlineUser` 인터페이스를 추가하고 `any` 타입을 완전히 걷어내 타입 에러와 런타임 버그 회귀 차단 |
+
+## v3.38.65 — [Admin Alerts] 아키텍처 오염 방어 및 서버 과부하 개선
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 Sidebar 리얼타임 구독 필터링 | `Sidebar.tsx`에서 모든 채널을 구독하던 것을 `.on('postgres_changes', { filter: 'user_id=eq.${currentUser.id}' })` 형태로 본인 것만 받도록 방어막 설치해 무의미한 서버 폭격을 차단 |
+| 🟠 폴링 주기 최적화 | 네트워크 방어용 중복 폴링 간격을 45초에서 5분으로 늘려 무의미한 서버 호출을 1/8 수준으로 줄임 |
+| 🟡 발송 타입 오염 방어 | `actions/admin.ts` 호스트 승인 알림 타입을 `application_status_changed`로 변경하고, `api/notifications/email`의 폴백 타입을 `general`로 보정해 일반 회원 알림 수신함 오염을 방지 |
+
+
 ## v3.38.64 — [Analytics] AnalyticsTab Phase 2 리팩터링 + Analytics 데이터 품질 수정
 
 | 항목 | 내용 |

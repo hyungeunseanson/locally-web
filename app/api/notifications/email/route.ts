@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       // 1. DB 일괄 저장
       const notificationsData = recipient_ids.map((id: string) => ({
         user_id: id,
-        type: type || 'admin_alert',
+        type: type || 'general',
         title: title,
         message: message,
         link: link || '/notifications',

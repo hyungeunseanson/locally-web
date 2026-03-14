@@ -119,7 +119,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
       if (notification) {
         const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
           user_id: app.user_id,
-          type: 'admin_alert',
+          type: 'application_status_changed',
           title: notification.title,
           message: notification.message,
           link: notification.link,
