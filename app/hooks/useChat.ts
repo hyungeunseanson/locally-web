@@ -144,9 +144,9 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const guestIds = Array.from(new Set(inquiryRows.map((item) => item.user_id).filter(Boolean))) as string[];
 
         const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
-          supabase.from('profiles').select('*').in('id', hostIds),
-          supabase.from('host_applications').select('*').in('user_id', hostIds),
-          supabase.from('profiles').select('*').in('id', guestIds),
+          supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', hostIds),
+          supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', hostIds),
+          supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', guestIds),
           supabase.from('inquiry_messages')
             .select('inquiry_id')
             .in('inquiry_id', inquiryIds)
@@ -243,8 +243,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const rawMessages = data as InquiryMessageRow[];
         const senderIds = Array.from(new Set(rawMessages.map((m) => m.sender_id)));
         const [proRes, appRes] = await Promise.all([
-          supabase.from('profiles').select('*').in('id', senderIds),
-          supabase.from('host_applications').select('*').in('user_id', senderIds)
+          supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', senderIds),
+          supabase.from('host_applications').select('user_id, name, profile_photo').in('user_id', senderIds)
         ]);
 
         const profileRows = (proRes.data || []) as ProfileRow[];

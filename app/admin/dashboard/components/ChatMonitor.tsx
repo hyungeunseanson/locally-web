@@ -353,9 +353,9 @@ export default function ChatMonitor() {
               {messages.map((msg) => {
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest;
-                // 🟢 관리자(alignRight)가 1:1 문의(isAdminSupport)에 답변할 경우 이름을 "로컬리"로 고정
+                // 🟢 관리자 탭 한정: 관리자가 답변 시 "로컬리 (실명)" 형식으로 표출하여 팀 내 추적성 확보
                 const isAdminReply = alignRight && isAdminSupportInquiry(selectedInquiry.type);
-                const displayName = isAdminReply ? '로컬리' : (msg.sender?.name || '알 수 없음');
+                const displayName = isAdminReply ? `로컬리 (${msg.sender?.name || '알 수 없음'})` : (msg.sender?.name || '알 수 없음');
 
                 return (
                   <div key={msg.id} className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}>

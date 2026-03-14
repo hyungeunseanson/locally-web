@@ -50,6 +50,7 @@ export async function GET() {
                 .from('inquiry_messages')
                 .select('*', { count: 'exact', head: true })
                 .in('inquiry_id', csIds)
+                .neq('sender_id', user.id)
                 .eq('is_read', false);
             csUnreadCount = count || 0;
         }
