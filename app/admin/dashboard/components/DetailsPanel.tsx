@@ -8,9 +8,10 @@ import {
   MapPin, Cake, CheckCircle2, ShoppingBag, StickyNote, Star, Trash2, Link as LinkIcon, Edit,
   CreditCard, FileText, Camera, Shield, Download, AlertTriangle, Check, X
 } from 'lucide-react';
-import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
+import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels, LanguageLevelEntry } from '@/app/utils/languageLevels';
+import { AdminDetailsPanelProps } from '@/app/types/admin';
 
-export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem, setSelectedItem, updateStatus, deleteItem }: any) {
+export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem, setSelectedItem, updateStatus, deleteItem }: AdminDetailsPanelProps) {
   const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [csLoading, setCsLoading] = useState(false);
@@ -262,7 +263,7 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
               <div className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1.5"><MessageCircle size={12} /> 언어</div>
               <div className="flex flex-wrap gap-1.5">
                 {applicationLanguageLevels.length > 0
-                  ? applicationLanguageLevels.map((entry) => (
+                  ? applicationLanguageLevels.map((entry: LanguageLevelEntry) => (
                     <span key={`${entry.language}-${entry.level}`} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">
                       {entry.language} · Lv.{entry.level}
                     </span>
@@ -364,7 +365,7 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
               <div className="flex items-center gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1.5"><MessageCircle size={12} /> 진행 언어</div>
               <div className="flex flex-wrap gap-1.5">
                 {applicationLanguageLevels.length > 0
-                  ? applicationLanguageLevels.map((entry) => (
+                  ? applicationLanguageLevels.map((entry: LanguageLevelEntry) => (
                     <span key={`${entry.language}-${entry.level}`} className="px-1.5 py-0.5 bg-white border rounded text-[10px] md:text-xs font-bold">
                       {entry.language} · Lv.{entry.level}
                     </span>

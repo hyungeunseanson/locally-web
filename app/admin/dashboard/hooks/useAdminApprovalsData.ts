@@ -23,11 +23,9 @@ export function useAdminApprovalsData() {
         fetch(`/api/admin/host-applications?select=${encodeURIComponent(HOST_APPLICATION_SUMMARY_SELECT)}`).then((response) =>
           response.ok ? response.json() : { data: [] }
         ),
-        supabase
-          .from('experiences')
-          .select('*, profiles!experiences_host_id_fkey(full_name, email)')
-          .order('created_at', { ascending: false })
-          .limit(3000),
+        fetch(`/api/admin/experiences`).then((response) =>
+          response.ok ? response.json() : { data: [] }
+        ),
       ]);
 
       const appsArray = Array.isArray(appsResult)
@@ -56,17 +54,16 @@ export function useAdminApprovalsData() {
     fetchApprovals();
   }, [fetchApprovals]);
 
-  const updateStatus = useCallback(async (table: 'host_applications' | 'experiences', id: string, status: string) => {
-    let comment = '';
+  const updateStatus = useCallback(async (
+    table: 'host_applications' | 'experiences',
+    id: string,
+    status: string,
+    comment: string = ''
+  ) => {
     let nextStatus = status;
 
-    if (status === 'rejected' || status === 'revision') {
-      const input = prompt(`Reason for [${status}]:`);
-      if (input === null) return false;
-      comment = input;
-    } else if (status === 'approved') {
-      if (!confirm('Approve?')) return false;
-      if (table === 'experiences') nextStatus = 'active';
+    if (status === 'approved' && table === 'experiences') {
+      nextStatus = 'active';
     }
 
     try {
@@ -82,9 +79,6 @@ export function useAdminApprovalsData() {
   }, [fetchApprovals, showToast]);
 
   const deleteItem = useCallback(async (table: string, id: string) => {
-    if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-      return false;
-    }
 
     try {
       const response = await fetch('/api/admin/delete', {

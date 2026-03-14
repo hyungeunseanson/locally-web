@@ -297,12 +297,17 @@ test.describe.serial('Admin approvals smoke', () => {
       await hostListItem.click();
       await expect(page.getByRole('button', { name: '보완 요청' })).toBeVisible({ timeout: 15000 });
 
-      page.once('dialog', async (dialog) => {
-        expect(dialog.type()).toBe('prompt');
-        await dialog.accept(revisionReason);
-      });
-
       await page.getByRole('button', { name: '보완 요청' }).click();
+
+      // Wait for the custom dialog
+      const dialogTitle = page.locator('h4', { hasText: '보완 사유 입력' }).filter({ visible: true }).first();
+      await expect(dialogTitle).toBeVisible({ timeout: 5000 });
+
+      // Fill in textarea for comment
+      await page.locator('textarea[placeholder*="사유를 입력해주세요"]').filter({ visible: true }).first().fill(revisionReason);
+
+      // Click the dialog confirm button
+      await page.getByRole('button', { name: '보완 요청 전송' }).filter({ visible: true }).first().click();
 
       await assertHostApplicationStatus(hostApplicationId, 'revision', revisionReason);
     });
@@ -313,14 +318,17 @@ test.describe.serial('Admin approvals smoke', () => {
       const expListItem = page.locator('div.cursor-pointer').filter({ hasText: experience.title }).first();
       await expect(expListItem).toBeVisible({ timeout: 15000 });
       await expListItem.click();
-      await expect(page.locator('button').filter({ hasText: /^승인$/ }).first()).toBeVisible({ timeout: 15000 });
+      const approveButton = page.locator('button').filter({ hasText: /^승인$/ }).first();
+      await expect(approveButton).toBeVisible({ timeout: 15000 });
 
-      page.once('dialog', async (dialog) => {
-        expect(dialog.type()).toBe('confirm');
-        await dialog.accept();
-      });
+      await approveButton.click();
 
-      await page.locator('button').filter({ hasText: /^승인$/ }).first().click();
+      // Wait for the custom dialog
+      const dialogTitle = page.locator('h4', { hasText: '승인 확인' }).filter({ visible: true }).first();
+      await expect(dialogTitle).toBeVisible({ timeout: 5000 });
+
+      // Click the dialog confirm button
+      await page.getByRole('button', { name: '승인 및 권한 부여' }).filter({ visible: true }).first().click();
 
       await assertExperienceStatus(experience.id, 'active');
     });

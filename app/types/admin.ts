@@ -100,6 +100,54 @@ export interface HostApplication {
   content: Record<string, unknown> | null;
 }
 
+export interface ExperienceApprovalItem {
+  id: string;
+  created_at: string;
+  title: string;
+  status: 'pending' | 'active' | 'rejected' | 'revision';
+  price?: number;
+  duration?: number;
+  max_guests?: number;
+  city?: string;
+  country?: string;
+  subCity?: string;
+  is_private_enabled?: boolean;
+  private_price?: number;
+  category?: string;
+  meeting_point?: string;
+  location?: string;
+  description?: string;
+  supplies?: string;
+  itinerary?: { title: string; description: string }[];
+  inclusions?: string[];
+  exclusions?: string[];
+  photos?: string[];
+  rules?: { age_limit?: string; activity_level?: string };
+  profiles?: { full_name: string | null; email: string | null };
+}
+
+export interface AdminManagementTabProps {
+  activeTab: string;
+  filter: string;
+  setFilter: (f: string) => void;
+  apps: HostApplication[];
+  exps: ExperienceApprovalItem[];
+  users: any[];
+  messages: any[];
+  selectedItem: any;
+  setSelectedItem: (item: any) => void;
+  updateStatus: (table: 'host_applications' | 'experiences', id: string, status: string, comment?: string) => Promise<boolean> | void;
+  deleteItem: (table: string, id: string) => Promise<boolean> | void;
+}
+
+export interface AdminDetailsPanelProps {
+  activeTab: string;
+  selectedItem: any;
+  setSelectedItem: (item: any) => void;
+  updateStatus: (table: 'host_applications' | 'experiences', id: string, status: string, comment?: string) => Promise<boolean> | void;
+  deleteItem: (table: string, id: string) => Promise<boolean> | void;
+}
+
 export interface AdminServiceBooking {
   id: string;
   order_id: string;
