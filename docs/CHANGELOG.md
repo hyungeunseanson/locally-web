@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.70 — [Team Workspace] 보안 및 데이터 정합성 교정 4건
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 #1 `profiles select *` 삭제 | `getCurrentUser`에서 `select('*')` → `select('full_name')`으로 핀셋 수정. 불필요한 개인정보 컨럼 노옶 차단 |
+| 🟠 #2 `team-counts` 채팅 동산 제외 | `admin_task_comments` 카운트에서 팀 채팅방 메시지(`task_id = 000...0`) 제외. Team Workspace 다은 뱃지 숫자 부풀림 버그 해결 |
+| 🟠 #3 할 일 삭제 서버 권한 검증 | `DELETE /api/admin/team/tasks/[id]`에 `author_id === user.id` 서버 측 소유권 검증 추가. API 직접 호출으로 타인 할 일 삭제 가능한 보안 이슈 차단 |
+| 🟡 #4 이미지 MIME 유효성 검증 | `GlobalTeamChat` 파일 업로드 시 `file.type` MIME 검증 (JPEG/PNG/WEBP/GIF만 허용). 콴라이언트+업로드 함수 두 곳 모두 적용해 확장자 위장 방어 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.69 — [Message Monitoring] 관리자 전용 데이터 레이어 분리 (Phase 3)
 
 | 항목 | 내용 |

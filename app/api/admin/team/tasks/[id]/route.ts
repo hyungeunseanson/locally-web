@@ -118,6 +118,27 @@ export async function DELETE(
       return teamError('유효하지 않은 작업 ID입니다.', 400);
     }
 
+    // 게선: 서버 측 작성자 검증 (author_id)
+    // 관리자 타인의 할일을 API 직접 호출로 삭제하는 공격 방지
+    const { data: existingTask, error: fetchError } = await context.supabaseAdmin
+      .from('admin_tasks')
+      .select('id, author_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('[admin/team/tasks/[id]] fetch error for delete:', fetchError);
+      return teamError('작업 정보를 불러오지 못했습니다.', 500);
+    }
+
+    if (!existingTask) {
+      return teamError('작업을 찾을 수 없습니다.', 404);
+    }
+
+    if (existingTask.author_id !== context.user.id) {
+      return teamError('본인이 작성한 항목만 삭제할 수 있습니다.', 403);
+    }
+
     const { error } = await context.supabaseAdmin
       .from('admin_tasks')
       .delete()

@@ -111,7 +111,7 @@ export default function TeamTab() {
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
       setCurrentUser({ id: user.id, name: profile?.full_name || user.email?.split('@')[0] });
     }
   };

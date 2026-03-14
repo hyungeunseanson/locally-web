@@ -3,6 +3,9 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
+// 팀 채팅방 전용 허수 ID (admin_task_comments 내에 채팅 메시지를 구분하는 고정 UUID)
+const TEAM_CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+
 export async function GET(request: Request) {
   try {
     const supabaseServer = await createServerClient();
@@ -36,7 +39,9 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from('admin_task_comments')
         .select('id', { count: 'exact', head: true })
-        .gt('created_at', parsedLastViewed),
+        .gt('created_at', parsedLastViewed)
+        // 🔧 Fix: 팀 채팅방 메시지는 Task 뱃지 카운트에서 제외
+        .neq('task_id', TEAM_CHAT_ROOM_ID),
     ]);
 
     const newTasksCount = tasksRes.count || 0;
