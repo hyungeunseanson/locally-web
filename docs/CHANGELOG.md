@@ -5,7 +5,18 @@
 
 ---
 
+## v3.38.74 — [Billing & Revenue] settleHostPayout 보안 강화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 #1 관리자 인증 확인 | `getAdminClient()`가 `resolveAdminAccess`로 비관리자를 throw 차단함을 코드 주석으로 명시 |
+| 🔴 #3 이중 정산 방지 | `payout_status='paid'` 기존 정산 건 사전 검증 추가. `service-payouts/mark-paid`와 동일한 방어 로직 적용 |
+| 🔴 #3 누락 예약 검증 | 요청한 `bookingIds` 중 DB에서 찾을 수 없는 건 포함 시 조기 오류 반환 |
+| 🟡 감사로그 보강 | `details`에 `count` 필드 추가 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.73 — [Master Ledger] Realtime 과부하 방지 (Phase A)
+
 
 | 항목 | 내용 |
 | --- | --- |
