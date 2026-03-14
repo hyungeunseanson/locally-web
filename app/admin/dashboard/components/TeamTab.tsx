@@ -184,6 +184,7 @@ export default function TeamTab() {
     const viewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
     setLastViewed(viewed);
     localStorage.setItem('last_viewed_team', new Date().toISOString());
+    window.dispatchEvent(new Event('team-viewed'));
 
     const initData = async () => {
       setIsLoading(true);

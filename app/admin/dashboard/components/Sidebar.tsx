@@ -116,7 +116,7 @@ export default function Sidebar() {
 
       setCounts(prev => ({
         ...prev,
-        teamNewCount: (data.newTasksCount || 0) + (data.newCommentsCount || 0),
+        teamNewCount: data.newWorkspaceCount ?? ((data.newTasksCount || 0) + (data.newCommentsCount || 0)),
       }));
     } catch (e) {
       console.error('Sidebar team counts fetch error:', e);
@@ -139,6 +139,7 @@ export default function Sidebar() {
 
     // 열람 상태 변경 감지를 위한 이벤트 리스너
     window.addEventListener('booking-viewed', fetchCounts);
+    window.addEventListener('team-viewed', fetchTeamCounts);
     const intervalId = window.setInterval(fetchCounts, 45000);
 
     const channel = supabase.channel('online_users_sidebar')
@@ -168,6 +169,7 @@ export default function Sidebar() {
       supabase.removeChannel(teamChannel);
       supabase.removeChannel(adminAlertsChannel);
       window.removeEventListener('booking-viewed', fetchCounts);
+      window.removeEventListener('team-viewed', fetchTeamCounts);
       window.clearInterval(intervalId);
     };
   }, [fetchCounts, fetchCurrentUser, fetchTeamCounts, supabase]);

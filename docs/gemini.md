@@ -30,6 +30,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/team/comments/[id]`: Team Chat reaction 저장 API (`GlobalTeamChat` direct update 제거)
 - `/api/admin/team/whitelist`: Team Workspace Admin Whitelist 추가 API
 - `/api/admin/team/whitelist/[id]`: Team Workspace Admin Whitelist 삭제 API (+ audit log)
+- `/api/admin/team-counts`: Team Workspace 사이드바 배지 집계 API (`lastViewed` 기준 새 작업/댓글 개별 count + 합산 `newWorkspaceCount`)
 - `types/admin.ts`: 관리자 전용 타입 중앙화 (`AdminServiceBooking` 포함)
 - `/api/admin/users-summary`: User Management/Analytics 공용 경량 회원 목록 API (`profiles + users.role` 병합)
 - `/api/admin/users-activity-summary`: User Management 리스트 전용 활동 summary API (`총 결제액/예약·의뢰 수/최근 활동` 지연 집계)
@@ -123,6 +124,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `User Management` 탭은 `/api/admin/users-summary`와 presence 구독을 쓰는 `useAdminUsersData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다. `useAdminData.ts` 공통 로딩을 기다리지 않는다.
 - `Approvals` 탭은 `/api/admin/host-applications` 요약 API + `experiences` 클라이언트 조회를 쓰는 `useAdminApprovalsData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다. `useAdminData.ts` 공통 로딩을 기다리지 않는다.
 - `TEAM` 탭은 아직 목록/실시간 읽기는 client Supabase를 유지하지만, `TeamTab`, `GlobalTeamChat`, `MiniChatBar`의 `admin_tasks / admin_task_comments / admin_whitelist` 쓰기(create/update/delete/reaction)는 전용 `/api/admin/team/*` 경로로만 처리한다.
+- `TEAM` 탭 진입 시 `last_viewed_team`을 현재 시각으로 갱신하고 `team-viewed` 이벤트를 발생시켜, 사이드바 `Team Workspace` 배지가 같은 탭 세션에서도 즉시 0으로 돌아가게 유지한다.
 - 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
 - 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
 - 어드민 대시보드 권한 및 무통장 버그 수정(v3.9.3): `service_bookings` 영역의 RLS 권한 누락으로 인한 관리자 데이터 블락/사이드바 카운트 증발 현상을 우회하기 위해 `createAdminClient`를 쓰는 전용 백엔드 API 신설 (`/api/admin/service-bookings`, `/api/admin/sidebar-counts`). 또한, 일반 `bookings` 테이블에 `payment_method` 컬럼을 신규 추가하고 `create_booking_atomic` 함수에서 이를 저장하도록 수정.

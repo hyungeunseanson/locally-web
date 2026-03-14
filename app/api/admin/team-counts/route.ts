@@ -23,24 +23,31 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const lastViewed = searchParams.get('lastViewed') || new Date(0).toISOString();
+    const rawLastViewed = searchParams.get('lastViewed') || new Date(0).toISOString();
+    const parsedLastViewed = Number.isNaN(new Date(rawLastViewed).getTime())
+      ? new Date(0).toISOString()
+      : rawLastViewed;
 
     const [tasksRes, commentsRes] = await Promise.all([
       supabaseAdmin
         .from('admin_tasks')
         .select('id', { count: 'exact', head: true })
-        .gt('created_at', lastViewed),
+        .gt('created_at', parsedLastViewed),
       supabaseAdmin
         .from('admin_task_comments')
         .select('id', { count: 'exact', head: true })
-        .gt('created_at', lastViewed),
+        .gt('created_at', parsedLastViewed),
     ]);
+
+    const newTasksCount = tasksRes.count || 0;
+    const newCommentsCount = commentsRes.count || 0;
 
     return NextResponse.json({
       success: true,
       data: {
-        newTasksCount: tasksRes.count || 0,
-        newCommentsCount: commentsRes.count || 0,
+        newTasksCount,
+        newCommentsCount,
+        newWorkspaceCount: newTasksCount + newCommentsCount,
       },
     });
   } catch (error: unknown) {
