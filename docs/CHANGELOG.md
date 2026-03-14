@@ -5,6 +5,17 @@
 
 ---
 
+## v3.38.86 — [SEO] 공개 정보 페이지 메타/사이트맵 1차 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 공개 정보 페이지 메타 확대 | `app/help/layout.tsx`, `app/site-map/layout.tsx`, `app/company/news/layout.tsx`, `app/company/notices/layout.tsx`, `app/company/careers/layout.tsx`, `app/company/investors/layout.tsx`, `app/company/partnership/layout.tsx` 추가 — 주요 정보성 공개 페이지에 locale별 title/description/canonical/alternates를 직접 부여 |
+| 🟡 `/community` canonical 안전화 | `app/community/page.tsx`의 카테고리 query 메타는 유지하되 canonical과 `alternates.languages`는 기본 목록 경로 `/community`로 고정해 필터형 query 조합의 중복 신호를 줄임 |
+| 🟡 `services/intro` 메타 보강 | `app/services/intro/page.tsx`에 canonical, `alternates.languages`, OG URL 기준을 추가해 공개 서비스 소개 랜딩의 메타 신호를 보강 |
+| 🟡 사이트맵 정리 | `app/sitemap.ts`에서 dead path였던 `/company/community`를 제거하고 `/search`, `/community`, `/services/intro`, `/site-map`을 추가 |
+| 🟡 사이트맵 페이지 링크 정리 | `app/site-map/page.tsx`의 커뮤니티 링크를 `/community`로 교체하고 `Explore` 섹션에 `/search`, `/services/intro`, `/community`를 추가 |
+| 🟡 공개 메타 보호막 확대 | `tests/e2e/25-public-metadata.spec.ts`가 `/help`, `/community`, `/company/news`, `/services/intro`, `/site-map`까지 title/description/canonical을 직접 검증하도록 확장 |
+
 ## v3.38.85 — [SEO] Private 페이지 noindex 정리
 
 | 항목 | 내용 |

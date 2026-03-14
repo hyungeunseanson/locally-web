@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import IntroClient from './IntroClient';
+import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 
 // OG 이미지: 환경변수 우선, 없으면 일본 사진 fallback, 최종 fallback은 사이트 대표 이미지
 const OG_IMAGE =
@@ -15,17 +16,27 @@ export const metadata: Metadata = {
     '후쿠오카 투어', '현지인 가이드', '맞춤 의뢰', 'Locally',
   ],
   openGraph: {
-    title: '일본 현지인 동행 가이드 맞춤 의뢰 | Locally',
+    title: '일본 현지인 동행 가이드 맞춤 의뢰',
     description:
       '도쿄·오사카·후쿠오카에서 검증된 현지인 호스트와 단둘이 떠나는 맞춤 여행. 시간당 ₩35,000, 최소 4시간부터 의뢰 가능.',
+    url: buildLocalizedAbsoluteUrl('ko', '/services/intro'),
     images: [{ url: OG_IMAGE, width: 1200, height: 800, alt: '일본 현지인 동행 가이드 서비스 | Locally' }],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: '일본 현지인 동행 가이드 맞춤 의뢰 | Locally',
+    title: '일본 현지인 동행 가이드 맞춤 의뢰',
     description: '도쿄·오사카·후쿠오카에서 검증된 현지인 호스트와 단둘이 떠나는 맞춤 여행.',
     images: [OG_IMAGE],
+  },
+  alternates: {
+    canonical: buildLocalizedAbsoluteUrl('ko', '/services/intro'),
+    languages: {
+      ko: buildLocalizedAbsoluteUrl('ko', '/services/intro'),
+      en: buildLocalizedAbsoluteUrl('en', '/services/intro'),
+      ja: buildLocalizedAbsoluteUrl('ja', '/services/intro'),
+      zh: buildLocalizedAbsoluteUrl('zh', '/services/intro'),
+    },
   },
 };
 

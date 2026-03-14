@@ -2,7 +2,6 @@
 
 import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
-import SiteFooter from '@/app/components/SiteFooter'; // 푸터 import 추가
 import Link from 'next/link';
 
 const SITEMAP_LINKS = [
@@ -22,8 +21,16 @@ const SITEMAP_LINKS = [
     category: 'Hosting',
     links: [
       { name: '호스트 되기', url: '/become-a-host' },
-      { name: '커뮤니티 포럼', url: '/company/community' },
+      { name: '커뮤니티 포럼', url: '/community' },
       { name: '호스트 대시보드', url: '/host/dashboard' },
+    ]
+  },
+  {
+    category: 'Explore',
+    links: [
+      { name: '체험 검색', url: '/search' },
+      { name: '현지 동행 서비스 소개', url: '/services/intro' },
+      { name: '커뮤니티', url: '/community' },
     ]
   },
   {

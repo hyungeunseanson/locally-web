@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-15 (v3.38.82 체험 카드결제 서버 재검증 강화)
-**Version:** 3.38.82 (Experience Card Verification Hardening)
+**Last Updated:** 2026-03-15 (v3.38.86 공개 정보 페이지 메타/사이트맵 1차 정리)
+**Version:** 3.38.86 (Public SEO Metadata & Sitemap Cleanup)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -390,8 +390,10 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - 메타데이터(`metadataBase`, canonical, `alternates.languages`, OG URL), `robots`, `sitemap`, 이메일 기본 링크는 모두 `app/utils/siteUrl.ts` helper를 통해 생성한다.
 - `locally.vercel.app`, `locally-web.vercel.app`, `www.locally-travel.com` 같은 배포 도메인을 개별 파일에 하드코딩하지 않는다.
 - staging/transition 기간에는 `NEXT_PUBLIC_SITE_URL`만 현재 배포 도메인으로 유지하고, 최종 도메인 전환 시에는 env만 교체한다.
-- `/about`, `/search`, `/become-a-host` 같은 공개 랜딩은 route-level metadata를 직접 가진다. 반대로 로그인 리다이렉트가 있는 `/services` 잡보드류는 공개 SEO 보강 대상이 아니라 private `noindex` 정리 대상으로 본다.
+- `/about`, `/search`, `/become-a-host`, `/help`, `/site-map`, `company/*`, `/services/intro` 같은 공개 랜딩/정보 페이지는 route-level metadata를 직접 가진다. 반대로 로그인 리다이렉트가 있는 `/services` 잡보드류는 공개 SEO 보강 대상이 아니라 private `noindex` 정리 대상으로 본다.
 - private 페이지(`app/account`, `app/guest/*`, `app/notifications`, `app/services`, `app/services/my`)는 `app/utils/seo.ts`의 `PRIVATE_NOINDEX_METADATA`를 단일 source로 사용해 `robots: noindex, nofollow`를 강제한다.
+- `/community`처럼 필터 query를 쓰는 공개 목록은 canonical과 `alternates.languages`를 기본 목록 경로에 고정해 query 조합별 중복 신호를 만들지 않는다.
+- `sitemap.xml`은 dead path를 포함하지 않아야 하며, `/search`, `/community`, `/services/intro`, `/site-map` 같은 주요 공개 진입 페이지를 누락하지 않는다.
 
 ---
 

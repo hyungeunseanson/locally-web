@@ -9,7 +9,13 @@ import CommunitySearchControls from './components/CommunitySearchControls';
 import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
-import type { CommunityCategory, CommunityFilterCategory } from '@/app/types/community';
+import type { Experience, Profile } from '@/app/types';
+import type { CommunityCategory, CommunityFilterCategory, CommunityPost } from '@/app/types/community';
+import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
+
+type CommunityPostRow = CommunityPost;
+type FeedProfile = Pick<Profile, 'id' | 'name' | 'full_name' | 'avatar_url'>;
+type FeedExperience = Pick<Experience, 'id' | 'title' | 'image_url' | 'price'>;
 
 // ✅ Vercel 엣지 캐시 비활성화 — 새 글 등록 후 피드가 구 버전 캐시를 서빙하는 버그 방지
 export const dynamic = 'force-dynamic';
@@ -18,20 +24,39 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
     const params = await searchParams;
     const categoryQuery = params?.category as string;
 
-    let title = '커뮤니티 | Locally';
-    if (categoryQuery === 'qna') title = '💡 질문과 답변 - 커뮤니티 | Locally';
-    else if (categoryQuery === 'companion') title = '🤝 동행 찾기 - 커뮤니티 | Locally';
-    else if (categoryQuery === 'info') title = '🗺️ 여행 꿀팁 - 커뮤니티 | Locally';
-    else if (categoryQuery === 'locally_content') title = '✨ 로컬리 콘텐츠 - 커뮤니티 | Locally';
+    let title = '커뮤니티';
+    if (categoryQuery === 'qna') title = '질문과 답변 - 커뮤니티';
+    else if (categoryQuery === 'companion') title = '동행 찾기 - 커뮤니티';
+    else if (categoryQuery === 'info') title = '여행 꿀팁 - 커뮤니티';
+    else if (categoryQuery === 'locally_content') title = '로컬리 콘텐츠 - 커뮤니티';
+
+    const description = '현지인과 여행자들이 생생한 정보를 나누고 동행을 구하는 로컬리 커뮤니티';
+    const canonicalPath = '/community';
+    const canonicalUrl = buildLocalizedAbsoluteUrl('ko', canonicalPath);
 
     return {
         title,
-        description: '현지인과 여행자들이 생생한 정보를 나누고 동행을 구하는 로컬리 커뮤니티',
+        description,
         openGraph: {
             title,
-            description: '현지인과 여행자들이 정보를 나누고 동행을 구하는 로컬리 커뮤니티',
+            description,
+            url: canonicalUrl,
             type: 'website',
-        }
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+        },
+        alternates: {
+            canonical: canonicalUrl,
+            languages: {
+                ko: buildLocalizedAbsoluteUrl('ko', canonicalPath),
+                en: buildLocalizedAbsoluteUrl('en', canonicalPath),
+                ja: buildLocalizedAbsoluteUrl('ja', canonicalPath),
+                zh: buildLocalizedAbsoluteUrl('zh', canonicalPath),
+            },
+        },
     };
 }
 
@@ -73,36 +98,41 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     }
 
     const { data: posts } = await query;
+    const typedPosts: CommunityPostRow[] = posts ?? [];
 
     // ② profiles 별도 조회 (실패해도 피드 유지)
-    let initialData: any[] = [];
-    if (posts && posts.length > 0) {
-        const userIds = [...new Set(posts.map((p: any) => p.user_id))];
+    let initialData: CommunityPost[] = [];
+    if (typedPosts.length > 0) {
+        const userIds = [...new Set(typedPosts.map((post) => post.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')
             .select('id, name, full_name, avatar_url')
             .in('id', userIds);
-        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        const typedProfiles: FeedProfile[] = profiles ?? [];
+        const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile] as const));
 
         // ③ experiences 조건부 조회
-        const expIds = [...new Set(posts.map((p: any) => p.linked_exp_id).filter(Boolean))];
-        let expMap = new Map();
+        const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];
+        let expMap = new Map<number, FeedExperience>();
         if (expIds.length > 0) {
             const { data: experiences } = await supabase
                 .from('experiences')
                 .select('id, title, image_url, price')
                 .in('id', expIds);
-            expMap = new Map((experiences || []).map((e: any) => [e.id, e]));
+            const typedExperiences: FeedExperience[] = experiences ?? [];
+            expMap = new Map(typedExperiences.map((experience) => [experience.id, experience] as const));
         }
 
-        initialData = posts.map((post: any) => ({
+        initialData = typedPosts.map((post) => ({
             ...post,
-            profiles: profileMap.get(post.user_id) ?? null,
-            linked_experience: post.linked_exp_id ? (expMap.get(post.linked_exp_id) ?? null) : null,
+            profiles: (profileMap.get(post.user_id) as Profile | undefined) ?? undefined,
+            linked_experience: post.linked_exp_id
+                ? ((expMap.get(post.linked_exp_id) as Experience | undefined) ?? undefined)
+                : undefined,
         }));
     }
 
-    const initialNextOffset = (posts && posts.length === limit) ? limit : null;
+    const initialNextOffset = typedPosts.length === limit ? limit : null;
 
     const writeCategory = category === 'all' ? 'qna' : category;
 

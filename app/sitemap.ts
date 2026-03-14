@@ -31,6 +31,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.7,
     },
+    {
+      url: buildAbsoluteUrl('/search'),
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
+      url: buildAbsoluteUrl('/community'),
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    {
+      url: buildAbsoluteUrl('/services/intro'),
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: buildAbsoluteUrl('/site-map'),
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
     // 회사 소개 관련 페이지
     {
       url: buildAbsoluteUrl('/company/notices'),
@@ -43,12 +67,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8,
-    },
-    {
-      url: buildAbsoluteUrl('/company/community'),
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.7,
     },
     {
       url: buildAbsoluteUrl('/company/careers'),
