@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.89 — [SEO] Sitemap lastModified 현실화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 정적 sitemap `lastModified` 교정 | `app/sitemap.ts`가 정적 공개 URL의 `lastModified`를 매 요청 시각이 아니라 각 라우트 파일의 실제 수정 시각(`fs.stat().mtime`) 기준으로 계산하도록 변경 |
+| 🟡 route 기준 중앙화 | 정적 공개 URL 목록을 `STATIC_ROUTE_CONFIGS`로 모아 `pathname`, `changeFrequency`, `priority`, `sourcePaths`를 한군데서 관리하도록 정리 |
+| 🟡 fallback 유지 | 라우트 소스 파일 stat이 실패하는 경우에는 `app/sitemap.ts`의 mtime으로 안전하게 fallback 하도록 처리 |
+| 🟡 보호막 추가 | `tests/e2e/29-sitemap.spec.ts` 추가 — `/search`, `/community`, `/services/intro`, `/site-map` 존재, dead path `/company/community` 부재, `<lastmod>` 태그 존재를 직접 검증 |
+
 ## v3.38.88 — [SEO] JSON-LD 1차 추가
 
 | 항목 | 내용 |
