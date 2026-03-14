@@ -31,6 +31,13 @@ function normalizeDateParam(value: string | null) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
+/** UTC ISO 문자열을 KST(UTC+9) 기준 YYYY-MM-DD로 변환 */
+function toKSTDateStr(utcString: string): string {
+  const d = new Date(utcString);
+  d.setHours(d.getHours() + 9);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -53,7 +60,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    let bookingsQuery = supabaseAdmin.from('bookings').select('*').order('created_at', { ascending: false });
+    let bookingsQuery = supabaseAdmin
+      .from('bookings')
+      .select(
+        'id, order_id, user_id, experience_id, status, amount, total_price, total_experience_price, price_at_booking, solo_guarantee_price, host_payout_amount, platform_revenue, payment_method, date, time, guests, contact_name, contact_phone, created_at, cancel_reason, refund_amount, tid, payout_status'
+      )
+      .order('created_at', { ascending: false });
     if (startDate) {
       bookingsQuery = bookingsQuery.gte('date', startDate);
     }
@@ -97,7 +109,12 @@ export async function GET(request: Request) {
     if ((startDate || endDate) && filteredServiceRequests && filteredServiceRequestIds.length === 0) {
       serviceBookingsPromise = Promise.resolve({ data: [], error: null });
     } else {
-      let serviceBookingsQuery = supabaseAdmin.from('service_bookings').select('*').order('created_at', { ascending: false });
+      let serviceBookingsQuery = supabaseAdmin
+        .from('service_bookings')
+        .select(
+          'id, order_id, request_id, application_id, customer_id, host_id, amount, created_at, status, host_payout_amount, platform_revenue, payout_status'
+        )
+        .order('created_at', { ascending: false });
       if ((startDate || endDate) && filteredServiceRequests && filteredServiceRequestIds.length > 0) {
         serviceBookingsQuery = serviceBookingsQuery.in('request_id', filteredServiceRequestIds);
       }
@@ -224,7 +241,7 @@ export async function GET(request: Request) {
         ...booking,
         _type: 'service' as const,
         order_id: booking.order_id ?? booking.id,
-        date: request?.service_date ?? booking.created_at?.slice(0, 10) ?? '',
+        date: request?.service_date ?? (booking.created_at ? toKSTDateStr(booking.created_at) : ''),
         time: request?.start_time ?? '',
         guests: request?.guest_count ?? '-',
         contact_name: customer?.full_name ?? request?.contact_name ?? '-',

@@ -5,7 +5,18 @@
 
 ---
 
+## v3.38.71 — [Master Ledger] 보안·데이터 정합성 교정 4건
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 #2 `select *` 제거 | `bookings`, `service_bookings` 모두 `select('*')` → 필요 컬럼 명시 선택. `tid`(PG 결제 토큰) 등 민감 필드 응답 최소화 |
+| 🟠 #3 KST 날짜 변환 | `service_booking` 날짜 폴백 시 `created_at.slice(0,10)` (UTC 기준) → `toKSTDateStr()` (UTC+9 변환)으로 교정. 오전 9시 이전 예약의 하루 차이 버그 해결 |
+| 🟡 #5 검색 문자열 보완 | `contact_phone`, `profiles.email` 검색 대상 추가. null 안전 `filter(Boolean).join(' ')` 방식으로 교체 |
+| 🟡 #6 `isBankPaymentMethod` 통일 | `.includes('bank')` → `=== 'bank'`로 서버 API 기준과 완전 통일 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.70 — [Team Workspace] 보안 및 데이터 정합성 교정 4건
+
 
 | 항목 | 내용 |
 | --- | --- |

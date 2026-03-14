@@ -52,7 +52,8 @@ function parseDateOnly(value?: string | null) {
 }
 
 function isBankPaymentMethod(value?: string | null) {
-  return value === 'bank' || Boolean(value && value.includes('bank'));
+  // 게선: 서버 API와 동일하게 === 'bank'만 허용
+  return value === 'bank';
 }
 
 function getLedgerBasePrice(booking: AdminMasterLedgerEntry) {
@@ -241,7 +242,15 @@ export default function MasterLedgerTab({
     }
 
     // 검색어 매칭
-    const searchString = `${b.experiences?.profiles?.name} ${b.experiences?.title} ${b.contact_name} ${b.id} ${b.profiles?.email} ${b.order_id ?? ''}`.toLowerCase();
+    const searchString = [
+      b.experiences?.profiles?.name,
+      b.experiences?.title,
+      b.contact_name,
+      b.contact_phone,
+      b.profiles?.email,
+      b.id,
+      b.order_id,
+    ].filter(Boolean).join(' ').toLowerCase();
     const searchMatch = searchString.includes(searchTerm.toLowerCase());
 
     // 상태 필터링
