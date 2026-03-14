@@ -391,6 +391,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - `locally.vercel.app`, `locally-web.vercel.app`, `www.locally-travel.com` 같은 배포 도메인을 개별 파일에 하드코딩하지 않는다.
 - staging/transition 기간에는 `NEXT_PUBLIC_SITE_URL`만 현재 배포 도메인으로 유지하고, 최종 도메인 전환 시에는 env만 교체한다.
 - `/about`, `/search`, `/become-a-host` 같은 공개 랜딩은 route-level metadata를 직접 가진다. 반대로 로그인 리다이렉트가 있는 `/services` 잡보드류는 공개 SEO 보강 대상이 아니라 private `noindex` 정리 대상으로 본다.
+- private 페이지(`app/account`, `app/guest/*`, `app/notifications`, `app/services`, `app/services/my`)는 `app/utils/seo.ts`의 `PRIVATE_NOINDEX_METADATA`를 단일 source로 사용해 `robots: noindex, nofollow`를 강제한다.
 
 ---
 

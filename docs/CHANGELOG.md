@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.85 — [SEO] Private 페이지 noindex 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 private noindex 기준 추가 | `app/utils/seo.ts`에 `PRIVATE_NOINDEX_METADATA` 추가 — private 페이지의 `robots: noindex, nofollow` 단일 source로 사용 |
+| 🟡 layout 단위 noindex 적용 | `app/account/layout.tsx`, `app/guest/layout.tsx`, `app/notifications/layout.tsx`, `app/services/my/layout.tsx` 추가 — 해당 private 페이지군의 검색 노출 차단 |
+| 🟡 `/services` 루트 wrapper 정리 | 기존 client page를 `app/services/ServiceJobBoardClient.tsx`로 분리하고, `app/services/page.tsx`는 server wrapper로 교체해 job board 루트에도 noindex metadata 부여 |
+| 🟡 보호막 추가 | `tests/e2e/26-private-noindex.spec.ts` 추가 — `/account`, `/guest/*`, `/notifications`, `/services`, `/services/my` 응답 HTML에 `robots noindex,nofollow` 메타가 직접 포함되는지 검증 |
+| 🟡 검증 | `npx eslint`, `npx tsc --noEmit`, `git diff --check`, `npx playwright test tests/e2e/26-private-noindex.spec.ts --project=chromium`, `npx playwright test tests/e2e/25-public-metadata.spec.ts --project=chromium` 기준으로 확인 |
+
 ## v3.38.84 — [SEO] 공개 랜딩 페이지 메타데이터 보강
 
 | 항목 | 내용 |
