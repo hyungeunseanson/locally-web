@@ -272,7 +272,9 @@ export async function GET(request: Request) {
     const now = endAt ? new Date(endAt) : new Date();
     const startBoundary = startAt ? new Date(startAt) : new Date(now.getTime() - (30 * MS_PER_DAY));
     const totalRangeDays = Math.max(1, Math.ceil((now.getTime() - startBoundary.getTime()) / MS_PER_DAY));
-    const comparisonWindowDays = clampWindowDays(Math.floor(totalRangeDays / 2) || 7);
+    const rawWindowDays = Math.floor(totalRangeDays / 2) || 7;
+    const comparisonWindowDays = clampWindowDays(rawWindowDays);
+    const windowClamped = comparisonWindowDays !== rawWindowDays;
     const recentStartMs = now.getTime() - ((comparisonWindowDays - 1) * MS_PER_DAY);
     const previousEndMs = recentStartMs - 1;
     const previousStartMs = previousEndMs - ((comparisonWindowDays - 1) * MS_PER_DAY);
@@ -473,6 +475,7 @@ export async function GET(request: Request) {
       data: {
         totalSearches,
         comparisonWindowDays,
+        windowClamped,
         topKeywords,
         risingKeywords,
         lowSupplyKeywords,

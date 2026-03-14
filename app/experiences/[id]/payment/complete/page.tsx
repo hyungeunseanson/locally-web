@@ -11,6 +11,7 @@ import { useToast } from '@/app/context/ToastContext';
 import Spinner from '@/app/components/ui/Spinner';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
+import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 
 type BookingExperience = {
   id?: string | number;
@@ -80,6 +81,18 @@ function PaymentCompleteContent() {
         setBooking(data);
         // 🎉 데이터 로드 성공 시 폭죽 발사!
         fireConfetti();
+        // 결제 완료 analytics 이벤트 기록
+        const experienceId = data.experiences?.id;
+        if (experienceId) {
+          supabase.from('analytics_events').insert([{
+            event_type: 'booking_confirmed',
+            target_id: String(experienceId),
+            user_id: null,
+            ...getAnalyticsTrackingMetadata(),
+          }]).then(({ error }) => {
+            if (error) console.error('booking_confirmed event error:', error);
+          });
+        }
       }
       setLoading(false);
     };

@@ -102,11 +102,12 @@ function parseBirthYear(rawValue: string | null | undefined) {
 }
 
 function getAgeBucket(birthYear: number | null) {
-  if (!birthYear) return null;
+  if (!birthYear || !Number.isInteger(birthYear)) return null;
 
   const currentYear = new Date().getFullYear();
   const age = currentYear - birthYear;
 
+  if (age < 0 || age > 120) return null; // 비정상 값 방어
   if (age < 20) return '10대';
   if (age < 30) return '20대';
   if (age < 40) return '30대';
