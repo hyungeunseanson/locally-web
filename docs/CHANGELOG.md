@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.78 — [SEO] Sitemap 동적 체험 URL 추가 + Middleware 언어 자동감지 수정
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 Fix A: Sitemap 동적 라우트 | `app/sitemap.ts`: 정적 11개 URL에 Supabase `experiences` 테이블 `status='active'` 체험 전체를 동적으로 추가. `revalidate=3600` (1시간 캐시). Supabase 조회 실패 시 정적 URL만 반환하는 graceful fallback 내장 |
+| 🟡 Fix B: Middleware Accept-Language 복원 | `app/middleware.ts`: URL prefix 없을 때 `x-locally-locale='ko'`를 무조건 주입하던 버그 수정 → URL prefix 있을 때만 헤더 주입. prefix 없으면 `locale.ts`가 cookie → Accept-Language 순으로 정상 처리. 일본어/중국어/영어 브라우저 첫 방문 SSR 언어 정확도 향상 + 기존 언어 선택 유저의 서버사이드 깜빡임 제거 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 에러 0건 (Exit 0) |
+
 ## v3.38.77 — [Community] 봇 cron 안정화 + RightSidebar 실 DB 연동
 
 | 항목 | 내용 |

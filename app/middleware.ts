@@ -14,11 +14,13 @@ export async function middleware(request: NextRequest) {
 
   // 1. URL Path에서 locale 추출 (ko|en|ja|zh)
   const localeMatch = pathname.match(/^\/(ko|en|ja|zh)(\/|$)/);
-  const locale = localeMatch ? localeMatch[1] : 'ko';
 
-  // 2. 헤더 복사 및 언어 값 주입 (Secret Memo)
+  // 2. 헤더 복사 — URL prefix 있을 때만 주입
+  // prefix 없으면 헤더 미주입 → locale.ts가 cookie → Accept-Language 순으로 자연스럽게 처리
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-locally-locale', locale);
+  if (localeMatch) {
+    requestHeaders.set('x-locally-locale', localeMatch[1]);
+  }
 
   // 3. 조작된 헤더를 지닌 request 껍데기를 만들어 하위 로직(updateSession)으로 패스
   const modifiedRequest = new NextRequest(request, {
