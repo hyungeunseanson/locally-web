@@ -1,8 +1,10 @@
 import React from 'react';
 import { Metadata } from 'next';
 import HomePageClient from '@/app/components/HomePageClient';
+import JsonLd from '@/app/components/seo/JsonLd';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
+import { buildOrganizationJsonLd, buildWebsiteJsonLd } from '@/app/utils/structuredData';
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getCurrentLocale();
@@ -41,6 +43,13 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function Page() {
-  return <HomePageClient />;
+export default async function Page() {
+  const locale = await getCurrentLocale();
+
+  return (
+    <>
+      <JsonLd data={[buildOrganizationJsonLd(locale), buildWebsiteJsonLd(locale)]} />
+      <HomePageClient />
+    </>
+  );
 }

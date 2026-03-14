@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-15 (v3.38.87 동적 상세 공개 기준 1차 정리)
-**Version:** 3.38.87 (Dynamic Detail SEO Boundaries)
+**Last Updated:** 2026-03-15 (v3.38.88 JSON-LD 1차 추가)
+**Version:** 3.38.88 (JSON-LD Initial Rollout)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -395,6 +395,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - `/community`처럼 필터 query를 쓰는 공개 목록은 canonical과 `alternates.languages`를 기본 목록 경로에 고정해 query 조합별 중복 신호를 만들지 않는다.
 - `sitemap.xml`은 dead path를 포함하지 않아야 하며, `/search`, `/community`, `/services/intro`, `/site-map` 같은 주요 공개 진입 페이지를 누락하지 않는다.
 - 동적 상세 중 체험 상세는 `status='active' && is_active !== false`일 때만 indexable 메타를 유지하고, 그 외 상태는 `noindex`로 낮춘다. 서비스 의뢰 상세(`/services/[requestId]`)는 공유용 title/description은 유지하되 항상 `noindex`다.
+- JSON-LD는 `app/components/seo/JsonLd.tsx`와 `app/utils/structuredData.ts`를 통해 주입한다. 1차 범위는 홈(`Organization`, `WebSite`), 공개 체험 상세(`Product`), 커뮤니티 상세(`Article`)까지이며, 실제 화면/DB에 존재하는 사실만 구조화 데이터에 넣는다.
 
 ---
 

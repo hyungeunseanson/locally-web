@@ -10,8 +10,10 @@ import CommentSection from '../components/CommentSection';
 import LikeButton from '../components/LikeButton';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
+import JsonLd from '@/app/components/seo/JsonLd';
 import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
+import { buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -110,6 +112,8 @@ export default async function CommunityPostDetail({
     const authorName = getProfileDisplayName(profile);
     const authorInitial = getProfileInitial(profile);
     const pageUrl = buildAbsoluteUrl(`/community/${id}`);
+    const articleDescription = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
+    const articleImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
     const fallbackParams = new URLSearchParams();
     fallbackParams.set('category', (detailSearchParams?.category as string) || post.category);
     const fallbackQuery = ((detailSearchParams?.q as string) || '').trim();
@@ -119,10 +123,23 @@ export default async function CommunityPostDetail({
     const fallbackHref = `/community?${fallbackParams.toString()}`;
 
     return (
-        // 데스크탑: max-w-7xl 2컬럼 / 모바일: max-w-[768px] 단일 컬럼
-        <div className="min-h-screen bg-[#F7F7F9]">
-            <div className="max-w-7xl mx-auto lg:px-4 lg:py-8">
-                <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+        <>
+            <JsonLd
+                data={buildCommunityArticleJsonLd({
+                    title: post.title,
+                    description: articleDescription,
+                    url: pageUrl,
+                    imageUrl: articleImage,
+                    authorName,
+                    datePublished: post.created_at,
+                    dateModified: post.updated_at,
+                    section: post.category,
+                })}
+            />
+            {/* 데스크탑: max-w-7xl 2컬럼 / 모바일: max-w-[768px] 단일 컬럼 */}
+            <div className="min-h-screen bg-[#F7F7F9]">
+                <div className="max-w-7xl mx-auto lg:px-4 lg:py-8">
+                    <div className="lg:grid lg:grid-cols-12 lg:gap-8">
 
                     {/* ─── 좌측: 게시글 본문 (lg:col-span-8) ─── */}
                     <div className="lg:col-span-8">
@@ -254,8 +271,9 @@ export default async function CommunityPostDetail({
                         </div>
                     </div>
 
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }

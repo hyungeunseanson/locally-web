@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
 import ExperienceClient from './ExperienceClient';
+import JsonLd from '@/app/components/seo/JsonLd';
 import { notFound } from 'next/navigation';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
@@ -9,6 +10,7 @@ import { getHostPublicProfile } from '@/app/utils/profile';
 import { ExperienceDetail, HostProfileDetail } from './types';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
+import { buildExperienceProductJsonLd } from '@/app/utils/structuredData';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -82,6 +84,7 @@ export async function generateMetadata(
 // 🟢 메인 페이지 컴포넌트 (Server Side Rendering)
 export default async function Page({ params }: Props) {
   const { id } = await params;
+  const locale = await getCurrentLocale();
   const supabase = await createClient();
 
   // 1. 병렬 데이터 페칭 (속도 최적화)
@@ -174,14 +177,34 @@ export default async function Page({ params }: Props) {
   }
 
   // 4. Client Component로 데이터 전달
+  const isPublicExperience = experience.status === 'active' && experience.is_active !== false;
+  const experienceJsonLd =
+    isPublicExperience
+      ? buildExperienceProductJsonLd({
+          id,
+          locale,
+          title: getContent(experience, 'title', locale),
+          description: getContent(experience, 'description', locale),
+          imageUrl: experience.photos?.[0] || experience.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb',
+          price: typeof experience.price === 'number' ? experience.price : Number(experience.price || 0),
+          category: experience.category || null,
+          city: experience.city || null,
+          country: typeof experience.country === 'string' ? experience.country : null,
+          providerName: hostProfile?.name || null,
+        })
+      : null;
+
   return (
-    <ExperienceClient
-      initialUser={userResult.data.user}
-      initialExperience={experience}
-      initialHostProfile={hostProfile}
-      initialAvailableDates={availableDates}
-      initialDateToTimeMap={dateToTimeMap}
-      initialRemainingSeatsMap={remainingSeatsMap}
-    />
+    <>
+      {experienceJsonLd ? <JsonLd data={experienceJsonLd} /> : null}
+      <ExperienceClient
+        initialUser={userResult.data.user}
+        initialExperience={experience}
+        initialHostProfile={hostProfile}
+        initialAvailableDates={availableDates}
+        initialDateToTimeMap={dateToTimeMap}
+        initialRemainingSeatsMap={remainingSeatsMap}
+      />
+    </>
   );
 }

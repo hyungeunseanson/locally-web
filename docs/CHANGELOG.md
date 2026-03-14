@@ -5,6 +5,16 @@
 
 ---
 
+## v3.38.88 — [SEO] JSON-LD 1차 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 홈 구조화 데이터 추가 | `app/page.tsx`에 `Organization`, `WebSite` JSON-LD를 추가해 브랜드/사이트 검색 엔트리 의미를 검색엔진에 명시 |
+| 🟠 체험 상세 구조화 데이터 추가 | `app/experiences/[id]/page.tsx`의 공개(active) 체험에만 `Product` JSON-LD를 추가하고, 제목/설명/대표 이미지/가격/카테고리/호스트명을 실제 데이터 기준으로 노출 |
+| 🟠 커뮤니티 상세 구조화 데이터 추가 | `app/community/[id]/page.tsx`에 `Article` JSON-LD를 추가해 게시글 제목/요약/대표 이미지/작성자/게시일을 구조화 데이터로 제공 |
+| 🟡 공용 helper 추가 | `app/components/seo/JsonLd.tsx`, `app/utils/structuredData.ts` 추가 — 구조화 데이터 직렬화와 `Organization`/`WebSite`/`Product`/`Article` 생성 기준을 중앙화 |
+| 🟡 보호막 추가 | `tests/e2e/28-json-ld.spec.ts` 추가 — 홈, 활성 체험 상세, 커뮤니티 상세에서 `Organization`, `WebSite`, `Product`, `Article` JSON-LD가 실제 HTML에 포함되는지 확인 |
+
 ## v3.38.87 — [SEO] 동적 상세 공개 기준 1차 정리
 
 | 항목 | 내용 |
