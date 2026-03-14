@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
@@ -58,6 +58,8 @@ type AdminChatState = {
 export default function ChatMonitor() {
   const searchParams = useSearchParams();
   const targetInquiryId = searchParams.get('inquiryId');
+  const router = useRouter();
+  const pathname = usePathname();
 
   const {
     inquiries,
@@ -91,12 +93,19 @@ export default function ChatMonitor() {
     }
   }, [targetInquiryId, inquiries?.length]);
 
+  const handleClearSelected = () => {
+    clearSelected();
+    if (targetInquiryId) {
+      router.replace(pathname, { scroll: false });
+    }
+  };
+
   const handleUpdateCSStatus = async (inquiryId: number | string, newStatus: CSStatus) => {
     try {
       const response = await fetch(`/api/admin/inquiries/${inquiryId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, updated_at: selectedInquiry?.updated_at }),
       });
 
       const result = await response.json();
@@ -304,7 +313,7 @@ export default function ChatMonitor() {
               )}
               <div className="flex items-center gap-1.5 md:gap-4 min-w-0">
                 <button
-                  onClick={clearSelected} // 목록으로 돌아가기
+                  onClick={handleClearSelected} // 목록으로 돌아가기
                   className="md:hidden p-1.5 -ml-1 text-slate-500 shrink-0 bg-slate-100 rounded-full"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>

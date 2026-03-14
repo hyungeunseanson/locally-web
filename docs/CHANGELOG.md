@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.68 — [Message Monitoring] 동시성 방어 및 감사로그 정합성 보정 (Phase 2)
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 상태 변경 Optimistic Lock 도입 | `/api/admin/inquiries/[id]/status` 호출 시 `updated_at`을 검증해, 다수의 관리자가 동시에 처리할 때 발생하는 '마지막 작성자 덮어쓰기'를 원천 방어 (409 Conflict) |
+| 🟠 1:1 문의 랜덤 배정 폐기 | `thread/shared.ts`에서 CS 시작 시 `Math.random`으로 관리자 1명을 무작위 할당하던 로직을 폐기하고 `host_id`를 null로 두어, 팀 전체가 오픈 풀 형태로응대하도록 구조화 |
+| 🟡 관리자 답변 감사 로그 | 관리자가 1:1 지원 문의에 답변할 때마다 `admin_audit_logs`에 발송자, 문의 대상, 메시지 미리보기(`ADMIN_CS_MESSAGE_SEND`)를 남겨 내부 운영 투명성 확보 |
+| 🟡 URL 파라미터 찌꺼기 픽스 | `ChatMonitor.tsx`에서 다른 문의로 넘어갔다가 돌아올 때 기존 `?inquiryId=`가 남아 강제 선택되는 버그를 `router.replace` 파라미터 소거로 해결 |
+
 ## v3.38.67 — [Message Monitoring] 성능 최적화 및 정합성 보정 (Phase 1)
 
 | 항목 | 내용 |

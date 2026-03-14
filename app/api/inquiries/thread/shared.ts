@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 
-import { createAdminClient } from '@/app/utils/supabase/admin';
+import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sanitizeText } from '@/app/utils/sanitize';
 
@@ -375,13 +375,11 @@ async function resolveAdminSupportThread(params: {
   body: InquiryThreadRequestBody;
 }): Promise<ResolvedInquiryThread> {
   const { actor } = params;
-  const adminIds = await getAdminRecipientIds();
-  const randomAdminId = adminIds[Math.floor(Math.random() * adminIds.length)];
 
   return {
     existing: null,
     guestId: actor.id,
-    hostId: randomAdminId,
+    hostId: null, // 특정 담당자 무작위 배정 대신 null로 두어 전체 풀(Open Pool)에서 처리
     experienceId: null,
     serviceRequestId: null,
     inquiryType: 'admin_support' as const,
@@ -556,6 +554,27 @@ export async function createInquiryMessage(params: {
       message: displayContent,
       link: notificationLink,
     });
+  }
+
+  // 🟢 관리자가 CS 문의에 답변할 경우 운영 감사로그 추가
+  if (actorIsAdmin && isAdminSupport) {
+    try {
+      await recordAuditLog({
+        admin_id: actor.id,
+        admin_email: actor.email || '',
+        action_type: 'ADMIN_CS_MESSAGE_SEND',
+        target_type: 'inquiries',
+        target_id: String(inquiry.id),
+        details: {
+          inquiry_type: inquiry.type,
+          guest_id: inquiry.user_id,
+          message_id: insertedMessage.id,
+          content_preview: cleanContent ? cleanContent.substring(0, 50) : (normalizedType === 'image' ? '[이미지 첨부]' : ''),
+        },
+      });
+    } catch (e) {
+      console.warn('[inquiries/thread] audit log failed:', e);
+    }
   }
 
   return {

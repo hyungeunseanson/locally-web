@@ -11,6 +11,7 @@ type InquiryStatusRow = {
   type: string | null;
   status: string | null;
   user_id: string;
+  updated_at: string | null;
 };
 
 export async function PATCH(
@@ -46,6 +47,7 @@ export async function PATCH(
 
     const body = await request.json();
     const nextStatus = typeof body?.status === 'string' ? body.status : '';
+    const clientUpdatedAt = typeof body?.updated_at === 'string' ? body.updated_at : null;
 
     if (!ALLOWED_STATUSES.has(nextStatus)) {
       return NextResponse.json({ success: false, error: '유효하지 않은 상태값입니다.' }, { status: 400 });
@@ -53,7 +55,7 @@ export async function PATCH(
 
     const { data: inquiry, error: inquiryError } = await supabaseAdmin
       .from('inquiries')
-      .select('id, type, status, user_id')
+      .select('id, type, status, user_id, updated_at')
       .eq('id', inquiryId)
       .maybeSingle<InquiryStatusRow>();
 
@@ -74,11 +76,18 @@ export async function PATCH(
       return NextResponse.json({ success: true, data: { id: inquiryId, status: nextStatus } });
     }
 
+    // 동시성 방어 (Optimistic Locking)
+    if (clientUpdatedAt && inquiry.updated_at && clientUpdatedAt !== inquiry.updated_at) {
+      return NextResponse.json({ success: false, error: '다른 관리자에 의해 이미 상태가 변경되었습니다. 최신 상태를 확인해주세요.' }, { status: 409 });
+    }
+
+    const newUpdatedAt = new Date().toISOString();
+
     const { data: updatedInquiry, error: updateError } = await supabaseAdmin
       .from('inquiries')
-      .update({ status: nextStatus })
+      .update({ status: nextStatus, updated_at: newUpdatedAt })
       .eq('id', inquiryId)
-      .select('id, status')
+      .select('id, status, updated_at')
       .maybeSingle();
 
     if (updateError) {
