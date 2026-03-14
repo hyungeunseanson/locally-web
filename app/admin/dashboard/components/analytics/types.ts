@@ -1,3 +1,107 @@
+export type SummarySource = 'server' | 'cached' | 'fallback';
+
+export type AnalyticsBookingInput = {
+  created_at?: string | null;
+  status?: string | null;
+  amount?: number | string | null;
+  user_id?: string | null;
+  experience_id?: string | null;
+};
+
+export type AnalyticsUserInput = {
+  id?: string | null;
+  name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  created_at?: string | null;
+  nationality?: string | null;
+  age?: number | string | null;
+  birth_year?: number | string | null;
+  gender?: string | null;
+};
+
+export type AnalyticsExperienceInput = {
+  id?: string | null;
+  host_id?: string | null;
+  title?: string | null;
+  image_url?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  [key: string]: unknown;
+};
+
+export type AnalyticsApplicationInput = {
+  created_at?: string | null;
+  status?: string | null;
+  source?: string | null;
+  host_nationality?: string | null;
+  languages?: string[] | string | null;
+};
+
+export type AnalyticsReviewInput = {
+  created_at?: string | null;
+  experience_id?: string | null;
+  rating?: number | null;
+};
+
+export type AnalyticsSearchLogInput = {
+  created_at?: string | null;
+  keyword?: string | null;
+};
+
+export type AnalyticsEventInput = {
+  created_at?: string | null;
+  event_type?: string | null;
+};
+
+export type AnalyticsInquiryInput = {
+  id?: string | null;
+  host_id?: string | null;
+  created_at?: string | null;
+};
+
+export type AnalyticsInquiryMessageInput = {
+  inquiry_id?: string | null;
+  sender_id?: string | null;
+  created_at?: string | null;
+};
+
+export type AnalyticsBucket = {
+  name: string;
+  count: number;
+  percent: number;
+};
+
+export type AnalyticsHostCandidate = {
+  id: string;
+  name: string;
+  email?: string | null;
+  bookings: number;
+  cancelCount: number;
+  rating: string;
+};
+
+export type AnalyticsResponseHost = {
+  id: string;
+  name: string;
+  rate: number;
+  timeMins: number;
+  total: number;
+};
+
+export type AnalyticsTimeSeriesPoint = {
+  dateStr: string;
+  amount: number;
+  height: number;
+};
+
+export type AnalyticsExperienceSummary = AnalyticsExperienceInput & {
+  bookingCount: number;
+  totalRevenue: number;
+  rating: string;
+  reviewCount: number;
+};
+
 export type SearchTrendItem = {
   keyword: string;
   count: number;
@@ -54,6 +158,58 @@ export type CompositionBucket = {
   customers: number;
   percent: number;
 };
+
+export type AnalyticsHostEcosystem = {
+  sources: AnalyticsBucket[];
+  languages: AnalyticsBucket[];
+  nationalities: AnalyticsBucket[];
+  allSources: AnalyticsBucket[];
+  allLanguages: AnalyticsBucket[];
+  allNationalities: AnalyticsBucket[];
+  funnel: { applied: number; approved: number; active: number; booked: number };
+};
+
+export type AnalyticsBusinessSummary = {
+  totalUsers: number;
+  activeExpsCount: number;
+  gmv: number;
+  netRevenue: number;
+  hostPayout: number;
+  conversionRate: string;
+  retentionRate: string;
+  aov: number;
+  cancellationRate: number;
+  topExperiences: AnalyticsExperienceSummary[];
+  allExperiences: AnalyticsExperienceSummary[];
+  funnel: { views: number; clicks: number; paymentInit: number; completed: number };
+  cancelBreakdown: { user: number; host: number };
+  priceDistribution: { low: number; mid: number; high: number };
+  demographics: {
+    nationalities: AnalyticsBucket[];
+    ages: AnalyticsBucket[];
+    genders: AnalyticsBucket[];
+    allNationalities: AnalyticsBucket[];
+  };
+  searchTrends: SearchTrendItem[];
+  allSearchTrends: SearchTrendItem[];
+  timeSeries: AnalyticsTimeSeriesPoint[];
+  newUsersList: AnalyticsUserInput[];
+  topRevenueDate: { dateStr: string; amount: number };
+  expsBreakdown: { new: number; active: number; pending: number; rejected: number };
+  retentionBreakdown: { once: number; twice: number; threeOrMore: number };
+};
+
+export type AnalyticsHostSummary = {
+  superHostCandidates: AnalyticsHostCandidate[];
+  riskHosts: AnalyticsHostCandidate[];
+  hostEcosystem: AnalyticsHostEcosystem;
+  avgResponseTime: number;
+  responseRate: number;
+  topRespHosts: AnalyticsResponseHost[];
+  bottomRespHosts: AnalyticsResponseHost[];
+};
+
+export type AnalyticsStats = AnalyticsBusinessSummary & AnalyticsHostSummary;
 
 export type SourceFunnelBucket = {
   name: string;

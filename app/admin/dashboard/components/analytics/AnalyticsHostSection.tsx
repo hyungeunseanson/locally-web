@@ -3,15 +3,14 @@
 import React from 'react';
 import { Activity, AlertTriangle, CheckCircle, Search, Star, TrendingUp, UserCheck } from 'lucide-react';
 import { SimpleKpi } from './helpers';
-
-type SummarySource = 'server' | 'cached' | 'fallback';
+import type { AnalyticsStats, SummarySource } from './types';
 
 export default function AnalyticsHostSection({
   stats,
   summarySource,
   onSelectMetric,
 }: {
-  stats: any;
+  stats: AnalyticsStats;
   summarySource: SummarySource;
   onSelectMetric: (metric: string) => void;
 }) {
@@ -98,7 +97,7 @@ export default function AnalyticsHostSection({
             <UserCheck size={16} className="text-emerald-500 md:w-[18px] md:h-[18px]" />
           </div>
           <div className="space-y-4">
-            {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((host: any) => (
+            {stats.superHostCandidates.length > 0 ? stats.superHostCandidates.map((host) => (
               <div key={host.id} onClick={() => { window.location.href = `/users/${host.id}`; }} className="flex items-center gap-4 p-3 hover:bg-emerald-50/50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-emerald-100">
                 <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
                   {host.name[0]}
@@ -134,7 +133,7 @@ export default function AnalyticsHostSection({
             <AlertTriangle size={16} className="text-rose-500 animate-pulse md:w-[18px] md:h-[18px]" />
           </div>
           <div className="space-y-4 relative z-10">
-            {stats.riskHosts.length > 0 ? stats.riskHosts.map((host: any) => (
+            {stats.riskHosts.length > 0 ? stats.riskHosts.map((host) => (
               <div key={host.id} onClick={() => { window.location.href = `/users/${host.id}`; }} className="flex items-center gap-4 p-3 bg-white hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-slate-100 hover:border-rose-200">
                 <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
                   {host.name[0]}
@@ -211,7 +210,7 @@ export default function AnalyticsHostSection({
               <Search size={16} className="text-indigo-400 md:w-[18px] md:h-[18px]" /> 주요 유입 경로
             </h3>
             <div className="space-y-5 relative z-10">
-              {stats.hostEcosystem.sources.map((src: any, i: number) => (
+              {stats.hostEcosystem.sources.map((src, i) => (
                 <div key={i}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-medium text-slate-300">{src.name}</span>
@@ -231,7 +230,7 @@ export default function AnalyticsHostSection({
                 <UserCheck size={16} className="text-blue-500 md:w-[18px] md:h-[18px]" /> 호스트 국적 비율
               </h3>
               <div className="flex h-24 md:h-32 items-end gap-2 border-b border-slate-100 pb-2">
-                {stats.hostEcosystem.nationalities.map((nat: any, i: number) => (
+                {stats.hostEcosystem.nationalities.map((nat, i) => (
                   <div key={i} className="flex-1 flex flex-col justify-end group cursor-pointer relative">
                     <div className="absolute -top-6 md:-top-8 w-full text-center text-[10px] md:text-xs font-bold text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
                       {nat.count}명
@@ -248,7 +247,7 @@ export default function AnalyticsHostSection({
                 <Star size={16} className="text-yellow-500 md:w-[18px] md:h-[18px]" /> 보유 언어 역량
               </h3>
               <div className="space-y-4">
-                {stats.hostEcosystem.languages.map((lang: any, i: number) => (
+                {stats.hostEcosystem.languages.map((lang, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="w-20 text-xs font-bold text-slate-600">{lang.name}</div>
                     <div className="flex-1 h-2 bg-slate-100 rounded-full">

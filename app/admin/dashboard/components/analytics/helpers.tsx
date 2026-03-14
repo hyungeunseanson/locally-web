@@ -1,6 +1,31 @@
 'use client';
 
-export function SimpleKpi({ label, value, unit, className, sub, onClick }: any) {
+import type { ReactNode } from 'react';
+
+type SimpleKpiProps = {
+  label: string;
+  value: number | string;
+  unit?: string;
+  className?: string;
+  sub?: string;
+  onClick?: () => void;
+};
+
+type FunnelBarProps = {
+  label: string;
+  value: number;
+  max: number;
+  isFinal?: boolean;
+  color: string;
+};
+
+type SimpleBarProps = {
+  label: ReactNode;
+  val: number;
+  max: number;
+};
+
+export function SimpleKpi({ label, value, unit = '', className = '', sub, onClick }: SimpleKpiProps) {
   return (
     <div
       onClick={onClick}
@@ -22,7 +47,7 @@ export function SimpleKpi({ label, value, unit, className, sub, onClick }: any) 
   );
 }
 
-export function FunnelBar({ label, value, max, isFinal, color }: any) {
+export function FunnelBar({ label, value, max, isFinal = false, color }: FunnelBarProps) {
   const percent = max > 0 ? (value / max) * 100 : 0;
   return (
     <div className="flex items-center gap-2 md:gap-4 group">
@@ -45,7 +70,7 @@ export function FunnelBar({ label, value, max, isFinal, color }: any) {
   );
 }
 
-export function SimpleBar({ label, val, max }: any) {
+export function SimpleBar({ label, val, max }: SimpleBarProps) {
   const percent = max > 0 ? (val / max) * 100 : 0;
   return (
     <div className="flex items-center gap-3">

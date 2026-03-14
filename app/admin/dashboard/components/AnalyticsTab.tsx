@@ -1,94 +1,54 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
-import { Star, X, TrendingUp, AlertTriangle, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Star, X, TrendingUp, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import Skeleton from '@/app/components/ui/Skeleton';
-import { useToast } from '@/app/context/ToastContext';
 import dynamic from 'next/dynamic';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
-import { Range } from 'react-date-range';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/constants/bookingStatus';
+import { Range, type RangeKeyDict } from 'react-date-range';
+import { format, subDays } from 'date-fns';
 import ReviewsTab from './ReviewsTab';
 import AuditLogTab from './AuditLogTab';
 import AnalyticsBusinessSection from './analytics/AnalyticsBusinessSection';
 import AnalyticsHostSection from './analytics/AnalyticsHostSection';
-import { SimpleKpi, FunnelBar, SimpleBar } from './analytics/helpers';
-import { getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
+import { FunnelBar, SimpleBar } from './analytics/helpers';
+import { useAnalyticsSummaryData } from '../hooks/useAnalyticsSummaryData';
 import type {
-  AnalyticsCustomerCompositionSummary,
-  AnalyticsSearchIntentSummary,
-  CustomerCompositionSource,
-  SearchIntentSource,
-  SearchTrendItem,
+  AnalyticsApplicationInput,
+  AnalyticsBookingInput,
+  AnalyticsEventInput,
+  AnalyticsExperienceInput,
+  AnalyticsInquiryInput,
+  AnalyticsInquiryMessageInput,
+  AnalyticsReviewInput,
+  AnalyticsSearchLogInput,
+  AnalyticsUserInput,
 } from './analytics/types';
 
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
 
 interface AnalyticsTabProps {
-  bookings?: any[];
-  users?: any[];
-  exps?: any[];
-  apps?: any[];
-  reviews?: any[];
-  searchLogs?: any[]; // 🟢 추가
-  analyticsEvents?: any[]; // 🟢 추가
-  inquiries?: any[]; // 🟢 추가
-  inquiryMessages?: any[]; // 🟢 추가
+  bookings?: AnalyticsBookingInput[];
+  users?: AnalyticsUserInput[];
+  exps?: AnalyticsExperienceInput[];
+  apps?: AnalyticsApplicationInput[];
+  reviews?: AnalyticsReviewInput[];
+  searchLogs?: AnalyticsSearchLogInput[];
+  analyticsEvents?: AnalyticsEventInput[];
+  inquiries?: AnalyticsInquiryInput[];
+  inquiryMessages?: AnalyticsInquiryMessageInput[];
 }
 
-const EMPTY_ANALYTICS_ITEMS: any[] = [];
+const EMPTY_ANALYTICS_ITEMS: never[] = [];
+type AnalyticsMainTab = 'business' | 'host' | 'reviews' | 'logs';
 
-type AnalyticsBusinessSummary = {
-  totalUsers: number;
-  activeExpsCount: number;
-  gmv: number;
-  netRevenue: number;
-  hostPayout: number;
-  conversionRate: string;
-  retentionRate: string;
-  aov: number;
-  cancellationRate: number;
-  topExperiences: any[];
-  allExperiences: any[];
-  funnel: { views: number; clicks: number; paymentInit: number; completed: number };
-  cancelBreakdown: { user: number; host: number };
-  priceDistribution: { low: number; mid: number; high: number };
-  demographics: {
-    nationalities: { name: string; count: number; percent: number }[];
-    ages: { name: string; count: number; percent: number }[];
-    genders: { name: string; count: number; percent: number }[];
-    allNationalities: { name: string; count: number; percent: number }[];
-  };
-  searchTrends: { keyword: string; count: number; percent: number }[];
-  allSearchTrends: { keyword: string; count: number; percent: number }[];
-  timeSeries: { dateStr: string; amount: number; height: number }[];
-  newUsersList: any[];
-  topRevenueDate: { dateStr: string; amount: number };
-  expsBreakdown: { new: number; active: number; pending: number; rejected: number };
-  retentionBreakdown: { once: number; twice: number; threeOrMore: number };
-};
-
-type AnalyticsHostSummary = {
-  superHostCandidates: any[];
-  riskHosts: any[];
-  hostEcosystem: {
-    sources: { name: string; count: number; percent: number }[];
-    languages: { name: string; count: number; percent: number }[];
-    nationalities: { name: string; count: number; percent: number }[];
-    allSources: { name: string; count: number; percent: number }[];
-    allLanguages: { name: string; count: number; percent: number }[];
-    allNationalities: { name: string; count: number; percent: number }[];
-    funnel: { applied: number; approved: number; active: number; booked: number };
-  };
-  avgResponseTime: number;
-  responseRate: number;
-  topRespHosts: any[];
-  bottomRespHosts: any[];
-};
-
-type SummarySource = 'server' | 'cached' | 'fallback';
+const ANALYTICS_MAIN_TABS: Array<{ id: AnalyticsMainTab; label: string }> = [
+  { id: 'business', label: 'Business & Guest' },
+  { id: 'host', label: 'Host Ecosystem' },
+  { id: 'reviews', label: 'Review Quality' },
+  { id: 'logs', label: '운영 감사 로그' },
+];
 
 export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   const bookings = props.bookings ?? EMPTY_ANALYTICS_ITEMS;
@@ -100,29 +60,8 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
   const analyticsEvents = props.analyticsEvents ?? EMPTY_ANALYTICS_ITEMS;
   const inquiries = props.inquiries ?? EMPTY_ANALYTICS_ITEMS;
   const inquiryMessages = props.inquiryMessages ?? EMPTY_ANALYTICS_ITEMS;
-  const { showToast } = useToast();
-  const [loading, setLoading] = useState(true);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
-  const [activeMainTab, setActiveMainTab] = useState<'business' | 'host' | 'reviews' | 'logs'>('business'); // 🟢 서브탭 구분
-  const [summarySource, setSummarySource] = useState<{ business: SummarySource; host: SummarySource }>({
-    business: 'server',
-    host: 'server',
-  });
-  const [searchIntentSource, setSearchIntentSource] = useState<SearchIntentSource>('server');
-  const [searchIntent, setSearchIntent] = useState<AnalyticsSearchIntentSummary | null>(null);
-  const [customerCompositionSource, setCustomerCompositionSource] = useState<CustomerCompositionSource>('server');
-  const [customerComposition, setCustomerComposition] = useState<AnalyticsCustomerCompositionSummary | null>(null);
-  const summaryCacheRef = useRef<{
-    business: Record<string, AnalyticsBusinessSummary>;
-    host: Record<string, AnalyticsHostSummary>;
-  }>({
-    business: {},
-    host: {},
-  });
-  const searchIntentCacheRef = useRef<Record<string, AnalyticsSearchIntentSummary>>({});
-  const customerCompositionCacheRef = useRef<Record<string, AnalyticsCustomerCompositionSummary>>({});
-
-  const formatKrw = (value: number) => `₩${Math.round(value || 0).toLocaleString()}`;
+  const [activeMainTab, setActiveMainTab] = useState<AnalyticsMainTab>('business');
 
   // 날짜 필터 상태 추가
   const [dateRange, setDateRange] = useState<Range[]>([{
@@ -156,642 +95,26 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
     else if (preset === 'ALL') setDateRange([{ startDate: new Date('2020-01-01'), endDate: now, key: 'selection' }]);
   };
 
-  const isWithinDateRange = (dateString: string) => {
-    if (!dateRange[0].startDate || !dateRange[0].endDate) return true;
-    const target = new Date(dateString);
-    const sd = startOfDay(dateRange[0].startDate);
-    const ed = endOfDay(dateRange[0].endDate);
-    return target >= sd && target <= ed;
-  };
-
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeExpsCount: 0,
-    gmv: 0,
-    netRevenue: 0,
-    hostPayout: 0,
-    conversionRate: '0.0',
-    retentionRate: '0.0',
-    aov: 0,
-    cancellationRate: 0,
-    topExperiences: [] as any[],
-    allExperiences: [] as any[],
-    superHostCandidates: [] as any[], // 🟢 복구: 슈퍼호스트 후보
-    funnel: { views: 0, clicks: 0, paymentInit: 0, completed: 0 },
-    cancelBreakdown: { user: 0, host: 0 },
-    priceDistribution: { low: 0, mid: 0, high: 0 },
-    demographics: {
-      nationalities: [] as { name: string, count: number, percent: number }[],
-      ages: [] as { name: string, count: number, percent: number }[],
-      genders: [] as { name: string, count: number, percent: number }[], // 🟢 추가
-      allNationalities: [] as { name: string, count: number, percent: number }[]
-    },
-    searchTrends: [] as { keyword: string, count: number, percent: number }[], // 🟢 추가
-    allSearchTrends: [] as { keyword: string, count: number, percent: number }[],
-    timeSeries: [] as { dateStr: string, amount: number, height: number }[],
-    riskHosts: [] as any[],
-    newUsersList: [] as any[], // 모달용
-    topRevenueDate: { dateStr: '', amount: 0 }, // 모달용
-    hostEcosystem: {
-      sources: [] as { name: string, count: number, percent: number }[],
-      languages: [] as { name: string, count: number, percent: number }[],
-      nationalities: [] as { name: string, count: number, percent: number }[],
-      allSources: [] as { name: string, count: number, percent: number }[],
-      allLanguages: [] as { name: string, count: number, percent: number }[],
-      allNationalities: [] as { name: string, count: number, percent: number }[],
-      funnel: { applied: 0, approved: 0, active: 0, booked: 0 }
-    },
-    avgResponseTime: 0,
-    responseRate: 0,
-    topRespHosts: [] as any[],
-    bottomRespHosts: [] as any[],
-    expsBreakdown: { new: 0, active: 0, pending: 0, rejected: 0 },
-    retentionBreakdown: { once: 0, twice: 0, threeOrMore: 0 }
+  const {
+    loading,
+    stats,
+    summarySource,
+    searchIntent,
+    searchIntentSource,
+    customerComposition,
+    customerCompositionSource,
+  } = useAnalyticsSummaryData({
+    bookings,
+    users,
+    exps,
+    apps,
+    reviews,
+    searchLogs,
+    analyticsEvents,
+    inquiries,
+    inquiryMessages,
+    dateRange,
   });
-
-  const searchTrendItems = stats.searchTrends as SearchTrendItem[];
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadAnalyticsData = async () => {
-      setLoading(true);
-
-      let localStats: typeof stats | null = null;
-      const getLocalStats = () => {
-        if (!localStats) {
-          localStats = buildLocalStats();
-        }
-        return localStats;
-      };
-
-      const params = new URLSearchParams();
-      if (dateRange[0].startDate) {
-        params.set('startAt', startOfDay(dateRange[0].startDate).toISOString());
-      }
-      if (dateRange[0].endDate) {
-        params.set('endAt', endOfDay(dateRange[0].endDate).toISOString());
-      }
-
-      const queryString = params.toString();
-      const analyticsSummaryUrl = queryString ? `/api/admin/analytics-summary?${queryString}` : '/api/admin/analytics-summary';
-      const analyticsHostUrl = queryString ? `/api/admin/analytics-host-summary?${queryString}` : '/api/admin/analytics-host-summary';
-      const analyticsSearchIntentUrl = queryString ? `/api/admin/analytics-search-intent?${queryString}` : '/api/admin/analytics-search-intent';
-      const analyticsCustomerCompositionUrl = queryString ? `/api/admin/analytics-customer-composition?${queryString}` : '/api/admin/analytics-customer-composition';
-      const cacheKey = queryString || 'default';
-      const cachedBusinessSummary = summaryCacheRef.current.business[cacheKey];
-      const cachedHostSummary = summaryCacheRef.current.host[cacheKey];
-      const cachedSearchIntent = searchIntentCacheRef.current[cacheKey];
-      const cachedCustomerComposition = customerCompositionCacheRef.current[cacheKey];
-
-      const [businessResult, hostResult, searchIntentResult, customerCompositionResult] = await Promise.allSettled([
-        fetch(analyticsSummaryUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics summary fetch failed');
-          }
-
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics summary fetch failed');
-          }
-
-          return result.data as AnalyticsBusinessSummary;
-        }),
-        fetch(analyticsHostUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics host summary fetch failed');
-          }
-
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics host summary fetch failed');
-          }
-
-          return result.data as AnalyticsHostSummary;
-        }),
-        fetch(analyticsSearchIntentUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics search intent fetch failed');
-          }
-
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics search intent fetch failed');
-          }
-
-          return result.data as AnalyticsSearchIntentSummary;
-        }),
-        fetch(analyticsCustomerCompositionUrl).then(async (response) => {
-          if (!response.ok) {
-            throw new Error('Analytics customer composition fetch failed');
-          }
-
-          const result = await response.json();
-          if (!result?.success) {
-            throw new Error(result?.error || 'Analytics customer composition fetch failed');
-          }
-
-          return result.data as AnalyticsCustomerCompositionSummary;
-        }),
-      ]);
-
-      const nextSummarySource: { business: SummarySource; host: SummarySource } = {
-        business: 'fallback',
-        host: 'fallback',
-      };
-      let nextStats = stats;
-
-      if (businessResult.status === 'fulfilled') {
-        summaryCacheRef.current.business[cacheKey] = businessResult.value;
-        nextStats = {
-          ...nextStats,
-          ...businessResult.value,
-        };
-        nextSummarySource.business = 'server';
-      } else if (cachedBusinessSummary) {
-        nextStats = {
-          ...nextStats,
-          ...cachedBusinessSummary,
-        };
-        nextSummarySource.business = 'cached';
-      } else {
-        nextStats = {
-          ...nextStats,
-          ...getLocalStats(),
-        };
-        console.error('[AnalyticsTab] analytics-summary fallback:', businessResult.reason);
-      }
-
-      if (hostResult.status === 'fulfilled') {
-        summaryCacheRef.current.host[cacheKey] = hostResult.value;
-        nextStats = {
-          ...nextStats,
-          ...hostResult.value,
-        };
-        nextSummarySource.host = 'server';
-      } else if (cachedHostSummary) {
-        nextStats = {
-          ...nextStats,
-          ...cachedHostSummary,
-        };
-        nextSummarySource.host = 'cached';
-      } else {
-        nextStats = {
-          ...nextStats,
-          ...getLocalStats(),
-        };
-        console.error('[AnalyticsTab] analytics-host-summary fallback:', hostResult.reason);
-      }
-
-      let nextSearchIntent: AnalyticsSearchIntentSummary | null = null;
-      let nextSearchIntentSource: SearchIntentSource = 'unavailable';
-      let nextCustomerComposition: AnalyticsCustomerCompositionSummary | null = null;
-      let nextCustomerCompositionSource: CustomerCompositionSource = 'unavailable';
-
-      if (searchIntentResult.status === 'fulfilled') {
-        searchIntentCacheRef.current[cacheKey] = searchIntentResult.value;
-        nextSearchIntent = searchIntentResult.value;
-        nextSearchIntentSource = 'server';
-      } else if (cachedSearchIntent) {
-        nextSearchIntent = cachedSearchIntent;
-        nextSearchIntentSource = 'cached';
-      } else {
-        console.error('[AnalyticsTab] analytics-search-intent unavailable:', searchIntentResult.reason);
-      }
-
-      if (customerCompositionResult.status === 'fulfilled') {
-        customerCompositionCacheRef.current[cacheKey] = customerCompositionResult.value;
-        nextCustomerComposition = customerCompositionResult.value;
-        nextCustomerCompositionSource = 'server';
-      } else if (cachedCustomerComposition) {
-        nextCustomerComposition = cachedCustomerComposition;
-        nextCustomerCompositionSource = 'cached';
-      } else {
-        console.error('[AnalyticsTab] analytics-customer-composition unavailable:', customerCompositionResult.reason);
-      }
-
-      if (!cancelled) {
-        setStats(nextStats);
-        setSummarySource(nextSummarySource);
-        setSearchIntent(nextSearchIntent);
-        setSearchIntentSource(nextSearchIntentSource);
-        setCustomerComposition(nextCustomerComposition);
-        setCustomerCompositionSource(nextCustomerCompositionSource);
-        setLoading(false);
-      }
-    };
-
-    void loadAnalyticsData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [bookings, users, exps, reviews, apps, searchLogs, analyticsEvents, inquiries, inquiryMessages, dateRange]);
-
-  const buildLocalStats = () => {
-    try {
-      let gmv = 0, netRevenue = 0, cancelledCount = 0, completedCount = 0;
-      let userCancel = 0, hostCancel = 0;
-      const userBookingCounts: Record<string, number> = {};
-      const expStats: Record<string, any> = {};
-      const hostStats: Record<string, any> = {};
-      const priceDist = { low: 0, mid: 0, high: 0 };
-
-      const nationalityCount: Record<string, number> = {};
-      const ageCount: Record<string, number> = { '10s': 0, '20s': 0, '30s': 0, '40s+': 0 };
-      const genderCount: Record<string, number> = { '남성': 0, '여성': 0, '기타': 0 }; // 🟢 추가
-      const timeSeriesMap: Record<string, number> = {};
-
-      const searchKeywordCount: Record<string, number> = {}; // 🟢 추가
-
-      bookings?.forEach((b: any) => {
-        if (!b.created_at || !isWithinDateRange(b.created_at)) return;
-        // 호스트 통계 집계 (체험 ID -> 호스트 ID 매핑)
-        const exp = exps?.find(e => e.id === b.experience_id);
-        if (exp?.host_id) {
-          if (!hostStats[exp.host_id]) hostStats[exp.host_id] = { bookings: 0, ratingSum: 0, reviewCount: 0, cancelCount: 0 };
-          hostStats[exp.host_id].bookings += 1;
-        }
-
-        // 완료된 건 (매출 발생)
-        if (isConfirmedBookingStatus(b.status || '')) {
-          completedCount++;
-          const amount = Number(b.amount || 0);
-          gmv += amount;
-
-          const revenue = getBookingPlatformRevenue(b);
-          netRevenue += revenue;
-
-          // 가격대 분포
-          if (amount < 30000) priceDist.low++;
-          else if (amount < 100000) priceDist.mid++;
-          else priceDist.high++;
-
-          // 시계열 데이터 집계 (날짜별 매출액)
-          const dateStr = format(new Date(b.created_at), 'MM.dd');
-          timeSeriesMap[dateStr] = (timeSeriesMap[dateStr] || 0) + amount;
-
-          // 유저 재구매율 분석
-          if (b.user_id) userBookingCounts[b.user_id] = (userBookingCounts[b.user_id] || 0) + 1;
-
-          // 인기 체험 집계
-          if (!expStats[b.experience_id]) expStats[b.experience_id] = { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
-          expStats[b.experience_id].count++;
-          expStats[b.experience_id].revenue += amount;
-        }
-
-        // 취소된 건 (사유 분석)
-        if (isCancelledBookingStatus(b.status || '')) {
-          cancelledCount++;
-          if ((b.status || '').toLowerCase() === 'cancelled') userCancel++; else hostCancel++;
-
-          // 호스트 취소율 반영
-          if (exp?.host_id && hostStats[exp.host_id]) {
-            hostStats[exp.host_id].cancelCount++;
-          }
-        }
-      });
-
-      // 리뷰 데이터 통합 (기간 내 리뷰만)
-      reviews?.forEach((r: any) => {
-        if (!r.created_at || !isWithinDateRange(r.created_at)) return;
-        // 체험별 평점
-        if (expStats[r.experience_id]) {
-          expStats[r.experience_id].ratingSum += r.rating;
-          expStats[r.experience_id].reviewCount++;
-        }
-        // 호스트별 평점
-        const exp = exps?.find(e => e.id === r.experience_id);
-        if (exp?.host_id && hostStats[exp.host_id]) {
-          hostStats[exp.host_id].ratingSum += r.rating;
-          hostStats[exp.host_id].reviewCount++;
-        }
-      });
-
-      // 인기 체험 정렬 (Top 5 & All)
-      const allExps = exps?.map((e: any) => {
-        const s = expStats[e.id] || { count: 0, revenue: 0, ratingSum: 0, reviewCount: 0 };
-        return {
-          ...e,
-          bookingCount: s.count,
-          totalRevenue: s.revenue,
-          rating: s.reviewCount > 0 ? (s.ratingSum / s.reviewCount).toFixed(1) : 'New',
-          reviewCount: s.reviewCount
-        };
-      })
-        .filter((e: any) => e.bookingCount > 0)
-        .sort((a: any, b: any) => b.bookingCount - a.bookingCount) || [];
-      const topExps = allExps.slice(0, 5);
-
-      // 🟢 복구: 슈퍼 호스트 후보 선정
-      // 조건: 예약 3건 이상, 평점 4.0 이상, 취소 0건
-      const superHosts: any[] = [];
-      const riskHosts: any[] = [];
-
-      Object.entries(hostStats).forEach(([id, s]: any) => {
-        const hostInfo = users?.find(u => u.id === id);
-        const ratingNum = s.reviewCount > 0 ? (s.ratingSum / s.reviewCount) : 0;
-        const hostObj = {
-          id,
-          name: hostInfo?.name || 'Unknown Host',
-          email: hostInfo?.email,
-          bookings: s.bookings,
-          cancelCount: s.cancelCount,
-          rating: ratingNum > 0 ? ratingNum.toFixed(1) : 'New'
-        };
-
-        if (hostObj.bookings >= 3 && ratingNum >= 4.0 && hostObj.cancelCount === 0) {
-          superHosts.push(hostObj);
-        }
-        // 주의 필요 조건: 취소 2건 이상 이거나, 리뷰가 있는데 평점 3.5 미만일 때.
-        if (hostObj.cancelCount >= 2 || (ratingNum > 0 && ratingNum < 3.5)) {
-          riskHosts.push(hostObj);
-        }
-      });
-
-      const topSuperHosts = superHosts.slice(0, 5);
-      const topRiskHosts = riskHosts.slice(0, 5);
-
-      // 필터된 기간 내 가입한 신규 유저
-      const newUsersList = users?.filter(u => u.created_at && isWithinDateRange(u.created_at)) || [];
-      const newUsersCount = newUsersList.length;
-      const returnUsers = Object.values(userBookingCounts).filter(c => c > 1).length;
-
-      // 체험 상세 등급
-      const expsBreakdown = { new: 0, active: 0, pending: 0, rejected: 0 };
-      exps?.forEach((e: any) => {
-        if (e.created_at && isWithinDateRange(e.created_at)) expsBreakdown.new++;
-        if (e.status === 'active') expsBreakdown.active++;
-        else if (e.status === 'pending') expsBreakdown.pending++;
-        else if (e.status === 'rejected') expsBreakdown.rejected++;
-      });
-
-      // 리텐션(재구매율) 상세 집계
-      const retentionBreakdown = { once: 0, twice: 0, threeOrMore: 0 };
-      Object.values(userBookingCounts).forEach(c => {
-        if (c === 1) retentionBreakdown.once++;
-        else if (c === 2) retentionBreakdown.twice++;
-        else if (c >= 3) retentionBreakdown.threeOrMore++;
-      });
-
-      // 인구통계학 데이터 정제
-      const totalUniqueGuests = Object.keys(userBookingCounts).length;
-      const allNationalitiesSorted = Object.entries(nationalityCount)
-        .map(([name, count]) => ({ name, count, percent: totalUniqueGuests ? (count / totalUniqueGuests) * 100 : 0 }))
-        .sort((a, b) => b.count - a.count);
-      const topNationalities = allNationalitiesSorted.slice(0, 4); // 상위 4개국
-
-      const agesArr = Object.entries(ageCount)
-        .map(([name, count]) => ({ name: name.replace('s', '대'), count, percent: totalUniqueGuests ? (count / totalUniqueGuests) * 100 : 0 }));
-
-      // 🟢 성별 통계 계산
-      const totalGenders = Object.values(genderCount).reduce((a, b) => a + b, 0);
-      const genderArr = Object.entries(genderCount)
-        .filter(v => v[1] > 0)
-        .map(([name, count]) => ({ name, count, percent: totalGenders ? (count / totalGenders) * 100 : 0 }));
-
-      // 🟢 검색 로그 취합 (Top 10)
-      let totalSearches = 0;
-      searchLogs?.forEach((log: any) => {
-        if (!isWithinDateRange(log.created_at)) return;
-        totalSearches++;
-        searchKeywordCount[log.keyword] = (searchKeywordCount[log.keyword] || 0) + 1;
-      });
-      const allKeywordsSorted = Object.entries(searchKeywordCount)
-        .map(([keyword, count]) => ({ keyword, count, percent: totalSearches ? (count / totalSearches) * 100 : 0 }))
-        .sort((a, b) => b.count - a.count);
-      const topKeywords = allKeywordsSorted.slice(0, 10);
-
-      // 🟢 실제 퍼널 데이터 취합
-      let realViews = 0, realClicks = 0, realInit = 0;
-      analyticsEvents?.forEach((ev: any) => {
-        if (!isWithinDateRange(ev.created_at)) return;
-        if (ev.event_type === 'view') realViews++;
-        else if (ev.event_type === 'click') realClicks++;
-        else if (ev.event_type === 'payment_init') realInit++;
-      });
-
-      // 시계열 데이터 정제 (최근 7일치로 압축 또는 있는 날짜만. 여기선 단순 정렬 후 상위값 기준 퍼센트 계산)
-      const sortedKeys = Object.keys(timeSeriesMap).sort();
-      const recentDates = sortedKeys.slice(-7); // 차트 UI 제약상 최대 7개 봉투만 표시
-      const maxSeriesAmount = Math.max(...recentDates.map(k => timeSeriesMap[k]), 1); // 0 방지
-      const timeSeries = recentDates.map(k => ({
-        dateStr: k,
-        amount: timeSeriesMap[k],
-        height: (timeSeriesMap[k] / maxSeriesAmount) * 100
-      }));
-
-      // 가장 매출이 높았던 날
-      let topRevDate = { dateStr: '-', amount: 0 };
-      Object.entries(timeSeriesMap).forEach(([d, a]) => {
-        if (a > topRevDate.amount) topRevDate = { dateStr: d, amount: a };
-      });
-
-      // 🟢 호스트 생태계 (Host Ecosystem) 데이터 정제
-      const hostSources: Record<string, number> = {};
-      const hostLangs: Record<string, number> = {};
-      const hostNats: Record<string, number> = {};
-      let applied = 0;
-      let approved = 0;
-      const activeHosts = new Set<string>();
-      const bookedHosts = new Set<string>();
-
-      apps?.forEach((a: any) => {
-        if (!a.created_at || !isWithinDateRange(a.created_at)) return;
-        applied++;
-        if (a.status === 'approved') approved++;
-
-        const src = a.source || '기타/미입력';
-        hostSources[src] = (hostSources[src] || 0) + 1;
-
-        const nat = a.host_nationality || '미입력';
-        hostNats[nat] = (hostNats[nat] || 0) + 1;
-
-        const langs = Array.isArray(a.languages) ? a.languages : (a.languages ? [a.languages] : []);
-        langs.forEach((l: string) => {
-          hostLangs[l] = (hostLangs[l] || 0) + 1;
-        });
-      });
-
-      // 🟢 호스트 응답률 및 응답 시간 계산
-      const hostCommStats: Record<string, { total: number, answered: number, timeMs: number }> = {};
-      let totalHostInquiries = 0;
-      let answeredHostInquiries = 0;
-      let totalResponseTimeMs = 0;
-
-      const messagesByInquiry: Record<string, any[]> = {};
-      inquiryMessages?.forEach(m => {
-        if (!messagesByInquiry[m.inquiry_id]) messagesByInquiry[m.inquiry_id] = [];
-        messagesByInquiry[m.inquiry_id].push(m);
-      });
-      Object.keys(messagesByInquiry).forEach(id => {
-        messagesByInquiry[id].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-      });
-
-      inquiries?.forEach(inq => {
-        if (!inq.host_id || !isWithinDateRange(inq.created_at)) return;
-        totalHostInquiries++;
-        if (!hostCommStats[inq.host_id]) hostCommStats[inq.host_id] = { total: 0, answered: 0, timeMs: 0 };
-        hostCommStats[inq.host_id].total++;
-
-        const msgs = messagesByInquiry[inq.id] || [];
-
-        // 첫 호스트 응답 탐색
-        const firstHostMsg = msgs.find(m => m.sender_id === inq.host_id);
-        if (firstHostMsg) {
-          answeredHostInquiries++;
-          hostCommStats[inq.host_id].answered++;
-
-          const guestMsg = msgs.find(m => m.sender_id !== inq.host_id);
-          const startTime = guestMsg ? new Date(guestMsg.created_at).getTime() : new Date(inq.created_at).getTime();
-          const responseTimeMs = new Date(firstHostMsg.created_at).getTime() - startTime;
-          if (responseTimeMs > 0) {
-            totalResponseTimeMs += responseTimeMs;
-            hostCommStats[inq.host_id].timeMs += responseTimeMs;
-          }
-        }
-      });
-
-      const avgRespMins = answeredHostInquiries > 0 ? (totalResponseTimeMs / answeredHostInquiries) / (1000 * 60) : 0;
-      const respRatePct = totalHostInquiries > 0 ? (answeredHostInquiries / totalHostInquiries) * 100 : 0;
-
-      // 호스트 개별 순위 계산
-      const hostRespArr = Object.entries(hostCommStats).map(([id, s]) => {
-        const hostInfo = users?.find(u => u.id === id);
-        const rate = s.total > 0 ? (s.answered / s.total) * 100 : 0;
-        const timeMins = s.answered > 0 ? (s.timeMs / s.answered) / (1000 * 60) : 0;
-        return {
-          id,
-          name: hostInfo?.name || hostInfo?.full_name || 'Unknown',
-          rate,
-          timeMins: Math.round(timeMins),
-          total: s.total
-        };
-      }).filter(h => h.total >= 1);
-
-      const topRespHosts = [...hostRespArr].sort((a, b) => b.rate - a.rate || a.timeMins - b.timeMins).slice(0, 10);
-      const bottomRespHosts = [...hostRespArr].sort((a, b) => a.rate - b.rate || b.timeMins - a.timeMins).slice(0, 10);
-
-      // 등록된 Active 체험을 보유한 호스트 수 계산
-      exps?.forEach((e: any) => {
-        if (e.status === 'active' && e.host_id) activeHosts.add(e.host_id);
-      });
-      // 기간 내 예약을 1건이라도 받은 호스트
-      bookings?.forEach((b: any) => {
-        if (b.created_at && isWithinDateRange(b.created_at) && isConfirmedBookingStatus(b.status || '')) {
-          const exp = exps?.find(e => e.id === b.experience_id);
-          if (exp?.host_id) bookedHosts.add(exp.host_id);
-        }
-      });
-
-      const allHostSources = Object.entries(hostSources).map(([name, count]) => ({ name, count, percent: applied ? (count / applied) * 100 : 0 })).sort((a, b) => b.count - a.count);
-      const allHostNats = Object.entries(hostNats).map(([name, count]) => ({ name, count, percent: applied ? (count / applied) * 100 : 0 })).sort((a, b) => b.count - a.count);
-
-      const topSources = allHostSources.slice(0, 4);
-      const topNats = allHostNats.slice(0, 4);
-
-      const totalLangs = Object.values(hostLangs).reduce((acc, c) => acc + c, 0);
-      const allHostLangs = Object.entries(hostLangs).map(([name, count]) => ({ name, count, percent: totalLangs ? (count / totalLangs) * 100 : 0 })).sort((a, b) => b.count - a.count);
-      const topLangs = allHostLangs.slice(0, 4);
-
-      return {
-        totalUsers: newUsersCount,
-        activeExpsCount: exps?.filter((e: any) => e.status === 'active').length || 0,
-        gmv,
-        netRevenue,
-        hostPayout: gmv - netRevenue,
-        conversionRate: newUsersCount > 0 ? ((completedCount / newUsersCount) * 100).toFixed(1) : '0.0',
-        retentionRate: Object.keys(userBookingCounts).length ? ((returnUsers / Object.keys(userBookingCounts).length) * 100).toFixed(1) : '0.0',
-        aov: completedCount > 0 ? Math.floor(gmv / completedCount) : 0,
-        cancellationRate: (cancelledCount + completedCount) > 0 ? Math.floor((cancelledCount / (cancelledCount + completedCount)) * 100) : 0,
-        topExperiences: topExps || [],
-        superHostCandidates: topSuperHosts, // 데이터 연결
-        funnel: {
-          views: realViews, // 🟢 리얼 퍼널 적용
-          clicks: realClicks,
-          paymentInit: realInit,
-          completed: completedCount
-        },
-        cancelBreakdown: { user: userCancel, host: hostCancel }, // 데이터 연결
-        priceDistribution: priceDist,
-        demographics: { nationalities: topNationalities, ages: agesArr, genders: genderArr, allNationalities: allNationalitiesSorted }, // 🟢 추가
-        searchTrends: topKeywords, // 🟢 추가
-        allSearchTrends: allKeywordsSorted,
-        // (add all experiences to root)
-        allExperiences: allExps,
-        timeSeries,
-        riskHosts: topRiskHosts,
-        newUsersList: newUsersList.slice(0, 5), // 상위 5명만 모달에 표시
-        topRevenueDate: topRevDate,
-        hostEcosystem: {
-          sources: topSources,
-          languages: topLangs,
-          nationalities: topNats,
-          allSources: allHostSources,
-          allNationalities: allHostNats,
-          allLanguages: allHostLangs,
-          funnel: { applied, approved, active: activeHosts.size, booked: bookedHosts.size }
-        },
-        avgResponseTime: avgRespMins > 0 ? Math.round(avgRespMins) : 0, // 🟢 리얼 응답 시간(분)
-        responseRate: respRatePct > 0 ? Number(respRatePct.toFixed(1)) : 0, // 🟢 리얼 응답률(%)
-        topRespHosts,
-        bottomRespHosts,
-        expsBreakdown,
-        retentionBreakdown
-      };
-    } catch (err) {
-      console.error(err);
-      return {
-        totalUsers: 0,
-        activeExpsCount: 0,
-        gmv: 0,
-        netRevenue: 0,
-        hostPayout: 0,
-        conversionRate: '0.0',
-        retentionRate: '0.0',
-        aov: 0,
-        cancellationRate: 0,
-        topExperiences: [],
-        allExperiences: [],
-        superHostCandidates: [],
-        funnel: { views: 0, clicks: 0, paymentInit: 0, completed: 0 },
-        cancelBreakdown: { user: 0, host: 0 },
-        priceDistribution: { low: 0, mid: 0, high: 0 },
-        demographics: {
-          nationalities: [],
-          ages: [],
-          genders: [],
-          allNationalities: [],
-        },
-        searchTrends: [],
-        allSearchTrends: [],
-        timeSeries: [],
-        riskHosts: [],
-        newUsersList: [],
-        topRevenueDate: { dateStr: '', amount: 0 },
-        hostEcosystem: {
-          sources: [],
-          languages: [],
-          nationalities: [],
-          allSources: [],
-          allLanguages: [],
-          allNationalities: [],
-          funnel: { applied: 0, approved: 0, active: 0, booked: 0 },
-        },
-        avgResponseTime: 0,
-        responseRate: 0,
-        topRespHosts: [],
-        bottomRespHosts: [],
-        expsBreakdown: { new: 0, active: 0, pending: 0, rejected: 0 },
-        retentionBreakdown: { once: 0, twice: 0, threeOrMore: 0 },
-      };
-    }
-  };
-
-  // 🟢 복구: 인기 검색어 클릭 핸들러
-  const handleKeywordClick = (keyword: string) => {
-    showToast(`'${keyword}' 검색 결과 트렌드 분석을 시작합니다. (Demo)`, 'success');
-  };
 
   if (loading) return <div className="p-8"><Skeleton className="w-full h-96 rounded-xl" /></div>;
 
@@ -838,7 +161,11 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                 </div>
                 <DateRange
                   editableDateInputs={true}
-                  onChange={(item: any) => { setDateRange([item.selection]); setActivePreset('CUSTOM'); }}
+                  onChange={(item: RangeKeyDict) => {
+                    if (!item.selection) return;
+                    setDateRange([item.selection]);
+                    setActivePreset('CUSTOM');
+                  }}
                   moveRangeOnFirstSelection={false}
                   ranges={dateRange}
                   months={1}
@@ -854,15 +181,10 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
 
       {/* 🟢 수정: 메인 탭 전환 (Business / Host / Reviews / Logs) */}
       <div className="flex flex-nowrap md:flex-wrap bg-slate-100 p-1 rounded-xl w-full md:w-fit mb-6 md:mb-8 overflow-x-auto scrollbar-hide gap-1">
-        {[
-          { id: 'business', label: 'Business & Guest' },
-          { id: 'host', label: 'Host Ecosystem' },
-          { id: 'reviews', label: 'Review Quality' },
-          { id: 'logs', label: '운영 감사 로그' }
-        ].map(tab => (
+        {ANALYTICS_MAIN_TABS.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveMainTab(tab.id as any)}
+            onClick={() => setActiveMainTab(tab.id)}
             className={`flex-none px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all duration-300 whitespace-nowrap ${activeMainTab === tab.id
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
@@ -890,7 +212,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
           onSelectMetric={setSelectedMetric}
           searchIntent={searchIntent}
           searchIntentSource={searchIntentSource}
-          searchTrends={searchTrendItems}
+          searchTrends={stats.searchTrends}
           customerComposition={customerComposition}
           customerCompositionSource={customerCompositionSource}
         />
@@ -947,7 +269,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                 <div className="space-y-6">
                   <h3 className="text-xl font-bold">최근 가입 유저 (기간 내)</h3>
                   <div className="space-y-3">
-                    {stats.newUsersList.length > 0 ? stats.newUsersList.map((u: any, idx: number) => (
+                    {stats.newUsersList.length > 0 ? stats.newUsersList.map((u, idx) => (
                       <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs">
@@ -955,7 +277,9 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                           </div>
                           <div>
                             <div className="text-sm font-bold text-slate-800">{u.name || 'Unknown'}</div>
-                            <div className="text-xs text-slate-500">{format(new Date(u.created_at), 'yyyy-MM-dd')} 가입</div>
+                            <div className="text-xs text-slate-500">
+                              {u.created_at ? `${format(new Date(u.created_at), 'yyyy-MM-dd')} 가입` : '가입일 미확인'}
+                            </div>
                           </div>
                         </div>
                         <span className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded">
@@ -1003,7 +327,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                     🏆 응답시간 상위 10명 <span className="text-xs font-normal text-emerald-500">최단 시간 기준</span>
                   </h3>
                   <div className="space-y-3 mb-6">
-                    {stats.topRespHosts.length > 0 ? stats.topRespHosts.map((h: any, idx: number) => (
+                    {stats.topRespHosts.length > 0 ? stats.topRespHosts.map((h, idx) => (
                       <div key={h.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
                         <div className="flex items-center gap-3">
                           <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-black">{idx + 1}</div>
@@ -1021,7 +345,7 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                     🐢 응답시간 하위 10명 <span className="text-xs font-normal text-rose-500">최장 시간 기준</span>
                   </h3>
                   <div className="space-y-3">
-                    {stats.bottomRespHosts.length > 0 ? stats.bottomRespHosts.map((h: any, idx: number) => (
+                    {stats.bottomRespHosts.length > 0 ? stats.bottomRespHosts.map((h, idx) => (
                       <div key={h.id} className="flex justify-between items-center bg-rose-50/30 p-3 rounded-lg border border-rose-100">
                         <div className="flex items-center gap-3">
                           <div className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs font-black">{idx + 1}</div>
@@ -1130,14 +454,14 @@ export default function AnalyticsTab(props: AnalyticsTabProps = {}) {
                   <h3 className="text-xl font-bold">전체 체험 판매 랭킹</h3>
                   <p className="text-xs text-slate-400 -mt-3">체험 예약 결제 완료 건수 기준</p>
                   <div className="space-y-3">
-                    {stats.allExperiences.length > 0 ? stats.allExperiences.map((exp: any, i: number) => (
-                      <div key={exp.id} className="flex gap-4 p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-300 transition-colors">
+                    {stats.allExperiences.length > 0 ? stats.allExperiences.map((exp, i) => (
+                      <div key={exp.id ?? `experience-${i}`} className="flex gap-4 p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-300 transition-colors">
                         <div className="w-8 flex flex-col items-center justify-center">
                           <span className={`text-lg font-black ${i < 3 ? 'text-amber-500' : 'text-slate-400'}`}>{i + 1}</span>
                         </div>
-                        <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
+                          <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
                           {exp.image_url ? (
-                            <img src={exp.image_url} alt={exp.title} className="w-full h-full object-cover" />
+                            <img src={exp.image_url ?? undefined} alt={exp.title || 'Experience image'} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-300"><Star size={20} /></div>
                           )}

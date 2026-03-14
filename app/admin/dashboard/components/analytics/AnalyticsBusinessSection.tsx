@@ -5,14 +5,14 @@ import { SimpleKpi, FunnelBar } from './helpers';
 import AnalyticsCustomerCompositionSection from './AnalyticsCustomerCompositionSection';
 import AnalyticsSearchDemandSection from './AnalyticsSearchDemandSection';
 import type {
+  AnalyticsStats,
   AnalyticsCustomerCompositionSummary,
   AnalyticsSearchIntentSummary,
   CustomerCompositionSource,
   SearchIntentSource,
   SearchTrendItem,
+  SummarySource,
 } from './types';
-
-type SummarySource = 'server' | 'cached' | 'fallback';
 
 export default function AnalyticsBusinessSection({
   stats,
@@ -24,7 +24,7 @@ export default function AnalyticsBusinessSection({
   customerComposition,
   customerCompositionSource,
 }: {
-  stats: any;
+  stats: AnalyticsStats;
   summarySource: SummarySource;
   onSelectMetric: (metric: string) => void;
   searchIntent: AnalyticsSearchIntentSummary | null;
@@ -108,7 +108,7 @@ export default function AnalyticsBusinessSection({
               <span>🌍 게스트 국적 비중</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">체험 + 서비스 결제 고객 기준</span>
             </h3>
             <div className="space-y-4">
-              {stats.demographics.nationalities.length > 0 ? stats.demographics.nationalities.map((nat: any) => (
+              {stats.demographics.nationalities.length > 0 ? stats.demographics.nationalities.map((nat) => (
                 <div key={nat.name} className="flex items-center gap-4">
                   <div className="w-8 text-sm font-bold text-slate-600">{nat.name}</div>
                   <div className="flex-1 h-6 bg-slate-100 rounded-lg overflow-hidden flex">
@@ -130,7 +130,7 @@ export default function AnalyticsBusinessSection({
             <div className="flex items-end justify-around h-32 md:h-40 mt-4 pb-2 border-b border-slate-100 relative">
               <div className="absolute top-0 w-full border-t border-slate-50 border-dashed"></div>
               <div className="absolute top-1/2 w-full border-t border-slate-50 border-dashed"></div>
-              {stats.demographics.ages.map((age: any) => (
+              {stats.demographics.ages.map((age) => (
                 <div key={age.name} className="flex flex-col items-center gap-1 md:gap-2 group w-1/5">
                   <span className="text-[9px] md:text-[10px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
                     {age.percent.toFixed(1)}%
@@ -153,7 +153,7 @@ export default function AnalyticsBusinessSection({
               <span>🚻 게스트 성별 비율</span> <span className="text-[10px] md:text-xs font-normal text-slate-400 sm:ml-auto">전체 결제 기준</span>
             </h3>
             <div className="flex-1 flex flex-col justify-center space-y-5">
-              {stats.demographics.genders.length > 0 ? stats.demographics.genders.map((gen: any) => (
+              {stats.demographics.genders.length > 0 ? stats.demographics.genders.map((gen) => (
                 <div key={gen.name} className="flex items-center gap-4">
                   <div className="w-10 text-sm font-bold text-slate-600">{gen.name}</div>
                   <div className="flex-1 h-8 bg-slate-100 rounded-full overflow-hidden flex relative shadow-inner">
@@ -199,7 +199,7 @@ export default function AnalyticsBusinessSection({
             <div className="absolute top-0 left-0 w-full border-t border-slate-100 border-dashed"></div>
             <div className="absolute top-1/2 left-0 w-full border-t border-slate-100 border-dashed"></div>
             <div className="absolute bottom-0 left-0 w-full border-t border-slate-100"></div>
-            {stats.timeSeries.length > 0 ? stats.timeSeries.map((ts: any, idx: number) => (
+            {stats.timeSeries.length > 0 ? stats.timeSeries.map((ts, idx) => (
               <div key={idx} className="flex flex-col items-center gap-1 md:gap-2 group w-8 md:w-12 z-10">
                 <span className="text-[9px] md:text-[10px] font-bold text-slate-500 bg-white px-1 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 md:-top-6 whitespace-nowrap">
                   ₩{(ts.amount / 10000).toFixed(0)}만
@@ -248,7 +248,7 @@ export default function AnalyticsBusinessSection({
             </div>
           </div>
           <div className="space-y-3 md:space-y-4">
-            {stats.topExperiences.length > 0 ? stats.topExperiences.map((exp: any, idx: number) => (
+            {stats.topExperiences.length > 0 ? stats.topExperiences.map((exp, idx) => (
               <div key={exp.id} className="flex items-center gap-3 md:gap-4 p-2 md:p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 border border-slate-200 text-sm md:text-base shrink-0">
                   {idx + 1}
