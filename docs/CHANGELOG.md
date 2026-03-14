@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.79 — [Analytics] 상세 모달 분리로 본체 책임 축소
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 `AnalyticsMetricModal` 분리 | `AnalyticsTab.tsx`에 길게 남아 있던 KPI drill-down 모달 분기를 `app/admin/dashboard/components/analytics/AnalyticsMetricModal.tsx` 로 추출 |
+| 🟡 metric key 공용 타입화 | `analytics/types.ts`에 `AnalyticsMetricKey` 추가 — Business / Host / SearchDemand 섹션의 metric key를 공용 타입으로 통일 |
+| 🟡 회귀 검증 | `09-admin-analytics.spec.ts`, `06-admin-master-ledger.spec.ts`, `npx tsc --noEmit`, `git diff --check` 통과 |
+
 ## v3.38.78 — [SEO] Sitemap 동적 체험 URL 추가 + Middleware 언어 자동감지 수정
 
 | 항목 | 내용 |

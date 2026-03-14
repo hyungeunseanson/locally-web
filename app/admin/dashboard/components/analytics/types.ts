@@ -211,6 +211,21 @@ export type AnalyticsHostSummary = {
 
 export type AnalyticsStats = AnalyticsBusinessSummary & AnalyticsHostSummary;
 
+export type AnalyticsMetricKey =
+  | 'aov'
+  | 'users'
+  | 'gmv'
+  | 'cancel'
+  | 'response'
+  | 'exps'
+  | 'demographics'
+  | 'searchTrends'
+  | 'topExps'
+  | 'hostDemographics'
+  | 'revenue'
+  | 'conversion'
+  | 'retention';
+
 export type SourceFunnelBucket = {
   name: string;
   signups: number;

@@ -7,6 +7,7 @@ import AnalyticsSearchDemandSection from './AnalyticsSearchDemandSection';
 import type {
   AnalyticsStats,
   AnalyticsCustomerCompositionSummary,
+  AnalyticsMetricKey,
   AnalyticsSearchIntentSummary,
   CustomerCompositionSource,
   SearchIntentSource,
@@ -26,7 +27,7 @@ export default function AnalyticsBusinessSection({
 }: {
   stats: AnalyticsStats;
   summarySource: SummarySource;
-  onSelectMetric: (metric: string) => void;
+  onSelectMetric: (metric: AnalyticsMetricKey) => void;
   searchIntent: AnalyticsSearchIntentSummary | null;
   searchIntentSource: SearchIntentSource;
   searchTrends: SearchTrendItem[];

@@ -3,6 +3,7 @@
 import { AlertTriangle, Search } from 'lucide-react';
 
 import type {
+  AnalyticsMetricKey,
   AnalyticsSearchIntentSummary,
   SearchIntentSource,
   SearchTrendItem,
@@ -17,7 +18,7 @@ export default function AnalyticsSearchDemandSection({
   searchIntent: AnalyticsSearchIntentSummary | null;
   searchIntentSource: SearchIntentSource;
   searchTrends: SearchTrendItem[];
-  onSelectMetric: (metric: string) => void;
+  onSelectMetric: (metric: AnalyticsMetricKey) => void;
 }) {
   return (
     <>

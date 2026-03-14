@@ -3,7 +3,7 @@
 import React from 'react';
 import { Activity, AlertTriangle, CheckCircle, Search, Star, TrendingUp, UserCheck } from 'lucide-react';
 import { SimpleKpi } from './helpers';
-import type { AnalyticsStats, SummarySource } from './types';
+import type { AnalyticsMetricKey, AnalyticsStats, SummarySource } from './types';
 
 export default function AnalyticsHostSection({
   stats,
@@ -12,7 +12,7 @@ export default function AnalyticsHostSection({
 }: {
   stats: AnalyticsStats;
   summarySource: SummarySource;
-  onSelectMetric: (metric: string) => void;
+  onSelectMetric: (metric: AnalyticsMetricKey) => void;
 }) {
   return (
     <div className="space-y-12 animate-in slide-in-from-bottom-[50px] duration-500">
