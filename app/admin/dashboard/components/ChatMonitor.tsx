@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
-import { useChat } from '@/app/hooks/useChat';
+import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
 import { useToast } from '@/app/context/ToastContext';
 
@@ -71,7 +71,7 @@ export default function ChatMonitor() {
     refresh,
     isLoading,
     error
-  } = useChat('admin') as unknown as AdminChatState;
+  } = useAdminChatQuery();
 
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
@@ -195,7 +195,7 @@ export default function ChatMonitor() {
             <h3 className="font-bold text-sm md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">
               <MessageCircle size={14} className="md:w-[18px] md:h-[18px]" /> 채팅 관리
             </h3>
-            <button onClick={refresh} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
+            <button onClick={() => refresh(true)} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
               <RefreshCw size={14} className={`md:w-4 md:h-4 ${isLoading ? "animate-spin" : ""}`} />
             </button>
           </div>
@@ -252,7 +252,7 @@ export default function ChatMonitor() {
               <div className="text-xs md:text-sm font-bold mb-1">
                 {activeTab === 'monitor' ? '진행 중인 대화가 없습니다.' : '접수된 문의가 없습니다.'}
               </div>
-              <button onClick={refresh} className="text-[10px] md:text-xs text-blue-600 underline mt-1 md:mt-2">새로고침</button>
+              <button onClick={() => refresh(true)} className="text-[10px] md:text-xs text-blue-600 underline mt-1 md:mt-2">새로고침</button>
             </div>
           ) : (
             filteredInquiries.map((inq) => (

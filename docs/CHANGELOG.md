@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.69 — [Message Monitoring] 관리자 전용 데이터 레이어 분리 (Phase 3)
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 `useChat` 의존 폐제 | `ChatMonitor.tsx`가 비대한 공용 `useChat` 훅을 옆에서야 하던 관계를 완전히 끄어냄. 관리자용 전용 `useAdminChatQuery` 훅으로 완전 교체 |
+| 🟠 BE 데이터 레이어 신규 2개 | `/api/admin/inquiries` (목록) 및 `/api/admin/inquiries/[id]/messages` (메시지) 서버 API를 신규 창제. 프론트 에서 Supabase를 직접 다룰 N+1 쿼리가 서버로 새 |
+| 🟡 핀셋 Realtime 구독 | 기존에는 모든 `inquiry_messages` 이벤트를 수신하던 무차별 소켓을, 지금 열려있는 문의방 번호로만 필터링하여 나머지 이벤트를 무시 - 웹소켓 커넥션 관리 효율화 |
+| 🟡 빌드 검증 | `npx tsc --noEmit` 및 `npm run build` 모두 에러 0첨 (종료 코드 0) |
+
 ## v3.38.68 — [Message Monitoring] 동시성 방어 및 감사로그 정합성 보정 (Phase 2)
 
 | 항목 | 내용 |
