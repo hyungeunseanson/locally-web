@@ -27,13 +27,20 @@ export async function GET() {
             expsRes,
             bookingsRes,
             svcRes,
-            inquiriesRes
+            inquiriesRes,
+            adminAlertsRes,
         ] = await Promise.all([
             supabaseAdmin.from('host_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
             supabaseAdmin.from('experiences').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
             supabaseAdmin.from('bookings').select('id').eq('status', 'PENDING'),
             supabaseAdmin.from('service_bookings').select('id', { count: 'exact', head: true }).eq('status', 'PENDING').eq('payment_method', 'bank'),
-            supabaseAdmin.from('inquiries').select('id').or('type.eq.admin_support,type.eq.admin')
+            supabaseAdmin.from('inquiries').select('id').or('type.eq.admin_support,type.eq.admin'),
+            supabaseAdmin
+                .from('notifications')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .eq('is_read', false)
+                .eq('type', 'admin_alert'),
         ]);
 
         let csUnreadCount = 0;
@@ -54,7 +61,8 @@ export async function GET() {
                 expsCount: expsRes.count || 0,
                 pendingBookingIds: (bookingsRes.data || []).map(b => b.id),
                 svcBankPendingCount: svcRes.count || 0,
-                csUnreadCount
+                csUnreadCount,
+                adminAlertsUnread: adminAlertsRes.count || 0,
             }
         });
     } catch (error: unknown) {

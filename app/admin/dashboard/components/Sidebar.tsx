@@ -97,6 +97,7 @@ export default function Sidebar() {
         pendingBookings: unviewedPendingBookings,
         servicePendingBank: data.svcBankPendingCount || 0,
         csUnreadCount: data.csUnreadCount || 0,
+        adminAlertsUnread: data.adminAlertsUnread || 0,
       }));
     } catch (e) {
       console.error('Sidebar counts fetch error:', e);
@@ -122,29 +123,6 @@ export default function Sidebar() {
     }
   }, []);
 
-  const fetchAdminAlertCount = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-        .eq('type', 'admin_alert');
-
-      if (error) throw error;
-
-      setCounts(prev => ({
-        ...prev,
-        adminAlertsUnread: count || 0,
-      }));
-    } catch (e) {
-      console.error('Sidebar admin alerts count fetch error:', e);
-    }
-  }, [supabase]);
-
   const fetchCurrentUser = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -157,7 +135,6 @@ export default function Sidebar() {
   useEffect(() => {
     fetchCounts();
     fetchTeamCounts();
-    fetchAdminAlertCount();
     fetchCurrentUser();
 
     // 열람 상태 변경 감지를 위한 이벤트 리스너
@@ -183,7 +160,7 @@ export default function Sidebar() {
       .subscribe();
 
     const adminAlertsChannel = supabase.channel('admin_alert_notifications_sidebar')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => { fetchAdminAlertCount(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => { fetchCounts(); })
       .subscribe();
 
     return () => {
@@ -193,7 +170,7 @@ export default function Sidebar() {
       window.removeEventListener('booking-viewed', fetchCounts);
       window.clearInterval(intervalId);
     };
-  }, [fetchAdminAlertCount, fetchCounts, fetchCurrentUser, fetchTeamCounts, supabase]);
+  }, [fetchCounts, fetchCurrentUser, fetchTeamCounts, supabase]);
 
   const handleTabChange = (tab: string) => {
     router.push(`/admin/dashboard?tab=${tab}`);
