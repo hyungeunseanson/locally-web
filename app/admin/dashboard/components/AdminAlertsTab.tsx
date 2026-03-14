@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, Briefcase, Check, ClipboardList, CreditCard, MessageSquare, Trash2 } from 'lucide-react';
 
 import { createClient } from '@/app/utils/supabase/client';
+import { useToast } from '@/app/context/ToastContext';
 import { getAdminNotificationCategory, isAdminAlertNotification } from '@/app/utils/adminNotifications';
 
 type AdminNotificationItem = {
@@ -31,38 +32,27 @@ function getNotificationIcon(notification: AdminNotificationItem) {
 export default function AdminAlertsTab() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const { showToast } = useToast();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AdminNotificationItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
 
+  const fetchNotifications = useCallback(async () => {
+    const response = await fetch('/api/admin/alerts', { cache: 'no-store' });
+    const result = await response.json();
+
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.error || '관리자 알림을 불러오지 못했습니다.');
+    }
+
+    setNotifications(Array.isArray(result?.data) ? result.data : []);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
-
-    const fetchNotifications = async (userId: string) => {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('type', 'admin_alert')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (!isMounted) return;
-
-      if (error) {
-        console.error('[AdminAlertsTab] fetch notifications failed:', error);
-        setNotifications([]);
-        setIsLoading(false);
-        return;
-      }
-
-      setNotifications((data || []) as AdminNotificationItem[]);
-      setIsLoading(false);
-    };
 
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -70,14 +60,24 @@ export default function AdminAlertsTab() {
       if (!isMounted) return;
 
       if (!user) {
-        setCurrentUserId(null);
         setNotifications([]);
         setIsLoading(false);
         return;
       }
 
-      setCurrentUserId(user.id);
-      await fetchNotifications(user.id);
+      try {
+        await fetchNotifications();
+      } catch (error) {
+        console.error('[AdminAlertsTab] fetch notifications failed:', error);
+        if (isMounted) {
+          setNotifications([]);
+          showToast('관리자 알림을 불러오지 못했습니다.', 'error');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
 
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -120,7 +120,7 @@ export default function AdminAlertsTab() {
         channelRef.current = null;
       }
     };
-  }, [supabase]);
+  }, [fetchNotifications, showToast, supabase]);
 
   const unreadCount = notifications.filter((notification) => !notification.is_read).length;
   const filteredNotifications = notifications.filter((notification) => {
@@ -130,14 +130,25 @@ export default function AdminAlertsTab() {
 
   const handleClick = async (notification: AdminNotificationItem) => {
     if (!notification.is_read) {
+      const previousNotifications = notifications;
       setNotifications((prev) => prev.map((item) => (
         item.id === notification.id ? { ...item, is_read: true } : item
       )));
 
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notification.id);
+      try {
+        const response = await fetch(`/api/admin/alerts/${notification.id}`, {
+          method: 'PATCH',
+        });
+        const result = await response.json();
+
+        if (!response.ok || result?.success === false) {
+          throw new Error(result?.error || '알림 읽음 처리 실패');
+        }
+      } catch (error) {
+        console.error('[AdminAlertsTab] mark read failed:', error);
+        setNotifications(previousNotifications);
+        showToast('알림 읽음 처리에 실패했습니다.', 'error');
+      }
     }
 
     if (notification.link && notification.link !== '/admin/dashboard?tab=ALERTS') {
@@ -153,33 +164,48 @@ export default function AdminAlertsTab() {
   };
 
   const handleMarkAllRead = async () => {
-    if (!currentUserId) return;
-
     const unreadIds = notifications
       .filter((notification) => !notification.is_read)
       .map((notification) => notification.id);
 
     if (unreadIds.length === 0) return;
 
+    const previousNotifications = notifications;
     setNotifications((prev) => prev.map((notification) => ({ ...notification, is_read: true })));
 
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .in('id', unreadIds)
-      .eq('user_id', currentUserId);
+    try {
+      const response = await fetch('/api/admin/alerts/read-all', {
+        method: 'POST',
+      });
+      const result = await response.json();
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || '전체 읽음 처리 실패');
+      }
+    } catch (error) {
+      console.error('[AdminAlertsTab] mark all read failed:', error);
+      setNotifications(previousNotifications);
+      showToast('전체 읽음 처리에 실패했습니다.', 'error');
+    }
   };
 
   const handleDelete = async (notificationId: number) => {
+    const previousNotifications = notifications;
     setNotifications((prev) => prev.filter((notification) => notification.id !== notificationId));
 
-    const { error } = await supabase
-      .from('notifications')
-      .delete()
-      .eq('id', notificationId);
+    try {
+      const response = await fetch(`/api/admin/alerts/${notificationId}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
 
-    if (error) {
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || '알림 삭제 실패');
+      }
+    } catch (error) {
       console.error('[AdminAlertsTab] delete notification failed:', error);
+      setNotifications(previousNotifications);
+      showToast('알림 삭제에 실패했습니다.', 'error');
     }
   };
 

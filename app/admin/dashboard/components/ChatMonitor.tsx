@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
 import { useChat } from '@/app/hooks/useChat';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
-import { createClient } from '@/app/utils/supabase/client';
+import { useToast } from '@/app/context/ToastContext';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
 type CSStatusFilter = 'ALL' | CSStatus;
@@ -71,7 +71,7 @@ export default function ChatMonitor() {
     error
   } = useChat('admin') as unknown as AdminChatState;
 
-  const supabase = createClient();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [replyText, setReplyText] = useState('');
@@ -92,8 +92,27 @@ export default function ChatMonitor() {
   }, [targetInquiryId, inquiries?.length]);
 
   const handleUpdateCSStatus = async (inquiryId: number | string, newStatus: CSStatus) => {
-    await supabase.from('inquiries').update({ status: newStatus }).eq('id', inquiryId);
-    refresh();
+    try {
+      const response = await fetch(`/api/admin/inquiries/${inquiryId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || '문의 상태 변경 실패');
+      }
+
+      refresh();
+      return true;
+    } catch (error) {
+      console.error('[ChatMonitor] update status failed:', error);
+      const message = error instanceof Error ? error.message : '문의 상태 변경 실패';
+      showToast(message, 'error');
+      return false;
+    }
   };
 
   const handleSend = async () => {
@@ -111,6 +130,8 @@ export default function ChatMonitor() {
         }
       } catch (error) {
         console.error('[ChatMonitor] sendMessage failed:', error);
+        const message = error instanceof Error ? error.message : '메시지 전송 실패';
+        showToast(message, 'error');
       }
     }
   };

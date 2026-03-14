@@ -20,6 +20,15 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `hooks/useServiceAdminData.ts`: service_bookings 전용 독립 훅 (v3.9.0 신설, v3.9.3부터 `/api/admin/service-bookings` 경유)
 - `components/ServiceAdminTab.tsx`: 맞춤 의뢰 관리 탭 — 전체 의뢰 / 정산 대기 / 취소·환불 내역 (v3.9.0 신설)
 - `components/AdminAlertsTab.tsx`: 관리자 운영 인앱 알림 누적 탭 (`notifications` 재사용)
+- `/api/admin/inquiries/[id]/status`: ChatMonitor 관리자 1:1 문의 상태 변경 전용 API (`admin`/`admin_support` 문의만 `open → in_progress → resolved` 변경 + audit log)
+- `/api/admin/alerts`: Admin Alerts 전용 서버 읽기 API (현재 로그인 관리자 본인의 `admin_alert` 알림 100건)
+- `/api/admin/alerts/[id]`: Admin Alerts 전용 서버 단건 API (읽음 처리 / 삭제)
+- `/api/admin/alerts/read-all`: Admin Alerts 전용 전체 읽음 처리 API
+- `/api/admin/team/tasks`: Team Workspace `Daily Log / TODO / MEMO` 생성 전용 API (`TeamTab` create 경계 서버화)
+- `/api/admin/team/tasks/[id]`: Team Workspace 작업 수정 / 삭제 API (`TeamTab` 상태 변경, 메모 수정, 작업 삭제 전용)
+- `/api/admin/team/comments`: Team Workspace TODO/MEMO 댓글 생성 API (`TeamTab` 댓글 direct insert 제거)
+- `/api/admin/team/whitelist`: Team Workspace Admin Whitelist 추가 API
+- `/api/admin/team/whitelist/[id]`: Team Workspace Admin Whitelist 삭제 API (+ audit log)
 - `types/admin.ts`: 관리자 전용 타입 중앙화 (`AdminServiceBooking` 포함)
 - `/api/admin/users-summary`: User Management/Analytics 공용 경량 회원 목록 API (`profiles + users.role` 병합)
 - `/api/admin/users-activity-summary`: User Management 리스트 전용 활동 summary API (`총 결제액/예약·의뢰 수/최근 활동` 지연 집계)
@@ -28,6 +37,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/analytics-search-intent`: Data Analytics `고객 검색 수요 분석` 전용 서버 집계 API (검색량 TOP, 급상승, 공급 부족, 동일 세션 기준 참고용 검색→클릭/결제 시작 전환 + 유입 source별 대표 검색 수요 조립)
 - `/api/admin/analytics-customer-composition`: Data Analytics `고객 구성 분석` 전용 서버 집계 API (체험 예약 + 서비스 결제 고객 기준 국적, 언어권, 신규/반복, 체험/서비스 선호 조립 + 추적된 고객 기준 유입 source/가입→결제 전환/결제액/반복 고객/주요 고객 국적·언어 참고용 집계)
 - `/api/admin/reviews`: Data Analytics `Review Quality` 전용 서버 읽기 API (리뷰 + 게스트 프로필 + 체험 제목 조립)
+- `/api/admin/reviews/[id]`: Data Analytics `Review Quality` 전용 서버 삭제 API (관리자 권한 확인 후 리뷰 삭제 + audit log)
 - `/api/admin/audit-logs`: Data Analytics `운영 감사 로그` 전용 서버 읽기 API (최근 100개 admin_audit_logs)
 - `/api/admin/service-cancel`: 관리자 강제 취소/환불 API (NicePay error-safe)
 - `/api/admin/service-confirm-payment`: 무통장 입금 확인 API (PENDING→PAID + request→open, v3.9.2)
@@ -111,6 +121,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `Data Analytics` 탭은 `/api/admin/analytics-summary`, `/api/admin/analytics-host-summary`, `/api/admin/reviews`, `/api/admin/audit-logs`를 전용 source로 사용하므로, `page.tsx`에서 `useAdminData()` 공통 로딩 게이트 밖에서 직접 렌더링한다. `AnalyticsTab`의 shared props는 마지막 fallback 안전망으로만 유지한다.
 - `User Management` 탭은 `/api/admin/users-summary`와 presence 구독을 쓰는 `useAdminUsersData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다. `useAdminData.ts` 공통 로딩을 기다리지 않는다.
 - `Approvals` 탭은 `/api/admin/host-applications` 요약 API + `experiences` 클라이언트 조회를 쓰는 `useAdminApprovalsData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다. `useAdminData.ts` 공통 로딩을 기다리지 않는다.
+- `TEAM` 탭은 아직 목록/실시간 읽기는 client Supabase를 유지하지만, `TeamTab`의 `admin_tasks / admin_task_comments / admin_whitelist` 쓰기(create/update/delete)는 전용 `/api/admin/team/*` 경로로만 처리한다. `GlobalTeamChat`, `MiniChatBar` direct write는 별도 단계로 남겨둔다.
 - 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
 - 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
 - 어드민 대시보드 권한 및 무통장 버그 수정(v3.9.3): `service_bookings` 영역의 RLS 권한 누락으로 인한 관리자 데이터 블락/사이드바 카운트 증발 현상을 우회하기 위해 `createAdminClient`를 쓰는 전용 백엔드 API 신설 (`/api/admin/service-bookings`, `/api/admin/sidebar-counts`). 또한, 일반 `bookings` 테이블에 `payment_method` 컬럼을 신규 추가하고 `create_booking_atomic` 함수에서 이를 저장하도록 수정.

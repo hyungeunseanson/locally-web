@@ -84,6 +84,23 @@ export default function TeamTab() {
     autoResizeTextarea(element, 144);
   }, [autoResizeTextarea]);
 
+  const requestTeamApi = useCallback(async (url: string, init: RequestInit = {}) => {
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || payload?.success === false) {
+      throw new Error(payload?.error || '요청 처리 중 오류가 발생했습니다.');
+    }
+
+    return payload;
+  }, []);
+
   const toggleMemoExpand = (id: string) => {
     const newSet = new Set(expandedMemos);
     if (newSet.has(id)) newSet.delete(id);
@@ -121,6 +138,12 @@ export default function TeamTab() {
       .order('created_at', { ascending: true });
     if (data) setComments(data);
   }, [supabase]);
+
+  const refreshTasksAndComments = useCallback(async () => {
+    const nextTasks = await fetchTasks();
+    await fetchComments(nextTasks ?? []);
+    return nextTasks;
+  }, [fetchComments]);
 
   const scheduleFetchComments = useCallback((taskList?: { id: string }[]) => {
     if (commentsFetchTimerRef.current) {
@@ -231,14 +254,13 @@ export default function TeamTab() {
       return;
     }
     try {
-      const { error } = await supabase.from('admin_whitelist').insert({ email });
-      if (error) {
-        if (error.code === '23505') showToast('이미 화이트리스트에 존재하는 이메일입니다.', 'error');
-        else throw error;
-      } else {
-        setNewWhitemail('');
-        showToast('화이트리스트 추가 완료', 'success');
-      }
+      await requestTeamApi('/api/admin/team/whitelist', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+      await fetchWhitelist();
+      setNewWhitemail('');
+      showToast('화이트리스트 추가 완료', 'success');
     } catch (error: any) {
       showToast('오류 발생: ' + error.message, 'error');
     }
@@ -247,15 +269,16 @@ export default function TeamTab() {
   const addDailyLog = async () => {
     if (!newLog.task.trim() || !currentUser) return;
     try {
-      const { error } = await supabase.from('admin_tasks').insert({
-        type: 'DAILY_LOG',
-        content: newLog.task,
-        author_id: currentUser.id,
-        author_name: currentUser.name,
-        is_completed: false,
-        metadata: { note: newLog.note, status_text: 'Progress' }
+      await requestTeamApi('/api/admin/team/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'DAILY_LOG',
+          content: newLog.task,
+          isCompleted: false,
+          metadata: { note: newLog.note, status_text: 'Progress' },
+        }),
       });
-      if (error) throw error;
+      await refreshTasksAndComments();
       setNewLog({ task: '', note: '' });
       showToast('Daily Log 기록 성공', 'success');
     } catch (error: any) {
@@ -268,19 +291,17 @@ export default function TeamTab() {
     if (!text || !currentUser || isSubmittingCommentByTaskId[taskId]) return;
     setTaskCommentSubmitting(taskId, true);
     try {
-      const { error } = await supabase.from('admin_task_comments').insert({
-        task_id: taskId,
-        content: text,
-        author_id: currentUser.id,
-        author_name: currentUser.name,
-        client_nonce: generateClientNonce(taskId)
+      const result = await requestTeamApi('/api/admin/team/comments', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId,
+          content: text,
+          clientNonce: generateClientNonce(taskId),
+        }),
       });
-      if (error) {
-        if (error.code === '23505') {
-          setNewComment('');
-          return;
-        }
-        throw error;
+      if (result?.duplicate) {
+        setNewComment('');
+        return;
       }
 
       // 알림 발송 (비동기 처리)
@@ -308,11 +329,14 @@ export default function TeamTab() {
   const toggleStatus = async (id: string, currentStatus: boolean) => {
     try {
       const nextStatus = !currentStatus;
-      const { error } = await supabase.from('admin_tasks').update({
-        is_completed: nextStatus,
-        metadata: { status_text: nextStatus ? 'Done' : 'Progress' }
-      }).eq('id', id);
-      if (error) throw error;
+      await requestTeamApi(`/api/admin/team/tasks/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          isCompleted: nextStatus,
+          metadata: { status_text: nextStatus ? 'Done' : 'Progress' },
+        }),
+      });
+      await refreshTasksAndComments();
     } catch (error: any) {
       showToast('상태 업데이트 실패: ' + error.message, 'error');
     }
@@ -321,8 +345,23 @@ export default function TeamTab() {
   const deleteTask = async (table: string, id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
     try {
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if (error) throw error;
+      const endpoint =
+        table === 'admin_tasks'
+          ? `/api/admin/team/tasks/${id}`
+          : table === 'admin_whitelist'
+            ? `/api/admin/team/whitelist/${id}`
+            : null;
+
+      if (!endpoint) {
+        throw new Error('지원하지 않는 삭제 대상입니다.');
+      }
+
+      await requestTeamApi(endpoint, { method: 'DELETE' });
+      if (table === 'admin_tasks') {
+        await refreshTasksAndComments();
+      } else {
+        await fetchWhitelist();
+      }
       showToast('삭제 완료', 'success');
     } catch (error: any) {
       showToast('삭제 실패: ' + error.message, 'error');
@@ -332,8 +371,11 @@ export default function TeamTab() {
   const addTodo = async () => {
     if (!newTodo.trim() || !currentUser) return;
     try {
-      const { error } = await supabase.from('admin_tasks').insert({ type: 'TODO', content: newTodo, author_id: currentUser.id, author_name: currentUser.name, is_completed: false });
-      if (error) throw error;
+      await requestTeamApi('/api/admin/team/tasks', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'TODO', content: newTodo, isCompleted: false }),
+      });
+      await refreshTasksAndComments();
 
       fetch('/api/admin/notify-team', {
         method: 'POST',
@@ -358,19 +400,17 @@ export default function TeamTab() {
     if (!text || !currentUser || isSubmittingCommentByTaskId[taskId]) return;
     setTaskCommentSubmitting(taskId, true);
     try {
-      const { error } = await supabase.from('admin_task_comments').insert({
-        task_id: taskId,
-        content: text,
-        author_id: currentUser.id,
-        author_name: currentUser.name,
-        client_nonce: generateClientNonce(taskId)
+      const result = await requestTeamApi('/api/admin/team/comments', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId,
+          content: text,
+          clientNonce: generateClientNonce(taskId),
+        }),
       });
-      if (error) {
-        if (error.code === '23505') {
-          setMemoCommentInputs(prev => ({ ...prev, [taskId]: '' }));
-          return;
-        }
-        throw error;
+      if (result?.duplicate) {
+        setMemoCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+        return;
       }
 
       fetch('/api/admin/notify-team', {
@@ -399,17 +439,21 @@ export default function TeamTab() {
     if (!currentUser) return;
     try {
       if (editingMemo) {
-        const { error } = await supabase.from('admin_tasks').update({ content: markdownContent }).eq('id', editingMemo.id);
-        if (error) throw error;
+        await requestTeamApi(`/api/admin/team/tasks/${editingMemo.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ content: markdownContent }),
+        });
+        await refreshTasksAndComments();
         showToast('마크다운 메모가 수정되었습니다.', 'success');
       } else {
-        const { error } = await supabase.from('admin_tasks').insert({
-          type: 'MEMO',
-          content: markdownContent,
-          author_id: currentUser.id,
-          author_name: currentUser.name
+        await requestTeamApi('/api/admin/team/tasks', {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'MEMO',
+            content: markdownContent,
+          }),
         });
-        if (error) throw error;
+        await refreshTasksAndComments();
 
         fetch('/api/admin/notify-team', {
           method: 'POST',

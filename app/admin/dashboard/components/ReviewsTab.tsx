@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { Star, Trash2, Search, RefreshCw } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 
 interface AdminReview {
@@ -19,7 +18,6 @@ interface AdminReview {
 }
 
 export default function ReviewsTab() {
-  const supabase = createClient();
   const { showToast } = useToast();
 
   const [reviews, setReviews] = useState<AdminReview[]>([]);
@@ -55,13 +53,21 @@ export default function ReviewsTab() {
     if (!confirm('이 후기를 삭제하시겠습니까? 취소할 수 없습니다.')) return;
     setDeletingId(reviewId);
     try {
-      const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
-      if (error) throw error;
+      const response = await fetch(`/api/admin/reviews/${reviewId}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || '삭제 실패');
+      }
+
       setReviews(prev => prev.filter(r => r.id !== reviewId));
       showToast('후기가 삭제되었습니다.', 'success');
     } catch (err) {
       console.error(err);
-      showToast('삭제 실패', 'error');
+      const message = err instanceof Error ? err.message : '삭제 실패';
+      showToast(message, 'error');
     } finally {
       setDeletingId(null);
     }
