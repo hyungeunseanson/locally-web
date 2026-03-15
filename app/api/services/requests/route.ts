@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import crypto from 'crypto';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
@@ -32,6 +32,34 @@ type CreateRequestBody = {
   contact_name?: string;
   contact_phone?: string;
 };
+
+type ServiceAdminClient = SupabaseClient;
+
+async function cleanupCreatedServiceRequest(
+  supabaseAdmin: ServiceAdminClient,
+  requestId: string
+) {
+  const { error: deleteError } = await supabaseAdmin
+    .from('service_requests')
+    .delete()
+    .eq('id', requestId)
+    .eq('status', 'pending_payment');
+
+  if (!deleteError) {
+    return;
+  }
+
+  console.error('Service Request Cleanup Delete Error:', deleteError);
+
+  const { error: cancelError } = await supabaseAdmin
+    .from('service_requests')
+    .update({ status: 'cancelled' })
+    .eq('id', requestId);
+
+  if (cancelError) {
+    console.error('Service Request Cleanup Cancel Error:', cancelError);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -106,8 +134,8 @@ export async function POST(request: Request) {
         host_id: null,          // v2: 호스트 선택 전이므로 null
         application_id: null,   // v2: 호스트 선택 후 채워짐
         amount: data.total_customer_price,
-        host_payout_amount: durationNum * 20000,
-        platform_revenue: durationNum * 15000,
+        host_payout_amount: data.total_host_payout,
+        platform_revenue: data.total_customer_price - data.total_host_payout,
         status: 'PENDING',
         contact_name: contact_name.trim(),
         contact_phone: contact_phone.trim(),
@@ -117,8 +145,9 @@ export async function POST(request: Request) {
 
     if (bookingError) {
       console.error('Service Booking Pre-create Error:', bookingError);
-      // 예약 생성 실패 시 의뢰 취소 처리
-      await supabaseAdmin.from('service_requests').update({ status: 'cancelled' }).eq('id', data.id);
+      // 예약 생성 실패 시 방금 만든 pending_payment 의뢰를 우선 삭제하고,
+      // 삭제 실패 시에만 cancelled fallback으로 남긴다.
+      await cleanupCreatedServiceRequest(supabaseAdmin, data.id);
       return NextResponse.json({ success: false, error: '예약 생성 중 오류가 발생했습니다.' }, { status: 500 });
     }
 

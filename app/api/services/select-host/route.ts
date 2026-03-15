@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
@@ -8,6 +8,143 @@ type SelectHostBody = {
   request_id?: string;
   application_id?: string;
 };
+
+type ServiceAdminClient = SupabaseClient;
+type BookingBindingSnapshot = {
+  id: string;
+  host_id: string | null;
+  application_id: string | null;
+};
+
+async function rollbackSelectHostState(
+  supabaseAdmin: ServiceAdminClient,
+  params: {
+    requestId: string;
+    originalRequest: {
+      status: string;
+      selected_application_id: string | null;
+      selected_host_id: string | null;
+    };
+    bookingSnapshots: BookingBindingSnapshot[];
+    requestUpdated: boolean;
+    selectedApplicationUpdated: boolean;
+    rejectedApplicationIds: string[];
+    selectedApplicationId: string;
+  }
+) {
+  const {
+    requestId,
+    originalRequest,
+    bookingSnapshots,
+    requestUpdated,
+    selectedApplicationUpdated,
+    rejectedApplicationIds,
+    selectedApplicationId,
+  } = params;
+
+  const { data: currentRequest, error: currentRequestError } = await supabaseAdmin
+    .from('service_requests')
+    .select('status, selected_application_id, selected_host_id')
+    .eq('id', requestId)
+    .maybeSingle();
+
+  if (currentRequestError) {
+    console.error('Select Host Rollback - Current Request Fetch Error:', currentRequestError);
+  }
+
+  if (
+    currentRequest &&
+    currentRequest.status === 'matched' &&
+    currentRequest.selected_application_id &&
+    currentRequest.selected_host_id
+  ) {
+    const { error: selectedAlignError } = await supabaseAdmin
+      .from('service_applications')
+      .update({ status: 'selected' })
+      .eq('id', currentRequest.selected_application_id);
+
+    if (selectedAlignError) {
+      console.error('Select Host Rollback - Winner App Align Error:', selectedAlignError);
+    }
+
+    const { error: othersAlignError } = await supabaseAdmin
+      .from('service_applications')
+      .update({ status: 'rejected' })
+      .eq('request_id', requestId)
+      .neq('id', currentRequest.selected_application_id)
+      .in('status', ['pending', 'selected']);
+
+    if (othersAlignError) {
+      console.error('Select Host Rollback - Other Apps Align Error:', othersAlignError);
+    }
+
+    const { error: bookingAlignError } = await supabaseAdmin
+      .from('service_bookings')
+      .update({
+        host_id: currentRequest.selected_host_id,
+        application_id: currentRequest.selected_application_id,
+      })
+      .eq('request_id', requestId)
+      .in('status', ['PAID', 'PENDING']);
+
+    if (bookingAlignError) {
+      console.error('Select Host Rollback - Booking Align Error:', bookingAlignError);
+    }
+
+    return;
+  }
+
+  if (requestUpdated) {
+    const { error } = await supabaseAdmin
+      .from('service_requests')
+      .update({
+        status: originalRequest.status,
+        selected_application_id: originalRequest.selected_application_id,
+        selected_host_id: originalRequest.selected_host_id,
+      })
+      .eq('id', requestId);
+
+    if (error) {
+      console.error('Select Host Rollback - Request Error:', error);
+    }
+  }
+
+  if (rejectedApplicationIds.length > 0) {
+    const { error } = await supabaseAdmin
+      .from('service_applications')
+      .update({ status: 'pending' })
+      .in('id', rejectedApplicationIds);
+
+    if (error) {
+      console.error('Select Host Rollback - Rejected Apps Error:', error);
+    }
+  }
+
+  if (selectedApplicationUpdated) {
+    const { error } = await supabaseAdmin
+      .from('service_applications')
+      .update({ status: 'pending' })
+      .eq('id', selectedApplicationId);
+
+    if (error) {
+      console.error('Select Host Rollback - Selected App Error:', error);
+    }
+  }
+
+  for (const snapshot of bookingSnapshots) {
+    const { error } = await supabaseAdmin
+      .from('service_bookings')
+      .update({
+        host_id: snapshot.host_id,
+        application_id: snapshot.application_id,
+      })
+      .eq('id', snapshot.id);
+
+    if (error) {
+      console.error('Select Host Rollback - Booking Error:', error);
+    }
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -32,7 +169,7 @@ export async function POST(request: Request) {
     // 1. 의뢰 조회 + 소유자 검증
     const { data: serviceRequest, error: reqError } = await supabaseAdmin
       .from('service_requests')
-      .select('id, status, user_id, title, duration_hours')
+      .select('id, status, user_id, title, duration_hours, selected_application_id, selected_host_id')
       .eq('id', request_id)
       .maybeSingle();
 
@@ -65,31 +202,74 @@ export async function POST(request: Request) {
     }
 
     const selectedHostId = application.host_id;
+    const { data: bookingSnapshots, error: bookingFetchError } = await supabaseAdmin
+      .from('service_bookings')
+      .select('id, host_id, application_id')
+      .eq('request_id', request_id)
+      .in('status', ['PAID', 'PENDING']);
 
-    // 3. 원자적 업데이트: service_requests 상태 변경
-    const { error: updateReqErr } = await supabaseAdmin
-      .from('service_requests')
-      .update({
-        status: 'matched',
-        selected_application_id: application_id,
-        selected_host_id: selectedHostId,
-      })
-      .eq('id', request_id);
+    if (bookingFetchError) {
+      console.error('Select Host - Booking Fetch Error:', bookingFetchError);
+      return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
 
-    if (updateReqErr) {
-      console.error('Select Host - Request Update Error:', updateReqErr);
+    if (!bookingSnapshots || bookingSnapshots.length === 0) {
+      return NextResponse.json({ success: false, error: '결제 예약을 찾을 수 없습니다.' }, { status: 409 });
+    }
+
+    let selectedApplicationUpdated = false;
+    let requestUpdated = false;
+    let rejectedHostIds: string[] = [];
+    let rejectedApplicationIds: string[] = [];
+
+    // 3. 에스크로 예약에 호스트 정보 채워넣기 (PAID/PENDING 상태 예약)
+    const bookingIds = bookingSnapshots.map((row) => row.id);
+    const { error: bookingUpdateError } = await supabaseAdmin
+      .from('service_bookings')
+      .update({ host_id: selectedHostId, application_id })
+      .in('id', bookingIds);
+
+    if (bookingUpdateError) {
+      console.error('Select Host - Booking Update Error:', bookingUpdateError);
       return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     // 4. 선택된 지원서 상태 변경
-    const { error: updateAppErr } = await supabaseAdmin
+    const { data: selectedApplicationRows, error: updateAppErr } = await supabaseAdmin
       .from('service_applications')
       .update({ status: 'selected' })
-      .eq('id', application_id);
+      .eq('id', application_id)
+      .eq('status', 'pending')
+      .select('id');
 
     if (updateAppErr) {
       console.error('Select Host - Application Update Error:', updateAppErr);
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
+
+    if (!selectedApplicationRows || selectedApplicationRows.length !== 1) {
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '이미 처리된 지원서입니다.' }, { status: 409 });
+    }
+
+    selectedApplicationUpdated = true;
 
     // 5. 나머지 지원서 rejected 처리
     const { data: rejectedApplications, error: rejectedUpdateError } = await supabaseAdmin
@@ -98,22 +278,67 @@ export async function POST(request: Request) {
       .eq('request_id', request_id)
       .neq('id', application_id)
       .eq('status', 'pending')
-      .select('host_id');
+      .select('id, host_id');
 
     if (rejectedUpdateError) {
       console.error('Select Host - Rejected Application Update Error:', rejectedUpdateError);
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    const rejectedHostIds = (rejectedApplications || [])
+    rejectedApplicationIds = (rejectedApplications || []).map((row) => row.id);
+    rejectedHostIds = (rejectedApplications || [])
       .map((row) => row.host_id)
       .filter((id): id is string => Boolean(id));
 
-    // 6. 에스크로 예약에 호스트 정보 채워넣기 (PAID 상태 예약)
-    await supabaseAdmin
-      .from('service_bookings')
-      .update({ host_id: selectedHostId, application_id })
-      .eq('request_id', request_id)
-      .in('status', ['PAID', 'PENDING']);
+    // 6. 마지막에 service_requests 상태 변경
+    const { data: updatedRequestRows, error: updateReqErr } = await supabaseAdmin
+      .from('service_requests')
+      .update({
+        status: 'matched',
+        selected_application_id: application_id,
+        selected_host_id: selectedHostId,
+      })
+      .eq('id', request_id)
+      .eq('status', 'open')
+      .select('id');
+
+    if (updateReqErr) {
+      console.error('Select Host - Request Update Error:', updateReqErr);
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    if (!updatedRequestRows || updatedRequestRows.length !== 1) {
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '호스트를 선택할 수 없는 상태입니다.' }, { status: 409 });
+    }
+
+    requestUpdated = true;
 
     // 7. 선택된 호스트에게 알림 (비동기) — 에스크로: 이미 결제 완료 상태
     supabaseAdmin.from('notifications').insert({

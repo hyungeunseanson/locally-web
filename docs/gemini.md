@@ -73,6 +73,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 서비스 NicePay 카드결제는 `/api/services/payment/nicepay-callback`에서 브라우저 성공 payload를 신뢰하지 않고, PortOne REST API 재조회(`imp_uid`)로 `status=paid`, `merchant_uid=service_bookings.order_id`, `amount=service_bookings.amount`를 모두 확인한 뒤에만 `service_bookings.status='PAID'`, `payment_method='card'`, `service_requests.status='open'`으로 확정한다.
 - 서비스 결제 페이지는 pending `service_bookings.payment_method`를 함께 읽는다. 이미 `payment_method='bank'`로 표시된 `PENDING` 예약은 UI에서 무통장으로 고정되고, `/api/services/payment/nicepay-callback` 및 `/api/services/payment/paypal/capture-order`도 같은 예약에 대한 카드/PayPal 확정을 거부한다.
 - 서비스 결제 완료 후 호스트 모집 알림(`service_request_new`)은 카드/NicePay, PayPal, 무통장 입금 확인 모두 같은 helper로 대상을 고른다. 기준은 `host_applications.status='approved'` + `service_requests.country/city`와 같은 위치에 활성 체험(`experiences.is_active=true`)이 등록된 호스트만 대상으로 하며, 고객 본인은 제외한다. 잡보드(`/services`)와 서비스 상세 읽기 권한도 같은 eligible-host 기준을 사용한다.
+- `/api/services/requests`는 `service_requests(status='pending_payment')`와 사전 생성 `service_bookings(status='PENDING')`를 같은 요청 안에서 만들고, booking 생성 실패 시 방금 만든 의뢰를 즉시 삭제(실패 시 `cancelled` fallback)해 orphan `pending_payment` 의뢰를 남기지 않는다.
+- `/api/services/select-host`는 `service_bookings.host_id/application_id`, 선택 지원서 `selected`, 나머지 지원서 `rejected`, `service_requests.status='matched'`를 순차 적용하되, 중간 실패 시 현재 request 최종 상태에 맞춰 rollback/alignment를 수행해 부분 성공 상태를 남기지 않는다.
 - `/api/services/payment/card-ready`는 서비스 카드결제 검증 준비 상태를 반환한다. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 서비스 결제 페이지는 readiness가 false일 때 카드 결제를 비활성화하고 무통장/PayPal만 허용한다.
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics의 `Review Quality`, `운영 감사 로그`는 이제 브라우저 직접 select 대신 각각 `/api/admin/reviews`, `/api/admin/audit-logs`를 초기 읽기 source로 사용한다. 현재 실시간성은 감사 로그 INSERT 구독만 클라이언트에 남겨둔다.
@@ -282,10 +284,10 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 
 | 엔드포인트 | 용도 |
 |------------|------|
-| `POST /api/services/requests` | 의뢰 생성(pending_payment) + 에스크로 예약 사전 생성(PENDING, host_id=null), city 기준 country 자동 정규화 |
+| `POST /api/services/requests` | 의뢰 생성(pending_payment) + 에스크로 예약 사전 생성(PENDING, host_id=null), city 기준 country 자동 정규화, booking 실패 시 request cleanup |
 | `GET /api/services/requests?mode=board\|my` | 의뢰 목록 조회 (`board`: 승인 호스트 중 의뢰 위치와 같은 국가/도시에 활성 체험이 있는 경우만 open 노출) |
 | `POST /api/services/applications` | 호스트 지원 (중복/재지원 처리) |
-| `POST /api/services/select-host` | 고객의 호스트 선택 → matched + 기존 예약에 host_id/application_id 채워넣기 |
+| `POST /api/services/select-host` | 고객의 호스트 선택 → matched + 기존 예약에 host_id/application_id 채워넣기 + 중간 실패 시 rollback/alignment |
 | `POST /api/services/payment/nicepay-callback` | 결제 확정 → request.status: open 전환 + 호스트 전체 알림 |
 | `POST /api/services/cancel` | PENDING: DB 취소 / open+PAID: PG 환불 성공 시에만 취소 확정 / matched: 관리자 검토 |
 
