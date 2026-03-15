@@ -346,4 +346,125 @@ test.describe.serial('Service select-host atomic hardening', () => {
     expect(finalApplications?.map((row) => row.status)).toEqual(['pending', 'pending']);
     expect(finalApplications?.map((row) => row.id).sort()).toEqual([applicationAId, applicationBId].sort());
   });
+
+  test('rolls back booking binding when selection fails after booking update', async ({ page }) => {
+    const customerUser = createUser('rollback-booking-customer');
+    const hostA = createUser('rollback-booking-host-a');
+    const hostB = createUser('rollback-booking-host-b');
+
+    const customerId = await createAuthUser(customerUser);
+    const hostAId = await createAuthUser(hostA);
+    const hostBId = await createAuthUser(hostB);
+
+    const requestRow = await createOpenRequest(customerId, customerUser);
+    const applicationAId = await createApplication(requestRow.id, hostAId, 'rollback-booking-a');
+    await createApplication(requestRow.id, hostBId, 'rollback-booking-b');
+    const bookingId = await createEscrowBooking(
+      requestRow.id,
+      customerId,
+      Number(requestRow.total_customer_price),
+      Number(requestRow.total_host_payout)
+    );
+
+    await login(page, customerUser);
+
+    const response = await page.request.post('/api/services/select-host', {
+      headers: {
+        'x-locally-test-select-host-fail-stage': 'after-booking-update',
+      },
+      data: { request_id: requestRow.id, application_id: applicationAId },
+    });
+
+    expect(response.status()).toBe(500);
+
+    const supabase = getAdminClient();
+    const { data: finalRequest, error: requestError } = await supabase
+      .from('service_requests')
+      .select('status, selected_application_id, selected_host_id')
+      .eq('id', requestRow.id)
+      .maybeSingle();
+
+    if (requestError) throw requestError;
+
+    expect(finalRequest?.status).toBe('open');
+    expect(finalRequest?.selected_application_id).toBeNull();
+    expect(finalRequest?.selected_host_id).toBeNull();
+
+    const { data: finalBooking, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('host_id, application_id')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(finalBooking?.host_id).toBeNull();
+    expect(finalBooking?.application_id).toBeNull();
+  });
+
+  test('rolls back selected/rejected application states when selection fails before request match', async ({ page }) => {
+    const customerUser = createUser('rollback-app-customer');
+    const hostA = createUser('rollback-app-host-a');
+    const hostB = createUser('rollback-app-host-b');
+
+    const customerId = await createAuthUser(customerUser);
+    const hostAId = await createAuthUser(hostA);
+    const hostBId = await createAuthUser(hostB);
+
+    const requestRow = await createOpenRequest(customerId, customerUser);
+    const applicationAId = await createApplication(requestRow.id, hostAId, 'rollback-app-a');
+    const applicationBId = await createApplication(requestRow.id, hostBId, 'rollback-app-b');
+    const bookingId = await createEscrowBooking(
+      requestRow.id,
+      customerId,
+      Number(requestRow.total_customer_price),
+      Number(requestRow.total_host_payout)
+    );
+
+    await login(page, customerUser);
+
+    const response = await page.request.post('/api/services/select-host', {
+      headers: {
+        'x-locally-test-select-host-fail-stage': 'after-rejected-applications-update',
+      },
+      data: { request_id: requestRow.id, application_id: applicationAId },
+    });
+
+    expect(response.status()).toBe(500);
+
+    const supabase = getAdminClient();
+    const { data: finalRequest, error: requestError } = await supabase
+      .from('service_requests')
+      .select('status, selected_application_id, selected_host_id')
+      .eq('id', requestRow.id)
+      .maybeSingle();
+
+    if (requestError) throw requestError;
+
+    expect(finalRequest?.status).toBe('open');
+    expect(finalRequest?.selected_application_id).toBeNull();
+    expect(finalRequest?.selected_host_id).toBeNull();
+
+    const { data: finalApplications, error: appError } = await supabase
+      .from('service_applications')
+      .select('id, status')
+      .eq('request_id', requestRow.id)
+      .order('id');
+
+    if (appError) throw appError;
+
+    expect(finalApplications?.map((row) => row.status)).toEqual(['pending', 'pending']);
+    expect(finalApplications?.map((row) => row.id).sort()).toEqual([applicationAId, applicationBId].sort());
+
+    const { data: finalBooking, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('host_id, application_id')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(finalBooking?.host_id).toBeNull();
+    expect(finalBooking?.application_id).toBeNull();
+  });
 });

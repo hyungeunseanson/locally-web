@@ -35,6 +35,16 @@
 | 🟠 호스트 프로필 select drift 정리 | `guest trips`, `guest inbox`, `service applications`가 실제 DB에 없는 `host_applications.profession` 컬럼을 더 이상 조회하지 않도록 정리하여 hidden 500을 제거 |
 | 🟡 보호막 추가 | `tests/e2e/57-guest-trips-sync-completed.spec.ts` 추가 — GET은 read-only로 유지되고, POST sync에서만 DB `completed` 전환이 일어나는지 검증 |
 
+## v3.39.12 — [Service Requests] 생성 cleanup 경계 보강 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 booking pre-create cleanup 보강 | `app/api/services/requests/route.ts`가 service booking 사전 생성 실패 시 request cleanup 전에 동일 `request_id`/`bookingId` 기준 booking row까지 best-effort로 제거하도록 정리 |
+| 🟡 test-only failure hook | non-production에서만 `x-locally-test-force-booking-create-fail: 1` 헤더로 booking pre-create 실패 경로를 강제할 수 있도록 추가 |
+| 🟡 보호막 추가 | `tests/e2e/49-service-request-contract.spec.ts`에 booking pre-create 실패 시 `service_requests`가 남지 않는지 확인하는 계약 테스트 추가 |
+| 🟠 select-host rollback 보호막 보강 | `app/api/services/select-host/route.ts`에 non-production 전용 실패 주입 stage(`after-booking-update`, `after-selected-application-update`, `after-rejected-applications-update`)를 추가해 rollback 경로를 직접 검증할 수 있게 정리 |
+| 🟡 rollback 회귀 테스트 추가 | `tests/e2e/50-service-select-host-atomicity.spec.ts`에 booking binding 단계 실패, rejected apps 단계 실패 후 request/applications/booking이 모두 원복되는지 검증 추가 |
+
 ## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
 
 | 항목 | 내용 |

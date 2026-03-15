@@ -282,6 +282,60 @@ test.describe.serial('Service request contract alignment', () => {
     }
   });
 
+  test('cleans up the pending service request when booking pre-create fails', async ({ page }) => {
+    const customerUser = createUser('cleanup-customer');
+    const customerId = await createAuthUser(customerUser);
+
+    await login(page, customerUser);
+
+    const serviceDate = new Date();
+    serviceDate.setDate(serviceDate.getDate() + 7);
+    const title = `서비스 생성 cleanup 테스트 ${Date.now()}`;
+
+    const response = await page.request.post('/api/services/requests', {
+      headers: {
+        'x-locally-test-force-booking-create-fail': '1',
+      },
+      data: {
+        title,
+        description: 'booking pre-create 실패 cleanup 검증용 의뢰입니다.',
+        city: '서울',
+        service_date: formatDate(serviceDate),
+        start_time: '10:00',
+        duration_hours: 5,
+        guest_count: 2,
+        languages: ['한국어'],
+        contact_name: customerUser.fullName,
+        contact_phone: customerUser.phone,
+      },
+    });
+
+    expect(response.status()).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+    });
+
+    const supabase = getAdminClient();
+    const { data: requestRows, error: requestError } = await supabase
+      .from('service_requests')
+      .select('id, status')
+      .eq('user_id', customerId)
+      .eq('title', title);
+
+    if (requestError) throw requestError;
+    expect(requestRows ?? []).toHaveLength(0);
+
+    const { data: bookingRows, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('id')
+      .eq('customer_id', customerId)
+      .eq('contact_name', customerUser.fullName)
+      .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+
+    if (bookingError) throw bookingError;
+    expect((bookingRows ?? []).length).toBe(0);
+  });
+
   test('shows persisted total_host_payout on the apply page instead of a hardcoded hourly fallback', async ({ page }) => {
     const hostUser = createUser('host');
     const customerUser = createUser('request-owner');

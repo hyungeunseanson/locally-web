@@ -35,10 +35,27 @@ type CreateRequestBody = {
 
 type ServiceAdminClient = SupabaseClient;
 
-async function cleanupCreatedServiceRequest(
+async function cleanupCreatedServiceRequestState(
   supabaseAdmin: ServiceAdminClient,
-  requestId: string
+  params: {
+    requestId: string;
+    bookingId?: string;
+  }
 ) {
+  const { requestId, bookingId } = params;
+
+  if (bookingId) {
+    const { error: bookingDeleteError } = await supabaseAdmin
+      .from('service_bookings')
+      .delete()
+      .eq('id', bookingId)
+      .eq('request_id', requestId);
+
+    if (bookingDeleteError) {
+      console.error('Service Request Cleanup Booking Delete Error:', bookingDeleteError);
+    }
+  }
+
   const { error: deleteError } = await supabaseAdmin
     .from('service_requests')
     .delete()
@@ -95,6 +112,9 @@ export async function POST(request: Request) {
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const shouldForceBookingCreateFailure =
+      process.env.NODE_ENV !== 'production' &&
+      request.headers.get('x-locally-test-force-booking-create-fail') === '1';
 
     // 1. service_requests 생성 (v2 에스크로: pending_payment 상태로 시작)
     const { data, error } = await supabaseAdmin
@@ -123,31 +143,45 @@ export async function POST(request: Request) {
     }
 
     // 2. 에스크로 예약 사전 생성 (PENDING, 호스트 미정)
+    const bookingId = crypto.randomUUID();
     const orderId = generateOrderId();
-    const { error: bookingError } = await supabaseAdmin
-      .from('service_bookings')
-      .insert({
-        id: crypto.randomUUID(),
-        order_id: orderId,
-        request_id: data.id,
-        customer_id: user.id,
-        host_id: null,          // v2: 호스트 선택 전이므로 null
-        application_id: null,   // v2: 호스트 선택 후 채워짐
-        amount: data.total_customer_price,
-        host_payout_amount: data.total_host_payout,
-        platform_revenue: data.total_customer_price - data.total_host_payout,
-        status: 'PENDING',
-        contact_name: contact_name.trim(),
-        contact_phone: contact_phone.trim(),
-        payment_method: 'card',
-        payout_status: 'pending',
-      });
+    const bookingPayload = {
+      id: bookingId,
+      order_id: orderId,
+      request_id: data.id,
+      customer_id: user.id,
+      host_id: null,          // v2: 호스트 선택 전이므로 null
+      application_id: null,   // v2: 호스트 선택 후 채워짐
+      amount: data.total_customer_price,
+      host_payout_amount: data.total_host_payout,
+      platform_revenue: data.total_customer_price - data.total_host_payout,
+      status: 'PENDING' as const,
+      contact_name: contact_name.trim(),
+      contact_phone: contact_phone.trim(),
+      payment_method: 'card',
+      payout_status: 'pending',
+    };
+
+    let bookingError: unknown = null;
+
+    if (shouldForceBookingCreateFailure) {
+      bookingError = new Error('Forced service booking pre-create failure');
+    } else {
+      const bookingInsertResult = await supabaseAdmin
+        .from('service_bookings')
+        .insert(bookingPayload);
+
+      bookingError = bookingInsertResult.error;
+    }
 
     if (bookingError) {
       console.error('Service Booking Pre-create Error:', bookingError);
       // 예약 생성 실패 시 방금 만든 pending_payment 의뢰를 우선 삭제하고,
       // 삭제 실패 시에만 cancelled fallback으로 남긴다.
-      await cleanupCreatedServiceRequest(supabaseAdmin, data.id);
+      await cleanupCreatedServiceRequestState(supabaseAdmin, {
+        requestId: data.id,
+        bookingId,
+      });
       return NextResponse.json({ success: false, error: '예약 생성 중 오류가 발생했습니다.' }, { status: 500 });
     }
 

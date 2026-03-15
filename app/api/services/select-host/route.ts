@@ -16,6 +16,26 @@ type BookingBindingSnapshot = {
   application_id: string | null;
 };
 
+type SelectHostFailureStage =
+  | 'after-booking-update'
+  | 'after-selected-application-update'
+  | 'after-rejected-applications-update';
+
+function getForcedSelectHostFailureStage(request: Request): SelectHostFailureStage | null {
+  if (process.env.NODE_ENV === 'production') return null;
+
+  const value = request.headers.get('x-locally-test-select-host-fail-stage');
+  if (
+    value === 'after-booking-update' ||
+    value === 'after-selected-application-update' ||
+    value === 'after-rejected-applications-update'
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
 async function rollbackSelectHostState(
   supabaseAdmin: ServiceAdminClient,
   params: {
@@ -165,6 +185,7 @@ export async function POST(request: Request) {
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const forcedFailureStage = getForcedSelectHostFailureStage(request);
 
     // 1. 의뢰 조회 + 소유자 검증
     const { data: serviceRequest, error: reqError } = await supabaseAdmin
@@ -234,6 +255,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
+    if (forcedFailureStage === 'after-booking-update') {
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
     // 4. 선택된 지원서 상태 변경
     const { data: selectedApplicationRows, error: updateAppErr } = await supabaseAdmin
       .from('service_applications')
@@ -271,6 +305,19 @@ export async function POST(request: Request) {
 
     selectedApplicationUpdated = true;
 
+    if (forcedFailureStage === 'after-selected-application-update') {
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
     // 5. 나머지 지원서 rejected 처리
     const { data: rejectedApplications, error: rejectedUpdateError } = await supabaseAdmin
       .from('service_applications')
@@ -298,6 +345,19 @@ export async function POST(request: Request) {
     rejectedHostIds = (rejectedApplications || [])
       .map((row) => row.host_id)
       .filter((id): id is string => Boolean(id));
+
+    if (forcedFailureStage === 'after-rejected-applications-update') {
+      await rollbackSelectHostState(supabaseAdmin, {
+        requestId: request_id,
+        originalRequest: serviceRequest,
+        bookingSnapshots,
+        requestUpdated,
+        selectedApplicationUpdated,
+        rejectedApplicationIds,
+        selectedApplicationId: application_id,
+      });
+      return NextResponse.json({ success: false, error: '처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
 
     // 6. 마지막에 service_requests 상태 변경
     const { data: updatedRequestRows, error: updateReqErr } = await supabaseAdmin
