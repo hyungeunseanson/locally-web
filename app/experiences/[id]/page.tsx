@@ -33,7 +33,7 @@ export async function generateMetadata(
 
   if (!experience) {
     return {
-      title: '체험을 찾을 수 없습니다 - Locally',
+      title: '체험을 찾을 수 없습니다',
       robots: PRIVATE_NOINDEX_METADATA.robots,
     }
   }
@@ -45,12 +45,13 @@ export async function generateMetadata(
   const isPublicExperience = experience.status === 'active' && experience.is_active !== false;
 
   const metadata: Metadata = {
-    title: `${title} - Locally`,
+    title,
     description: description?.slice(0, 150) || '현지인과 함께하는 특별한 여행',
     openGraph: {
       title: title,
       description: description?.slice(0, 150),
       images: [imageUrl],
+      url: buildLocalizedAbsoluteUrl(locale, `/experiences/${id}`),
       locale: locale,
       siteName: 'Locally',
     },

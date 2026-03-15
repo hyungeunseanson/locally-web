@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.92 — [SEO] 동적 상세 title/canonical 일관성 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 체험 상세 title 중복 제거 | `app/experiences/[id]/page.tsx`의 page-level title에서 수동 `- Locally` suffix를 제거해 root layout template와의 중복 브랜드 표기를 없앴고, OG URL도 함께 추가 |
+| 🟠 커뮤니티 상세 canonical 보강 | `app/community/[id]/page.tsx`에 locale 기준 canonical / `alternates.languages` / Twitter 메타를 추가하고, page title에서 중복 `| Locally` suffix를 제거 |
+| 🟡 보호막 보강 | `tests/e2e/28-json-ld.spec.ts`가 활성 체험/커뮤니티 상세의 실제 `<title>`과 canonical이 기대값과 일치하는지까지 직접 검증하도록 확장 |
+
 ## v3.38.91 — [SEO] 크롤링 정책 정렬
 
 | 항목 | 내용 |

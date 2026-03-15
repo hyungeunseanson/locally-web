@@ -12,35 +12,55 @@ import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
-import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
+import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
+import { getCurrentLocale } from '@/app/utils/locale';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
     const { id } = await params;
+    const locale = await getCurrentLocale();
     const supabase = await createClient();
     const { data: post } = await supabase.from('community_posts').select('title, content, images, category').eq('id', id).maybeSingle();
 
     if (!post) {
-        return { title: '게시글을 찾을 수 없습니다 | Locally' };
+        return { title: '게시글을 찾을 수 없습니다' };
     }
 
     const snippet = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
     const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
+    const pagePath = `/community/${id}`;
+    const canonicalUrl = buildLocalizedAbsoluteUrl(locale, pagePath);
 
     let prefix = '';
     if (post.category === 'qna') prefix = '[Q&A] ';
     else if (post.category === 'companion') prefix = '[동행] ';
 
     return {
-        title: `${prefix}${post.title} | Locally`,
+        title: `${prefix}${post.title}`,
         description: snippet,
         openGraph: {
             title: `${prefix}${post.title} | Locally 커뮤니티`,
             description: snippet,
+            url: canonicalUrl,
             images: [defaultImage],
             type: 'article',
-        }
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: `${prefix}${post.title}`,
+            description: snippet,
+            images: [defaultImage],
+        },
+        alternates: {
+            canonical: canonicalUrl,
+            languages: {
+                ko: buildLocalizedAbsoluteUrl('ko', pagePath),
+                en: buildLocalizedAbsoluteUrl('en', pagePath),
+                ja: buildLocalizedAbsoluteUrl('ja', pagePath),
+                zh: buildLocalizedAbsoluteUrl('zh', pagePath),
+            },
+        },
     };
 }
 

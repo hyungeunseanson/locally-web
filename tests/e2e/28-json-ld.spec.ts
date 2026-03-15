@@ -208,6 +208,12 @@ test.describe('JSON-LD smoke', () => {
 
     await page.goto(`/experiences/${experience.id}`, { waitUntil: 'domcontentloaded' });
 
+    await expect(page).toHaveTitle(`${experience.title} | Locally`);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      new RegExp(`/experiences/${experience.id}$`)
+    );
+
     const experienceJsonLd = await page.locator('script[type="application/ld+json"]').allTextContents();
     expect(experienceJsonLd.some((content) => content.includes('"@type":"Product"'))).toBeTruthy();
     expect(experienceJsonLd.some((content) => content.includes(`"sku":"experience-${experience.id}"`))).toBeTruthy();
@@ -215,6 +221,12 @@ test.describe('JSON-LD smoke', () => {
     expect(experienceJsonLd.some((content) => content.includes('"audienceType":"Travelers"'))).toBeTruthy();
 
     await page.goto(`/community/${communityPost.id}`, { waitUntil: 'domcontentloaded' });
+
+    await expect(page).toHaveTitle(`[Q&A] ${communityPost.title} | Locally`);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      new RegExp(`/community/${communityPost.id}$`)
+    );
 
     const articleJsonLd = await page.locator('script[type="application/ld+json"]').allTextContents();
     expect(articleJsonLd.some((content) => content.includes('"@type":"Article"'))).toBeTruthy();
