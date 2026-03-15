@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.06 — [Guest Flow] 홈/검색 → 상세 진입 보호막 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 앞단 진입 smoke 추가 | `tests/e2e/43-guest-search-detail-ingress.spec.ts` 추가 — 공개 active 체험을 기준으로 홈 검색바 필터 후 카드 클릭, `/search?location=...` 결과 카드 클릭, 두 경로 모두 같은 체험 상세 페이지로 들어가는지 직접 검증 |
+| 🟡 상세 도착 기준 확인 | 같은 스모크가 상세 페이지 URL, 제목, `예약하기` CTA 노출까지 확인해 검색→상세 진입 경로의 최소 보호막을 제공 |
+
 ## v3.39.05 — [Guest Flow] 체험 PayPal mocked browser smoke 추가
 
 | 항목 | 내용 |
