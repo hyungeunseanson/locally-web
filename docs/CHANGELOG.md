@@ -45,6 +45,15 @@
 | 🟠 select-host rollback 보호막 보강 | `app/api/services/select-host/route.ts`에 non-production 전용 실패 주입 stage(`after-booking-update`, `after-selected-application-update`, `after-rejected-applications-update`)를 추가해 rollback 경로를 직접 검증할 수 있게 정리 |
 | 🟡 rollback 회귀 테스트 추가 | `tests/e2e/50-service-select-host-atomicity.spec.ts`에 booking binding 단계 실패, rejected apps 단계 실패 후 request/applications/booking이 모두 원복되는지 검증 추가 |
 
+## v3.39.13 — [Public Search & Community Feed] 목록 payload 축소 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 search 목록 select 축소 | `app/search/page.tsx`가 `experiences.select('*')` 대신 실제 검색/카드 렌더에 필요한 필드만 선택하도록 정리 |
+| 🟠 community 목록 select 축소 | 새 `app/community/feedSelect.ts`를 추가하고 `app/community/page.tsx`, `app/api/community/route.ts`가 `community_posts`/`profiles`/`experiences` 목록용 필드만 선택하도록 공통화 |
+| 🟠 search drift 정리 | 실제 DB에 없는 `experiences.tags`, `experiences.available_dates`를 검색 목록 select에서 제거해 `/search` 빈결과/400 에러를 제거 |
+| 🟡 회귀 확인 | `43-guest-search-detail-ingress`, `46-community-detail-state`, `25-public-metadata` 재검증 기준 유지 |
+
 ## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
 
 | 항목 | 내용 |

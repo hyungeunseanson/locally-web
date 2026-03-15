@@ -12,6 +12,11 @@ import Link from 'next/link';
 import type { Experience, Profile } from '@/app/types';
 import type { CommunityCategory, CommunityFilterCategory, CommunityPost } from '@/app/types/community';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
+import {
+    COMMUNITY_FEED_EXPERIENCE_SELECT,
+    COMMUNITY_FEED_POST_SELECT,
+    COMMUNITY_FEED_PROFILE_SELECT,
+} from './feedSelect';
 
 type CommunityPostRow = CommunityPost;
 type FeedProfile = Pick<Profile, 'id' | 'name' | 'full_name' | 'avatar_url'>;
@@ -77,7 +82,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     // ① community_posts 단독 조회 (join 에러로 initialData가 빈값→피드 공백 버그 방지)
     let query = supabase
         .from('community_posts')
-        .select('*')
+        .select(COMMUNITY_FEED_POST_SELECT)
         .range(0, limit - 1);
 
     if (category && category !== 'all') {
@@ -98,7 +103,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     }
 
     const { data: posts } = await query;
-    const typedPosts: CommunityPostRow[] = posts ?? [];
+    const typedPosts = (posts ?? []) as unknown as CommunityPostRow[];
 
     // ② profiles 별도 조회 (실패해도 피드 유지)
     let initialData: CommunityPost[] = [];
@@ -106,7 +111,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         const userIds = [...new Set(typedPosts.map((post) => post.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, name, full_name, avatar_url')
+            .select(COMMUNITY_FEED_PROFILE_SELECT)
             .in('id', userIds);
         const typedProfiles: FeedProfile[] = profiles ?? [];
         const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile] as const));
@@ -117,7 +122,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         if (expIds.length > 0) {
             const { data: experiences } = await supabase
                 .from('experiences')
-                .select('id, title, image_url, price')
+                .select(COMMUNITY_FEED_EXPERIENCE_SELECT)
                 .in('id', expIds);
             const typedExperiences: FeedExperience[] = experiences ?? [];
             expMap = new Map(typedExperiences.map((experience) => [experience.id, experience] as const));

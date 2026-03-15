@@ -49,6 +49,33 @@ interface SearchExperience {
   [key: string]: unknown;
 }
 
+const SEARCH_EXPERIENCE_SELECT = [
+  'id',
+  'title',
+  'description',
+  'city',
+  'country',
+  'category',
+  'title_ko',
+  'description_ko',
+  'title_en',
+  'description_en',
+  'category_en',
+  'title_ja',
+  'description_ja',
+  'category_ja',
+  'title_zh',
+  'description_zh',
+  'category_zh',
+  'languages',
+  'image_url',
+  'photos',
+  'rating',
+  'review_count',
+  'price',
+  'location',
+].join(', ');
+
 const TIME_OPTIONS = [
   { id: 'morning', label: '오전', desc: '낮 12시 이전' },
   { id: 'afternoon', label: '오후', desc: '오후 12시~오후 5시' },
@@ -254,7 +281,7 @@ function SearchResults() {
       try {
         let query = supabase
           .from('experiences')
-          .select('*')
+          .select(SEARCH_EXPERIENCE_SELECT)
           .eq('status', 'active');
 
         if (location) {
@@ -301,7 +328,7 @@ function SearchResults() {
         if (error) throw error;
 
         const searchTerms = tokenizeSearchInput(location);
-        let nextData = data || [];
+        let nextData = (data ?? []) as unknown as SearchExperience[];
 
         if (searchTerms.length > 0) {
           nextData = nextData.filter((item) => {
