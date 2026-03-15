@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.00 — [Host Flow] 수익 탭을 호스트 정산금 중심으로 단순화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 호스트 정산금 기준 정렬 | `app/host/dashboard/Earnings.tsx`가 더 이상 게스트 결제액/플랫폼 수수료/결제망 수수료를 호스트 화면에 노출하지 않고, `host_payout_amount` 우선 fallback 기준의 정산 예정 금액만 집계하도록 정리 |
+| 🟡 보호막 추가 | `tests/e2e/37-host-earnings-policy.spec.ts` 추가 — 호스트 수익 탭이 `₩24,000` 같은 정산금만 보이고 `총 매출(게스트 결제액)`, `서비스 수수료`, `결제망 이용료` 행은 렌더하지 않는지 검증 |
+
 ## v3.38.99 — [Host Flow] 등록 admin alert legacy route를 compatibility-only로 명시
 
 | 항목 | 내용 |

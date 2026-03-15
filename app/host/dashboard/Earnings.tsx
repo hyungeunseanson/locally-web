@@ -7,6 +7,16 @@ import { useRouter } from 'next/navigation';
 import Skeleton from '@/app/components/ui/Skeleton';
 import { BOOKING_CONFIRMED_STATUSES, isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { getBookingHostPayout } from '@/app/utils/bookingFinance';
+
+type EarningsBookingRow = {
+  amount?: number | null;
+  total_price?: number | null;
+  total_experience_price?: number | null;
+  created_at: string;
+  status: string;
+  host_payout_amount?: number | null;
+};
 
 export default function Earnings() {
   const supabase = createClient();
@@ -18,11 +28,8 @@ export default function Earnings() {
   const [showSettings, setShowSettings] = useState(false);
 
   const [stats, setStats] = useState({
-    gross: 0,        // 총 매출
-    fee: 0,          // 플랫폼 수수료
-    exchangeFee: 0,  // 결제망 수수료
-    net: 0,          // 최종 정산금
-    count: 0         // ✅ [복구] 예약 건수
+    net: 0,
+    count: 0
   });
 
   const [chartData, setChartData] = useState<{
@@ -48,7 +55,9 @@ export default function Earnings() {
         const { data: bookings, error } = await supabase
           .from('bookings')
           .select(`
+            amount,
             total_price,
+            total_experience_price,
             created_at,
             status,
             host_payout_amount,
@@ -59,44 +68,21 @@ export default function Earnings() {
 
         if (error) throw error;
 
-        let totalGross = 0;
-        let totalFee = 0;
-        let totalExchange = 0;
         let totalNet = 0;
         let validCount = 0;
 
         const dailyIncome: Record<string, number> = {};
 
-        bookings?.forEach((b: any) => {
-          // [H-1] Skip cancelled bookings with no payout
-          if (isCancelledOnlyBookingStatus(b.status) && (!b.host_payout_amount || b.host_payout_amount <= 0)) {
+        (bookings as EarningsBookingRow[] | null)?.forEach((booking) => {
+          if (
+            isCancelledOnlyBookingStatus(booking.status) &&
+            (!booking.host_payout_amount || booking.host_payout_amount <= 0)
+          ) {
             return;
           }
 
-          const dateStr = b.created_at.split('T')[0];
-          let itemGross = 0;
-          let itemFee = 0;
-          let itemExchange = 0;
-          let itemNet = 0;
-
-          if (isCancelledOnlyBookingStatus(b.status)) {
-            // For cancelled bookings with payout, the payout is the final net amount.
-            // We treat it as 0 fees for display since they were deducted at source (backend).
-            itemNet = b.host_payout_amount || 0;
-            itemGross = b.host_payout_amount || 0; // Effective gross for host
-            itemFee = 0;
-            itemExchange = 0;
-          } else {
-            // 정상 완료 건: 결제액의 80%를 호스트에게 지급 (관리자 정산 장부 로직과 완전히 동일)
-            itemGross = b.total_price || 0;
-            itemNet = Math.floor(itemGross * 0.8);
-            itemFee = Math.floor(itemGross * 0.2); // 플랫폼 수익 (수수료)
-            itemExchange = 0; // 결제망 수수료는 호스트 정산금에 포함시키지 않음(플랫폼에서 부담 또는 위약금에서 제외)
-          }
-
-          totalGross += itemGross;
-          totalFee += itemFee;
-          totalExchange += itemExchange;
+          const dateStr = booking.created_at.split('T')[0];
+          const itemNet = getBookingHostPayout(booking);
           totalNet += itemNet;
           validCount++;
 
@@ -126,11 +112,8 @@ export default function Earnings() {
         }
 
         setStats({
-          gross: totalGross,
-          fee: totalFee,
-          exchangeFee: totalExchange,
           net: totalNet,
-          count: validCount // ✅ [복구] 건수 저장
+          count: validCount
         });
 
         setChartData(chart);
@@ -260,25 +243,10 @@ export default function Earnings() {
             </div>
 
             <div className="space-y-4">
-              {/* ✅ [추가] 여기에도 건수 표시 */}
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">{t('hp_earn_count')}</span>
                 <span className="font-bold text-slate-900">{stats.count}건</span>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">{t('hp_earn_gross_sales')}</span>
-                <span className="font-bold text-slate-900">₩{stats.gross.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">{t('hp_earn_fee')} (20%)</span>
-                <span className="font-bold text-rose-500">- ₩{stats.fee.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">{t('hp_earn_pg_fee')} (3%)</span>
-                <span className="font-bold text-rose-500">- ₩{stats.exchangeFee.toLocaleString()}</span>
-              </div>
-
-              <div className="border-t border-slate-200 border-dashed my-4"></div>
 
               <div className="flex justify-between items-center">
                 <span className="font-black text-sm md:text-base text-slate-900">{t('hp_earn_net')}</span>
