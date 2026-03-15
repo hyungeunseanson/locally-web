@@ -105,7 +105,7 @@ function InboxContent() {
             .maybeSingle(),
           supabase
             .from('host_applications')
-            .select('user_id, name, profile_photo, self_intro, languages, profession, host_nationality')
+            .select('user_id, name, profile_photo, self_intro, languages, host_nationality')
             .eq('user_id', hostId)
             .maybeSingle(),
         ]);

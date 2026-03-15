@@ -25,6 +25,16 @@
 | 🟡 모바일 레이어 간격 정리 | `ToastContext`, `NotificationContext`의 모바일 bottom offset을 분리해 bottom nav / 플로팅 버튼 / 서로 간 토스트 충돌을 줄임 |
 | 🟡 보호막 추가 | `tests/e2e/56-notification-read-route.spec.ts` 추가 — 단건 읽음과 전체 읽음이 현재 사용자 알림에만 적용되는지 검증 |
 
+## v3.39.11 — [Guest Trips] 읽기/상태 동기화 경계 분리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 GET side effect 제거 | `app/api/guest/trips/route.ts`가 지난 `PAID/confirmed` 예약을 응답에서만 `completed`로 계산하고, 더 이상 GET 안에서 `bookings.update()`를 실행하지 않도록 정리 |
+| 🟠 별도 sync route 추가 | 새 `app/api/guest/trips/sync-completed/route.ts` 추가 — 현재 로그인 게스트의 지난 활성 예약만 idempotent하게 `completed`로 동기화 |
+| 🟠 hook background sync 연결 | `app/utils/api/trips.ts`, `app/guest/trips/hooks/useGuestTrips.ts`가 `syncCompletedNeeded` 응답을 보고 한 번만 background sync 후 query invalidate 하도록 정리 |
+| 🟠 호스트 프로필 select drift 정리 | `guest trips`, `guest inbox`, `service applications`가 실제 DB에 없는 `host_applications.profession` 컬럼을 더 이상 조회하지 않도록 정리하여 hidden 500을 제거 |
+| 🟡 보호막 추가 | `tests/e2e/57-guest-trips-sync-completed.spec.ts` 추가 — GET은 read-only로 유지되고, POST sync에서만 DB `completed` 전환이 일어나는지 검증 |
+
 ## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
 
 | 항목 | 내용 |

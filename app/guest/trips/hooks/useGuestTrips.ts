@@ -1,25 +1,28 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/context/ToastContext';
-import { fetchGuestTrips, cancelGuestTrip } from '@/app/utils/api/trips';
+import { fetchGuestTrips, cancelGuestTrip, syncCompletedGuestTrips, type GuestTripsResponse } from '@/app/utils/api/trips';
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
-import type { GuestTrip } from '../components/TripCard';
 
 export function useGuestTrips() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const hasRequestedCompletedSyncRef = useRef(false);
 
   // 🟢 1. React Query를 이용한 예약 내역 패칭 및 캐싱
   const { 
-    data: trips = [], 
+    data,
     isLoading, 
     error, 
     refetch 
-  } = useQuery<GuestTrip[], Error>({
+  } = useQuery<GuestTripsResponse, Error>({
     queryKey: ['guestTrips'], // 캐시 키
     queryFn: fetchGuestTrips, // 분리한 API 함수 호출
   });
+  const trips = data?.trips || [];
+  const syncCompletedNeeded = data?.syncCompletedNeeded || false;
 
   // 🟢 2. React Query Mutation을 이용한 취소 로직 처리
   const cancelMutation = useMutation<unknown, Error, { bookingId: number; reason: string }>({
@@ -33,6 +36,30 @@ export function useGuestTrips() {
       showToast(`취소 실패: ${err.message}`, 'error');
     }
   });
+
+  const syncCompletedMutation = useMutation<{ updatedCount: number; updatedIds: Array<number | string> }, Error>({
+    mutationFn: syncCompletedGuestTrips,
+    onSettled: () => {
+      hasRequestedCompletedSyncRef.current = false;
+    },
+    onSuccess: (result) => {
+      if (result.updatedCount > 0) {
+        queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
+      }
+    },
+    onError: (err) => {
+      console.error('[useGuestTrips] syncCompletedGuestTrips failed:', err);
+    },
+  });
+
+  useEffect(() => {
+    if (!syncCompletedNeeded || syncCompletedMutation.isPending || hasRequestedCompletedSyncRef.current) {
+      return;
+    }
+
+    hasRequestedCompletedSyncRef.current = true;
+    void syncCompletedMutation.mutateAsync();
+  }, [syncCompletedMutation, syncCompletedNeeded]);
 
   // 🟢 3. 기존 UI 컴포넌트와 연결되는 함수 (기존 구조 100% 유지)
   const requestCancel = async (bookingId: number, reason: string) => {

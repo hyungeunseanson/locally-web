@@ -16,7 +16,6 @@ type HostApplicationRow = {
   profile_photo?: string | null;
   self_intro?: string | null;
   languages?: string[] | string | null;
-  profession?: string | null;
   host_nationality?: string | null;
 };
 
@@ -57,7 +56,7 @@ export async function GET() {
           .in('id', hostIds),
         supabase
           .from('host_applications')
-          .select('user_id, name, profile_photo, self_intro, languages, profession, host_nationality')
+          .select('user_id, name, profile_photo, self_intro, languages, host_nationality')
           .in('user_id', hostIds),
       ])
       : [{ data: [], error: null }, { data: [], error: null }];
@@ -73,8 +72,8 @@ export async function GET() {
     const now = new Date();
     const updatedTrips = [];
 
-    // 2. 데이터 가공 및 '자동 완료' 로직
-    const bookingsToUpdate: string[] = [];
+    // 2. 데이터 가공 및 '자동 완료' 계산
+    let syncCompletedNeeded = false;
 
     for (const booking of bookings || []) {
       const expDate = new Date(`${booking.date}T${booking.time}`);
@@ -87,10 +86,11 @@ export async function GET() {
         )
         : null;
 
-      // 🟢 시간이 지난 활성 예약(PAID, confirmed)은 런타임에 즉시 DB를 동기화하여 상태 불일치를 방지합니다. (Lazy Update)
+      // 시간이 지난 활성 예약(PAID, confirmed)은 응답에서만 completed로 계산한다.
+      // 실제 DB sync는 별도 POST /api/guest/trips/sync-completed 에서 처리한다.
       if (expDate < now && BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(status)) {
         status = 'completed';
-        bookingsToUpdate.push(booking.id);
+        syncCompletedNeeded = true;
       }
 
       const firstReview = booking.reviews?.[0] || null;
@@ -125,19 +125,7 @@ export async function GET() {
       });
     }
 
-    // 3. Fake 'completed' 상태 물리적 동기화 (Lazy Update)
-    if (bookingsToUpdate.length > 0) {
-      const { error: updateError } = await supabase
-        .from('bookings')
-        .update({ status: 'completed' })
-        .in('id', bookingsToUpdate);
-
-      if (updateError) {
-        console.error('Failed to sync completed status:', updateError);
-      }
-    }
-
-    return NextResponse.json({ trips: updatedTrips });
+    return NextResponse.json({ trips: updatedTrips, syncCompletedNeeded });
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal Server Error';
