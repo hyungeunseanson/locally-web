@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.05 — [Guest Flow] 체험 PayPal mocked browser smoke 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 체험 PayPal 보호막 추가 | `tests/e2e/42-experience-paypal-payment.spec.ts` 추가 — 승인 가능한 체험 슬롯을 준비하고, PayPal SDK 및 내부 PayPal route를 mocked 응답으로 감싼 상태에서 체험 결제 페이지의 PayPal 옵션 선택 → booking 생성 → 승인 → 완료 페이지 진입까지 직접 검증 |
+| 🟡 후속 상태 확인 | 같은 스모크가 mocked capture 직후 `bookings.status='PAID'`, `payment_method='paypal'`, `tid` 반영과 완료 페이지의 체험 제목/주문번호 노출까지 확인 |
+
 ## v3.39.04 — [Host Flow] 문의 읽음 처리 서버 경계 정리
 
 | 항목 | 내용 |
