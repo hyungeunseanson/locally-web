@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { getAboutLandingOgImagePath } from '@/app/about/aboutLandingAssets';
 import { getCurrentLocale } from '@/app/utils/locale';
+import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 
 const TITLE_MAP: Record<'ko' | 'en' | 'ja' | 'zh', string> = {
@@ -23,6 +25,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const pageUrl = buildLocalizedAbsoluteUrl(locale, '/about');
   const title = TITLE_MAP[locale];
   const description = DESCRIPTION_MAP[locale];
+  const ogImagePath = getAboutLandingOgImagePath(locale);
+  const images = ogImagePath
+    ? [{ url: buildAbsoluteUrl(ogImagePath), alt: 'About Locally landing image' }]
+    : undefined;
 
   return {
     title,
@@ -31,8 +37,17 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       url: pageUrl,
+      images,
       type: 'website',
     },
+    twitter: images
+      ? {
+          card: 'summary_large_image',
+          title,
+          description,
+          images: [images[0].url],
+        }
+      : undefined,
     alternates: {
       canonical: pageUrl,
       languages: {
