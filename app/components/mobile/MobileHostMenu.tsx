@@ -12,6 +12,7 @@ import HostModeTransition from './HostModeTransition';
 import MobileLanguageSwitcher from './MobileLanguageSwitcher';
 import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
 import { useNotification } from '@/app/context/NotificationContext';
+import { useViewMode } from '@/app/context/ViewModeContext';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 
@@ -36,6 +37,7 @@ export default function MobileHostMenu() {
     const supabase = useMemo(() => createClient(), []);
     const profileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
     const { pendingHref, isNavigating, navigate } = usePendingNavigation();
+    const { setGuestView } = useViewMode();
 
     const { notifications, unreadCount } = useNotification();
     const serviceUnread = notifications.some(
@@ -224,7 +226,10 @@ export default function MobileHostMenu() {
             {/* ── 게스트 모드 전환 플로팅 버튼 ── */}
             <div className="fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none">
                 <button
-                    onClick={() => setShowTransition(true)}
+                    onClick={() => {
+                        setGuestView();
+                        setShowTransition(true);
+                    }}
                     className="pointer-events-auto flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-lg text-[13px] font-semibold active:scale-95 transition-transform"
                 >
                     게스트 모드로 전환

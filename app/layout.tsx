@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Suspense } from "react";
+import { cookies } from 'next/headers';
 import { LanguageProvider } from '@/app/context/LanguageContext';
 import UserPresenceTracker from '@/app/components/UserPresenceTracker';
 import { NotificationProvider } from '@/app/context/NotificationContext';
@@ -12,6 +13,7 @@ import ClientMainWrapper from '@/app/components/ClientMainWrapper';
 import Script from "next/script";
 import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
+import { ViewModeProvider, type ViewMode } from '@/app/context/ViewModeContext';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
 import { createClient } from '@/app/utils/supabase/server';
@@ -127,6 +129,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getCurrentLocale();
+  const cookieStore = await cookies();
+  const initialViewModeCookie = cookieStore.get('locally_view_mode')?.value;
+  const initialViewMode: ViewMode | null =
+    initialViewModeCookie === 'host' || initialViewModeCookie === 'guest'
+      ? initialViewModeCookie
+      : null;
 
   // 🟢 [M-3] 서버 사이드에서 세션 가져오기 (FOUC 방지)
   const supabase = await createClient();
@@ -164,25 +172,27 @@ export default async function RootLayout({
         )}
         <QueryProvider>
           <AuthProvider initialUser={initialUser}>
-            <ToastProvider>
-              <NotificationProvider>
-                <LanguageProvider>
+            <ViewModeProvider initialViewMode={initialViewMode}>
+              <ToastProvider>
+                <NotificationProvider>
+                  <LanguageProvider>
 
-                  <Suspense fallback={null}>
-                    <UserPresenceTracker />
-                  </Suspense>
+                    <Suspense fallback={null}>
+                      <UserPresenceTracker />
+                    </Suspense>
 
-                  <div className="flex flex-col min-h-screen">
-                    <ClientMainWrapper>
-                      {children}
-                    </ClientMainWrapper>
-                    <SiteFooter />
-                    <BottomTabNavigation />
-                  </div>
-                  <Analytics />
-                </LanguageProvider>
-              </NotificationProvider>
-            </ToastProvider>
+                    <div className="flex flex-col min-h-screen">
+                      <ClientMainWrapper>
+                        {children}
+                      </ClientMainWrapper>
+                      <SiteFooter />
+                      <BottomTabNavigation />
+                    </div>
+                    <Analytics />
+                  </LanguageProvider>
+                </NotificationProvider>
+              </ToastProvider>
+            </ViewModeProvider>
           </AuthProvider>
         </QueryProvider>
       </body>

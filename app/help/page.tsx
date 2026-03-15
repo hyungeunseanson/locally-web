@@ -4,15 +4,15 @@ import React, { useEffect, useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import {
   Search, ChevronDown, ChevronUp, MessageCircle, Mail,
-  User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, Globe, ArrowLeft
+  User, Briefcase, CreditCard, ShieldCheck, MapPin, Calendar, ArrowLeft
 } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
+import { useViewMode } from '@/app/context/ViewModeContext';
 
 export default function HelpCenterPage() {
   const { t, lang } = useLanguage(); // 🟢 추가
-  const pathname = usePathname();
   const supportCopy = (() => {
     if (lang === 'en') {
       return {
@@ -154,8 +154,9 @@ export default function HelpCenterPage() {
       }
     ]
   };
+  const { isHostView } = useViewMode();
   const [activeTab, setActiveTab] = useState<'guest' | 'host'>(
-    pathname?.startsWith('/host') ? 'host' : 'guest'
+    isHostView ? 'host' : 'guest'
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
@@ -167,12 +168,8 @@ export default function HelpCenterPage() {
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (pathname?.startsWith('/host')) {
-      setActiveTab('host');
-    } else {
-      setActiveTab('guest');
-    }
-  }, [pathname]);
+    setActiveTab(isHostView ? 'host' : 'guest');
+  }, [isHostView]);
 
   const toggleItem = (catIdx: number, itemIdx: number) => {
     const key = `${catIdx}-${itemIdx}`;
@@ -192,7 +189,7 @@ export default function HelpCenterPage() {
       router.back();
       return;
     }
-    router.push(pathname?.startsWith('/host') ? '/host/menu' : '/account');
+    router.push(isHostView ? '/host/menu' : '/account');
   };
 
   // 1:1 문의 제출

@@ -12,8 +12,9 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
     const router = useRouter();
 
     useEffect(() => {
-        // 2.5초 뒤 실제 라우팅 (전환 화면은 유지)
-        const t1 = setTimeout(() => {
+        // Strict Mode 개발 환경에서는 effect cleanup이 한 번 더 실행되므로
+        // cleanup에서 onComplete를 호출하지 않고 별도 fallback timer로만 정리한다.
+        const pushTimer = setTimeout(() => {
             if (targetMode === 'host') {
                 router.push('/host/menu');
             } else {
@@ -21,9 +22,17 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
             }
         }, 900);
 
+        const completeTimer = onComplete
+            ? setTimeout(() => {
+                onComplete();
+            }, 1800)
+            : null;
+
         return () => {
-            clearTimeout(t1);
-            onComplete?.();
+            clearTimeout(pushTimer);
+            if (completeTimer) {
+                clearTimeout(completeTimer);
+            }
         };
     }, [onComplete, router, targetMode]);
 

@@ -18,6 +18,8 @@ import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageVa
 import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useNotification } from '@/app/context/NotificationContext';
+import { useViewMode } from '@/app/context/ViewModeContext';
+import { useAuth } from '@/app/context/AuthContext';
 
 type GuestReview = {
   id: string | number;
@@ -66,6 +68,8 @@ export default function AccountPage() {
   const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 0 });
   const { pendingHref, isNavigating, navigate } = usePendingNavigation();
   const { unreadCount } = useNotification();
+  const { canUseHostView, setHostView } = useViewMode();
+  const { hostStatusResolved } = useAuth();
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -541,11 +545,31 @@ export default function AccountPage() {
       {/* 호스트 모드 전환 플로팅 버튼 (모바일 전용) */}
       <div className="md:hidden fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none">
         <button
-          onClick={() => setShowHostTransition(true)}
-          className="pointer-events-auto flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2.5 rounded-full shadow-lg text-[12px] font-semibold active:scale-95 transition-transform"
+          onClick={() => {
+            if (!hostStatusResolved) {
+              return;
+            }
+            if (!canUseHostView) {
+              navigate('/become-a-host');
+              return;
+            }
+            setHostView();
+            setShowHostTransition(true);
+          }}
+          disabled={!hostStatusResolved || isNavigating}
+          className="pointer-events-auto flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2.5 rounded-full shadow-lg text-[12px] font-semibold active:scale-95 transition-transform disabled:opacity-60 disabled:active:scale-100"
         >
-          호스트 모드로 전환
-          <ChevronRight className="w-[14px] h-[14px]" strokeWidth={2.5} />
+          {!hostStatusResolved ? (
+            <>
+              <Loader2 className="w-[14px] h-[14px] animate-spin" />
+              불러오는 중
+            </>
+          ) : (
+            <>
+              {canUseHostView ? '호스트 모드로 전환' : '호스트 되기'}
+              <ChevronRight className="w-[14px] h-[14px]" strokeWidth={2.5} />
+            </>
+          )}
         </button>
       </div>
 

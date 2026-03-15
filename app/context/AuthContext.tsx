@@ -16,6 +16,7 @@ interface AuthContextType {
   isHost: boolean;
   applicationStatus: string | null;
   isLoading: boolean;
+  hostStatusResolved: boolean;
   refreshAuth: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -43,28 +44,35 @@ export function AuthProvider({
   const [isHost, setIsHost] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!initialUser); // 🟢 만약 initialUser가 있으면 로딩 없이 즉시 렌더링
+  const [hostStatusResolved, setHostStatusResolved] = useState(!initialUser);
   const supabase = useMemo(() => createClient(), []);
 
   const checkHostStatus = useCallback(async (userId: string) => {
-    const { data: app } = await supabase
-      .from('host_applications')
-      .select('status')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    setHostStatusResolved(false);
+    try {
+      const { data: app } = await supabase
+        .from('host_applications')
+        .select('status')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (app) setApplicationStatus(app.status);
+      if (app) setApplicationStatus(app.status);
+      else setApplicationStatus(null);
 
-    const { count } = await supabase
-      .from('experiences')
-      .select('*', { count: 'exact', head: true })
-      .eq('host_id', userId);
+      const { count } = await supabase
+        .from('experiences')
+        .select('*', { count: 'exact', head: true })
+        .eq('host_id', userId);
 
-    if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
-      setIsHost(true);
-    } else {
-      setIsHost(false);
+      if ((app && (app.status === 'approved' || app.status === 'active')) || (count && count > 0)) {
+        setIsHost(true);
+      } else {
+        setIsHost(false);
+      }
+    } finally {
+      setHostStatusResolved(true);
     }
   }, [supabase]);
 
@@ -99,6 +107,7 @@ export function AuthProvider({
         setUser(null);
         setIsHost(false);
         setApplicationStatus(null);
+        setHostStatusResolved(true);
       }
     } catch (error) {
       const isMissingSessionError =
@@ -109,6 +118,7 @@ export function AuthProvider({
         setUser(null);
         setIsHost(false);
         setApplicationStatus(null);
+        setHostStatusResolved(true);
       } else {
         console.error('Auth Load Error:', error);
       }
@@ -122,6 +132,7 @@ export function AuthProvider({
       setUser(null);
       setIsHost(false);
       setApplicationStatus(null);
+      setHostStatusResolved(true);
       await supabase.auth.signOut({ scope: 'local' });
     } catch (error) {
       console.error('Sign out failed:', error);
@@ -132,11 +143,12 @@ export function AuthProvider({
   };
 
   useEffect(() => {
-    if (initialUser) {
-      checkHostStatus(initialUser.id);
-    } else {
-      loadUser();
-    }
+      if (initialUser) {
+        checkHostStatus(initialUser.id);
+      } else {
+        setHostStatusResolved(true);
+        loadUser();
+      }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
@@ -145,6 +157,7 @@ export function AuthProvider({
         setUser(null);
         setIsHost(false);
         setApplicationStatus(null);
+        setHostStatusResolved(true);
         setIsLoading(false);
       }
     });
@@ -153,7 +166,7 @@ export function AuthProvider({
   }, [checkHostStatus, initialUser, loadUser, supabase]);
 
   return (
-    <AuthContext.Provider value={{ user, isHost, applicationStatus, isLoading, refreshAuth: loadUser, signOut }}>
+    <AuthContext.Provider value={{ user, isHost, applicationStatus, isLoading, hostStatusResolved, refreshAuth: loadUser, signOut }}>
       {children}
     </AuthContext.Provider>
   );

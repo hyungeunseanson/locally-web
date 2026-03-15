@@ -8,19 +8,18 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import { useNotification } from '@/app/context/NotificationContext';
+import { useViewMode } from '@/app/context/ViewModeContext';
 import LoginModal from '@/app/components/LoginModal';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 
 export default function BottomTabNavigation() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const isHostMode = pathname?.startsWith('/host');
-    const isHostNavPath =
-        pathname?.startsWith('/host/dashboard') ||
-        pathname?.startsWith('/host/menu') ||
-        pathname?.startsWith('/host/help') ||
-        pathname?.startsWith('/host/notifications') ||
-        pathname?.startsWith('/services');
+    const { isHostView } = useViewMode();
+    const shouldHideForHostPath =
+        pathname?.startsWith('/host/create') ||
+        pathname?.startsWith('/host/register') ||
+        pathname?.startsWith('/host/experiences/');
     const activeHostTab = searchParams?.get('tab') || 'reservations';
     const { user } = useAuth();
     const { unreadCount } = useNotification();
@@ -35,7 +34,7 @@ export default function BottomTabNavigation() {
         pathname?.startsWith('/login') ||
         pathname?.startsWith('/signup') ||
         pathname?.includes('/payment') ||
-        (isHostMode && !isHostNavPath)
+        (isHostView && shouldHideForHostPath)
     ) {
         return null;
     }
@@ -152,7 +151,7 @@ export default function BottomTabNavigation() {
         }
     ];
 
-    const tabs = isHostMode ? hostTabs : guestTabs;
+    const tabs = isHostView ? hostTabs : guestTabs;
     const isTabActive = (href: string) => {
         if (href === '/') return pathname === '/';
 

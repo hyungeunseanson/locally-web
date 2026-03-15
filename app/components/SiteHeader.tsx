@@ -21,9 +21,10 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
+import { useViewMode } from '@/app/context/ViewModeContext';
 import dynamic from 'next/dynamic';
 import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만든 파일 불러오기
 import DesktopModeTransition from './DesktopModeTransition';
@@ -50,12 +51,11 @@ function SiteHeaderContent() {
   const supabase = useMemo(() => createClient(), []);
 
   const { unreadCount } = useNotification();
+  const { isHostView, canUseHostView, setGuestView, setHostView } = useViewMode();
   const menuRef = useRef<HTMLElement>(null);
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t } = useLanguage();
   const router = useRouter();
-  const pathname = usePathname();
-  const isHostMode = pathname?.startsWith('/host');
 
   // 🟢 [수정] 로그아웃은 AuthContext의 signOut 호출
   const handleLogout = async () => {
@@ -130,7 +130,8 @@ function SiteHeaderContent() {
   };
 
   const handleMainHeaderButtonClick = () => {
-    if (isHostMode) {
+    if (isHostView) {
+      setGuestView();
       startDesktopModeTransition('/account', 'guest');
     } else {
       router.push('/become-a-host');
@@ -138,12 +139,14 @@ function SiteHeaderContent() {
   };
 
   const handleDropdownMenuClick = () => {
-    if (isHostMode) {
+    if (isHostView) {
+      setGuestView();
       startDesktopModeTransition('/account', 'guest');
       return;
     }
 
-    if (applicationStatus || isHost) {
+    if (canUseHostView && (applicationStatus || isHost)) {
+      setHostView();
       startDesktopModeTransition('/host/dashboard?tab=reservations', 'host');
     } else {
       router.push('/become-a-host');
@@ -151,7 +154,7 @@ function SiteHeaderContent() {
   };
 
   const getButtonLabel = () => {
-    if (isHostMode) return t('guest_mode');
+    if (isHostView) return t('guest_mode');
     return t('become_host');
   };
 
@@ -186,7 +189,7 @@ function SiteHeaderContent() {
             {/* 🟢 로딩이 끝난 후에만 알림/유저 아이콘 표시 (깜빡임 최소화) */}
             {!isLoading && user ? (
               <Link
-                href={pathname?.startsWith('/host') ? '/host/notifications' : '/notifications'}
+                href={isHostView ? '/host/notifications' : '/notifications'}
                 className="relative mx-1 p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors inline-block"
               >
                 <Bell size={20} />
@@ -214,7 +217,7 @@ function SiteHeaderContent() {
 
               {!isLoading && user && isMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-100 rounded-xl shadow-xl py-2 z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                  {isHostMode ? (
+                  {isHostView ? (
                     <>
                       <div className="py-2 border-b border-slate-100">
                         <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">

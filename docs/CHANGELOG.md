@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.09 — [Navigation] 호스트 모드 지속성 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 전역 host/guest view mode 도입 | `app/context/ViewModeContext.tsx` 추가 — `locally_view_mode` cookie/localStorage를 source로 사용하고, `useAuth()`의 host 접근 가능 여부와 결합해 호스트 모드를 공용 페이지에서도 유지 |
+| 🟠 root provider 연결 | `app/layout.tsx`가 서버 cookie를 읽어 `ViewModeProvider` 초기값으로 주입, 새로고침 후에도 host view 유지 |
+| 🟠 헤더 / 모바일 탭 / 도움말 판정 정리 | `app/components/SiteHeader.tsx`, `app/components/mobile/BottomTabNavigation.tsx`, `app/help/page.tsx`가 더 이상 `pathname.startsWith('/host')`만 보지 않고 view mode 기준으로 host UI/FAQ/back route를 유지 |
+| 🟠 모바일 전환 버튼 연결 | `app/account/page.tsx`, `app/components/mobile/MobileHostMenu.tsx`, `app/components/mobile/HostModeTransition.tsx`가 전환 transition 전에 `setHostView()` / `setGuestView()`를 먼저 수행하고, dev Strict Mode에서도 cleanup 때문에 오버레이가 즉시 사라지지 않도록 정리 |
+| 🟡 보호막 추가 | `tests/e2e/55-host-view-mode-persistence.spec.ts` 추가 — 호스트 모드 진입 후 `/community`, `/become-a-host`, `/help` 이동과 새로고침에서도 host tabs가 유지되고, 명시적 게스트 전환 후에만 guest tabs로 돌아오는지 검증 |
+
 ## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
 
 | 항목 | 내용 |

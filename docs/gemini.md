@@ -304,7 +304,8 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - **홈 서비스 탭:** `LOCALLY_SERVICES` 5번째 항목(id=5) → 클릭 시 `/services/intro` 라우팅
 - **호스트 대시보드:** `service-jobs` 탭 추가 (Briefcase 아이콘) → ServiceJobsTab 렌더
 - **MobileHostMenu:** "서비스 매칭" 메뉴 항목 추가 → `/host/dashboard?tab=service-jobs`
-- **BottomTabNavigation:** `isHostNavPath`에 `/services` 경로 추가 (호스트 잡보드 탐색 시 탭바 유지)
+- **ViewModeContext:** 호스트/게스트 UI 모드는 `pathname.startsWith('/host')` 단독 판정이 아니라 `locally_view_mode` cookie/localStorage + `useAuth()` host 접근 가능 여부로 유지한다.
+- **BottomTabNavigation / SiteHeader / HelpCenter:** 공용 페이지(`/community`, `/about`, `/become-a-host`, `/services`, `/help`)에서도 host view를 유지하고, `payment/login/signup` 및 host form/edit 경로만 하단 탭을 숨긴다. 모바일 `HostModeTransition`은 dev Strict Mode에서도 cleanup으로 즉시 닫히지 않는 타이머 구조를 유지한다.
 
 ### 10.7 주요 제약사항
 
