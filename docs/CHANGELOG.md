@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.07 — [Guest Flow] 체험 카드 결제 mocked UI smoke 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 체험 카드 결제 UI 보호막 추가 | `tests/e2e/44-experience-card-payment-ui.spec.ts` 추가 — `card-ready`, `iamport.js`, `nicepay-callback`만 mocked 응답으로 감싸고, 체험 결제 페이지에서 예약 생성 → 카드 승인 callback → 완료 페이지 진입까지 직접 검증 |
+| 🟡 카드 happy path 상태 확인 | 같은 스모크가 mocked callback 직후 `bookings.status='PAID'`, `payment_method='card'`, `tid` 반영과 완료 페이지의 체험 제목/주문번호 노출까지 확인 |
+
 ## v3.39.06 — [Guest Flow] 홈/검색 → 상세 진입 보호막 추가
 
 | 항목 | 내용 |
