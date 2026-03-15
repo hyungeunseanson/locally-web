@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
@@ -12,6 +12,19 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 type TimeSlot = string;
 type AvailabilityMap = Record<string, TimeSlot[]>;
 type BookingCountMap = Record<string, number>;
+type AvailabilityRow = {
+  date: string;
+  start_time: string;
+};
+type BookingRow = {
+  date: string;
+  time: string;
+};
+type ScheduleSaveResponse = {
+  success?: boolean;
+  error?: string;
+  skippedBookedDeletions?: Array<{ date: string; time: string }>;
+};
 
 export default function ManageDatesPage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
@@ -27,9 +40,10 @@ export default function ManageDatesPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const experienceId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   // 1. 데이터 불러오기
-  const fetchDates = async () => {
+  const fetchDates = useCallback(async () => {
     // (1) 슬롯 조회
     const { data: slots, error: slotError } = await supabase
       .from('experience_availability')
@@ -50,7 +64,7 @@ export default function ManageDatesPage() {
 
     const availMap: AvailabilityMap = {};
     if (slots) {
-      slots.forEach((item: any) => {
+      (slots as AvailabilityRow[]).forEach((item) => {
         if (!availMap[item.date]) availMap[item.date] = [];
         availMap[item.date].push(item.start_time);
       });
@@ -58,7 +72,7 @@ export default function ManageDatesPage() {
 
     const countMap: BookingCountMap = {};
     if (bookings) {
-      bookings.forEach((b: any) => {
+      (bookings as BookingRow[]).forEach((b) => {
         const key = `${b.date}_${b.time}`;
         countMap[key] = (countMap[key] || 0) + 1;
       });
@@ -67,9 +81,9 @@ export default function ManageDatesPage() {
     setAvailability(JSON.parse(JSON.stringify(availMap)));
     setInitialData(JSON.parse(JSON.stringify(availMap)));
     setBookingCounts(countMap);
-  };
+  }, [params.id, supabase]);
 
-  useEffect(() => { fetchDates(); }, []);
+  useEffect(() => { void fetchDates(); }, [fetchDates]);
 
   const handleDateClick = (dateStr: string) => setSelectedDate(dateStr);
 
@@ -104,68 +118,34 @@ export default function ManageDatesPage() {
     setLoading(true);
 
     try {
-      const toInsert: any[] = [];
-      const toDelete: { date: string, time: string }[] = [];
-
-      // 추가할 것 찾기
-      for (const [date, times] of Object.entries(availability)) {
-        const initialTimes = initialData[date] || [];
-        times.forEach(time => {
-          if (!initialTimes.includes(time)) {
-            toInsert.push({
-              experience_id: params.id,
-              date: date,
-              start_time: time,
-              is_booked: false
-            });
-          }
-        });
+      if (!experienceId) {
+        throw new Error('Experience id is missing.');
       }
 
-      // 삭제할 것 찾기
-      for (const [date, times] of Object.entries(initialData)) {
-        const currentTimes = availability[date] || [];
-        times.forEach(time => {
-          if (!currentTimes.includes(time)) {
-            toDelete.push({ date, time });
-          }
-        });
+      const response = await fetch(`/api/host/experiences/${experienceId}/availability`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ availability }),
+      });
+      const result = (await response.json()) as ScheduleSaveResponse;
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to save schedule changes.');
       }
 
-      // 실행
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from('experience_availability').insert(toInsert);
-        if (error) throw error;
-      }
-
-      for (const item of toDelete) {
-        // 예약 체크 (Double Check)
-        const { count } = await supabase
-          .from('bookings')
-          .select('*', { count: 'exact', head: true })
-          .eq('experience_id', params.id)
-          .eq('date', item.date)
-          .eq('time', item.time)
-          .in('status', [...BOOKING_CONFIRMED_STATUSES]);
-
-        if (count && count > 0) {
-          console.warn(`Skipped deletion for ${item.date} ${item.time} due to active bookings.`);
-        } else {
-          await supabase
-            .from('experience_availability')
-            .delete()
-            .eq('experience_id', params.id)
-            .eq('date', item.date)
-            .eq('start_time', item.time);
-        }
+      if ((result.skippedBookedDeletions?.length || 0) > 0) {
+        console.warn('Skipped booked schedule deletions:', result.skippedBookedDeletions);
       }
 
       showToast(t('sched_save_success'), 'success'); // 🟢 번역
       await fetchDates();
 
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      showToast(t('sched_save_error') + e.message, 'error'); // 🟢 번역
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      showToast(t('sched_save_error') + message, 'error'); // 🟢 번역
     } finally {
       setLoading(false);
     }
