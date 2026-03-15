@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useToast } from '@/app/context/ToastContext';
 
 interface ExperienceBookingCount {
   count?: number | null;
@@ -32,6 +33,7 @@ const CITY_MAP: Record<string, string> = {
 export default function MyExperiences() {
   const { t } = useLanguage();
   const supabase = createClient();
+  const { showToast } = useToast();
 
   const [experiences, setExperiences] = useState<ExperienceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +78,23 @@ export default function MyExperiences() {
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('exp_delete_confirm'))) return;
-    await supabase.from('experiences').delete().eq('id', id);
-    await refreshMyExperiences();
+
+    try {
+      const response = await fetch(`/api/host/experiences/${id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || t('exp_del_fail'));
+      }
+
+      showToast(t('exp_toast_deleted'), 'success');
+      await refreshMyExperiences();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('exp_del_fail');
+      showToast(message, 'error');
+    }
   };
 
   const getCityLabel = useCallback((city?: string | null) => {
