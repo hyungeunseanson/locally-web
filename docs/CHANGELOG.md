@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.93 — [SEO] locale canonical / sitemap 일관성 정렬
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 locale canonical 정렬 | locale prefix rewrite 구조에 맞춰 공개 페이지와 동적 상세의 canonical을 기본 no-prefix 경로(ko primary route)로 정렬하고, locale prefix URL은 `alternates.languages`로만 유지하도록 기준을 명시화 |
+| 🟠 locale cookie 동기화 | `app/middleware.ts`가 `/en`, `/ja`, `/zh` 같은 locale prefix URL로 들어올 때 `app_lang` cookie도 같은 값으로 동기화해, 내부 RSC/메타 요청이 이전 cookie locale로 흔들리지 않게 정렬 |
+| 🟠 sitemap 공개 기준 정렬 | `app/sitemap.ts`의 동적 체험 URL 포함 기준을 `status='active'` 뿐 아니라 실제 indexable 규칙과 같은 `is_active !== false`까지 맞춰 `sitemap`과 `page-level noindex`가 어긋나지 않게 조정 |
+| 🟡 locale 보호막 보강 | `tests/e2e/25-public-metadata.spec.ts`, `tests/e2e/28-json-ld.spec.ts`가 locale-prefixed URL에서도 canonical이 primary no-prefix route로 유지되고, 커뮤니티 JSON-LD URL도 그 기준을 따르는지 직접 검증하도록 확장 |
+
 ## v3.38.92 — [SEO] 동적 상세 title/canonical 일관성 정리
 
 | 항목 | 내용 |

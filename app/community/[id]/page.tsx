@@ -14,12 +14,10 @@ import JsonLd from '@/app/components/seo/JsonLd';
 import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
-import { getCurrentLocale } from '@/app/utils/locale';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
     const { id } = await params;
-    const locale = await getCurrentLocale();
     const supabase = await createClient();
     const { data: post } = await supabase.from('community_posts').select('title, content, images, category').eq('id', id).maybeSingle();
 
@@ -30,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const snippet = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
     const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
     const pagePath = `/community/${id}`;
-    const canonicalUrl = buildLocalizedAbsoluteUrl(locale, pagePath);
+    const canonicalUrl = buildLocalizedAbsoluteUrl('ko', pagePath);
 
     let prefix = '';
     if (post.category === 'qna') prefix = '[Q&A] ';

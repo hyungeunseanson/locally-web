@@ -30,6 +30,14 @@ export async function middleware(request: NextRequest) {
   // Supabase 세션 처리 및 헤더 병합
   const finalResponse = await updateSession(modifiedRequest);
 
+  if (localeMatch) {
+    finalResponse.cookies.set('app_lang', localeMatch[1], {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+    });
+  }
+
   return finalResponse;
 }
 

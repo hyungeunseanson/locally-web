@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-15 (v3.38.92 동적 상세 title/canonical 일관성 정리)
-**Version:** 3.38.92 (Dynamic Detail Metadata Consistency)
+**Last Updated:** 2026-03-15 (v3.38.93 locale canonical / sitemap 일관성 정렬)
+**Version:** 3.38.93 (Locale Canonical and Sitemap Alignment)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -397,6 +397,8 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - 정적 공개 URL의 sitemap `lastModified`는 매 요청 시각이 아니라 해당 라우트 소스 파일들의 실제 수정 시각(`fs.stat().mtime`) 기준으로 계산한다. 동적 체험 상세는 DB `updated_at`을 계속 사용한다.
 - 동적 상세 중 체험 상세는 `status='active' && is_active !== false`일 때만 indexable 메타를 유지하고, 그 외 상태는 `noindex`로 낮춘다. 서비스 의뢰 상세(`/services/[requestId]`)는 공유용 title/description은 유지하되 항상 `noindex`다.
 - 동적 상세 title은 root layout의 `%s | Locally` template를 전제로 하므로, page-level title 문자열에 `| Locally`나 `- Locally`를 중복으로 직접 붙이지 않는다. 공개 동적 상세(체험, 커뮤니티 글)는 self-canonical을 반드시 가진다.
+- locale prefix rewrite를 쓰는 공개 페이지는 기본 no-prefix 경로를 canonical primary route로 사용하고, `/en`, `/ja`, `/zh` prefix URL은 `alternates.languages`로만 유지한다. `sitemap.xml`의 동적 공개 URL 포함 기준도 page-level indexability 규칙과 정확히 일치해야 한다.
+- locale prefix URL(`/en`, `/ja`, `/zh`)로 진입한 요청은 middleware가 `app_lang` cookie도 같은 locale로 동기화해야 한다. 그래야 내부 RSC/메타 요청이 이전 cookie locale 때문에 canonical/JSON-LD를 잘못 만들지 않는다.
 - JSON-LD는 `app/components/seo/JsonLd.tsx`와 `app/utils/structuredData.ts`를 통해 주입한다. 현재 범위는 홈(`Organization`, `WebSite` + `sameAs`), 공개 체험 상세(`Product` + `TouristTrip` 힌트), 커뮤니티 상세(`Article` + `BreadcrumbList`)까지이며, 실제 화면/DB에 존재하는 사실만 구조화 데이터에 넣는다.
 - `robots.txt`는 private UI를 차단하는 용도가 아니라, 크롤 불필요한 `/api/`만 `Disallow`한다. private UI 차단은 route-level `noindex`가 단일 source다.
 

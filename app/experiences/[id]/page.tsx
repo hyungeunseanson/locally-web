@@ -51,7 +51,7 @@ export async function generateMetadata(
       title: title,
       description: description?.slice(0, 150),
       images: [imageUrl],
-      url: buildLocalizedAbsoluteUrl(locale, `/experiences/${id}`),
+      url: buildLocalizedAbsoluteUrl('ko', `/experiences/${id}`),
       locale: locale,
       siteName: 'Locally',
     },

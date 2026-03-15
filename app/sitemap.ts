@@ -136,10 +136,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const { data: experiences } = await supabase
       .from('experiences')
-      .select('id, updated_at')
+      .select('id, updated_at, is_active')
       .eq('status', 'active');
 
-    const experienceUrls: MetadataRoute.Sitemap = (experiences || []).map((exp) => ({
+    const experienceUrls: MetadataRoute.Sitemap = (experiences || [])
+      .filter((exp) => exp.is_active !== false)
+      .map((exp) => ({
       url: buildAbsoluteUrl(`/experiences/${exp.id}`),
       lastModified: exp.updated_at ? new Date(exp.updated_at) : new Date(),
       changeFrequency: 'weekly',

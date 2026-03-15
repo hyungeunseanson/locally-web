@@ -220,6 +220,13 @@ test.describe('JSON-LD smoke', () => {
     expect(experienceJsonLd.some((content) => content.includes('"additionalType":"https://schema.org/TouristTrip"'))).toBeTruthy();
     expect(experienceJsonLd.some((content) => content.includes('"audienceType":"Travelers"'))).toBeTruthy();
 
+    await page.goto(`/en/experiences/${experience.id}`, { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      new RegExp(`/experiences/${experience.id}$`)
+    );
+
     await page.goto(`/community/${communityPost.id}`, { waitUntil: 'domcontentloaded' });
 
     await expect(page).toHaveTitle(`[Q&A] ${communityPost.title} | Locally`);
@@ -233,5 +240,17 @@ test.describe('JSON-LD smoke', () => {
     expect(articleJsonLd.some((content) => content.includes(communityPost.title))).toBeTruthy();
     expect(articleJsonLd.some((content) => content.includes('"@type":"BreadcrumbList"'))).toBeTruthy();
     expect(articleJsonLd.some((content) => content.includes('"name":"커뮤니티"'))).toBeTruthy();
+
+    await page.goto(`/ja/community/${communityPost.id}`, { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      new RegExp(`/community/${communityPost.id}$`)
+    );
+
+    const localizedArticleJsonLd = await page.locator('script[type="application/ld+json"]').allTextContents();
+    expect(
+      localizedArticleJsonLd.some((content) => content.includes(`/community/${communityPost.id}`))
+    ).toBeTruthy();
   });
 });

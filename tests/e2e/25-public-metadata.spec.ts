@@ -62,4 +62,20 @@ test.describe('Public metadata smoke', () => {
       );
     });
   }
+
+  test('keeps locale-prefixed public pages canonicalized to primary no-prefix routes', async ({ page }) => {
+    const cases = [
+      { path: '/en/about', canonicalPath: '/about' },
+      { path: '/ja/community', canonicalPath: '/community' },
+      { path: '/zh/services/intro', canonicalPath: '/services/intro' },
+    ] as const;
+
+    for (const item of cases) {
+      await page.goto(item.path, { waitUntil: 'networkidle' });
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+        'href',
+        new RegExp(`${item.canonicalPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+      );
+    }
+  });
 });
