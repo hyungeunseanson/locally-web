@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS public.community_posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  category text NOT NULL CHECK (category IN ('qna', 'companion', 'info')),
+  category text NOT NULL CHECK (category IN ('qna', 'companion', 'info', 'locally_content')),
   title text NOT NULL,
   content text NOT NULL,
   images text[] DEFAULT '{}'::text[],

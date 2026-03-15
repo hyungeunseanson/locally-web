@@ -5,6 +5,18 @@
 
 ---
 
+## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 상세 상태 정합성 정리 | `app/community/[id]/page.tsx`가 현재 사용자 좋아요 여부를 SSR로 읽어 `initialLiked`를 넘기고, 새 `CommunityCommentsPanel`이 상세 요약 행과 `댓글 N` 헤더를 같은 comment count state로 묶어 즉시 동기화 |
+| 🟠 좋아요 route 응답 강화 | `app/api/community/likes/route.ts`가 insert/delete 에러를 반드시 검사하고, 응답을 `{ liked, likeCount }`로 확장해 optimistic UI를 서버 기준 값으로 되돌리도록 정리 |
+| 🟠 글쓰기 저장 경계 보강 | `app/community/write/PostEditor.tsx`, `app/api/community/posts/route.ts`가 `image_paths`를 함께 전달/수신하고, DB insert 실패 시 `images` bucket uploaded path를 best-effort cleanup 하도록 보강 |
+| 🟠 커뮤니티 category 제약 정렬 | `supabase_community_migration.sql`과 `docs/migrations/v3_39_08_community_locally_content_constraint.sql`에 `locally_content`를 공식 허용 category로 반영 |
+| 🟠 companion 서버 검증 추가 | `/api/community/posts`가 `companion` 글에 대해 `companion_date`, `companion_city`를 서버에서도 필수 검증하도록 보강 |
+| 🟡 write noindex 회귀 보강 | `app/community/write/page.tsx` robots를 `noindex, nofollow`로 명시하고, `tests/e2e/26-private-noindex.spec.ts`에 `/community/write` 케이스를 추가 |
+| 🟡 보호막 추가 | `tests/e2e/46-community-detail-state.spec.ts`, `tests/e2e/47-community-post-route.spec.ts` 추가 — 좋아요/댓글 수 즉시 동기화, companion validation, insert failure cleanup, schema contract를 직접 검증 |
+
 ## v3.39.07 — [Guest Flow] 체험 카드 결제 mocked UI smoke 추가
 
 | 항목 | 내용 |

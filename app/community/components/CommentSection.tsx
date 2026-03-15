@@ -8,8 +8,8 @@ import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
 
 interface CommentSectionProps {
     postId: string;
-    initialCount: number;
     onOpenLogin?: () => void;
+    onCountChange?: (count: number) => void;
 }
 
 const getTimeAgo = (dateStr: string) => {
@@ -23,7 +23,7 @@ const getTimeAgo = (dateStr: string) => {
     } catch { return ''; }
 };
 
-export default function CommentSection({ postId, initialCount, onOpenLogin }: CommentSectionProps) {
+export default function CommentSection({ postId, onOpenLogin, onCountChange }: CommentSectionProps) {
     const { user } = useAuth();
     const [comments, setComments] = useState<CommunityComment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +37,10 @@ export default function CommentSection({ postId, initialCount, onOpenLogin }: Co
             try {
                 const res = await fetch(`/api/community/comments?post_id=${postId}`);
                 const { data } = await res.json();
-                if (data) setComments(data);
+                if (data) {
+                    setComments(data);
+                    onCountChange?.(data.length);
+                }
             } catch (e) {
                 console.error('Failed to load comments', e);
             } finally {
@@ -45,7 +48,7 @@ export default function CommentSection({ postId, initialCount, onOpenLogin }: Co
             }
         };
         fetchComments();
-    }, [postId]);
+    }, [postId, onCountChange]);
 
     const handleSubmit = async () => {
         if (!user) {
@@ -61,9 +64,17 @@ export default function CommentSection({ postId, initialCount, onOpenLogin }: Co
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ post_id: postId, content: inputText.trim() })
             });
+            if (!res.ok) {
+                const payload = await res.json().catch(() => ({ error: '댓글 등록에 실패했습니다.' }));
+                throw new Error(payload.error || '댓글 등록에 실패했습니다.');
+            }
             const { data } = await res.json();
             if (data) {
-                setComments(prev => [...prev, data]);
+                setComments(prev => {
+                    const nextComments = [...prev, data];
+                    onCountChange?.(nextComments.length);
+                    return nextComments;
+                });
                 setInputText('');
             }
         } catch (e) {

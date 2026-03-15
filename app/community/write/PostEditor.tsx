@@ -40,6 +40,11 @@ const parseStoredDate = (dateString: string) => {
     return new Date(year, month - 1, day);
 };
 
+type UploadedImage = {
+    path: string;
+    publicUrl: string;
+};
+
 export default function PostEditor() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -110,8 +115,8 @@ export default function PostEditor() {
         });
     };
 
-    const uploadImages = async (): Promise<string[]> => {
-        const uploadedPaths: string[] = [];
+    const uploadImages = async (): Promise<UploadedImage[]> => {
+        const uploadedImages: UploadedImage[] = [];
 
         for (const file of imageFiles) {
             const compressed = await compressImage(file);
@@ -128,10 +133,13 @@ export default function PostEditor() {
             }
 
             const { data } = supabase.storage.from('images').getPublicUrl(filePath);
-            uploadedPaths.push(data.publicUrl);
+            uploadedImages.push({
+                path: filePath,
+                publicUrl: data.publicUrl,
+            });
         }
 
-        return uploadedPaths;
+        return uploadedImages;
     };
 
     const handleSubmit = async (event?: React.FormEvent) => {
@@ -150,7 +158,9 @@ export default function PostEditor() {
         setIsSubmitting(true);
 
         try {
-            const finalImageUrls = await uploadImages();
+            const uploadedImages = await uploadImages();
+            const finalImageUrls = uploadedImages.map((image) => image.publicUrl);
+            const finalImagePaths = uploadedImages.map((image) => image.path);
 
             const response = await fetch('/api/community/posts', {
                 method: 'POST',
@@ -160,6 +170,7 @@ export default function PostEditor() {
                     title,
                     content,
                     images: finalImageUrls,
+                    image_paths: finalImagePaths,
                     companion_date: companionDate || undefined,
                     companion_city: companionCity.trim() || undefined,
                     linked_exp_id: null,
@@ -170,9 +181,10 @@ export default function PostEditor() {
 
             const { id } = await response.json();
             window.location.href = `/community/${id}`;
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(error.message || '글 등록 중 오류가 발생했습니다.');
+            const message = error instanceof Error ? error.message : '글 등록 중 오류가 발생했습니다.';
+            alert(message);
         } finally {
             setIsSubmitting(false);
         }

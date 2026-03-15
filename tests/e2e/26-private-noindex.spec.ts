@@ -8,6 +8,7 @@ const PRIVATE_PATHS = [
   '/guest/wishlists',
   '/host/register',
   '/notifications',
+  '/community/write',
   '/services',
   '/services/my',
 ] as const;

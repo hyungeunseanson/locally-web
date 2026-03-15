@@ -117,6 +117,12 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 클라이언트 혹은 애플리케이션 레벨의 수동 Upsert(`syncProfile.ts`) 로직은 절대 사용하지 않는다. (FK Constraint Violation 방지)
 - 동기화는 100% DB 레벨의 Postgres Trigger (`on_auth_user_created`)가 담당한다.
 
+### 3.5 커뮤니티 정합성 원칙
+- 커뮤니티 상세의 좋아요 상태는 SSR이 현재 사용자 `community_likes` 존재 여부를 읽어 초기화하고, `POST /api/community/likes`는 항상 `{ liked, likeCount }`를 반환해 optimistic UI를 서버 기준 값으로 다시 맞춘다. `likeCount`는 `community_likes` 실제 row 수를 기준으로 계산한다.
+- 커뮤니티 상세의 댓글 수는 서버가 준 `post.comment_count`에만 고정하지 않는다. 클라이언트 wrapper가 현재 댓글 목록 길이를 source로 잡아 요약 행과 `댓글 N` 헤더를 함께 동기화한다.
+- 커뮤니티 글쓰기의 공식 category 집합은 `qna`, `companion`, `info`, `locally_content`다. `supabase_community_migration.sql`과 실운영 ALTER migration은 이 집합을 동일하게 유지해야 한다.
+- 커뮤니티 글쓰기는 계속 client→storage 업로드를 사용하지만, `POST /api/community/posts`에 `image_paths`를 함께 전달해 DB insert 실패 시 `images` bucket orphan 파일을 best-effort cleanup 한다. `companion` 글은 서버에서도 `companion_date`, `companion_city`를 필수로 검증한다.
+
 ---
 
 ## 4. 현재 상태 요약

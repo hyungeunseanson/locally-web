@@ -7,12 +7,13 @@ import { useAuth } from '@/app/context/AuthContext';
 interface LikeButtonProps {
     postId: string;
     initialCount: number;
+    initialLiked: boolean;
     onOpenLogin?: () => void;
 }
 
-export default function LikeButton({ postId, initialCount, onOpenLogin }: LikeButtonProps) {
+export default function LikeButton({ postId, initialCount, initialLiked, onOpenLogin }: LikeButtonProps) {
     const { user } = useAuth();
-    const [liked, setLiked] = useState(false);
+    const [liked, setLiked] = useState(initialLiked);
     const [count, setCount] = useState(initialCount);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -23,8 +24,8 @@ export default function LikeButton({ postId, initialCount, onOpenLogin }: LikeBu
         }
         if (isLoading) return;
 
-        // Optimistic UI update
         const wasLiked = liked;
+        const previousCount = count;
         setLiked(!wasLiked);
         setCount(c => wasLiked ? c - 1 : c + 1);
         setIsLoading(true);
@@ -37,12 +38,11 @@ export default function LikeButton({ postId, initialCount, onOpenLogin }: LikeBu
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
-            // Sync with server result
             setLiked(data.liked);
-        } catch (e) {
-            // Rollback on failure
+            setCount(data.likeCount);
+        } catch {
             setLiked(wasLiked);
-            setCount(c => wasLiked ? c + 1 : c - 1);
+            setCount(previousCount);
         } finally {
             setIsLoading(false);
         }

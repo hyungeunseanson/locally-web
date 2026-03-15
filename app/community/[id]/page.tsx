@@ -6,8 +6,7 @@ import Link from 'next/link';
 import { MapPin, CalendarCheck } from 'lucide-react';
 import LinkedExperienceChip from '../components/LinkedExperienceChip';
 import PostImages from '../components/PostImages';
-import CommentSection from '../components/CommentSection';
-import LikeButton from '../components/LikeButton';
+import CommunityCommentsPanel from '../components/CommunityCommentsPanel';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
 import JsonLd from '@/app/components/seo/JsonLd';
@@ -79,6 +78,7 @@ export default async function CommunityPostDetail({
     const { id } = await params;
     const detailSearchParams = await searchParams;
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     // ① post 단독 조회 (SSR Join 분리 원칙)
     const { data: post, error: postError } = await supabase
@@ -89,6 +89,22 @@ export default async function CommunityPostDetail({
 
     if (postError) console.error('[Community Post Detail] Post query error:', postError);
     if (!post) notFound();
+
+    let initialLiked = false;
+    if (user) {
+        const { data: existingLike, error: existingLikeError } = await supabase
+            .from('community_likes')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (existingLikeError) {
+            console.error('[Community Post Detail] Like state query error:', existingLikeError);
+        } else {
+            initialLiked = Boolean(existingLike);
+        }
+    }
 
     // ② profile 별도 조회
     const { data: profile } = await supabase
@@ -241,23 +257,15 @@ export default async function CommunityPostDetail({
                                     </div>
                                 )}
 
-                                {/* Stats + LikeButton */}
-                                <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5">
-                                    <span>조회 {post.view_count || 0}</span>
-                                    <span>댓글 {post.comment_count || 0}</span>
-                                    <div className="ml-auto">
-                                        <LikeButton postId={post.id} initialCount={post.like_count || 0} />
-                                    </div>
-                                </div>
                             </article>
 
-                            {/* 댓글 구분선 */}
-                            <div className="w-full h-2 bg-slate-50 border-y border-slate-100" />
-
-                            <section className="px-5 py-6">
-                                <h3 className="text-[17px] font-bold text-slate-900 mb-6">댓글 {post.comment_count || 0}</h3>
-                                <CommentSection postId={post.id} initialCount={post.comment_count || 0} />
-                            </section>
+                            <CommunityCommentsPanel
+                                postId={post.id}
+                                viewCount={post.view_count || 0}
+                                initialLikeCount={post.like_count || 0}
+                                initialLiked={initialLiked}
+                                initialCommentCount={post.comment_count || 0}
+                            />
 
                             {/* 이전글 / 다음글 */}
                             {(prevPost || nextPost) && (
