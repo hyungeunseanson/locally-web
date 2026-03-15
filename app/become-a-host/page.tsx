@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import BecomeHostLandingContent from '@/app/become-a-host2/BecomeHostLandingContent';
+import { getHostLandingOgImagePath } from '@/app/become-a-host2/hostLandingAssets';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 
@@ -23,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const pageUrl = buildLocalizedAbsoluteUrl(locale, '/become-a-host');
   const title = TITLE_MAP[locale];
   const description = DESCRIPTION_MAP[locale];
-  const ogImage = buildAbsoluteUrl('/images/become-a-host/desktop/ko/1.png');
+  const ogImage = buildAbsoluteUrl(getHostLandingOgImagePath(locale));
 
   return {
     title,
@@ -53,6 +54,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function BecomeHostPage() {
-  return <BecomeHostLandingContent />;
+export default async function BecomeHostPage() {
+  const locale = await getCurrentLocale();
+
+  return <BecomeHostLandingContent locale={locale} />;
 }
