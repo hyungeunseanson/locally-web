@@ -133,6 +133,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합, Postgres Trigger 프로필 100% 일치 동기화.
 - 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다. 서비스 매칭 채팅은 `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 적용 후 `inquiries.service_request_id` 기준으로 request 단위 분리를 활성화한다.
 - 메시징 읽음 처리(`is_read`, `read_at`)는 `/api/inquiries/read` 서버 API를 단일 source로 유지한다. 클라이언트 훅(`useChat`)은 unread UI를 낙관적으로 갱신할 수 있지만, 실제 `inquiry_messages` 읽음 업데이트는 브라우저 direct write를 하지 않는다.
+- 기존 inquiry의 텍스트 답장은 `useChat.sendMessage()`가 optimistic append를 기본으로 사용한다. 성공 후 `loadMessages()`로 전체 스레드를 강제 재조회하지 않고, 현재 열린 스레드의 임시 message를 서버 id로 치환한 뒤 inquiry 목록만 background refresh한다. 새 문의방 최초 생성과 이미지 메시지는 기존 서버 round-trip 흐름을 유지한다.
+- `/guest/inbox`는 `hostId`만 있는 deep link에서도 caller query에 `hostName/hostAvatar`가 없으면 `profiles + host_applications`를 직접 조회해 host summary를 복구한다. 결제 완료 페이지나 예약카드에서 host summary를 못 넘긴 진입도 초기 `?` 아바타가 뜨지 않아야 한다.
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 관리자 탭 데이터는 공통 eager load 대신 탭별 전용 훅/API를 기준으로 유지한다.
 - `Billing & Revenue` 탭은 `/api/admin/sales-summary`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다.
 - `Master Ledger` 탭은 `/api/admin/master-ledger`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다. `MasterLedgerTab`은 자체 realtime 구독(`bookings INSERT/UPDATE`, `service_bookings INSERT/UPDATE`)으로 최신성을 유지한다.
@@ -408,6 +410,9 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - `/about`, `/search`, `/become-a-host`, `/help`, `/site-map`, `company/*`, `/services/intro` 같은 공개 랜딩/정보 페이지는 route-level metadata를 직접 가진다. 반대로 로그인 리다이렉트가 있는 `/services` 잡보드류는 공개 SEO 보강 대상이 아니라 private `noindex` 정리 대상으로 본다.
 - `/become-a-host` 랜딩 이미지는 `public/images/become-a-host/{desktop|mobile}/{ko|en|ja|zh}/1.png~7.png` 규칙을 단일 source로 쓰고, 현재 locale 이미지가 없으면 서버에서 자동으로 `ko` asset으로 fallback한다.
 - `/about`은 현재 코드 기반 에디토리얼 페이지를 기본값으로 유지하되, `public/images/about/{desktop|mobile}/{ko|en|ja|zh}/1.png...` 자산이 들어오면 숫자 순서대로 이미지 랜딩을 우선 렌더한다. locale 파일이 비어 있으면 같은 번호의 `ko` 이미지로 fallback한다.
+- 호스트 체험 등록/수정의 대표 사진은 모바일 hover를 전제하지 않는다. 썸네일 탭 시 `HostPhotoActionSheet`로 `사진 변경 / 사진 삭제 / 취소`를 제공하고, 데스크탑에서만 hover quick delete를 유지한다. 이번 범위는 hero photo만 해당하며 itinerary photo 액션은 기존 구조를 유지한다.
+- `GET /api/guest/trips`는 예약카드 렌더용으로 `hostName`, `hostAvatarUrl`, `meetingPoint`, `meetingPointI18n`를 포함해야 한다. `TripCard`는 `meeting_point_i18n -> meeting_point -> location` 순으로 로컬라이즈된 만나는 장소를 표시하고, 메시지 진입 query에도 host summary를 싣는다.
+- 모바일 unread 표시는 `NotificationContext.unreadCount`를 단일 source로 사용한다. guest는 bottom nav `프로필` 탭과 `/account` 상단 벨, host는 bottom nav `더보기` 탭과 `/host/menu` 상단 벨에 같은 red dot 규칙을 적용한다.
 - private 페이지(`app/login`, `app/account`, `app/guest/*`, `app/host/*`, `app/admin/*`, `app/notifications`, `app/services`, `app/services/my`)는 `app/utils/seo.ts`의 `PRIVATE_NOINDEX_METADATA`를 단일 source로 사용해 `robots: noindex, nofollow`를 강제한다.
 - `/community`처럼 필터 query를 쓰는 공개 목록은 canonical과 `alternates.languages`를 기본 목록 경로에 고정해 query 조합별 중복 신호를 만들지 않는다.
 - `sitemap.xml`은 dead path를 포함하지 않아야 하며, `/search`, `/community`, `/services/intro`, `/site-map` 같은 주요 공개 진입 페이지를 누락하지 않는다.

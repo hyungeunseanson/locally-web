@@ -1,6 +1,24 @@
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { getHostPublicProfile } from '@/app/utils/profile';
+
+type HostProfileRow = {
+  id: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  email?: string | null;
+};
+
+type HostApplicationRow = {
+  user_id: string;
+  name?: string | null;
+  profile_photo?: string | null;
+  self_intro?: string | null;
+  languages?: string[] | string | null;
+  profession?: string | null;
+  host_nationality?: string | null;
+};
 
 export async function GET() {
   const supabase = await createClient();
@@ -15,13 +33,42 @@ export async function GET() {
       .from('bookings')
       .select(`
         *,
-        experiences (id, host_id, title, image_url, photos, location),
+        experiences (id, host_id, title, image_url, photos, location, meeting_point, meeting_point_i18n),
         reviews (id, rating, content, photos, created_at)
       `)
       .eq('user_id', user.id)
       .order('date', { ascending: false });
 
     if (error) throw error;
+
+    const hostIds = Array.from(
+      new Set(
+        (bookings || [])
+          .map((booking) => booking.experiences?.host_id)
+          .filter(Boolean)
+      )
+    ) as string[];
+
+    const [hostProfilesRes, hostAppsRes] = hostIds.length > 0
+      ? await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, email')
+          .in('id', hostIds),
+        supabase
+          .from('host_applications')
+          .select('user_id, name, profile_photo, self_intro, languages, profession, host_nationality')
+          .in('user_id', hostIds),
+      ])
+      : [{ data: [], error: null }, { data: [], error: null }];
+
+    if (hostProfilesRes.error) throw hostProfilesRes.error;
+    if (hostAppsRes.error) throw hostAppsRes.error;
+
+    const hostProfiles = (hostProfilesRes.data || []) as HostProfileRow[];
+    const hostApplications = (hostAppsRes.data || []) as HostApplicationRow[];
+    const hostProfileMap = new Map(hostProfiles.map((profile) => [profile.id, profile]));
+    const hostApplicationMap = new Map(hostApplications.map((application) => [application.user_id, application]));
 
     const now = new Date();
     const updatedTrips = [];
@@ -32,6 +79,13 @@ export async function GET() {
     for (const booking of bookings || []) {
       const expDate = new Date(`${booking.date}T${booking.time}`);
       let status = booking.status;
+      const hostPublicProfile = booking.experiences?.host_id
+        ? getHostPublicProfile(
+          hostProfileMap.get(String(booking.experiences.host_id)),
+          hostApplicationMap.get(String(booking.experiences.host_id)),
+          'Host'
+        )
+        : null;
 
       // 🟢 시간이 지난 활성 예약(PAID, confirmed)은 런타임에 즉시 DB를 동기화하여 상태 불일치를 방지합니다. (Lazy Update)
       if (expDate < now && BOOKING_ACTIVE_STATUS_FOR_CAPACITY.includes(status)) {
@@ -49,6 +103,8 @@ export async function GET() {
         image: booking.experiences?.image_url,
         photos: booking.experiences?.photos, // 🟢 누락되었던 체험 사진 배열 추가 매핑
         location: booking.experiences?.location,
+        meetingPoint: booking.experiences?.meeting_point,
+        meetingPointI18n: booking.experiences?.meeting_point_i18n || null,
         date: booking.date,
         time: booking.time,
         guests: booking.guests,
@@ -56,6 +112,8 @@ export async function GET() {
         status: status, // 업데이트된 상태 사용
         paymentDate: booking.created_at,
         hostId: booking.experiences?.host_id, // 메시지 보내기용
+        hostName: hostPublicProfile?.name || 'Host',
+        hostAvatarUrl: hostPublicProfile?.avatarUrl || null,
         hasReview: booking.reviews && booking.reviews.length > 0, // 🟢 후기 작성 여부 (배열 길이로 체크)
         review: firstReview ? {  // [R5] 수정용 후기 데이터
           id: firstReview.id,

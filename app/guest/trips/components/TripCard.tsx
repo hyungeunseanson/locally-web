@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import CancellationModal from './CancellationModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
+import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 
 export interface GuestTrip {
   id: number;
@@ -18,6 +19,8 @@ export interface GuestTrip {
   date: string;
   time: string;
   location?: string;
+  meetingPoint?: string;
+  meetingPointI18n?: Record<string, string> | null;
   address?: string;
   image?: string;
   photos?: string[];
@@ -30,6 +33,8 @@ export interface GuestTrip {
   totalPrice?: number;
   total_price?: number;
   price?: number;
+  hostName?: string;
+  hostAvatarUrl?: string | null;
 }
 
 interface TripCardProps {
@@ -47,6 +52,16 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 
   // 🟢 [추가] 환불 예상 정보 상태
   const [refundInfo, setRefundInfo] = useState({ percent: 0, amount: 0, reason: '' });
+  const localizedMeetingPoint =
+    getLocalizedExperienceText(
+      {
+        meeting_point: trip.meetingPoint,
+        meeting_point_i18n: trip.meetingPointI18n,
+      },
+      'meeting_point',
+      lang
+    ) || trip.location || 'SEOUL';
+
   const openExternalLink = (url: string) => {
     window.location.href = url;
   };
@@ -228,7 +243,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 </div>
 
                 <div className="text-[11px] md:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 md:gap-2 mt-0.5 md:mt-1">
-                  <MapPin className="w-[11px] h-[11px] md:w-3 md:h-3" /> {trip.location || 'SEOUL'}
+                  <MapPin className="w-[11px] h-[11px] md:w-3 md:h-3" /> {localizedMeetingPoint}
                 </div>
               </div>
 
@@ -286,13 +301,28 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
           {/* 하단 3버튼 */}
           <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 grid grid-cols-3 gap-1.5 md:gap-2">
             <button
-              onClick={() => router.push(`/guest/inbox?hostId=${trip.hostId}&expId=${trip.expId}&expTitle=${encodeURIComponent(trip.title)}`)}
+              onClick={() => {
+                const messageParams = new URLSearchParams({
+                  hostId: String(trip.hostId),
+                  expId: String(trip.expId),
+                  expTitle: trip.title,
+                });
+
+                if (trip.hostName) {
+                  messageParams.set('hostName', trip.hostName);
+                }
+                if (trip.hostAvatarUrl) {
+                  messageParams.set('hostAvatar', trip.hostAvatarUrl);
+                }
+
+                router.push(`/guest/inbox?${messageParams.toString()}`);
+              }}
               className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
             >
               <MessageSquare className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]" /> {t('messages')} {/* 🟢 교체 */}
             </button>
             <button
-              onClick={() => openExternalLink(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location || '')}`)}
+              onClick={() => openExternalLink(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(localizedMeetingPoint || '')}`)}
               className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
             >
               <Map className="w-[13px] h-[13px] md:w-[14px] md:h-[14px]" /> {t('trip_map')} {/* 🟢 교체 */}

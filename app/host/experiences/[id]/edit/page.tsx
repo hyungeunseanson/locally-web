@@ -22,6 +22,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 import { buildExperienceWritePayload, getManualFieldValue, setManualFieldValue, syncManualContentWithLocales } from '@/app/host/create/experienceFormState';
+import HostPhotoActionSheet from '@/app/host/components/HostPhotoActionSheet';
 import {
   buildManualContentFromExperience,
   getManualLocalesFromLanguageLevels,
@@ -45,6 +46,8 @@ export default function EditExperiencePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadingItineraryIndex, setUploadingItineraryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'course'>('basic');
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  const replacePhotoInputRef = React.useRef<HTMLInputElement>(null);
 
   // 데이터 불러오기
   useEffect(() => {
@@ -227,6 +230,24 @@ export default function EditExperiencePage() {
     showToast(t('msg_photo_delete_success'), 'success');
   };
 
+  const replacePhoto = async (indexToReplace: number, file: File) => {
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      if (isHeicValidationResult(validation)) {
+        showHeicUnsupportedToast(validation.message);
+      } else {
+        showToast(validation.message || copy.imageValidationFallback, 'error');
+      }
+      return;
+    }
+
+    const publicUrl = await uploadImageFile(file, 'hero');
+    setFormData((prev: any) => ({
+      ...prev,
+      photos: prev.photos.map((photo: string, idx: number) => (idx === indexToReplace ? publicUrl : photo)),
+    }));
+  };
+
   const handleItineraryPhotoUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setUploadingItineraryIndex(index);
@@ -257,6 +278,24 @@ export default function EditExperiencePage() {
       setUploadingItineraryIndex(null);
       e.target.value = '';
     }
+  };
+
+  const handleReplacePhotoInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (file && activePhotoIndex !== null) {
+      try {
+        setUploading(true);
+        await replacePhoto(activePhotoIndex, file);
+      } catch (err: any) {
+        showToast(t('msg_photo_fail') + err.message, 'error');
+      } finally {
+        setUploading(false);
+      }
+    }
+
+    setActivePhotoIndex(null);
+    e.target.value = '';
   };
 
   const removeItineraryPhoto = (index: number) => {
@@ -327,6 +366,31 @@ export default function EditExperiencePage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans pb-20 md:pb-0">
+      <HostPhotoActionSheet
+        isOpen={activePhotoIndex !== null}
+        photoLabel={
+          activePhotoIndex !== null
+            ? `${copy.mainPhotoBadge} ${activePhotoIndex + 1}`
+            : undefined
+        }
+        onClose={() => setActivePhotoIndex(null)}
+        onChange={() => replacePhotoInputRef.current?.click()}
+        onDelete={() => {
+          if (activePhotoIndex !== null) {
+            removePhoto(activePhotoIndex);
+          }
+          setActivePhotoIndex(null);
+        }}
+      />
+      <input
+        ref={replacePhotoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        data-testid="edit-replace-photo-input"
+        onChange={handleReplacePhotoInput}
+      />
+
       <SiteHeader />
 
       <main className="max-w-4xl mx-auto px-3 md:px-6 py-5 md:py-8">
@@ -381,14 +445,34 @@ export default function EditExperiencePage() {
                 )}
                 {/* 사진 목록 */}
                 {formData.photos.map((url: string, idx: number) => (
-                  <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative group shadow-sm border border-slate-200">
+                  <div
+                    key={idx}
+                    className="aspect-square rounded-2xl overflow-hidden relative group shadow-sm border border-slate-200 cursor-pointer"
+                    onClick={() => setActivePhotoIndex(idx)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setActivePhotoIndex(idx);
+                      }
+                    }}
+                  >
                     <img src={url} className="w-full h-full object-cover" alt={`experience-${idx}`} />
                     {idx === 0 && (
                       <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-bold text-white">
                         {copy.mainPhotoBadge}
                       </span>
                     )}
-                    <button onClick={() => removePhoto(idx)} className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600">
+                    <button
+                      type="button"
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removePhoto(idx);
+                      }}
+                      className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    >
                       <Trash2 size={14} />
                     </button>
                   </div>

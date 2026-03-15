@@ -7,6 +7,7 @@ import {
     CalendarCheck, LayoutList, BookOpen, AlignJustify, Loader2
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
+import { useNotification } from '@/app/context/NotificationContext';
 import LoginModal from '@/app/components/LoginModal';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 
@@ -22,6 +23,7 @@ export default function BottomTabNavigation() {
         pathname?.startsWith('/services');
     const activeHostTab = searchParams?.get('tab') || 'reservations';
     const { user } = useAuth();
+    const { unreadCount } = useNotification();
     const avatarUrl = user?.user_metadata?.avatar_url;
     const [showLogin, setShowLogin] = useState(false);
     const { pendingHref, isNavigating, navigate } = usePendingNavigation();
@@ -87,12 +89,24 @@ export default function BottomTabNavigation() {
             icon: (isActive: boolean) => {
                 if (avatarUrl) {
                     return (
-                        <div className={`w-6 h-6 rounded-full overflow-hidden border-2 ${isActive ? 'border-[#FF385C]' : 'border-gray-200'}`}>
-                            <img src={avatarUrl} alt="profile" className="w-full h-full object-cover" />
+                        <div className="relative">
+                            <div className={`w-6 h-6 rounded-full overflow-hidden border-2 ${isActive ? 'border-[#FF385C]' : 'border-gray-200'}`}>
+                                <img src={avatarUrl} alt="profile" className="w-full h-full object-cover" />
+                            </div>
+                            {unreadCount > 0 && (
+                                <span data-testid="guest-mobile-profile-unread-dot" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                            )}
                         </div>
                     );
                 }
-                return <User size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />;
+                return (
+                    <div className="relative">
+                        <User size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+                        {unreadCount > 0 && (
+                            <span data-testid="guest-mobile-profile-unread-dot" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                        )}
+                    </div>
+                );
             }
         }
     ];
@@ -127,7 +141,14 @@ export default function BottomTabNavigation() {
             name: '더보기',
             href: '/host/menu',
             requireAuth: true,
-            icon: (isActive: boolean) => <AlignJustify size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+            icon: (isActive: boolean) => (
+                <div className="relative">
+                    <AlignJustify size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
+                    {unreadCount > 0 && (
+                        <span data-testid="host-mobile-menu-unread-dot" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                    )}
+                </div>
+            )
         }
     ];
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
@@ -19,6 +19,7 @@ import { getLanguageNames } from '@/app/utils/languageLevels';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { buildExperienceWritePayload, syncManualContentWithLocales, type ExperienceFormState, type ItineraryItem } from './experienceFormState';
 import { getManualLocalesFromLanguageLevels, isExperienceLocale } from '@/app/utils/experienceTranslation';
+import HostPhotoActionSheet from '@/app/host/components/HostPhotoActionSheet';
 
 export default function CreateExperiencePage() {
   const { lang } = useLanguage();
@@ -44,6 +45,8 @@ export default function CreateExperiencePage() {
   );
   const [tempInclusion, setTempInclusion] = useState('');
   const [tempExclusion, setTempExclusion] = useState('');
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  const replacePhotoInputRef = useRef<HTMLInputElement>(null);
 
   const validateCurrentStep = (targetStep: number) => {
     const manualLocales = getManualLocalesFromLanguageLevels(formData.language_levels || []);
@@ -244,6 +247,20 @@ export default function CreateExperiencePage() {
     updateData('photos', newPhotos);
   };
 
+  const handleReplaceImage = async (index: number, file: File) => {
+    const { previewUrls, processedFiles } = await buildPreviewFiles([file]);
+
+    if (previewUrls.length === 0 || processedFiles.length === 0) {
+      return;
+    }
+
+    updateData(
+      'photos',
+      formData.photos.map((photo, photoIndex) => (photoIndex === index ? previewUrls[0] : photo))
+    );
+    setImageFiles((prev) => prev.map((imageFile, imageIndex) => (imageIndex === index ? processedFiles[0] : imageFile)));
+  };
+
   const buildPreviewFiles = async (files: File[]) => {
     const previewUrls: string[] = [];
     const processedFiles: File[] = [];
@@ -318,6 +335,17 @@ export default function CreateExperiencePage() {
       return next;
     });
 
+    e.target.value = '';
+  };
+
+  const handleReplacePhotoInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (file && activePhotoIndex !== null) {
+      await handleReplaceImage(activePhotoIndex, file);
+    }
+
+    setActivePhotoIndex(null);
     e.target.value = '';
   };
 
@@ -424,6 +452,31 @@ export default function CreateExperiencePage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
+      <HostPhotoActionSheet
+        isOpen={activePhotoIndex !== null}
+        photoLabel={
+          activePhotoIndex !== null
+            ? `${copy.mainPhotoBadge} ${activePhotoIndex + 1}`
+            : undefined
+        }
+        onClose={() => setActivePhotoIndex(null)}
+        onChange={() => replacePhotoInputRef.current?.click()}
+        onDelete={() => {
+          if (activePhotoIndex !== null) {
+            handleRemoveImage(activePhotoIndex);
+          }
+          setActivePhotoIndex(null);
+        }}
+      />
+      <input
+        ref={replacePhotoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        data-testid="create-replace-photo-input"
+        onChange={handleReplacePhotoInput}
+      />
+
       {/* 헤더 */}
       {step < TOTAL_STEPS && (
         <header className="fixed top-0 left-0 right-0 h-14 md:h-20 bg-white/80 backdrop-blur-md z-50 px-4 md:px-6 flex items-center justify-between pt-[env(safe-area-inset-top,0px)]">
@@ -446,6 +499,7 @@ export default function CreateExperiencePage() {
           addItem={addItem}
           removeItem={removeItem}
           handleRemoveImage={handleRemoveImage}
+          onPhotoTap={setActivePhotoIndex}
           addItineraryItem={addItineraryItem}
           removeItineraryItem={removeItineraryItem}
           updateItineraryItem={updateItineraryItem}

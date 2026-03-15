@@ -60,7 +60,7 @@ type InquiryListItem = InquiryRow & {
 };
 
 type InquiryMessageRow = {
-  id: number;
+  id: number | string;
   inquiry_id: number | string;
   sender_id: string;
   content: string;
@@ -300,6 +300,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
     let imageUrl: string | null = null;
     let type = 'text';
+    const shouldOptimisticallyAppend = !file && normalizedHasText(cleanContent);
+    const optimisticMessageId = shouldOptimisticallyAppend ? `temp-${Date.now()}` : null;
+    const optimisticCreatedAt = new Date().toISOString();
+    const previousInquiries = inquiriesRef.current;
 
     if (file) {
       const validation = validateImage(file);
@@ -328,6 +332,27 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         showToast('이미지 전송 실패', 'error');
         return;
       }
+    }
+
+    if (shouldOptimisticallyAppend && optimisticMessageId) {
+      const optimisticMessage: InquiryMessageView = {
+        id: optimisticMessageId,
+        inquiry_id: inquiryId,
+        sender_id: actorId,
+        content: cleanContent,
+        image_url: null,
+        type: 'text',
+        is_read: false,
+        read_at: null,
+        created_at: optimisticCreatedAt,
+        sender: {
+          id: actorId,
+          name: currentUser?.user_metadata?.full_name || currentUser?.email || '나',
+          avatar_url: currentUser?.user_metadata?.avatar_url || null,
+        },
+      };
+
+      setMessages((prev) => [...prev, optimisticMessage]);
     }
 
     try {
@@ -362,14 +387,41 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       inquiriesRef.current = nextInquiries;
       setInquiries(nextInquiries);
+      const updatedSelectedInquiry = nextInquiries.find((inq) => String(inq.id) === String(inquiryId)) || null;
+      selectedInquiryRef.current = updatedSelectedInquiry;
+      if (updatedSelectedInquiry) {
+        setSelectedInquiry(updatedSelectedInquiry);
+      }
 
-      await loadMessages(inquiryId);
+      if (shouldOptimisticallyAppend && optimisticMessageId) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            String(msg.id) === optimisticMessageId
+              ? {
+                ...msg,
+                id: result.messageId,
+                content: cleanContent,
+                created_at: optimisticCreatedAt,
+              }
+              : msg
+          )
+        );
+        void fetchInquiries(false);
+      } else {
+        await loadMessages(inquiryId);
+      }
     } catch (err: unknown) {
       const dbError = err as { code?: string, message?: string };
       let message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
 
       if (dbError.code === '23503' && dbError.message?.includes('profiles')) {
         message = '프로필 동기화가 진행 중입니다. 잠시 후(5초 뒤) 메시지를 다시 보내주세요.';
+      }
+
+      if (shouldOptimisticallyAppend && optimisticMessageId) {
+        setMessages((prev) => prev.filter((msg) => String(msg.id) !== optimisticMessageId));
+        inquiriesRef.current = previousInquiries;
+        setInquiries(previousInquiries);
       }
 
       showToast('메시지 전송 실패: ' + message, 'error');
@@ -481,4 +533,8 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     clearSelected,
     refresh: fetchInquiries
   };
+}
+
+function normalizedHasText(value: string) {
+  return value.trim().length > 0;
 }

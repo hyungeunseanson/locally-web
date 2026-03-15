@@ -61,6 +61,7 @@ interface ExperienceFormStepsProps {
   tempExclusion: string;
   setTempExclusion: React.Dispatch<React.SetStateAction<string>>;
   handleRemoveImage?: (index: number) => void;
+  onPhotoTap?: (index: number) => void;
 }
 
 const LEVELS: LanguageLevel[] = [1, 2, 3, 4, 5];
@@ -155,6 +156,7 @@ export default function ExperienceFormSteps({
   tempExclusion,
   setTempExclusion,
   handleRemoveImage,
+  onPhotoTap,
 }: ExperienceFormStepsProps) {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
@@ -339,7 +341,19 @@ export default function ExperienceFormSteps({
             )}
 
             {formData.photos.map((url: string, idx: number) => (
-              <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative shadow-sm group border border-slate-100">
+              <div
+                key={idx}
+                className="aspect-square rounded-2xl overflow-hidden relative shadow-sm group border border-slate-100 cursor-pointer"
+                onClick={() => onPhotoTap?.(idx)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if ((event.key === 'Enter' || event.key === ' ') && onPhotoTap) {
+                    event.preventDefault();
+                    onPhotoTap(idx);
+                  }
+                }}
+              >
                 <img src={url} className="w-full h-full object-cover" alt={`preview ${idx}`} />
                 {idx === 0 && (
                   <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-bold text-white">
@@ -348,10 +362,12 @@ export default function ExperienceFormSteps({
                 )}
                 <button
                   type="button"
-                  onClick={() => {
+                  className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full opacity-0 md:group-hover:opacity-100 transition-all hover:bg-rose-500 hover:scale-110"
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
                     if (handleRemoveImage) handleRemoveImage(idx);
                   }}
-                  className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:scale-110"
                 >
                   <X size={14} strokeWidth={3} />
                 </button>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
@@ -10,6 +10,8 @@ import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
+import { createClient } from '@/app/utils/supabase/client';
+import { getHostPublicProfile } from '@/app/utils/profile';
 
 const ADMIN_SUPPORT_AVATAR_SRC = '/images/logos/Frame%201545423142.png';
 
@@ -32,9 +34,12 @@ function InboxContent() {
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const supabase = useMemo(() => createClient(), []);
 
   // 🟢 프로필 모달 상태
   const [modalUserId, setModalUserId] = useState<string | null>(null);
+  const [hostBootstrapSummary, setHostBootstrapSummary] = useState<{ name: string; avatarUrl: string | null } | null>(null);
+  const [isBootstrappingHost, setIsBootstrappingHost] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,6 +81,57 @@ function InboxContent() {
   useEffect(() => {
     setIsUrlProcessed(false);
   }, [hostId, expId, inquiryId, hostName, hostAvatar, expTitle]);
+
+  useEffect(() => {
+    setHostBootstrapSummary(null);
+  }, [hostId]);
+
+  useEffect(() => {
+    if (!hostId || (hostName && hostAvatar)) {
+      setIsBootstrappingHost(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsBootstrappingHost(true);
+
+    const loadHostBootstrap = async () => {
+      try {
+        const [profileRes, hostAppRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, email')
+            .eq('id', hostId)
+            .maybeSingle(),
+          supabase
+            .from('host_applications')
+            .select('user_id, name, profile_photo, self_intro, languages, profession, host_nationality')
+            .eq('user_id', hostId)
+            .maybeSingle(),
+        ]);
+
+        if (cancelled) return;
+
+        const summary = getHostPublicProfile(profileRes.data, hostAppRes.data, hostName || 'Host');
+        setHostBootstrapSummary({
+          name: summary.name,
+          avatarUrl: summary.avatarUrl,
+        });
+      } catch (error) {
+        console.error('[guest inbox] host bootstrap failed:', error);
+      } finally {
+        if (!cancelled) {
+          setIsBootstrappingHost(false);
+        }
+      }
+    };
+
+    void loadHostBootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hostAvatar, hostId, hostName, supabase]);
 
   useEffect(() => {
     if (isLoading || isUrlProcessed) return;
@@ -120,15 +176,22 @@ function InboxContent() {
         loadMessages(existing.id);
       }
     } else {
+      if ((!hostName || !hostAvatar) && isBootstrappingHost) {
+        return;
+      }
       if (selectedInquiry?.id !== 'new') {
         startNewChat(
-          { id: hostId, name: hostName || 'Host', avatarUrl: hostAvatar || undefined },
+          {
+            id: hostId,
+            name: hostName || hostBootstrapSummary?.name || 'Host',
+            avatarUrl: hostAvatar || hostBootstrapSummary?.avatarUrl || undefined,
+          },
           { id: expId, title: expTitle || 'Experience' }
         );
       }
     }
     setIsUrlProcessed(true);
-  }, [isLoading, inquiries, hostId, expId, inquiryId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed]);
+  }, [isLoading, inquiries, hostId, expId, inquiryId, hostName, hostAvatar, expTitle, selectedInquiry, loadMessages, startNewChat, isUrlProcessed, hostBootstrapSummary, isBootstrappingHost]);
 
   const handleSelectInquiry = (inqId: number | string) => {
     loadMessages(inqId);
@@ -139,7 +202,13 @@ function InboxContent() {
     if (!selectedInquiry || isSending) return;
     if (!inputText.trim() && !file) return;
 
+    const draftText = inputText;
+    const shouldOptimisticallyClear = selectedInquiry.id !== 'new' && !file && draftText.trim().length > 0;
+
     setIsSending(true);
+    if (shouldOptimisticallyClear) {
+      setInputText('');
+    }
     try {
       if (selectedInquiry.id === 'new') {
         if (!selectedInquiry.host_id) {
@@ -150,10 +219,15 @@ function InboxContent() {
       } else {
         await sendMessage(selectedInquiry.id, inputText, file);
       }
-      setInputText('');
+      if (!shouldOptimisticallyClear) {
+        setInputText('');
+      }
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       console.error("Failed to send message", error);
+      if (shouldOptimisticallyClear) {
+        setInputText(draftText);
+      }
     } finally {
       setIsSending(false);
     }
@@ -179,7 +253,11 @@ function InboxContent() {
       };
     }
     if (inqOrSelected?.id === 'new' && inqOrSelected?.host_id === hostId) {
-      return { name: hostName || 'Host', avatar: hostAvatar, id: hostId };
+      return {
+        name: hostName || hostBootstrapSummary?.name || 'Host',
+        avatar: hostAvatar || hostBootstrapSummary?.avatarUrl || null,
+        id: hostId,
+      };
     }
     return { name: 'Host', avatar: null, id: null };
   };

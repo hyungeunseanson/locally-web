@@ -17,6 +17,7 @@ import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { useNotification } from '@/app/context/NotificationContext';
 
 type GuestReview = {
   id: string | number;
@@ -64,6 +65,7 @@ export default function AccountPage() {
   // 프로필 카드용 통계
   const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 0 });
   const { pendingHref, isNavigating, navigate } = usePendingNavigation();
+  const { unreadCount } = useNotification();
 
   // 프로필 상태
   const [profile, setProfile] = useState({
@@ -420,12 +422,15 @@ export default function AccountPage() {
               onClick={() => navigate('/notifications')}
               disabled={isNavigating}
               aria-busy={pendingHref === '/notifications'}
-              className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 active:scale-[0.96] disabled:cursor-not-allowed ${pendingHref === '/notifications' ? 'bg-gray-200' : 'bg-gray-100 active:bg-gray-200'}`}
+              className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 active:scale-[0.96] disabled:cursor-not-allowed ${pendingHref === '/notifications' ? 'bg-gray-200' : 'bg-gray-100 active:bg-gray-200'}`}
             >
               {pendingHref === '/notifications'
                 ? <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
                 : <Bell className="w-4 h-4 text-gray-600" />
               }
+              {unreadCount > 0 && pendingHref !== '/notifications' && (
+                <span data-testid="guest-account-unread-dot" className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+              )}
             </button>
           </div>
         </div>

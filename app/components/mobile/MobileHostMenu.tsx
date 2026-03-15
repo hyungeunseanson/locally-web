@@ -37,7 +37,7 @@ export default function MobileHostMenu() {
     const profileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
     const { pendingHref, isNavigating, navigate } = usePendingNavigation();
 
-    const { notifications } = useNotification();
+    const { notifications, unreadCount } = useNotification();
     const serviceUnread = notifications.some(
         (n) => !n.is_read && [
             'service_request_new', 'service_application_new',
@@ -138,6 +138,9 @@ export default function MobileHostMenu() {
                             ? <Loader2 size={16} className="animate-spin text-gray-600" />
                             : <Bell size={17} className="text-gray-600" />
                         }
+                        {unreadCount > 0 && pendingHref !== '/host/notifications' && (
+                            <span data-testid="host-menu-bell-unread-dot" className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                        )}
                     </button>
                     <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
                         {profile?.avatar_url

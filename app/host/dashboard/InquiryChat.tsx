@@ -99,13 +99,23 @@ export default function InquiryChat() {
   const handleSend = async (file?: File) => {
     if (!selectedInquiry || isSending) return;
     if (!replyText.trim() && !file) return;
+    const draftText = replyText;
+    const shouldOptimisticallyClear = !file && draftText.trim().length > 0;
     setIsSending(true);
+    if (shouldOptimisticallyClear) {
+      setReplyText('');
+    }
     try {
       await sendMessage(selectedInquiry.id, replyText, file);
-      setReplyText('');
+      if (!shouldOptimisticallyClear) {
+        setReplyText('');
+      }
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       console.error('Failed to send', err);
+      if (shouldOptimisticallyClear) {
+        setReplyText(draftText);
+      }
     } finally {
       setIsSending(false);
     }
