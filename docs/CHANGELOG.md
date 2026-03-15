@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.03 — [Host Flow] 예약/문의 탭 UI 보호막 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 예약 탭 UI 보호막 | `tests/e2e/40-host-reservations-inquiries-ui.spec.ts` 추가 — 호스트 대시보드 `reservations` 탭에서 예약 카드 렌더, `취소/환불` 탭 필터, 게스트 프로필 모달 노출까지 직접 검증 |
+| 🟡 메시지 CTA → 문의방 보호막 | 같은 스모크가 예약 카드의 `메시지` 버튼으로 `inquiries` 탭 진입, `POST /api/host/start-chat` 기반 문의방 생성, 호스트 답장 전송과 `inquiry_messages` 저장까지 확인 |
+
 ## v3.39.02 — [Host Flow] 리뷰 탭 쓰기 경계 서버화
 
 | 항목 | 내용 |
