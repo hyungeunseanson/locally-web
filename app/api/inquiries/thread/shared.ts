@@ -45,12 +45,23 @@ export type InquiryMessageRequestBody = {
   type?: 'text' | 'image';
 };
 
+export type InquiryReadRequestBody = {
+  inquiryId?: number | string;
+};
+
 export type InquiryMessageResponse = {
   success: true;
   inquiryId: number | string;
   messageId: number | string;
   displayContent: string;
   updatedAt: string;
+};
+
+export type InquiryReadResponse = {
+  success: true;
+  inquiryId: number | string;
+  markedCount: number;
+  readAt: string;
 };
 
 type InquiryInsertRow = {
@@ -193,41 +204,6 @@ async function notifyRecipient(params: {
   } catch (error) {
     console.warn('[inquiries/thread] message notification email failed:', error);
   }
-}
-
-async function getAdminRecipientIds() {
-  const supabaseAdmin = createAdminClient();
-
-  const { data: whitelistEntries, error: whitelistError } = await supabaseAdmin
-    .from('admin_whitelist')
-    .select('email');
-
-  if (whitelistError) throw new InquiryThreadError(500, '관리자 정보를 불러올 수 없습니다.');
-
-  const adminEmails = (whitelistEntries || [])
-    .map((entry) => entry.email)
-    .filter(Boolean);
-
-  if (adminEmails.length === 0) {
-    throw new InquiryThreadError(400, '현재 상담 가능한 관리자가 없습니다.');
-  }
-
-  const { data: admins, error: adminError } = await supabaseAdmin
-    .from('profiles')
-    .select('id, email')
-    .in('email', adminEmails);
-
-  if (adminError) throw new InquiryThreadError(500, '관리자 정보를 불러올 수 없습니다.');
-
-  const adminIds = (admins || [])
-    .map((admin) => admin.id)
-    .filter(Boolean);
-
-  if (adminIds.length === 0) {
-    throw new InquiryThreadError(400, '현재 상담 가능한 관리자가 없습니다.');
-  }
-
-  return adminIds;
 }
 
 async function assertAdminActor(actor: AuthActor) {
@@ -584,6 +560,47 @@ export async function createInquiryMessage(params: {
     displayContent,
     updatedAt,
   } satisfies InquiryMessageResponse;
+}
+
+export async function markInquiryMessagesRead(params: {
+  actor: AuthActor;
+  body: InquiryReadRequestBody;
+}) {
+  const { actor, body } = params;
+  const supabaseAdmin = createAdminClient();
+  const inquiryId = body.inquiryId != null ? String(body.inquiryId) : '';
+
+  if (!inquiryId) {
+    throw new InquiryThreadError(400, 'inquiryId is required');
+  }
+
+  const { inquiry } = await resolveInquiryMessageAccess({
+    actor,
+    inquiryId,
+  });
+
+  const readAt = new Date().toISOString();
+  const { data: updatedRows, error: updateError } = await supabaseAdmin
+    .from('inquiry_messages')
+    .update({
+      is_read: true,
+      read_at: readAt,
+    })
+    .eq('inquiry_id', inquiry.id)
+    .neq('sender_id', actor.id)
+    .is('read_at', null)
+    .select('id');
+
+  if (updateError) {
+    throw new InquiryThreadError(500, '읽음 처리에 실패했습니다.');
+  }
+
+  return {
+    success: true,
+    inquiryId: inquiry.id,
+    markedCount: updatedRows?.length || 0,
+    readAt,
+  } satisfies InquiryReadResponse;
 }
 
 export async function upsertInquiryThread(params: {

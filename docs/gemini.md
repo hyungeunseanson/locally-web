@@ -124,6 +124,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 결제/보안: NicePay 서명 검증, 결제 확정/취소 API 권한 검증 반영
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합, Postgres Trigger 프로필 100% 일치 동기화.
 - 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다. 서비스 매칭 채팅은 `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 적용 후 `inquiries.service_request_id` 기준으로 request 단위 분리를 활성화한다.
+- 메시징 읽음 처리(`is_read`, `read_at`)는 `/api/inquiries/read` 서버 API를 단일 source로 유지한다. 클라이언트 훅(`useChat`)은 unread UI를 낙관적으로 갱신할 수 있지만, 실제 `inquiry_messages` 읽음 업데이트는 브라우저 direct write를 하지 않는다.
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 관리자 탭 데이터는 공통 eager load 대신 탭별 전용 훅/API를 기준으로 유지한다.
 - `Billing & Revenue` 탭은 `/api/admin/sales-summary`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다.
 - `Master Ledger` 탭은 `/api/admin/master-ledger`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다. `MasterLedgerTab`은 자체 realtime 구독(`bookings INSERT/UPDATE`, `service_bookings INSERT/UPDATE`)으로 최신성을 유지한다.
@@ -216,6 +217,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 호스트 대시보드 `Earnings` 탭은 게스트 실결제액(`bookings.amount`)이나 플랫폼 수수료를 노출하지 않고, `host_payout_amount` 우선 fallback 기준의 호스트 정산 예정 금액만 표시한다.
 - 호스트 대시보드 `ProfileEditor` 저장은 `POST /api/host/profile` 서버 route가 맡는다. 이 route는 공개 프로필 필드(`full_name`, `job`, `dream_destination`, `favorite_song`, `languages`, `avatar_url`)와 latest `host_applications.self_intro`만 갱신하며, 정산/국적/지원서 private 필드는 계속 읽기 전용으로 유지한다.
 - 호스트 대시보드 리뷰 탭 쓰기는 `POST /api/host/guest-reviews`, `POST /api/host/reviews/reply` 서버 route가 맡는다. 게스트 후기 생성은 `booking -> experiences.host_id` 소유권과 중복 여부를, 후기 답글 저장은 `review -> experiences.host_id` 소유권을 서버에서 검증한 뒤 반영한다.
+- `useChat`의 문의 읽음 처리도 `POST /api/inquiries/read` 서버 route가 맡는다. 이 route는 문의 참여자(게스트/호스트) 또는 관리자만 접근할 수 있고, 상대방이 보낸 `read_at IS NULL` 메시지만 `is_read=true`, `read_at=now()`로 갱신한다.
 - 호스트 지원서의 `language_cert`는 입력/저장을 유지하며, 관리자 상세에서만 텍스트로 노출한다.
 - 호스트 지원서 상태의 `idCardType`은 로컬 상태만 존재하고, 렌더/저장/조회 경로가 없다.
 - 체험 등록의 `spots`는 생성 시 저장되지만 현재 런타임 읽기 경로가 없다.

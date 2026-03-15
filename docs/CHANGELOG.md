@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.04 — [Host Flow] 문의 읽음 처리 서버 경계 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 문의 읽음 처리 서버화 | `app/api/inquiries/read/route.ts` 추가 — `useChat`이 더 이상 브라우저에서 `inquiry_messages.update({ is_read, read_at })`를 직접 호출하지 않고, 문의 참여자/관리자 접근 검증을 거친 뒤 서버 route가 읽음 처리 |
+| 🟡 route 보호막 추가 | `tests/e2e/41-inquiry-read-route.spec.ts` 추가 — 비로그인 401, 비참여자 403, 참여자 읽음 처리 시 상대방 미읽음 메시지만 `read_at` 기록되고 자신의 메시지/기존 읽음 메시지는 보존되는지 검증 |
+
 ## v3.39.03 — [Host Flow] 예약/문의 탭 UI 보호막 추가
 
 | 항목 | 내용 |

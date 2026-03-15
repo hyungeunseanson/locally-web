@@ -221,13 +221,16 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       inq.id === inquiryId ? { ...inq, unread_count: 0 } : inq
     ));
 
-    await supabase
-      .from('inquiry_messages')
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .eq('inquiry_id', inquiryId)
-      .neq('sender_id', currentUser.id)
-      .is('read_at', null);  // 이미 read_at 기록된 메시지는 덮어쓰지 않음
-  }, [currentUser, supabase]);
+    try {
+      await fetch('/api/inquiries/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inquiryId }),
+      });
+    } catch (error) {
+      console.error('[useChat] markAsRead failed:', error);
+    }
+  }, [currentUser]);
 
   const loadMessages = useCallback(async (inquiryId: number | string) => {
     try {
