@@ -5,6 +5,13 @@
 
 ---
 
+## v3.38.94 — [Guest Trips] 취소 규정 문구를 실제 환불 규칙과 정렬
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 취소 정책 카피 정렬 | `app/guest/trips/components/CancellationModal.tsx` 의 환불 규정 요약 문구를 실제 프론트/서버 환불 계산 규칙(`24시간 철회`, `20일 전 100%`, `8~19일 전 80%`, `2~7일 전 70%`, `1일 전 40%`, `당일/경과 불가`)과 일치하도록 수정 |
+| 🟡 live 보호막 보강 | `tests/e2e/23-live-guest-post-booking.spec.ts` 가 fresh guest의 Trips 카드에서 취소 모달을 직접 열고, 최신 환불 규정 문구가 화면에 그대로 노출되는지 확인하도록 확장 |
+
 ## v3.38.93 — [SEO] locale canonical / sitemap 일관성 정렬
 
 | 항목 | 내용 |

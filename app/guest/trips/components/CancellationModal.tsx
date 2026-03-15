@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, AlertTriangle, CreditCard, Info } from 'lucide-react';
+import { X, AlertTriangle, Info } from 'lucide-react';
 
 interface RefundInfo {
   percent: number;
@@ -51,11 +51,13 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
             </p>
           </div>
 
-          {/* 환불 규정 안내 (간략화) */}
+          {/* 환불 규정 안내 (실제 계산 규칙과 동일하게 유지) */}
           <div className="text-[11px] md:text-xs text-slate-500 bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100 space-y-1">
              <div className="font-bold flex items-center gap-1 text-slate-700"><AlertTriangle className="w-[11px] h-[11px] md:w-3 md:h-3"/> 취소 규정 요약</div>
-             <p>• 7일 전: 100% / 3일 전: 50% / 당일: 불가</p>
-             <p>• 결제 후 24시간 이내(투어 1일 전까지): 100%</p>
+             <p>• 결제 후 24시간 이내 철회(투어 2일 전까지): 100%</p>
+             <p>• 20일 전: 100% / 8~19일 전: 80%</p>
+             <p>• 2~7일 전: 70% / 1일 전: 40%</p>
+             <p>• 당일/지난 일정: 환불 불가</p>
           </div>
 
           {/* 취소 사유 입력 */}
