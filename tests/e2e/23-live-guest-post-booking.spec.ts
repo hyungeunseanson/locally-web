@@ -264,6 +264,8 @@ test.describe.serial('Live guest post-booking experience flow', () => {
     let bookingOrderId = '';
     let bookingAmount = 0;
     let generalInquiryId = '';
+    let paymentBankAccount = '';
+    let paymentBankName = '';
 
     await test.step('Create a fresh guest account', async () => {
       await signUpGuest(page, guest);
@@ -285,6 +287,12 @@ test.describe.serial('Live guest post-booking experience flow', () => {
       await page.locator('input[placeholder="010-0000-0000"]').fill(guest.phone);
 
       await page.getByRole('button', { name: /무통장 입금/ }).click();
+
+      const bankCard = page.locator('div').filter({ hasText: /입금하실 계좌/ }).last();
+      paymentBankAccount = (await bankCard.locator('span.font-black').textContent())?.trim() || '';
+      paymentBankName = (await bankCard.locator('span.bg-yellow-300').textContent())?.trim() || '';
+      expect(paymentBankAccount).not.toBe('');
+      expect(paymentBankName).not.toBe('');
 
       const noOffPlatformAgreement = page.getByText(/호스트와의 직접 연락.*플랫폼 외부 결제/).first();
       const safetyAgreement = page.getByText(/게스트 안전 가이드라인/).first();
@@ -323,6 +331,8 @@ test.describe.serial('Live guest post-booking experience flow', () => {
       await expect(page.getByText(/입금을 대기 중입니다|입금 확인 중|Payment pending/i)).toBeVisible({
         timeout: 15000,
       });
+      await expect(page.getByText(paymentBankAccount)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText(new RegExp(paymentBankName))).toBeVisible({ timeout: 10000 });
 
       await page
         .getByRole('link', {

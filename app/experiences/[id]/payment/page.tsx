@@ -11,6 +11,7 @@ import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_BLOCKING_STATUSES_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
 type PaymentExperience = {
   title?: string;
@@ -696,6 +697,7 @@ function PaymentContent() {
   };
 
   const imageUrl = experience?.photos?.[0] || experience?.image_url || 'https://images.unsplash.com/photo-1540206395-688085723adb';
+  const bankInfo = getPublicBankInfo();
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 md:py-10 font-sans px-3 md:px-4">
@@ -805,8 +807,8 @@ function PaymentContent() {
               <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
                 <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="font-black text-[16px] md:text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
-                  <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
+                  <span className="font-black text-[16px] md:text-lg text-slate-900">{bankInfo.account}</span>
+                  <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{bankInfo.bankName}</span>
                 </div>
                 <p className="text-[11px] md:text-xs text-slate-400">
                   * 예약 후 <span className="text-rose-500 font-bold">1시간 이내</span>에 미입금 시 자동 취소됩니다.

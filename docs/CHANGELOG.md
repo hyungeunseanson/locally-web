@@ -5,6 +5,15 @@
 
 ---
 
+## v3.38.95 — [Guest Flow] 예약 후 계좌 정보 / 취소 UX 정리 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 공개 계좌 정보 source 통일 | `app/utils/publicBankInfo.ts` 추가 — 체험 결제 페이지와 결제 완료 페이지가 같은 `NEXT_PUBLIC_BANK_ACCOUNT`, `NEXT_PUBLIC_BANK_NAME`, `NEXT_PUBLIC_BANK_ACCOUNT_HOLDER` 기준을 사용하고, fallback/accountDigits 계산도 한 곳에서 처리 |
+| 🟠 취소 성공 카피 정리 | `app/guest/trips/hooks/useGuestTrips.ts` 의 취소 성공 토스트를 `취소 요청 접수`가 아니라 실제 처리 의미에 맞는 `예약 취소가 완료되었습니다.` 로 조정 |
+| 🟡 live post-booking 보강 | `tests/e2e/23-live-guest-post-booking.spec.ts` 가 무통장 예약 시 결제 페이지에서 본 계좌번호/은행명이 결제 완료 페이지에서도 그대로 보이는지 직접 검증하도록 확장 |
+| 🟡 live cancel 보호막 추가 | `tests/e2e/31-live-guest-trip-cancel.spec.ts` 추가 — fresh guest의 pending 무통장 예약을 Trips에서 취소하고, 성공 토스트와 DB `bookings.status='cancelled'` 반영까지 확인 |
+
 ## v3.38.94 — [Guest Trips] 취소 규정 문구를 실제 환불 규칙과 정렬
 
 | 항목 | 내용 |

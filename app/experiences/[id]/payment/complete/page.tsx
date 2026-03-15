@@ -12,6 +12,7 @@ import Spinner from '@/app/components/ui/Spinner';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
+import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
 type BookingExperience = {
   id?: string | number;
@@ -28,6 +29,7 @@ type BookingData = {
   date: string;
   time: string;
   order_id?: string;
+  user_id?: string | null;
   experiences?: BookingExperience | null;
 };
 
@@ -40,6 +42,7 @@ function PaymentCompleteContent() {
   const orderId = searchParams.get('orderId');
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(true);
+  const bankInfo = getPublicBankInfo();
 
   // 🎉 폭죽 효과 함수
   const fireConfetti = () => {
@@ -87,7 +90,7 @@ function PaymentCompleteContent() {
           supabase.from('analytics_events').insert([{
             event_type: 'booking_confirmed',
             target_id: String(experienceId),
-            user_id: (data as any).user_id ?? null,
+            user_id: data.user_id ?? null,
             ...getAnalyticsTrackingMetadata(),
           }]).then(({ error }) => {
             if (error) console.error('booking_confirmed event error:', error);
@@ -162,10 +165,10 @@ function PaymentCompleteContent() {
               <div className="bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl p-4 md:p-6 max-w-xs md:max-w-sm mx-auto">
                 <p className="text-[11px] md:text-xs font-bold text-slate-400 mb-2 uppercase">입금 계좌 정보</p>
                 <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="font-black text-[20px] md:text-2xl text-slate-900">3333-14-0254739</span>
-                  <Copy className="w-4 h-4 text-slate-400 cursor-pointer hover:text-black" onClick={() => { navigator.clipboard.writeText('3333140254739'); showToast('계좌번호 복사 완료!', 'success'); }} />
+                  <span className="font-black text-[20px] md:text-2xl text-slate-900">{bankInfo.account}</span>
+                  <Copy className="w-4 h-4 text-slate-400 cursor-pointer hover:text-black" onClick={() => { navigator.clipboard.writeText(bankInfo.accountDigits); showToast('계좌번호 복사 완료!', 'success'); }} />
                 </div>
-                <p className="font-bold text-slate-700 text-[13px] md:text-base">카카오뱅크 (예금주: 로컬리)</p>
+                <p className="font-bold text-slate-700 text-[13px] md:text-base">{bankInfo.bankName} (예금주: {bankInfo.accountHolder})</p>
                 <p className="text-[11px] md:text-xs text-rose-500 mt-1.5 md:mt-2 font-bold">* 1시간 내 미입금 시 자동 취소</p>
               </div>
             </>
