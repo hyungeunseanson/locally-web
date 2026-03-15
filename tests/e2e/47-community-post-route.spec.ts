@@ -122,36 +122,36 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community post write boundary', () => {
-  test('ships locally_content in the schema contract and keeps write validation stable', async ({ page }) => {
+  test('accepts locally_content writes and keeps companion validation stable', async ({ page }) => {
     test.setTimeout(90000);
 
     const user = createUser('content');
     const userId = await createAuthUser(user);
     await login(page, user);
 
-    const qnaResponse = await page.request.post('/api/community/posts', {
+    const locallyContentResponse = await page.request.post('/api/community/posts', {
       data: {
-        category: 'qna',
-        title: `QnA Contract ${Date.now()}`,
-        content: '커뮤니티 글쓰기 route 성공 경로 검증용 글입니다.',
+        category: 'locally_content',
+        title: `Locally Content ${Date.now()}`,
+        content: 'locally_content 카테고리 실제 insert 검증용 글입니다.',
         images: [],
         image_paths: [],
       },
     });
 
-    expect(qnaResponse.status()).toBe(200);
-    const qnaPayload = await qnaResponse.json();
-    expect(qnaPayload.id).toBeTruthy();
-    createdPostIds.push(qnaPayload.id);
+    expect(locallyContentResponse.status()).toBe(200);
+    const locallyContentPayload = await locallyContentResponse.json();
+    expect(locallyContentPayload.id).toBeTruthy();
+    createdPostIds.push(locallyContentPayload.id);
 
     const supabase = getAdminClient();
     const { data: insertedPost } = await supabase
       .from('community_posts')
       .select('id, category, user_id')
-      .eq('id', qnaPayload.id)
+      .eq('id', locallyContentPayload.id)
       .maybeSingle();
 
-    expect(insertedPost?.category).toBe('qna');
+    expect(insertedPost?.category).toBe('locally_content');
     expect(insertedPost?.user_id).toBe(userId);
 
     const bootstrapMigration = readFileSync('supabase_community_migration.sql', 'utf8');
