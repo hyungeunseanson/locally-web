@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.01 — [Host Flow] 대시보드 프로필 저장을 서버 route로 전환
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 프로필 저장 경계 서버화 | `app/api/host/profile/route.ts` 추가 — 호스트 대시보드 `ProfileEditor`가 더 이상 브라우저에서 `profiles.update` / `host_applications.update`를 직접 호출하지 않고, 공개 프로필 필드와 `self_intro` 저장만 서버 route가 맡도록 정리 |
+| 🟡 보호막 추가 | `tests/e2e/38-host-profile-save.spec.ts` 추가 — 비로그인 401, 호스트 지원서 없음 404, 정상 저장 시 `profiles` 공개 필드와 latest `host_applications.self_intro` 반영까지 검증 |
+
 ## v3.39.00 — [Host Flow] 수익 탭을 호스트 정산금 중심으로 단순화
 
 | 항목 | 내용 |
