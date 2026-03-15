@@ -215,6 +215,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 기존 `POST /api/host/register/admin-alert`는 현재 제품 경로에서는 더 이상 호출하지 않으며, stale client 호환을 위한 compatibility endpoint로만 유지한다.
 - 호스트 대시보드 `Earnings` 탭은 게스트 실결제액(`bookings.amount`)이나 플랫폼 수수료를 노출하지 않고, `host_payout_amount` 우선 fallback 기준의 호스트 정산 예정 금액만 표시한다.
 - 호스트 대시보드 `ProfileEditor` 저장은 `POST /api/host/profile` 서버 route가 맡는다. 이 route는 공개 프로필 필드(`full_name`, `job`, `dream_destination`, `favorite_song`, `languages`, `avatar_url`)와 latest `host_applications.self_intro`만 갱신하며, 정산/국적/지원서 private 필드는 계속 읽기 전용으로 유지한다.
+- 호스트 대시보드 리뷰 탭 쓰기는 `POST /api/host/guest-reviews`, `POST /api/host/reviews/reply` 서버 route가 맡는다. 게스트 후기 생성은 `booking -> experiences.host_id` 소유권과 중복 여부를, 후기 답글 저장은 `review -> experiences.host_id` 소유권을 서버에서 검증한 뒤 반영한다.
 - 호스트 지원서의 `language_cert`는 입력/저장을 유지하며, 관리자 상세에서만 텍스트로 노출한다.
 - 호스트 지원서 상태의 `idCardType`은 로컬 상태만 존재하고, 렌더/저장/조회 경로가 없다.
 - 체험 등록의 `spots`는 생성 시 저장되지만 현재 런타임 읽기 경로가 없다.

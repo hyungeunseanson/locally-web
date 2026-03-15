@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.02 — [Host Flow] 리뷰 탭 쓰기 경계 서버화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 게스트 후기/호스트 답글 서버화 | `app/api/host/guest-reviews/route.ts`, `app/api/host/reviews/reply/route.ts` 추가 — 호스트 대시보드 리뷰 탭이 더 이상 브라우저에서 `guest_reviews.insert`, `reviews.update`를 직접 호출하지 않고, 예약/리뷰 소유권을 서버에서 검증한 뒤에만 저장 |
+| 🟡 리뷰 route 보호막 추가 | `tests/e2e/39-host-review-routes.spec.ts` 추가 — 비로그인 401, 비소유자 403, 소유자 게스트 후기 생성, 중복 409, 후기 답글 저장까지 직접 검증 |
+
 ## v3.39.01 — [Host Flow] 대시보드 프로필 저장을 서버 route로 전환
 
 | 항목 | 내용 |

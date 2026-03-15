@@ -2,17 +2,22 @@
 
 import React, { useState } from 'react';
 import { Star, X, Loader2 } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 
+type GuestBookingReviewTarget = {
+  id: string | number;
+  guest?: {
+    full_name?: string | null;
+  } | null;
+};
+
 interface Props {
-  booking: any;
+  booking: GuestBookingReviewTarget;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export default function GuestReviewModal({ booking, onClose, onSuccess }: Props) {
-  const supabase = createClient();
   const { showToast } = useToast();
   
   const [rating, setRating] = useState(5);
@@ -27,25 +32,28 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
     setSubmitting(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요합니다.');
-
-      const { error } = await supabase.from('guest_reviews').insert({
-        booking_id: booking.id,
-        host_id: user.id,
-        guest_id: booking.user_id,
-        rating,
-        content
+      const response = await fetch('/api/host/guest-reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: booking.id,
+          rating,
+          content,
+        }),
       });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || '후기 등록 실패');
+      }
 
       showToast('게스트 후기가 등록되었습니다!', 'success');
       onSuccess();
       onClose();
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : '알 수 없는 오류';
       console.error(e);
-      showToast('후기 등록 실패: ' + e.message, 'error');
+      showToast('후기 등록 실패: ' + message, 'error');
     } finally {
       setSubmitting(false);
     }

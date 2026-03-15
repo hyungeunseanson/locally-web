@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Star, MessageCircle, Filter, CheckCircle, Reply, MoreHorizontal, Edit2, User } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Star, MessageCircle, Filter, Reply, Edit2, User } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
 import { useToast } from '@/app/context/ToastContext';
@@ -9,12 +9,46 @@ import Skeleton from '@/app/components/ui/Skeleton';
 import { sendNotification } from '@/app/utils/notification';
 import { useLanguage } from '@/app/context/LanguageContext';
 
+type HostReviewGuest = {
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
+type HostReviewExperience = {
+  id: string;
+  title: string | null;
+  host_id: string;
+};
+
+type HostReview = {
+  id: number;
+  user_id: string | null;
+  rating: number;
+  content: string;
+  created_at: string;
+  reply: string | null;
+  reply_at: string | null;
+  photos: string[] | null;
+  experiences: HostReviewExperience | HostReviewExperience[] | null;
+  guest: HostReviewGuest | HostReviewGuest[] | null;
+};
+
+function getReviewGuest(review: HostReview) {
+  if (Array.isArray(review.guest)) return review.guest[0] ?? null;
+  return review.guest ?? null;
+}
+
+function getReviewExperience(review: HostReview) {
+  if (Array.isArray(review.experiences)) return review.experiences[0] ?? null;
+  return review.experiences ?? null;
+}
+
 export default function HostReviews() {
-  const supabase = createClient();
+  const supabase = useRef(createClient()).current;
   const { showToast } = useToast();
   const { t } = useLanguage();
 
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<HostReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unreplied'>('all');
 
@@ -23,11 +57,7 @@ export default function HostReviews() {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchReviews();
-  }, []);
-
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -44,7 +74,7 @@ export default function HostReviews() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setReviews(data || []);
+      setReviews((data as HostReview[]) || []);
 
     } catch (error) {
       console.error(error);
@@ -52,22 +82,30 @@ export default function HostReviews() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast, supabase]);
+
+  useEffect(() => {
+    void fetchReviews();
+  }, [fetchReviews]);
 
   const handleSubmitReply = async (reviewId: number) => {
     if (!replyText.trim()) return;
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('reviews')
-        .update({
+      const response = await fetch('/api/host/reviews/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewId,
           reply: replyText,
-          reply_at: new Date().toISOString()
-        })
-        .eq('id', reviewId);
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || '답글 등록 실패');
+      }
 
       showToast('답글이 등록되었습니다!', 'success');
 
@@ -86,7 +124,7 @@ export default function HostReviews() {
 
       setReviews(prev => prev.map(r =>
         r.id === reviewId
-          ? { ...r, reply: replyText, reply_at: new Date().toISOString() }
+          ? { ...r, reply: replyText, reply_at: result.replyAt || new Date().toISOString() }
           : r
       ));
 
@@ -204,108 +242,116 @@ export default function HostReviews() {
             filteredReviews.map((review) => (
               <div key={review.id} className="p-4 md:p-8 hover:bg-slate-50 transition-colors">
                 <div className="flex gap-4">
+                  {(() => {
+                    const guest = getReviewGuest(review);
+                    const experience = getReviewExperience(review);
 
-                  <div className="shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden relative border border-slate-100 flex items-center justify-center">
-                      {review.guest?.avatar_url ? (
-                        <Image
-                          src={review.guest.avatar_url}
-                          alt="Guest"
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <User className="w-5 h-5 text-slate-400" />
-                      )}
-                    </div>
-                  </div>
+                    return (
+                      <>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-sm">{review.guest?.full_name || t('hr_anonymous_guest')}</h4>
-                        <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
-                          <span>{new Date(review.created_at).toLocaleDateString()}</span>
-                          <span className="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
-                          <span className="truncate max-w-[150px]">{review.experiences?.title}</span>
-                        </div>
-                      </div>
-                      <div className="flex text-amber-400">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} size={14} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-slate-200"} />
-                        ))}
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-slate-700 leading-relaxed mb-4 whitespace-pre-wrap">{review.content}</p>
-
-                    {review.photos && review.photos.length > 0 && (
-                      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                        {review.photos.map((photo: string, idx: number) => (
-                          <div key={idx} className="w-20 h-20 rounded-lg overflow-hidden relative shrink-0 border border-slate-200">
-                            <Image src={photo} alt="Review" fill className="object-cover" />
+                        <div className="shrink-0">
+                          <div className="w-12 h-12 rounded-full bg-slate-200 overflow-hidden relative border border-slate-100 flex items-center justify-center">
+                            {guest?.avatar_url ? (
+                              <Image
+                                src={guest.avatar_url}
+                                alt="Guest"
+                                fill
+                                className="object-cover"
+                              />
+                            ) : (
+                              <User className="w-5 h-5 text-slate-400" />
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {review.reply && replyingId !== review.id ? (
-                      <div className="bg-slate-100 rounded-2xl p-4 mt-4 flex gap-3 group relative">
-                        <Reply size={16} className="text-slate-400 shrink-0 mt-1 rotate-180" />
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold text-slate-900">{t('hr_host_reply')}</span>
-                            <span className="text-[10px] text-slate-400">{new Date(review.reply_at || Date.now()).toLocaleDateString()}</span>
-                          </div>
-                          <p className="text-xs text-slate-600 leading-relaxed">{review.reply}</p>
                         </div>
-                        {/* 🟢 [추가] 수정 버튼 (마우스 오버 시 표시) */}
-                        <button
-                          onClick={() => { setReplyingId(review.id); setReplyText(review.reply); }}
-                          className="absolute top-2 right-2 p-1.5 bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-black"
-                          title={t('hr_reply_edit')}
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="mt-4">
-                        {replyingId === review.id ? (
-                          <div className="animate-in fade-in slide-in-from-top-2">
-                            <textarea
-                              value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:border-black focus:ring-0 transition-all min-h-[100px]"
-                              placeholder={t('hr_reply_placeholder')}
-                              autoFocus
-                            />
-                            <div className="flex justify-end gap-2 mt-2">
-                              <button
-                                onClick={() => { setReplyingId(null); setReplyText(''); }}
-                                className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
-                              >
-                                {t('hr_reply_cancel')}
-                              </button>
-                              <button
-                                onClick={() => handleSubmitReply(review.id)}
-                                disabled={isSubmitting}
-                                className="px-4 py-2 text-xs font-bold bg-black text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
-                              >
-                                {isSubmitting ? t('hr_reply_submitting') : t('hr_reply_submit')}
-                              </button>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-sm">{guest?.full_name || t('hr_anonymous_guest')}</h4>
+                              <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                <span>{new Date(review.created_at).toLocaleDateString()}</span>
+                                <span className="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+                                <span className="truncate max-w-[150px]">{experience?.title}</span>
+                              </div>
+                            </div>
+                            <div className="flex text-amber-400">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} size={14} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-slate-200"} />
+                              ))}
                             </div>
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => { setReplyingId(review.id); setReplyText(''); }}
-                            className="text-xs font-bold text-slate-500 hover:text-rose-500 flex items-center gap-1.5 transition-colors border border-slate-200 px-3 py-1.5 rounded-lg hover:border-rose-200 hover:bg-rose-50"
-                          >
-                            <MessageCircle size={14} /> 답글 달기
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+
+                          <p className="text-sm text-slate-700 leading-relaxed mb-4 whitespace-pre-wrap">{review.content}</p>
+
+                          {review.photos && review.photos.length > 0 && (
+                            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                              {review.photos.map((photo, idx) => (
+                                <div key={idx} className="w-20 h-20 rounded-lg overflow-hidden relative shrink-0 border border-slate-200">
+                                  <Image src={photo} alt="Review" fill className="object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {review.reply && replyingId !== review.id ? (
+                            <div className="bg-slate-100 rounded-2xl p-4 mt-4 flex gap-3 group relative">
+                              <Reply size={16} className="text-slate-400 shrink-0 mt-1 rotate-180" />
+                              <div className="flex-1">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-xs font-bold text-slate-900">{t('hr_host_reply')}</span>
+                                  <span className="text-[10px] text-slate-400">{new Date(review.reply_at || Date.now()).toLocaleDateString()}</span>
+                                </div>
+                                <p className="text-xs text-slate-600 leading-relaxed">{review.reply}</p>
+                              </div>
+                              <button
+                                onClick={() => { setReplyingId(review.id); setReplyText(review.reply ?? ''); }}
+                                className="absolute top-2 right-2 p-1.5 bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-black"
+                                title={t('hr_reply_edit')}
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="mt-4">
+                              {replyingId === review.id ? (
+                                <div className="animate-in fade-in slide-in-from-top-2">
+                                  <textarea
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:border-black focus:ring-0 transition-all min-h-[100px]"
+                                    placeholder={t('hr_reply_placeholder')}
+                                    autoFocus
+                                  />
+                                  <div className="flex justify-end gap-2 mt-2">
+                                    <button
+                                      onClick={() => { setReplyingId(null); setReplyText(''); }}
+                                      className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                                    >
+                                      {t('hr_reply_cancel')}
+                                    </button>
+                                    <button
+                                      onClick={() => handleSubmitReply(review.id)}
+                                      disabled={isSubmitting}
+                                      className="px-4 py-2 text-xs font-bold bg-black text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+                                    >
+                                      {isSubmitting ? t('hr_reply_submitting') : t('hr_reply_submit')}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => { setReplyingId(review.id); setReplyText(''); }}
+                                  className="text-xs font-bold text-slate-500 hover:text-rose-500 flex items-center gap-1.5 transition-colors border border-slate-200 px-3 py-1.5 rounded-lg hover:border-rose-200 hover:bg-rose-50"
+                                >
+                                  <MessageCircle size={14} /> 답글 달기
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ))
