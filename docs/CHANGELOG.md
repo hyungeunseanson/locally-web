@@ -5,6 +5,14 @@
 
 ---
 
+## v3.38.98 — [Host Flow] 호스트 등록 submit 저장 경계 서버화 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 등록 저장 경계 서버화 | `app/api/host/register/submit/route.ts` 추가 — 최종 submit 시 `host_applications` insert/update, 빈 `profiles` 필드 seed, admin alert 조건 처리를 서버 route로 이동 |
+| 🟡 업로드/UI 범위 유지 | `app/host/register/page.tsx`는 단계형 폼과 스토리지 업로드는 그대로 유지하고, 업로드 후 DB 저장만 새 submit route를 호출하도록 축소 변경 |
+| 🟡 route 보호막 추가 | `tests/e2e/36-host-register-submit.spec.ts` 추가 — 비로그인 401, 신규 제출 `pending`, `rejected` 재제출 `pending`, `approved` 유지와 profile seed를 직접 검증 |
+
 ## v3.38.96 — [Host Flow] 수정/일정 관리 UI 보호막 추가
 
 | 항목 | 내용 |

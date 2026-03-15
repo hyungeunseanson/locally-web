@@ -211,6 +211,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 
 - 호스트 지원서의 `email`은 `host_applications.email` 전용 필드다. 관리자 검토용으로는 보이지만, 실제 로그인 계정 이메일(`auth`/`profiles.email`)과 동기화되지 않는다.
 - 호스트 지원서 언어는 `host_applications.language_levels`(JSON) + `languages`(문자열 배열) 이중 구조로 저장한다. 관리자 상세에서는 `언어 + Lv.n`으로 보여주고, 리스트 요약은 `languages` 기준으로 표시한다.
+- `/host/register`는 여전히 단계형 UI와 스토리지 업로드를 클라이언트에서 유지하지만, 최종 저장(`host_applications` insert/update + 빈 `profiles` 필드 seed + admin alert 조건 처리)은 `POST /api/host/register/submit` 서버 route가 맡는다.
 - 호스트 지원서의 `language_cert`는 입력/저장을 유지하며, 관리자 상세에서만 텍스트로 노출한다.
 - 호스트 지원서 상태의 `idCardType`은 로컬 상태만 존재하고, 렌더/저장/조회 경로가 없다.
 - 체험 등록의 `spots`는 생성 시 저장되지만 현재 런타임 읽기 경로가 없다.

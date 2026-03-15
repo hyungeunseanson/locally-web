@@ -8,7 +8,6 @@ import HostRegisterForm from './components/HostRegisterForm';
 import {
   type LanguageLevel,
   type LanguageLevelEntry,
-  getLanguageNames,
   normalizeLanguageLevels,
 } from '@/app/utils/languageLevels';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
@@ -68,14 +67,6 @@ function getFallbackLevel(value: unknown): LanguageLevel {
   return 3;
 }
 
-function hasTextValue(value: unknown): boolean {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function hasLanguageValues(value: unknown): boolean {
-  return Array.isArray(value) && value.some((item) => String(item).trim().length > 0);
-}
-
 export default function HostRegisterPage() {
   const { lang } = useLanguage();
   const copy = getHostRegisterCopy(lang);
@@ -87,8 +78,6 @@ export default function HostRegisterPage() {
   const [step, setStep] = useState(1);
   const totalSteps = 8;
   const [loading, setLoading] = useState(false);
-  const [applicationId, setApplicationId] = useState<string | null>(null);
-  const [existingApplicationStatus, setExistingApplicationStatus] = useState<string | null>(null);
   const [formData, setFormData] = useState<HostRegisterFormData>(INITIAL_FORM_DATA);
   const [files, setFiles] = useState<{ profile?: File; idCard?: File }>({});
 
@@ -109,8 +98,6 @@ export default function HostRegisterPage() {
 
       if (!data) return;
 
-      setApplicationId(data.id);
-      setExistingApplicationStatus(data.status || null);
       setFormData((prev) => ({
         ...prev,
         languageLevels: normalizeLanguageLevels(
@@ -252,83 +239,35 @@ export default function HostRegisterPage() {
         }
       }
 
-      const languageNames = getLanguageNames(formData.languageLevels);
-      const shouldNotifyAdmin =
-        (!applicationId || existingApplicationStatus === 'revision' || existingApplicationStatus === 'rejected')
-        && (applicationId ? existingApplicationStatus !== 'approved' : true);
-
       const payload = {
-        user_id: user.id,
-        host_nationality: formData.hostNationality,
-        languages: languageNames,
         language_levels: formData.languageLevels,
+        languageLevels: formData.languageLevels,
+        languageCert: formData.languageCert,
         name: formData.name,
         phone: formData.phone,
         dob: formData.dob,
         email: formData.email,
         instagram: formData.instagram,
         source: formData.source,
-        language_cert: formData.languageCert,
-        profile_photo: profileUrl,
-        self_intro: formData.selfIntro,
-        id_card_file: idCardUrl,
-        bank_name: formData.bankName,
-        account_number: formData.accountNumber,
-        account_holder: formData.accountHolder,
+        profilePhoto: profileUrl,
+        selfIntro: formData.selfIntro,
+        idCardFile: idCardUrl,
+        hostNationality: formData.hostNationality,
+        bankName: formData.bankName,
+        accountNumber: formData.accountNumber,
+        accountHolder: formData.accountHolder,
         motivation: formData.motivation,
-        status: applicationId && existingApplicationStatus === 'approved' ? 'approved' : 'pending',
       };
 
-      const { error } = applicationId
-        ? await supabase.from('host_applications').update(payload).eq('id', applicationId)
-        : await supabase.from('host_applications').insert([payload]);
+      const submitResponse = await fetch('/api/host/register/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const submitResult = await submitResponse.json();
 
-      if (error) throw error;
-
-      const { data: currentProfile, error: profileLoadError } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url, languages')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileLoadError) throw profileLoadError;
-
-      const profileSeedUpdates: Record<string, unknown> = {};
-
-      if (!hasTextValue(currentProfile?.full_name) && hasTextValue(formData.name)) {
-        profileSeedUpdates.full_name = formData.name.trim();
-      }
-
-      if (!hasTextValue(currentProfile?.avatar_url) && profileUrl) {
-        profileSeedUpdates.avatar_url = profileUrl;
-      }
-
-      if (!hasLanguageValues(currentProfile?.languages) && languageNames.length > 0) {
-        profileSeedUpdates.languages = languageNames;
-      }
-
-      if (Object.keys(profileSeedUpdates).length > 0) {
-        const { error: profileSeedError } = await supabase
-          .from('profiles')
-          .update(profileSeedUpdates)
-          .eq('id', user.id);
-
-        if (profileSeedError) throw profileSeedError;
-      }
-
-      if (shouldNotifyAdmin && payload.status === 'pending') {
-        try {
-          const adminAlertResponse = await fetch('/api/host/register/admin-alert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          });
-
-          if (!adminAlertResponse.ok) {
-            console.error('Host Register Admin Alert Error:', await adminAlertResponse.text());
-          }
-        } catch (notifyError) {
-          console.error('Host Register Admin Alert Error:', notifyError);
-        }
+      if (!submitResponse.ok || !submitResult?.success) {
+        throw new Error(submitResult?.error || copy.unknownError);
       }
 
       await refreshAuth();
