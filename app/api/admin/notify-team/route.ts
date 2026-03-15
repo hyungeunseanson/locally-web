@@ -3,28 +3,19 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import {
+    buildTeamEmailRecipients,
+    shouldSendTeamEmail,
+    isImmediateTeamEmail,
+    type TeamEventType,
+} from '@/app/utils/teamNotificationPolicy';
 
 const TEAM_CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
-
-type TeamEventType =
-    | 'team_chat'
-    | 'team_todo'
-    | 'team_task_comment'
-    | 'team_memo'
-    | 'team_memo_comment';
 
 type TeamRecipient = {
     email: string;
     userId: string | null;
 };
-
-function shouldSendTeamEmail(eventType?: TeamEventType | null) {
-    return eventType === 'team_chat' || eventType === 'team_memo' || eventType === 'team_memo_comment';
-}
-
-function isImmediateTeamEmail(eventType?: TeamEventType | null) {
-    return eventType === 'team_memo' || eventType === 'team_memo_comment';
-}
 
 async function getUnreadTeamChatCount(recipientUserId: string) {
     const supabaseAdmin = createAdminClient();
@@ -107,33 +98,41 @@ export async function POST(request: Request) {
             throw new Error(whitelistError.message);
         }
 
-        const targetEmails = (whitelistData || [])
+        const whitelistEmails = (whitelistData || [])
             .map((entry) => entry.email)
-            .filter((email): email is string => Boolean(email))
-            .filter((email) => email !== user.email);
+            .filter((email): email is string => Boolean(email));
 
-        if (targetEmails.length === 0) {
+        const notificationTargetEmails = whitelistEmails.filter((email) => email !== user.email);
+        const emailTargetEmails = buildTeamEmailRecipients({
+            eventType,
+            whitelistEmails,
+            actorEmail: user.email,
+        });
+
+        if (notificationTargetEmails.length === 0 && emailTargetEmails.length === 0) {
             console.log('ℹ️ [Admin Notify API] 수신 대상자가 없어 발송을 스킵합니다.');
             return NextResponse.json({ success: true, count: 0, mode: 'skipped' });
         }
 
         const notificationLink = link || '/admin/dashboard?tab=TEAM';
-        const { data: profileRows, error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email')
-            .in('email', targetEmails);
+        const profileRows = notificationTargetEmails.length > 0
+            ? await supabaseAdmin
+                .from('profiles')
+                .select('id, email')
+                .in('email', notificationTargetEmails)
+            : { data: [], error: null };
 
-        if (profileError) {
-            throw new Error(profileError.message);
+        if (profileRows.error) {
+            throw new Error(profileRows.error.message);
         }
 
         const recipientMap = new Map(
-            (profileRows || [])
+            (profileRows.data || [])
                 .filter((row) => row.email)
                 .map((row) => [row.email as string, row.id as string])
         );
 
-        const recipients: TeamRecipient[] = targetEmails.map((email) => ({
+        const recipients: TeamRecipient[] = notificationTargetEmails.map((email) => ({
             email,
             userId: recipientMap.get(email) || null,
         }));
@@ -172,11 +171,11 @@ export async function POST(request: Request) {
         let sentCount = 0;
         let skippedCount = 0;
 
-        await Promise.all(recipients.map(async (recipient) => {
+        await Promise.all(emailTargetEmails.map(async (recipientEmail) => {
             try {
                 if (isImmediateTeamEmail(eventType)) {
                     await sendImmediateGenericEmail({
-                        recipientEmail: recipient.email,
+                        recipientEmail,
                         subject: `[Locally Admin] ${title}`,
                         title,
                         message,
@@ -188,7 +187,8 @@ export async function POST(request: Request) {
                 }
 
                 if (eventType === 'team_chat') {
-                    if (!recipient.userId) {
+                    const recipient = recipients.find((item) => item.email === recipientEmail);
+                    if (!recipient?.userId) {
                         skippedCount += 1;
                         return;
                     }
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
                     }
 
                     await sendImmediateGenericEmail({
-                        recipientEmail: recipient.email,
+                        recipientEmail,
                         subject: `[Locally Admin] ${title}`,
                         title,
                         message,
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
                     return;
                 }
             } catch (emailError) {
-                console.error(`❌ [Admin Notify API] 이메일 발송 실패 (${recipient.email}):`, emailError);
+                console.error(`❌ [Admin Notify API] 이메일 발송 실패 (${recipientEmail}):`, emailError);
             }
         }));
 

@@ -410,6 +410,8 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - locale prefix URL(`/en`, `/ja`, `/zh`)로 진입한 요청은 middleware가 `app_lang` cookie도 같은 locale로 동기화해야 한다. 그래야 내부 RSC/메타 요청이 이전 cookie locale 때문에 canonical/JSON-LD를 잘못 만들지 않는다.
 - JSON-LD는 `app/components/seo/JsonLd.tsx`와 `app/utils/structuredData.ts`를 통해 주입한다. 현재 범위는 홈(`Organization`, `WebSite` + `sameAs`), 공개 체험 상세(`Product` + `TouristTrip` 힌트), 커뮤니티 상세(`Article` + `BreadcrumbList`)까지이며, 실제 화면/DB에 존재하는 사실만 구조화 데이터에 넣는다.
 - `robots.txt`는 private UI를 차단하는 용도가 아니라, 크롤 불필요한 `/api/`만 `Disallow`한다. private UI 차단은 route-level `noindex`가 단일 source다.
+- `/api/admin/notify-team`의 팀 메모/메모 답글 이메일은 `admin_whitelist` 수신자 외에 작성자 본인에게도 즉시 1부를 보낸다. 반면 인앱 알림과 팀채팅 메일은 계속 작성자를 제외한다.
+- Playwright E2E는 시작 시 `tests/e2e/global.setup.ts`에서 `admin_whitelist`의 `codex.%@example.com` 찌꺼기를 자동 삭제해, 중단된 테스트가 남긴 가짜 관리자 이메일이 운영 팀 탭에 쌓이지 않게 유지한다.
 
 ---
 
