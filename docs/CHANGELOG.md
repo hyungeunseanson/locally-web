@@ -5,6 +5,12 @@
 
 ---
 
+## v3.38.99 — [Host Flow] 등록 admin alert legacy route를 compatibility-only로 명시
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 legacy route 명시 | `app/api/host/register/admin-alert/route.ts` 상단에 현재 submit 저장 경로는 `POST /api/host/register/submit`가 알림까지 처리하고, 기존 admin-alert route는 stale client 호환용 compatibility endpoint로만 유지한다는 주석을 추가 |
+
 ## v3.38.98 — [Host Flow] 호스트 등록 submit 저장 경계 서버화 1차
 
 | 항목 | 내용 |

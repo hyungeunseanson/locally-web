@@ -3,6 +3,10 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 
+// Legacy compatibility route.
+// Current host register submit flow already creates the admin alert inside
+// POST /api/host/register/submit. Keep this endpoint alive for older clients
+// that may still call it after saving the application.
 export async function POST() {
   try {
     const supabaseServer = await createServerClient();
