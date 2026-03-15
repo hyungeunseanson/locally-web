@@ -8,6 +8,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import SiteHeader from '@/app/components/SiteHeader';
 import Spinner from '@/app/components/ui/Spinner';
+import { resolveServiceCountry } from '@/app/utils/serviceRequestLocation';
 
 const LANGUAGE_OPTIONS = ['한국어', '영어', '일본어', '중국어'];
 const CITY_OPTIONS = ['도쿄', '오사카', '후쿠오카', '삿포로', '나고야', '서울', '부산', '제주'];
@@ -64,11 +65,17 @@ function ServiceRequestForm() {
 
     setIsSubmitting(true);
     try {
+      const resolvedCountry = resolveServiceCountry(city, null);
+      if (!resolvedCountry) {
+        showToast(t('srf_city_ph') as string, 'error');
+        return;
+      }
+
       const res = await fetch('/api/services/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title, description, city, country: 'JP',
+          title, description, city, country: resolvedCountry,
           service_date: serviceDate,
           start_time: startTime,
           duration_hours: durationHours,

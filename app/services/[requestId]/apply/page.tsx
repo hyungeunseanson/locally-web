@@ -22,7 +22,7 @@ export default function ServiceApplyPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 호스트 수입 (고객 노출 금지 — UI에서만 사용, 단가 비율 노출 안 함)
-  const hostEarning = request ? 20000 * request.duration_hours : 0;
+  const hostEarning = request?.total_host_payout ?? 0;
 
   useEffect(() => {
     const load = async () => {

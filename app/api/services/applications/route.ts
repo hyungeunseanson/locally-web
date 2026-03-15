@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { isApprovedHostEligibleForServiceRequest } from '@/app/utils/serviceHostNotifications';
 
 type ApplyBody = {
   request_id?: string;
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     // 1. 의뢰 존재 + open 상태 + 본인 의뢰 아님 검증
     const { data: serviceRequest, error: reqError } = await supabaseAdmin
       .from('service_requests')
-      .select('id, status, user_id, title, city, duration_hours')
+      .select('id, status, user_id, title, city, country, duration_hours')
       .eq('id', request_id)
       .maybeSingle();
 
@@ -57,6 +58,16 @@ export async function POST(request: Request) {
 
     if (!hostApp || hostApp.status !== 'approved') {
       return NextResponse.json({ success: false, error: '승인된 호스트만 지원할 수 있습니다.' }, { status: 403 });
+    }
+
+    const isEligibleHost = await isApprovedHostEligibleForServiceRequest(supabaseAdmin, {
+      hostId: user.id,
+      requestCity: serviceRequest.city,
+      requestCountry: serviceRequest.country,
+    });
+
+    if (!isEligibleHost) {
+      return NextResponse.json({ success: false, error: '해당 국가/도시에 등록된 체험이 있는 호스트만 지원할 수 있습니다.' }, { status: 403 });
     }
 
     // 3. 중복 지원 방지 (DB UNIQUE 제약으로도 보호되나 메시지 개선용)

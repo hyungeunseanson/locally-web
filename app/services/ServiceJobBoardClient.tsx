@@ -32,6 +32,7 @@ export default function ServiceJobBoardClient() {
   const [requests, setRequests] = useState<ServiceRequestCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCity, setSelectedCity] = useState('전체');
+  const [accessError, setAccessError] = useState('');
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -44,10 +45,18 @@ export default function ServiceJobBoardClient() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setAccessError('');
       const city = selectedCity === '전체' ? '' : selectedCity;
       const res = await fetch(`/api/services/requests?mode=board${city ? `&city=${encodeURIComponent(city)}` : ''}`);
       const data = await res.json();
-      if (data.success) setRequests(data.data ?? []);
+      if (res.status === 403) {
+        setRequests([]);
+        setAccessError(data.error || '승인된 호스트만 맞춤 의뢰를 열람할 수 있습니다.');
+      } else if (data.success) {
+        setRequests(data.data ?? []);
+      } else {
+        setRequests([]);
+      }
       setLoading(false);
     };
     void load();
@@ -97,6 +106,13 @@ export default function ServiceJobBoardClient() {
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="animate-pulse h-32 bg-white rounded-2xl border border-slate-100" />
             ))}
+          </div>
+        ) : accessError ? (
+          <div className="text-center py-24 flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
+              <Briefcase size={24} className="text-slate-300" />
+            </div>
+            <p className="font-semibold text-slate-500 text-[13px] md:text-sm">{accessError}</p>
           </div>
         ) : requests.length === 0 ? (
           <div className="text-center py-24 flex flex-col items-center gap-3">

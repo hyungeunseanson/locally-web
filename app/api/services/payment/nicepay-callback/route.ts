@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
     const { data: serviceBooking, error: bookingError } = await supabaseAdmin
       .from('service_bookings')
-      .select('*, service_requests(user_id, title, city, duration_hours, guest_count)')
+      .select('*, service_requests(user_id, title, city, country, duration_hours, guest_count)')
       .eq('order_id', orderId)
       .maybeSingle();
 
@@ -111,10 +111,11 @@ export async function POST(request: Request) {
 
     const requestInfo =
       serviceBooking.service_requests as
-        | { title?: string; city?: string; duration_hours?: number; guest_count?: number }
+        | { title?: string; city?: string; country?: string; duration_hours?: number; guest_count?: number }
         | null;
     const requestTitle = requestInfo?.title || '맞춤 서비스';
     const reqCity = requestInfo?.city ?? '';
+    const reqCountry = requestInfo?.country ?? '';
     const reqDuration = requestInfo?.duration_hours ?? 0;
     const reqGuests = requestInfo?.guest_count ?? 0;
 
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
       try {
         const hostIds = await getEligibleServiceHostIds(supabaseAdmin, {
           requestCity: reqCity,
+          requestCountry: reqCountry,
           customerId: serviceBooking.customer_id,
         });
         if (hostIds.length === 0) return;

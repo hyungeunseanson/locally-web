@@ -55,12 +55,13 @@ export async function POST(request: Request) {
     // 4. Fetch service request info (for notifications)
     const { data: serviceRequest } = await supabaseAdmin
       .from('service_requests')
-      .select('title, city, duration_hours, guest_count')
+      .select('title, city, country, duration_hours, guest_count')
       .eq('id', booking.request_id)
       .maybeSingle();
 
     const requestTitle = serviceRequest?.title || '맞춤 서비스';
     const reqCity = (serviceRequest as { city?: string } | null)?.city ?? '';
+    const reqCountry = (serviceRequest as { country?: string } | null)?.country ?? '';
     const reqDuration = (serviceRequest as { duration_hours?: number } | null)?.duration_hours ?? 0;
     const reqGuests = (serviceRequest as { guest_count?: number } | null)?.guest_count ?? 0;
 
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
       try {
         const hostIds = await getEligibleServiceHostIds(supabaseAdmin, {
           requestCity: reqCity,
+          requestCountry: reqCountry,
           customerId: booking.customer_id,
         });
         if (hostIds.length === 0) return;

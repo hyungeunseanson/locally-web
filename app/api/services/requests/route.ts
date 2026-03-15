@@ -3,6 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import crypto from 'crypto';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import {
+  getApprovedHostServiceLocationKeys,
+  isApprovedHostEligibleForServiceRequest,
+} from '@/app/utils/serviceHostNotifications';
+import {
+  getServiceLocationKey,
+  normalizeServiceCity,
+  resolveServiceCountry,
+} from '@/app/utils/serviceRequestLocation';
 
 function generateOrderId(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -35,7 +44,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as CreateRequestBody;
     const {
-      title, description, city, country = 'JP',
+      title, description, city, country,
       service_date, start_time, duration_hours,
       languages, guest_count, contact_name, contact_phone
     } = body;
@@ -43,11 +52,14 @@ export async function POST(request: Request) {
     const durationNum = Number(duration_hours);
     const guestNum = Number(guest_count);
 
+    const resolvedCountry = resolveServiceCountry(city, country);
+
     if (
       !title || !description || !city || !service_date || !start_time ||
       !Number.isFinite(durationNum) || durationNum < 4 ||
       !Number.isFinite(guestNum) || guestNum < 1 ||
-      !contact_name || !contact_phone
+      !contact_name || !contact_phone ||
+      !resolvedCountry
     ) {
       return NextResponse.json({ success: false, error: 'Missing or invalid required fields' }, { status: 400 });
     }
@@ -63,8 +75,8 @@ export async function POST(request: Request) {
         user_id: user.id,
         title: title.trim(),
         description: description.trim(),
-        city: city.trim(),
-        country,
+        city: normalizeServiceCity(city),
+        country: resolvedCountry,
         service_date,
         start_time,
         duration_hours: durationNum,
@@ -150,7 +162,7 @@ export async function GET(request: Request) {
     if (requestId) {
       const { data, error } = await supabaseAdmin
         .from('service_requests')
-        .select('*')
+        .select('id, user_id, title, description, city, country, service_date, start_time, duration_hours, languages, guest_count, hourly_rate_customer, hourly_rate_host, total_customer_price, total_host_payout, status, selected_application_id, selected_host_id, contact_name, contact_phone, created_at, updated_at, expires_at')
         .eq('id', requestId)
         .maybeSingle();
 
@@ -159,46 +171,100 @@ export async function GET(request: Request) {
         return NextResponse.json({ success: false, error: '의뢰를 찾을 수 없습니다.' }, { status: 404 });
       }
 
-      const canRead =
-        data.status === 'open' ||
-        currentUser?.id === data.user_id ||
-        currentUser?.id === data.selected_host_id;
+      const isOwner = currentUser?.id === data.user_id;
+      const isSelectedHost = currentUser?.id === data.selected_host_id;
+      const isEligibleHost =
+        !isOwner &&
+        !isSelectedHost &&
+        currentUser?.id
+          ? await isApprovedHostEligibleForServiceRequest(supabaseAdmin, {
+              hostId: currentUser.id,
+              requestCity: data.city,
+              requestCountry: data.country,
+            })
+          : false;
+
+      const canRead = isOwner || isSelectedHost || (data.status === 'open' && isEligibleHost);
 
       if (!canRead) {
         return NextResponse.json({ success: false, error: '의뢰를 찾을 수 없습니다.' }, { status: 404 });
       }
 
-      return NextResponse.json({ success: true, data });
+      return NextResponse.json({
+        success: true,
+        data: {
+          ...data,
+          contact_name: isOwner || isSelectedHost ? data.contact_name : null,
+          contact_phone: isOwner || isSelectedHost ? data.contact_phone : null,
+        },
+      });
     }
 
     if (!currentUser) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    let query = supabaseAdmin
-      .from('service_requests')
-      .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, total_host_payout, status, created_at, user_id')
-      .order('created_at', { ascending: false });
-
     if (mode === 'my') {
-      // 내 의뢰 목록
-      query = query.eq('user_id', currentUser.id);
-    } else {
-      // 잡보드: open 상태만
-      query = query.eq('status', 'open');
-      if (city && city !== 'all') {
-        query = query.eq('city', city);
+      const { data, error } = await supabaseAdmin
+        .from('service_requests')
+        .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, total_host_payout, status, created_at, user_id')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Service Requests Fetch Error:', error);
+        return NextResponse.json({ success: false, error: '목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
       }
+
+      return NextResponse.json({ success: true, data: data ?? [] });
     }
 
-    const { data, error } = await query.limit(50);
+    const { isApproved, locationKeys } = await getApprovedHostServiceLocationKeys(supabaseAdmin, currentUser.id);
+    if (!isApproved) {
+      return NextResponse.json({ success: false, error: '승인된 호스트만 의뢰를 열람할 수 있습니다.' }, { status: 403 });
+    }
+
+    if (locationKeys.size === 0) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    const selectedLocationKey = city && city !== 'all'
+      ? getServiceLocationKey({ city, country: resolveServiceCountry(city, null) })
+      : null;
+
+    const { data, error } = await supabaseAdmin
+      .from('service_requests')
+      .select('id, title, city, country, service_date, start_time, duration_hours, languages, guest_count, total_customer_price, total_host_payout, status, created_at, user_id')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (error) {
       console.error('Service Requests Fetch Error:', error);
       return NextResponse.json({ success: false, error: '목록 조회 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data: data ?? [] });
+    const filtered = (data ?? [])
+      .filter((requestRow) => {
+        const requestLocationKey = getServiceLocationKey({
+          city: requestRow.city,
+          country: requestRow.country,
+        });
+
+        if (!requestLocationKey || !locationKeys.has(requestLocationKey)) {
+          return false;
+        }
+
+        if (selectedLocationKey) {
+          return requestLocationKey === selectedLocationKey;
+        }
+
+        return true;
+      })
+      .slice(0, 50);
+
+    return NextResponse.json({ success: true, data: filtered });
 
   } catch (error: unknown) {
     console.error('API Service Requests GET Error:', error);
