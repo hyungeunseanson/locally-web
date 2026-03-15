@@ -15,6 +15,16 @@
 | 🟠 모바일 전환 버튼 연결 | `app/account/page.tsx`, `app/components/mobile/MobileHostMenu.tsx`, `app/components/mobile/HostModeTransition.tsx`가 전환 transition 전에 `setHostView()` / `setGuestView()`를 먼저 수행하고, dev Strict Mode에서도 cleanup 때문에 오버레이가 즉시 사라지지 않도록 정리 |
 | 🟡 보호막 추가 | `tests/e2e/55-host-view-mode-persistence.spec.ts` 추가 — 호스트 모드 진입 후 `/community`, `/become-a-host`, `/help` 이동과 새로고침에서도 host tabs가 유지되고, 명시적 게스트 전환 후에만 guest tabs로 돌아오는지 검증 |
 
+## v3.39.10 — [Messaging] 메시지/알림 피드백 1차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 알림 읽음 처리 서버화 | 새 `app/api/notifications/read/route.ts` 추가 — `NotificationContext`가 더 이상 브라우저에서 `notifications.update()`를 직접 호출하지 않고, 단건/전체 읽음을 서버 auth 경계로 처리 |
+| 🟠 읽음 처리 rollback 보강 | `NotificationContext`가 `markAsRead` / `markAllAsRead` 실패 시 optimistic unread 상태를 원복하도록 정리 |
+| 🟠 기존 inquiry 전송 체감 지연 완화 | `app/hooks/useChat.ts`가 이미지 전송을 포함한 기존 inquiry 답장 성공 후 `loadMessages()` 전체 재조회를 피하고 현재 열린 스레드에 즉시 반영 |
+| 🟡 모바일 레이어 간격 정리 | `ToastContext`, `NotificationContext`의 모바일 bottom offset을 분리해 bottom nav / 플로팅 버튼 / 서로 간 토스트 충돌을 줄임 |
+| 🟡 보호막 추가 | `tests/e2e/56-notification-read-route.spec.ts` 추가 — 단건 읽음과 전체 읽음이 현재 사용자 알림에만 적용되는지 검증 |
+
 ## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
 
 | 항목 | 내용 |

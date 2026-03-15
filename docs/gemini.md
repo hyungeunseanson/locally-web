@@ -133,7 +133,9 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합, Postgres Trigger 프로필 100% 일치 동기화.
 - 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다. 서비스 매칭 채팅은 `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 적용 후 `inquiries.service_request_id` 기준으로 request 단위 분리를 활성화한다.
 - 메시징 읽음 처리(`is_read`, `read_at`)는 `/api/inquiries/read` 서버 API를 단일 source로 유지한다. 클라이언트 훅(`useChat`)은 unread UI를 낙관적으로 갱신할 수 있지만, 실제 `inquiry_messages` 읽음 업데이트는 브라우저 direct write를 하지 않는다.
+- 일반 알림(`notifications.is_read`) 읽음 처리 역시 `/api/notifications/read` 서버 API를 단일 source로 유지한다. `NotificationContext`는 단건/전체 읽음을 optimistic하게 반영할 수 있지만, 실제 DB update는 브라우저 direct write를 하지 않는다.
 - 기존 inquiry의 텍스트 답장은 `useChat.sendMessage()`가 optimistic append를 기본으로 사용한다. 성공 후 `loadMessages()`로 전체 스레드를 강제 재조회하지 않고, 현재 열린 스레드의 임시 message를 서버 id로 치환한 뒤 inquiry 목록만 background refresh한다. 새 문의방 최초 생성과 이미지 메시지는 기존 서버 round-trip 흐름을 유지한다.
+- 기존 inquiry의 이미지 답장도 성공 후 `loadMessages()` 전체 재조회를 강제하지 않는다. 현재 열린 스레드에 서버 응답 기반 message를 즉시 append하고, inquiry 목록만 background refresh한다. 새 문의방 최초 생성은 기존 round-trip 흐름을 유지한다.
 - `/guest/inbox`는 `hostId`만 있는 deep link에서도 caller query에 `hostName/hostAvatar`가 없으면 `profiles + host_applications`를 직접 조회해 host summary를 복구한다. 결제 완료 페이지나 예약카드에서 host summary를 못 넘긴 진입도 초기 `?` 아바타가 뜨지 않아야 한다.
 - Admin 맞춤 의뢰 관리 통합(v3.9.0): `service_bookings` 테이블 결제 흐름을 Admin이 통제할 수 있도록 별도 탭 `SERVICE_REQUESTS`를 신설하고, `useServiceAdminData.ts` 독립 훅·`ServiceAdminTab.tsx` 3-서브탭 컴포넌트·`/api/admin/service-cancel` 강제 취소 API를 추가. NicePay cancel 실패 시 DB 상태 미변경(에러 안전) 보장. `SalesTab` KPI에 service_bookings GMV/정산액 합산(수수료율 % 미노출). 관리자 탭 데이터는 공통 eager load 대신 탭별 전용 훅/API를 기준으로 유지한다.
 - `Billing & Revenue` 탭은 `/api/admin/sales-summary`를 전용 source로 사용하므로, `page.tsx`에서 공통 로딩 게이트 밖에서 직접 렌더링한다.

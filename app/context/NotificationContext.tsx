@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useMemo 
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { X, Bell, MessageSquare } from 'lucide-react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface NotificationDB {
   id: number;
@@ -16,7 +17,7 @@ interface NotificationDB {
   created_at: string;
 }
 
-interface NotificationUI extends NotificationDB {}
+type NotificationUI = NotificationDB;
 
 interface ToastData {
   title: string;
@@ -34,6 +35,24 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+async function markNotificationsRead(params: { notificationId?: number; markAll?: boolean }) {
+  const response = await fetch('/api/notifications/read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  const result = await response.json();
+  if (!response.ok || !result?.success) {
+    throw new Error(result?.error || '알림 읽음 처리에 실패했습니다.');
+  }
+
+  return {
+    markedIds: Array.isArray(result.markedIds) ? (result.markedIds as number[]) : [],
+    markedCount: typeof result.markedCount === 'number' ? result.markedCount : 0,
+  };
+}
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationUI[]>([]);
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -41,7 +60,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const router = useRouter();
 
 // 🟢 [추가] 채널 관리를 위해 useRef 사용 (구독 중복 방지)
-const channelRef = useRef<any>(null);
+const channelRef = useRef<RealtimeChannel | null>(null);
 
 useEffect(() => {
   const setupRealtime = async () => {
@@ -98,15 +117,39 @@ useEffect(() => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const markAsRead = async (id: number) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    let rollbackSnapshot: NotificationUI[] | null = null;
+
+    setNotifications((prev) => {
+      rollbackSnapshot = prev;
+      return prev.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+    });
+
+    try {
+      await markNotificationsRead({ notificationId: id });
+    } catch (error) {
+      console.error('[NotificationContext] markAsRead failed:', error);
+      if (rollbackSnapshot) {
+        setNotifications(rollbackSnapshot);
+      }
+    }
   };
 
   const markAllAsRead = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id);
+    let rollbackSnapshot: NotificationUI[] | null = null;
+
+    setNotifications((prev) => {
+      rollbackSnapshot = prev;
+      return prev.map((n) => ({ ...n, is_read: true }));
+    });
+
+    try {
+      await markNotificationsRead({ markAll: true });
+    } catch (error) {
+      console.error('[NotificationContext] markAllAsRead failed:', error);
+      if (rollbackSnapshot) {
+        setNotifications(rollbackSnapshot);
+      }
+    }
   };
 
   return (
@@ -116,7 +159,7 @@ useEffect(() => {
       {/* 🟢 [디자인 수정] 다크 모드 토스트 알림창 */}
       {toast && (
         <div 
-          className="fixed bottom-[80px] md:bottom-6 right-4 md:right-6 z-[9999] bg-slate-900/95 backdrop-blur-sm border border-slate-700 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"
+          className="fixed bottom-[188px] md:bottom-20 right-4 md:right-6 z-[10000] bg-slate-900/95 backdrop-blur-sm border border-slate-700 shadow-2xl rounded-2xl p-4 w-80 animate-in slide-in-from-bottom-5 fade-in duration-300 cursor-pointer hover:scale-105 transition-transform"
           onClick={() => {
             if (toast.link) router.push(toast.link);
             setToast(null);

@@ -393,6 +393,18 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         setSelectedInquiry(updatedSelectedInquiry);
       }
 
+      const senderName =
+        currentUser?.user_metadata?.full_name ||
+        currentUser?.email ||
+        selectedInquiryRef.current?.guest?.name ||
+        selectedInquiryRef.current?.host?.name ||
+        '나';
+      const senderAvatar =
+        currentUser?.user_metadata?.avatar_url ||
+        selectedInquiryRef.current?.guest?.avatar_url ||
+        selectedInquiryRef.current?.host?.avatar_url ||
+        null;
+
       if (shouldOptimisticallyAppend && optimisticMessageId) {
         setMessages((prev) =>
           prev.map((msg) =>
@@ -408,7 +420,25 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         );
         void fetchInquiries(false);
       } else {
-        await loadMessages(inquiryId);
+        const persistedMessage: InquiryMessageView = {
+          id: result.messageId,
+          inquiry_id: inquiryId,
+          sender_id: actorId,
+          content: cleanContent,
+          image_url: imageUrl,
+          type,
+          is_read: false,
+          read_at: null,
+          created_at: String(result.updatedAt || optimisticCreatedAt),
+          sender: {
+            id: actorId,
+            name: senderName,
+            avatar_url: secureUrl(senderAvatar),
+          },
+        };
+
+        setMessages((prev) => [...prev, persistedMessage]);
+        void fetchInquiries(false);
       }
     } catch (err: unknown) {
       const dbError = err as { code?: string, message?: string };
