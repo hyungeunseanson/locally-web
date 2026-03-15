@@ -416,7 +416,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - 호스트 생성/수정 폼은 이제 `manual_content + source_locale` 구조를 사용하고, 호스트가 선택한 구사 언어에 대해서만 직접 title/description을 입력한다.
 - host write path는 더 이상 클라이언트 `supabase.from('experiences')` direct write를 사용하지 않고 `POST /api/host/experiences`, `PATCH /api/host/experiences/:id` 서버 API로 이관한다.
 - host 일정 관리 저장도 `POST /api/host/experiences/:id/availability` 서버 route를 사용한다. `/host/experiences/[id]/dates`는 읽기(`experience_availability`, 예약 count)만 클라이언트에서 유지하고, 저장 시에는 서버가 현재 슬롯/확정 예약을 다시 조회해 diff를 계산한다.
-- host 내 체험 삭제도 `DELETE /api/host/experiences/:id` 서버 route를 사용한다. `MyExperiences`는 삭제 버튼에서 route만 호출하고, 실제 소유권 확인과 삭제 실행은 서버가 맡는다.
+- host 내 체험 삭제도 `DELETE /api/host/experiences/:id` 서버 route를 사용한다. `MyExperiences`와 `/host/experiences/[id]` 상세 페이지는 삭제 버튼에서 route만 호출하고, 실제 소유권 확인과 삭제 실행은 서버가 맡는다.
 - PATCH 저장 시에는 기존 `manual_locales`를 보존 병합하고, `title/description/source_locale/manual_locales + meeting_point/itinerary/inclusions/exclusions/supplies/rules` 중 실제 변경이 있을 때만 `translation_version`을 증가시킨다.
 
 ### 12.2 queue 테이블

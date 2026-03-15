@@ -9,11 +9,27 @@ import Spinner from '@/app/components/ui/Spinner';
 import Link from 'next/link';
 import { useLanguage } from '@/app/context/LanguageContext';
 
+type HostExperienceDetail = {
+  id: number;
+  title: string;
+  description?: string | null;
+  photos?: string[] | null;
+  image_url?: string | null;
+  location?: string | null;
+  meeting_point?: string | null;
+  country?: string | null;
+  city?: string | null;
+  rating?: number | null;
+  price?: number | string | null;
+  category?: string | null;
+  status?: string | null;
+};
+
 export default function HostExperienceDetailPage() {
   const router = useRouter();
   const params = useParams();
   const supabase = useMemo(() => createClient(), []);
-  const [experience, setExperience] = useState<any>(null);
+  const [experience, setExperience] = useState<HostExperienceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
 
@@ -42,23 +58,24 @@ export default function HostExperienceDetailPage() {
   }, [params.id, router, supabase]);
 
   const handleDelete = async () => {
+    if (!experience) return;
     if (!confirm(t('exp_del_confirm') as string)) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      alert("로그인이 필요합니다.");
-      return;
-    }
+    try {
+      const response = await fetch(`/api/host/experiences/${experience.id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
 
-    const { error } = await supabase
-      .from('experiences')
-      .delete()
-      .eq('id', experience.id)
-      .eq('host_id', user.id);
-    if (error) alert(t('exp_del_fail'));
-    else {
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || t('exp_del_fail'));
+      }
+
       alert(t('exp_del_success'));
-      router.push('/host/dashboard');
+      router.push('/host/dashboard?tab=experiences');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('exp_del_fail');
+      alert(message);
     }
   };
 

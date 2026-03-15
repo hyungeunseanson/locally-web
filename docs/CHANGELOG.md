@@ -12,6 +12,13 @@
 | 🟡 호스트 수정 UI 보호막 추가 | `tests/e2e/34-host-edit-and-dates-ui.spec.ts` 추가 — 승인 호스트가 `/host/dashboard?tab=experiences`에서 실제 `수정` 링크를 열고 제목을 바꾼 뒤, `PATCH /api/host/experiences/:id`와 DB 반영까지 이어지는지 검증 |
 | 🟡 호스트 일정 관리 UI 보호막 추가 | 같은 스모크가 대시보드 `일정 관리` 링크를 열고 날짜 선택 → 시간 추가 → 저장 확인 모달 → `POST /api/host/experiences/:id/availability` → DB `experience_availability` 반영까지 직접 확인 |
 
+## v3.38.97 — [Host Flow] 상세 페이지 삭제도 서버 DELETE route로 정렬
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 호스트 상세 삭제 direct write 제거 | `app/host/experiences/[id]/page.tsx`가 더 이상 브라우저 `supabase.from('experiences').delete()`를 직접 호출하지 않고, 기존 `DELETE /api/host/experiences/:id` 서버 route를 사용하도록 정리 |
+| 🟡 상세 삭제 UI 보호막 추가 | `tests/e2e/35-host-experience-detail-delete-ui.spec.ts` 추가 — 호스트 상세 페이지에서 삭제 버튼, confirm/alert, route 호출, 대시보드 복귀, DB row 제거까지 실제 UI 흐름으로 검증 |
+
 ## v3.38.95 — [Guest Flow] 예약 후 계좌 정보 / 취소 UX 정리 1차
 
 | 항목 | 내용 |
