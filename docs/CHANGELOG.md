@@ -15,6 +15,16 @@
 | 🟠 만석 날짜 달력 노출 | `app/experiences/[id]/types.ts`, `app/experiences/[id]/ExperienceClient.tsx`, `app/experiences/[id]/components/ExpSidebar.tsx`, `app/experiences/[id]/components/ReservationCard.tsx` — 예약 가능 날짜만 숨기지 않고 `available/sold_out` day status를 내려, 만석 날짜도 달력에 남기고 시간 버튼에서 `매진` / `프라이빗 예약 마감` 상태를 표시 |
 | 🟡 보호막 추가 | `tests/e2e/42-experience-paypal-payment.spec.ts`, `tests/e2e/44-experience-card-payment-ui.spec.ts`, `tests/e2e/64-experience-availability-detail.spec.ts`, `tests/e2e/65-experience-post-confirm-detail-refresh.spec.ts`, `tests/e2e/66-bookings-solo-guard.spec.ts`, `tests/e2e/helpers/experienceBooking.ts` — 결제 후 상세 재진입, sold-out 날짜 가시성, solo deep-link/API guard 회귀를 검증 |
 
+## v3.39.28 — [Host Dashboard] 게스트 프로필 모달 리디자인
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 모달 전면 리디자인 | `app/host/dashboard/components/GuestProfileModal.tsx` — 다크 배너 헤더 제거, 모바일 바텀시트 전환(`items-end`, `rounded-t-[28px]`, 드래그 핸들), 데스크탑 중앙 모달(`md:max-w-[560px]`, `md:rounded-[28px]`) |
+| 🟠 프로필 헤더 개선 | slate-50 배경, 아바타(모바일 64px / 데스크탑 96px) + 이름 + Guest 배지 + 가입일 인라인 배치. `border-4 border-white shadow-lg` 아바타 |
+| 🟠 속성 2×2 그리드 카드 | 다색 배지(blue/rose/emerald) 제거 → `rounded-2xl bg-slate-50 p-4` 통일 그리드. Gender / Languages / MBTI / Job 각 항목 조건부 렌더링 |
+| 🟠 About / 후기 섹션 | `rounded-3xl` 스타일 통일, 후기 카드 hover 효과, 날짜 ko-KR short 포맷 |
+| 🟡 school 필드 제거 | DB 미존재 컬럼(`profiles.school`) UI 표시 완전 제거 |
+
 ## v3.39.27 — [Profile] 모바일 게스트 프로필 통계 라벨 수정 · 가입 기간 월 단위로 변경
 
 | 항목 | 내용 |

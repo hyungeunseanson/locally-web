@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { User, X, Star, Globe, Smile, MessageCircle } from 'lucide-react';
+import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { formatGenderLabel, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
@@ -12,7 +12,6 @@ interface GuestModalProfile {
   avatar_url?: string | null;
   nationality?: string | null;
   job?: string | null;
-  school?: string | null;
   gender?: string | null;
   mbti?: string | null;
   languages?: string[] | string | null;
@@ -43,11 +42,10 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
   const [reviews, setReviews] = useState<GuestReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
-  // 🟢 게스트가 받은 후기 불러오기
   useEffect(() => {
     const fetchReviews = async () => {
       if (!guest?.id) return;
-      
+
       const { data } = await supabase
         .from('guest_reviews')
         .select(`
@@ -63,164 +61,174 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
     fetchReviews();
   }, [guest, supabase]);
 
+  useEffect(() => {
+    if (!guest) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [guest]);
+
   if (!guest) return null;
 
-  // 언어 배열 처리
   const languages = normalizeLanguageList(guest.languages);
   const joinedAt = guest.created_at
     ? new Date(guest.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
     : '가입일 정보 없음';
-  const infoRows = [
-    guest.job ? { label: '직업', value: guest.job } : null,
-    guest.school ? { label: '학교', value: guest.school } : null,
-  ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+  const genderLabel = guest.gender ? formatGenderLabel(guest.gender) : null;
+  const languageDisplay = languages.length > 0
+    ? languages.map((lang: string) => t(`lang_${normalizeProfileLanguageValue(lang)}`)).join(', ')
+    : null;
+
+  // 2×2 attribute grid items — only render non-empty ones
+  const gridItems = [
+    genderLabel ? { icon: <Users size={14} />, label: 'Gender', value: genderLabel } : null,
+    languageDisplay ? { icon: <Globe size={14} />, label: 'Languages', value: languageDisplay } : null,
+    guest.mbti ? { icon: <Smile size={14} />, label: 'MBTI', value: guest.mbti } : null,
+    guest.job ? { icon: <Briefcase size={14} />, label: 'Job', value: guest.job } : null,
+  ].filter(Boolean) as Array<{ icon: React.ReactNode; label: string; value: string }>;
 
   return (
-    <div className="fixed inset-0 z-[160] flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-      <div 
-        className="bg-white rounded-2xl md:rounded-3xl w-[92vw] max-w-[390px] md:max-w-lg overflow-hidden shadow-2xl relative flex flex-col max-h-[84vh] md:max-h-[90vh]" 
-        onClick={e => e.stopPropagation()}
+    <div
+      className="fixed inset-0 z-[160] flex items-end md:items-center justify-center bg-black/60 md:px-4 md:py-6 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[88vh] md:max-h-[90vh] w-full md:max-w-[560px] flex-col overflow-hidden rounded-t-[28px] md:rounded-[28px] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
+        onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* 헤더 (배경 + 닫기 버튼) */}
-        <div className="h-20 md:h-32 bg-slate-900 relative shrink-0">
-           <button onClick={onClose} className="absolute top-3 md:top-4 right-3 md:right-4 z-10 p-1.5 md:p-2 bg-black/20 hover:bg-black/40 rounded-full text-white transition-colors">
-             <X size={18} className="md:w-5 md:h-5" />
-           </button>
+        {/* 모바일 드래그 핸들 */}
+        <div className="flex justify-center pt-3 pb-1 md:hidden flex-shrink-0">
+          <div className="w-10 h-1 bg-slate-300 rounded-full" />
         </div>
 
-        {/* 프로필 정보 (스크롤 가능 영역) */}
-        <div className="px-4 md:px-6 pb-5 md:pb-8 overflow-y-auto custom-scrollbar -mt-10 md:-mt-12 flex-1">
-          
-          {/* 아바타 & 기본 정보 */}
-          <div className="flex justify-between items-end mb-3 md:mb-4">
-             <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white p-1 shadow-lg">
-               <div className="w-full h-full rounded-full bg-slate-100 overflow-hidden relative border border-slate-100">
-                 {guest.avatar_url ? (
-                   <img src={guest.avatar_url} className="w-full h-full object-cover" alt="Guest" />
-                 ) : (
-                   <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={30} className="md:w-10 md:h-10"/></div>
-                 )}
-               </div>
-             </div>
-             
-             {/* 가입일 등 메타 정보 */}
-             <div className="text-right mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('guest_modal_joined')}</span>
-                <p className="text-[11px] md:text-xs font-bold text-slate-600">
-                  {joinedAt}
-                </p>
-             </div>
-          </div>
+        {/* 프로필 헤더 */}
+        <div className="relative border-b border-slate-100 bg-slate-50 px-5 pb-5 pt-4 md:px-6 md:pb-7 md:pt-8 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-3 md:top-4 inline-flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 transition-colors hover:text-slate-900"
+          >
+            <X size={17} />
+          </button>
 
-          <div className="mb-4 md:mb-6">
-            <h2 className="text-lg md:text-2xl font-black text-slate-900 flex items-center gap-2">
-              {guest.full_name}
-              {guest.nationality && (
-                <span className="text-sm md:text-lg bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                  {guest.nationality}
-                </span>
+          <div className="flex items-center gap-3 md:gap-4">
+            {/* 아바타 */}
+            <div className="h-16 w-16 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-slate-200 shadow-lg flex items-center justify-center">
+              {guest.avatar_url ? (
+                <img src={guest.avatar_url} className="h-full w-full object-cover" alt={guest.full_name ?? 'Guest'} />
+              ) : (
+                <User size={24} className="text-slate-400 md:hidden" />
               )}
-            </h2>
+              {!guest.avatar_url && <User size={32} className="text-slate-400 hidden md:block" />}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] md:text-[11px] font-bold text-white">
+                  Guest
+                </span>
+                <span className="text-[11px] md:text-[12px] font-medium text-slate-400">
+                  {joinedAt}
+                </span>
+              </div>
+              <h2 className="break-words text-[20px] md:text-[24px] font-black text-slate-900 [overflow-wrap:anywhere]">
+                {guest.full_name}
+                {guest.nationality && (
+                  <span className="ml-2 text-[15px] md:text-[17px] font-medium text-slate-500">
+                    {guest.nationality}
+                  </span>
+                )}
+              </h2>
+            </div>
           </div>
+        </div>
 
-          {/* 🟢 [핵심] 성향/언어 배지 */}
-          <div className="flex flex-wrap gap-1.5 md:gap-2 mb-4 md:mb-6">
-            {/* 성별 */}
-            {guest.gender && (
-              <span className="inline-flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100">
-                {formatGenderLabel(guest.gender, '미입력')}
-              </span>
-            )}
-            
-            {/* MBTI */}
-            {guest.mbti && (
-              <span className="inline-flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">
-                <Smile size={12}/> {guest.mbti}
-              </span>
-            )}
+        {/* 스크롤 본문 */}
+        <div className="overflow-y-auto px-4 py-5 md:px-6 md:py-6 custom-scrollbar flex-1">
 
-            {/* 언어 */}
-            {languages.map((lang: string) => (
-              <span key={lang} className="inline-flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                <Globe size={12}/> {t(`lang_${normalizeProfileLanguageValue(lang)}`)}
-              </span>
-            ))}
-            {languages.length === 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-full text-[10px] md:text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                <Globe size={12}/> 미입력
-              </span>
-            )}
-          </div>
-
-          {infoRows.length > 0 && (
-            <div className="bg-white border border-slate-100 rounded-xl md:rounded-2xl mb-6 md:mb-8 overflow-hidden">
-              {infoRows.map((item, index) => (
-                <div
-                  key={item.label}
-                  className={`flex items-center justify-between gap-4 px-4 py-3 ${index < infoRows.length - 1 ? 'border-b border-slate-100' : ''}`}
-                >
-                  <span className="text-[11px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">{item.label}</span>
-                  <span className="text-[12px] md:text-sm font-semibold text-slate-700 text-right">{item.value}</span>
+          {/* 속성 그리드 */}
+          {gridItems.length > 0 && (
+            <div className="mb-6 grid grid-cols-2 gap-3">
+              {gridItems.map((item) => (
+                <div key={item.label} className="rounded-2xl bg-slate-50 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-slate-500">
+                    {item.icon}
+                    <span className="text-[11px] font-bold uppercase tracking-[0.14em]">{item.label}</span>
+                  </div>
+                  <p className="break-words text-[13px] md:text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">
+                    {item.value}
+                  </p>
                 </div>
               ))}
             </div>
           )}
 
-          {/* 소개글 */}
-          <div className="bg-slate-50 p-4 md:p-5 rounded-xl md:rounded-2xl mb-6 md:mb-8 border border-slate-100">
-            <h3 className="text-[11px] md:text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Introduction</h3>
-            <p className="text-[12px] md:text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-              {guest.introduction || guest.bio || t('guest_modal_intro_empty')}
-            </p>
-          </div>
+          {/* About */}
+          <section className="mb-8">
+            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">About</h3>
+            <div className="rounded-3xl bg-slate-50 p-5 text-[15px] leading-7 text-slate-700">
+              <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
+                {guest.introduction || guest.bio || t('guest_modal_intro_empty')}
+              </p>
+            </div>
+          </section>
 
-          {/* 🟢 [핵심] 받은 후기 리스트 */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-               <Star size={18} fill="black" className="text-slate-900"/>
-               <h3 className="font-bold text-base md:text-lg">{t('guest_modal_reviews')} ({reviews.length})</h3>
+          {/* 받은 후기 */}
+          <section>
+            <div className="mb-4 flex items-center gap-2">
+              <Star size={16} className="text-slate-900" fill="currentColor" />
+              <h3 className="text-[16px] font-bold text-slate-900">
+                {t('guest_modal_reviews')} ({reviews.length})
+              </h3>
             </div>
 
             {loadingReviews ? (
               <div className="space-y-3">
-                 {[1,2].map(i => <div key={i} className="h-20 bg-slate-50 rounded-xl animate-pulse"/>)}
+                {[1, 2].map((i) => (
+                  <div key={i} className="h-24 rounded-3xl bg-slate-50 animate-pulse" />
+                ))}
               </div>
             ) : reviews.length === 0 ? (
-              <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <MessageCircle size={24} className="mx-auto text-slate-300 mb-2"/>
-                <p className="text-sm text-slate-400">{t('guest_modal_no_reviews')}</p>
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center">
+                <MessageCircle size={24} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-[13px] md:text-sm text-slate-400">{t('guest_modal_no_reviews')}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {reviews.map((review) => (
-                  <div key={review.id} className="bg-white border border-slate-100 p-3 md:p-4 rounded-xl hover:border-slate-300 transition-colors">
-                     <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                           <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
-                              {review.host?.avatar_url ? (
-                                <img src={review.host.avatar_url} className="w-full h-full object-cover" alt="호스트 리뷰 작성자 사진" />
-                              ) : <User size={14} className="text-slate-400 m-auto mt-1"/>}
-                           </div>
-                           <span className="text-[12px] md:text-sm font-bold text-slate-900">
-                             {review.host?.full_name || 'Host'}
-                           </span>
+                  <div key={review.id} className="rounded-3xl border border-slate-100 px-4 py-4 transition-colors hover:border-slate-200 hover:bg-slate-50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-200">
+                          {review.host?.avatar_url ? (
+                            <img src={review.host.avatar_url} className="h-full w-full object-cover" alt="" />
+                          ) : (
+                            <User size={14} className="text-slate-400 m-auto mt-1.5" />
+                          )}
                         </div>
-                        <div className="flex items-center gap-1 text-amber-400">
-                           <Star size={12} fill="currentColor"/>
-                           <span className="text-xs font-bold text-slate-700">{review.rating}</span>
-                        </div>
-                     </div>
-                     <p className="text-[12px] md:text-sm text-slate-600 leading-snug">&quot;{review.content}&quot;</p>
-                     <p className="text-[10px] text-slate-400 mt-2 text-right">
-                       {new Date(review.created_at).toLocaleDateString()}
-                     </p>
+                        <span className="text-[13px] md:text-sm font-bold text-slate-900">
+                          {review.host?.full_name || 'Host'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Star size={11} fill="currentColor" className="text-amber-400" />
+                        <span className="text-[12px] font-bold text-slate-700">{review.rating}</span>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[13px] md:text-[14px] text-slate-600 leading-relaxed">
+                      &ldquo;{review.content}&rdquo;
+                    </p>
+                    <p className="mt-2 text-[11px] text-slate-400 text-right">
+                      {new Date(review.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </p>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-
+          </section>
         </div>
       </div>
     </div>
