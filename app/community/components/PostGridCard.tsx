@@ -52,14 +52,16 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
                 </div>
             )}
 
-            <div className="absolute inset-x-0 top-0 z-10 flex justify-start p-4 pointer-events-none">
-                <span className={`rounded-full px-3 py-1 text-[10px] font-bold shadow-sm ${categoryMeta.badgeClassName}`}>
+            {/* 배지: 모바일 -20% (text-[8px] px-2), 데스크탑 기존 유지 */}
+            <div className="absolute inset-x-0 top-0 z-10 flex justify-start p-3 md:p-4 pointer-events-none">
+                <span className={`rounded-full px-2 py-0.5 text-[8px] md:px-3 md:py-1 md:text-[10px] font-bold shadow-sm ${categoryMeta.badgeClassName}`}>
                     {categoryMeta.shortLabel}
                 </span>
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 pb-4 pt-12 pointer-events-none">
-                <div className="flex items-center justify-between gap-3">
+            <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-3 pb-3 pt-10 md:px-4 md:pb-4 md:pt-12 pointer-events-none">
+                {/* 데스크탑: 작성자 + 통계 */}
+                <div className="hidden md:flex items-center justify-between gap-3">
                     <CommunityAuthorTrigger
                         userId={post.user_id}
                         authorName={authorName}
@@ -84,6 +86,20 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
                         </span>
                         <span className="flex items-center gap-1">
                             <MessageSquare size={14} />
+                            {post.comment_count ?? 0}
+                        </span>
+                    </div>
+                </div>
+
+                {/* 모바일: 통계만 우측 하단, -20% 크기 */}
+                <div className="flex md:hidden justify-end">
+                    <div className="flex items-center gap-2 text-[10px] font-semibold text-white/90">
+                        <span className="flex items-center gap-0.5">
+                            <Heart size={11} />
+                            {post.like_count ?? 0}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                            <MessageSquare size={11} />
                             {post.comment_count ?? 0}
                         </span>
                     </div>

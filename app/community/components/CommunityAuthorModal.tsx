@@ -175,47 +175,53 @@ export default function CommunityAuthorModal({
 
   return (
     <div
-      className="fixed inset-0 z-[180] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[180] flex items-end md:items-center justify-center bg-black/60 md:px-4 md:py-6 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
         data-testid="community-author-modal"
-        className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-[30px] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
+        className="flex max-h-[85vh] md:max-h-[88vh] w-full md:max-w-lg flex-col overflow-hidden rounded-t-[28px] md:rounded-[30px] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative border-b border-slate-100 bg-slate-50 px-6 pb-6 pt-8">
+        {/* 모바일 드래그 핸들 */}
+        <div className="flex justify-center pt-3 pb-1 md:hidden flex-shrink-0">
+          <div className="w-10 h-1 bg-slate-300 rounded-full" />
+        </div>
+
+        <div className="relative border-b border-slate-100 bg-slate-50 px-5 pb-4 pt-3 md:px-6 md:pb-6 md:pt-8">
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 transition-colors hover:text-slate-900"
+            className="absolute right-4 top-3 md:top-4 inline-flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 transition-colors hover:text-slate-900"
           >
-            <X size={18} />
+            <X size={17} />
           </button>
 
           {loading ? (
-            <div className="flex min-h-36 items-center gap-4">
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white bg-slate-200 text-slate-300 shadow-lg">
-                <Loader2 size={28} className="animate-spin text-slate-300" />
+            <div className="flex min-h-24 md:min-h-36 items-center gap-3 md:gap-4">
+              <div className="flex h-16 w-16 md:h-24 md:w-24 shrink-0 items-center justify-center rounded-full border-4 border-white bg-slate-200 text-slate-300 shadow-lg">
+                <Loader2 size={22} className="animate-spin text-slate-300" />
               </div>
               <div className="flex-1">
-                <div className="mb-3 h-4 w-28 animate-pulse rounded-full bg-slate-200" />
-                <div className="mb-2 h-8 w-40 animate-pulse rounded-full bg-slate-200" />
-                <p className="text-sm font-medium text-slate-400">프로필을 불러오는 중입니다.</p>
+                <div className="mb-2 h-3 w-24 animate-pulse rounded-full bg-slate-200" />
+                <div className="mb-2 h-6 w-36 animate-pulse rounded-full bg-slate-200" />
+                <p className="text-[13px] font-medium text-slate-400">불러오는 중...</p>
               </div>
             </div>
           ) : profile ? (
-            <div className="flex items-end gap-4">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-slate-200 text-slate-300 shadow-lg">
+            <div className="flex items-center gap-3 md:items-end md:gap-4">
+              <div className="flex h-16 w-16 md:h-24 md:w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-slate-200 text-slate-300 shadow-lg">
                 {profile.avatarUrl ? (
                   <img src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full object-cover" />
                 ) : (
-                  <User size={32} />
+                  <User size={24} className="md:hidden" />
                 )}
+                {!profile.avatarUrl && <User size={32} className="hidden md:block" />}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
+                <div className="mb-1.5 md:mb-2 flex flex-wrap items-center gap-1.5 md:gap-2">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    className={`rounded-full px-2 py-0.5 md:px-2.5 md:py-1 text-[10px] md:text-[11px] font-bold ${
                       profile.role === 'host'
                         ? 'bg-neutral-900 text-white'
                         : 'bg-slate-200 text-slate-700'
@@ -223,11 +229,11 @@ export default function CommunityAuthorModal({
                   >
                     {profile.role === 'host' ? 'Host' : 'Guest'}
                   </span>
-                  <span className="text-[12px] font-medium text-slate-400">
+                  <span className="text-[11px] md:text-[12px] font-medium text-slate-400">
                     {formatJoinDate(profile.joinedAt)}
                   </span>
                 </div>
-                <h2 className="break-words text-[24px] font-black text-slate-900 [overflow-wrap:anywhere]">
+                <h2 className="break-words text-[20px] md:text-[24px] font-black text-slate-900 [overflow-wrap:anywhere]">
                   {profile.displayName}
                 </h2>
               </div>
@@ -239,7 +245,7 @@ export default function CommunityAuthorModal({
           )}
         </div>
 
-        <div className="overflow-y-auto px-6 py-6">
+        <div className="overflow-y-auto px-4 py-4 md:px-6 md:py-6">
           {loading ? (
             <LoadingBody />
           ) : profile ? (

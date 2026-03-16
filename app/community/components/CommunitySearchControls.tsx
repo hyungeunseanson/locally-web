@@ -224,7 +224,8 @@ export default function CommunitySearchControls({
                 </div>
             </div>
 
-            <div className="space-y-3 md:hidden">
+            {/* 모바일: 검색 입력란만 (카테고리 탭은 CommunityCategoryTabs에서 렌더, 정렬은 MobileSortBar에서 렌더) */}
+            <div className="md:hidden">
                 <div className="flex items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full border border-[#E7E7E7] bg-white px-4 shadow-[0_1px_2px_rgba(0,0,0,0.06)] focus-within:shadow-[0_8px_18px_rgba(0,0,0,0.08)]">
                         <Search size={16} className="shrink-0 text-[#6B6B6B]" />
@@ -241,23 +242,6 @@ export default function CommunitySearchControls({
                     >
                         검색
                     </button>
-                </div>
-
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {COMMUNITY_FILTER_CATEGORY_OPTIONS.map((item) => (
-                        <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => handleCategorySelect(item.id)}
-                            className={`h-9 shrink-0 rounded-full border px-4 text-[12px] font-semibold transition-colors ${
-                                category === item.id
-                                    ? 'border-[#222222] bg-[#222222] text-white'
-                                    : 'border-[#E2E2E2] bg-white text-[#4B4B4B]'
-                            }`}
-                        >
-                            {item.label}
-                        </button>
-                    ))}
                 </div>
             </div>
         </form>
