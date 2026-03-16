@@ -81,7 +81,7 @@ export default function MobileProfileView({
     const [editData, setEditData] = useState({ ...profile });
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 1 });
+    const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinMonths: 1 });
     const supabase = useMemo(() => createClient(), []);
     const { showToast, showHeicUnsupportedToast } = useToast();
     const { t } = useLanguage();
@@ -104,11 +104,15 @@ export default function MobileProfileView({
             ]);
             const { data: userData } = await supabase.auth.getUser();
             const createdAt = userData?.user?.created_at ? new Date(userData.user.created_at) : new Date();
-            const joinYears = Math.max(1, new Date().getFullYear() - createdAt.getFullYear());
+            const now = new Date();
+            const totalMonths =
+                (now.getFullYear() - createdAt.getFullYear()) * 12 +
+                (now.getMonth() - createdAt.getMonth());
+            const joinMonths = Math.max(1, totalMonths);
             setStats({
                 tripCount: tripCount || 0,
                 reviewCount: reviewCount || guestReviews.length,
-                joinYears,
+                joinMonths,
             });
         };
         fetchStats();
@@ -272,18 +276,26 @@ export default function MobileProfileView({
                 {/* 우측: 통계 3개 */}
                 <div className="flex-1 flex flex-col gap-2.5 pb-0.5">
                     <div>
-                        <p className="text-[10px] text-gray-400 leading-none">Locally를 통한 여행</p>
+                        <p className="text-[10px] text-gray-400 leading-none">로컬리와 함께한 여행</p>
                         <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[11px] font-semibold">회</span></p>
                     </div>
                     <div className="border-t border-gray-100" />
                     <div>
-                        <p className="text-[10px] text-gray-400 leading-none">후기</p>
+                        <p className="text-[10px] text-gray-400 leading-none">받은 후기</p>
                         <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[11px] font-semibold">개</span></p>
                     </div>
                     <div className="border-t border-gray-100" />
                     <div>
-                        <p className="text-[10px] text-gray-400 leading-none">Locally 가입 기간</p>
-                        <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[11px] font-semibold">년</span></p>
+                        <p className="text-[10px] text-gray-400 leading-none">로컬리와 함께한 시간</p>
+                        <p className="text-[17px] font-extrabold text-gray-900 leading-tight">
+                            {(() => {
+                                const y = Math.floor(stats.joinMonths / 12);
+                                const m = stats.joinMonths % 12;
+                                if (y === 0) return <>{stats.joinMonths} <span className="text-[11px] font-semibold">개월</span></>;
+                                if (m === 0) return <>{y} <span className="text-[11px] font-semibold">년</span></>;
+                                return <>{y} <span className="text-[11px] font-semibold">년</span> {m} <span className="text-[11px] font-semibold">개월</span></>;
+                            })()}
+                        </p>
                     </div>
                 </div>
             </div>
