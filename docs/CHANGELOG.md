@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.25 — [Community] 모바일 전용 UI 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 모바일 카테고리 탭 중복 제거 | `CommunitySearchControls.tsx` — 모바일 category pills 제거 (CommunityCategoryTabs와 중복), 검색 입력란만 유지 |
+| 🟠 PostGridCard 모바일 간소화 | `PostGridCard.tsx` — 모바일에서 작성자 영역 숨김, 하트/댓글 통계만 우측 하단에 표시, 아이콘 size 14→11 / 텍스트 text-[12px]→text-[10px] (-20%), 배지 text-[10px]→text-[8px] (-20%) |
+| 🟠 CommunityAuthorModal 모바일 바텀시트 | `CommunityAuthorModal.tsx` — 모바일: `items-end + rounded-t-[28px]` 바텀시트 스타일, 드래그 핸들 pill, 아바타/폰트 축소; 데스크탑: 기존 중앙 모달 유지 |
+
 ## v3.39.24 — [Community] 인스타 슬라이더 데스크탑 축소 · 정렬 버튼 위치 이동 · 목록 보기 중복 제거
 
 | 항목 | 내용 |
