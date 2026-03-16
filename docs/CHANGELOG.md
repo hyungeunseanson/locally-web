@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.24 — [Community] 인스타 슬라이더 데스크탑 축소 · 정렬 버튼 위치 이동 · 목록 보기 중복 제거
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 InstagramSlider 데스크탑 크기 50% 축소 | `app/community/components/PostImages.tsx` — hero 모드 wrapper에 `md:w-1/2 md:mx-auto` 추가, 모바일 full-width 유지 |
+| 🟠 모바일 최신순/인기순 버튼 위치 이동 | `app/community/components/CommunitySearchControls.tsx` — 모바일 sort grid 제거 / 신규 `MobileSortBar.tsx` 컴포넌트 생성 → `page.tsx`에서 MobileWidgetStrip 하단·피드 상단에 배치 |
+| 🟠 상세 페이지 목록 보기 중복 제거 | `app/community/[id]/page.tsx` — 작성자 행 옆 상단 목록 보기 버튼 삭제, 하단 prev/next 네비의 목록 버튼만 유지 |
+
 ## v3.39.23 — [Community] 그리드 카드 클릭 버그 수정 · 이미지 업로드 개선 · 인스타 슬라이더
 
 | 항목 | 내용 |

@@ -259,23 +259,6 @@ export default function CommunitySearchControls({
                         </button>
                     ))}
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 rounded-full border border-[#E7E7E7] bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                    {SORT_OPTIONS.map((item) => (
-                        <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => handleSortSelect(item.id)}
-                            className={`h-9 rounded-full text-[12px] font-semibold transition-colors ${
-                                sort === item.id
-                                    ? 'bg-[#F5F5F5] text-[#222222]'
-                                    : 'text-[#6B6B6B]'
-                            }`}
-                        >
-                            {item.label}
-                        </button>
-                    ))}
-                </div>
             </div>
         </form>
     );

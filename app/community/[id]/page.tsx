@@ -217,7 +217,7 @@ export default async function CommunityPostDetail({
                                     {post.title}
                                 </h1>
 
-                                <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="mb-5">
                                     <CommunityAuthorTrigger
                                         userId={post.user_id}
                                         authorName={authorName}
@@ -243,14 +243,6 @@ export default async function CommunityPostDetail({
                                             </div>
                                         </div>
                                     </CommunityAuthorTrigger>
-
-                                    <Link
-                                        href={fallbackHref}
-                                        data-testid="community-detail-list-button"
-                                        className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                                    >
-                                        목록 보기
-                                    </Link>
                                 </div>
 
                                 {isCompanion && (post.companion_city || post.companion_date) && (

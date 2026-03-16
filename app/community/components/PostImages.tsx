@@ -39,8 +39,15 @@ export default function PostImages({ images, detail = false, hero = false }: Pos
     if (!images || images.length === 0) return null;
 
     // ─── 로컬리 컨텐츠 상세 hero → 인스타그램 슬라이더 ─────────────
+    // 모바일: full-width 4:5 / 데스크탑: 50% 중앙 정렬
     if (detail && hero) {
-        return <InstagramSlider images={images} />;
+        return (
+            <div className="flex justify-center">
+                <div className="w-full md:w-1/2">
+                    <InstagramSlider images={images} />
+                </div>
+            </div>
+        );
     }
 
     // ─── 단일 이미지 ──────────────────────────────────────────────────

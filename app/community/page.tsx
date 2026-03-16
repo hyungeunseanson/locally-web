@@ -5,6 +5,7 @@ import CommunityCategoryTabs from './components/CommunityCategoryTabs';
 import CommunityFeed from './CommunityFeed';
 import RightSidebar from './components/RightSidebar';
 import MobileWidgetStrip from './components/MobileWidgetStrip';
+import MobileSortBar from './components/MobileSortBar';
 import CommunitySearchControls from './components/CommunitySearchControls';
 import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
@@ -194,6 +195,13 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                             {category !== 'locally_content' && (
                                 <MobileWidgetStrip />
                             )}
+
+                            {/* 모바일 전용 정렬 버튼 (위젯 아래, 피드 위) */}
+                            <MobileSortBar
+                                currentCategory={category}
+                                currentQuery={queryText}
+                                currentSort={sort}
+                            />
 
                             {/* 피드 */}
                             <CommunityFeed
