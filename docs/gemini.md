@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-16 (v3.39.18 service request rpc fallback / community view count / inquiry fast path)
-**Version:** 3.39.18 (Service Request RPC Fallback and Community View Count)
+**Last Updated:** 2026-03-16 (v3.39.19 notification policy alignment)
+**Version:** 3.39.19 (Notification Policy Alignment)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -237,6 +237,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 호스트 대시보드 `ProfileEditor` 저장은 `POST /api/host/profile` 서버 route가 맡는다. 이 route는 공개 프로필 필드(`full_name`, `job`, `dream_destination`, `favorite_song`, `languages`, `avatar_url`)와 latest `host_applications.self_intro`만 갱신하며, 정산/국적/지원서 private 필드는 계속 읽기 전용으로 유지한다.
 - 호스트 대시보드 리뷰 탭 쓰기는 `POST /api/host/guest-reviews`, `POST /api/host/reviews/reply` 서버 route가 맡는다. 게스트 후기 생성은 `booking -> experiences.host_id` 소유권과 중복 여부를, 후기 답글 저장은 `review -> experiences.host_id` 소유권을 서버에서 검증한 뒤 반영한다.
 - `useChat`의 문의 읽음 처리도 `POST /api/inquiries/read` 서버 route가 맡는다. 이 route는 문의 참여자(게스트/호스트) 또는 관리자만 접근할 수 있고, 상대방이 보낸 `read_at IS NULL` 메시지만 `is_read=true`, `read_at=now()`로 갱신한다.
+- 결제/취소 메일 기준은 도메인 owner route가 직접 통제한다. 체험 카드/PayPal 결제 완료는 게스트/호스트 모두 인앱 + 메일, 체험 취소 완료는 게스트/호스트 모두 인앱 + 메일, 서비스 결제 완료는 고객 + eligible host 인앱 + 메일, 서비스 취소 요청/완료는 고객/호스트 인앱 + 메일을 기본으로 하고 관리자 메일은 `adminAlertCenter` 기준으로 유지한다.
 - 호스트 지원서의 `language_cert`는 입력/저장을 유지하며, 관리자 상세에서만 텍스트로 노출한다.
 - 호스트 지원서 상태의 `idCardType`은 로컬 상태만 존재하고, 렌더/저장/조회 경로가 없다.
 - 체험 등록의 `spots`는 생성 시 저장되지만 현재 런타임 읽기 경로가 없다.

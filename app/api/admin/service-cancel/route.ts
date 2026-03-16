@@ -3,21 +3,14 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import crypto from 'crypto';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
+import { notifyServiceCancellationCompleted } from '@/app/utils/serviceNotificationFlows';
 
 type AdminCancelBody = {
   order_id?: string;
   refund_amount?: number;
   cancel_reason?: string;
-};
-
-type NotificationInsertRow = {
-  user_id: string;
-  type: string;
-  title: string;
-  message: string;
-  link: string;
-  is_read: boolean;
 };
 
 export async function POST(request: Request) {
@@ -90,6 +83,34 @@ export async function POST(request: Request) {
         target_type: 'service_booking',
         target_id: order_id,
         details: { cancel_reason, refund_amount: 0, pg_called: false },
+      });
+
+      await notifyServiceCancellationCompleted({
+        supabaseAdmin,
+        requestId: booking.request_id,
+        requestTitle,
+        customerId: booking.customer_id || null,
+        hostId: booking.host_id || null,
+        refundAmount: 0,
+      });
+
+      const adminMessage = `'${requestTitle}' 서비스 의뢰가 관리자에 의해 취소되었습니다. 주문번호: ${order_id}`;
+      insertAdminAlerts({
+        title: '서비스 의뢰가 강제 취소되었습니다',
+        message: adminMessage,
+        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+      }).catch((adminAlertError) => {
+        console.error('[ADMIN] service cancel admin alert error:', adminAlertError);
+      });
+
+      sendAdminAlertEmails({
+        subject: '[Locally Admin] 서비스 강제 취소 완료',
+        title: '서비스 의뢰가 강제 취소되었습니다',
+        message: adminMessage,
+        link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+        ctaLabel: '서비스 요청 보기',
+      }).catch((adminEmailError) => {
+        console.error('[ADMIN] service cancel admin email error:', adminEmailError);
       });
 
       return NextResponse.json({ success: true, message: '의뢰가 취소되었습니다 (결제 전).' });
@@ -192,33 +213,33 @@ export async function POST(request: Request) {
       .update({ status: 'cancelled' })
       .eq('id', booking.request_id);
 
-    // 7. Notify customer + host (non-blocking)
-    const notifs: NotificationInsertRow[] = [];
-    if (booking.customer_id) {
-      notifs.push({
-        user_id: booking.customer_id,
-        type: 'service_cancelled',
-        title: '의뢰가 취소되었습니다.',
-        message: `'${requestTitle}' 의뢰가 관리자에 의해 취소되었습니다. 환불 처리가 진행됩니다.`,
-        link: '/services/my',
-        is_read: false,
-      });
-    }
-    if (booking.host_id) {
-      notifs.push({
-        user_id: booking.host_id,
-        type: 'service_cancelled',
-        title: '의뢰가 취소되었습니다.',
-        message: `'${requestTitle}' 의뢰가 관리자에 의해 취소되었습니다.`,
-        link: '/host/services',
-        is_read: false,
-      });
-    }
-    if (notifs.length > 0) {
-      supabaseAdmin.from('notifications').insert(notifs).then(({ error }) => {
-        if (error) console.error('[ADMIN] cancel notification error:', error);
-      });
-    }
+    await notifyServiceCancellationCompleted({
+      supabaseAdmin,
+      requestId: booking.request_id,
+      requestTitle,
+      customerId: booking.customer_id || null,
+      hostId: booking.host_id || null,
+      refundAmount: actualRefundAmount,
+    });
+
+    const adminMessage = `'${requestTitle}' 서비스 의뢰가 관리자에 의해 취소되었습니다. 주문번호: ${order_id}`;
+    insertAdminAlerts({
+      title: '서비스 의뢰가 강제 취소되었습니다',
+      message: adminMessage,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+    }).catch((adminAlertError) => {
+      console.error('[ADMIN] service cancel admin alert error:', adminAlertError);
+    });
+
+    sendAdminAlertEmails({
+      subject: '[Locally Admin] 서비스 강제 취소 완료',
+      title: '서비스 의뢰가 강제 취소되었습니다',
+      message: adminMessage,
+      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+      ctaLabel: '서비스 요청 보기',
+    }).catch((adminEmailError) => {
+      console.error('[ADMIN] service cancel admin email error:', adminEmailError);
+    });
 
     // 8. Audit log (fail-safe — from recordAuditLog)
     await recordAuditLog({

@@ -4,7 +4,7 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { getPortOnePayment } from '@/app/utils/portone/server';
-import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
+import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
 
 type ServiceNicePayCallbackBody = {
   imp_uid?: string;
@@ -141,44 +141,16 @@ export async function POST(request: Request) {
       console.error('[SERVICE] Request status update failed:', requestUpdateErr);
     }
 
-    void (async () => {
-      try {
-        const hostIds = await getEligibleServiceHostIds(supabaseAdmin, {
-          requestCity: reqCity,
-          requestCountry: reqCountry,
-          customerId: serviceBooking.customer_id,
-        });
-        if (hostIds.length === 0) return;
-
-        const notifications = hostIds.map((hostId) => ({
-          user_id: hostId,
-          type: 'service_request_new',
-          title: `📋 새로운 맞춤 서비스 의뢰 — ${reqCity}`,
-          message: `${requestTitle} (${reqDuration}시간, ${reqGuests}명)`,
-          link: `/services/${serviceBooking.request_id}`,
-          is_read: false,
-        }));
-
-        const { error: notiErr } = await supabaseAdmin.from('notifications').insert(notifications);
-        if (notiErr) console.error('[SERVICE] Host Notification Error:', notiErr);
-      } catch (hostNotificationError) {
-        console.error('[SERVICE] eligible host notification error:', hostNotificationError);
-      }
-    })();
-
-    supabaseAdmin
-      .from('notifications')
-      .insert({
-        user_id: serviceBooking.customer_id,
-        type: 'service_payment_confirmed',
-        title: '✅ 결제 완료! 호스트 모집이 시작됩니다',
-        message: `'${requestTitle}' 결제가 완료되었습니다. 현지 호스트들의 지원이 시작됩니다.`,
-        link: `/services/${serviceBooking.request_id}`,
-        is_read: false,
-      })
-      .then(({ error }) => {
-        if (error) console.error('[SERVICE] Payment Notification Error:', error);
-      });
+    await notifyServicePaymentOpened({
+      supabaseAdmin,
+      requestId: serviceBooking.request_id,
+      requestTitle,
+      requestCity: reqCity,
+      requestCountry: reqCountry,
+      durationHours: reqDuration,
+      guestCount: reqGuests,
+      customerId: serviceBooking.customer_id,
+    });
 
     insertAdminAlerts({
       title: '서비스 결제가 완료되었습니다',

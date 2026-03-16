@@ -3,6 +3,10 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import crypto from 'crypto';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
+import {
+  notifyServiceCancellationCompleted,
+  notifyServiceCancellationRequested,
+} from '@/app/utils/serviceNotificationFlows';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 
 type CancelBody = {
@@ -199,6 +203,15 @@ export async function POST(request: Request) {
         console.error('Service Cancel Admin Email Error:', adminEmailError);
       });
 
+      await notifyServiceCancellationCompleted({
+        supabaseAdmin,
+        requestId: booking.request_id,
+        requestTitle,
+        customerId: booking.customer_id || null,
+        hostId: booking.host_id || null,
+        refundAmount: 0,
+      });
+
       return NextResponse.json({ success: true, message: '의뢰가 취소되었습니다.' });
     }
 
@@ -246,6 +259,15 @@ export async function POST(request: Request) {
         console.error('Service Refund Cancel Admin Email Error:', adminEmailError);
       });
 
+      await notifyServiceCancellationCompleted({
+        supabaseAdmin,
+        requestId: booking.request_id,
+        requestTitle,
+        customerId: booking.customer_id || null,
+        hostId: booking.host_id || null,
+        refundAmount: refundResult.refundAmount,
+      });
+
       return NextResponse.json({ success: true, message: '의뢰가 취소되고 환불이 처리됩니다.' });
     }
 
@@ -255,19 +277,13 @@ export async function POST(request: Request) {
       .update({ status: 'cancellation_requested', cancel_reason })
       .eq('order_id', order_id);
 
-    const otherPartyId = isCustomer ? booking.host_id : booking.customer_id;
-    if (otherPartyId) {
-      supabaseAdmin.from('notifications').insert({
-        user_id: otherPartyId,
-        type: 'service_cancelled',
-        title: '취소 요청이 접수되었습니다.',
-        message: `'${requestTitle}' 서비스에 대한 취소 요청이 접수되었습니다. 관리자가 검토 후 처리합니다.`,
-        link: `/services/my`,
-        is_read: false,
-      }).then(({ error }) => {
-        if (error) console.error('Cancel Notification Error:', error);
-      });
-    }
+    await notifyServiceCancellationRequested({
+      supabaseAdmin,
+      requestId: booking.request_id,
+      requestTitle,
+      customerId: booking.customer_id || null,
+      hostId: booking.host_id || null,
+    });
 
     const adminMessage = `'${requestTitle}' 서비스에 취소 요청이 접수되었습니다. 주문번호: ${order_id}`;
     insertAdminAlerts({

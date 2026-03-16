@@ -310,6 +310,33 @@ async function waitForServiceRequestNotificationCount(userId: string, requestId:
   throw new Error(`Notification count for ${userId} did not reach ${expectedCount}.`);
 }
 
+async function waitForNotificationCount(params: {
+  userId: string;
+  type: string;
+  link: string;
+  expectedCount: number;
+}) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', params.userId)
+      .eq('type', params.type)
+      .eq('link', params.link);
+
+    if (error) throw error;
+    if ((data?.length || 0) === params.expectedCount) return;
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(
+    `Notification count for ${params.userId} / ${params.type} / ${params.link} did not reach ${params.expectedCount}.`
+  );
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -388,6 +415,12 @@ test.describe.serial('Service host notification scope', () => {
 
     await waitForServiceRequestNotificationCount(seoulHostId, fixture.requestId, 1);
     await waitForServiceRequestNotificationCount(busanHostId, fixture.requestId, 0);
+    await waitForNotificationCount({
+      userId: customerId,
+      type: 'service_payment_confirmed',
+      link: `/services/${fixture.requestId}`,
+      expectedCount: 1,
+    });
 
     const supabase = getAdminClient();
     const { data: booking, error: bookingError } = await supabase

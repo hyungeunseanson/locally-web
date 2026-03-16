@@ -3,7 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import { getEligibleServiceHostIds } from '@/app/utils/serviceHostNotifications';
+import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
 
 export async function POST(request: Request) {
   try {
@@ -83,43 +83,19 @@ export async function POST(request: Request) {
       console.error('[ADMIN] service request update error:', requestUpdateErr);
     }
 
-    // 7. Notify eligible hosts with the same scope as card/PayPal confirmation
-    void (async () => {
-      try {
-        const hostIds = await getEligibleServiceHostIds(supabaseAdmin, {
-          requestCity: reqCity,
-          requestCountry: reqCountry,
-          customerId: booking.customer_id,
-        });
-        if (hostIds.length === 0) return;
-
-        const notifications = hostIds.map((hostId) => ({
-          user_id: hostId,
-          type: 'service_request_new',
-          title: `📋 새로운 맞춤 서비스 의뢰 — ${reqCity}`,
-          message: `${requestTitle} (${reqDuration}시간, ${reqGuests}명)`,
-          link: `/services/${booking.request_id}`,
-          is_read: false,
-        }));
-        const { error: notiErr } = await supabaseAdmin.from('notifications').insert(notifications);
-        if (notiErr) console.error('[ADMIN] host notification error:', notiErr);
-      } catch (hostNotificationError) {
-        console.error('[ADMIN] eligible host notification error:', hostNotificationError);
-      }
-    })();
-
-    // 8. Notify customer (identical to nicepay-callback)
-    supabaseAdmin.from('notifications').insert({
-      user_id: booking.customer_id,
-      type: 'service_payment_confirmed',
-      title: '✅ 입금 확인 완료! 호스트 모집이 시작됩니다',
-      message: `'${requestTitle}' 입금이 확인되어 현지 호스트들의 지원이 시작됩니다.`,
-      link: `/services/${booking.request_id}`,
-      is_read: false,
-    }).then(({ error }) => {
-      if (error) console.error('[ADMIN] customer notification error:', error);
+    // 7. Notify customer + eligible hosts
+    await notifyServicePaymentOpened({
+      supabaseAdmin,
+      requestId: booking.request_id,
+      requestTitle,
+      requestCity: reqCity,
+      requestCountry: reqCountry,
+      durationHours: reqDuration,
+      guestCount: reqGuests,
+      customerId: booking.customer_id,
     });
 
+    // 8. Admin alert
     insertAdminAlerts({
       title: '서비스 입금 확인이 완료되었습니다',
       message: `'${requestTitle}' 서비스의 무통장 입금이 확인되어 호스트 모집이 시작되었습니다.`,

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
+import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
 import { getPortOnePayment } from '@/app/utils/portone/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
@@ -184,31 +185,17 @@ export async function POST(request: Request) {
     const resolvedHostId = bookingExperienceMeta?.host_id;
     const guestName = bookingData.contact_name || '게스트';
 
-    if (resolvedHostId) {
-      await supabaseAdmin.from('notifications').insert({
-        user_id: resolvedHostId,
-        type: 'new_booking',
-        title: '🎉 새로운 예약 도착!',
-        message: `[${expTitle}] 체험에 ${guestName}님의 예약이 확정되었습니다.`,
-        link: '/host/dashboard',
-        is_read: false,
-      });
-
-      fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'booking_confirmation',
-          hostId: resolvedHostId,
-          guestName,
-          experienceTitle: expTitle,
-          guestsCount: bookingData.guests,
-          bookingDate: bookingData.date,
-          bookingTime: bookingData.time,
-          totalAmount: bookingData.amount || expectedAmount,
-        }),
-      }).catch((mailError) => console.error('Background fetch to send-email failed:', mailError));
-    }
+    await notifyExperiencePaymentConfirmed({
+      supabaseAdmin,
+      guestId: bookingData.user_id || null,
+      hostId: resolvedHostId || null,
+      experienceTitle: expTitle,
+      guestName,
+      guestsCount: Number(bookingData.guests || 1),
+      bookingDate: bookingData.date,
+      bookingTime: bookingData.time || null,
+      totalAmount: Number(bookingData.amount || expectedAmount || 0),
+    });
 
     insertAdminAlerts({
       title: '체험 예약 결제가 완료되었습니다',

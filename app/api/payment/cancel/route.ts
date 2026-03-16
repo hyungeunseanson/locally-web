@@ -6,6 +6,7 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 
 const TIMEZONE = 'Asia/Seoul';
@@ -152,18 +153,39 @@ export async function POST(request: Request) {
     const hostId = booking.experiences?.host_id;
     const expTitle = booking.experiences?.title;
 
-    if (hostId) {
-      // (A) 알림 저장
-      await supabaseAdmin.from('notifications').insert({
-        user_id: hostId,
-        type: 'cancellation',
-        title: '😢 예약이 취소되었습니다.',
-        message: `[${expTitle}] 예약이 취소되었습니다. 환불액: ₩${refundAmount.toLocaleString()}`,
-        link: '/host/dashboard',
-        is_read: false
-      });
+    try {
+      const notifications = [];
+      if (hostId) {
+        notifications.push({
+          user_id: hostId,
+          type: 'cancellation',
+          title: '😢 예약이 취소되었습니다.',
+          message: `[${expTitle}] 예약이 취소되었습니다. 환불액: ₩${refundAmount.toLocaleString()}`,
+          link: '/host/dashboard',
+          is_read: false,
+        });
+      }
+      if (booking.user_id) {
+        notifications.push({
+          user_id: booking.user_id,
+          type: 'cancellation',
+          title: '예약이 취소되었습니다.',
+          message: `'${expTitle}' 예약이 취소되었습니다. 환불액: ₩${refundAmount.toLocaleString()}`,
+          link: '/guest/trips',
+          is_read: false,
+        });
+      }
+      if (notifications.length > 0) {
+        const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notifications);
+        if (notificationError) {
+          console.error('Booking cancellation notification insert error:', notificationError);
+        }
+      }
+    } catch (notificationError) {
+      console.error('Booking cancellation notification side effect error:', notificationError);
+    }
 
-      // (B) 이메일 발송
+    if (hostId) {
       let hostEmail = '';
       const { data: hostProfile } = await supabaseAdmin.from('profiles').select('email, name').eq('id', hostId).maybeSingle();
 
@@ -175,7 +197,6 @@ export async function POST(request: Request) {
       }
 
       if (hostEmail) {
-        // Decoupled Email Sending (Non-blocking background push)
         fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -188,6 +209,19 @@ export async function POST(request: Request) {
           })
         }).catch(e => console.error('Background fetch to send-email failed:', e));
       }
+    }
+
+    if (booking.user_id) {
+      void sendImmediateGenericEmail({
+        recipientUserId: booking.user_id,
+        subject: '[Locally] 예약 취소 안내',
+        title: '예약이 취소되었습니다',
+        message: `'${expTitle}' 예약이 취소되었습니다.\n환불액: ₩${refundAmount.toLocaleString()}`,
+        link: '/guest/trips',
+        ctaLabel: '내 여행 보기',
+      }).catch((emailError) => {
+        console.error('Guest booking cancellation email failed:', emailError);
+      });
     }
 
     await insertAdminAlerts({

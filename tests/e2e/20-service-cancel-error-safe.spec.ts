@@ -354,5 +354,16 @@ test.describe.serial('Service customer cancel error-safe flow', () => {
 
     expect(booking?.status).toBe('cancelled');
     expect(serviceRequest?.status).toBe('cancelled');
+
+    const { data: notifications, error: notificationError } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', customerId)
+      .eq('type', 'service_cancelled')
+      .eq('link', `/services/${fixture.requestId}`);
+
+    if (notificationError) throw notificationError;
+
+    expect((notifications || []).length).toBeGreaterThan(0);
   });
 });

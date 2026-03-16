@@ -5,6 +5,17 @@
 
 ---
 
+## v3.39.19 — [Notifications] 결제/취소 메일 기준 통일
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 체험 카드/PayPal 결제 완료 통일 | `app/api/payment/nicepay-callback/route.ts`, `app/api/payment/paypal/capture-order/route.ts`가 새 `app/utils/experienceNotificationFlows.ts`를 통해 호스트뿐 아니라 게스트에게도 `booking_confirmed` 인앱 알림과 즉시 메일을 발송하도록 정리 |
+| 🟠 체험 취소 완료 게스트 안내 추가 | `app/api/payment/cancel/route.ts`가 기존 호스트 알림/메일 유지와 함께 게스트에게도 `cancellation` 인앱 알림과 취소 안내 메일을 보내도록 정리 |
+| 🟠 서비스 결제 완료 통일 | 새 `app/utils/serviceNotificationFlows.ts`를 추가하고, `app/api/services/payment/nicepay-callback/route.ts`, `app/api/services/payment/paypal/capture-order/route.ts`, `app/api/admin/service-confirm-payment/route.ts`가 모두 같은 helper로 고객 `service_payment_confirmed` + eligible host `service_request_new` 인앱/메일을 발송하도록 정리 |
+| 🟠 서비스 취소 요청/완료 통일 | `app/api/services/cancel/route.ts`, `app/api/admin/service-cancel/route.ts`가 취소 요청은 고객/호스트 모두에게, 취소 완료는 고객/호스트 모두에게 인앱 + 메일을 보내도록 정리하고, 링크도 공통 `/services/[id]` detail 기준으로 맞춤 |
+| 🟡 정책 문서 정리 | `docs/email_notification_policy.md`를 실제 운영 기준에 맞춰 업데이트하고, `docs/gemini.md` 현재 기준 메모도 최신화 |
+| 🟡 회귀 확인 | `tests/e2e/20-service-cancel-error-safe.spec.ts`, `tests/e2e/22-service-host-notification-scope.spec.ts`에 고객 알림 계약을 보강하고 관련 결제/취소/알림 스모크를 재검증 |
+
 ## v3.39.18 — [Service Requests] RPC 우선 원자화 경로 추가
 
 | 항목 | 내용 |
