@@ -21,7 +21,7 @@ const SITEMAP_LINKS = [
     category: 'Hosting',
     links: [
       { name: '호스트 되기', url: '/become-a-host' },
-      { name: '커뮤니티 포럼', url: '/community' },
+      { name: '커뮤니티', url: '/community' },
       { name: '호스트 대시보드', url: '/host/dashboard' },
     ]
   },
@@ -55,7 +55,7 @@ export default function SitemapPage() {
   return (
     <div className="min-h-screen bg-white text-[#222222] font-sans selection:bg-black selection:text-white flex flex-col">
       <SiteHeader />
-      
+
       <main className="flex-1 max-w-[1040px] mx-auto px-6 py-24 w-full">
         <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-20">
           Sitemap
@@ -70,8 +70,8 @@ export default function SitemapPage() {
               <ul className="space-y-4">
                 {section.links.map((link, i) => (
                   <li key={i}>
-                    <Link 
-                      href={link.url} 
+                    <Link
+                      href={link.url}
                       className="text-[#717171] hover:text-black hover:underline decoration-1 underline-offset-4 transition-colors font-medium block"
                     >
                       {link.name}

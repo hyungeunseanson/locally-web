@@ -67,7 +67,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     footer_admin: "Admin",
     footer_hosting: "호스팅",
     footer_become_host: "호스트 되기",
-    footer_community: "커뮤니티 포럼",
+    footer_community: "커뮤니티",
     footer_locally: "로컬리",
     footer_news: "뉴스",
     footer_careers: "채용 정보",
