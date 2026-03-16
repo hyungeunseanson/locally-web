@@ -6,6 +6,7 @@ import PostListCard from './components/PostListCard';
 import PostGridCard from './components/PostGridCard';
 import { Loader2, MessageSquareDashed } from 'lucide-react';
 import Link from 'next/link';
+import { parseCommunityFeedResponse } from './feedSelect';
 
 interface CommunityFeedProps {
     initialData: CommunityPost[];
@@ -102,7 +103,11 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
             const url = `/api/community?${params.toString()}`;
 
             const res = await fetch(url);
-            const { data, nextOffset: newOffset } = await res.json();
+            const payload = await res.json();
+            if (!res.ok) {
+                throw new Error(payload?.error || '커뮤니티 피드를 불러오지 못했습니다.');
+            }
+            const { data, nextOffset: newOffset } = parseCommunityFeedResponse(payload);
 
             if (data && data.length > 0) {
                 setPosts(prev => {

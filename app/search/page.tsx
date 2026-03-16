@@ -3,7 +3,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import SiteFooter from '@/app/components/SiteFooter';
 import ExperienceCard from '@/app/components/ExperienceCard';
@@ -34,47 +33,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
-
-interface SearchExperience {
-  id: string;
-  title?: string;
-  category?: string;
-  city?: string;
-  country?: string;
-  languages?: string[];
-  image_url?: string;
-  photos?: string[];
-  rating?: number;
-  price?: number | string;
-  [key: string]: unknown;
-}
-
-const SEARCH_EXPERIENCE_SELECT = [
-  'id',
-  'title',
-  'description',
-  'city',
-  'country',
-  'category',
-  'title_ko',
-  'description_ko',
-  'title_en',
-  'description_en',
-  'category_en',
-  'title_ja',
-  'description_ja',
-  'category_ja',
-  'title_zh',
-  'description_zh',
-  'category_zh',
-  'languages',
-  'image_url',
-  'photos',
-  'rating',
-  'review_count',
-  'price',
-  'location',
-].join(', ');
+import type { SearchExperience, SearchExperiencesResponse } from './searchContract';
 
 const TIME_OPTIONS = [
   { id: 'morning', label: '오전', desc: '낮 12시 이전' },
@@ -109,19 +68,6 @@ function formatShortDate(iso: string | null) {
   return `${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
 
-function normalizeSearchInput(value: string) {
-  return value
-    .replace(/[(),'"`]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function tokenizeSearchInput(value: string) {
-  const normalized = normalizeSearchInput(value);
-  return normalized ? normalized.split(' ').filter(Boolean) : [];
-}
-
 function asString(value: unknown) {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
@@ -140,69 +86,6 @@ function arrayToText(value: unknown) {
       return '';
     })
     .join(' ');
-}
-
-function buildSearchHaystack(item: SearchExperience) {
-  const record = item as Record<string, unknown>;
-  return [
-    item.title,
-    item.description,
-    item.city,
-    item.country,
-    item.category,
-    record.title_ko,
-    record.description_ko,
-    record.title_en,
-    record.description_en,
-    record.category_en,
-    record.title_ja,
-    record.description_ja,
-    record.category_ja,
-    record.title_zh,
-    record.description_zh,
-    record.category_zh,
-    arrayToText(record.tags),
-  ]
-    .map(asString)
-    .join(' ')
-    .toLowerCase();
-}
-
-function parseSearchDate(iso: string | null) {
-  if (!iso) return null;
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
-function getExperienceDates(item: SearchExperience) {
-  const record = item as Record<string, unknown>;
-  const candidates = [record.available_dates, record.availableDates];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate.map((value) => asString(value)).filter(Boolean);
-    }
-  }
-  return [];
-}
-
-function matchesDateRange(item: SearchExperience, startDate: string | null, endDate: string | null) {
-  const start = parseSearchDate(startDate);
-  if (!start) return true;
-
-  const end = parseSearchDate(endDate) || start;
-  const startBoundary = new Date(start);
-  const endBoundary = new Date(end);
-  startBoundary.setHours(0, 0, 0, 0);
-  endBoundary.setHours(23, 59, 59, 999);
-
-  const availableDates = getExperienceDates(item);
-  if (availableDates.length === 0) return false;
-
-  return availableDates.some((dateValue) => {
-    const timestamp = new Date(dateValue).getTime();
-    return Number.isFinite(timestamp) && timestamp >= startBoundary.getTime() && timestamp <= endBoundary.getTime();
-  });
 }
 
 function getTimeHaystack(item: SearchExperience) {
@@ -238,7 +121,6 @@ function matchesTimeSelection(item: SearchExperience, selectedTimes: string[]) {
 
 function SearchResults() {
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const { lang, t } = useLanguage();
 
@@ -279,65 +161,20 @@ function SearchResults() {
     const fetchSearchResults = async () => {
       setLoading(true);
       try {
-        let query = supabase
-          .from('experiences')
-          .select(SEARCH_EXPERIENCE_SELECT)
-          .eq('status', 'active');
+        const params = new URLSearchParams();
+        if (location) params.set('location', location);
+        if (language) params.set('language', language);
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
 
-        if (location) {
-          const searchTerms = tokenizeSearchInput(location);
-          if (searchTerms.length === 0) {
-            if (requestId === requestSeqRef.current) {
-              setExperiences([]);
-              setLoading(false);
-            }
-            return;
-          }
+        const response = await fetch(`/api/search/experiences?${params.toString()}`);
+        const payload = await response.json();
 
-          const searchFields = [
-            'title',
-            'description',
-            'city',
-            'country',
-            'category',
-            'title_ko',
-            'description_ko',
-            'title_en',
-            'description_en',
-            'category_en',
-            'title_ja',
-            'description_ja',
-            'category_ja',
-            'title_zh',
-            'description_zh',
-            'category_zh',
-          ];
-
-          const seedTerm = searchTerms[0].replace(/[%_]/g, '');
-          if (seedTerm) {
-            const orQuery = searchFields.map((field) => `${field}.ilike.%${seedTerm}%`).join(',');
-            query = query.or(orQuery);
-          }
+        if (!response.ok) {
+          throw new Error(payload.error || '검색 결과를 불러오는데 실패했습니다.');
         }
 
-        if (language !== 'all') {
-          query = query.contains('languages', [language]);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        const searchTerms = tokenizeSearchInput(location);
-        let nextData = (data ?? []) as unknown as SearchExperience[];
-
-        if (searchTerms.length > 0) {
-          nextData = nextData.filter((item) => {
-            const haystack = buildSearchHaystack(item);
-            return searchTerms.every((term) => haystack.includes(term));
-          });
-        }
-
-        nextData = nextData.filter((item) => matchesDateRange(item, startDate, endDate));
+        const nextData = ((payload as SearchExperiencesResponse).data ?? []) as SearchExperience[];
         if (requestId === requestSeqRef.current) {
           setExperiences(nextData);
         }
@@ -354,7 +191,7 @@ function SearchResults() {
     };
 
     fetchSearchResults();
-  }, [location, language, startDate, endDate, showToast, supabase, searchSignature]);
+  }, [location, language, startDate, endDate, showToast, searchSignature]);
 
   const filteredExperiences = useMemo(() => {
     let nextItems = experiences;

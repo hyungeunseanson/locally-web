@@ -54,6 +54,15 @@
 | 🟠 search drift 정리 | 실제 DB에 없는 `experiences.tags`, `experiences.available_dates`를 검색 목록 select에서 제거해 `/search` 빈결과/400 에러를 제거 |
 | 🟡 회귀 확인 | `43-guest-search-detail-ingress`, `46-community-detail-state`, `25-public-metadata` 재검증 기준 유지 |
 
+## v3.39.14 — [Public Search & Community Feed] 서버 필터링 / 응답 계약 2차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 search 서버 경계 추가 | 새 `app/api/search/experiences/route.ts`를 추가해 `/search`가 브라우저에서 직접 `experiences`/`experience_availability`를 조회하지 않고, 서버가 목록 select + availability 병합 + 위치/언어/날짜 필터를 처리한 뒤 `SearchExperiencesResponse` 계약으로 반환하도록 정리 |
+| 🟠 search 계약 공통화 | 새 `app/search/searchContract.ts`로 목록 select 문자열과 `SearchExperience`/`SearchExperiencesResponse` 타입을 공통화해 page/route가 같은 필드 계약을 사용하도록 정리 |
+| 🟠 community infinite scroll 응답 고정 | `app/community/feedSelect.ts`에 `CommunityFeedResponse`/`parseCommunityFeedResponse()`를 추가하고, `app/community/CommunityFeed.tsx`가 `/api/community` 응답을 느슨한 `any` 대신 명시 계약으로 파싱하도록 정리 |
+| 🟡 회귀 확인 | `43-guest-search-detail-ingress`, `46-community-detail-state`, `25-public-metadata` 재통과로 검색 진입/커뮤니티 상세/공개 메타 회귀가 없는지 확인 |
+
 ## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
 
 | 항목 | 내용 |

@@ -424,6 +424,8 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - `/community`처럼 필터 query를 쓰는 공개 목록은 canonical과 `alternates.languages`를 기본 목록 경로에 고정해 query 조합별 중복 신호를 만들지 않는다.
 - `sitemap.xml`은 dead path를 포함하지 않아야 하며, `/search`, `/community`, `/services/intro`, `/site-map` 같은 주요 공개 진입 페이지를 누락하지 않는다.
 - 정적 공개 URL의 sitemap `lastModified`는 매 요청 시각이 아니라 해당 라우트 소스 파일들의 실제 수정 시각(`fs.stat().mtime`) 기준으로 계산한다. 동적 체험 상세는 DB `updated_at`을 계속 사용한다.
+- `/search` 공개 목록은 브라우저가 직접 `experiences`를 넓게 읽지 않는다. `app/api/search/experiences/route.ts`가 `SEARCH_EXPERIENCE_SELECT` 계약으로 목록 필드만 읽고, `experience_availability`를 병합해 위치/언어/날짜 필터를 서버에서 먼저 적용한 뒤 `SearchExperiencesResponse`로 반환한다.
+- 커뮤니티 infinite scroll 응답은 `app/community/feedSelect.ts`의 `CommunityFeedResponse`/`parseCommunityFeedResponse()`를 단일 계약으로 사용한다. `CommunityFeed`는 `/api/community` 응답을 느슨한 `any`로 직접 소비하지 않는다.
 - 동적 상세 중 체험 상세는 `status='active' && is_active !== false`일 때만 indexable 메타를 유지하고, 그 외 상태는 `noindex`로 낮춘다. 서비스 의뢰 상세(`/services/[requestId]`)는 공유용 title/description은 유지하되 항상 `noindex`다.
 - 동적 상세 title은 root layout의 `%s | Locally` template를 전제로 하므로, page-level title 문자열에 `| Locally`나 `- Locally`를 중복으로 직접 붙이지 않는다. 공개 동적 상세(체험, 커뮤니티 글)는 self-canonical을 반드시 가진다.
 - locale prefix rewrite를 쓰는 공개 페이지는 기본 no-prefix 경로를 canonical primary route로 사용하고, `/en`, `/ja`, `/zh` prefix URL은 `alternates.languages`로만 유지한다. `sitemap.xml`의 동적 공개 URL 포함 기준도 page-level indexability 규칙과 정확히 일치해야 한다.
