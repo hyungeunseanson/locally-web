@@ -220,9 +220,6 @@ function SiteHeaderContent() {
                   {isHostView ? (
                     <>
                       <div className="py-2 border-b border-slate-100">
-                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                          <Users2 size={18} /> 커뮤니티
-                        </Link>
                         <Link href="/host/dashboard?tab=reservations" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
                           <CalendarCheck size={18} /> 예약 관리
                         </Link>
@@ -249,6 +246,9 @@ function SiteHeaderContent() {
                         </Link>
                         <Link href="/host/dashboard?tab=profile" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                           <Settings size={18} /> 프로필 설정
+                        </Link>
+                        <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
+                          <Users2 size={18} /> 커뮤니티
                         </Link>
                         {isAdminWhitelisted && (
                           <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
