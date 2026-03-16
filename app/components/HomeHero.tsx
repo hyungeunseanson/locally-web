@@ -265,7 +265,7 @@ export default function HomeHero({
                 NEW
               </div>
             </div>
-            <span className={`text-[10px] leading-tight tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
+            <span className={`text-[11px] leading-tight tracking-[0.02em] ${activeTab === 'experience' ? 'text-[#222222] font-semibold' : 'text-[#717171] font-normal'}`}>
               {t('cat_exp')}
             </span>
             {activeTab === 'experience' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
@@ -282,7 +282,7 @@ export default function HomeHero({
                 NEW
               </div>
             </div>
-            <span className={`text-[10px] leading-tight tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222] font-medium' : 'text-[#717171] font-normal'}`}>
+            <span className={`text-[11px] leading-tight tracking-[0.02em] ${activeTab === 'service' ? 'text-[#222222] font-semibold' : 'text-[#717171] font-normal'}`}>
               {t('cat_service')}
             </span>
             {activeTab === 'service' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[22px] h-[2px] bg-[#222222] rounded-full" />}
@@ -295,7 +295,7 @@ export default function HomeHero({
           }`}>
           <button
             onClick={() => setActiveTab('experience')}
-            className={`relative py-[6px] text-[11px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'experience' ? 'text-[#222222] font-bold' : 'text-[#7E7E7E] font-medium'
+            className={`relative py-[6px] text-[12px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'experience' ? 'text-[#222222] font-extrabold' : 'text-[#7E7E7E] font-medium'
               }`}
           >
             {t('cat_exp')}
@@ -303,7 +303,7 @@ export default function HomeHero({
           </button>
           <button
             onClick={() => setActiveTab('service')}
-            className={`relative py-[6px] text-[11px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'service' ? 'text-[#222222] font-bold' : 'text-[#7E7E7E] font-medium'
+            className={`relative py-[6px] text-[12px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'service' ? 'text-[#222222] font-extrabold' : 'text-[#7E7E7E] font-medium'
               }`}
           >
             {t('cat_service')}
