@@ -193,7 +193,7 @@ export default async function CommunityPostDetail({
                         <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-8">
 
                             {/* Sticky 헤더 */}
-                            <div className="sticky top-0 md:top-20 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-3 flex items-center justify-between">
+                            <div className="sticky top-0 md:top-20 z-50 bg-white/95 border-b border-slate-100 px-5 py-3 flex items-center justify-between [transform:translateZ(0)]">
                                 <BackButton href={fallbackHref} />
                                 <div className="flex items-center gap-3 text-slate-400">
                                     <ShareButton title={post.title} url={pageUrl} />
