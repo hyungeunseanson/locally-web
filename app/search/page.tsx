@@ -33,32 +33,35 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
-import type { SearchExperience, SearchExperiencesResponse } from './searchContract';
+import type {
+  SearchExperience,
+  SearchExperiencesResponse,
+  SearchTimeId,
+  SearchTypeId,
+} from './searchContract';
 
-const TIME_OPTIONS = [
+const TIME_OPTIONS: Array<{ id: SearchTimeId; label: string; desc: string }> = [
   { id: 'morning', label: '오전', desc: '낮 12시 이전' },
   { id: 'afternoon', label: '오후', desc: '오후 12시~오후 5시' },
   { id: 'evening', label: '저녁', desc: '오후 5시 이후' },
 ] as const;
 
-const TIME_KEYWORDS: Record<string, string[]> = {
-  morning: ['오전', '아침', 'morning', 'am'],
-  afternoon: ['오후', '낮', 'afternoon', 'pm'],
-  evening: ['저녁', '밤', '야간', 'evening', 'night'],
-};
-
-const TYPE_OPTIONS = [
-  { id: 'food_tour', label: '맛집 탐방', icon: Utensils, keywords: ['맛집 탐방', '맛집', '음식', 'food'] },
-  { id: 'cafe_dessert', label: '카페/디저트', icon: Coffee, keywords: ['카페/디저트', '카페', '디저트', 'cafe', 'dessert'] },
-  { id: 'walking_healing', label: '산책/힐링', icon: TreePine, keywords: ['산책/힐링', '산책', '힐링', 'walk', 'healing'] },
-  { id: 'shopping', label: '쇼핑', icon: ShoppingBag, keywords: ['쇼핑', 'shopping'] },
-  { id: 'culture', label: '문화 체험', icon: Landmark, keywords: ['문화 체험', '문화', 'culture'] },
-  { id: 'activity', label: '액티비티', icon: Dumbbell, keywords: ['액티비티', 'activity'] },
-  { id: 'nightlife', label: '나이트라이프', icon: MoonStar, keywords: ['나이트라이프', 'nightlife'] },
-  { id: 'architecture', label: '건축', icon: Building2, keywords: ['건축', 'architecture'] },
-  { id: 'show_sports', label: '공연/경기', icon: Ticket, keywords: ['공연/경기', '공연', '경기', 'show', 'sports'] },
-  { id: 'landmark', label: '랜드마크', icon: Flag, keywords: ['랜드마크', '명소', 'landmark'] },
-  { id: 'one_day_class', label: '원데이 클래스', icon: Palette, keywords: ['원데이 클래스', '클래스', 'class'] },
+const TYPE_OPTIONS: Array<{
+  id: SearchTypeId;
+  label: string;
+  icon: typeof Utensils;
+}> = [
+  { id: 'food_tour', label: '맛집 탐방', icon: Utensils },
+  { id: 'cafe_dessert', label: '카페/디저트', icon: Coffee },
+  { id: 'walking_healing', label: '산책/힐링', icon: TreePine },
+  { id: 'shopping', label: '쇼핑', icon: ShoppingBag },
+  { id: 'culture', label: '문화 체험', icon: Landmark },
+  { id: 'activity', label: '액티비티', icon: Dumbbell },
+  { id: 'nightlife', label: '나이트라이프', icon: MoonStar },
+  { id: 'architecture', label: '건축', icon: Building2 },
+  { id: 'show_sports', label: '공연/경기', icon: Ticket },
+  { id: 'landmark', label: '랜드마크', icon: Flag },
+  { id: 'one_day_class', label: '원데이 클래스', icon: Palette },
 ] as const;
 
 function formatShortDate(iso: string | null) {
@@ -66,57 +69,6 @@ function formatShortDate(iso: string | null) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getMonth() + 1}월 ${date.getDate()}일`;
-}
-
-function asString(value: unknown) {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return String(value);
-  return '';
-}
-
-function arrayToText(value: unknown) {
-  if (!Array.isArray(value)) return '';
-  return value
-    .map((entry) => {
-      if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
-      if (entry && typeof entry === 'object') {
-        const record = entry as Record<string, unknown>;
-        return [record.time, record.start, record.label, record.name].map(asString).join(' ');
-      }
-      return '';
-    })
-    .join(' ');
-}
-
-function getTimeHaystack(item: SearchExperience) {
-  const record = item as Record<string, unknown>;
-  return [
-    record.start_time,
-    record.startTime,
-    record.time_slot,
-    record.timeSlot,
-    record.time_of_day,
-    record.timeOfDay,
-    record.session,
-    record.schedule_text,
-    record.scheduleText,
-    arrayToText(record.available_times),
-    arrayToText(record.availableTimes),
-    arrayToText(record.time_slots),
-    arrayToText(record.timeSlots),
-    arrayToText(record.schedules),
-  ]
-    .map(asString)
-    .join(' ')
-    .toLowerCase();
-}
-
-function matchesTimeSelection(item: SearchExperience, selectedTimes: string[]) {
-  if (selectedTimes.length === 0) return true;
-  const haystack = getTimeHaystack(item);
-  if (!haystack) return true;
-
-  return selectedTimes.some((timeId) => (TIME_KEYWORDS[timeId] || []).some((keyword) => haystack.includes(keyword)));
 }
 
 function SearchResults() {
@@ -130,8 +82,8 @@ function SearchResults() {
   const requestSeqRef = useRef(0);
 
   const [activeSheet, setActiveSheet] = useState<'type' | 'time' | 'filter' | null>(null);
-  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedTimes, setSelectedTimes] = useState<SearchTimeId[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<SearchTypeId[]>([]);
 
   const location = searchParams.get('location') || '';
   const language = searchParams.get('language') || 'all';
@@ -147,7 +99,9 @@ function SearchResults() {
     .filter(Boolean)
     .join(' · ');
 
-  const searchSignature = `${location}|${language}|${startDate || ''}|${endDate || ''}`;
+  const selectedTimesKey = useMemo(() => [...selectedTimes].sort().join(','), [selectedTimes]);
+  const selectedTypesKey = useMemo(() => [...selectedTypes].sort().join(','), [selectedTypes]);
+  const searchSignature = `${location}|${language}|${startDate || ''}|${endDate || ''}|${selectedTimesKey}|${selectedTypesKey}`;
 
   useLayoutEffect(() => {
     // 쿼리 변경 직후 이전 결과가 한 프레임 노출되는 현상을 방지
@@ -166,6 +120,8 @@ function SearchResults() {
         if (language) params.set('language', language);
         if (startDate) params.set('startDate', startDate);
         if (endDate) params.set('endDate', endDate);
+        if (selectedTimesKey) params.set('times', selectedTimesKey);
+        if (selectedTypesKey) params.set('types', selectedTypesKey);
 
         const response = await fetch(`/api/search/experiences?${params.toString()}`);
         const payload = await response.json();
@@ -191,39 +147,24 @@ function SearchResults() {
     };
 
     fetchSearchResults();
-  }, [location, language, startDate, endDate, showToast, searchSignature]);
-
-  const filteredExperiences = useMemo(() => {
-    let nextItems = experiences;
-
-    if (selectedTypes.length > 0) {
-      const selectedTypeConfig = TYPE_OPTIONS.filter((option) => selectedTypes.includes(option.id));
-      nextItems = nextItems.filter((item) => {
-        const haystack = `${getContent(item, 'title', lang) || ''} ${getContent(item, 'category', lang) || ''} ${item.city || ''}`.toLowerCase();
-        return selectedTypeConfig.some((option) => option.keywords.some((keyword) => haystack.includes(keyword.toLowerCase())));
-      });
-    }
-
-    nextItems = nextItems.filter((item) => matchesTimeSelection(item, selectedTimes));
-    return nextItems;
-  }, [experiences, selectedTypes, selectedTimes, lang]);
+  }, [location, language, startDate, endDate, selectedTimesKey, selectedTypesKey, showToast, searchSignature]);
 
   const mobileSections = useMemo(() => {
     const cityName = location || '도쿄';
-    const sectionBase = filteredExperiences;
+    const sectionBase = experiences;
 
     return [
       { id: 'izakaya', title: `${cityName} 이자카야 투어`, items: sectionBase.slice(0, 12) },
       { id: 'alley', title: `${cityName} 로컬 골목 체험`, items: [...sectionBase.slice(2), ...sectionBase].slice(0, 12) },
       { id: 'japanese', title: `${cityName} 일본어 투어`, items: [...sectionBase.slice(5), ...sectionBase].slice(0, 12) },
     ];
-  }, [filteredExperiences, location]);
+  }, [experiences, location]);
 
-  const toggleTime = (id: string) => {
+  const toggleTime = (id: SearchTimeId) => {
     setSelectedTimes((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
 
-  const toggleType = (id: string) => {
+  const toggleType = (id: SearchTypeId) => {
     setSelectedTypes((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
 
@@ -353,7 +294,7 @@ function SearchResults() {
                 </div>
               ))}
             </div>
-          ) : filteredExperiences.length === 0 ? (
+          ) : experiences.length === 0 ? (
             <div className="min-h-[66vh] flex flex-col items-center justify-center text-center">
               <div className="relative w-[154px] h-[112px] mb-5">
                 <img
@@ -377,7 +318,7 @@ function SearchResults() {
             </div>
           ) : (
             <div className="space-y-8 pb-6">
-              {mobileSections.map((section) => (
+              {mobileSections.filter((section) => section.items.length > 0).map((section) => (
                 <section key={section.id}>
                   <h3 className="text-[17px] font-semibold text-[#202020] tracking-[-0.01em] leading-tight mb-3">{section.title}</h3>
                   <div className="flex gap-3 overflow-x-auto no-scrollbar pr-4">{section.items.map((item) => renderMobileCard(item))}</div>
@@ -394,7 +335,7 @@ function SearchResults() {
             <SearchFilter label="가격 범위" />
             <SearchFilter label="숙소 유형" />
             <div className="h-8 w-[1px] bg-slate-200 mx-2 shrink-0"></div>
-            <span className="text-sm font-bold text-slate-500 whitespace-nowrap">{filteredExperiences.length}개의 체험</span>
+            <span className="text-sm font-bold text-slate-500 whitespace-nowrap">{experiences.length}개의 체험</span>
           </div>
 
           <button
@@ -425,7 +366,7 @@ function SearchResults() {
                   </div>
                 ))}
               </div>
-            ) : filteredExperiences.length === 0 ? (
+            ) : experiences.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-20">
                 <Ghost size={48} className="text-slate-300 mb-4" />
                 <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
@@ -433,7 +374,7 @@ function SearchResults() {
               </div>
             ) : (
               <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
-                {filteredExperiences.map((item) => (
+                {experiences.map((item) => (
                   <ExperienceCard key={item.id} data={item} />
                 ))}
               </div>

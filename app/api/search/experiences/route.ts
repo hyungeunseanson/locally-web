@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import {
   SEARCH_EXPERIENCE_SELECT,
+  SEARCH_TIME_RANGES,
+  SEARCH_TYPE_KEYWORDS,
   type SearchExperience,
   type SearchExperiencesResponse,
+  type SearchTimeId,
+  type SearchTypeId,
 } from '@/app/search/searchContract';
 
 function normalizeSearchInput(value: string) {
@@ -24,6 +28,15 @@ function asString(value: unknown) {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
   return '';
+}
+
+function parseFilterIds<T extends string>(value: string | null, allowed: readonly T[]) {
+  if (!value) return [];
+  const allowedSet = new Set(allowed);
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry): entry is T => allowedSet.has(entry as T));
 }
 
 function buildSearchHaystack(item: SearchExperience) {
@@ -88,6 +101,43 @@ function matchesDateRange(item: SearchExperience, startDate: string | null, endD
   });
 }
 
+function matchesTypeSelection(item: SearchExperience, selectedTypes: SearchTypeId[]) {
+  if (selectedTypes.length === 0) return true;
+
+  const haystack = buildSearchHaystack(item);
+  return selectedTypes.some((typeId) =>
+    SEARCH_TYPE_KEYWORDS[typeId].some((keyword) => haystack.includes(keyword.toLowerCase()))
+  );
+}
+
+function parseHour(timeValue: string) {
+  const normalized = timeValue.trim();
+  const match = normalized.match(/^(\d{1,2}):/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
+}
+
+function matchesTimeSelection(item: SearchExperience, selectedTimes: SearchTimeId[]) {
+  if (selectedTimes.length === 0) return true;
+
+  const record = item as Record<string, unknown>;
+  const rawTimes = Array.isArray(record.available_times) ? record.available_times : [];
+  const hours = rawTimes
+    .map((value) => asString(value))
+    .map((value) => parseHour(value))
+    .filter((value): value is number => value !== null);
+
+  if (hours.length === 0) return false;
+
+  return selectedTimes.some((timeId) => {
+    const range = SEARCH_TIME_RANGES[timeId];
+    return hours.some((hour) =>
+      range.endHour === null ? hour >= range.startHour : hour >= range.startHour && hour < range.endHour
+    );
+  });
+}
+
 type AvailabilityRow = {
   experience_id: number;
   date: string | null;
@@ -103,6 +153,20 @@ export async function GET(request: NextRequest) {
     const language = searchParams.get('language') || 'all';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const selectedTimes = parseFilterIds<SearchTimeId>(searchParams.get('times'), ['morning', 'afternoon', 'evening']);
+    const selectedTypes = parseFilterIds<SearchTypeId>(searchParams.get('types'), [
+      'food_tour',
+      'cafe_dessert',
+      'walking_healing',
+      'shopping',
+      'culture',
+      'activity',
+      'nightlife',
+      'architecture',
+      'show_sports',
+      'landmark',
+      'one_day_class',
+    ]);
 
     let query = supabase
       .from('experiences')
@@ -194,6 +258,8 @@ export async function GET(request: NextRequest) {
     }
 
     filtered = filtered.filter((item) => matchesDateRange(item, startDate, endDate));
+    filtered = filtered.filter((item) => matchesTypeSelection(item, selectedTypes));
+    filtered = filtered.filter((item) => matchesTimeSelection(item, selectedTimes));
 
     const response: SearchExperiencesResponse = {
       data: filtered,

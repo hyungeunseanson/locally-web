@@ -1,11 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
-import { CommunityPost } from '@/app/types/community';
 import { MessageSquare, Heart, Eye } from 'lucide-react';
 import { getProfileDisplayName } from '@/app/utils/profile';
+import type { CommunityFeedPost } from '../feedSelect';
 
 interface PostListCardProps {
-    post: CommunityPost;
+    post: CommunityFeedPost;
     category: string;
     query: string;
     sort: 'latest' | 'popular';

@@ -63,6 +63,15 @@
 | 🟠 community infinite scroll 응답 고정 | `app/community/feedSelect.ts`에 `CommunityFeedResponse`/`parseCommunityFeedResponse()`를 추가하고, `app/community/CommunityFeed.tsx`가 `/api/community` 응답을 느슨한 `any` 대신 명시 계약으로 파싱하도록 정리 |
 | 🟡 회귀 확인 | `43-guest-search-detail-ingress`, `46-community-detail-state`, `25-public-metadata` 재통과로 검색 진입/커뮤니티 상세/공개 메타 회귀가 없는지 확인 |
 
+## v3.39.15 — [Public Search & Community Feed] 서버 필터 계약 / 목록 카드 타입 3차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 search 시간/유형 필터 서버화 | `app/api/search/experiences/route.ts`가 `times`, `types` query를 받아 시간대는 `available_times`의 실제 시각 범위로, 유형은 `SEARCH_TYPE_KEYWORDS` 계약으로 서버에서 먼저 걸러주도록 정리 |
+| 🟠 search 필터 계약 공통화 | `app/search/searchContract.ts`에 `SearchTimeId`, `SearchTypeId`, `SEARCH_TIME_RANGES`, `SEARCH_TYPE_KEYWORDS`를 추가하고, `app/search/page.tsx`는 선택 상태를 query로만 넘기며 결과는 서버 응답을 단일 source로 사용하도록 정리 |
+| 🟠 community feed 카드 타입 분리 | `app/community/feedSelect.ts`에 `CommunityFeedPost/Profile/Experience` 타입과 `buildCommunityFeedPosts()` mapper를 추가하고, `app/community/page.tsx`, `app/api/community/route.ts`, `CommunityFeed`, `PostListCard`, `PostGridCard`가 feed 전용 타입 계약만 사용하도록 정리 |
+| 🟡 보호막 추가 | `tests/e2e/58-search-server-filters.spec.ts`, `tests/e2e/59-community-feed-contract.spec.ts` 추가 — 검색 서버 필터와 커뮤니티 feed route의 linked experience/profile 계약을 직접 검증 |
+
 ## v3.39.08 — [Community] 상세 정합성 + 글쓰기 저장 경계 안정화 1차
 
 | 항목 | 내용 |

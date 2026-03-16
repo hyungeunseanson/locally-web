@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { CommunityPost } from '@/app/types/community';
 import PostListCard from './components/PostListCard';
 import PostGridCard from './components/PostGridCard';
 import { Loader2, MessageSquareDashed } from 'lucide-react';
 import Link from 'next/link';
-import { parseCommunityFeedResponse } from './feedSelect';
+import { parseCommunityFeedResponse, type CommunityFeedPost } from './feedSelect';
 
 interface CommunityFeedProps {
-    initialData: CommunityPost[];
+    initialData: CommunityFeedPost[];
     initialNextOffset: number | null;
     category: string;
     query: string;
@@ -72,7 +71,7 @@ function EmptyState({ category, query }: { category: string; query: string }) {
 }
 
 export default function CommunityFeed({ initialData, initialNextOffset, category, query, sort }: CommunityFeedProps) {
-    const [posts, setPosts] = useState<CommunityPost[]>(initialData);
+    const [posts, setPosts] = useState<CommunityFeedPost[]>(initialData);
     const [nextOffset, setNextOffset] = useState<number | null>(initialNextOffset);
     const [isLoading, setIsLoading] = useState(false);
     const [isInitialLoading, setIsInitialLoading] = useState(false);
@@ -113,7 +112,7 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
                 setPosts(prev => {
                     // Prevent duplicate keys due to React strict mode double invocation
                     const prevIds = new Set(prev.map(p => p.id));
-                    const newUniqueData = data.filter((p: CommunityPost) => !prevIds.has(p.id));
+                    const newUniqueData = data.filter((p: CommunityFeedPost) => !prevIds.has(p.id));
                     return [...prev, ...newUniqueData];
                 });
             }

@@ -9,18 +9,18 @@ import CommunitySearchControls from './components/CommunitySearchControls';
 import SiteHeader from '@/app/components/SiteHeader';
 import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
-import type { Experience, Profile } from '@/app/types';
-import type { CommunityCategory, CommunityFilterCategory, CommunityPost } from '@/app/types/community';
+import type { CommunityCategory, CommunityFilterCategory } from '@/app/types/community';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import {
+    buildCommunityFeedPosts,
     COMMUNITY_FEED_EXPERIENCE_SELECT,
+    type CommunityFeedExperience,
+    type CommunityFeedPost,
+    type CommunityFeedPostRow,
     COMMUNITY_FEED_POST_SELECT,
     COMMUNITY_FEED_PROFILE_SELECT,
+    type CommunityFeedProfile,
 } from './feedSelect';
-
-type CommunityPostRow = CommunityPost;
-type FeedProfile = Pick<Profile, 'id' | 'name' | 'full_name' | 'avatar_url'>;
-type FeedExperience = Pick<Experience, 'id' | 'title' | 'image_url' | 'price'>;
 
 // ✅ Vercel 엣지 캐시 비활성화 — 새 글 등록 후 피드가 구 버전 캐시를 서빙하는 버그 방지
 export const dynamic = 'force-dynamic';
@@ -103,38 +103,30 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     }
 
     const { data: posts } = await query;
-    const typedPosts = (posts ?? []) as unknown as CommunityPostRow[];
+    const typedPosts = (posts ?? []) as unknown as CommunityFeedPostRow[];
 
     // ② profiles 별도 조회 (실패해도 피드 유지)
-    let initialData: CommunityPost[] = [];
+    let initialData: CommunityFeedPost[] = [];
     if (typedPosts.length > 0) {
         const userIds = [...new Set(typedPosts.map((post) => post.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')
             .select(COMMUNITY_FEED_PROFILE_SELECT)
             .in('id', userIds);
-        const typedProfiles: FeedProfile[] = profiles ?? [];
-        const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile] as const));
+        const typedProfiles: CommunityFeedProfile[] = profiles ?? [];
 
         // ③ experiences 조건부 조회
         const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];
-        let expMap = new Map<number, FeedExperience>();
+        let typedExperiences: CommunityFeedExperience[] = [];
         if (expIds.length > 0) {
             const { data: experiences } = await supabase
                 .from('experiences')
                 .select(COMMUNITY_FEED_EXPERIENCE_SELECT)
                 .in('id', expIds);
-            const typedExperiences: FeedExperience[] = experiences ?? [];
-            expMap = new Map(typedExperiences.map((experience) => [experience.id, experience] as const));
+            typedExperiences = experiences ?? [];
         }
 
-        initialData = typedPosts.map((post) => ({
-            ...post,
-            profiles: (profileMap.get(post.user_id) as Profile | undefined) ?? undefined,
-            linked_experience: post.linked_exp_id
-                ? ((expMap.get(post.linked_exp_id) as Experience | undefined) ?? undefined)
-                : undefined,
-        }));
+        initialData = buildCommunityFeedPosts(typedPosts, typedProfiles, typedExperiences);
     }
 
     const initialNextOffset = typedPosts.length === limit ? limit : null;

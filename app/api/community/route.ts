@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import {
+    buildCommunityFeedPosts,
     COMMUNITY_FEED_EXPERIENCE_SELECT,
+    type CommunityFeedExperience,
+    type CommunityFeedPostRow,
     COMMUNITY_FEED_POST_SELECT,
     COMMUNITY_FEED_PROFILE_SELECT,
+    type CommunityFeedProfile,
 } from '@/app/community/feedSelect';
-import type { CommunityPost } from '@/app/types/community';
-import type { Experience, Profile } from '@/app/types';
-
-type CommunityFeedPostRow = CommunityPost;
-type CommunityFeedProfileRow = Pick<Profile, 'id' | 'name' | 'full_name' | 'avatar_url'>;
-type CommunityFeedExperienceRow = Pick<Experience, 'id' | 'title' | 'image_url' | 'price'>;
 
 export async function GET(request: NextRequest) {
     try {
@@ -63,28 +61,21 @@ export async function GET(request: NextRequest) {
             .from('profiles')
             .select(COMMUNITY_FEED_PROFILE_SELECT)
             .in('id', userIds);
-        const typedProfiles = (profiles ?? []) as unknown as CommunityFeedProfileRow[];
-
-        const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile] as const));
+        const typedProfiles = (profiles ?? []) as unknown as CommunityFeedProfile[];
 
         // ③ experiences 별도 조회 (linked_exp_id가 있는 포스트만)
         const expIds = [...new Set(typedPosts.map((post) => post.linked_exp_id).filter((value): value is number => typeof value === 'number'))];
-        let expMap = new Map<number, CommunityFeedExperienceRow>();
+        let typedExperiences: CommunityFeedExperience[] = [];
         if (expIds.length > 0) {
             const { data: experiences } = await supabase
                 .from('experiences')
                 .select(COMMUNITY_FEED_EXPERIENCE_SELECT)
                 .in('id', expIds);
-            const typedExperiences = (experiences ?? []) as unknown as CommunityFeedExperienceRow[];
-            expMap = new Map(typedExperiences.map((experience) => [experience.id, experience] as const));
+            typedExperiences = (experiences ?? []) as unknown as CommunityFeedExperience[];
         }
 
         // ④ 조립
-        const data = typedPosts.map((post) => ({
-            ...post,
-            profiles: profileMap.get(post.user_id) ?? null,
-            linked_experience: post.linked_exp_id ? (expMap.get(post.linked_exp_id) ?? null) : null,
-        }));
+        const data = buildCommunityFeedPosts(typedPosts, typedProfiles, typedExperiences);
 
         const nextOffset = data.length === limit ? offset + limit : null;
 

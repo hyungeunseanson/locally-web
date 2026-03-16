@@ -2,11 +2,11 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { CommunityPost } from '@/app/types/community';
 import { Heart, MessageSquare } from 'lucide-react';
+import type { CommunityFeedPost } from '../feedSelect';
 
 interface PostGridCardProps {
-    post: CommunityPost;
+    post: CommunityFeedPost;
     category: string;
     query: string;
     sort: 'latest' | 'popular';
