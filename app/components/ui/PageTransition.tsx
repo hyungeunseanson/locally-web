@@ -11,7 +11,8 @@ export default function PageTransition({ children }: { children: ReactNode }) {
         pathname?.startsWith('/about') ||
         pathname?.startsWith('/become-a-host') ||
         pathname?.startsWith('/company') ||
-        pathname?.startsWith('/site-map');
+        pathname?.startsWith('/site-map') ||
+        pathname?.startsWith('/community');
 
     if (!shouldAnimate) {
         return <>{children}</>;

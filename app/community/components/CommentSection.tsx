@@ -5,6 +5,7 @@ import { CommunityComment } from '@/app/types/community';
 import { Loader2, Send } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
+import CommunityAuthorTrigger from './CommunityAuthorTrigger';
 
 interface CommentSectionProps {
     postId: string;
@@ -97,15 +98,21 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
                 <div className="space-y-6">
                     {comments.map((comment) => (
                         <div key={comment.id} className="flex gap-3">
-                            <div className="w-9 h-9 rounded-full bg-slate-100 overflow-hidden border border-slate-100 flex-shrink-0">
-                                {comment.profiles?.avatar_url ? (
-                                    <img src={comment.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">
-                                        {getProfileInitial(comment.profiles)}
-                                    </div>
-                                )}
-                            </div>
+                            <CommunityAuthorTrigger
+                                userId={comment.user_id}
+                                authorName={getProfileDisplayName(comment.profiles)}
+                                currentPostId={postId}
+                            >
+                                <div className="w-9 h-9 rounded-full bg-slate-100 overflow-hidden border border-slate-100 flex-shrink-0 hover:ring-2 hover:ring-slate-300 transition-all cursor-pointer">
+                                    {comment.profiles?.avatar_url ? (
+                                        <img src={comment.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">
+                                            {getProfileInitial(comment.profiles)}
+                                        </div>
+                                    )}
+                                </div>
+                            </CommunityAuthorTrigger>
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="text-[14px] font-bold text-slate-900">{getProfileDisplayName(comment.profiles)}</span>
