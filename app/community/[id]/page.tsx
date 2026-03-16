@@ -188,12 +188,12 @@ export default async function CommunityPostDetail({
                 <div className="max-w-7xl mx-auto lg:px-4 lg:py-8">
                     <div className="lg:grid lg:grid-cols-12 lg:gap-8">
 
-                    {/* ─── 좌측: 게시글 본문 (lg:col-span-8) ─── */}
-                    <div className="lg:col-span-8">
-                        <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-32">
+                    {/* ─── 게시글 본문 ─── */}
+                    <div className="lg:col-span-12">
+                        <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-24">
 
                             {/* Sticky 헤더 */}
-                            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+                            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-3 flex items-center justify-between">
                                 <BackButton href={fallbackHref} />
                                 <div className="flex items-center gap-3 text-slate-400">
                                     <ShareButton title={post.title} url={pageUrl} />
@@ -296,60 +296,60 @@ export default async function CommunityPostDetail({
                             />
 
                             <div className="mx-5 border-t border-slate-100 pb-6 pt-5">
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div className="grid grid-cols-3 gap-3">
                                     {prevPost ? (
                                         <Link
                                             href={`/community/${prevPost.id}?${fallbackParams.toString()}`}
                                             data-testid="community-detail-prev-link"
-                                            className="group rounded-2xl border border-slate-200 px-4 py-4 transition-colors hover:bg-slate-50"
+                                            className="group rounded-2xl border border-slate-200 px-3 py-2.5 md:px-4 md:py-3 transition-colors hover:bg-slate-50"
                                         >
-                                            <div className="mb-1 text-[11px] font-bold text-slate-400">◀ 이전글</div>
-                                            <div className="break-words text-[13px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere]">
+                                            <div className="mb-1 text-[10px] font-bold text-slate-400 md:text-[11px]">◀ 이전글</div>
+                                            <div className="line-clamp-2 break-words text-[12px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere] md:text-[13px]">
                                                 {prevPost.title}
                                             </div>
                                         </Link>
                                     ) : (
-                                        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-[13px] text-slate-300">
-                                            이전글이 없습니다.
+                                        <div className="rounded-2xl border border-dashed border-slate-200 px-3 py-2.5 md:px-4 md:py-3 text-[12px] text-slate-300">
+                                            이전글 없음
                                         </div>
                                     )}
 
                                     <Link
                                         href={fallbackHref}
                                         data-testid="community-detail-list-button"
-                                        className="flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-4 py-4 text-[13px] font-semibold text-white transition-colors hover:bg-black"
+                                        className="flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-3 py-2.5 md:px-4 md:py-3 text-[12px] font-semibold text-white transition-colors hover:bg-black md:text-[13px]"
                                     >
-                                        목록 보기
+                                        목록
                                     </Link>
 
                                     {nextPost ? (
                                         <Link
                                             href={`/community/${nextPost.id}?${fallbackParams.toString()}`}
                                             data-testid="community-detail-next-link"
-                                            className="group rounded-2xl border border-slate-200 px-4 py-4 transition-colors hover:bg-slate-50"
+                                            className="group rounded-2xl border border-slate-200 px-3 py-2.5 md:px-4 md:py-3 transition-colors hover:bg-slate-50"
                                         >
-                                            <div className="mb-1 text-[11px] font-bold text-slate-400">▶ 다음글</div>
-                                            <div className="break-words text-[13px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere]">
+                                            <div className="mb-1 text-[10px] font-bold text-slate-400 md:text-[11px]">▶ 다음글</div>
+                                            <div className="line-clamp-2 break-words text-[12px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere] md:text-[13px]">
                                                 {nextPost.title}
                                             </div>
                                         </Link>
                                     ) : (
-                                        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-[13px] text-slate-300">
-                                            다음글이 없습니다.
+                                        <div className="rounded-2xl border border-dashed border-slate-200 px-3 py-2.5 md:px-4 md:py-3 text-[12px] text-slate-300">
+                                            다음글 없음
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* 모바일 전용 광고 영역 (댓글 아래) */}
-                            <div className="lg:hidden mx-5 mb-6 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 h-24 flex items-center justify-center">
+                            {/* 모바일 전용 광고 영역 — 콘텐츠 준비 전 숨김 */}
+                            {/* <div className="lg:hidden mx-5 mb-6 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 h-24 flex items-center justify-center">
                                 <span className="text-[12px] font-medium text-gray-400">광고 영역</span>
-                            </div>
+                            </div> */}
                         </main>
                     </div>
 
-                    {/* ─── 우측: 광고 사이드바 (lg:col-span-4, 모바일 hidden) ─── */}
-                    <div className="hidden lg:block lg:col-span-4">
+                    {/* ─── 우측: 광고 사이드바 — 콘텐츠 준비 전 숨김 ─── */}
+                    {/* <div className="hidden lg:block lg:col-span-4">
                         <div className="sticky top-8 space-y-4">
                             <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-64 flex items-center justify-center shadow-sm">
                                 <span className="text-[13px] font-medium text-gray-400">광고 영역</span>
@@ -358,7 +358,7 @@ export default async function CommunityPostDetail({
                                 <span className="text-[13px] font-medium text-gray-400">광고 영역 2</span>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     </div>
                 </div>

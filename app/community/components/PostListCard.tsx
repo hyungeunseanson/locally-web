@@ -46,25 +46,16 @@ export default function PostListCard({ post, category, query, sort }: PostListCa
             />
 
             <div className="relative z-10 flex items-start gap-3 px-5 py-4 pointer-events-none">
-                <div className="h-[72px] w-[72px] overflow-hidden rounded-2xl border border-gray-100 bg-gray-100 flex-shrink-0">
-                    {thumbnail ? (
+                {thumbnail && (
+                    <div className="h-[72px] w-[72px] overflow-hidden rounded-2xl border border-gray-100 bg-gray-100 flex-shrink-0">
                         <img
                             src={thumbnail}
                             alt="썸네일"
                             className="h-full w-full object-cover"
                             loading="lazy"
                         />
-                    ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-50">
-                            <img
-                                src="/images/logo-black-transparent.png"
-                                alt="Locally 로고"
-                                className="h-10 w-10 object-contain opacity-70"
-                                loading="lazy"
-                            />
-                        </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-1.5">

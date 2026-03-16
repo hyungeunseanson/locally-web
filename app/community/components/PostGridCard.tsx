@@ -58,7 +58,7 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
                 </span>
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/88 via-black/52 to-transparent px-4 pb-4 pt-12 pointer-events-none">
+            <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 pb-4 pt-12 pointer-events-none">
                 <h3 className="line-clamp-2 break-words text-[16px] font-semibold leading-snug text-white [overflow-wrap:anywhere]">
                     {post.title}
                 </h3>

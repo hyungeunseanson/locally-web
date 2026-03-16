@@ -5,6 +5,22 @@
 
 ---
 
+## v3.39.22 — [Community] 커뮤니티 페이지 UX/UI 핀셋 수정
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 조회수+하트 행 좌우 여백 추가 | `app/community/components/CommunityCommentsPanel.tsx` — stat row에 `px-5 flex-wrap` 추가, LikeButton 컨테이너 이탈 방지 |
+| 🔴 이전글/다음글 버튼 크기 축소 | `app/community/[id]/page.tsx` — `py-4` → `py-2.5 md:py-3`, `px-4` → `px-3 md:px-4`, 텍스트 클램프(`line-clamp-2`) 및 "목록 보기" → "목록" 축약, `grid-cols-1 sm:grid-cols-3` → 항상 `grid-cols-3` |
+| 🟠 Sticky 헤더 높이 축소 | `app/community/[id]/page.tsx` — `py-4` → `py-3` |
+| 🟠 댓글 입력창 z-index 수정 | `app/community/components/CommentSection.tsx` — `z-[90]` → `z-[105]`, BottomNav(`z-[100]`) 위로 올림 |
+| 🟠 하단 패딩 축소 | `app/community/[id]/page.tsx` — `pb-32` → `pb-24` |
+| 🟠 단일 이미지 데스크탑 너비 확대 | `app/community/components/PostImages.tsx` — 피드 단일 이미지 `md:max-w-xs` → `md:max-w-md` |
+| 🟠 PostListCard 썸네일 없을 때 숨김 | `app/community/components/PostListCard.tsx` — 이미지 없는 글에서 빈 72×72 회색 박스 제거, 썸네일 있을 때만 렌더 |
+| 🟡 광고 placeholder 영역 숨김 | `app/community/[id]/page.tsx` — 모바일/데스크탑 빈 점선 광고 박스 주석 처리, 사이드바 col-span 12로 확장 |
+| 🟡 PostGridCard 그라디언트 밝기 완화 | `app/community/components/PostGridCard.tsx` — `from-black/88 via-black/52` → `from-black/70 via-black/40` |
+| 🟡 Empty State 버튼 컬러 통일 | `app/community/CommunityFeed.tsx` — `bg-black hover:bg-gray-800` → `bg-[#FF385C] hover:bg-[#E31C5F]` |
+| 🟡 3장 그리드 이미지 간격 확대 | `app/community/components/PostImages.tsx` — 2~3장 그리드 `gap-1` → `gap-2` |
+
 ## v3.39.21 — [Mobile] 호스트 메뉴 커뮤니티 위치 조정
 
 | 항목 | 내용 |

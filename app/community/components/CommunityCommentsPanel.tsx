@@ -58,7 +58,7 @@ export default function CommunityCommentsPanel({
 
     return (
         <>
-            <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5">
+            <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5 px-5 flex-wrap">
                 <span data-testid="community-view-summary-count">조회 {currentViewCount || 0}</span>
                 <span data-testid="community-comment-summary-count">댓글 {commentCount || 0}</span>
                 <div className="ml-auto">

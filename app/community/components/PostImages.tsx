@@ -56,7 +56,7 @@ export default function PostImages({ images, detail = false, hero = false }: Pos
         // 상세 페이지: max-w-xl로 확장
         const sizeClass = detail
             ? 'w-full max-w-xl mx-auto'
-            : 'w-full md:max-w-xs md:mx-auto';
+            : 'w-full md:max-w-md md:mx-auto';
 
         return (
             <div
@@ -78,7 +78,7 @@ export default function PostImages({ images, detail = false, hero = false }: Pos
     const gridClass = images.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
 
     return (
-        <div className={`grid ${gridClass} gap-1 rounded-xl overflow-hidden`}>
+        <div className={`grid ${gridClass} gap-2 rounded-xl overflow-hidden`}>
             {images.slice(0, 3).map((img, idx) => (
                 <div key={idx} className="aspect-square bg-gray-100 overflow-hidden">
                     <img
