@@ -5,6 +5,15 @@
 
 ---
 
+## v3.39.29 — [Community] 상세 페이지 헤더·댓글·버튼 수정
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 데스크탑 사이트 헤더 가림 수정 | `app/community/[id]/page.tsx` — 내부 sticky 헤더 `top-0` → `top-0 md:top-20`으로 변경, SiteHeader(80px) 높이 아래에 붙도록 수정 |
+| 🔴 댓글 입력창 inline 배치 | `app/community/components/CommentSection.tsx` — `fixed bottom-16 md:bottom-0 z-[105]` 제거, 정상 블록 흐름(`border-t mt-4`)으로 변경. 댓글 목록 바로 아래 노출 |
+| 🟠 이전글/목록/다음글 버튼 슬림화 | `app/community/[id]/page.tsx` — 게시글 제목 제거, `py-2.5 md:py-3` → `py-2`, `rounded-2xl` → `rounded-xl`, 전 버튼 단일 라벨(◀ 이전글 / 목록 / 다음글 ▶) 중앙 정렬 |
+| 🟡 main pb-24 → pb-8 | fixed 댓글창 제거에 따른 불필요한 하단 여백 축소 |
+
 ## v3.39.26 — [Experiences] 예약 가능 요약 hardening · 만석 날짜 가시화
 
 | 항목 | 내용 |

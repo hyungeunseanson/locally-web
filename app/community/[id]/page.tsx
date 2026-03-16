@@ -190,10 +190,10 @@ export default async function CommunityPostDetail({
 
                     {/* ─── 좌측: 게시글 본문 (lg:col-span-8) ─── */}
                     <div className="lg:col-span-8">
-                        <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-24">
+                        <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-8">
 
                             {/* Sticky 헤더 */}
-                            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-3 flex items-center justify-between">
+                            <div className="sticky top-0 md:top-20 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 px-5 py-3 flex items-center justify-between">
                                 <BackButton href={fallbackHref} />
                                 <div className="flex items-center gap-3 text-slate-400">
                                     <ShareButton title={post.title} url={pageUrl} />
@@ -293,15 +293,12 @@ export default async function CommunityPostDetail({
                                         <Link
                                             href={`/community/${prevPost.id}?${fallbackParams.toString()}`}
                                             data-testid="community-detail-prev-link"
-                                            className="group rounded-2xl border border-slate-200 px-3 py-2.5 md:px-4 md:py-3 transition-colors hover:bg-slate-50"
+                                            className="flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                                         >
-                                            <div className="mb-1 text-[10px] font-bold text-slate-400 md:text-[11px]">◀ 이전글</div>
-                                            <div className="line-clamp-2 break-words text-[12px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere] md:text-[13px]">
-                                                {prevPost.title}
-                                            </div>
+                                            ◀ 이전글
                                         </Link>
                                     ) : (
-                                        <div className="rounded-2xl border border-dashed border-slate-200 px-3 py-2.5 md:px-4 md:py-3 text-[12px] text-slate-300">
+                                        <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 px-3 py-2 text-[12px] text-slate-300">
                                             이전글 없음
                                         </div>
                                     )}
@@ -309,7 +306,7 @@ export default async function CommunityPostDetail({
                                     <Link
                                         href={fallbackHref}
                                         data-testid="community-detail-list-button"
-                                        className="flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-3 py-2.5 md:px-4 md:py-3 text-[12px] font-semibold text-white transition-colors hover:bg-black md:text-[13px]"
+                                        className="flex items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-black"
                                     >
                                         목록
                                     </Link>
@@ -318,15 +315,12 @@ export default async function CommunityPostDetail({
                                         <Link
                                             href={`/community/${nextPost.id}?${fallbackParams.toString()}`}
                                             data-testid="community-detail-next-link"
-                                            className="group rounded-2xl border border-slate-200 px-3 py-2.5 md:px-4 md:py-3 transition-colors hover:bg-slate-50"
+                                            className="flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                                         >
-                                            <div className="mb-1 text-[10px] font-bold text-slate-400 md:text-[11px]">▶ 다음글</div>
-                                            <div className="line-clamp-2 break-words text-[12px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere] md:text-[13px]">
-                                                {nextPost.title}
-                                            </div>
+                                            다음글 ▶
                                         </Link>
                                     ) : (
-                                        <div className="rounded-2xl border border-dashed border-slate-200 px-3 py-2.5 md:px-4 md:py-3 text-[12px] text-slate-300">
+                                        <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 px-3 py-2 text-[12px] text-slate-300">
                                             다음글 없음
                                         </div>
                                     )}
