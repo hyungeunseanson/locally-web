@@ -188,8 +188,8 @@ export default async function CommunityPostDetail({
                 <div className="max-w-7xl mx-auto lg:px-4 lg:py-8">
                     <div className="lg:grid lg:grid-cols-12 lg:gap-8">
 
-                    {/* ─── 게시글 본문 ─── */}
-                    <div className="lg:col-span-12">
+                    {/* ─── 좌측: 게시글 본문 (lg:col-span-8) ─── */}
+                    <div className="lg:col-span-8">
                         <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-24">
 
                             {/* Sticky 헤더 */}
@@ -341,15 +341,15 @@ export default async function CommunityPostDetail({
                                 </div>
                             </div>
 
-                            {/* 모바일 전용 광고 영역 — 콘텐츠 준비 전 숨김 */}
-                            {/* <div className="lg:hidden mx-5 mb-6 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 h-24 flex items-center justify-center">
+                            {/* 모바일 전용 광고 영역 (댓글 아래) */}
+                            <div className="lg:hidden mx-5 mb-6 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 h-24 flex items-center justify-center">
                                 <span className="text-[12px] font-medium text-gray-400">광고 영역</span>
-                            </div> */}
+                            </div>
                         </main>
                     </div>
 
-                    {/* ─── 우측: 광고 사이드바 — 콘텐츠 준비 전 숨김 ─── */}
-                    {/* <div className="hidden lg:block lg:col-span-4">
+                    {/* ─── 우측: 광고 사이드바 (lg:col-span-4, 모바일 hidden) ─── */}
+                    <div className="hidden lg:block lg:col-span-4">
                         <div className="sticky top-8 space-y-4">
                             <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-64 flex items-center justify-center shadow-sm">
                                 <span className="text-[13px] font-medium text-gray-400">광고 영역</span>
@@ -358,7 +358,7 @@ export default async function CommunityPostDetail({
                                 <span className="text-[13px] font-medium text-gray-400">광고 영역 2</span>
                             </div>
                         </div>
-                    </div> */}
+                    </div>
 
                     </div>
                 </div>
