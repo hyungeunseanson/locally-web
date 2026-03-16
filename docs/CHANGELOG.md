@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.20 — [Legal] 법적 문서 en/ja/zh 번역 완성
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 이용약관 3개국어 번역 | `app/constants/legalText_en.ts`, `legalText_ja.ts`, `legalText_zh.ts` 신규 생성 — TERMS_OF_USE EN/JA/ZH 하드코딩 번역 완성 |
+| 🟠 개인정보 처리방침 3개국어 번역 | PRIVACY_POLICY EN/JA/ZH 하드코딩 번역 완성 |
+| 🟠 여행약관 3개국어 번역 | TRAVEL_TERMS (국내/국외) EN/JA/ZH 하드코딩 번역 완성 |
+| 🟠 취소 및 환불 정책 3개국어 번역 | REFUND_POLICY EN/JA/ZH 하드코딩 번역 완성 |
+| 🟠 legalDocuments.ts 로케일별 본문 연결 | `LEGAL_BODY_BY_TYPE`을 단일 문자열에서 `Record<LegalDocType, Record<LegalLocale, string>>` 구조로 변경 — en/ja/zh 방문자는 각 언어 본문 직접 반환, fallback 공지 제거 |
+
 ## v3.39.19 — [Notifications] 결제/취소 메일 기준 통일
 
 | 항목 | 내용 |

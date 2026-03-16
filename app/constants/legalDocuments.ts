@@ -4,6 +4,24 @@ import {
   TERMS_OF_USE,
   TRAVEL_TERMS,
 } from '@/app/constants/legalText';
+import {
+  PRIVACY_POLICY_EN,
+  REFUND_POLICY_EN,
+  TERMS_OF_USE_EN,
+  TRAVEL_TERMS_EN,
+} from '@/app/constants/legalText_en';
+import {
+  PRIVACY_POLICY_JA,
+  REFUND_POLICY_JA,
+  TERMS_OF_USE_JA,
+  TRAVEL_TERMS_JA,
+} from '@/app/constants/legalText_ja';
+import {
+  PRIVACY_POLICY_ZH,
+  REFUND_POLICY_ZH,
+  TERMS_OF_USE_ZH,
+  TRAVEL_TERMS_ZH,
+} from '@/app/constants/legalText_zh';
 
 export type LegalLocale = 'ko' | 'en' | 'ja' | 'zh';
 export type LegalDocType = 'terms' | 'privacy' | 'travel' | 'refund';
@@ -21,11 +39,31 @@ const normalizeLocale = (locale: string): LegalLocale => {
   return SUPPORTED_LOCALES.includes(locale as LegalLocale) ? (locale as LegalLocale) : 'ko';
 };
 
-const LEGAL_BODY_BY_TYPE: Record<LegalDocType, string> = {
-  terms: TERMS_OF_USE,
-  privacy: PRIVACY_POLICY,
-  travel: TRAVEL_TERMS,
-  refund: REFUND_POLICY,
+const LEGAL_BODY_BY_TYPE: Record<LegalDocType, Record<LegalLocale, string>> = {
+  terms: {
+    ko: TERMS_OF_USE,
+    en: TERMS_OF_USE_EN,
+    ja: TERMS_OF_USE_JA,
+    zh: TERMS_OF_USE_ZH,
+  },
+  privacy: {
+    ko: PRIVACY_POLICY,
+    en: PRIVACY_POLICY_EN,
+    ja: PRIVACY_POLICY_JA,
+    zh: PRIVACY_POLICY_ZH,
+  },
+  travel: {
+    ko: TRAVEL_TERMS,
+    en: TRAVEL_TERMS_EN,
+    ja: TRAVEL_TERMS_JA,
+    zh: TRAVEL_TERMS_ZH,
+  },
+  refund: {
+    ko: REFUND_POLICY,
+    en: REFUND_POLICY_EN,
+    ja: REFUND_POLICY_JA,
+    zh: REFUND_POLICY_ZH,
+  },
 };
 
 const LEGAL_TITLE_BY_TYPE: Record<LegalDocType, Record<LegalLocale, string>> = {
@@ -55,20 +93,12 @@ const LEGAL_TITLE_BY_TYPE: Record<LegalDocType, Record<LegalLocale, string>> = {
   },
 };
 
-const LEGAL_FALLBACK_NOTICE: Record<Exclude<LegalLocale, 'ko'>, string> = {
-  en: 'The reviewed translation is not published yet. The Korean original below currently applies.',
-  ja: '確認済みの翻訳はまだ公開されていません。現在は以下の韓国語原文が適用されます。',
-  zh: '已审核译文尚未发布，目前以下韩文原文适用。',
-};
-
 export function getLegalDocument(locale: string, type: LegalDocType): LegalDocument {
   const normalizedLocale = normalizeLocale(locale);
-  const isFallback = normalizedLocale !== 'ko';
 
   return {
     title: LEGAL_TITLE_BY_TYPE[type][normalizedLocale],
-    body: LEGAL_BODY_BY_TYPE[type],
-    isFallback,
-    fallbackNotice: isFallback ? LEGAL_FALLBACK_NOTICE[normalizedLocale] : undefined,
+    body: LEGAL_BODY_BY_TYPE[type][normalizedLocale],
+    isFallback: false,
   };
 }
