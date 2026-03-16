@@ -9,6 +9,7 @@ import PostImages from '../components/PostImages';
 import CommunityCommentsPanel from '../components/CommunityCommentsPanel';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
+import SiteHeader from '@/app/components/SiteHeader';
 import CommunityAuthorTrigger from '../components/CommunityAuthorTrigger';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { getProfileDisplayName } from '@/app/utils/profile';
@@ -183,6 +184,7 @@ export default async function CommunityPostDetail({
                     ]),
                 ]}
             />
+            <SiteHeader />
             {/* 데스크탑: max-w-7xl 2컬럼 / 모바일: max-w-[768px] 단일 컬럼 */}
             <div className="min-h-screen bg-[#F7F7F9]">
                 <div className="max-w-7xl mx-auto lg:px-4 lg:py-8">
@@ -192,8 +194,8 @@ export default async function CommunityPostDetail({
                     <div className="lg:col-span-8">
                         <main className="max-w-[768px] mx-auto lg:max-w-none min-h-screen bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 pb-8">
 
-                            {/* Sticky 헤더 */}
-                            <div className="sticky top-0 md:top-20 z-50 bg-white/95 border-b border-slate-100 px-5 py-3 flex items-center justify-between [transform:translateZ(0)]">
+                            {/* 뒤로가기/공유 바: 모바일만 sticky, 데스크탑은 static */}
+                            <div className="sticky top-0 z-50 md:static md:z-auto bg-white/95 border-b border-slate-100 px-5 py-3 flex items-center justify-between">
                                 <BackButton href={fallbackHref} />
                                 <div className="flex items-center gap-3 text-slate-400">
                                     <ShareButton title={post.title} url={pageUrl} />
