@@ -15,6 +15,13 @@
 | 🟠 만석 날짜 달력 노출 | `app/experiences/[id]/types.ts`, `app/experiences/[id]/ExperienceClient.tsx`, `app/experiences/[id]/components/ExpSidebar.tsx`, `app/experiences/[id]/components/ReservationCard.tsx` — 예약 가능 날짜만 숨기지 않고 `available/sold_out` day status를 내려, 만석 날짜도 달력에 남기고 시간 버튼에서 `매진` / `프라이빗 예약 마감` 상태를 표시 |
 | 🟡 보호막 추가 | `tests/e2e/42-experience-paypal-payment.spec.ts`, `tests/e2e/44-experience-card-payment-ui.spec.ts`, `tests/e2e/64-experience-availability-detail.spec.ts`, `tests/e2e/65-experience-post-confirm-detail-refresh.spec.ts`, `tests/e2e/66-bookings-solo-guard.spec.ts`, `tests/e2e/helpers/experienceBooking.ts` — 결제 후 상세 재진입, sold-out 날짜 가시성, solo deep-link/API guard 회귀를 검증 |
 
+## v3.39.26 — [Home] 모바일 홈 체험/서비스 탭 텍스트 크기 및 볼드 강화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 아이콘 탭 텍스트 +10% | `app/components/HomeHero.tsx` — 기본(비스크롤) 탭 `text-[10px]` → `text-[11px]`, 선택 시 `font-medium` → `font-semibold` |
+| 🟡 텍스트 탭 텍스트 +10% | 스크롤 후 탭 `text-[11px]` → `text-[12px]`, 선택 시 `font-bold` → `font-extrabold` |
+
 ## v3.39.25 — [Community] 모바일 전용 UI 정리
 
 | 항목 | 내용 |
