@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import type {
+  ExperienceCalendarDayStatus,
   ExperienceAvailabilitySummary,
   ExperienceSlotSummary,
 } from '@/app/experiences/[id]/types';
@@ -44,6 +45,7 @@ export function buildExperienceAvailabilitySummary({
 }: BuildExperienceAvailabilitySummaryInput): ExperienceAvailabilitySummary {
   const normalizedMaxGuests = Math.max(1, Number(maxGuests || 10));
   const dateToTimeMap: Record<string, string[]> = {};
+  const calendarDayStatusMap: Record<string, ExperienceCalendarDayStatus> = {};
   const slotSummaryMap: Record<string, ExperienceSlotSummary> = {};
   const bookingAggregateMap = new Map<string, BookingAggregate>();
 
@@ -76,11 +78,14 @@ export function buildExperienceAvailabilitySummary({
       confirmedGuestCount: 0,
       hasConfirmedPrivateBooking: false,
     };
-    const remainingSeats = normalizedMaxGuests - aggregate.confirmedGuestCount;
-
-    if (aggregate.hasConfirmedPrivateBooking || remainingSeats <= 0) {
-      continue;
-    }
+    const rawRemainingSeats = normalizedMaxGuests - aggregate.confirmedGuestCount;
+    const soldOutReason = aggregate.hasConfirmedPrivateBooking
+      ? 'private_booked'
+      : rawRemainingSeats <= 0
+        ? 'capacity_full'
+        : undefined;
+    const isBookable = !soldOutReason;
+    const remainingSeats = isBookable ? Math.max(0, rawRemainingSeats) : 0;
 
     if (!dateToTimeMap[date]) {
       dateToTimeMap[date] = [];
@@ -90,11 +95,20 @@ export function buildExperienceAvailabilitySummary({
       dateToTimeMap[date].push(time);
     }
 
+    if (!calendarDayStatusMap[date]) {
+      calendarDayStatusMap[date] = 'sold_out';
+    }
+    if (isBookable) {
+      calendarDayStatusMap[date] = 'available';
+    }
+
     slotSummaryMap[slotKey] = {
       remainingSeats,
       confirmedGuestCount: aggregate.confirmedGuestCount,
-      hasConfirmedPrivateBooking: false,
-      soloGuaranteeEligible: aggregate.confirmedGuestCount === 0,
+      hasConfirmedPrivateBooking: aggregate.hasConfirmedPrivateBooking,
+      isBookable,
+      soldOutReason,
+      soloGuaranteeEligible: isBookable && aggregate.confirmedGuestCount === 0,
     };
   }
 
@@ -107,6 +121,7 @@ export function buildExperienceAvailabilitySummary({
   return {
     availableDates: Object.keys(sortedDateToTimeMap),
     dateToTimeMap: sortedDateToTimeMap,
+    calendarDayStatusMap,
     slotSummaryMap,
   };
 }

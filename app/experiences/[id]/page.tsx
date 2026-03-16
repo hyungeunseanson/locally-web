@@ -173,6 +173,7 @@ export default async function Page({ params }: Props) {
         initialHostProfile={hostProfile}
         initialAvailableDates={availabilitySummary.availableDates}
         initialDateToTimeMap={availabilitySummary.dateToTimeMap}
+        initialCalendarDayStatusMap={availabilitySummary.calendarDayStatusMap}
         initialSlotSummaryMap={availabilitySummary.slotSummaryMap}
       />
     </>

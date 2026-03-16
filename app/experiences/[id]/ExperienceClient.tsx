@@ -17,6 +17,7 @@ import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
 import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 import {
+  ExperienceCalendarDayStatus,
   ExperienceAvailabilitySummary,
   ExperienceDetail,
   ExperienceSlotSummary,
@@ -35,6 +36,7 @@ type Props = {
   initialHostProfile: HostProfileDetail;
   initialAvailableDates: string[];
   initialDateToTimeMap: Record<string, string[]>;
+  initialCalendarDayStatusMap: Record<string, ExperienceCalendarDayStatus>;
   initialSlotSummaryMap: Record<string, ExperienceSlotSummary>;
 };
 
@@ -44,6 +46,7 @@ export default function ExperienceClient({
   initialHostProfile,
   initialAvailableDates,
   initialDateToTimeMap,
+  initialCalendarDayStatusMap,
   initialSlotSummaryMap
 }: Props) {
   const [isCopySuccess, setIsCopySuccess] = useState(false);
@@ -62,6 +65,7 @@ export default function ExperienceClient({
 
   const [availableDates, setAvailableDates] = useState<string[]>(initialAvailableDates);
   const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>(initialDateToTimeMap);
+  const [calendarDayStatusMap, setCalendarDayStatusMap] = useState<Record<string, ExperienceCalendarDayStatus>>(initialCalendarDayStatusMap);
   const [slotSummaryMap, setSlotSummaryMap] = useState<Record<string, ExperienceSlotSummary>>(initialSlotSummaryMap);
 
   const [inquiryText, setInquiryText] = useState('');
@@ -109,6 +113,7 @@ export default function ExperienceClient({
       const summary = (await response.json()) as ExperienceAvailabilitySummary;
       setAvailableDates(Array.isArray(summary.availableDates) ? summary.availableDates : []);
       setDateToTimeMap(summary.dateToTimeMap || {});
+      setCalendarDayStatusMap(summary.calendarDayStatusMap || {});
       setSlotSummaryMap(summary.slotSummaryMap || {});
     } catch (error) {
       console.error('Experience availability refresh error:', error);
@@ -432,6 +437,7 @@ export default function ExperienceClient({
             experience={experience}
             availableDates={availableDates}
             dateToTimeMap={dateToTimeMap}
+            calendarDayStatusMap={calendarDayStatusMap}
             slotSummaryMap={slotSummaryMap}
             handleReserve={handleReserve}
           />

@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.26 — [Experiences] 예약 가능 요약 hardening · 만석 날짜 가시화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 상세/결제 availability summary 통일 | `app/utils/experienceAvailability.ts`, `app/api/experiences/[id]/availability-summary/route.ts`, `app/experiences/[id]/page.tsx` — 확정 예약(`PAID/confirmed`) 기준 slot summary를 공용 helper로 통합하고, 상세/결제/뒤로가기 복귀가 같은 요약 데이터를 사용하도록 정리 |
+| 🔴 1인 출발 확정 confirmed-only 차단 | `app/api/bookings/route.ts`, `supabase_booking_capacity_solo_visibility_v3.9.5.sql`, `app/experiences/[id]/payment/page.tsx`, `app/experiences/[id]/components/ReservationCard.tsx` — 확정 예약이 이미 있는 슬롯에서는 solo guarantee UI/딥링크/서버 생성/RPC를 모두 차단 |
+| 🟠 결제 확정 후 상세 캐시 무효화 | `app/api/payment/nicepay-callback/route.ts`, `app/api/payment/paypal/capture-order/route.ts`, `app/api/admin/bookings/confirm-payment/route.ts`, `app/api/bookings/confirm-payment/route.ts` — 카드/PayPal/무통장 확정 직후 체험 상세 경로를 `revalidatePath()`로 무효화 |
+| 🟠 만석 날짜 달력 노출 | `app/experiences/[id]/types.ts`, `app/experiences/[id]/ExperienceClient.tsx`, `app/experiences/[id]/components/ExpSidebar.tsx`, `app/experiences/[id]/components/ReservationCard.tsx` — 예약 가능 날짜만 숨기지 않고 `available/sold_out` day status를 내려, 만석 날짜도 달력에 남기고 시간 버튼에서 `매진` / `프라이빗 예약 마감` 상태를 표시 |
+| 🟡 보호막 추가 | `tests/e2e/42-experience-paypal-payment.spec.ts`, `tests/e2e/44-experience-card-payment-ui.spec.ts`, `tests/e2e/64-experience-availability-detail.spec.ts`, `tests/e2e/65-experience-post-confirm-detail-refresh.spec.ts`, `tests/e2e/66-bookings-solo-guard.spec.ts`, `tests/e2e/helpers/experienceBooking.ts` — 결제 후 상세 재진입, sold-out 날짜 가시성, solo deep-link/API guard 회귀를 검증 |
+
 ## v3.39.25 — [Community] 모바일 전용 UI 정리
 
 | 항목 | 내용 |

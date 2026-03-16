@@ -69,11 +69,18 @@ export type ExperienceSlotSummary = {
   remainingSeats: number;
   confirmedGuestCount: number;
   hasConfirmedPrivateBooking: boolean;
+  isBookable: boolean;
+  soldOutReason?: ExperienceSlotSoldOutReason;
   soloGuaranteeEligible: boolean;
 };
+
+export type ExperienceCalendarDayStatus = 'available' | 'sold_out';
+
+export type ExperienceSlotSoldOutReason = 'capacity_full' | 'private_booked';
 
 export type ExperienceAvailabilitySummary = {
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
+  calendarDayStatusMap: Record<string, ExperienceCalendarDayStatus>;
   slotSummaryMap: Record<string, ExperienceSlotSummary>;
 };

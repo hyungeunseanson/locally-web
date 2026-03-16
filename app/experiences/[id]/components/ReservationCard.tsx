@@ -4,7 +4,11 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
-import { ExperienceSlotSummary } from '../types';
+import {
+  ExperienceCalendarDayStatus,
+  ExperienceSlotSoldOutReason,
+  ExperienceSlotSummary,
+} from '../types';
 
 interface ReservationCardProps {
   price: number;
@@ -13,6 +17,7 @@ interface ReservationCardProps {
   duration: number;
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
+  calendarDayStatusMap?: Record<string, ExperienceCalendarDayStatus>;
   maxGuests?: number;
   slotSummaryMap?: Record<string, ExperienceSlotSummary>;
   onReserve: (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => void;
@@ -20,7 +25,7 @@ interface ReservationCardProps {
 
 export default function ReservationCard({
   price, privatePrice = 0, isPrivateEnabled = false,
-  duration, availableDates, dateToTimeMap, onReserve,
+  duration, availableDates, dateToTimeMap, calendarDayStatusMap = {}, onReserve,
   maxGuests = 10, slotSummaryMap = {}
 }: ReservationCardProps) {
   const { t } = useLanguage();
@@ -33,6 +38,7 @@ export default function ReservationCard({
 
   const cleanTime = selectedTime.substring(0, 5);
   const currentKey = `${selectedDate}_${cleanTime}`;
+  const selectedDateStatus = selectedDate ? calendarDayStatusMap[selectedDate] : undefined;
 
   const currentSlotSummary = (selectedDate && selectedTime)
     ? slotSummaryMap[currentKey]
@@ -61,6 +67,13 @@ export default function ReservationCard({
     const [hour, minute] = startTime.split(':').map(Number);
     return `${hour + duration}:${String(minute).padStart(2, '0')}`;
   };
+  const getSoldOutLabel = (soldOutReason?: ExperienceSlotSoldOutReason) => {
+    if (soldOutReason === 'private_booked') {
+      return '프라이빗 예약 마감';
+    }
+
+    return t('exp_reservation_sold_out');
+  };
 
   // 달력 렌더링
   const renderCalendar = () => {
@@ -72,14 +85,36 @@ export default function ReservationCard({
     for (let i = 0; i < startBlank; i++) days.push(<div key={`empty-${i}`} />);
     for (let d = 1; d <= daysCount; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const isAvailable = availableDates.includes(dateStr);
+      const dayStatus = calendarDayStatusMap[dateStr];
+      const isSelectable = Boolean(dayStatus);
       const isSelected = selectedDate === dateStr;
+      const isSoldOutDay = dayStatus === 'sold_out';
       days.push(
-        <button key={d} disabled={!isAvailable}
+        <button key={d} disabled={!isSelectable}
           data-testid={`reservation-day-${dateStr}`}
           onClick={() => { setSelectedDate(dateStr); setSelectedTime(""); }}
-          className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected ? 'bg-black text-white' : ''} ${!isSelected && isAvailable ? 'hover:bg-slate-100 hover:border-black border border-transparent' : ''} ${!isSelected && !isAvailable ? 'text-slate-300 decoration-slate-300 line-through' : ''}`}>
-          {d}
+          className={`relative h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
+            isSelected
+              ? isSoldOutDay
+                ? 'bg-slate-900 text-white ring-2 ring-rose-200'
+                : 'bg-black text-white'
+              : ''
+          } ${
+            !isSelected && dayStatus === 'available'
+              ? 'hover:bg-slate-100 hover:border-black border border-transparent text-slate-900'
+              : ''
+          } ${
+            !isSelected && isSoldOutDay
+              ? 'border border-rose-200 bg-rose-50 text-rose-500 hover:border-rose-300 hover:bg-rose-100'
+              : ''
+          } ${
+            !isSelected && !isSelectable ? 'text-slate-300 decoration-slate-300 line-through' : ''
+          }`}
+        >
+          <span>{d}</span>
+          {isSoldOutDay && !isSelected && (
+            <span className="absolute bottom-[5px] h-1.5 w-1.5 rounded-full bg-rose-400" />
+          )}
         </button>
       );
     }
@@ -128,6 +163,24 @@ export default function ReservationCard({
       setIsSoloGuaranteed(false);
     }
   }, [isSoloEligible, isSoloGuaranteed]);
+
+  useEffect(() => {
+    if (selectedTime && currentSlotSummary && !currentSlotSummary.isBookable) {
+      setSelectedTime('');
+      setIsSoloGuaranteed(false);
+    }
+  }, [currentSlotSummary, selectedTime]);
+
+  const isReserveDisabled =
+    !selectedDate ||
+    !selectedTime ||
+    !currentSlotSummary?.isBookable;
+  const hasBookableTimeOnSelectedDate = selectedDate
+    ? (dateToTimeMap[selectedDate] || []).some((time) => {
+        const timeKey = `${selectedDate}_${time.slice(0, 5)}`;
+        return Boolean(slotSummaryMap[timeKey]?.isBookable);
+      })
+    : false;
 
   return (
     <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-5 md:p-6 bg-white">
@@ -210,23 +263,27 @@ export default function ReservationCard({
             {dateToTimeMap[selectedDate]?.map(time => {
               const tClean = time.substring(0, 5);
               const tKey = `${selectedDate}_${tClean}`;
-              const tSeats = slotSummaryMap[tKey]?.remainingSeats ?? maxGuests;
+              const slotSummary = slotSummaryMap[tKey];
+              const tSeats = slotSummary?.remainingSeats ?? maxGuests;
+              const isBookable = slotSummary?.isBookable ?? false;
 
               return (
                 <button
                   key={time} 
                   data-testid={`reservation-time-${tClean}`}
                   onClick={() => setSelectedTime(tClean)}
-                  disabled={tSeats <= 0}
+                  disabled={!isBookable}
                   className={`py-2 px-3 rounded-lg text-[11px] md:text-xs font-semibold border transition-all flex flex-col items-center 
                     ${selectedTime === tClean ? 'bg-black text-white border-black' : 
-                      tSeats <= 0 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed line-through' :
+                      !isBookable ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' :
                       'bg-white text-slate-700 border-slate-200 hover:border-black'}`}
                 >
                   <span>{time}</span>
                   <span className={`text-[10px] md:text-[10px] font-normal ${selectedTime === tClean ? 'text-slate-300' : 'text-slate-400'}`}>
-                    {tSeats <= 0 ? t('exp_reservation_sold_out') : t('exp_reservation_end_time_prefix', { time: calculateEndTime(time) })}
-                    {tSeats > 0 && tSeats <= 5 && <span className="ml-1 text-rose-500">{t('exp_reservation_remaining_short', { count: tSeats })}</span>}
+                    {!isBookable
+                      ? getSoldOutLabel(slotSummary?.soldOutReason)
+                      : t('exp_reservation_end_time_prefix', { time: calculateEndTime(time) })}
+                    {isBookable && tSeats > 0 && tSeats <= 5 && <span className="ml-1 text-rose-500">{t('exp_reservation_remaining_short', { count: tSeats })}</span>}
                   </span>
                 </button>
               );
@@ -234,6 +291,11 @@ export default function ReservationCard({
           </div>
           {(!dateToTimeMap[selectedDate] || dateToTimeMap[selectedDate].length === 0) && (
             <div className="text-center text-xs text-slate-400 py-4 bg-slate-50 rounded-lg">{t('exp_reservation_time_empty')}</div>
+          )}
+          {selectedDateStatus === 'sold_out' && !hasBookableTimeOnSelectedDate && (
+            <div className="mt-3 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] leading-relaxed text-rose-600">
+              선택한 날짜는 현재 예약이 마감되었습니다. 다른 날짜를 선택해 주세요.
+            </div>
           )}
         </div>
       )}
@@ -260,8 +322,9 @@ export default function ReservationCard({
 
       <button
         data-testid="reservation-submit"
+        disabled={isReserveDisabled}
         onClick={() => onReserve(selectedDate, selectedTime, guestCount, isPrivate, isSoloEligible && isSoloGuaranteed)}
-        className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4"
+        className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none"
       >
         {isPrivate ? t('exp_reservation_book_private') : t('exp_reservation_book_shared')}
       </button>

@@ -2,12 +2,13 @@
 
 import React from 'react';
 import ReservationCard from './ReservationCard';
-import { ExperienceDetail, ExperienceSlotSummary } from '../types';
+import { ExperienceCalendarDayStatus, ExperienceDetail, ExperienceSlotSummary } from '../types';
 
 type ExpSidebarProps = {
   experience: ExperienceDetail;
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
+  calendarDayStatusMap: Record<string, ExperienceCalendarDayStatus>;
   slotSummaryMap: Record<string, ExperienceSlotSummary>;
   handleReserve: (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => void;
 };
@@ -16,6 +17,7 @@ export default function ExpSidebar({
   experience,
   availableDates,
   dateToTimeMap,
+  calendarDayStatusMap,
   slotSummaryMap,
   handleReserve
 }: ExpSidebarProps) {
@@ -30,6 +32,7 @@ export default function ExpSidebar({
         duration={Number(experience.duration || 2)}
         availableDates={availableDates}
         dateToTimeMap={dateToTimeMap}
+        calendarDayStatusMap={calendarDayStatusMap}
         onReserve={handleReserve}
       />
     </div>
