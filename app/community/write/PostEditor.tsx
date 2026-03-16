@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import DatePicker from '@/app/components/DatePicker';
-import { ArrowLeft, CalendarDays, ChevronRight, ImagePlus, Loader2, MapPin, X } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronRight, GripVertical, ImagePlus, Loader2, MapPin, X } from 'lucide-react';
 import type { CommunityCategory } from '@/app/types/community';
 import { getCommunityCategoryMeta } from '../categoryMeta';
+
+const MAX_IMAGES = 10;
 
 const WRITABLE_CATEGORIES: CommunityCategory[] = ['qna', 'companion', 'info', 'locally_content'];
 
@@ -59,6 +61,8 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
     const [content, setContent] = useState('');
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imageUrls, setImageUrls] = useState<string[]>([]);
+    const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+    const dragSrcIdx = useRef<number | null>(null);
     const [isAnonymous, setIsAnonymous] = useState(false);
     const [companionDate, setCompanionDate] = useState('');
     const [companionCity, setCompanionCity] = useState('');
@@ -89,8 +93,8 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
         if (!event.target.files) return;
         const files = Array.from(event.target.files);
 
-        if (imageFiles.length + files.length > 3) {
-            showToast('사진은 최대 3장까지만 업로드 가능합니다.', 'error');
+        if (imageFiles.length + files.length > MAX_IMAGES) {
+            showToast(`사진은 최대 ${MAX_IMAGES}장까지만 업로드 가능합니다.`, 'error');
             event.target.value = '';
             return;
         }
@@ -119,6 +123,42 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
             nextUrls.splice(index, 1);
             return nextUrls;
         });
+    };
+
+    const handleDragStart = (e: React.DragEvent, idx: number) => {
+        dragSrcIdx.current = idx;
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e: React.DragEvent, idx: number) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverIdx !== idx) setDragOverIdx(idx);
+    };
+
+    const handleDrop = (e: React.DragEvent, toIdx: number) => {
+        e.preventDefault();
+        const fromIdx = dragSrcIdx.current;
+        if (fromIdx === null || fromIdx === toIdx) { setDragOverIdx(null); return; }
+        setImageFiles((prev) => {
+            const next = [...prev];
+            const [item] = next.splice(fromIdx, 1);
+            next.splice(toIdx, 0, item);
+            return next;
+        });
+        setImageUrls((prev) => {
+            const next = [...prev];
+            const [item] = next.splice(fromIdx, 1);
+            next.splice(toIdx, 0, item);
+            return next;
+        });
+        dragSrcIdx.current = null;
+        setDragOverIdx(null);
+    };
+
+    const handleDragEnd = () => {
+        dragSrcIdx.current = null;
+        setDragOverIdx(null);
     };
 
     const uploadImages = async (): Promise<UploadedImage[]> => {
@@ -339,29 +379,47 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
                             <div className="mb-3 flex items-center justify-between">
                                 <div>
                                     <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">이미지</div>
-                                    <p className="mt-1 text-[13px] text-slate-500">최대 3장까지 업로드할 수 있습니다.</p>
+                                    <p className="mt-1 text-[13px] text-slate-500">최대 {MAX_IMAGES}장 · 드래그해서 순서 변경 가능</p>
                                 </div>
-                                <span className="text-[12px] font-semibold text-slate-400">{imageFiles.length}/3</span>
+                                <span className={`text-[12px] font-semibold ${imageFiles.length >= MAX_IMAGES ? 'text-rose-400' : 'text-slate-400'}`}>
+                                    {imageFiles.length}/{MAX_IMAGES}
+                                </span>
                             </div>
 
                             <div className="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
                                 {imageUrls.map((url, index) => (
                                     <div
                                         key={index}
-                                        className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, index)}
+                                        onDragOver={(e) => handleDragOver(e, index)}
+                                        onDrop={(e) => handleDrop(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        className={`relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-2xl border bg-slate-100 cursor-grab active:cursor-grabbing transition-all ${
+                                            dragOverIdx === index
+                                                ? 'border-slate-900 ring-2 ring-slate-900 scale-105'
+                                                : 'border-slate-200'
+                                        }`}
                                     >
-                                        <img src={url} alt={`preview ${index + 1}`} className="h-full w-full object-cover" />
+                                        <img src={url} alt={`preview ${index + 1}`} className="h-full w-full object-cover pointer-events-none" />
+                                        {/* 순서 표시 */}
+                                        <div className="absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white text-[10px] font-bold">
+                                            {index + 1}
+                                        </div>
+                                        <div className="absolute top-1.5 left-1.5 text-white/80">
+                                            <GripVertical size={14} />
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => removeImage(index)}
-                                            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+                                            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
                                         >
                                             <X size={14} />
                                         </button>
                                     </div>
                                 ))}
 
-                                {imageFiles.length < 3 && (
+                                {imageFiles.length < MAX_IMAGES && (
                                     <label className="flex h-24 w-24 flex-shrink-0 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-slate-400 transition-colors hover:bg-slate-100">
                                         <ImagePlus size={24} className="mb-1" />
                                         <span className="text-[11px] font-semibold">추가</span>

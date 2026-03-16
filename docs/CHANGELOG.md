@@ -5,6 +5,17 @@
 
 ---
 
+## v3.39.23 — [Community] 그리드 카드 클릭 버그 수정 · 이미지 업로드 개선 · 인스타 슬라이더
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 PostGridCard 클릭 버그 수정 | `app/community/components/PostGridCard.tsx` — `<img>`에 `pointer-events-none` 추가, 기존 `z-0` 절대 링크를 덮어 클릭이 막히던 문제 수정 |
+| 🟠 PostGridCard 제목 오버레이 제거 | 하단 그라디언트 영역의 `<h3>` 제목 텍스트 삭제, 배지 + 작성자/통계만 유지 |
+| 🟠 글쓰기 이미지 최대 10장으로 확장 | `app/community/write/PostEditor.tsx` — 3장 → 10장, UI 카운터 및 안내 문구 갱신 (자동 압축은 기존 `compressImage` 그대로 동작) |
+| 🟠 이미지 드래그 순서 변경 | `PostEditor.tsx` — HTML5 drag API 기반 thumbnail 재정렬 구현 (외부 라이브러리 없음), 드래그 대상 하이라이트 + 순서 번호 뱃지 표시 |
+| 🟠 로컬리 컨텐츠 상세 인스타그램 슬라이더 | 신규 `app/community/components/InstagramSlider.tsx` 생성 — 4:5(1080×1350) 비율, 터치 스와이프, 화살표 버튼(데스크탑 hover), 닷 인디케이터, N/Total 카운터 |
+| 🟡 PostImages hero 분기 수정 | `app/community/components/PostImages.tsx` — `detail && hero` 조건에서 기존 단일 이미지 뷰 대신 `InstagramSlider` 렌더링 |
+
 ## v3.39.22 — [Community] 커뮤니티 페이지 UX/UI 핀셋 수정
 
 | 항목 | 내용 |

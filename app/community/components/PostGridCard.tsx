@@ -38,11 +38,11 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
                 <img
                     src={thumbnail}
                     alt={post.title}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] pointer-events-none"
                     loading="lazy"
                 />
             ) : (
-                <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,#ffffff_0%,#f4f4f5_58%,#e4e4e7_100%)] p-6">
+                <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,#ffffff_0%,#f4f4f5_58%,#e4e4e7_100%)] p-6 pointer-events-none">
                     <img
                         src="/images/logo-black-transparent.png"
                         alt="Locally 로고"
@@ -59,11 +59,7 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
             </div>
 
             <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 pb-4 pt-12 pointer-events-none">
-                <h3 className="line-clamp-2 break-words text-[16px] font-semibold leading-snug text-white [overflow-wrap:anywhere]">
-                    {post.title}
-                </h3>
-
-                <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                     <CommunityAuthorTrigger
                         userId={post.user_id}
                         authorName={authorName}
@@ -93,6 +89,7 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
                     </div>
                 </div>
             </div>
+
         </article>
     );
 }

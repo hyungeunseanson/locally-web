@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useCallback } from 'react';
+import InstagramSlider from './InstagramSlider';
 
 interface PostImagesProps {
     images: string[];
@@ -37,20 +38,13 @@ export default function PostImages({ images, detail = false, hero = false }: Pos
 
     if (!images || images.length === 0) return null;
 
+    // ─── 로컬리 컨텐츠 상세 hero → 인스타그램 슬라이더 ─────────────
+    if (detail && hero) {
+        return <InstagramSlider images={images} />;
+    }
+
     // ─── 단일 이미지 ──────────────────────────────────────────────────
     if (images.length === 1) {
-        if (detail && hero) {
-            return (
-                <div className="w-full overflow-hidden rounded-[28px] bg-gray-100">
-                    <img
-                        src={images[0]}
-                        alt="첨부 이미지"
-                        className="h-auto w-full object-contain"
-                        loading="lazy"
-                    />
-                </div>
-            );
-        }
 
         // 피드 카드: 모바일은 full-width, 데스크탑은 max-w-xs(320px)로 제한 후 중앙 정렬
         // 상세 페이지: max-w-xl로 확장
