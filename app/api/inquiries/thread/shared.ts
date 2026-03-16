@@ -36,6 +36,9 @@ export type InquiryThreadResponse = {
   redirectUrl: string;
   createdThread: boolean;
   createdMessage: boolean;
+  messageId?: number | string;
+  displayContent?: string;
+  updatedAt?: string;
 };
 
 export type InquiryMessageRequestBody = {
@@ -195,12 +198,16 @@ async function notifyRecipient(params: {
       auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
     });
 
-    await transporter.sendMail({
-      from: `"Locally Team" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: `[Locally] ${title}`,
-      html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${link}">확인하기</a>`,
-    });
+    void transporter
+      .sendMail({
+        from: `"Locally Team" <${process.env.GMAIL_USER}>`,
+        to: email,
+        subject: `[Locally] ${title}`,
+        html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${link}">확인하기</a>`,
+      })
+      .catch((error) => {
+        console.warn('[inquiries/thread] message notification email failed:', error);
+      });
   } catch (error) {
     console.warn('[inquiries/thread] message notification email failed:', error);
   }
@@ -640,6 +647,9 @@ export async function upsertInquiryThread(params: {
   let inquiry = resolved.existing as InquiryInsertRow | null;
   let createdThread = false;
   let createdMessage = false;
+  let createdMessageId: number | string | undefined;
+  let createdMessageDisplayContent: string | undefined;
+  let createdMessageUpdatedAt: string | undefined;
 
   if (!inquiry) {
     const initialContent = cleanMessage || resolved.emptyContent || '';
@@ -697,7 +707,8 @@ export async function upsertInquiryThread(params: {
   }
 
   if (cleanMessage) {
-    const { error: messageError } = await supabaseAdmin
+    const updatedAt = new Date().toISOString();
+    const { data: insertedMessage, error: messageError } = await supabaseAdmin
       .from('inquiry_messages')
       .insert({
         inquiry_id: inquiry.id,
@@ -705,10 +716,12 @@ export async function upsertInquiryThread(params: {
         content: cleanMessage,
         type: 'text',
         is_read: false,
-      });
+      })
+      .select('id')
+      .maybeSingle<InquiryMessageInsertRow>();
 
-    if (messageError) {
-      if (messageError.code === '23503' && messageError.message?.includes('profiles')) {
+    if (messageError || !insertedMessage) {
+      if (messageError?.code === '23503' && messageError.message?.includes('profiles')) {
         throw new InquiryThreadError(400, '프로필 동기화가 진행 중입니다. 잠시 후(5초 뒤) 다시 시도해주세요.');
       }
       throw new InquiryThreadError(500, '첫 메시지 저장에 실패했습니다.');
@@ -718,11 +731,14 @@ export async function upsertInquiryThread(params: {
       .from('inquiries')
       .update({
         content: cleanMessage,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
       })
       .eq('id', inquiry.id);
 
     createdMessage = true;
+    createdMessageId = insertedMessage?.id;
+    createdMessageDisplayContent = cleanMessage;
+    createdMessageUpdatedAt = updatedAt;
 
     const actorDisplayName = await getActorDisplayName(actor.id);
     const recipientId = actor.id === resolved.hostId ? resolved.guestId : resolved.hostId;
@@ -766,6 +782,9 @@ export async function upsertInquiryThread(params: {
     redirectUrl,
     createdThread,
     createdMessage,
+    messageId: createdMessageId,
+    displayContent: createdMessageDisplayContent,
+    updatedAt: createdMessageUpdatedAt,
   } satisfies InquiryThreadResponse;
 }
 

@@ -79,6 +79,10 @@ type InquiryMessageView = InquiryMessageRow & {
   };
 };
 
+function sortInquiriesByUpdatedAt(items: InquiryListItem[]) {
+  return [...items].sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime());
+}
+
 type RealtimeMessagePayload = {
   id?: number;
   sender_id?: string;
@@ -462,6 +466,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const createInquiry = async (hostId: string, experienceId: string | number, content: string) => {
     const authUser = await getAuthenticatedUser();
     if (!authUser) throw new Error('로그인 필요');
+    const cleanContent = sanitizeText(content).trim();
 
     const response = await fetch('/api/inquiries/thread', {
       method: 'POST',
@@ -470,7 +475,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         contextType: 'experience_general',
         hostId,
         experienceId: String(experienceId),
-        message: content,
+        message: cleanContent,
       }),
     });
 
@@ -480,8 +485,63 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       throw new Error(result?.error || '문의방 생성에 실패했습니다.');
     }
 
-    await fetchInquiries(false);
-    await loadMessages(result.inquiryId as number | string);
+    const currentSelected = selectedInquiryRef.current;
+    const updatedAt = String(result.updatedAt || new Date().toISOString());
+    const nextInquiry: InquiryListItem = {
+      id: result.inquiryId as number | string,
+      type: result.inquiryType || 'general',
+      host_id: hostId,
+      user_id: authUser.id,
+      experience_id: experienceId,
+      unread_count: 0,
+      content: String(result.displayContent || cleanContent),
+      updated_at: updatedAt,
+      host: currentSelected?.host || {
+        id: hostId,
+        name: 'Host',
+        avatar_url: null,
+      },
+      guest: currentSelected?.guest,
+      experiences: currentSelected?.experiences || null,
+    };
+
+    const nextInquiries = sortInquiriesByUpdatedAt([
+      nextInquiry,
+      ...inquiriesRef.current.filter((inq) => String(inq.id) !== String(result.inquiryId)),
+    ]);
+    inquiriesRef.current = nextInquiries;
+    setInquiries(nextInquiries);
+    selectedInquiryRef.current = nextInquiry;
+    setSelectedInquiry(nextInquiry);
+
+    const firstMessageId = result.messageId ?? `temp-thread-${Date.now()}`;
+    setMessages([
+      {
+        id: firstMessageId,
+        inquiry_id: result.inquiryId,
+        sender_id: authUser.id,
+        content: cleanContent,
+        image_url: null,
+        type: 'text',
+        is_read: false,
+        read_at: null,
+        created_at: updatedAt,
+        sender: {
+          id: authUser.id,
+          name:
+            authUser.user_metadata?.full_name ||
+            currentUser?.user_metadata?.full_name ||
+            authUser.email ||
+            '나',
+          avatar_url:
+            authUser.user_metadata?.avatar_url ||
+            currentUser?.user_metadata?.avatar_url ||
+            null,
+        },
+      },
+    ]);
+
+    void fetchInquiries(false);
 
     return result;
   };

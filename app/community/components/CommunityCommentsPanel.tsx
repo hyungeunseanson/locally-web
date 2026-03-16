@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import CommentSection from './CommentSection';
 import LikeButton from './LikeButton';
@@ -23,11 +23,43 @@ export default function CommunityCommentsPanel({
     onOpenLogin,
 }: CommunityCommentsPanelProps) {
     const [commentCount, setCommentCount] = useState(initialCommentCount);
+    const [currentViewCount, setCurrentViewCount] = useState(viewCount);
+    const hasTrackedViewRef = useRef(false);
+
+    useEffect(() => {
+        if (hasTrackedViewRef.current) return;
+        hasTrackedViewRef.current = true;
+
+        let isMounted = true;
+
+        void fetch('/api/community/views', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId }),
+        })
+            .then(async (response) => {
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data?.success) {
+                    throw new Error(data?.error || 'view tracking failed');
+                }
+
+                if (isMounted && Number.isFinite(Number(data.viewCount))) {
+                    setCurrentViewCount(Number(data.viewCount));
+                }
+            })
+            .catch((error) => {
+                console.warn('[CommunityCommentsPanel] view tracking failed:', error);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [postId]);
 
     return (
         <>
             <div className="flex items-center gap-4 text-slate-400 text-sm font-semibold border-t border-slate-100 pt-5 mt-5">
-                <span>조회 {viewCount || 0}</span>
+                <span data-testid="community-view-summary-count">조회 {currentViewCount || 0}</span>
                 <span data-testid="community-comment-summary-count">댓글 {commentCount || 0}</span>
                 <div className="ml-auto">
                     <LikeButton

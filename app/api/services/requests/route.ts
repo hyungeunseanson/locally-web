@@ -34,6 +34,93 @@ type CreateRequestBody = {
 };
 
 type ServiceAdminClient = SupabaseClient;
+type ServiceRpcErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+type CreateServiceRequestAtomicResult = {
+  request_id: string;
+  booking_id: string;
+  order_id: string;
+  amount: number;
+};
+
+function isMissingServiceRpcError(error: ServiceRpcErrorLike | null | undefined, functionName: string) {
+  if (!error) return false;
+
+  const combinedMessage = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+  return (
+    error.code === 'PGRST202' ||
+    (combinedMessage.includes(functionName) &&
+      (combinedMessage.includes('Could not find the function') ||
+        combinedMessage.includes('No function matches') ||
+        combinedMessage.includes('does not exist')))
+  );
+}
+
+async function tryCreateServiceRequestAtomic(
+  supabaseAdmin: ServiceAdminClient,
+  params: {
+    userId: string;
+    title: string;
+    description: string;
+    city: string;
+    country: string;
+    serviceDate: string;
+    startTime: string;
+    durationHours: number;
+    languages: string[];
+    guestCount: number;
+    contactName: string;
+    contactPhone: string;
+  }
+) {
+  const rpcName = 'create_service_request_with_booking_atomic';
+  const { data, error } = await supabaseAdmin
+    .rpc(rpcName, {
+      p_user_id: params.userId,
+      p_title: params.title,
+      p_description: params.description,
+      p_city: params.city,
+      p_country: params.country,
+      p_service_date: params.serviceDate,
+      p_start_time: params.startTime,
+      p_duration_hours: params.durationHours,
+      p_languages: params.languages,
+      p_guest_count: params.guestCount,
+      p_contact_name: params.contactName,
+      p_contact_phone: params.contactPhone,
+    })
+    .maybeSingle<CreateServiceRequestAtomicResult>();
+
+  if (error) {
+    if (isMissingServiceRpcError(error, rpcName)) {
+      return { kind: 'missing' as const };
+    }
+
+    console.error('Service Request Atomic RPC Error:', error);
+    return {
+      kind: 'error' as const,
+      status: 500,
+      error: '의뢰 생성 중 오류가 발생했습니다.',
+    };
+  }
+
+  if (!data?.request_id || !data.order_id) {
+    return {
+      kind: 'error' as const,
+      status: 500,
+      error: '의뢰 생성 중 오류가 발생했습니다.',
+    };
+  }
+
+  return {
+    kind: 'success' as const,
+    data,
+  };
+}
 
 async function cleanupCreatedServiceRequestState(
   supabaseAdmin: ServiceAdminClient,
@@ -115,23 +202,70 @@ export async function POST(request: Request) {
     const shouldForceBookingCreateFailure =
       process.env.NODE_ENV !== 'production' &&
       request.headers.get('x-locally-test-force-booking-create-fail') === '1';
+    const normalizedTitle = title.trim();
+    const normalizedDescription = description.trim();
+    const normalizedCity = normalizeServiceCity(city);
+    const normalizedContactName = contact_name.trim();
+    const normalizedContactPhone = contact_phone.trim();
+    const normalizedLanguages = languages ?? [];
+
+    if (!shouldForceBookingCreateFailure) {
+      const atomicCreateResult = await tryCreateServiceRequestAtomic(supabaseAdmin, {
+        userId: user.id,
+        title: normalizedTitle,
+        description: normalizedDescription,
+        city: normalizedCity,
+        country: resolvedCountry,
+        serviceDate: service_date,
+        startTime: start_time,
+        durationHours: durationNum,
+        languages: normalizedLanguages,
+        guestCount: guestNum,
+        contactName: normalizedContactName,
+        contactPhone: normalizedContactPhone,
+      });
+
+      if (atomicCreateResult.kind === 'success') {
+        insertAdminAlerts({
+          title: '새 맞춤 의뢰가 생성되었습니다',
+          message: `'${normalizedTitle}' 맞춤 의뢰가 생성되었습니다.`,
+          link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+        }).catch((adminAlertError) => {
+          console.error('Service Request Admin Alert Error:', adminAlertError);
+        });
+
+        return NextResponse.json({
+          success: true,
+          requestId: atomicCreateResult.data.request_id,
+          orderId: atomicCreateResult.data.order_id,
+          amount: atomicCreateResult.data.amount,
+        });
+      }
+
+      if (atomicCreateResult.kind === 'error') {
+        return NextResponse.json(
+          { success: false, error: atomicCreateResult.error },
+          { status: atomicCreateResult.status }
+        );
+      }
+    }
 
     // 1. service_requests 생성 (v2 에스크로: pending_payment 상태로 시작)
     const { data, error } = await supabaseAdmin
       .from('service_requests')
       .insert({
         user_id: user.id,
-        title: title.trim(),
-        description: description.trim(),
-        city: normalizeServiceCity(city),
+        title: normalizedTitle,
+        description: normalizedDescription,
+        city: normalizedCity,
         country: resolvedCountry,
         service_date,
         start_time,
         duration_hours: durationNum,
-        languages: languages ?? [],
+        languages: normalizedLanguages,
         guest_count: guestNum,
-        contact_name: contact_name.trim(),
-        contact_phone: contact_phone.trim(),
+        contact_name: normalizedContactName,
+        contact_phone: normalizedContactPhone,
         status: 'pending_payment',  // v2 에스크로: 결제 후 open 전환
       })
       .select('id, total_customer_price, total_host_payout, duration_hours')
@@ -156,8 +290,8 @@ export async function POST(request: Request) {
       host_payout_amount: data.total_host_payout,
       platform_revenue: data.total_customer_price - data.total_host_payout,
       status: 'PENDING' as const,
-      contact_name: contact_name.trim(),
-      contact_phone: contact_phone.trim(),
+      contact_name: normalizedContactName,
+      contact_phone: normalizedContactPhone,
       payment_method: 'card',
       payout_status: 'pending',
     };
@@ -188,7 +322,7 @@ export async function POST(request: Request) {
     // 3. 호스트 알림은 결제 완료(open 전환) 시점에 발송 — 여기서는 생략
     insertAdminAlerts({
       title: '새 맞춤 의뢰가 생성되었습니다',
-      message: `'${title.trim()}' 맞춤 의뢰가 생성되었습니다.`,
+      message: `'${normalizedTitle}' 맞춤 의뢰가 생성되었습니다.`,
       link: '/admin/dashboard?tab=SERVICE_REQUESTS',
     }).catch((adminAlertError) => {
       console.error('Service Request Admin Alert Error:', adminAlertError);

@@ -5,6 +5,32 @@
 
 ---
 
+## v3.39.18 — [Service Requests] RPC 우선 원자화 경로 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 request 생성 RPC 우선 경로 | `app/api/services/requests/route.ts`가 새 `create_service_request_with_booking_atomic` RPC를 먼저 시도하고, 함수가 아직 없는 환경에서만 기존 JS cleanup 경로로 fallback 하도록 정리 |
+| 🟠 host 선택 RPC 우선 경로 | `app/api/services/select-host/route.ts`가 새 `select_service_host_atomic` RPC를 먼저 시도하고, 함수가 없거나 non-production 강제 실패 헤더가 있으면 기존 rollback 경로를 그대로 사용하도록 정리 |
+| 🟠 DB 적용 파일 추가 | `docs/migrations/v3_39_09_create_service_request_with_booking_atomic.sql`, `docs/migrations/v3_39_10_select_service_host_atomic.sql` 추가 — v2 에스크로 구조 기준 request+pending booking 생성, host 선택 상태전이를 각각 하나의 DB 함수로 제공 |
+| 🟡 회귀 확인 | `tests/e2e/49-service-request-contract.spec.ts`, `tests/e2e/50-service-select-host-atomicity.spec.ts` 재통과 — 현재 DB에 함수가 없어도 fallback 경로로 동일 계약을 유지하는지 확인 |
+
+## v3.39.17 — [Community] 상세 조회수 집계 보수 정책 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 상세 view count route 추가 | 새 `app/api/community/views/route.ts` 추가 — 상세 페이지 진입 시 `community_posts.view_count`를 6시간 httpOnly cookie 기준으로 한 브라우저당 한 번만 집계 |
+| 🟠 상세 패널 동기화 | `CommunityCommentsPanel`이 마운트 후 `POST /api/community/views`를 한 번 호출하고, 반환된 `viewCount`로 `조회 N` 표시를 즉시 보정 |
+| 🟡 보호막 추가 | `tests/e2e/61-community-view-count.spec.ts` 추가 — 첫 진입에서만 조회수가 증가하고 같은 브라우저 새로고침에서는 다시 증가하지 않는지 검증 |
+
+## v3.39.16 — [Messaging] 문의방 fast-path 계약 2차
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 새 문의방 응답 확장 | `/api/inquiries/thread`가 첫 메시지 생성 시 `messageId`, `displayContent`, `updatedAt`를 함께 반환하도록 정리해 클라이언트가 전체 스레드 재조회 없이 초기 메시지를 바로 그릴 수 있게 함 |
+| 🟠 createInquiry fast-path | `useChat.createInquiry()`가 새 문의방 생성 성공 후 `fetchInquiries() + loadMessages()`를 기다리지 않고, 선택된 host/experience summary를 유지한 채 inquiry list / selected inquiry / 첫 message를 즉시 구성하도록 정리 |
+| 🟠 이메일 대기 제거 | `app/api/inquiries/thread/shared.ts`의 `notifyRecipient()`가 DB notification insert 후 Gmail 전송을 fire-and-forget으로 보내, 문의방 생성 응답이 메일 발송 대기 때문에 느려지지 않도록 조정 |
+| 🟡 보호막 추가 | `tests/e2e/60-inquiry-thread-contract.spec.ts` 추가 — fast-path UI에 필요한 첫 메시지 메타데이터가 응답에 포함되는지 검증 |
+
 ## v3.39.09 — [Navigation] 호스트 모드 지속성 1차
 
 | 항목 | 내용 |

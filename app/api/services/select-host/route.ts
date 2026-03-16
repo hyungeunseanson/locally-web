@@ -10,10 +10,21 @@ type SelectHostBody = {
 };
 
 type ServiceAdminClient = SupabaseClient;
+type ServiceRpcErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
 type BookingBindingSnapshot = {
   id: string;
   host_id: string | null;
   application_id: string | null;
+};
+type SelectServiceHostAtomicResult = {
+  selected_host_id: string;
+  selected_application_id: string;
+  rejected_host_ids: string[] | null;
 };
 
 type SelectHostFailureStage =
@@ -34,6 +45,149 @@ function getForcedSelectHostFailureStage(request: Request): SelectHostFailureSta
   }
 
   return null;
+}
+
+function isMissingServiceRpcError(error: ServiceRpcErrorLike | null | undefined, functionName: string) {
+  if (!error) return false;
+
+  const combinedMessage = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+  return (
+    error.code === 'PGRST202' ||
+    (combinedMessage.includes(functionName) &&
+      (combinedMessage.includes('Could not find the function') ||
+        combinedMessage.includes('No function matches') ||
+        combinedMessage.includes('does not exist')))
+  );
+}
+
+function mapServiceAtomicError(error: ServiceRpcErrorLike | null | undefined) {
+  const message = `${error?.message || ''} ${error?.details || ''}`;
+
+  if (message.includes('SVC_NOT_FOUND')) {
+    return { status: 404, error: '의뢰 또는 지원서를 찾을 수 없습니다.' };
+  }
+  if (message.includes('SVC_FORBIDDEN')) {
+    return { status: 403, error: '권한이 없습니다.' };
+  }
+  if (message.includes('SVC_INVALID_STATUS')) {
+    return { status: 409, error: '호스트를 선택할 수 없는 상태입니다.' };
+  }
+  if (message.includes('SVC_BAD_REQUEST')) {
+    return { status: 400, error: '지원서 정보가 올바르지 않습니다.' };
+  }
+  if (message.includes('SVC_BOOKING_MISSING')) {
+    return { status: 409, error: '결제 예약을 찾을 수 없습니다.' };
+  }
+
+  return null;
+}
+
+async function trySelectServiceHostAtomic(
+  supabaseAdmin: ServiceAdminClient,
+  params: {
+    customerId: string;
+    requestId: string;
+    applicationId: string;
+  }
+) {
+  const rpcName = 'select_service_host_atomic';
+  const { data, error } = await supabaseAdmin
+    .rpc(rpcName, {
+      p_customer_id: params.customerId,
+      p_request_id: params.requestId,
+      p_application_id: params.applicationId,
+    })
+    .maybeSingle<SelectServiceHostAtomicResult>();
+
+  if (error) {
+    if (isMissingServiceRpcError(error, rpcName)) {
+      return { kind: 'missing' as const };
+    }
+
+    const mappedError = mapServiceAtomicError(error);
+    if (mappedError) {
+      return { kind: 'error' as const, ...mappedError };
+    }
+
+    console.error('Select Host Atomic RPC Error:', error);
+    return {
+      kind: 'error' as const,
+      status: 500,
+      error: '처리 중 오류가 발생했습니다.',
+    };
+  }
+
+  if (!data?.selected_host_id || !data.selected_application_id) {
+    return {
+      kind: 'error' as const,
+      status: 500,
+      error: '처리 중 오류가 발생했습니다.',
+    };
+  }
+
+  return {
+    kind: 'success' as const,
+    data,
+  };
+}
+
+function notifyServiceHostSelection(params: {
+  supabaseAdmin: ServiceAdminClient;
+  requestId: string;
+  requestTitle: string;
+  selectedHostId: string;
+  rejectedHostIds: string[];
+}) {
+  const { supabaseAdmin, requestId, requestTitle, selectedHostId, rejectedHostIds } = params;
+
+  supabaseAdmin.from('notifications').insert({
+    user_id: selectedHostId,
+    type: 'service_host_selected',
+    title: '🎉 고객에게 선택되었습니다!',
+    message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 결제는 이미 완료되어 바로 진행됩니다.`,
+    link: `/services/${requestId}`,
+    is_read: false,
+  }).then(({ error }) => {
+    if (error) console.error('Select Host Notification Error:', error);
+  });
+
+  sendImmediateGenericEmail({
+    recipientUserId: selectedHostId,
+    subject: '[Locally] 고객에게 선택되었습니다',
+    title: '고객에게 선택되었습니다',
+    message: `'${requestTitle}' 의뢰에서 선택되셨습니다. 바로 진행을 준비해주세요.`,
+    link: `/services/${requestId}`,
+    ctaLabel: '의뢰 확인하기',
+  }).catch((emailError) => {
+    console.error('Select Host Email Error:', emailError);
+  });
+
+  insertAdminAlerts({
+    title: '서비스 호스트가 선택되었습니다',
+    message: rejectedHostIds.length > 0
+      ? `'${requestTitle}' 의뢰에서 호스트 선택이 완료되었고, 미선택 ${rejectedHostIds.length}건이 함께 처리되었습니다.`
+      : `'${requestTitle}' 의뢰에서 호스트 선택이 완료되었습니다.`,
+    link: '/admin/dashboard?tab=SERVICE_REQUESTS',
+  }).catch((adminAlertError) => {
+    console.error('Select Host Admin Alert Error:', adminAlertError);
+  });
+
+  Promise.resolve(rejectedHostIds)
+    .then((rejected) => {
+      if (rejected.length === 0) return;
+      const notifications = rejected.map((hostId) => ({
+        user_id: hostId,
+        type: 'service_host_rejected',
+        title: '다른 호스트가 선택되었습니다.',
+        message: `'${requestTitle}' 의뢰에서 다른 호스트가 선택되었습니다.`,
+        link: '/services',
+        is_read: false,
+      }));
+      if (notifications.length === 0) return;
+      supabaseAdmin.from('notifications').insert(notifications).then(({ error }) => {
+        if (error) console.error('Reject Notification Error:', error);
+      });
+    });
 }
 
 async function rollbackSelectHostState(
@@ -223,6 +377,34 @@ export async function POST(request: Request) {
     }
 
     const selectedHostId = application.host_id;
+
+    if (!forcedFailureStage) {
+      const atomicSelectResult = await trySelectServiceHostAtomic(supabaseAdmin, {
+        customerId: user.id,
+        requestId: request_id,
+        applicationId: application_id,
+      });
+
+      if (atomicSelectResult.kind === 'success') {
+        notifyServiceHostSelection({
+          supabaseAdmin,
+          requestId: request_id,
+          requestTitle: serviceRequest.title,
+          selectedHostId: atomicSelectResult.data.selected_host_id,
+          rejectedHostIds: (atomicSelectResult.data.rejected_host_ids || []).filter(Boolean),
+        });
+
+        return NextResponse.json({ success: true, selectedHostId: atomicSelectResult.data.selected_host_id });
+      }
+
+      if (atomicSelectResult.kind === 'error') {
+        return NextResponse.json(
+          { success: false, error: atomicSelectResult.error },
+          { status: atomicSelectResult.status }
+        );
+      }
+    }
+
     const { data: bookingSnapshots, error: bookingFetchError } = await supabaseAdmin
       .from('service_bookings')
       .select('id, host_id, application_id')
@@ -400,57 +582,13 @@ export async function POST(request: Request) {
 
     requestUpdated = true;
 
-    // 7. 선택된 호스트에게 알림 (비동기) — 에스크로: 이미 결제 완료 상태
-    supabaseAdmin.from('notifications').insert({
-      user_id: selectedHostId,
-      type: 'service_host_selected',
-      title: '🎉 고객에게 선택되었습니다!',
-      message: `'${serviceRequest.title}' 의뢰에서 선택되셨습니다. 결제는 이미 완료되어 바로 진행됩니다.`,
-      link: `/services/${request_id}`,
-      is_read: false,
-    }).then(({ error }) => {
-      if (error) console.error('Select Host Notification Error:', error);
+    notifyServiceHostSelection({
+      supabaseAdmin,
+      requestId: request_id,
+      requestTitle: serviceRequest.title,
+      selectedHostId,
+      rejectedHostIds,
     });
-
-    sendImmediateGenericEmail({
-      recipientUserId: selectedHostId,
-      subject: '[Locally] 고객에게 선택되었습니다',
-      title: '고객에게 선택되었습니다',
-      message: `'${serviceRequest.title}' 의뢰에서 선택되셨습니다. 바로 진행을 준비해주세요.`,
-      link: `/services/${request_id}`,
-      ctaLabel: '의뢰 확인하기',
-    }).catch((emailError) => {
-      console.error('Select Host Email Error:', emailError);
-    });
-
-    insertAdminAlerts({
-      title: '서비스 호스트가 선택되었습니다',
-      message: rejectedHostIds.length > 0
-        ? `'${serviceRequest.title}' 의뢰에서 호스트 선택이 완료되었고, 미선택 ${rejectedHostIds.length}건이 함께 처리되었습니다.`
-        : `'${serviceRequest.title}' 의뢰에서 호스트 선택이 완료되었습니다.`,
-      link: '/admin/dashboard?tab=SERVICE_REQUESTS',
-    }).catch((adminAlertError) => {
-      console.error('Select Host Admin Alert Error:', adminAlertError);
-    });
-
-    // 8. 미선택 호스트들에게 알림 조회 (비동기)
-    Promise.resolve(rejectedHostIds)
-      .then((rejected) => {
-        if (rejected.length === 0) return;
-        const notifications = rejected
-          .map((hostId) => ({
-            user_id: hostId,
-            type: 'service_host_rejected',
-            title: '다른 호스트가 선택되었습니다.',
-            message: `'${serviceRequest.title}' 의뢰에서 다른 호스트가 선택되었습니다.`,
-            link: '/services',
-            is_read: false,
-          }));
-        if (notifications.length === 0) return;
-        supabaseAdmin.from('notifications').insert(notifications).then(({ error }) => {
-          if (error) console.error('Reject Notification Error:', error);
-        });
-      });
 
     return NextResponse.json({ success: true, selectedHostId });
 

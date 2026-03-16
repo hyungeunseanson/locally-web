@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-15 (v3.38.93 locale canonical / sitemap 일관성 정렬)
-**Version:** 3.38.93 (Locale Canonical and Sitemap Alignment)
+**Last Updated:** 2026-03-16 (v3.39.18 service request rpc fallback / community view count / inquiry fast path)
+**Version:** 3.39.18 (Service Request RPC Fallback and Community View Count)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -75,6 +75,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 서비스 결제 완료 후 호스트 모집 알림(`service_request_new`)은 카드/NicePay, PayPal, 무통장 입금 확인 모두 같은 helper로 대상을 고른다. 기준은 `host_applications.status='approved'` + `service_requests.country/city`와 같은 위치에 활성 체험(`experiences.is_active=true`)이 등록된 호스트만 대상으로 하며, 고객 본인은 제외한다. 잡보드(`/services`)와 서비스 상세 읽기 권한도 같은 eligible-host 기준을 사용한다.
 - `/api/services/requests`는 `service_requests(status='pending_payment')`와 사전 생성 `service_bookings(status='PENDING')`를 같은 요청 안에서 만들고, booking 생성 실패 시 방금 만든 의뢰를 즉시 삭제(실패 시 `cancelled` fallback)해 orphan `pending_payment` 의뢰를 남기지 않는다.
 - `/api/services/select-host`는 `service_bookings.host_id/application_id`, 선택 지원서 `selected`, 나머지 지원서 `rejected`, `service_requests.status='matched'`를 순차 적용하되, 중간 실패 시 현재 request 최종 상태에 맞춰 rollback/alignment를 수행해 부분 성공 상태를 남기지 않는다.
+- 서비스 매칭 write 경계는 RPC 우선으로 강화한다. `/api/services/requests`는 `create_service_request_with_booking_atomic`, `/api/services/select-host`는 `select_service_host_atomic`을 먼저 시도하고, 해당 함수가 아직 없는 환경에서만 기존 JS cleanup/rollback 경로로 fallback 한다. non-production 실패 주입 헤더 검증은 계속 legacy 경로를 사용한다.
 - `/api/services/payment/card-ready`는 서비스 카드결제 검증 준비 상태를 반환한다. `NEXT_PUBLIC_PORTONE_IMP_CODE`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`가 모두 있어야 `ready=true`이며, 서비스 결제 페이지는 readiness가 false일 때 카드 결제를 비활성화하고 무통장/PayPal만 허용한다.
 - Data Analytics `Business & Guest`는 `useAdminData`의 최근 20건 예약 캐시를 재사용하지 않고 `/api/admin/analytics-summary`를 단일 집계 source로 사용한다. 현재 플랫폼 전체화 범위는 상단 비즈니스 KPI(GMV/순수익/AOV/결제건수), 반복 결제 고객 비율, 결제 고객 인구통계이며, `Host Ecosystem`, `Review Management`, `Audit Logs`, `Top 체험`, `검색 트렌드`는 기존 구조를 유지한다.
 - Data Analytics의 `Review Quality`, `운영 감사 로그`는 이제 브라우저 직접 select 대신 각각 `/api/admin/reviews`, `/api/admin/audit-logs`를 초기 읽기 source로 사용한다. 현재 실시간성은 감사 로그 INSERT 구독만 클라이언트에 남겨둔다.
@@ -124,6 +125,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 커뮤니티 상세의 댓글 수는 서버가 준 `post.comment_count`에만 고정하지 않는다. 클라이언트 wrapper가 현재 댓글 목록 길이를 source로 잡아 요약 행과 `댓글 N` 헤더를 함께 동기화한다.
 - 커뮤니티 글쓰기의 공식 category 집합은 `qna`, `companion`, `info`, `locally_content`다. `supabase_community_migration.sql`과 실운영 ALTER migration은 이 집합을 동일하게 유지해야 한다.
 - 커뮤니티 글쓰기는 계속 client→storage 업로드를 사용하지만, `POST /api/community/posts`에 `image_paths`를 함께 전달해 DB insert 실패 시 `images` bucket orphan 파일을 best-effort cleanup 한다. `companion` 글은 서버에서도 `companion_date`, `companion_city`를 필수로 검증한다.
+- 커뮤니티 `view_count`는 상세 페이지에서만 집계한다. `POST /api/community/views`가 6시간 httpOnly cookie 기준으로 한 브라우저당 한 번만 증가시키고, 상세 클라이언트 패널은 반환된 `viewCount`로 `조회 N` 표시를 보정한다. 목록 진입/새로고침을 과도하게 집계하지 않는다.
 
 ---
 
@@ -132,6 +134,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 결제/보안: NicePay 서명 검증, 결제 확정/취소 API 권한 검증 반영
 - 데이터 무결성: 클라이언트 직접 DB 쓰기 제거, 서버 중심 예약/정산 흐름 통합, Postgres Trigger 프로필 100% 일치 동기화.
 - 메시징/문의 API 원칙: 신규 문의방 생성과 첫 메시지 생성은 `/api/inquiries/thread`, 기존 문의방 답장 전송은 `/api/inquiries/message` 서버 API를 기준으로 유지한다. 체험 일반 문의, 관리자 1:1 문의, 관리자 CS 선개시, 서비스 매칭 채팅방 열기/첫 메시지/후속 답장은 이 경로들을 재사용한다. 서비스 매칭 채팅은 `docs/migrations/v3_37_35_service_request_inquiry_key.sql` 적용 후 `inquiries.service_request_id` 기준으로 request 단위 분리를 활성화한다.
+- `/api/inquiries/thread`는 fast-path 문의방 생성용으로 첫 메시지 메타데이터(`messageId`, `displayContent`, `updatedAt`)까지 함께 반환한다. `useChat.createInquiry()`는 이 응답을 사용해 새 문의방 리스트/선택 상태/첫 메시지를 즉시 구성하고, 메일 발송은 응답 안에서 기다리지 않는다.
 - 메시징 읽음 처리(`is_read`, `read_at`)는 `/api/inquiries/read` 서버 API를 단일 source로 유지한다. 클라이언트 훅(`useChat`)은 unread UI를 낙관적으로 갱신할 수 있지만, 실제 `inquiry_messages` 읽음 업데이트는 브라우저 direct write를 하지 않는다.
 - 일반 알림(`notifications.is_read`) 읽음 처리 역시 `/api/notifications/read` 서버 API를 단일 source로 유지한다. `NotificationContext`는 단건/전체 읽음을 optimistic하게 반영할 수 있지만, 실제 DB update는 브라우저 direct write를 하지 않는다.
 - 기존 inquiry의 텍스트 답장은 `useChat.sendMessage()`가 optimistic append를 기본으로 사용한다. 성공 후 `loadMessages()`로 전체 스레드를 강제 재조회하지 않고, 현재 열린 스레드의 임시 message를 서버 id로 치환한 뒤 inquiry 목록만 background refresh한다. 새 문의방 최초 생성과 이미지 메시지는 기존 서버 round-trip 흐름을 유지한다.
