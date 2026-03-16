@@ -1,10 +1,108 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Search, MapPin } from 'lucide-react';
-import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
-import { CATEGORIES } from '@/app/constants';
+import { Search } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext';
 import DatePicker from './DatePicker';
+
+const recommendedPlaces = [
+  { id: 'tokyo',   name: '도쿄',    desc: '도쿄 타워가 빛나는 곳' },
+  { id: 'osaka',   name: '오사카',  desc: '미식과 야경이 살아있는 곳' },
+  { id: 'izakaya', name: '이자카야', desc: '현지 밤문화를 맛보고 싶다면' },
+  { id: 'seoul',   name: '서울',    desc: '남산 타워와 한강, 그리고 K-pop' },
+];
+
+const PlaceIcon = ({ type }: { type: string }) => {
+  const colors: Record<string, string> = {
+    tokyo: '#EE7B7B', osaka: '#F2A15A', seoul: '#7CB0ED', izakaya: '#D5AE3D',
+  };
+  const stroke = colors[type] || '#6B7280';
+  const sw = 1.0;
+  const blurId = `icon-soft-desktop-${type}`;
+  const paths = () => {
+    if (type === 'tokyo') return (<>
+      <path d="M13 3V6.2" stroke={stroke} strokeWidth={sw} />
+      <path d="M11.1 6.2H14.9" stroke={stroke} strokeWidth={sw} />
+      <path d="M10.8 6.2L9.7 10.5H16.3L15.2 6.2" stroke={stroke} strokeWidth={sw} />
+      <path d="M8.7 12H17.3" stroke={stroke} strokeWidth={sw} />
+      <path d="M9.4 12V15.4" stroke={stroke} strokeWidth={sw} />
+      <path d="M16.6 12V15.4" stroke={stroke} strokeWidth={sw} />
+      <path d="M7.5 17.3H18.5" stroke={stroke} strokeWidth={sw} />
+      <path d="M6.2 22H19.8" stroke={stroke} strokeWidth={sw} />
+      <path d="M7.5 22L10.8 17.3" stroke={stroke} strokeWidth={sw} />
+      <path d="M18.5 22L15.2 17.3" stroke={stroke} strokeWidth={sw} />
+      <path d="M10.8 15.4H15.2" stroke={stroke} strokeWidth={sw} />
+    </>);
+    if (type === 'osaka') return (<>
+      <path d="M4.5 7.8C9.2 9.2 16.8 9.2 21.5 7.8" stroke={stroke} strokeWidth={sw} />
+      <path d="M5.4 10.2H20.6" stroke={stroke} strokeWidth={sw} />
+      <path d="M7.2 10.2V21.5" stroke={stroke} strokeWidth={sw} />
+      <path d="M18.8 10.2V21.5" stroke={stroke} strokeWidth={sw} />
+      <path d="M9.8 12.6H16.2" stroke={stroke} strokeWidth={sw} />
+      <path d="M8.5 15.8H17.5" stroke={stroke} strokeWidth={sw} />
+      <path d="M6.2 21.5H9.4" stroke={stroke} strokeWidth={sw} />
+      <path d="M16.6 21.5H19.8" stroke={stroke} strokeWidth={sw} />
+    </>);
+    if (type === 'seoul') return (<>
+      <path d="M13 2.8V6.1" stroke={stroke} strokeWidth={sw} />
+      <path d="M11.9 6.1H14.1" stroke={stroke} strokeWidth={sw} />
+      <path d="M11.3 6.1V9.2H14.7V6.1" stroke={stroke} strokeWidth={sw} />
+      <rect x="9.6" y="9.9" width="6.8" height="3.9" rx="0.8" stroke={stroke} strokeWidth={sw} />
+      <path d="M13 13.8V20.1" stroke={stroke} strokeWidth={sw} />
+      <path d="M10.3 16.6H15.7" stroke={stroke} strokeWidth={sw} />
+      <path d="M9.8 20.1H16.2" stroke={stroke} strokeWidth={sw} />
+      <path d="M7.7 22H18.3" stroke={stroke} strokeWidth={sw} />
+    </>);
+    if (type === 'izakaya') return (<>
+      <rect x="8" y="6.2" width="8.8" height="13.5" rx="2.2" stroke={stroke} strokeWidth={sw} />
+      <path d="M16.8 9.2H18.6C19.7 9.2 20.5 10 20.5 11.1V15.4C20.5 16.5 19.7 17.3 18.6 17.3H16.8" stroke={stroke} strokeWidth={sw} />
+      <path d="M10.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+      <path d="M12.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+      <path d="M14.4 10V16.8" stroke={stroke} strokeWidth={sw} />
+      <path d="M9 5.3C9.6 4.3 10.8 4.3 11.4 5.3C12 6.3 13.2 6.3 13.8 5.3C14.4 4.3 15.6 4.3 16.2 5.3" stroke={stroke} strokeWidth={sw} />
+    </>);
+    return (<>
+      <path d="M13 22C13 22 19 15.9 19 11.5C19 8.2 16.3 5.5 13 5.5C9.7 5.5 7 8.2 7 11.5C7 15.9 13 22 13 22Z" stroke={stroke} strokeWidth={sw} />
+      <circle cx="13" cy="11.5" r="2.2" stroke={stroke} strokeWidth={sw} />
+    </>);
+  };
+  return (
+    <svg width="24" height="24" viewBox="0 0 26 26" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <defs>
+        <filter id={blurId} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="0.4" />
+        </filter>
+      </defs>
+      <g opacity="0.2" filter={`url(#${blurId})`} transform="translate(0 0.5)">{paths()}</g>
+      <g>{paths()}</g>
+    </svg>
+  );
+};
+
+const PlaceBadge = ({ type }: { type: string }) => {
+  const styles: Record<string, { bg: string; border: string }> = {
+    tokyo:   { bg: 'linear-gradient(135deg, #FDF0F0 0%, #FFF8F8 100%)', border: '#F3DFDF' },
+    osaka:   { bg: 'linear-gradient(135deg, #FEF3E8 0%, #FFF9F2 100%)', border: '#F4E3D1' },
+    seoul:   { bg: 'linear-gradient(135deg, #EEF5FD 0%, #F7FBFF 100%)', border: '#DBE8F6' },
+    izakaya: { bg: 'linear-gradient(135deg, #FCF7E7 0%, #FFFBEF 100%)', border: '#EEE4C4' },
+    custom:  { bg: 'linear-gradient(135deg, #F1F4F8 0%, #FBFCFE 100%)', border: '#DEE5EE' },
+  };
+  const style = styles[type] || styles.custom;
+  return (
+    <div
+      className="w-[38px] h-[38px] rounded-[11px] flex items-center justify-center shrink-0"
+      style={{
+        background: style.bg,
+        border: `1px solid ${style.border}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), 0 1px 2px rgba(0,0,0,0.03)',
+      }}
+    >
+      <div style={{ filter: 'contrast(104%) saturate(98%)' }}>
+        <PlaceIcon type={type} />
+      </div>
+    </div>
+  );
+};
 
 interface MainSearchBarProps {
   activeSearchField: 'location' | 'date' | 'language' | null;
@@ -159,24 +257,33 @@ export default function MainSearchBar({
         </div>
       </div>
 
-      {/* 🟢 팝업: 지역 선택 (onCategorySelect 제거됨 -> 즉시 이동 방지) */}
+      {/* 여행지 선택 팝업 */}
       {activeSearchField === 'location' && (
-        <div className="absolute top-[80px] left-0 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
-          <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">지역으로 검색하기</h4>
-          <div className="grid grid-cols-1 gap-1">
-            {CATEGORIES.filter(c => c.id !== 'all').map((city) => (
+        <div
+          className="absolute top-[80px] left-0 w-[360px] bg-white p-5 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out"
+          style={{
+            borderRadius: '22px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)',
+            border: '0.5px solid #E6E6E6',
+          }}
+        >
+          <h4 className="text-[15px] font-extrabold text-[#222222] mb-4">여행지</h4>
+          <div className="space-y-0.5">
+            {recommendedPlaces.map((place) => (
               <button
-                key={city.id}
+                key={place.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLocationInput(t(city.label));
+                  setLocationInput(place.name);
                   setActiveSearchField('date');
-                  // 🔴 onCategorySelect(city.id) 삭제! 검색 버튼 누를 때까지 대기.
                 }}
-                className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-colors text-left group"
+                className="flex items-center gap-3 w-full py-2.5 px-2 rounded-xl hover:bg-[#F7F7F7] transition-colors text-left"
               >
-                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all"><MapPin size={20} /></div>
-                <span className="font-bold text-slate-700">{t(city.label)}</span>
+                <PlaceBadge type={place.id} />
+                <div>
+                  <p className="text-[13px] font-semibold text-[#222222] leading-tight">{place.name}</p>
+                  <p className="text-[11px] text-[#8B8B8B] mt-0.5">{place.desc}</p>
+                </div>
               </button>
             ))}
           </div>
