@@ -15,6 +15,14 @@
 | 🟠 만석 날짜 달력 노출 | `app/experiences/[id]/types.ts`, `app/experiences/[id]/ExperienceClient.tsx`, `app/experiences/[id]/components/ExpSidebar.tsx`, `app/experiences/[id]/components/ReservationCard.tsx` — 예약 가능 날짜만 숨기지 않고 `available/sold_out` day status를 내려, 만석 날짜도 달력에 남기고 시간 버튼에서 `매진` / `프라이빗 예약 마감` 상태를 표시 |
 | 🟡 보호막 추가 | `tests/e2e/42-experience-paypal-payment.spec.ts`, `tests/e2e/44-experience-card-payment-ui.spec.ts`, `tests/e2e/64-experience-availability-detail.spec.ts`, `tests/e2e/65-experience-post-confirm-detail-refresh.spec.ts`, `tests/e2e/66-bookings-solo-guard.spec.ts`, `tests/e2e/helpers/experienceBooking.ts` — 결제 후 상세 재진입, sold-out 날짜 가시성, solo deep-link/API guard 회귀를 검증 |
 
+## v3.39.27 — [Profile] 모바일 게스트 프로필 통계 라벨 수정 · 가입 기간 월 단위로 변경
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 라벨 3종 변경 | `app/components/mobile/MobileProfileView.tsx` — "Locally를 통한 여행" → "로컬리와 함께한 여행", "후기" → "받은 후기", "Locally 가입 기간" → "로컬리와 함께한 시간" |
+| 🟠 가입 기간 표기 월 단위로 교체 | 기존 `Math.max(1, 연도차)` 방식 → 실제 월수 계산 (최소 1개월). 표기: N개월 / N년 / N년 N개월 |
+| 🟡 데이터 소스 검증 | tripCount(`bookings` + `BOOKING_CONFIRMED_STATUSES`) ✅, reviewCount(`guest_reviews.guest_id`) ✅, joinMonths(`auth.created_at`) ✅ |
+
 ## v3.39.26 — [Home] 모바일 홈 체험/서비스 탭 텍스트 크기 및 볼드 강화
 
 | 항목 | 내용 |
