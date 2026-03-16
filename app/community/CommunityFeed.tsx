@@ -6,6 +6,7 @@ import PostGridCard from './components/PostGridCard';
 import { Loader2, MessageSquareDashed } from 'lucide-react';
 import Link from 'next/link';
 import { parseCommunityFeedResponse, type CommunityFeedPost } from './feedSelect';
+import { isLocallyContentCategory } from './categoryMeta';
 
 interface CommunityFeedProps {
     initialData: CommunityFeedPost[];
@@ -13,6 +14,7 @@ interface CommunityFeedProps {
     category: string;
     query: string;
     sort: 'latest' | 'popular';
+    canWriteLocallyContent: boolean;
 }
 
 // ─── Shimmer Skeleton: 리스트형 ──────────────────────────────────────────────
@@ -35,19 +37,28 @@ function PostListSkeleton() {
 // ─── Shimmer Skeleton: 그리드형 ──────────────────────────────────────────────
 function PostGridSkeleton() {
     return (
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-1">
-            {[...Array(12)].map((_, i) => (
-                <div key={i} className="aspect-square bg-gray-200 animate-pulse" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+            {[...Array(6)].map((_, i) => (
+                <div key={i} className="aspect-[4/5] rounded-[28px] bg-gray-200 animate-pulse" />
             ))}
         </div>
     );
 }
 
 // ─── Empty State ─────────────────────────────────────────────────────────────
-function EmptyState({ category, query }: { category: string; query: string }) {
+function EmptyState({
+    category,
+    query,
+    canWriteLocallyContent,
+}: {
+    category: string;
+    query: string;
+    canWriteLocallyContent: boolean;
+}) {
     const writeCategory = category && category !== 'all' ? category : 'qna';
     const writeHref = `/community/write?category=${writeCategory}`;
     const isSearchMode = Boolean(query.trim());
+    const showWriteButton = !isSearchMode && (!isLocallyContentCategory(category) || canWriteLocallyContent);
 
     return (
         <div className="bg-white rounded-2xl p-12 flex flex-col items-center justify-center border border-dashed border-gray-300 text-center">
@@ -58,7 +69,7 @@ function EmptyState({ category, query }: { category: string; query: string }) {
             <p className="text-gray-400 text-sm mb-6">
                 {isSearchMode ? '다른 키워드나 정렬로 다시 찾아보세요.' : '첫 글의 주인공이 되어보세요!'}
             </p>
-            {category !== 'locally_content' && !isSearchMode && (
+            {showWriteButton && (
                 <Link
                     href={writeHref}
                     className="px-6 py-2.5 bg-black text-white text-[14px] font-bold rounded-full hover:bg-gray-800 active:scale-95 transition-all"
@@ -70,7 +81,14 @@ function EmptyState({ category, query }: { category: string; query: string }) {
     );
 }
 
-export default function CommunityFeed({ initialData, initialNextOffset, category, query, sort }: CommunityFeedProps) {
+export default function CommunityFeed({
+    initialData,
+    initialNextOffset,
+    category,
+    query,
+    sort,
+    canWriteLocallyContent,
+}: CommunityFeedProps) {
     const [posts, setPosts] = useState<CommunityFeedPost[]>(initialData);
     const [nextOffset, setNextOffset] = useState<number | null>(initialNextOffset);
     const [isLoading, setIsLoading] = useState(false);
@@ -145,7 +163,7 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
 
     // 초기 로딩 스켈레톤 — 카테고리에 따라 분기
     if (isInitialLoading) {
-        if (category === 'locally_content') {
+        if (isLocallyContentCategory(category)) {
             return <div className="pb-24"><PostGridSkeleton /></div>;
         }
         return (
@@ -157,9 +175,8 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
 
     return (
         <div className="pb-24">
-            {/* 지웴립니다 콘텐츠: 인스타그램 3/4콼 그리드 */}
-            {category === 'locally_content' ? (
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-1">
+            {isLocallyContentCategory(category) ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
                     {posts.map((post) => (
                         <PostGridCard key={`${post.id}`} post={post} category={category} query={query} sort={sort} />
                     ))}
@@ -175,7 +192,11 @@ export default function CommunityFeed({ initialData, initialNextOffset, category
 
             {/* Empty State */}
             {posts.length === 0 && !isLoading && (
-                <EmptyState category={category} query={query} />
+                <EmptyState
+                    category={category}
+                    query={query}
+                    canWriteLocallyContent={canWriteLocallyContent}
+                />
             )}
 
             {/* 무한 스크롤 트리거 + 로딩 인디케이터 */}

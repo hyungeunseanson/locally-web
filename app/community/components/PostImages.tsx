@@ -6,6 +6,8 @@ interface PostImagesProps {
     images: string[];
     /** 상세 페이지에서는 true */
     detail?: boolean;
+    /** 상세 hero 이미지에서는 true */
+    hero?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface PostImagesProps {
  *  - 이전: aspect-square + w-full + max-h → 세 클래스가 충돌해 이상한 비율
  *  - 현재: max-w로 너비를 먼저 제한 → aspect로 높이 결정 (충돌 없음)
  */
-export default function PostImages({ images, detail = false }: PostImagesProps) {
+export default function PostImages({ images, detail = false, hero = false }: PostImagesProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     const handleSingleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -37,10 +39,23 @@ export default function PostImages({ images, detail = false }: PostImagesProps) 
 
     // ─── 단일 이미지 ──────────────────────────────────────────────────
     if (images.length === 1) {
+        if (detail && hero) {
+            return (
+                <div className="w-full overflow-hidden rounded-[28px] bg-gray-100">
+                    <img
+                        src={images[0]}
+                        alt="첨부 이미지"
+                        className="h-auto w-full object-contain"
+                        loading="lazy"
+                    />
+                </div>
+            );
+        }
+
         // 피드 카드: 모바일은 full-width, 데스크탑은 max-w-xs(320px)로 제한 후 중앙 정렬
-        // 상세 페이지: max-w-sm(384px) 고정
+        // 상세 페이지: max-w-xl로 확장
         const sizeClass = detail
-            ? 'w-full max-w-sm mx-auto'
+            ? 'w-full max-w-xl mx-auto'
             : 'w-full md:max-w-xs md:mx-auto';
 
         return (

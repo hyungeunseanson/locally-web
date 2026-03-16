@@ -5,10 +5,12 @@ import {
     COMMUNITY_FEED_EXPERIENCE_SELECT,
     type CommunityFeedExperience,
     type CommunityFeedPostRow,
+    COMMUNITY_FEED_POST_SELECT_LEGACY,
     COMMUNITY_FEED_POST_SELECT,
     COMMUNITY_FEED_PROFILE_SELECT,
     type CommunityFeedProfile,
 } from '@/app/community/feedSelect';
+import { isMissingAnonymousColumnError } from '@/app/community/anonymousColumn';
 
 export async function GET(request: NextRequest) {
     try {
@@ -21,41 +23,56 @@ export async function GET(request: NextRequest) {
         const limit = 15;
 
         // ① community_posts 단독 조회 (join 없음 — join 에러로 전체 피드가 빈값이 되는 버그 방지)
-        let query = supabase
-            .from('community_posts')
-            .select(COMMUNITY_FEED_POST_SELECT)
-            .range(offset, offset + limit - 1);
+        const buildQuery = (selectClause: string) => {
+            let query = supabase
+                .from('community_posts')
+                .select(selectClause)
+                .range(offset, offset + limit - 1);
 
-        if (category && category !== 'all') {
-            query = query.eq('category', category);
+            if (category && category !== 'all') {
+                query = query.eq('category', category);
+            }
+
+            if (queryText) {
+                query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
+            }
+
+            if (sort === 'popular') {
+                query = query
+                    .order('like_count', { ascending: false })
+                    .order('comment_count', { ascending: false })
+                    .order('created_at', { ascending: false });
+            } else {
+                query = query.order('created_at', { ascending: false });
+            }
+
+            return query;
+        };
+
+        const initialResult = await buildQuery(COMMUNITY_FEED_POST_SELECT);
+        let postsError = initialResult.error;
+        let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
+
+        if (postsError && isMissingAnonymousColumnError(postsError)) {
+            const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY);
+            postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => ({
+                ...post,
+                is_anonymous: false,
+            }));
+            postsError = legacyResult.error;
         }
 
-        if (queryText) {
-            query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
+        if (postsError) {
+            console.error('API Error fetching community posts:', postsError);
+            return NextResponse.json({ error: postsError.message }, { status: 500 });
         }
 
-        if (sort === 'popular') {
-            query = query
-                .order('like_count', { ascending: false })
-                .order('comment_count', { ascending: false })
-                .order('created_at', { ascending: false });
-        } else {
-            query = query.order('created_at', { ascending: false });
-        }
-
-        const { data: posts, error } = await query;
-
-        if (error) {
-            console.error('API Error fetching community posts:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        if (!posts || posts.length === 0) {
+        if (!postsData || postsData.length === 0) {
             return NextResponse.json({ data: [], nextOffset: null });
         }
 
         // ② profiles 별도 조회 (실패해도 피드는 유지됨)
-        const typedPosts = (posts ?? []) as unknown as CommunityFeedPostRow[];
+        const typedPosts = postsData;
         const userIds = [...new Set(typedPosts.map((post) => post.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')

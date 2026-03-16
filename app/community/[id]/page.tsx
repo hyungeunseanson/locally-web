@@ -9,10 +9,13 @@ import PostImages from '../components/PostImages';
 import CommunityCommentsPanel from '../components/CommunityCommentsPanel';
 import BackButton from '../components/BackButton';
 import ShareButton from '../components/ShareButton';
+import CommunityAuthorTrigger from '../components/CommunityAuthorTrigger';
 import JsonLd from '@/app/components/seo/JsonLd';
-import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
+import { getProfileDisplayName } from '@/app/utils/profile';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
+import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
+import { getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -109,7 +112,7 @@ export default async function CommunityPostDetail({
     // ② profile 별도 조회
     const { data: profile } = await supabase
         .from('profiles')
-        .select('id, name, full_name, avatar_url')
+        .select('id, full_name, avatar_url')
         .eq('id', post.user_id)
         .maybeSingle();
 
@@ -143,8 +146,11 @@ export default async function CommunityPostDetail({
     ]);
 
     const isCompanion = post.category === 'companion';
-    const authorName = getProfileDisplayName(profile);
-    const authorInitial = getProfileInitial(profile);
+    const isLocallyContent = isLocallyContentCategory(post.category);
+    const authorName = getCommunityAuthorName(profile, post.is_anonymous);
+    const authorInitial = getCommunityAuthorInitial(profile, post.is_anonymous);
+    const authorAvatar = getCommunityAuthorAvatar(profile, post.is_anonymous);
+    const categoryMeta = getCommunityCategoryMeta(post.category);
     const pageUrl = buildAbsoluteUrl(`/community/${id}`);
     const articleDescription = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
     const articleImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
@@ -195,33 +201,58 @@ export default async function CommunityPostDetail({
                             </div>
 
                             <article className="px-5 py-6">
-                                {/* ① 제목 최상단 */}
-                                <h1 className="text-[18px] md:text-[24px] font-bold text-slate-900 leading-snug mb-4">
+                                {isLocallyContent && post.images && post.images.length > 0 && (
+                                    <div className="mb-6">
+                                        <PostImages images={post.images} detail hero />
+                                    </div>
+                                )}
+
+                                <div className="mb-3 flex flex-wrap items-center gap-2">
+                                    <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${categoryMeta.detailChipClassName}`}>
+                                        {categoryMeta.shortLabel}
+                                    </span>
+                                </div>
+
+                                <h1 className="mb-4 break-words text-[18px] font-bold leading-snug text-slate-900 [overflow-wrap:anywhere] md:text-[24px]">
                                     {post.title}
                                 </h1>
 
-                                {/* ② 유저 정보 (제목 아래) */}
-                                <div className="flex items-center gap-3 mb-5">
-                                    <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
-                                        {profile?.avatar_url ? (
-                                            <img src={profile.avatar_url} alt="profile" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-sm">
-                                                {authorInitial}
+                                <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <CommunityAuthorTrigger
+                                        userId={post.user_id}
+                                        authorName={authorName}
+                                        isAnonymous={post.is_anonymous}
+                                        currentPostId={post.id}
+                                        className="text-left"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-bold text-slate-300">
+                                                {authorAvatar ? (
+                                                    <img src={authorAvatar} alt={authorName} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    authorInitial
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <span className="text-[13px] md:text-[15px] font-semibold md:font-bold text-slate-900 leading-tight block">
-                                            {authorName}
-                                        </span>
-                                        <span className="text-[11px] md:text-[12px] font-medium text-slate-400">
-                                            {getTimeString(post.created_at)}
-                                        </span>
-                                    </div>
+                                            <div className="min-w-0">
+                                                <span className="block break-words text-[13px] font-semibold leading-tight text-slate-900 [overflow-wrap:anywhere] md:text-[15px] md:font-bold">
+                                                    {authorName}
+                                                </span>
+                                                <span className="text-[11px] font-medium text-slate-400 md:text-[12px]">
+                                                    {getTimeString(post.created_at)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </CommunityAuthorTrigger>
+
+                                    <Link
+                                        href={fallbackHref}
+                                        data-testid="community-detail-list-button"
+                                        className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                    >
+                                        목록 보기
+                                    </Link>
                                 </div>
 
-                                {/* 동행 뱃지 (동행 카테고리만, 답변대기 제거) */}
                                 {isCompanion && (post.companion_city || post.companion_date) && (
                                     <div className="flex items-center gap-2 mb-6">
                                         {post.companion_city && (
@@ -237,19 +268,16 @@ export default async function CommunityPostDetail({
                                     </div>
                                 )}
 
-                                {/* 본문 */}
-                                <div className="text-[16px] text-slate-800 leading-relaxed whitespace-pre-wrap mb-8">
+                                <div className="mb-8 break-words whitespace-pre-wrap text-[16px] leading-relaxed text-slate-800 [overflow-wrap:anywhere]">
                                     {post.content}
                                 </div>
 
-                                {/* 이미지 */}
-                                {post.images && post.images.length > 0 && (
+                                {!isLocallyContent && post.images && post.images.length > 0 && (
                                     <div className="mb-8">
                                         <PostImages images={post.images} detail />
                                     </div>
                                 )}
 
-                                {/* 연동 체험 */}
                                 {linkedExperience && (
                                     <div className="mb-8">
                                         <h4 className="text-[13px] font-bold text-slate-500 mb-2">언급된 로컬리 체험</h4>
@@ -267,23 +295,51 @@ export default async function CommunityPostDetail({
                                 initialCommentCount={post.comment_count || 0}
                             />
 
-                            {/* 이전글 / 다음글 */}
-                            {(prevPost || nextPost) && (
-                                <div className="border-t border-slate-100 mx-5 pt-5 pb-6 space-y-2">
-                                    {prevPost && (
-                                        <Link href={`/community/${prevPost.id}?${fallbackParams.toString()}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
-                                            <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex-shrink-0">◀ 이전글</span>
-                                            <span className="text-[13px] text-slate-700 line-clamp-1 group-hover:underline">{prevPost.title}</span>
+                            <div className="mx-5 border-t border-slate-100 pb-6 pt-5">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                    {prevPost ? (
+                                        <Link
+                                            href={`/community/${prevPost.id}?${fallbackParams.toString()}`}
+                                            data-testid="community-detail-prev-link"
+                                            className="group rounded-2xl border border-slate-200 px-4 py-4 transition-colors hover:bg-slate-50"
+                                        >
+                                            <div className="mb-1 text-[11px] font-bold text-slate-400">◀ 이전글</div>
+                                            <div className="break-words text-[13px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere]">
+                                                {prevPost.title}
+                                            </div>
                                         </Link>
+                                    ) : (
+                                        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-[13px] text-slate-300">
+                                            이전글이 없습니다.
+                                        </div>
                                     )}
-                                    {nextPost && (
-                                        <Link href={`/community/${nextPost.id}?${fallbackParams.toString()}`} className="flex items-center gap-2 group py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors -mx-3">
-                                            <span className="text-[11px] font-bold text-slate-400 whitespace-nowrap flex-shrink-0">▶ 다음글</span>
-                                            <span className="text-[13px] text-slate-700 line-clamp-1 group-hover:underline">{nextPost.title}</span>
+
+                                    <Link
+                                        href={fallbackHref}
+                                        data-testid="community-detail-list-button"
+                                        className="flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-900 px-4 py-4 text-[13px] font-semibold text-white transition-colors hover:bg-black"
+                                    >
+                                        목록 보기
+                                    </Link>
+
+                                    {nextPost ? (
+                                        <Link
+                                            href={`/community/${nextPost.id}?${fallbackParams.toString()}`}
+                                            data-testid="community-detail-next-link"
+                                            className="group rounded-2xl border border-slate-200 px-4 py-4 transition-colors hover:bg-slate-50"
+                                        >
+                                            <div className="mb-1 text-[11px] font-bold text-slate-400">▶ 다음글</div>
+                                            <div className="break-words text-[13px] font-medium text-slate-700 group-hover:underline [overflow-wrap:anywhere]">
+                                                {nextPost.title}
+                                            </div>
                                         </Link>
+                                    ) : (
+                                        <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-[13px] text-slate-300">
+                                            다음글이 없습니다.
+                                        </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
 
                             {/* 모바일 전용 광고 영역 (댓글 아래) */}
                             <div className="lg:hidden mx-5 mb-6 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 h-24 flex items-center justify-center">

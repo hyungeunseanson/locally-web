@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Edit3, ChevronRight } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import type { CommunityCategory } from '@/app/types/community';
+import { isLocallyContentCategory } from '../categoryMeta';
 
 // ─── 인기 체험 타입 ───────────────────────────────────────────────────────────
 interface ExperienceItem { id: number; title: string; image_url: string | null; photos: string[] | null; price: number | null; }
@@ -27,11 +27,17 @@ interface RecentPost { id: string; title: string; created_at: string; }
 interface HotPost { id: string; title: string; category: string; }
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
-export default function RightSidebar({ category }: { category: CommunityCategory }) {
-    const router = useRouter();
+export default function RightSidebar({
+    category,
+    canWriteLocallyContent,
+}: {
+    category: CommunityCategory;
+    canWriteLocallyContent: boolean;
+}) {
     const [recentPosts, setRecentPosts] = useState<RecentPost[]>([]);
     const [hotPosts, setHotPosts] = useState<HotPost[]>([]);
     const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
+    const showWriteButton = !isLocallyContentCategory(category) || canWriteLocallyContent;
 
     useEffect(() => {
         const supabase = createClient();
@@ -81,14 +87,16 @@ export default function RightSidebar({ category }: { category: CommunityCategory
     return (
         <div className="sticky top-28 space-y-5">
 
-            {/* 위젯 1: 글쓰기 CTA */}
-            <button
-                onClick={() => router.push(`/community/write?category=${category}`)}
-                className="w-full rounded-xl font-bold py-3.5 bg-gradient-to-r from-[#FF385C] to-[#E31C5F] text-white shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 text-[15px]"
-            >
-                <Edit3 size={17} strokeWidth={2.5} />
-                커뮤니티 글쓰기
-            </button>
+            {showWriteButton && (
+                <Link
+                    href={`/community/write?category=${category}`}
+                    role="button"
+                    className="w-full rounded-xl font-bold py-3.5 bg-gradient-to-r from-[#FF385C] to-[#E31C5F] text-white shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 text-[15px]"
+                >
+                    <Edit3 size={17} strokeWidth={2.5} />
+                    커뮤니티 글쓰기
+                </Link>
+            )}
 
             {/* 위젯 2: 주간 인기 체험 */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">

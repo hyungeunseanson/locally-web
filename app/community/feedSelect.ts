@@ -8,6 +8,7 @@ export const COMMUNITY_FEED_POST_SELECT = [
   'title',
   'content',
   'images',
+  'is_anonymous',
   'companion_date',
   'companion_city',
   'linked_exp_id',
@@ -18,10 +19,29 @@ export const COMMUNITY_FEED_POST_SELECT = [
   'updated_at',
 ].join(', ');
 
-export const COMMUNITY_FEED_PROFILE_SELECT = 'id, name, full_name, avatar_url';
+export const COMMUNITY_FEED_POST_SELECT_LEGACY = [
+  'id',
+  'user_id',
+  'category',
+  'title',
+  'content',
+  'images',
+  'companion_date',
+  'companion_city',
+  'linked_exp_id',
+  'view_count',
+  'like_count',
+  'comment_count',
+  'created_at',
+  'updated_at',
+].join(', ');
+
+export const COMMUNITY_FEED_PROFILE_SELECT = 'id, full_name, avatar_url';
 export const COMMUNITY_FEED_EXPERIENCE_SELECT = 'id, title, image_url, price';
 
-export type CommunityFeedProfile = Pick<Profile, 'id' | 'name' | 'full_name' | 'avatar_url'>;
+export type CommunityFeedProfile = Pick<Profile, 'id' | 'full_name' | 'avatar_url'> & {
+  name?: string | null;
+};
 export type CommunityFeedExperience = Pick<Experience, 'id' | 'title' | 'image_url' | 'price'>;
 export type CommunityFeedPostRow = Pick<
   CommunityPost,
@@ -31,6 +51,7 @@ export type CommunityFeedPostRow = Pick<
   | 'title'
   | 'content'
   | 'images'
+  | 'is_anonymous'
   | 'companion_date'
   | 'companion_city'
   | 'linked_exp_id'
@@ -71,7 +92,7 @@ export function buildCommunityFeedPosts(
 
   return posts.map((post) => ({
     ...post,
-    profiles: profileMap.get(post.user_id) ?? null,
+    profiles: post.is_anonymous ? null : profileMap.get(post.user_id) ?? null,
     linked_experience: post.linked_exp_id ? experienceMap.get(post.linked_exp_id) ?? null : null,
   }));
 }

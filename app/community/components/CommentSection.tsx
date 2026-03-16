@@ -111,7 +111,9 @@ export default function CommentSection({ postId, onOpenLogin, onCountChange }: C
                                     <span className="text-[14px] font-bold text-slate-900">{getProfileDisplayName(comment.profiles)}</span>
                                     <span className="text-[12px] text-slate-400 ml-auto">{getTimeAgo(comment.created_at)}</span>
                                 </div>
-                                <p className="text-[15px] text-slate-700 leading-relaxed whitespace-pre-wrap">{comment.content}</p>
+                                <p className="break-words whitespace-pre-wrap text-[15px] leading-relaxed text-slate-700 [overflow-wrap:anywhere]">
+                                    {comment.content}
+                                </p>
                             </div>
                         </div>
                     ))}

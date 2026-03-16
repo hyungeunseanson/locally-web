@@ -18,6 +18,16 @@ let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdPostIds: string[] = [];
 const createdStoragePaths: string[] = [];
+const createdWhitelistEmails: string[] = [];
+
+async function hasAnonymousColumn() {
+  const { error } = await getAdminClient()
+    .from('community_posts')
+    .select('is_anonymous')
+    .limit(1);
+
+  return !error;
+}
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -73,7 +83,7 @@ async function waitForProfile(userId: string) {
   throw new Error(`Profile was not created for auth user ${userId}.`);
 }
 
-async function createAuthUser(user: TestUser) {
+async function createAuthUser(user: TestUser, options?: { whitelistAdmin?: boolean }) {
   const supabase = getAdminClient();
   const { data, error } = await supabase.auth.admin.createUser({
     email: user.email,
@@ -91,6 +101,16 @@ async function createAuthUser(user: TestUser) {
 
   createdAuthUserIds.push(data.user.id);
   await waitForProfile(data.user.id);
+
+  if (options?.whitelistAdmin) {
+    const { error: whitelistError } = await supabase
+      .from('admin_whitelist')
+      .upsert({ email: user.email }, { onConflict: 'email' });
+
+    if (whitelistError) throw whitelistError;
+    createdWhitelistEmails.push(user.email);
+  }
+
   return data.user.id;
 }
 
@@ -114,6 +134,10 @@ test.afterAll(async () => {
     await supabase.storage.from('images').remove(createdStoragePaths);
   }
 
+  for (const email of createdWhitelistEmails) {
+    await supabase.from('admin_whitelist').delete().eq('email', email);
+  }
+
   for (const userId of createdAuthUserIds) {
     await supabase.from('profiles').delete().eq('id', userId);
     await supabase.from('users').delete().eq('id', userId);
@@ -122,7 +146,7 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community post write boundary', () => {
-  test('accepts locally_content writes and keeps companion validation stable', async ({ page }) => {
+  test('rejects non-admin locally_content writes and stores anonymous general posts', async ({ page }) => {
     test.setTimeout(90000);
 
     const user = createUser('content');
@@ -133,35 +157,74 @@ test.describe.serial('Community post write boundary', () => {
       data: {
         category: 'locally_content',
         title: `Locally Content ${Date.now()}`,
-        content: 'locally_content 카테고리 실제 insert 검증용 글입니다.',
+        content: '비관리자 locally_content 차단 검증용 글입니다.',
         images: [],
         image_paths: [],
       },
     });
 
-    expect(locallyContentResponse.status()).toBe(200);
-    const locallyContentPayload = await locallyContentResponse.json();
-    expect(locallyContentPayload.id).toBeTruthy();
-    createdPostIds.push(locallyContentPayload.id);
-
-    const supabase = getAdminClient();
-    const { data: insertedPost } = await supabase
-      .from('community_posts')
-      .select('id, category, user_id')
-      .eq('id', locallyContentPayload.id)
-      .maybeSingle();
-
-    expect(insertedPost?.category).toBe('locally_content');
-    expect(insertedPost?.user_id).toBe(userId);
+    expect(locallyContentResponse.status()).toBe(403);
+    await expect(locallyContentResponse.json()).resolves.toMatchObject({
+      error: 'Forbidden',
+    });
 
     const bootstrapMigration = readFileSync('supabase_community_migration.sql', 'utf8');
     const alterMigration = readFileSync(
       'docs/migrations/v3_39_08_community_locally_content_constraint.sql',
       'utf8'
     );
+    const anonymousMigration = readFileSync(
+      'docs/migrations/v3_39_11_community_author_access_and_anonymous.sql',
+      'utf8'
+    );
 
     expect(bootstrapMigration).toContain("'locally_content'");
     expect(alterMigration).toContain("'locally_content'");
+    expect(anonymousMigration).toContain('is_anonymous');
+
+    const anonymousResponse = await page.request.post('/api/community/posts', {
+      data: {
+        category: 'qna',
+        title: `Anonymous General ${Date.now()}`,
+        content: '일반 카테고리 익명 저장 검증용 글입니다.',
+        images: [],
+        image_paths: [],
+        is_anonymous: true,
+      },
+    });
+
+    expect(anonymousResponse.status()).toBe(200);
+    const anonymousPayload = await anonymousResponse.json();
+    expect(anonymousPayload.id).toBeTruthy();
+    createdPostIds.push(anonymousPayload.id);
+
+    const supabase = getAdminClient();
+    if (await hasAnonymousColumn()) {
+      const { data: anonymousPost } = await supabase
+        .from('community_posts')
+        .select('id, user_id, category, is_anonymous')
+        .eq('id', anonymousPayload.id)
+        .maybeSingle();
+
+      expect(anonymousPost).toMatchObject({
+        id: anonymousPayload.id,
+        user_id: userId,
+        category: 'qna',
+        is_anonymous: true,
+      });
+    } else {
+      const { data: anonymousPost } = await supabase
+        .from('community_posts')
+        .select('id, user_id, category')
+        .eq('id', anonymousPayload.id)
+        .maybeSingle();
+
+      expect(anonymousPost).toMatchObject({
+        id: anonymousPayload.id,
+        user_id: userId,
+        category: 'qna',
+      });
+    }
 
     const invalidCompanionResponse = await page.request.post('/api/community/posts', {
       data: {
@@ -177,6 +240,57 @@ test.describe.serial('Community post write boundary', () => {
     await expect(invalidCompanionResponse.json()).resolves.toMatchObject({
       error: 'Companion posts require date and city',
     });
+  });
+
+  test('allows locally_content writes only for admins', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const adminUser = createUser('content-admin');
+    const adminUserId = await createAuthUser(adminUser, { whitelistAdmin: true });
+    await login(page, adminUser);
+
+    const adminResponse = await page.request.post('/api/community/posts', {
+      data: {
+        category: 'locally_content',
+        title: `Admin Locally Content ${Date.now()}`,
+        content: '관리자 전용 locally_content 등록 검증용 글입니다.',
+        images: [],
+        image_paths: [],
+        is_anonymous: true,
+      },
+    });
+
+    expect(adminResponse.status()).toBe(200);
+    const payload = await adminResponse.json();
+    expect(payload.id).toBeTruthy();
+    createdPostIds.push(payload.id);
+
+    if (await hasAnonymousColumn()) {
+      const { data: insertedPost } = await getAdminClient()
+        .from('community_posts')
+        .select('id, user_id, category, is_anonymous')
+        .eq('id', payload.id)
+        .maybeSingle();
+
+      expect(insertedPost).toMatchObject({
+        id: payload.id,
+        user_id: adminUserId,
+        category: 'locally_content',
+        is_anonymous: false,
+      });
+    } else {
+      const { data: insertedPost } = await getAdminClient()
+        .from('community_posts')
+        .select('id, user_id, category')
+        .eq('id', payload.id)
+        .maybeSingle();
+
+      expect(insertedPost).toMatchObject({
+        id: payload.id,
+        user_id: adminUserId,
+        category: 'locally_content',
+      });
+    }
   });
 
   test('cleans up uploaded image paths when the DB insert fails', async ({ page }) => {

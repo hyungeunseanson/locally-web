@@ -11,16 +11,19 @@ import { Edit3 } from 'lucide-react';
 import Link from 'next/link';
 import type { CommunityCategory, CommunityFilterCategory } from '@/app/types/community';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import {
     buildCommunityFeedPosts,
     COMMUNITY_FEED_EXPERIENCE_SELECT,
     type CommunityFeedExperience,
     type CommunityFeedPost,
     type CommunityFeedPostRow,
+    COMMUNITY_FEED_POST_SELECT_LEGACY,
     COMMUNITY_FEED_POST_SELECT,
     COMMUNITY_FEED_PROFILE_SELECT,
     type CommunityFeedProfile,
 } from './feedSelect';
+import { isMissingAnonymousColumnError } from './anonymousColumn';
 
 // ✅ Vercel 엣지 캐시 비활성화 — 새 글 등록 후 피드가 구 버전 캐시를 서빙하는 버그 방지
 export const dynamic = 'force-dynamic';
@@ -68,6 +71,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 export default async function CommunityPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
     const supabase = await createClient();
     const params = await searchParams;
+    const { data: { user } } = await supabase.auth.getUser();
 
     // 기본 디폴트 탭 (값이 없거나 이상하면 qna)
     let category = (params?.category as string) || 'all';
@@ -80,30 +84,50 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     const limit = 15;
 
     // ① community_posts 단독 조회 (join 에러로 initialData가 빈값→피드 공백 버그 방지)
-    let query = supabase
-        .from('community_posts')
-        .select(COMMUNITY_FEED_POST_SELECT)
-        .range(0, limit - 1);
+    const buildQuery = (selectClause: string) => {
+        let query = supabase
+            .from('community_posts')
+            .select(selectClause)
+            .range(0, limit - 1);
 
-    if (category && category !== 'all') {
-        query = query.eq('category', category);
+        if (category && category !== 'all') {
+            query = query.eq('category', category);
+        }
+
+        if (queryText) {
+            query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
+        }
+
+        if (sort === 'popular') {
+            query = query
+                .order('like_count', { ascending: false })
+                .order('comment_count', { ascending: false })
+                .order('created_at', { ascending: false });
+        } else {
+            query = query.order('created_at', { ascending: false });
+        }
+
+        return query;
+    };
+
+    const initialResult = await buildQuery(COMMUNITY_FEED_POST_SELECT);
+    let postsError = initialResult.error;
+    let postsData = (initialResult.data ?? null) as unknown as CommunityFeedPostRow[] | null;
+
+    if (postsError && isMissingAnonymousColumnError(postsError)) {
+        const legacyResult = await buildQuery(COMMUNITY_FEED_POST_SELECT_LEGACY);
+        postsData = ((legacyResult.data ?? []) as unknown as CommunityFeedPostRow[]).map((post) => ({
+            ...post,
+            is_anonymous: false,
+        }));
+        postsError = legacyResult.error;
     }
 
-    if (queryText) {
-        query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
+    if (postsError) {
+        console.error('[CommunityPage] feed query failed:', postsError);
     }
 
-    if (sort === 'popular') {
-        query = query
-            .order('like_count', { ascending: false })
-            .order('comment_count', { ascending: false })
-            .order('created_at', { ascending: false });
-    } else {
-        query = query.order('created_at', { ascending: false });
-    }
-
-    const { data: posts } = await query;
-    const typedPosts = (posts ?? []) as unknown as CommunityFeedPostRow[];
+    const typedPosts = postsData ?? [];
 
     // ② profiles 별도 조회 (실패해도 피드 유지)
     let initialData: CommunityFeedPost[] = [];
@@ -132,6 +156,17 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     const initialNextOffset = typedPosts.length === limit ? limit : null;
 
     const writeCategory = category === 'all' ? 'qna' : category;
+    let canWriteLocallyContent = false;
+
+    if (user) {
+        const adminAccess = await resolveAdminAccess(supabase, {
+            userId: user.id,
+            email: user.email,
+        });
+        canWriteLocallyContent = adminAccess.isAdmin;
+    }
+
+    const showFloatingWriteCta = category !== 'locally_content' || canWriteLocallyContent;
 
     return (
         <>
@@ -167,24 +202,30 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                                 category={category}
                                 query={queryText}
                                 sort={sort}
+                                canWriteLocallyContent={canWriteLocallyContent}
                             />
                         </div>
 
                         {/* ─── 우측 사이드바 (4/12, 모바일 hidden) ─── */}
                         <div className="col-span-1 lg:col-span-4 hidden lg:flex flex-col">
-                            <RightSidebar category={writeCategory as CommunityCategory} />
+                            <RightSidebar
+                                category={writeCategory as CommunityCategory}
+                                canWriteLocallyContent={canWriteLocallyContent}
+                            />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <Link
-                href={`/community/write?category=${writeCategory}`}
-                className="block lg:hidden fixed bottom-20 right-4 w-12 h-12 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
-                aria-label="글쓰기"
-            >
-                <Edit3 size={20} strokeWidth={2.5} />
-            </Link>
+            {showFloatingWriteCta && (
+                <Link
+                    href={`/community/write?category=${writeCategory}`}
+                    className="block lg:hidden fixed bottom-20 right-4 w-12 h-12 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
+                    aria-label="글쓰기"
+                >
+                    <Edit3 size={20} strokeWidth={2.5} />
+                </Link>
+            )}
         </>
     );
 }

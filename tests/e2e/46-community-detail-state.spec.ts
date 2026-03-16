@@ -93,17 +93,24 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createCommunityPost(authorId: string) {
+async function createCommunityPost(
+  authorId: string,
+  options?: {
+    title?: string;
+    createdAt?: string;
+  }
+) {
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from('community_posts')
     .insert({
       user_id: authorId,
       category: 'qna',
-      title: `[Playwright] Community Detail ${Date.now()}`,
+      title: options?.title || `[Playwright] Community Detail ${Date.now()}`,
       content: '좋아요/댓글 카운트 정합성 검증용 게시글입니다.',
       images: [],
       linked_exp_id: null,
+      created_at: options?.createdAt,
     })
     .select('id, like_count, comment_count')
     .single();
@@ -172,12 +179,27 @@ test.describe.serial('Community detail state consistency', () => {
     const viewer = createUser('viewer');
     const authorId = await createAuthUser(author);
     const viewerId = await createAuthUser(viewer);
-    const postId = await createCommunityPost(authorId);
+    const baseTime = Date.now();
+    await createCommunityPost(authorId, {
+      title: `[Playwright] Community Detail Previous ${baseTime}`,
+      createdAt: new Date(baseTime - 2 * 60 * 60 * 1000).toISOString(),
+    });
+    const postId = await createCommunityPost(authorId, {
+      title: `[Playwright] Community Detail Current ${baseTime}`,
+      createdAt: new Date(baseTime - 60 * 60 * 1000).toISOString(),
+    });
+    await createCommunityPost(authorId, {
+      title: `[Playwright] Community Detail Next ${baseTime}`,
+      createdAt: new Date(baseTime).toISOString(),
+    });
     const commentMessage = `Playwright comment ${Date.now()}`;
+    const filterQuery = 'community detail flow';
 
     await seedLike(postId, viewerId);
     await login(page, viewer);
-    await page.goto(`/community/${postId}`, { waitUntil: 'networkidle' });
+    await page.goto(`/community/${postId}?category=qna&q=${encodeURIComponent(filterQuery)}&sort=popular`, {
+      waitUntil: 'networkidle',
+    });
 
     const likeButton = page.locator('button').filter({
       has: page.locator('svg.lucide-heart'),
@@ -223,5 +245,32 @@ test.describe.serial('Community detail state consistency', () => {
       .maybeSingle();
 
     expect(insertedComment?.id).toBeTruthy();
+
+    await expect(page.getByTestId('community-detail-list-button').first()).toBeVisible();
+    await expect(page.getByText('이전글')).toBeVisible();
+    await expect(page.getByText('다음글')).toBeVisible();
+
+    const nextLink = page.getByTestId('community-detail-next-link');
+    const nextHref = await nextLink.getAttribute('href');
+    expect(nextHref).toBeTruthy();
+    expect(nextHref).toContain('category=qna');
+    expect(nextHref).toContain('sort=popular');
+
+    await page.getByTestId('community-detail-list-button').first().click();
+    await expect.poll(() => page.url()).toContain('/community?');
+    await expect.poll(() => page.url()).toContain('category=qna');
+    await expect.poll(() => page.url()).toContain('sort=popular');
+
+    await page.goBack({ waitUntil: 'networkidle' });
+    await expect.poll(() => page.url()).toContain(`/community/${postId}?`);
+
+    await page.goto(`/community/${postId}?category=qna&q=${encodeURIComponent(filterQuery)}&sort=popular`, {
+      waitUntil: 'networkidle',
+    });
+    const prevLink = page.getByTestId('community-detail-prev-link');
+    const prevHref = await prevLink.getAttribute('href');
+    expect(prevHref).toBeTruthy();
+    expect(prevHref).toContain('category=qna');
+    expect(prevHref).toContain('sort=popular');
   });
 });

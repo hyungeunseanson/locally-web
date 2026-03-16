@@ -1,8 +1,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { MessageSquare, Heart, Eye } from 'lucide-react';
-import { getProfileDisplayName } from '@/app/utils/profile';
 import type { CommunityFeedPost } from '../feedSelect';
+import { getCommunityCategoryMeta } from '../categoryMeta';
+import { getCommunityAuthorName } from '../authorDisplay';
+import CommunityAuthorTrigger from './CommunityAuthorTrigger';
 
 interface PostListCardProps {
     post: CommunityFeedPost;
@@ -24,79 +26,79 @@ const getTimeAgo = (dateStr: string) => {
     }
 };
 
-const CATEGORY_BADGE: Record<string, { label: string; className: string }> = {
-    qna: { label: 'Q&A', className: 'bg-amber-50 text-amber-600 border border-amber-200' },
-    companion: { label: '동행', className: 'bg-blue-50 text-blue-600 border border-blue-200' },
-    info: { label: '꿀팁', className: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
-};
-
-/**
- * 리스트형 피드 카드 — Q&A / 동행 / 꿀팁 탭 전용
- * F-Pattern 스캔 최적화: 좌측 썸네일 + 우측 정보 수평 배치
- */
 export default function PostListCard({ post, category, query, sort }: PostListCardProps) {
-    const { profiles, category: postCategory } = post;
-    const badge = CATEGORY_BADGE[postCategory] ?? { label: postCategory, className: 'bg-gray-100 text-gray-500' };
+    const badge = getCommunityCategoryMeta(post.category);
     const thumbnail = post.images?.[0] ?? null;
-    const hasCompanionDate = postCategory === 'companion' && post.companion_date;
-    const authorName = getProfileDisplayName(profiles);
+    const hasCompanionDate = post.category === 'companion' && post.companion_date;
+    const authorName = getCommunityAuthorName(post.profiles, post.is_anonymous);
     const params = new URLSearchParams();
     params.set('category', category);
     if (query.trim()) params.set('q', query.trim());
     if (sort !== 'latest') params.set('sort', sort);
+    const href = `/community/${post.id}?${params.toString()}`;
 
     return (
-        <Link href={`/community/${post.id}?${params.toString()}`} className="block">
-            <article className="flex items-start gap-3 px-5 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
+        <article className="group relative border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150">
+            <Link
+                href={href}
+                aria-label={`${post.title} 상세 보기`}
+                className="absolute inset-0 z-0"
+            />
 
-                {/* 좌측: 썸네일 */}
-                <div className="w-[68px] h-[68px] rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border border-gray-100">
+            <div className="relative z-10 flex items-start gap-3 px-5 py-4 pointer-events-none">
+                <div className="h-[72px] w-[72px] overflow-hidden rounded-2xl border border-gray-100 bg-gray-100 flex-shrink-0">
                     {thumbnail ? (
                         <img
                             src={thumbnail}
                             alt="썸네일"
-                            className="w-full h-full object-cover"
+                            className="h-full w-full object-cover"
                             loading="lazy"
                         />
                     ) : (
-                        <div className="w-full h-full bg-slate-50 flex items-center justify-center">
+                        <div className="flex h-full w-full items-center justify-center bg-slate-50">
                             <img
                                 src="/images/logo-black-transparent.png"
                                 alt="Locally 로고"
-                                className="w-10 h-10 object-contain opacity-70"
+                                className="h-10 w-10 object-contain opacity-70"
                                 loading="lazy"
                             />
                         </div>
                     )}
                 </div>
 
-                {/* 우측: 정보 */}
-                <div className="flex-1 min-w-0">
-                    {/* 뱃지 줄 */}
-                    <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.className}`}>
-                            {badge.label}
+                <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.badgeClassName}`}>
+                            {badge.shortLabel}
                         </span>
                         {post.companion_city && (
-                            <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500 break-words [overflow-wrap:anywhere]">
                                 📍 {post.companion_city}
                             </span>
                         )}
                         {hasCompanionDate && (
-                            <span className="text-[10px] font-semibold text-gray-400">
+                            <span className="text-[10px] font-semibold text-gray-400 break-words [overflow-wrap:anywhere]">
                                 {post.companion_date}
                             </span>
                         )}
                     </div>
 
-                    {/* 제목 */}
-                    <p className="text-[14px] font-semibold text-gray-900 line-clamp-2 leading-snug mb-1.5">
+                    <p className="mb-2 line-clamp-2 break-words text-[14px] font-semibold leading-snug text-gray-900 [overflow-wrap:anywhere]">
                         {post.title}
                     </p>
 
-                    {/* 메타: 닉네임 + 시간 + 통계 */}
                     <div className="flex items-center gap-2 text-[11px] text-gray-400 flex-wrap">
-                        <span className="font-medium text-gray-500">{authorName}</span>
+                        <CommunityAuthorTrigger
+                            userId={post.user_id}
+                            authorName={authorName}
+                            isAnonymous={post.is_anonymous}
+                            currentPostId={post.id}
+                            className="pointer-events-auto min-w-0 max-w-[10rem] text-left"
+                        >
+                            <span className="block truncate font-medium text-gray-500">
+                                {authorName}
+                            </span>
+                        </CommunityAuthorTrigger>
                         <span>·</span>
                         <span suppressHydrationWarning>{getTimeAgo(post.created_at)}</span>
                         <span className="ml-auto flex items-center gap-2.5">
@@ -115,7 +117,7 @@ export default function PostListCard({ post, category, query, sort }: PostListCa
                         </span>
                     </div>
                 </div>
-            </article>
-        </Link>
+            </div>
+        </article>
     );
 }

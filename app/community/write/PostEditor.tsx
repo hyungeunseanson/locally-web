@@ -1,22 +1,16 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import DatePicker from '@/app/components/DatePicker';
 import { ArrowLeft, CalendarDays, ChevronRight, ImagePlus, Loader2, MapPin, X } from 'lucide-react';
 import type { CommunityCategory } from '@/app/types/community';
+import { getCommunityCategoryMeta } from '../categoryMeta';
 
 const WRITABLE_CATEGORIES: CommunityCategory[] = ['qna', 'companion', 'info', 'locally_content'];
-
-const CATEGORY_OPTIONS: { id: CommunityCategory; label: string }[] = [
-    { id: 'qna', label: 'Q&A' },
-    { id: 'companion', label: '동행 구하기' },
-    { id: 'info', label: '꿀팁' },
-    { id: 'locally_content', label: '로컬리 콘텐츠' },
-];
 
 const formatDateLabel = (dateString: string) => {
     if (!dateString) return '날짜 선택';
@@ -45,22 +39,27 @@ type UploadedImage = {
     publicUrl: string;
 };
 
-export default function PostEditor() {
+interface PostEditorProps {
+    initialCategory: CommunityCategory;
+    canWriteLocallyContent: boolean;
+}
+
+export default function PostEditor({ initialCategory, canWriteLocallyContent }: PostEditorProps) {
     const router = useRouter();
-    const searchParams = useSearchParams();
     const supabase = createClient();
     const { showToast, showHeicUnsupportedToast } = useToast();
-    const initialCategory = searchParams.get('category');
-    const defaultCategory = WRITABLE_CATEGORIES.includes(initialCategory as CommunityCategory)
-        ? (initialCategory as CommunityCategory)
-        : 'qna';
+    const availableCategories = useMemo(
+        () => WRITABLE_CATEGORIES.filter((item) => canWriteLocallyContent || item !== 'locally_content'),
+        [canWriteLocallyContent],
+    );
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [category, setCategory] = useState<CommunityCategory>(defaultCategory);
+    const [category, setCategory] = useState<CommunityCategory>(initialCategory);
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imageUrls, setImageUrls] = useState<string[]>([]);
+    const [isAnonymous, setIsAnonymous] = useState(false);
     const [companionDate, setCompanionDate] = useState('');
     const [companionCity, setCompanionCity] = useState('');
     const [isDateModalOpen, setIsDateModalOpen] = useState(false);
@@ -72,7 +71,14 @@ export default function PostEditor() {
     );
 
     const isCompanion = category === 'companion';
+    const canWriteAnonymously = category !== 'locally_content';
     const canSubmit = title.trim().length > 0 && content.trim().length > 0 && (!isCompanion || (companionDate && companionCity.trim()));
+
+    useEffect(() => {
+        if (category === 'locally_content' && isAnonymous) {
+            setIsAnonymous(false);
+        }
+    }, [category, isAnonymous]);
 
     const openDateModal = () => {
         setDraftCompanionDate(parseStoredDate(companionDate));
@@ -171,6 +177,7 @@ export default function PostEditor() {
                     content,
                     images: finalImageUrls,
                     image_paths: finalImagePaths,
+                    is_anonymous: canWriteAnonymously ? isAnonymous : false,
                     companion_date: companionDate || undefined,
                     companion_city: companionCity.trim() || undefined,
                     linked_exp_id: null,
@@ -180,7 +187,7 @@ export default function PostEditor() {
             if (!response.ok) throw new Error('글 등록에 실패했습니다.');
 
             const { id } = await response.json();
-            window.location.href = `/community/${id}`;
+            window.location.href = `/community/${id}?category=${category}`;
         } catch (error) {
             console.error(error);
             const message = error instanceof Error ? error.message : '글 등록 중 오류가 발생했습니다.';
@@ -224,24 +231,53 @@ export default function PostEditor() {
                 >
                     <div className="border-b border-slate-100 px-5 py-5 md:px-8 md:py-6">
                         <div className="flex flex-wrap gap-2">
-                            {CATEGORY_OPTIONS.map((item) => (
+                            {availableCategories.map((item) => (
                                 <button
-                                    key={item.id}
+                                    key={item}
                                     type="button"
-                                    onClick={() => setCategory(item.id)}
+                                    onClick={() => setCategory(item)}
                                     className={`rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors md:text-[13px] ${
-                                        category === item.id
+                                        category === item
                                             ? 'border-slate-900 bg-slate-900 text-white'
                                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                                     }`}
                                 >
-                                    {item.label}
+                                    {getCommunityCategoryMeta(item).label}
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     <div className="space-y-6 px-5 py-5 md:px-8 md:py-8">
+                        {canWriteAnonymously && (
+                            <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">작성 옵션</div>
+                                        <h3 className="mt-1 text-[16px] font-semibold text-slate-900">익명으로 작성</h3>
+                                        <p className="mt-1 text-[13px] text-slate-500">
+                                            게시글 목록과 상세에서 작성자 이름 대신 익명으로 표시됩니다.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={isAnonymous}
+                                        onClick={() => setIsAnonymous((prev) => !prev)}
+                                        className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors ${
+                                            isAnonymous ? 'bg-slate-900' : 'bg-slate-200'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition-transform ${
+                                                isAnonymous ? 'translate-x-7' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {isCompanion && (
                             <div className="grid gap-3 md:grid-cols-2">
                                 <button

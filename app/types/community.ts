@@ -10,6 +10,7 @@ export interface CommunityPost {
     title: string;
     content: string;
     images: string[];
+    is_anonymous: boolean;
 
     // 동행 전용
     companion_date?: string;

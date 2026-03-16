@@ -4,7 +4,8 @@ import { CommunityPost } from '@/app/types/community';
 import LinkedExperienceChip from './LinkedExperienceChip';
 import PostImages from './PostImages';
 import { MessageSquare, Heart, Eye, MapPin, CalendarCheck } from 'lucide-react';
-import { getProfileDisplayName, getProfileInitial } from '@/app/utils/profile';
+import { getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
+import { getCommunityCategoryMeta } from '../categoryMeta';
 
 interface PostCardProps {
     post: CommunityPost;
@@ -23,17 +24,12 @@ const getTimeAgo = (dateStr: string) => {
     }
 };
 
-const CATEGORY_LABEL: Record<string, string> = {
-    qna: '💡 Q&A',
-    companion: '🤝 동행',
-    info: '🗺️ 꿀팁',
-};
-
 export default function PostCard({ post }: PostCardProps) {
     const { profiles, linked_experience, category } = post;
     const isCompanion = category === 'companion';
-    const authorName = getProfileDisplayName(profiles);
-    const authorInitial = getProfileInitial(profiles);
+    const authorName = getCommunityAuthorName(profiles, post.is_anonymous);
+    const authorInitial = getCommunityAuthorInitial(profiles, post.is_anonymous);
+    const categoryMeta = getCommunityCategoryMeta(category);
 
     return (
         <Link href={`/community/${post.id}`} className="block">
@@ -64,8 +60,8 @@ export default function PostCard({ post }: PostCardProps) {
                     {/* 카테고리 뱃지 */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         {category && (
-                            <span className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-md font-medium">
-                                {CATEGORY_LABEL[category] || category}
+                            <span className={`text-xs px-2.5 py-1 rounded-md font-medium ${categoryMeta.badgeClassName}`}>
+                                {categoryMeta.shortLabel}
                             </span>
                         )}
                     </div>

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Search } from 'lucide-react';
 import type { CommunityFilterCategory } from '@/app/types/community';
+import { COMMUNITY_FILTER_CATEGORY_OPTIONS } from '../categoryMeta';
 
 type SortOption = 'latest' | 'popular';
 type OpenLayer = 'category' | 'sort' | null;
@@ -13,14 +14,6 @@ interface CommunitySearchControlsProps {
     currentQuery: string;
     currentSort: SortOption;
 }
-
-const SEARCH_CATEGORIES: { id: CommunityFilterCategory; label: string }[] = [
-    { id: 'all', label: '전체보기' },
-    { id: 'qna', label: 'Q&A' },
-    { id: 'companion', label: '동행' },
-    { id: 'info', label: '꿀팁' },
-    { id: 'locally_content', label: '콘텐츠' },
-];
 
 const SORT_OPTIONS: { id: SortOption; label: string }[] = [
     { id: 'latest', label: '최신순' },
@@ -105,7 +98,7 @@ export default function CommunitySearchControls({
     }, []);
 
     const selectedCategoryLabel = useMemo(
-        () => SEARCH_CATEGORIES.find((item) => item.id === category)?.label || '전체보기',
+        () => COMMUNITY_FILTER_CATEGORY_OPTIONS.find((item) => item.id === category)?.label || '전체보기',
         [category],
     );
 
@@ -155,7 +148,7 @@ export default function CommunitySearchControls({
                             {openLayer === 'category' && (
                                 <div className="absolute left-0 top-[calc(100%+10px)] z-20 w-44 rounded-[24px] border border-[#EBEBEB] bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
                                     <div className="space-y-1" role="listbox" aria-label="카테고리 선택">
-                                        {SEARCH_CATEGORIES.map((item) => (
+                                        {COMMUNITY_FILTER_CATEGORY_OPTIONS.map((item) => (
                                             <button
                                                 key={item.id}
                                                 type="button"
@@ -251,7 +244,7 @@ export default function CommunitySearchControls({
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {SEARCH_CATEGORIES.map((item) => (
+                    {COMMUNITY_FILTER_CATEGORY_OPTIONS.map((item) => (
                         <button
                             key={item.id}
                             type="button"

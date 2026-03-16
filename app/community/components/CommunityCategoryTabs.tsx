@@ -2,14 +2,7 @@
 
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-
-const tabs = [
-    { id: 'all', label: '전체보기' },
-    { id: 'qna', label: '💡 Q&A' },
-    { id: 'companion', label: '🤝 동행 찾기' },
-    { id: 'info', label: '🗺️ 현지 꿀팁' },
-    { id: 'locally_content', label: '✨ 로컬리 콘텐츠' },
-];
+import { COMMUNITY_TAB_OPTIONS } from '../categoryMeta';
 
 export default function CommunityCategoryTabs() {
     const searchParams = useSearchParams();
@@ -28,7 +21,7 @@ export default function CommunityCategoryTabs() {
 
     return (
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-            {tabs.map((tab) => (
+            {COMMUNITY_TAB_OPTIONS.map((tab) => (
                 <button
                     key={tab.id}
                     onClick={() => handleTabClick(tab.id)}
