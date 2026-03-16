@@ -36,6 +36,38 @@ interface Props {
   onClose: () => void;
 }
 
+// ISO 2-letter country code → flag emoji
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  korea: 'KR', 'south korea': 'KR', japan: 'JP', china: 'CN', usa: 'US',
+  'united states': 'US', america: 'US', taiwan: 'TW', hongkong: 'HK',
+  'hong kong': 'HK', singapore: 'SG', thailand: 'TH', vietnam: 'VN',
+  philippines: 'PH', indonesia: 'ID', malaysia: 'MY', india: 'IN',
+  australia: 'AU', canada: 'CA', uk: 'GB', 'united kingdom': 'GB',
+  france: 'FR', germany: 'DE', italy: 'IT', spain: 'ES', brazil: 'BR',
+  mexico: 'MX', russia: 'RU', netherlands: 'NL', sweden: 'SE', norway: 'NO',
+  denmark: 'DK', finland: 'FI', switzerland: 'CH', austria: 'AT',
+  portugal: 'PT', greece: 'GR', turkey: 'TR', 'new zealand': 'NZ',
+  한국: 'KR', 일본: 'JP', 중국: 'CN', 미국: 'US', 대만: 'TW', 홍콩: 'HK',
+  싱가포르: 'SG', 태국: 'TH', 베트남: 'VN', 필리핀: 'PH', 인도네시아: 'ID',
+  말레이시아: 'MY', 인도: 'IN', 호주: 'AU', 캐나다: 'CA', 영국: 'GB',
+  프랑스: 'FR', 독일: 'DE', 이탈리아: 'IT', 스페인: 'ES', 브라질: 'BR',
+  러시아: 'RU',
+};
+
+function toFlagEmoji(nationality: string): string {
+  const trimmed = nationality.trim();
+  let code = '';
+  if (/^[A-Za-z]{2}$/.test(trimmed)) {
+    code = trimmed.toUpperCase();
+  } else {
+    code = COUNTRY_NAME_TO_CODE[trimmed.toLowerCase()] ?? '';
+  }
+  if (!code) return trimmed; // fallback to original text
+  return [...code.toUpperCase()]
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
 export default function GuestProfileModal({ guest, onClose }: Props) {
   const { t } = useLanguage();
   const supabase = createClient();
@@ -92,20 +124,15 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-end md:items-center justify-center bg-black/60 md:px-4 md:py-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 px-4 py-8 md:px-4 md:py-6 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] md:max-h-[90vh] w-full md:max-w-[560px] flex-col overflow-hidden rounded-t-[28px] md:rounded-[28px] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
+        className="flex max-h-[78vh] md:max-h-[90vh] w-full max-w-[340px] md:max-w-[560px] flex-col overflow-hidden rounded-[24px] md:rounded-[28px] bg-white shadow-[0_8px_40px_rgba(15,23,42,0.22)] md:shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 모바일 드래그 핸들 */}
-        <div className="flex justify-center pt-3 pb-1 md:hidden flex-shrink-0">
-          <div className="w-10 h-1 bg-slate-300 rounded-full" />
-        </div>
-
         {/* 프로필 헤더 */}
-        <div className="relative border-b border-slate-100 bg-slate-50 px-5 pb-5 pt-4 md:px-6 md:pb-7 md:pt-8 flex-shrink-0">
+        <div className="relative border-b border-slate-100 bg-slate-50 px-4 pb-4 pt-4 md:px-6 md:pb-7 md:pt-8 flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -116,29 +143,29 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
           <div className="flex items-center gap-3 md:gap-4">
             {/* 아바타 */}
-            <div className="h-16 w-16 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-slate-200 shadow-lg flex items-center justify-center">
+            <div className="h-12 w-12 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-slate-200 shadow-lg flex items-center justify-center">
               {guest.avatar_url ? (
                 <img src={guest.avatar_url} className="h-full w-full object-cover" alt={guest.full_name ?? 'Guest'} />
               ) : (
-                <User size={24} className="text-slate-400 md:hidden" />
+                <User size={18} className="text-slate-400 md:hidden" />
               )}
               {!guest.avatar_url && <User size={32} className="text-slate-400 hidden md:block" />}
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
                 <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] md:text-[11px] font-bold text-white">
                   Guest
                 </span>
-                <span className="text-[11px] md:text-[12px] font-medium text-slate-400">
+                <span className="text-[10px] md:text-[12px] font-medium text-slate-400">
                   {joinedAt}
                 </span>
               </div>
-              <h2 className="break-words text-[20px] md:text-[24px] font-black text-slate-900 [overflow-wrap:anywhere]">
+              <h2 className="break-words text-[17px] md:text-[24px] font-black text-slate-900 [overflow-wrap:anywhere] flex items-center gap-1.5 flex-wrap">
                 {guest.full_name}
                 {guest.nationality && (
-                  <span className="ml-2 text-[15px] md:text-[17px] font-medium text-slate-500">
-                    {guest.nationality}
+                  <span className="text-[18px] md:text-[22px] leading-none" title={guest.nationality}>
+                    {toFlagEmoji(guest.nationality)}
                   </span>
                 )}
               </h2>
@@ -147,18 +174,18 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
         </div>
 
         {/* 스크롤 본문 */}
-        <div className="overflow-y-auto px-4 py-5 md:px-6 md:py-6 custom-scrollbar flex-1">
+        <div className="overflow-y-auto px-3 py-4 md:px-6 md:py-6 custom-scrollbar flex-1">
 
           {/* 속성 그리드 */}
           {gridItems.length > 0 && (
             <div className="mb-6 grid grid-cols-2 gap-3">
               {gridItems.map((item) => (
-                <div key={item.label} className="rounded-2xl bg-slate-50 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-slate-500">
+                <div key={item.label} className="rounded-xl md:rounded-2xl bg-slate-50 p-3 md:p-4">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-slate-500">
                     {item.icon}
-                    <span className="text-[11px] font-bold uppercase tracking-[0.14em]">{item.label}</span>
+                    <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em]">{item.label}</span>
                   </div>
-                  <p className="break-words text-[13px] md:text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">
+                  <p className="break-words text-[12px] md:text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">
                     {item.value}
                   </p>
                 </div>
@@ -167,9 +194,9 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
           )}
 
           {/* About */}
-          <section className="mb-8">
-            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">About</h3>
-            <div className="rounded-3xl bg-slate-50 p-5 text-[15px] leading-7 text-slate-700">
+          <section className="mb-6 md:mb-8">
+            <h3 className="mb-2 md:mb-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">About</h3>
+            <div className="rounded-2xl md:rounded-3xl bg-slate-50 p-4 md:p-5 text-[13px] md:text-[15px] leading-6 md:leading-7 text-slate-700">
               <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
                 {guest.introduction || guest.bio || t('guest_modal_intro_empty')}
               </p>
@@ -178,9 +205,9 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
           {/* 받은 후기 */}
           <section>
-            <div className="mb-4 flex items-center gap-2">
-              <Star size={16} className="text-slate-900" fill="currentColor" />
-              <h3 className="text-[16px] font-bold text-slate-900">
+            <div className="mb-3 flex items-center gap-2">
+              <Star size={14} className="text-slate-900 md:w-4 md:h-4" fill="currentColor" />
+              <h3 className="text-[14px] md:text-[16px] font-bold text-slate-900">
                 {t('guest_modal_reviews')} ({reviews.length})
               </h3>
             </div>
@@ -199,7 +226,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
             ) : (
               <div className="space-y-3">
                 {reviews.map((review) => (
-                  <div key={review.id} className="rounded-3xl border border-slate-100 px-4 py-4 transition-colors hover:border-slate-200 hover:bg-slate-50">
+                  <div key={review.id} className="rounded-2xl md:rounded-3xl border border-slate-100 px-3 py-3 md:px-4 md:py-4 transition-colors hover:border-slate-200 hover:bg-slate-50">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-200">
