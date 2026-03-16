@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
@@ -204,6 +205,8 @@ export async function POST(request: Request) {
     }).catch((adminAlertError) => {
       console.error('Booking Payment Admin Alert Error:', adminAlertError);
     });
+
+    revalidatePath(`/experiences/${originalBooking.experience_id}`);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

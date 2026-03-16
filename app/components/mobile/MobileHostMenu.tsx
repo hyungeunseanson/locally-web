@@ -191,7 +191,6 @@ export default function MobileHostMenu() {
 
             {/* ── 메뉴 그룹 1 ── */}
             <div className="px-5 mb-1">
-                <HostMenuItem href="/community" icon={<Users size={17} />} label="커뮤니티" isPending={pendingHref === '/community'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label="예약 관리" isPending={pendingHref === '/host/dashboard?tab=reservations'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label="내 체험 관리" isPending={pendingHref === '/host/dashboard?tab=experiences'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label="문의함" isPending={pendingHref === '/host/dashboard?tab=inquiries'} disabled={isNavigating} onNavigate={navigate} />
@@ -220,6 +219,7 @@ export default function MobileHostMenu() {
                     disabled={isNavigating}
                     onNavigate={navigate}
                 />
+                <HostMenuItem href="/community" icon={<Users size={17} />} label="커뮤니티" isPending={pendingHref === '/community'} disabled={isNavigating} onNavigate={navigate} />
                 <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label="도움말 센터" isPending={pendingHref === '/host/help'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 

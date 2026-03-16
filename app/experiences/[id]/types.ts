@@ -64,3 +64,16 @@ export type HostProfileDetail = {
   bio?: string;
   [key: string]: unknown;
 } | null;
+
+export type ExperienceSlotSummary = {
+  remainingSeats: number;
+  confirmedGuestCount: number;
+  hasConfirmedPrivateBooking: boolean;
+  soloGuaranteeEligible: boolean;
+};
+
+export type ExperienceAvailabilitySummary = {
+  availableDates: string[];
+  dateToTimeMap: Record<string, string[]>;
+  slotSummaryMap: Record<string, ExperienceSlotSummary>;
+};

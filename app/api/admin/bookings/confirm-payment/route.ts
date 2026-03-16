@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       .from('bookings')
       .select(`
         id,
+        experience_id,
         user_id,
         amount,
         total_price,
@@ -155,6 +157,8 @@ export async function POST(request: Request) {
         guest_name: booking.contact_name,
       },
     });
+
+    revalidatePath(`/experiences/${booking.experience_id}`);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

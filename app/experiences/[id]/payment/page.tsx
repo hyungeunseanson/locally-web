@@ -1,7 +1,7 @@
 'use client';
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams, useParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Calendar, Users, ShieldCheck, Clock, Info, CheckCircle2 } from 'lucide-react';
 import Spinner from '@/app/components/ui/Spinner';
 import Script from 'next/script';
@@ -12,6 +12,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_BLOCKING_STATUSES_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
+import { ExperienceAvailabilitySummary, ExperienceSlotSummary } from '../types';
 
 type PaymentExperience = {
   title?: string;
@@ -133,6 +134,7 @@ declare global {
 }
 
 function PaymentContent() {
+  const pathname = usePathname();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -155,9 +157,13 @@ function PaymentContent() {
   const [isFeeInfoOpen, setIsFeeInfoOpen] = useState(false);
   const [isPayPalSdkReady, setIsPayPalSdkReady] = useState(false);
   const [paypalSdkError, setPaypalSdkError] = useState('');
+  const [slotSummary, setSlotSummary] = useState<ExperienceSlotSummary | null>(null);
+  const [isSlotSummaryResolved, setIsSlotSummaryResolved] = useState(false);
+  const [hasSlotSummaryLoaded, setHasSlotSummaryLoaded] = useState(false);
   const feeInfoRef = useRef<HTMLDivElement | null>(null);
   const paypalButtonRef = useRef<HTMLDivElement | null>(null);
   const paypalSessionRef = useRef<PayPalPreparedSession | null>(null);
+  const soloOptionNoticeShownRef = useRef(false);
   const latestPayPalContextRef = useRef<PayPalCheckoutContext>({
     customerName: '',
     customerPhone: '',
@@ -171,11 +177,15 @@ function PaymentContent() {
   const time = searchParams?.get('time') || '시간 미정';
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
-  const isSoloGuarantee = searchParams?.get('solo') === '1' && guests === 1 && !isPrivate;
+  const requestedSoloGuarantee = searchParams?.get('solo') === '1' && guests === 1 && !isPrivate;
+  const effectiveIsSoloGuarantee =
+    requestedSoloGuarantee &&
+    hasSlotSummaryLoaded &&
+    Boolean(slotSummary?.soloGuaranteeEligible);
 
   const expPrice = Number(experience?.price || 50000);
   const baseHostPrice = isPrivate ? Number(experience?.private_price || 300000) : expPrice * guests;
-  const soloGuaranteePrice = isSoloGuarantee ? SOLO_GUARANTEE_PRICE : 0;
+  const soloGuaranteePrice = effectiveIsSoloGuarantee ? SOLO_GUARANTEE_PRICE : 0;
   const hostPrice = baseHostPrice + soloGuaranteePrice;
   const guestFee = Math.floor(hostPrice * 0.1);
   const finalAmount = hostPrice + guestFee;
@@ -191,9 +201,9 @@ function PaymentContent() {
         time,
         guests,
         isPrivate,
-        isSoloGuarantee,
+        effectiveIsSoloGuarantee,
       ]),
-    [date, experienceId, guests, isPrivate, isSoloGuarantee, time]
+    [date, effectiveIsSoloGuarantee, experienceId, guests, isPrivate, time]
   );
 
   const getCheckoutValidationError = useCallback((context: PayPalCheckoutContext) => {
@@ -229,6 +239,39 @@ function PaymentContent() {
     };
   }, [agreeNoOffPlatform, agreeSafety, agreeTerms, customerName, customerPhone]);
 
+  const refreshSlotSummary = useCallback(async () => {
+    if (!experienceId || !date || !time || date === '날짜 미정' || time === '시간 미정') {
+      setSlotSummary(null);
+      setHasSlotSummaryLoaded(false);
+      setIsSlotSummaryResolved(true);
+      return;
+    }
+
+    setIsSlotSummaryResolved(false);
+
+    try {
+      const response = await fetch(`/api/experiences/${experienceId}/availability-summary`, {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch slot summary: ${response.status}`);
+      }
+
+      const summary = (await response.json()) as ExperienceAvailabilitySummary;
+      const slotKey = `${date}_${time.slice(0, 5)}`;
+
+      setSlotSummary(summary.slotSummaryMap?.[slotKey] || null);
+      setHasSlotSummaryLoaded(true);
+    } catch (error) {
+      console.error('Payment slot summary fetch error:', error);
+      setSlotSummary(null);
+      setHasSlotSummaryLoaded(false);
+    } finally {
+      setIsSlotSummaryResolved(true);
+    }
+  }, [date, experienceId, time]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -263,6 +306,41 @@ function PaymentContent() {
   }, []);
 
   useEffect(() => {
+    void refreshSlotSummary();
+  }, [refreshSlotSummary]);
+
+  useEffect(() => {
+    if (!requestedSoloGuarantee) {
+      soloOptionNoticeShownRef.current = false;
+      return;
+    }
+
+    if (!isSlotSummaryResolved || !hasSlotSummaryLoaded || effectiveIsSoloGuarantee || !searchParams) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('solo');
+    const nextQuery = nextParams.toString();
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+
+    if (!soloOptionNoticeShownRef.current) {
+      showToast('이미 확정된 예약이 있어 1인 출발 확정 옵션이 제거되었습니다.', 'error');
+      soloOptionNoticeShownRef.current = true;
+    }
+  }, [
+    effectiveIsSoloGuarantee,
+    hasSlotSummaryLoaded,
+    isSlotSummaryResolved,
+    pathname,
+    requestedSoloGuarantee,
+    router,
+    searchParams,
+    showToast,
+  ]);
+
+  useEffect(() => {
     if (!isPayPalEnabled && paymentMethod === 'paypal') {
       setPaymentMethod(isCardReadyResolved && !isCardReady ? 'bank' : 'card');
       return;
@@ -278,7 +356,7 @@ function PaymentContent() {
       paypalSessionRef.current = null;
       setPaymentError('');
     }
-  }, [paymentMethod, experienceId, date, time, guests, isPrivate, isSoloGuarantee]);
+  }, [date, effectiveIsSoloGuarantee, experienceId, guests, isPrivate, paymentMethod, time]);
 
   useEffect(() => {
     const fetchExp = async () => {
@@ -379,7 +457,7 @@ function PaymentContent() {
         time,
         guests,
         isPrivate,
-        isSoloGuarantee,
+        isSoloGuarantee: effectiveIsSoloGuarantee,
         customerName: context.customerName,
         customerPhone: context.customerPhone,
         paymentMethod: 'paypal',
@@ -411,7 +489,7 @@ function PaymentContent() {
     getCheckoutValidationError,
     guests,
     isPrivate,
-    isSoloGuarantee,
+    effectiveIsSoloGuarantee,
     router,
     showToast,
     supabase.auth,
@@ -492,7 +570,13 @@ function PaymentContent() {
       return;
     }
 
-    if (!isPayPalEnabled || !isPayPalSdkReady || !paypalButtonRef.current || !window.paypal?.Buttons) {
+    if (
+      !isSlotSummaryResolved ||
+      !isPayPalEnabled ||
+      !isPayPalSdkReady ||
+      !paypalButtonRef.current ||
+      !window.paypal?.Buttons
+    ) {
       return;
     }
 
@@ -534,7 +618,15 @@ function PaymentContent() {
     return () => {
       container.innerHTML = '';
     };
-  }, [createPayPalOrder, handlePayPalApprove, isPayPalEnabled, isPayPalSdkReady, paymentMethod, showToast]);
+  }, [
+    createPayPalOrder,
+    handlePayPalApprove,
+    isPayPalEnabled,
+    isPayPalSdkReady,
+    isSlotSummaryResolved,
+    paymentMethod,
+    showToast,
+  ]);
 
   const handlePayment = async () => {
     setPaymentError('');
@@ -549,6 +641,12 @@ function PaymentContent() {
     if (validationMessage) {
       setPaymentError(validationMessage);
       return showToast(validationMessage, 'error');
+    }
+
+    if (!isSlotSummaryResolved) {
+      const message = '예약 가능 정보를 확인하는 중입니다. 잠시 후 다시 시도해주세요.';
+      setPaymentError(message);
+      return showToast(message, 'error');
     }
 
     setIsProcessing(true);
@@ -584,7 +682,7 @@ function PaymentContent() {
           time,
           guests,
           isPrivate,
-          isSoloGuarantee,
+          isSoloGuarantee: effectiveIsSoloGuarantee,
           customerName,
           customerPhone,
           paymentMethod
@@ -744,7 +842,7 @@ function PaymentContent() {
             <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Clock className="w-3.5 h-3.5 md:w-4 md:h-4" /> 시간</span><span className="font-bold">{time}</span></div>
             <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Users className="w-3.5 h-3.5 md:w-4 md:h-4" /> 인원</span><span className="font-bold">{guests}명</span></div>
             {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> 타입</span><span className="font-bold text-rose-500">프라이빗 투어</span></div>}
-            {isSoloGuarantee && (
+            {effectiveIsSoloGuarantee && (
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] md:text-xs text-slate-500 leading-relaxed">
                 <span className="font-semibold text-slate-700">1인 출발 확정 옵션이 적용되었습니다.</span>
               </div>
@@ -821,25 +919,34 @@ function PaymentContent() {
                 <div className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
                   PayPal 승인 후 결제가 완료되며, 기존 카드/무통장 결제 흐름에는 영향을 주지 않습니다.
                 </div>
+                {!isSlotSummaryResolved && (
+                  <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
+                    <Spinner size={16} className="mr-2" />
+                    예약 가능 정보를 확인하는 중입니다.
+                  </div>
+                )}
                 {paypalSdkError && (
                   <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] md:text-xs text-rose-600">
                     {paypalSdkError}
                   </div>
                 )}
-                {!isPayPalSdkReady && !paypalSdkError && (
+                {isSlotSummaryResolved && !isPayPalSdkReady && !paypalSdkError && (
                   <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
                     <Spinner size={16} className="mr-2" />
                     PayPal 버튼을 불러오는 중입니다.
                   </div>
                 )}
-                <div ref={paypalButtonRef} className={isPayPalSdkReady ? 'min-h-[48px]' : 'hidden'} />
+                <div
+                  ref={paypalButtonRef}
+                  className={isPayPalSdkReady && isSlotSummaryResolved ? 'min-h-[48px]' : 'hidden'}
+                />
               </div>
             )}
           </div>
 
           <div className="px-1 md:px-2 space-y-1.5 md:space-y-2 mb-6 md:mb-8 text-[12px] md:text-sm">
             <div className="flex justify-between items-center text-slate-600"><span>체험 금액</span><span>₩{baseHostPrice.toLocaleString()}</span></div>
-            {isSoloGuarantee && (
+            {effectiveIsSoloGuarantee && (
               <div className="flex justify-between items-center text-slate-600"><span>1인 출발 확정비</span><span>+ ₩{soloGuaranteePrice.toLocaleString()}</span></div>
             )}
             <div className="flex justify-between items-center text-blue-600">
@@ -910,7 +1017,11 @@ function PaymentContent() {
           {paymentMethod !== 'paypal' ? (
             <button
               onClick={handlePayment}
-              disabled={isProcessing || (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))}
+              disabled={
+                isProcessing ||
+                !isSlotSummaryResolved ||
+                (paymentMethod === 'card' && (!isCardReadyResolved || !isCardReady))
+              }
               className="w-full h-12 md:h-14 rounded-xl md:rounded-2xl font-bold text-[15px] md:text-lg bg-black text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 md:gap-2 shadow-md md:shadow-lg shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
             >
               {isProcessing ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Star, Globe } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -16,7 +16,12 @@ import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
 import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
-import { ExperienceDetail, HostProfileDetail } from './types';
+import {
+  ExperienceAvailabilitySummary,
+  ExperienceDetail,
+  ExperienceSlotSummary,
+  HostProfileDetail,
+} from './types';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
 
@@ -30,7 +35,7 @@ type Props = {
   initialHostProfile: HostProfileDetail;
   initialAvailableDates: string[];
   initialDateToTimeMap: Record<string, string[]>;
-  initialRemainingSeatsMap: Record<string, number>;
+  initialSlotSummaryMap: Record<string, ExperienceSlotSummary>;
 };
 
 export default function ExperienceClient({
@@ -39,7 +44,7 @@ export default function ExperienceClient({
   initialHostProfile,
   initialAvailableDates,
   initialDateToTimeMap,
-  initialRemainingSeatsMap
+  initialSlotSummaryMap
 }: Props) {
   const [isCopySuccess, setIsCopySuccess] = useState(false);
   const { showToast } = useToast();
@@ -55,9 +60,9 @@ export default function ExperienceClient({
   const [experience] = useState(initialExperience);
   const [hostProfile] = useState(initialHostProfile);
 
-  const [availableDates] = useState<string[]>(initialAvailableDates);
-  const [dateToTimeMap] = useState<Record<string, string[]>>(initialDateToTimeMap);
-  const [remainingSeatsMap] = useState<Record<string, number>>(initialRemainingSeatsMap);
+  const [availableDates, setAvailableDates] = useState<string[]>(initialAvailableDates);
+  const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>(initialDateToTimeMap);
+  const [slotSummaryMap, setSlotSummaryMap] = useState<Record<string, ExperienceSlotSummary>>(initialSlotSummaryMap);
 
   const [inquiryText, setInquiryText] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -89,8 +94,29 @@ export default function ExperienceClient({
   const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : t('exp_card_new');
   const reviewCount = Number(experience.review_count || 0);
 
+  const refreshAvailability = useCallback(async () => {
+    if (!experienceId) return;
+
+    try {
+      const response = await fetch(`/api/experiences/${experienceId}/availability-summary`, {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to refresh availability: ${response.status}`);
+      }
+
+      const summary = (await response.json()) as ExperienceAvailabilitySummary;
+      setAvailableDates(Array.isArray(summary.availableDates) ? summary.availableDates : []);
+      setDateToTimeMap(summary.dateToTimeMap || {});
+      setSlotSummaryMap(summary.slotSummaryMap || {});
+    } catch (error) {
+      console.error('Experience availability refresh error:', error);
+    }
+  }, [experienceId]);
+
   // 🟢 체험 상세페이지 진입 시 조회(view) 이벤트 기록
-  React.useEffect(() => {
+  useEffect(() => {
     if (experience?.id) {
       supabase.from('analytics_events').insert([{
         event_type: 'view',
@@ -102,6 +128,19 @@ export default function ExperienceClient({
       });
     }
   }, [experience?.id, user?.id]);
+
+  useEffect(() => {
+    void refreshAvailability();
+  }, [refreshAvailability]);
+
+  useEffect(() => {
+    const handlePageShow = () => {
+      void refreshAvailability();
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [refreshAvailability]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -393,7 +432,7 @@ export default function ExperienceClient({
             experience={experience}
             availableDates={availableDates}
             dateToTimeMap={dateToTimeMap}
-            remainingSeatsMap={remainingSeatsMap}
+            slotSummaryMap={slotSummaryMap}
             handleReserve={handleReserve}
           />
         </div>

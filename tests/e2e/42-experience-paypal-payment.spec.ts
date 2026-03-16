@@ -3,6 +3,8 @@ import { readFileSync } from 'fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
+import { selectReservationDate, selectReservationTime } from './helpers/experienceBooking';
+
 type EnvMap = Record<string, string>;
 type TestUser = {
   email: string;
@@ -232,14 +234,15 @@ async function prepareBookableExperience(): Promise<BookableExperience> {
 }
 
 async function login(page: Page, user: TestUser) {
-  await page.goto('/login', { waitUntil: 'networkidle' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
 
+  await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
   await page.locator('input[type="email"]').fill(user.email);
   await page.locator('input[type="password"]').fill(user.password);
   await page.locator('button[type="submit"]').click();
 
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
-  await page.waitForLoadState('networkidle');
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
+  await page.waitForLoadState('domcontentloaded');
 }
 
 test.afterAll(async () => {
@@ -398,5 +401,10 @@ test.describe.serial('Experience PayPal payment smoke', () => {
     await expect(page.getByRole('heading', { name: /예약이 확정되었습니다!|Payment Complete!/ })).toBeVisible();
     await expect(page.getByText(observedBookingId)).toBeVisible();
     await expect(page.getByText(experience.title)).toBeVisible();
+
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'domcontentloaded' });
+    await selectReservationDate(page, experience.date);
+    await selectReservationTime(page, experience.time);
+    await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
   });
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
@@ -172,6 +173,8 @@ export async function POST(request: Request) {
     }).catch((adminAlertError) => {
       console.error('[PAYPAL] booking admin alert failed:', adminAlertError);
     });
+
+    revalidatePath(`/experiences/${originalBooking.experience_id}`);
 
     return NextResponse.json({
       success: true,

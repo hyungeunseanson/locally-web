@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { createClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import ExperienceClient from './ExperienceClient';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { notFound } from 'next/navigation';
@@ -8,13 +9,15 @@ import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { getContent } from '@/app/utils/contentHelper';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { ExperienceDetail, HostProfileDetail } from './types';
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
 import { buildExperienceProductJsonLd } from '@/app/utils/structuredData';
+import { fetchExperienceAvailabilitySummary } from '@/app/utils/experienceAvailability';
 
 type Props = {
   params: Promise<{ id: string }>;
 }
+
+export const dynamic = 'force-dynamic';
 
 // 🟢 메타데이터 생성 (SEO & 다국어)
 export async function generateMetadata(
@@ -89,14 +92,8 @@ export default async function Page({ params }: Props) {
   const supabase = await createClient();
 
   // 1. 병렬 데이터 페칭 (속도 최적화)
-  const [expResult, datesResult, bookingsResult, userResult] = await Promise.all([
+  const [expResult, userResult] = await Promise.all([
     supabase.from('experiences').select('*').eq('id', id).maybeSingle(),
-    supabase.from('experience_availability').select('date, start_time').eq('experience_id', id).eq('is_booked', false),
-    supabase
-      .from('bookings')
-      .select('date, time, guests')
-      .eq('experience_id', id)
-      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]),
     supabase.auth.getUser()
   ]);
 
@@ -142,40 +139,12 @@ export default async function Page({ params }: Props) {
     };
   }
 
-  // 3. 예약 가능 날짜 및 잔여석 계산 로직
-  const availableDates: string[] = [];
-  const dateToTimeMap: Record<string, string[]> = {};
-  const remainingSeatsMap: Record<string, number> = {};
-  const maxGuests = Number(experience.max_guests || 10);
-
-  if (datesResult.data) {
-    const availabilityRows = datesResult.data as Array<{ date: string; start_time: string }>;
-    const bookingRows = (bookingsResult.data || []) as Array<{ date: string; time: string; guests: number | null }>;
-
-    availabilityRows.forEach((d) => {
-      const availTime = String(d.start_time).substring(0, 5);
-
-      const currentBooked = bookingRows
-        .filter((b) => {
-          const bookingTime = String(b.time).substring(0, 5);
-          return b.date === d.date && bookingTime === availTime;
-        })
-        .reduce((sum: number, b) => sum + Number(b.guests || 0), 0);
-
-      const remaining = maxGuests - currentBooked;
-      const key = `${d.date}_${availTime}`;
-
-      if (remaining > 0) {
-        if (!dateToTimeMap[d.date]) dateToTimeMap[d.date] = [];
-        if (!dateToTimeMap[d.date].includes(availTime)) {
-          dateToTimeMap[d.date].push(availTime);
-        }
-        remainingSeatsMap[key] = remaining;
-      }
-    });
-
-    Object.keys(dateToTimeMap).sort().forEach(date => availableDates.push(date));
-  }
+  // 3. 예약 가능 날짜 및 슬롯 요약 계산
+  const availabilitySummary = await fetchExperienceAvailabilitySummary(
+    createAdminClient(),
+    id,
+    Number(experience.max_guests || 10)
+  );
 
   // 4. Client Component로 데이터 전달
   const isPublicExperience = experience.status === 'active' && experience.is_active !== false;
@@ -202,9 +171,9 @@ export default async function Page({ params }: Props) {
         initialUser={userResult.data.user}
         initialExperience={experience}
         initialHostProfile={hostProfile}
-        initialAvailableDates={availableDates}
-        initialDateToTimeMap={dateToTimeMap}
-        initialRemainingSeatsMap={remainingSeatsMap}
+        initialAvailableDates={availabilitySummary.availableDates}
+        initialDateToTimeMap={availabilitySummary.dateToTimeMap}
+        initialSlotSummaryMap={availabilitySummary.slotSummaryMap}
       />
     </>
   );

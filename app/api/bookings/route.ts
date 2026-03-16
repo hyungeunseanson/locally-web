@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
 type BookingRequestBody = {
     experienceId?: string | number;
@@ -39,11 +40,12 @@ export async function POST(request: Request) {
         } = body;
         const guestCount = Number(guests);
         const normalizedExperienceId = experienceId != null ? String(experienceId) : '';
+        const normalizedTime = typeof time === 'string' ? time.slice(0, 5) : '';
         const normalizedIsPrivate = Boolean(isPrivate);
         const normalizedIsSoloGuarantee = Boolean(isSoloGuarantee);
 
         // 파라미터 유효성 검사
-        if (!normalizedExperienceId || !date || !time || !customerName || !customerPhone || !Number.isFinite(guestCount) || guestCount < 1) {
+        if (!normalizedExperienceId || !date || !normalizedTime || !customerName || !customerPhone || !Number.isFinite(guestCount) || guestCount < 1) {
             return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -56,13 +58,42 @@ export async function POST(request: Request) {
         const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
         const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+        if (normalizedIsSoloGuarantee) {
+            const { data: confirmedBookings, error: confirmedBookingError } = await supabaseAdmin
+                .from('bookings')
+                .select('id, guests, type')
+                .eq('experience_id', normalizedExperienceId)
+                .eq('date', date)
+                .eq('time', normalizedTime)
+                .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
+
+            if (confirmedBookingError) {
+                throw new Error(confirmedBookingError.message);
+            }
+
+            const confirmedGuestCount =
+                (confirmedBookings || []).reduce((sum, booking) => sum + Number(booking.guests || 0), 0);
+            const hasConfirmedPrivateBooking =
+                (confirmedBookings || []).some((booking) => booking.type === 'private');
+
+            if (confirmedGuestCount > 0 || hasConfirmedPrivateBooking) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: '이미 확정된 예약이 있는 일정에는 1인 출발 확정 옵션을 사용할 수 없습니다.',
+                    },
+                    { status: 400 }
+                );
+            }
+        }
+
         // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 검증 + 삽입)
         const { data: bookingData, error: bookingError } = await supabaseAdmin
             .rpc('create_booking_atomic', {
                 p_user_id: user.id,
                 p_experience_id: normalizedExperienceId,
                 p_date: date,
-                p_time: time,
+                p_time: normalizedTime,
                 p_guests: guestCount,
                 p_is_private: normalizedIsPrivate,
                 p_customer_name: customerName,
@@ -81,6 +112,12 @@ export async function POST(request: Request) {
                 return NextResponse.json({ success: false, error: '체험 정보를 찾을 수 없습니다.' }, { status: 404 });
             }
             if (errorMessage.includes('BOOKING_BAD_REQUEST')) {
+                if (errorMessage.includes('Solo guarantee is unavailable when confirmed bookings already exist')) {
+                    return NextResponse.json(
+                        { success: false, error: '이미 확정된 예약이 있는 일정에는 1인 출발 확정 옵션을 사용할 수 없습니다.' },
+                        { status: 400 }
+                    );
+                }
                 return NextResponse.json({ success: false, error: '필수 입력값이 올바르지 않습니다.' }, { status: 400 });
             }
             if (errorMessage.includes('profiles') && bookingError?.code === '23503') {

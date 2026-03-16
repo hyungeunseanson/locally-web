@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -181,6 +182,8 @@ export async function POST(request: Request) {
     } catch (notiError) {
       console.error('Notification Failed (Ignored):', notiError);
     }
+
+    revalidatePath(`/experiences/${booking.experience_id}`);
 
     return NextResponse.json({ success: true });
 

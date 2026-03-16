@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+import { ExperienceSlotSummary } from '../types';
 
 interface ReservationCardProps {
   price: number;
@@ -12,34 +13,35 @@ interface ReservationCardProps {
   duration: number;
   availableDates: string[];
   dateToTimeMap: Record<string, string[]>;
-  maxGuests?: number; // 🟢 추가됨
-  remainingSeatsMap?: Record<string, number>; // 🟢 추가됨
+  maxGuests?: number;
+  slotSummaryMap?: Record<string, ExperienceSlotSummary>;
   onReserve: (date: string, time: string, guests: number, isPrivate: boolean, isSoloGuaranteed: boolean) => void;
 }
 
-export default function ReservationCard({ 
-  price, privatePrice = 0, isPrivateEnabled = false, 
-  duration, availableDates, dateToTimeMap, onReserve, 
-  maxGuests = 10, remainingSeatsMap = {} 
+export default function ReservationCard({
+  price, privatePrice = 0, isPrivateEnabled = false,
+  duration, availableDates, dateToTimeMap, onReserve,
+  maxGuests = 10, slotSummaryMap = {}
 }: ReservationCardProps) {
   const { t } = useLanguage();
-  
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
-  const [guestSelection, setGuestSelection] = useState<string>("1"); 
+  const [guestSelection, setGuestSelection] = useState<string>("1");
   const [isSoloGuaranteed, setIsSoloGuaranteed] = useState(false);
 
-  // 🟢 [핵심] 잔여석 계산 로직 (시간 문자열 HH:MM 포맷 주의)
-  const cleanTime = selectedTime.substring(0, 5); 
+  const cleanTime = selectedTime.substring(0, 5);
   const currentKey = `${selectedDate}_${cleanTime}`;
-  
-  // 선택된 시간의 잔여석 (없으면 최대 정원)
-  const remainingSeats = (selectedDate && selectedTime) 
-    ? (remainingSeatsMap[currentKey] ?? maxGuests) 
+
+  const currentSlotSummary = (selectedDate && selectedTime)
+    ? slotSummaryMap[currentKey]
+    : undefined;
+
+  const remainingSeats = (selectedDate && selectedTime)
+    ? (currentSlotSummary?.remainingSeats ?? maxGuests)
     : maxGuests;
 
-  // 인원 선택 최대값 제한 (잔여석 vs 최대정원 중 작은 값)
   const maxSelectable = Math.max(1, Math.min(remainingSeats, maxGuests));
 
   // 날짜 계산 헬퍼
@@ -73,7 +75,8 @@ export default function ReservationCard({
       const isAvailable = availableDates.includes(dateStr);
       const isSelected = selectedDate === dateStr;
       days.push(
-        <button key={d} disabled={!isAvailable} 
+        <button key={d} disabled={!isAvailable}
+          data-testid={`reservation-day-${dateStr}`}
           onClick={() => { setSelectedDate(dateStr); setSelectedTime(""); }}
           className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium transition-all ${isSelected ? 'bg-black text-white' : ''} ${!isSelected && isAvailable ? 'hover:bg-slate-100 hover:border-black border border-transparent' : ''} ${!isSelected && !isAvailable ? 'text-slate-300 decoration-slate-300 line-through' : ''}`}>
           {d}
@@ -83,13 +86,48 @@ export default function ReservationCard({
     return days;
   };
 
-  // 가격 계산
   const isPrivate = guestSelection === 'private';
   const guestCount = isPrivate ? 1 : Number(guestSelection);
-  const isSoloEligible = !isPrivate && guestCount === 1;
+  const isSoloEligible =
+    !isPrivate &&
+    guestCount === 1 &&
+    Boolean(currentSlotSummary?.soloGuaranteeEligible);
   const basePrice = isPrivate ? privatePrice : (price * guestCount);
   const optionPrice = (isSoloEligible && isSoloGuaranteed) ? SOLO_GUARANTEE_PRICE : 0;
   const totalPrice = basePrice + optionPrice;
+
+  useEffect(() => {
+    if (selectedDate && !availableDates.includes(selectedDate)) {
+      setSelectedDate('');
+      setSelectedTime('');
+      setIsSoloGuaranteed(false);
+    }
+  }, [availableDates, selectedDate]);
+
+  useEffect(() => {
+    if (!selectedDate || !selectedTime) return;
+
+    const availableTimes = dateToTimeMap[selectedDate] || [];
+    if (!availableTimes.includes(selectedTime)) {
+      setSelectedTime('');
+      setIsSoloGuaranteed(false);
+    }
+  }, [dateToTimeMap, selectedDate, selectedTime]);
+
+  useEffect(() => {
+    if (!isPrivate) {
+      const selectedGuestCount = Number(guestSelection);
+      if (Number.isFinite(selectedGuestCount) && selectedGuestCount > maxSelectable) {
+        setGuestSelection(String(maxSelectable));
+      }
+    }
+  }, [guestSelection, isPrivate, maxSelectable]);
+
+  useEffect(() => {
+    if (isSoloGuaranteed && !isSoloEligible) {
+      setIsSoloGuaranteed(false);
+    }
+  }, [isSoloEligible, isSoloGuaranteed]);
 
   return (
     <div className="sticky top-28 border border-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)] rounded-2xl p-5 md:p-6 bg-white">
@@ -104,9 +142,19 @@ export default function ReservationCard({
         {/* 달력 헤더 */}
         <div className="p-3.5 md:p-4 border-b border-slate-200 bg-white">
           <div className="flex justify-between items-center mb-3">
-            <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}><ChevronLeft size={16}/></button>
+            <button
+              data-testid="reservation-prev-month"
+              onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()-1)))}
+            >
+              <ChevronLeft size={16}/>
+            </button>
             <span className="font-semibold text-xs md:text-sm">{t('exp_reservation_calendar_header', { year: currentDate.getFullYear(), month: t(`month_${currentDate.getMonth() + 1}`) })}</span>
-            <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}><ChevronRight size={16}/></button>
+            <button
+              data-testid="reservation-next-month"
+              onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth()+1)))}
+            >
+              <ChevronRight size={16}/>
+            </button>
           </div>
           <div className="grid grid-cols-7 text-center mb-2">
             {[0, 1, 2, 3, 4, 5, 6].map((day) => <span key={day} className="text-[10px] md:text-[10px] text-slate-400 font-semibold">{t(`day_${day}`)}</span>)}
@@ -116,7 +164,6 @@ export default function ReservationCard({
           </div>
         </div>
 
-        {/* 🟢 인원 선택 (잔여석 반영 로직 적용됨) */}
         <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
           <div className="flex flex-col w-full">
             <div className="flex justify-between items-center mb-1">
@@ -128,7 +175,8 @@ export default function ReservationCard({
               )}
             </div>
             
-            <select 
+            <select
+              data-testid="reservation-guest-select"
               value={guestSelection} 
               onChange={(e) => {
                 const nextSelection = e.target.value;
@@ -140,7 +188,6 @@ export default function ReservationCard({
               className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
             >
               <optgroup label={t('exp_reservation_regular_booking')}>
-                {/* 🟢 남은 자리까지만 선택 가능하게 제한 (최대 6명 UI 제한 유지) */}
                 {Array.from({ length: Math.min(maxSelectable, 6) }, (_, i) => i + 1).map(n => (
                   <option key={n} value={String(n)}>{t('exp_reservation_guest_option', { count: n })}</option>
                 ))}
@@ -161,16 +208,16 @@ export default function ReservationCard({
           <p className="text-[11px] md:text-xs font-semibold text-slate-500 mb-2">{t('exp_reservation_time_select', { date: formatDateDisplay(selectedDate) })}</p>
           <div className="grid grid-cols-2 gap-2">
             {dateToTimeMap[selectedDate]?.map(time => {
-              // 🟢 시간대별 잔여석 확인 및 매진 처리
               const tClean = time.substring(0, 5);
               const tKey = `${selectedDate}_${tClean}`;
-              const tSeats = remainingSeatsMap[tKey] ?? maxGuests;
-              
+              const tSeats = slotSummaryMap[tKey]?.remainingSeats ?? maxGuests;
+
               return (
-                <button 
+                <button
                   key={time} 
+                  data-testid={`reservation-time-${tClean}`}
                   onClick={() => setSelectedTime(tClean)}
-                  disabled={tSeats <= 0} // 🟢 매진 시 클릭 불가
+                  disabled={tSeats <= 0}
                   className={`py-2 px-3 rounded-lg text-[11px] md:text-xs font-semibold border transition-all flex flex-col items-center 
                     ${selectedTime === tClean ? 'bg-black text-white border-black' : 
                       tSeats <= 0 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed line-through' :
@@ -179,7 +226,6 @@ export default function ReservationCard({
                   <span>{time}</span>
                   <span className={`text-[10px] md:text-[10px] font-normal ${selectedTime === tClean ? 'text-slate-300' : 'text-slate-400'}`}>
                     {tSeats <= 0 ? t('exp_reservation_sold_out') : t('exp_reservation_end_time_prefix', { time: calculateEndTime(time) })}
-                    {/* 🟢 5석 이하 시 강조 */}
                     {tSeats > 0 && tSeats <= 5 && <span className="ml-1 text-rose-500">{t('exp_reservation_remaining_short', { count: tSeats })}</span>}
                   </span>
                 </button>
@@ -194,7 +240,11 @@ export default function ReservationCard({
 
       {/* 1인 옵션 */}
       {isSoloEligible && (
-        <div className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-all ${isSoloGuaranteed ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`} onClick={() => setIsSoloGuaranteed(!isSoloGuaranteed)}>
+        <div
+          data-testid="reservation-solo-option"
+          className={`p-4 mb-4 rounded-xl border-2 cursor-pointer transition-all ${isSoloGuaranteed ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}
+          onClick={() => setIsSoloGuaranteed(!isSoloGuaranteed)}
+        >
           <div className="flex items-start gap-3">
             <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${isSoloGuaranteed ? 'bg-black border-black' : 'border-slate-300 bg-white'}`}>
               {isSoloGuaranteed && <Check size={12} className="text-white" strokeWidth={4}/>}
@@ -208,7 +258,11 @@ export default function ReservationCard({
         </div>
       )}
 
-      <button onClick={() => onReserve(selectedDate, selectedTime, guestCount, isPrivate, isSoloEligible && isSoloGuaranteed)} className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4">
+      <button
+        data-testid="reservation-submit"
+        onClick={() => onReserve(selectedDate, selectedTime, guestCount, isPrivate, isSoloEligible && isSoloGuaranteed)}
+        className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-[14px] md:text-base font-semibold py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.01] transition-all mb-4"
+      >
         {isPrivate ? t('exp_reservation_book_private') : t('exp_reservation_book_shared')}
       </button>
       
