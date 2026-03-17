@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useNotification } from '@/app/context/NotificationContext';
 import {
@@ -103,6 +103,14 @@ export default function NotificationsPage() {
     return <Info size={18} className="text-slate-500" />;
   };
 
+  const getAccentBorder = (type: string) => {
+    if (type.includes('booking') || type === 'new_booking') return 'border-l-blue-400';
+    if (type.includes('message') || type === 'new_message') return 'border-l-indigo-400';
+    if (type.includes('cancel') || type === 'cancellation') return 'border-l-orange-400';
+    if (type.startsWith('service_')) return 'border-l-emerald-400';
+    return 'border-l-slate-300';
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <SiteHeader />
@@ -169,13 +177,14 @@ export default function NotificationsPage() {
               </p>
             </div>
           ) : (
-            filteredList.map((noti) => (
+            filteredList.map((noti, idx) => (
               <div
                 key={noti.id}
-                className={`relative group rounded-xl px-4 md:px-5 py-3 md:py-3.5 border transition-all cursor-pointer ${!noti.is_read
-                    ? 'bg-blue-50/40 border-blue-100'
+                className={`relative group rounded-xl px-4 md:px-5 py-3 md:py-3.5 border transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300 [animation-fill-mode:both] ${!noti.is_read
+                    ? `bg-blue-50/40 border-blue-100 border-l-4 ${getAccentBorder(noti.type)}`
                     : 'bg-white border-slate-100 hover:border-slate-200'
                   }`}
+                style={{ animationDelay: `${Math.min(idx * 40, 400)}ms` }}
                 onClick={() => handleNotificationClick(noti)}
               >
                 <div className="flex gap-3 items-start">
@@ -188,7 +197,12 @@ export default function NotificationsPage() {
                     <div className="flex justify-between items-start">
                       <h3 className={`font-semibold text-[12px] md:text-[14px] mb-0.5 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
                         {noti.title}
-                        {!noti.is_read && <span className="ml-1.5 w-1.5 h-1.5 inline-block bg-rose-500 rounded-full align-middle"></span>}
+                        {!noti.is_read && (
+                          <span className="relative inline-flex ml-1.5 align-middle">
+                            <span className="absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75 animate-ping" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+                          </span>
+                        )}
                       </h3>
                       <span className="text-[10px] md:text-[11px] text-slate-400 shrink-0 ml-2">
                         {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')}
