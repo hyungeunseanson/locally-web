@@ -37,7 +37,7 @@ export default function MobileSplash({ onDone }: { onDone: () => void }) {
       <img
         src="/images/logo-black-transparent.png"
         alt="Locally"
-        className="w-[144px] h-[144px] md:w-[432px] md:h-[432px] object-contain"
+        className="w-[144px] h-[144px] md:w-[216px] md:h-[216px] object-contain"
       />
     </div>,
     document.body
