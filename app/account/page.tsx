@@ -165,9 +165,10 @@ export default function AccountPage() {
   } as const;
 
   useEffect(() => {
-    const t = setTimeout(() => setHostBtnReady(true), 500);
+    if (loading) return;
+    const t = setTimeout(() => setHostBtnReady(true), 300);
     return () => clearTimeout(t);
-  }, []);
+  }, [loading]);
 
   useEffect(() => {
     const getProfile = async () => {

@@ -50,9 +50,10 @@ export default function MobileHostMenu() {
     );
 
     useEffect(() => {
-        const t = setTimeout(() => setGuestBtnReady(true), 500);
+        if (loading) return;
+        const t = setTimeout(() => setGuestBtnReady(true), 300);
         return () => clearTimeout(t);
-    }, []);
+    }, [loading]);
 
     useEffect(() => {
         const fetchData = async () => {
