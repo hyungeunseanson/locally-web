@@ -16,12 +16,12 @@ export default function MobileSplash({ onDone }: { onDone: () => void }) {
 
   return (
     <div
-      className={`md:hidden fixed inset-0 z-[9999] bg-[#F3F3F3] flex flex-col items-center justify-center transition-opacity duration-350 ${fading ? 'opacity-0' : 'opacity-100'}`}
+      className={`md:hidden fixed inset-0 z-[9999] bg-[#F8F8F8] flex flex-col items-center justify-center transition-opacity duration-350 ${fading ? 'opacity-0' : 'opacity-100'}`}
     >
       <img
-        src="/images/logo.png"
+        src="/images/logo-black-transparent.png"
         alt="Locally"
-        className="w-[144px] h-[144px] object-contain mix-blend-multiply grayscale contrast-200"
+        className="w-[144px] h-[144px] object-contain"
       />
     </div>
   );
