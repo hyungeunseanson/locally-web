@@ -10,6 +10,7 @@ import { LOCALLY_SERVICES } from '@/app/constants';
 import { useExperienceFilter } from '@/app/hooks/useExperienceFilter';
 import { HomeExperienceCardSkeleton } from '@/app/components/skeletons/HomeExperienceCardSkeleton';
 import { useLanguage } from '@/app/context/LanguageContext';
+import MobileSplash from '@/app/components/mobile/MobileSplash';
 
 type HomeExperience = HomeExperienceCardData & {
   created_at?: string | null;
@@ -18,6 +19,7 @@ type HomeExperience = HomeExperienceCardData & {
 
 export default function HomePageClient() {
   const { t } = useLanguage();
+  const [splashDone, setSplashDone] = useState(false);
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | 'language' | null>(null);
   const [scrollY, setScrollY] = useState(0);
@@ -44,6 +46,7 @@ export default function HomePageClient() {
 
   return (
     <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
+      {!splashDone && <MobileSplash onDone={() => setSplashDone(true)} />}
       {/* 데스크탑 전용: 검색 필드 포커스 시 배경 딤 처리 */}
       {activeSearchField && (
         <div
