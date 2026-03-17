@@ -46,8 +46,9 @@ export default function HomePageClient() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
+    <>
       {!splashDone && <MobileSplash onDone={handleSplashDone} />}
+    <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
       {/* 데스크탑 전용: 검색 필드 포커스 시 배경 딤 처리 */}
       {activeSearchField && (
         <div
@@ -242,5 +243,6 @@ export default function HomePageClient() {
         )}
       </main>
     </div>
+    </>
   );
 }

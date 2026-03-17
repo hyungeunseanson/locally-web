@@ -18,7 +18,7 @@ export default function MobileSplash({ onDone }: { onDone: () => void }) {
 
   return (
     <div
-      className={`md:hidden transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
+      className={`transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
       style={{
         position: 'fixed',
         inset: 0,
@@ -32,7 +32,7 @@ export default function MobileSplash({ onDone }: { onDone: () => void }) {
       <img
         src="/images/logo-black-transparent.png"
         alt="Locally"
-        className="w-[144px] h-[144px] object-contain"
+        className="w-[144px] h-[144px] md:w-[432px] md:h-[432px] object-contain"
       />
     </div>
   );
