@@ -21,8 +21,7 @@ export default function MobileSplash({ onDone }: { onDone: () => void }) {
       <img
         src="/images/logo.png"
         alt="Locally"
-        className="w-[72px] h-[72px] object-contain mix-blend-multiply grayscale contrast-200"
-        style={{ filter: 'grayscale(1) contrast(1.8) opacity(0.18)' }}
+        className="w-[144px] h-[144px] object-contain mix-blend-multiply grayscale contrast-200"
       />
     </div>
   );
