@@ -442,7 +442,10 @@ export default function AccountPage() {
                 : <Bell className="w-4 h-4 text-gray-600" />
               }
               {unreadCount > 0 && pendingHref !== '/notifications' && (
-                <span data-testid="guest-account-unread-dot" className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                <span data-testid="guest-account-unread-dot" className="absolute right-0.5 top-0.5">
+                  <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                </span>
               )}
             </button>
           </div>

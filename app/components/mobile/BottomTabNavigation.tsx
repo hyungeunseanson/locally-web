@@ -93,7 +93,10 @@ export default function BottomTabNavigation() {
                                 <img src={avatarUrl} alt="profile" className="w-full h-full object-cover" />
                             </div>
                             {unreadCount > 0 && (
-                                <span data-testid="guest-mobile-profile-unread-dot" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                                <span data-testid="guest-mobile-profile-unread-dot" className="absolute -right-1 -top-1">
+                                <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 opacity-75 animate-ping" />
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                            </span>
                             )}
                         </div>
                     );
@@ -102,7 +105,10 @@ export default function BottomTabNavigation() {
                     <div className="relative">
                         <User size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
                         {unreadCount > 0 && (
-                            <span data-testid="guest-mobile-profile-unread-dot" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                            <span data-testid="guest-mobile-profile-unread-dot" className="absolute -right-1 -top-1">
+                                <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 opacity-75 animate-ping" />
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                            </span>
                         )}
                     </div>
                 );
@@ -144,7 +150,10 @@ export default function BottomTabNavigation() {
                 <div className="relative">
                     <AlignJustify size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
                     {unreadCount > 0 && (
-                        <span data-testid="host-mobile-menu-unread-dot" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                        <span data-testid="host-mobile-menu-unread-dot" className="absolute -right-1 -top-1">
+                            <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 opacity-75 animate-ping" />
+                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                        </span>
                     )}
                 </div>
             )

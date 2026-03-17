@@ -197,12 +197,7 @@ export default function NotificationsPage() {
                     <div className="flex justify-between items-start">
                       <h3 className={`font-semibold text-[12px] md:text-[14px] mb-0.5 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
                         {noti.title}
-                        {!noti.is_read && (
-                          <span className="relative inline-flex ml-1.5 align-middle">
-                            <span className="absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75 animate-ping" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
-                          </span>
-                        )}
+                        {!noti.is_read && <span className="ml-1.5 w-1.5 h-1.5 inline-block bg-rose-500 rounded-full align-middle"></span>}
                       </h3>
                       <span className="text-[10px] md:text-[11px] text-slate-400 shrink-0 ml-2">
                         {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')}
