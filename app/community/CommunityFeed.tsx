@@ -83,7 +83,7 @@ function EmptyState({
             {showWriteButton && (
                 <Link
                     href={writeHref}
-                    className="px-6 py-2.5 bg-[#FF385C] text-white text-[14px] font-bold rounded-full hover:bg-[#E31C5F] active:scale-95 transition-all"
+                    className="px-6 py-2.5 bg-[#111111] text-white text-[14px] font-bold rounded-full hover:bg-black active:scale-95 transition-all shadow-[0_10px_22px_rgba(15,23,42,0.14)]"
                 >
                     글 작성하기
                 </Link>

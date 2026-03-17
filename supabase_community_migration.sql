@@ -35,8 +35,9 @@ CREATE TABLE IF NOT EXISTS public.community_comments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id uuid REFERENCES public.community_posts(id) ON DELETE CASCADE NOT NULL,
   user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  parent_id uuid REFERENCES public.community_comments(id) ON DELETE CASCADE,
   content text NOT NULL,
-  is_selected boolean DEFAULT false, -- Q&A 채택 답변 여부
+  like_count integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -50,6 +51,15 @@ CREATE TABLE IF NOT EXISTS public.community_likes (
   UNIQUE(post_id, user_id) -- 한 사람이 여러 번 좋아요 누르는 것 방지
 );
 
+--- 3-1. 댓글 좋아요 테이블 (community_comment_likes) ---
+CREATE TABLE IF NOT EXISTS public.community_comment_likes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  comment_id uuid REFERENCES public.community_comments(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(comment_id, user_id)
+);
+
 
 --- 4. 검색 폭주 방지를 위한 빠른 인덱스 생성 (서버 부하 감소 핵심) ---
 CREATE INDEX IF NOT EXISTS idx_community_posts_category ON public.community_posts (category);
@@ -57,13 +67,16 @@ CREATE INDEX IF NOT EXISTS idx_community_posts_destination_hub ON public.communi
 CREATE INDEX IF NOT EXISTS idx_community_posts_post_format ON public.community_posts (post_format);
 CREATE INDEX IF NOT EXISTS idx_community_posts_created_at ON public.community_posts (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_community_comments_post_id ON public.community_comments (post_id);
+CREATE INDEX IF NOT EXISTS idx_community_comments_parent_id ON public.community_comments (parent_id);
 CREATE INDEX IF NOT EXISTS idx_community_likes_post_id ON public.community_likes (post_id);
+CREATE INDEX IF NOT EXISTS idx_community_comment_likes_comment_id ON public.community_comment_likes (comment_id);
 
 
 --- 5. 보안 정책 (Row Level Security - RLS) ---
 ALTER TABLE public.community_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.community_comment_likes ENABLE ROW LEVEL SECURITY;
 
 -- Posts: 누구나(익명 포함) 읽기 가능, 로그인 유저 작성 가능, 작성자 본인만 수정/삭제
 CREATE POLICY "Anyone can view community posts" ON public.community_posts FOR SELECT USING (true);
@@ -81,6 +94,11 @@ CREATE POLICY "Users can delete their own comments" ON public.community_comments
 CREATE POLICY "Anyone can view likes" ON public.community_likes FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can like posts" ON public.community_likes FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can unlike posts" ON public.community_likes FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+-- Comment Likes: 누구나 읽기 가능, 로그인 유저 작성(토글) 및 본인 것 삭제 가능
+CREATE POLICY "Anyone can view comment likes" ON public.community_comment_likes FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can like comments" ON public.community_comment_likes FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can unlike comments" ON public.community_comment_likes FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 
 --- 6. (부록) 카운트 자동 동기화용 트리거 (선택사항, 프론트에서 관리해도 되나 DB 일관성을 위해 추천) ---
@@ -131,3 +149,27 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER on_like_removed
   AFTER DELETE ON public.community_likes
   FOR EACH ROW EXECUTE FUNCTION decrement_like_count();
+
+-- 댓글 좋아요 추가 시 count +1
+CREATE OR REPLACE FUNCTION increment_comment_like_count() RETURNS trigger AS $$
+BEGIN
+  UPDATE public.community_comments SET like_count = like_count + 1 WHERE id = NEW.comment_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_comment_like_added
+  AFTER INSERT ON public.community_comment_likes
+  FOR EACH ROW EXECUTE FUNCTION increment_comment_like_count();
+
+-- 댓글 좋아요 취소 시 count -1
+CREATE OR REPLACE FUNCTION decrement_comment_like_count() RETURNS trigger AS $$
+BEGIN
+  UPDATE public.community_comments SET like_count = like_count - 1 WHERE id = OLD.comment_id;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_comment_like_removed
+  AFTER DELETE ON public.community_comment_likes
+  FOR EACH ROW EXECUTE FUNCTION decrement_comment_like_count();

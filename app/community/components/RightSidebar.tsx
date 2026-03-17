@@ -89,7 +89,7 @@ export default function RightSidebar({
                 <Link
                     href={`/community/write?${writeParams.toString()}`}
                     role="button"
-                    className="w-full rounded-xl font-bold py-3.5 bg-gradient-to-r from-[#FF385C] to-[#E31C5F] text-white shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 text-[15px]"
+                    className="w-full rounded-xl bg-[#111111] py-3.5 text-[15px] font-bold text-white shadow-[0_14px_28px_rgba(15,23,42,0.14)] transition-all duration-200 hover:bg-black active:scale-95 flex items-center justify-center gap-2"
                 >
                     <Edit3 size={17} strokeWidth={2.5} />
                     커뮤니티 글쓰기

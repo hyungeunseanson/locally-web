@@ -1,6 +1,7 @@
+'use client';
+
 import React from 'react';
-import Link from 'next/link';
-import { MessageSquare, Heart, Eye } from 'lucide-react';
+import { MessageSquare, Heart, Eye, Loader2 } from 'lucide-react';
 import type { CommunityFeedPost } from '../feedSelect';
 import { getCommunityCategoryMeta } from '../categoryMeta';
 import { getCommunityAuthorName } from '../authorDisplay';
@@ -8,6 +9,7 @@ import CommunityAuthorTrigger from './CommunityAuthorTrigger';
 import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
 import { buildCommunityDetailHref } from '../queryParams';
 import { getCommunityHubMeta } from '../hubMeta';
+import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 interface PostListCardProps {
     post: CommunityFeedPost;
@@ -35,6 +37,7 @@ export default function PostListCard({ post, hub, format, query, sort }: PostLis
     const thumbnail = post.images?.[0] ?? null;
     const hasCompanionDate = post.category === 'companion' && post.companion_date;
     const authorName = getCommunityAuthorName(post.profiles, post.is_anonymous);
+    const { navigate, pendingHref } = usePendingNavigation();
     const href = buildCommunityDetailHref(post.id, {
         hub,
         format,
@@ -42,14 +45,27 @@ export default function PostListCard({ post, hub, format, query, sort }: PostLis
         q: query,
         sort,
     });
+    const isNavigating = pendingHref === href;
 
     return (
-        <article className="group relative border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150">
-            <Link
-                href={href}
+        <article className={`group relative border-b border-gray-100 last:border-0 transition-all duration-150 ${
+            isNavigating ? 'bg-slate-50' : 'hover:bg-gray-50'
+        }`}>
+            <button
+                type="button"
+                onClick={() => navigate(href)}
+                disabled={isNavigating}
                 aria-label={`${post.title} 상세 보기`}
-                className="absolute inset-0 z-0"
+                aria-busy={isNavigating}
+                className="absolute inset-0 z-0 cursor-pointer active:scale-[0.998] disabled:pointer-events-none"
             />
+            {isNavigating && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm">
+                        <Loader2 size={16} className="animate-spin" />
+                    </span>
+                </div>
+            )}
 
             <div className="relative z-10 flex items-start gap-3 px-5 py-4 pointer-events-none">
                 {thumbnail && (

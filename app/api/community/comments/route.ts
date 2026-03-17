@@ -1,5 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+import type { CommunityComment, CommunityProfilePreview } from '@/app/types/community';
 import { createClient } from '@/app/utils/supabase/server';
+
+type CommentRow = {
+    id: string;
+    post_id: string;
+    user_id: string;
+    parent_id?: string | null;
+    content: string;
+    created_at: string;
+    updated_at: string;
+};
+
+type CommentProfileRow = CommunityProfilePreview;
+
+function isMissingParentColumnError(error: { message?: string } | null) {
+    return typeof error?.message === 'string' && error.message.includes('parent_id');
+}
+
+function isMissingCommentLikesTableError(error: { message?: string } | null) {
+    return typeof error?.message === 'string' && error.message.includes('community_comment_likes');
+}
+
+function buildNestedComments(rows: CommunityComment[]) {
+    const commentsById = new Map<string, CommunityComment>();
+    const rootComments: CommunityComment[] = [];
+
+    rows.forEach((row) => {
+        commentsById.set(row.id, {
+            ...row,
+            replies: [],
+        });
+    });
+
+    rows.forEach((row) => {
+        const current = commentsById.get(row.id);
+        if (!current) return;
+
+        if (row.parent_id && commentsById.has(row.parent_id)) {
+            commentsById.get(row.parent_id)?.replies?.push(current);
+            return;
+        }
+
+        rootComments.push(current);
+    });
+
+    return rootComments;
+}
+
+async function fetchCommentLikeMaps(supabase: Awaited<ReturnType<typeof createClient>>, commentIds: string[], viewerId: string | null) {
+    const counts = new Map<string, number>();
+    const likedIds = new Set<string>();
+
+    if (commentIds.length === 0) {
+        return { counts, likedIds };
+    }
+
+    const { data: likes, error } = await supabase
+        .from('community_comment_likes')
+        .select('comment_id, user_id')
+        .in('comment_id', commentIds);
+
+    if (error) {
+        if (!isMissingCommentLikesTableError(error)) {
+            throw error;
+        }
+        return { counts, likedIds };
+    }
+
+    (likes || []).forEach((like) => {
+        const commentId = String(like.comment_id);
+        counts.set(commentId, (counts.get(commentId) || 0) + 1);
+        if (viewerId && like.user_id === viewerId) {
+            likedIds.add(commentId);
+        }
+    });
+
+    return { counts, likedIds };
+}
 
 // GET /api/community/comments?post_id=...
 export async function GET(request: NextRequest) {
@@ -12,34 +91,53 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Missing post_id' }, { status: 400 });
         }
 
-        // ① comments 단독 조회 (join 없음 — profiles FK join이 "profiles_1.name" 오류 유발)
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
         const { data: comments, error } = await supabase
             .from('community_comments')
             .select('*')
             .eq('post_id', postId)
             .order('created_at', { ascending: true })
-            .limit(100);
+            .limit(200);
 
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-        if (!comments || comments.length === 0) return NextResponse.json({ data: [] });
+        if (!comments || comments.length === 0) return NextResponse.json({ data: [], totalCount: 0 });
 
-        // ② profiles 별도 조회
-        const userIds = [...new Set(comments.map((c: any) => c.user_id))];
+        const typedComments = comments as CommentRow[];
+        const userIds = [...new Set(typedComments.map((comment) => comment.user_id))];
         const { data: profiles } = await supabase
             .from('profiles')
             .select('id, full_name, avatar_url')
             .in('id', userIds);
 
-        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        const typedProfiles = (profiles || []) as CommentProfileRow[];
+        const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile] as const));
+        const commentIds = typedComments.map((comment) => comment.id);
+        const { counts, likedIds } = await fetchCommentLikeMaps(supabase, commentIds, user?.id ?? null);
 
-        const data = comments.map((c: any) => ({
-            ...c,
-            profiles: profileMap.get(c.user_id) ?? null,
+        const mappedComments: CommunityComment[] = typedComments.map((comment) => ({
+            id: comment.id,
+            post_id: comment.post_id,
+            user_id: comment.user_id,
+            parent_id: typeof comment.parent_id === 'string' ? comment.parent_id : null,
+            content: comment.content,
+            like_count: counts.get(comment.id) || 0,
+            is_liked: likedIds.has(comment.id),
+            created_at: comment.created_at,
+            updated_at: comment.updated_at,
+            profiles: profileMap.get(comment.user_id) ?? null,
+            replies: [],
         }));
 
-        return NextResponse.json({ data });
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({
+            data: buildNestedComments(mappedComments),
+            totalCount: mappedComments.length,
+        });
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -48,36 +146,88 @@ export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient();
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const {
+            data: { user },
+            error: authError,
+        } = await supabase.auth.getUser();
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { post_id, content } = await request.json();
+        const { post_id, content, parent_id } = await request.json();
         if (!post_id || !content?.trim()) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
 
-        // ① insert (join 없음)
-        const { data: inserted, error: insertError } = await supabase
+        let normalizedParentId: string | null = null;
+        if (typeof parent_id === 'string' && parent_id.trim()) {
+            const { data: parentComment, error: parentError } = await supabase
+                .from('community_comments')
+                .select('id, post_id, parent_id')
+                .eq('id', parent_id)
+                .maybeSingle();
+
+            if (parentError) {
+                return NextResponse.json({ error: parentError.message }, { status: 500 });
+            }
+
+            if (!parentComment || parentComment.post_id !== post_id) {
+                return NextResponse.json({ error: 'Invalid parent comment' }, { status: 400 });
+            }
+
+            normalizedParentId = parentComment.parent_id || parentComment.id;
+        }
+
+        const insertPayload: Record<string, unknown> = {
+            post_id,
+            user_id: user.id,
+            content: content.trim(),
+        };
+
+        if (normalizedParentId) {
+            insertPayload.parent_id = normalizedParentId;
+        }
+
+        let inserted: CommentRow | null = null;
+        const insertResult = await supabase
             .from('community_comments')
-            .insert({ post_id, user_id: user.id, content: content.trim() })
+            .insert(insertPayload)
             .select('*')
             .single();
 
-        if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+        if (insertResult.error) {
+            if (normalizedParentId && isMissingParentColumnError(insertResult.error)) {
+                return NextResponse.json({ error: '답글 기능을 사용하려면 최신 커뮤니티 마이그레이션이 필요합니다.' }, { status: 503 });
+            }
 
-        // ② profile 별도 조회
+            return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
+        }
+
+        inserted = insertResult.data as CommentRow;
+
         const { data: profile } = await supabase
             .from('profiles')
             .select('id, full_name, avatar_url')
             .eq('id', user.id)
             .maybeSingle();
 
-        const data = { ...inserted, profiles: profile ?? null };
+        const data: CommunityComment = {
+            id: inserted.id,
+            post_id: inserted.post_id,
+            user_id: inserted.user_id,
+            parent_id: typeof inserted.parent_id === 'string' ? inserted.parent_id : null,
+            content: inserted.content,
+            like_count: 0,
+            is_liked: false,
+            created_at: inserted.created_at,
+            updated_at: inserted.updated_at,
+            profiles: profile ?? null,
+            replies: [],
+        };
 
         return NextResponse.json({ data });
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Loader2, Search } from 'lucide-react';
 
 import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
 import { COMMUNITY_FORMAT_FILTER_OPTIONS } from '../categoryMeta';
 import { buildCommunityListHref } from '../queryParams';
+import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 type SortOption = 'latest' | 'popular';
 type OpenLayer = 'format' | 'sort' | null;
@@ -42,7 +42,7 @@ function TriggerButton({
             onClick={onClick}
             aria-haspopup="listbox"
             aria-expanded={isOpen}
-            className={`flex h-11 items-center gap-2 rounded-full px-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF385C]/25 ${
+            className={`flex h-11 items-center gap-2 rounded-full px-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 active:scale-[0.98] ${
                 tone === 'muted'
                     ? 'text-[#4B4B4B] hover:bg-[#F7F7F7]'
                     : 'text-[#222222] hover:bg-[#F7F7F7]'
@@ -66,19 +66,12 @@ export default function CommunitySearchControls({
     currentQuery,
     currentSort,
 }: CommunitySearchControlsProps) {
-    const router = useRouter();
     const rootRef = useRef<HTMLFormElement>(null);
     const [query, setQuery] = useState(currentQuery);
     const [format, setFormat] = useState<CommunityPostFormatFilter>(currentFormat);
     const [sort, setSort] = useState<SortOption>(currentSort);
     const [openLayer, setOpenLayer] = useState<OpenLayer>(null);
-
-    useEffect(() => {
-        setQuery(currentQuery);
-        setFormat(currentFormat);
-        setSort(currentSort);
-        setOpenLayer(null);
-    }, [currentFormat, currentQuery, currentSort]);
+    const { navigate, isNavigating } = usePendingNavigation();
 
     useEffect(() => {
         const handlePointerDown = (event: MouseEvent) => {
@@ -112,7 +105,7 @@ export default function CommunitySearchControls({
     );
 
     const pushSearch = (nextFormat: CommunityPostFormatFilter, nextQuery: string, nextSort: SortOption) => {
-        router.push(buildCommunityListHref({
+        navigate(buildCommunityListHref({
             hub: currentHub,
             format: nextFormat,
             q: nextQuery,
@@ -160,7 +153,7 @@ export default function CommunitySearchControls({
                                                 onClick={() => handleFormatSelect(item.id)}
                                                 className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
                                                     format === item.id
-                                                        ? 'bg-[#FFF1F4] text-[#E31C5F]'
+                                                        ? 'bg-[#111111] text-white'
                                                         : 'text-[#3B3B3B] hover:bg-[#F7F7F7]'
                                                 }`}
                                             >
@@ -207,7 +200,7 @@ export default function CommunitySearchControls({
                                                 onClick={() => handleSortSelect(item.id)}
                                                 className={`block w-full rounded-2xl px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
                                                     sort === item.id
-                                                        ? 'bg-[#F5F5F5] text-[#222222]'
+                                                        ? 'bg-[#111111] text-white'
                                                         : 'text-[#4B4B4B] hover:bg-[#F7F7F7]'
                                                 }`}
                                             >
@@ -221,8 +214,10 @@ export default function CommunitySearchControls({
 
                         <button
                             type="submit"
-                            className="ml-1 inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-[#FF385C] px-6 text-[14px] font-semibold text-white shadow-[0_8px_18px_rgba(255,56,92,0.22)] transition-all hover:bg-[#E31C5F] hover:shadow-[0_10px_22px_rgba(255,56,92,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF385C]/30"
+                            disabled={isNavigating}
+                            className="ml-1 inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#111111] px-6 text-[14px] font-semibold text-white shadow-[0_8px_18px_rgba(15,23,42,0.16)] transition-all hover:bg-[#000000] hover:shadow-[0_10px_22px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15 active:scale-[0.98] disabled:cursor-progress disabled:opacity-80"
                         >
+                            {isNavigating ? <Loader2 size={15} className="animate-spin" /> : null}
                             검색
                         </button>
                     </div>
@@ -242,8 +237,10 @@ export default function CommunitySearchControls({
                     </div>
                     <button
                         type="submit"
-                        className="inline-flex h-12 shrink-0 items-center justify-center rounded-full bg-[#FF385C] px-4 text-[13px] font-semibold text-white shadow-[0_8px_18px_rgba(255,56,92,0.22)] transition-colors hover:bg-[#E31C5F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF385C]/30"
+                        disabled={isNavigating}
+                        className="inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#111111] px-4 text-[13px] font-semibold text-white shadow-[0_8px_18px_rgba(15,23,42,0.16)] transition-colors hover:bg-[#000000] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15 active:scale-[0.98] disabled:cursor-progress disabled:opacity-80"
                     >
+                        {isNavigating ? <Loader2 size={14} className="animate-spin" /> : null}
                         검색
                     </button>
                 </div>

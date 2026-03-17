@@ -314,6 +314,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                             </div>
 
                             <CommunitySearchControls
+                                key={`${currentHub}:${currentFormat}:${queryText}:${sort}`}
                                 currentHub={currentHub}
                                 currentFormat={currentFormat}
                                 currentQuery={queryText}
@@ -364,7 +365,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
             {showFloatingWriteCta && (
                 <Link
                     href={writeHref}
-                    className="block lg:hidden fixed bottom-20 right-4 w-12 h-12 bg-[#FF385C] text-white rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-[#e0314f] active:scale-95 transition-all"
+                    className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#111111] text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition-all hover:bg-black active:scale-95 lg:hidden"
                     aria-label="글쓰기"
                 >
                     <Edit3 size={20} strokeWidth={2.5} />

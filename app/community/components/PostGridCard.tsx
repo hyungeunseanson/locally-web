@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
-import { Heart, MessageSquare } from 'lucide-react';
+import { Heart, Loader2, MessageSquare } from 'lucide-react';
 import type { CommunityFeedPost } from '../feedSelect';
 import { getCommunityCategoryMeta } from '../categoryMeta';
 import { getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
@@ -10,6 +9,7 @@ import CommunityAuthorTrigger from './CommunityAuthorTrigger';
 import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
 import { buildCommunityDetailHref } from '../queryParams';
 import { getCommunityHubMeta } from '../hubMeta';
+import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
 interface PostGridCardProps {
     post: CommunityFeedPost;
@@ -25,6 +25,7 @@ export default function PostGridCard({ post, hub, format, query, sort }: PostGri
     const authorInitial = getCommunityAuthorInitial(post.profiles, post.is_anonymous);
     const categoryMeta = getCommunityCategoryMeta(post.category);
     const hubLabel = post.destination_hub ? getCommunityHubMeta(post.destination_hub).shortLabel : null;
+    const { navigate, pendingHref } = usePendingNavigation();
     const href = buildCommunityDetailHref(post.id, {
         hub,
         format,
@@ -32,14 +33,25 @@ export default function PostGridCard({ post, hub, format, query, sort }: PostGri
         q: query,
         sort,
     });
+    const isNavigating = pendingHref === href;
 
     return (
         <article data-testid="community-content-card" className="group relative aspect-[4/5] overflow-hidden rounded-[28px] bg-neutral-100">
-            <Link
-                href={href}
+            <button
+                type="button"
+                onClick={() => navigate(href)}
+                disabled={isNavigating}
                 aria-label={`${post.title} 상세 보기`}
-                className="absolute inset-0 z-0"
+                aria-busy={isNavigating}
+                className="absolute inset-0 z-0 cursor-pointer active:scale-[0.99] disabled:pointer-events-none"
             />
+            {isNavigating && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-white/20 backdrop-blur-[1px]">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white shadow-sm">
+                        <Loader2 size={16} className="animate-spin" />
+                    </span>
+                </div>
+            )}
 
             {thumbnail ? (
                 <img

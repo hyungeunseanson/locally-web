@@ -7,6 +7,10 @@ export type CommunityPostFormatFilter = CommunityPostFormat | 'all';
 export type CommunityHub = 'tokyo' | 'osaka_kyoto' | 'fukuoka' | 'jp_other' | 'seoul' | 'busan' | 'jeju';
 export type CommunityHubFilter = CommunityHub | 'all';
 export type CommunitySourceLocale = 'ko' | 'ja' | 'en' | 'zh';
+export type CommunityProfilePreview = Pick<Profile, 'id' | 'avatar_url'> & {
+    full_name?: string | null;
+    name?: string | null;
+};
 
 export interface CommunityPost {
     id: string;
@@ -37,24 +41,35 @@ export interface CommunityPost {
     updated_at: string;
 
     // 프로필 조인 데이터
-    profiles?: Profile;
+    profiles?: CommunityProfilePreview | null;
 }
 
 export interface CommunityComment {
     id: string;
     post_id: string;
     user_id: string;
+    parent_id: string | null;
     content: string;
+    like_count: number;
+    is_liked?: boolean;
     created_at: string;
     updated_at: string;
 
     // 프로필 조인 데이터
-    profiles?: Profile;
+    profiles?: CommunityProfilePreview | null;
+    replies?: CommunityComment[];
 }
 
 export interface CommunityLike {
     id: string;
     post_id: string;
+    user_id: string;
+    created_at: string;
+}
+
+export interface CommunityCommentLike {
+    id: string;
+    comment_id: string;
     user_id: string;
     created_at: string;
 }

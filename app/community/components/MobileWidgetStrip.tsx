@@ -18,8 +18,12 @@ function HighlightCard({
     items: CommunityHighlightPost[];
 }) {
     return (
-        <div className="flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-3 w-[208px]">
-            <p className="text-[11px] font-extrabold text-gray-700 mb-2.5">{title}</p>
+        <div className="w-[196px] flex-shrink-0 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+            <div className="mb-2.5 min-h-[24px]">
+                <p className="inline-flex rounded-full bg-[#111111] px-2.5 py-1 text-[10px] font-extrabold text-white">
+                    {title}
+                </p>
+            </div>
             <ul className="space-y-2">
                 {items.length === 0 && (
                     <li className="text-[11px] text-gray-400">표시할 글이 없습니다.</li>

@@ -36,9 +36,9 @@ export const COMMUNITY_HUB_META: Record<CommunityHub, CommunityHubMeta> = {
   },
   jp_other: {
     id: 'jp_other',
-    label: '기타 일본 소도시',
-    shortLabel: '기타 일본',
-    eyebrow: 'SMALL CITIES',
+    label: '일본 소도시',
+    shortLabel: '일본 소도시',
+    eyebrow: 'SMALL CITY',
     description: '소도시 일정, 렌터카, 숨은 지역 팁이 모이는 허브',
     accentClassName: 'from-sky-100 via-white to-cyan-50 border-sky-200',
   },
