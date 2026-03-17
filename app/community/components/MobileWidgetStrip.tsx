@@ -18,7 +18,7 @@ function HighlightCard({
     items: CommunityHighlightPost[];
 }) {
     return (
-        <div className="flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 w-[240px]">
+        <div className="flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-3 w-[208px]">
             <p className="text-[11px] font-extrabold text-gray-700 mb-2.5">{title}</p>
             <ul className="space-y-2">
                 {items.length === 0 && (
@@ -63,7 +63,7 @@ export default function MobileWidgetStrip({
             <div className="flex items-start gap-2 overflow-x-auto no-scrollbar pb-1">
                 <HighlightCard title="🔥 이번 주 인기 질문" items={weeklyQuestions} />
                 <HighlightCard title="🤝 지금 올라오는 동행" items={companionPulse} />
-                <HighlightCard title="✨ 운영팀 저장 글" items={locallyPicks} />
+                <HighlightCard title="✨ 로컬리 콘텐츠" items={locallyPicks} />
             </div>
         </div>
     );

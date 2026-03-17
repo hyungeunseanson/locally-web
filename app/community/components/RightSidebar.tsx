@@ -85,14 +85,6 @@ export default function RightSidebar({
 
     return (
         <div className="sticky top-28 space-y-5">
-            <div className="rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(255,241,244,0.7)_48%,_rgba(255,255,255,0.9)_100%)] px-5 py-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FF385C]">Instagram Flow</div>
-                <h3 className="mt-2 text-[18px] font-semibold text-slate-900">릴스에서 보고 왔다면 도시 질문부터 확인하세요.</h3>
-                <p className="mt-2 text-[13px] leading-6 text-slate-500">
-                    저장한 릴스와 같은 주제의 질문, 동행, 운영팀 정리글을 한 화면에서 이어보는 구조입니다.
-                </p>
-            </div>
-
             {showWriteButton && (
                 <Link
                     href={`/community/write?${writeParams.toString()}`}
@@ -115,7 +107,7 @@ export default function RightSidebar({
                 moreHref={buildCommunityListHref({ hub, format: 'companion' })}
             />
             <SidebarList
-                title="✨ 운영팀 저장 글"
+                title="✨ 로컬리 콘텐츠"
                 items={locallyPicks}
                 moreHref={buildCommunityListHref({ hub, format: 'locally_pick' })}
             />

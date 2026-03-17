@@ -29,10 +29,10 @@ export default function CommunityCategoryTabs() {
                     key={tab.id}
                     onClick={() => handleTabClick(tab.id)}
                     className={`
-                        whitespace-nowrap rounded-full border px-3 py-1.5 text-[12px] md:px-5 md:py-2.5 md:text-[15px] font-medium transition-all duration-200 flex-shrink-0
+                        whitespace-nowrap rounded-2xl border px-3.5 py-2 text-[12px] md:px-5 md:py-3 md:text-[15px] font-semibold transition-all duration-200 flex-shrink-0
                         ${currentFormat === tab.id
-                            ? 'border-[#D8D8D8] bg-white text-[#222222] shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
-                            : 'border-transparent bg-transparent text-[#7A7A7A] hover:border-[#E5E5E5] hover:bg-white hover:text-[#222222]'
+                            ? 'border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_rgba(15,23,42,0.16)]'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                         }
                     `}
                 >
