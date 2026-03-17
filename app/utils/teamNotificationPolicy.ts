@@ -27,13 +27,8 @@ export function buildTeamEmailRecipients(params: {
     .map((email) => (typeof email === 'string' ? normalizeEmail(email) : ''))
     .filter(Boolean);
 
-  if (isImmediateTeamEmail(params.eventType) && actorEmail) {
-    recipients.push(actorEmail);
-  }
-
   return Array.from(new Set(recipients)).filter((email) => {
     if (!actorEmail) return true;
-    if (isImmediateTeamEmail(params.eventType)) return true;
     return email !== actorEmail;
   });
 }
