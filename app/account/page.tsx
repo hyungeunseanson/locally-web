@@ -65,7 +65,8 @@ export default function AccountPage() {
   const [signingOut, setSigningOut] = useState(false);
   const [pendingModalActionHref, setPendingModalActionHref] = useState<string | null>(null);
   // 프로필 카드용 통계
-  const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinYears: 0 });
+  const [stats, setStats] = useState({ tripCount: 0, reviewCount: 0, joinMonths: 0 });
+  const [hostBtnReady, setHostBtnReady] = useState(false);
   const { pendingHref, isNavigating, navigate } = usePendingNavigation();
   const { unreadCount } = useNotification();
   const { canUseHostView, setHostView } = useViewMode();
@@ -164,6 +165,11 @@ export default function AccountPage() {
   } as const;
 
   useEffect(() => {
+    const t = setTimeout(() => setHostBtnReady(true), 500);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
     const getProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/'); return; }
@@ -232,12 +238,14 @@ export default function AccountPage() {
         .eq('guest_id', user.id);
 
       const createdAt = new Date(user.created_at);
-      const joinYears = Math.max(1, new Date().getFullYear() - createdAt.getFullYear());
+      const now = new Date();
+      const totalMonths = (now.getFullYear() - createdAt.getFullYear()) * 12 + (now.getMonth() - createdAt.getMonth());
+      const joinMonths = Math.max(1, totalMonths);
 
       setStats({
         tripCount: tripCount || 0,
         reviewCount: reviewCount || (reviewData?.length || 0),
-        joinYears,
+        joinMonths,
       });
 
       setLoading(false);
@@ -488,8 +496,16 @@ export default function AccountPage() {
             </div>
             <div className="border-t border-gray-100" />
             <div>
-              <p className="text-[8px] text-gray-400 leading-none mb-0.5">Locally 가입 기간</p>
-              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.joinYears} <span className="text-[9px] font-semibold">년</span></p>
+              <p className="text-[8px] text-gray-400 leading-none mb-0.5">로컬리와 함께한 시간</p>
+              <p className="text-[12px] font-bold text-gray-900 leading-tight">
+                {(() => {
+                  const y = Math.floor(stats.joinMonths / 12);
+                  const m = stats.joinMonths % 12;
+                  if (y === 0) return <>{stats.joinMonths} <span className="text-[9px] font-semibold">개월</span></>;
+                  if (m === 0) return <>{y} <span className="text-[9px] font-semibold">년</span></>;
+                  return <>{y} <span className="text-[9px] font-semibold">년</span> {m} <span className="text-[9px] font-semibold">개월</span></>;
+                })()}
+              </p>
             </div>
           </div>
         </button>
@@ -543,7 +559,7 @@ export default function AccountPage() {
       </div>
 
       {/* 호스트 모드 전환 플로팅 버튼 (모바일 전용) */}
-      <div className="md:hidden fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none">
+      <div className={`md:hidden fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${hostBtnReady ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-90'}`}>
         <button
           onClick={() => {
             if (!hostStatusResolved) {

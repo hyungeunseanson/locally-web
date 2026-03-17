@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-17 (v3.39.20 desktop search bar UX)
-**Version:** 3.39.20 (Desktop Search Bar UX)
+**Last Updated:** 2026-03-17 (v3.39.21 mobile menu improvements)
+**Version:** 3.39.21 (Mobile Menu Improvements)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -156,6 +156,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
 - 어드민 대시보드 권한 및 무통장 버그 수정(v3.9.3): `service_bookings` 영역의 RLS 권한 누락으로 인한 관리자 데이터 블락/사이드바 카운트 증발 현상을 우회하기 위해 `createAdminClient`를 쓰는 전용 백엔드 API 신설 (`/api/admin/service-bookings`, `/api/admin/sidebar-counts`). 또한, 일반 `bookings` 테이블에 `payment_method` 컬럼을 신규 추가하고 `create_booking_atomic` 함수에서 이를 저장하도록 수정.
 
+- 모바일 메뉴 개선(v3.39.21): 1) 게스트 메뉴(`/account`) 하단 "호스트 모드로 전환" 버튼 — 페이지 진입 500ms 후 spring 애니메이션(`ease-[cubic-bezier(0.34,1.56,0.64,1)]`)으로 등장. 2) 호스트 메뉴(`/host/menu`) 하단 "게스트 모드로 전환" 버튼 동일 패턴 적용. 3) 게스트 메뉴 프로필 카드 세 번째 통계: 레이블 "Locally 가입 기간"→"로컬리와 함께한 시간", 계산 방식 연단위→월단위(`joinYears→joinMonths`), 표시 형식 `{N}년`→`{y}년 {m}개월`으로 수정하여 `MobileProfileView`와 동일하게 통일. 데스크탑 변경 없음.
 - 데스크탑 검색바 UX 개선(v3.39.20): 1) 여행지 드롭다운에서 도시 클릭 시 즉시 필터링 적용(`useExperienceFilter.applyFilters(locationOverride?)` 파라미터 추가로 React 배치 업데이트 우회). 2) 달력 날짜 선택 시 자동 닫힘 제거(바깥 클릭으로만 닫힘), 날짜 폰트 두께 감소(`font-bold→font-normal`), 초기화 버튼 추가(데스크탑 전용). 3) 검색 필드 포커스 시 배경 딤/블러 처리(`HomePageClient` 내 `hidden md:block fixed` 오버레이, z-40). 4) 팝업 슬라이드 방향 개선(location: 좌, language: 우). 5) `SiteHeader` 로고 클릭 시 홈(`/`)에서 `window.location.reload()` 수행. 모바일 변경 없음.
 
 비고: 상세 변경 로그(파일 단위 픽셀 조정, 과거 패치 서술)는 `docs/CHANGELOG.md` 또는 커밋 이력에서 확인한다.

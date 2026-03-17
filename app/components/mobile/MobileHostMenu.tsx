@@ -33,6 +33,7 @@ export default function MobileHostMenu() {
     const [reviewSummary, setReviewSummary] = useState<{ avg: number; count: number }>({ avg: 0, count: 0 });
     const [loading, setLoading] = useState(true);
     const [showTransition, setShowTransition] = useState(false);
+    const [guestBtnReady, setGuestBtnReady] = useState(false);
 
     const supabase = useMemo(() => createClient(), []);
     const profileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
@@ -47,6 +48,11 @@ export default function MobileHostMenu() {
             'service_payment_confirmed', 'service_cancelled'
         ].includes(n.type)
     );
+
+    useEffect(() => {
+        const t = setTimeout(() => setGuestBtnReady(true), 500);
+        return () => clearTimeout(t);
+    }, []);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -224,7 +230,7 @@ export default function MobileHostMenu() {
             </div>
 
             {/* ── 게스트 모드 전환 플로팅 버튼 ── */}
-            <div className="fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none">
+            <div className={`fixed bottom-[80px] left-0 right-0 flex justify-center z-50 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${guestBtnReady ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-90'}`}>
                 <button
                     onClick={() => {
                         setGuestView();
