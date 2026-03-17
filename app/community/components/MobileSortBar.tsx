@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
+import { buildCommunityListHref } from '../queryParams';
 
 const SORT_OPTIONS = [
     { id: 'latest' as const, label: '최신순' },
@@ -9,7 +11,8 @@ const SORT_OPTIONS = [
 ];
 
 interface MobileSortBarProps {
-    currentCategory: string;
+    currentHub: CommunityHubFilter;
+    currentFormat: CommunityPostFormatFilter;
     currentQuery: string;
     currentSort: 'latest' | 'popular';
 }
@@ -18,15 +21,16 @@ interface MobileSortBarProps {
  * 모바일 전용 최신순/인기순 정렬 버튼
  * MobileWidgetStrip 아래, 피드 리스트 바로 위에 렌더
  */
-export default function MobileSortBar({ currentCategory, currentQuery, currentSort }: MobileSortBarProps) {
+export default function MobileSortBar({ currentHub, currentFormat, currentQuery, currentSort }: MobileSortBarProps) {
     const router = useRouter();
 
     const handleSort = (nextSort: 'latest' | 'popular') => {
-        const params = new URLSearchParams();
-        params.set('category', currentCategory);
-        if (currentQuery.trim()) params.set('q', currentQuery.trim());
-        if (nextSort !== 'latest') params.set('sort', nextSort);
-        router.push(`/community?${params.toString()}`);
+        router.push(buildCommunityListHref({
+            hub: currentHub,
+            format: currentFormat,
+            q: currentQuery,
+            sort: nextSort,
+        }));
     };
 
     return (

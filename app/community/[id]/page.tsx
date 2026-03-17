@@ -17,6 +17,9 @@ import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
 import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
 import { getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
+import { getCommunityHubMeta } from '../hubMeta';
+import { getCommunityCategoryFromFormat } from '../categoryMeta';
+import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -129,39 +132,64 @@ export default async function CommunityPostDetail({
     }
 
     // ④ 이전글/다음글 (같은 카테고리)
-    const [{ data: prevPost }, { data: nextPost }] = await Promise.all([
-        supabase.from('community_posts')
-            .select('id, title, created_at')
-            .eq('category', post.category)
-            .lt('created_at', post.created_at)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-        supabase.from('community_posts')
-            .select('id, title, created_at')
-            .eq('category', post.category)
-            .gt('created_at', post.created_at)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle(),
-    ]);
-
     const isCompanion = post.category === 'companion';
     const isLocallyContent = isLocallyContentCategory(post.category);
     const authorName = getCommunityAuthorName(profile, post.is_anonymous);
     const authorInitial = getCommunityAuthorInitial(profile, post.is_anonymous);
     const authorAvatar = getCommunityAuthorAvatar(profile, post.is_anonymous);
     const categoryMeta = getCommunityCategoryMeta(post.category);
+    const hubMeta = post.destination_hub ? getCommunityHubMeta(post.destination_hub) : null;
     const pageUrl = buildAbsoluteUrl(`/community/${id}`);
     const articleDescription = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
     const articleImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
+    const fallbackHub = resolveCommunityHub(detailSearchParams?.hub as string);
+    const fallbackRequestedCategory = resolveCommunityCategory((detailSearchParams?.category as string) || post.category);
+    const fallbackFormat = resolveCommunityFormat(
+        detailSearchParams?.format as string,
+        fallbackRequestedCategory === 'all' ? post.category : fallbackRequestedCategory
+    );
     const fallbackParams = new URLSearchParams();
-    fallbackParams.set('category', (detailSearchParams?.category as string) || post.category);
+    if (fallbackHub !== 'all') fallbackParams.set('hub', fallbackHub);
+    if (fallbackFormat !== 'all') {
+        fallbackParams.set('format', fallbackFormat);
+        fallbackParams.set('category', getCommunityCategoryFromFormat(fallbackFormat));
+    } else {
+        fallbackParams.set('category', (detailSearchParams?.category as string) || post.category);
+    }
     const fallbackQuery = ((detailSearchParams?.q as string) || '').trim();
-    const fallbackSort = (detailSearchParams?.sort as string) === 'popular' ? 'popular' : 'latest';
+    const fallbackSort = resolveCommunitySort(detailSearchParams?.sort as string);
     if (fallbackQuery) fallbackParams.set('q', fallbackQuery);
     if (fallbackSort !== 'latest') fallbackParams.set('sort', fallbackSort);
     const fallbackHref = `/community?${fallbackParams.toString()}`;
+
+    const buildAdjacentQuery = (direction: 'prev' | 'next') => {
+        let query = supabase.from('community_posts')
+            .select('id, title, created_at')
+            .eq('category', post.category);
+
+        if (fallbackHub !== 'all' && post.destination_hub) {
+            query = query.eq('destination_hub', post.destination_hub);
+        }
+
+        if (direction === 'prev') {
+            return query
+                .lt('created_at', post.created_at)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+        }
+
+        return query
+            .gt('created_at', post.created_at)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+    };
+
+    const [{ data: prevPost }, { data: nextPost }] = await Promise.all([
+        buildAdjacentQuery('prev'),
+        buildAdjacentQuery('next'),
+    ]);
 
     return (
         <>
@@ -213,6 +241,11 @@ export default async function CommunityPostDetail({
                                     <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${categoryMeta.detailChipClassName}`}>
                                         {categoryMeta.shortLabel}
                                     </span>
+                                    {hubMeta && (
+                                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold text-slate-600">
+                                            {hubMeta.label}
+                                        </span>
+                                    )}
                                 </div>
 
                                 <h1 className="mb-4 break-words text-[18px] font-bold leading-snug text-slate-900 [overflow-wrap:anywhere] md:text-[24px]">

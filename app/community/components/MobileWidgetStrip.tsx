@@ -1,102 +1,69 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/app/utils/supabase/client';
 
-interface RecentPost { id: string; title: string; }
-interface HotPost { id: string; title: string; category: string; }
+import { buildCommunityDetailHref } from '../queryParams';
+import { getCommunityHubMeta } from '../hubMeta';
+import type { CommunityHighlightPost } from '../highlights';
 
-/**
- * 모바일 전용 가로 스크롤 위젯 스트립
- * [⚡ 실시간 업데이트] 카드들 → [💬 지금 뜨는 라운지 글] 카드들 순서로 배치
- * lg 이상(데스크탑)에서는 hidden (RightSidebar가 담당)
- */
-export default function MobileWidgetStrip() {
-    const [recentPosts, setRecentPosts] = useState<RecentPost[]>([]);
-    const [hotPosts, setHotPosts] = useState<HotPost[]>([]);
+interface MobileWidgetStripProps {
+    weeklyQuestions: CommunityHighlightPost[];
+    companionPulse: CommunityHighlightPost[];
+    locallyPicks: CommunityHighlightPost[];
+}
 
-    useEffect(() => {
-        const supabase = createClient();
-        const fetchRecent = async () => {
-            const { data } = await supabase
-                .from('community_posts')
-                .select('id, title')
-                .order('created_at', { ascending: false })
-                .limit(5);
-            if (data) setRecentPosts(data);
-        };
-        const fetchHotPosts = async () => {
-            const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-            const { data } = await supabase
-                .from('community_posts')
-                .select('id, title, category')
-                .gte('created_at', since)
-                .order('like_count', { ascending: false })
-                .order('comment_count', { ascending: false })
-                .order('created_at', { ascending: false })
-                .limit(5);
-            if (data) setHotPosts(data);
-        };
-        fetchRecent();
-        fetchHotPosts();
+function HighlightCard({
+    title,
+    items,
+}: {
+    title: string;
+    items: CommunityHighlightPost[];
+}) {
+    return (
+        <div className="flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 w-[240px]">
+            <p className="text-[11px] font-extrabold text-gray-700 mb-2.5">{title}</p>
+            <ul className="space-y-2">
+                {items.length === 0 && (
+                    <li className="text-[11px] text-gray-400">표시할 글이 없습니다.</li>
+                )}
+                {items.map((item, idx) => (
+                    <li key={item.id}>
+                        <Link
+                            href={buildCommunityDetailHref(item.id, {
+                                hub: item.destination_hub ?? 'all',
+                                format: item.post_format,
+                                category: item.category,
+                            })}
+                            className="flex items-start gap-2 group"
+                        >
+                            <span className="text-[10px] font-black text-gray-300 mt-[1px]">{idx + 1}</span>
+                            <div className="min-w-0 flex-1">
+                                <span className="block text-[11px] text-gray-700 line-clamp-2 group-hover:underline">
+                                    {item.title}
+                                </span>
+                                {item.destination_hub && (
+                                    <span className="mt-1 block text-[10px] font-semibold text-gray-400">
+                                        {getCommunityHubMeta(item.destination_hub).shortLabel}
+                                    </span>
+                                )}
+                            </div>
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
-        const channel = supabase.channel('community_widget_strip')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_posts' }, () => {
-                fetchRecent();
-                fetchHotPosts();
-            }).subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, []);
-
+export default function MobileWidgetStrip({
+    weeklyQuestions,
+    companionPulse,
+    locallyPicks,
+}: MobileWidgetStripProps) {
     return (
         <div className="lg:hidden mb-4 -mx-4 px-4">
             <div className="flex items-start gap-2 overflow-x-auto no-scrollbar pb-1">
-
-                {/* ─── 섹션 1: 실시간 업데이트 ─── */}
-                <div className="flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 w-[220px]">
-                    <div className="flex items-center gap-1.5 mb-2.5">
-                        <span className="text-[11px] font-extrabold text-gray-700">⚡ 실시간 업데이트</span>
-                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse ml-auto flex-shrink-0" />
-                    </div>
-                    <ul className="space-y-2">
-                        {recentPosts.length === 0
-                            ? [...Array(4)].map((_, i) => (
-                                <li key={i} className="flex items-center gap-1.5 animate-pulse">
-                                    <span className="w-1.5 h-1.5 bg-gray-200 rounded-full flex-shrink-0" />
-                                    <span className="h-2.5 bg-gray-100 rounded-full flex-1" />
-                                </li>
-                            ))
-                            : recentPosts.map((post) => (
-                                <li key={post.id}>
-                                    <Link href={`/community/${post.id}`} className="flex items-start gap-1.5 group">
-                                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse flex-shrink-0 mt-[5px]" />
-                                        <span className="text-[11px] text-gray-700 line-clamp-1 group-hover:underline">{post.title}</span>
-                                    </Link>
-                                </li>
-                            ))
-                        }
-                    </ul>
-                </div>
-
-                {/* ─── 섹션 2: 지금 뜨는 라운지 글 ─── */}
-                <div className="flex-shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 w-[220px]">
-                    <p className="text-[11px] font-extrabold text-gray-700 mb-2.5">💬 지금 뜨는 라운지 글</p>
-                    <ul className="space-y-2">
-                        {hotPosts.map((item, idx) => (
-                            <li key={idx}>
-                                <Link href={`/community/${item.id}?category=${item.category}`} className="flex items-start gap-1.5 group">
-                                    <span className="text-[10px] font-black text-gray-300 flex-shrink-0 mt-[1px]">{idx + 1}</span>
-                                    <span className="text-[11px] text-gray-700 line-clamp-1 group-hover:underline">{item.title}</span>
-                                </Link>
-                            </li>
-                        ))}
-                        {hotPosts.length === 0 && (
-                            <li className="text-[11px] text-gray-400">인기글이 아직 없습니다.</li>
-                        )}
-                    </ul>
-                </div>
-
+                <HighlightCard title="🔥 이번 주 인기 질문" items={weeklyQuestions} />
+                <HighlightCard title="🤝 지금 올라오는 동행" items={companionPulse} />
+                <HighlightCard title="✨ 운영팀 저장 글" items={locallyPicks} />
             </div>
         </div>
     );

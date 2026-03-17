@@ -4,7 +4,10 @@ import { redirect } from 'next/navigation';
 import PostEditor from './PostEditor';
 import { createClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { getCurrentLocale } from '@/app/utils/locale';
 import type { CommunityCategory } from '@/app/types/community';
+import { getCommunityCategoryFromFormat } from '../categoryMeta';
+import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub } from '../queryParams';
 
 export const metadata: Metadata = {
     title: '글쓰기 - 커뮤니티 | Locally',
@@ -18,7 +21,10 @@ export default async function WritePage({
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
     const params = await searchParams;
-    const requestedCategory = params?.category as CommunityCategory | undefined;
+    const locale = await getCurrentLocale();
+    const requestedCategory = resolveCommunityCategory(params?.category as string);
+    const requestedFormat = resolveCommunityFormat(params?.format as string, requestedCategory);
+    const requestedHub = resolveCommunityHub(params?.hub as string);
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -31,17 +37,21 @@ export default async function WritePage({
         canWriteLocallyContent = adminAccess.isAdmin;
     }
 
-    if (requestedCategory === 'locally_content' && !canWriteLocallyContent) {
-        redirect('/community?category=locally_content');
-    }
+    const initialFormat = requestedFormat === 'all'
+        ? (requestedCategory === 'all' ? 'question' : requestedCategory === 'companion' ? 'companion' : requestedCategory === 'info' ? 'live_tip' : requestedCategory === 'locally_content' ? 'locally_pick' : 'question')
+        : requestedFormat;
+    const initialCategory: CommunityCategory = getCommunityCategoryFromFormat(initialFormat);
 
-    const initialCategory: CommunityCategory = requestedCategory && ['qna', 'companion', 'info', 'locally_content'].includes(requestedCategory)
-        ? requestedCategory
-        : 'qna';
+    if (initialCategory === 'locally_content' && !canWriteLocallyContent) {
+        redirect('/community?format=locally_pick');
+    }
 
     return (
         <PostEditor
             initialCategory={initialCategory === 'locally_content' && !canWriteLocallyContent ? 'qna' : initialCategory}
+            initialFormat={initialCategory === 'locally_content' && !canWriteLocallyContent ? 'question' : initialFormat}
+            initialHub={requestedHub === 'all' ? null : requestedHub}
+            initialLocale={locale}
             canWriteLocallyContent={canWriteLocallyContent}
         />
     );

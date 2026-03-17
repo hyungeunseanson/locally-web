@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS public.community_posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   category text NOT NULL CHECK (category IN ('qna', 'companion', 'info', 'locally_content')),
+  post_format text NOT NULL DEFAULT 'question' CHECK (post_format IN ('question', 'companion', 'live_tip', 'locally_pick')),
+  destination_hub text CHECK (destination_hub IN ('tokyo', 'osaka_kyoto', 'fukuoka', 'jp_other', 'seoul', 'busan', 'jeju')),
+  source_locale text NOT NULL DEFAULT 'ko' CHECK (source_locale IN ('ko', 'ja', 'en', 'zh')),
   title text NOT NULL,
   content text NOT NULL,
   images text[] DEFAULT '{}'::text[],
@@ -50,6 +53,8 @@ CREATE TABLE IF NOT EXISTS public.community_likes (
 
 --- 4. 검색 폭주 방지를 위한 빠른 인덱스 생성 (서버 부하 감소 핵심) ---
 CREATE INDEX IF NOT EXISTS idx_community_posts_category ON public.community_posts (category);
+CREATE INDEX IF NOT EXISTS idx_community_posts_destination_hub ON public.community_posts (destination_hub);
+CREATE INDEX IF NOT EXISTS idx_community_posts_post_format ON public.community_posts (post_format);
 CREATE INDEX IF NOT EXISTS idx_community_posts_created_at ON public.community_posts (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_community_comments_post_id ON public.community_comments (post_id);
 CREATE INDEX IF NOT EXISTS idx_community_likes_post_id ON public.community_likes (post_id);

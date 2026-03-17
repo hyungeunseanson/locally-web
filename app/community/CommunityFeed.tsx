@@ -6,12 +6,14 @@ import PostGridCard from './components/PostGridCard';
 import { Loader2, MessageSquareDashed } from 'lucide-react';
 import Link from 'next/link';
 import { parseCommunityFeedResponse, type CommunityFeedPost } from './feedSelect';
-import { isLocallyContentCategory } from './categoryMeta';
+import { getCommunityCategoryFromFormat, isLocallyPickFormat } from './categoryMeta';
+import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
 
 interface CommunityFeedProps {
     initialData: CommunityFeedPost[];
     initialNextOffset: number | null;
-    category: string;
+    hub: CommunityHubFilter;
+    format: CommunityPostFormatFilter;
     query: string;
     sort: 'latest' | 'popular';
     canWriteLocallyContent: boolean;
@@ -47,18 +49,27 @@ function PostGridSkeleton() {
 
 // ─── Empty State ─────────────────────────────────────────────────────────────
 function EmptyState({
-    category,
+    hub,
+    format,
     query,
     canWriteLocallyContent,
 }: {
-    category: string;
+    hub: CommunityHubFilter;
+    format: CommunityPostFormatFilter;
     query: string;
     canWriteLocallyContent: boolean;
 }) {
-    const writeCategory = category && category !== 'all' ? category : 'qna';
-    const writeHref = `/community/write?category=${writeCategory}`;
+    const writeParams = new URLSearchParams();
+    if (format !== 'all') {
+        writeParams.set('category', getCommunityCategoryFromFormat(format));
+        writeParams.set('format', format);
+    } else {
+        writeParams.set('category', 'qna');
+    }
+    if (hub !== 'all') writeParams.set('hub', hub);
+    const writeHref = `/community/write?${writeParams.toString()}`;
     const isSearchMode = Boolean(query.trim());
-    const showWriteButton = !isSearchMode && (!isLocallyContentCategory(category) || canWriteLocallyContent);
+    const showWriteButton = !isSearchMode && (!isLocallyPickFormat(format) || canWriteLocallyContent);
 
     return (
         <div className="bg-white rounded-2xl p-12 flex flex-col items-center justify-center border border-dashed border-gray-300 text-center">
@@ -84,7 +95,8 @@ function EmptyState({
 export default function CommunityFeed({
     initialData,
     initialNextOffset,
-    category,
+    hub,
+    format,
     query,
     sort,
     canWriteLocallyContent,
@@ -105,7 +117,7 @@ export default function CommunityFeed({
         // 짧은 딜레이로 스켈레톤 UX 시뮬레이션
         const t = setTimeout(() => setIsInitialLoading(false), 200);
         return () => clearTimeout(t);
-    }, [category, initialData, initialNextOffset, query, sort]);
+    }, [format, hub, initialData, initialNextOffset, query, sort]);
 
     const loadMore = useCallback(async () => {
         if (isLoading || nextOffset === null) return;
@@ -113,7 +125,8 @@ export default function CommunityFeed({
         setIsLoading(true);
         try {
             const params = new URLSearchParams();
-            if (category) params.set('category', category);
+            if (hub && hub !== 'all') params.set('hub', hub);
+            if (format && format !== 'all') params.set('format', format);
             if (query.trim()) params.set('q', query.trim());
             if (sort !== 'latest') params.set('sort', sort);
             params.set('offset', String(nextOffset));
@@ -140,7 +153,7 @@ export default function CommunityFeed({
         } finally {
             setIsLoading(false);
         }
-    }, [category, nextOffset, isLoading, query, sort]);
+    }, [format, hub, nextOffset, isLoading, query, sort]);
 
     useEffect(() => {
         const currentRef = loadMoreRef.current;
@@ -163,7 +176,7 @@ export default function CommunityFeed({
 
     // 초기 로딩 스켈레톤 — 카테고리에 따라 분기
     if (isInitialLoading) {
-        if (isLocallyContentCategory(category)) {
+        if (isLocallyPickFormat(format)) {
             return <div className="pb-24"><PostGridSkeleton /></div>;
         }
         return (
@@ -175,17 +188,17 @@ export default function CommunityFeed({
 
     return (
         <div className="pb-24">
-            {isLocallyContentCategory(category) ? (
+            {isLocallyPickFormat(format) ? (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
                     {posts.map((post) => (
-                        <PostGridCard key={`${post.id}`} post={post} category={category} query={query} sort={sort} />
+                        <PostGridCard key={`${post.id}`} post={post} hub={hub} format={format} query={query} sort={sort} />
                     ))}
                 </div>
             ) : (
                 /* 일반 탭: 리스트형 피드 — 원 블록 화이트 보드 */
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {posts.map((post) => (
-                        <PostListCard key={`${post.id}`} post={post} category={category} query={query} sort={sort} />
+                        <PostListCard key={`${post.id}`} post={post} hub={hub} format={format} query={query} sort={sort} />
                     ))}
                 </div>
             )}
@@ -193,7 +206,8 @@ export default function CommunityFeed({
             {/* Empty State */}
             {posts.length === 0 && !isLoading && (
                 <EmptyState
-                    category={category}
+                    hub={hub}
+                    format={format}
                     query={query}
                     canWriteLocallyContent={canWriteLocallyContent}
                 />

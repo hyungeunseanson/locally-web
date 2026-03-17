@@ -3,14 +3,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Search } from 'lucide-react';
-import type { CommunityFilterCategory } from '@/app/types/community';
-import { COMMUNITY_FILTER_CATEGORY_OPTIONS } from '../categoryMeta';
+
+import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
+import { COMMUNITY_FORMAT_FILTER_OPTIONS } from '../categoryMeta';
+import { buildCommunityListHref } from '../queryParams';
 
 type SortOption = 'latest' | 'popular';
-type OpenLayer = 'category' | 'sort' | null;
+type OpenLayer = 'format' | 'sort' | null;
 
 interface CommunitySearchControlsProps {
-    currentCategory: CommunityFilterCategory;
+    currentHub: CommunityHubFilter;
+    currentFormat: CommunityPostFormatFilter;
     currentQuery: string;
     currentSort: SortOption;
 }
@@ -58,23 +61,24 @@ function TriggerButton({
 }
 
 export default function CommunitySearchControls({
-    currentCategory,
+    currentHub,
+    currentFormat,
     currentQuery,
     currentSort,
 }: CommunitySearchControlsProps) {
     const router = useRouter();
     const rootRef = useRef<HTMLFormElement>(null);
     const [query, setQuery] = useState(currentQuery);
-    const [category, setCategory] = useState<CommunityFilterCategory>(currentCategory);
+    const [format, setFormat] = useState<CommunityPostFormatFilter>(currentFormat);
     const [sort, setSort] = useState<SortOption>(currentSort);
     const [openLayer, setOpenLayer] = useState<OpenLayer>(null);
 
     useEffect(() => {
         setQuery(currentQuery);
-        setCategory(currentCategory);
+        setFormat(currentFormat);
         setSort(currentSort);
         setOpenLayer(null);
-    }, [currentCategory, currentQuery, currentSort]);
+    }, [currentFormat, currentQuery, currentSort]);
 
     useEffect(() => {
         const handlePointerDown = (event: MouseEvent) => {
@@ -97,9 +101,9 @@ export default function CommunitySearchControls({
         };
     }, []);
 
-    const selectedCategoryLabel = useMemo(
-        () => COMMUNITY_FILTER_CATEGORY_OPTIONS.find((item) => item.id === category)?.label || '전체보기',
-        [category],
+    const selectedFormatLabel = useMemo(
+        () => COMMUNITY_FORMAT_FILTER_OPTIONS.find((item) => item.id === format)?.label || '전체',
+        [format],
     );
 
     const selectedSortLabel = useMemo(
@@ -107,30 +111,31 @@ export default function CommunitySearchControls({
         [sort],
     );
 
-    const pushSearch = (nextCategory: CommunityFilterCategory, nextQuery: string, nextSort: SortOption) => {
-        const params = new URLSearchParams();
-        params.set('category', nextCategory);
-        if (nextQuery.trim()) params.set('q', nextQuery.trim());
-        if (nextSort !== 'latest') params.set('sort', nextSort);
-        router.push(`/community?${params.toString()}`);
+    const pushSearch = (nextFormat: CommunityPostFormatFilter, nextQuery: string, nextSort: SortOption) => {
+        router.push(buildCommunityListHref({
+            hub: currentHub,
+            format: nextFormat,
+            q: nextQuery,
+            sort: nextSort,
+        }));
     };
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
-        pushSearch(category, query, sort);
+        pushSearch(format, query, sort);
         setOpenLayer(null);
     };
 
-    const handleCategorySelect = (nextCategory: CommunityFilterCategory) => {
-        setCategory(nextCategory);
+    const handleFormatSelect = (nextFormat: CommunityPostFormatFilter) => {
+        setFormat(nextFormat);
         setOpenLayer(null);
-        pushSearch(nextCategory, query, sort);
+        pushSearch(nextFormat, query, sort);
     };
 
     const handleSortSelect = (nextSort: SortOption) => {
         setSort(nextSort);
         setOpenLayer(null);
-        pushSearch(category, query, nextSort);
+        pushSearch(format, query, nextSort);
     };
 
     return (
@@ -140,27 +145,27 @@ export default function CommunitySearchControls({
                     <div className="flex items-center">
                         <div className="relative shrink-0">
                             <TriggerButton
-                                label="카테고리"
-                                value={selectedCategoryLabel}
-                                isOpen={openLayer === 'category'}
-                                onClick={() => setOpenLayer((prev) => (prev === 'category' ? null : 'category'))}
+                                label="포맷"
+                                value={selectedFormatLabel}
+                                isOpen={openLayer === 'format'}
+                                onClick={() => setOpenLayer((prev) => (prev === 'format' ? null : 'format'))}
                             />
-                            {openLayer === 'category' && (
+                            {openLayer === 'format' && (
                                 <div className="absolute left-0 top-[calc(100%+10px)] z-20 w-44 rounded-[24px] border border-[#EBEBEB] bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.12)]">
-                                    <div className="space-y-1" role="listbox" aria-label="카테고리 선택">
-                                        {COMMUNITY_FILTER_CATEGORY_OPTIONS.map((item) => (
+                                    <div className="space-y-1" role="listbox" aria-label="포맷 선택">
+                                        {COMMUNITY_FORMAT_FILTER_OPTIONS.map((item) => (
                                             <button
                                                 key={item.id}
                                                 type="button"
-                                                onClick={() => handleCategorySelect(item.id)}
+                                                onClick={() => handleFormatSelect(item.id)}
                                                 className={`flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
-                                                    category === item.id
+                                                    format === item.id
                                                         ? 'bg-[#FFF1F4] text-[#E31C5F]'
                                                         : 'text-[#3B3B3B] hover:bg-[#F7F7F7]'
                                                 }`}
                                             >
                                                 <span>{item.label}</span>
-                                                {category === item.id && <span className="text-[11px] font-semibold">선택됨</span>}
+                                                {format === item.id && <span className="text-[11px] font-semibold">선택됨</span>}
                                             </button>
                                         ))}
                                     </div>
@@ -224,7 +229,6 @@ export default function CommunitySearchControls({
                 </div>
             </div>
 
-            {/* 모바일: 검색 입력란만 (카테고리 탭은 CommunityCategoryTabs에서 렌더, 정렬은 MobileSortBar에서 렌더) */}
             <div className="md:hidden">
                 <div className="flex items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full border border-[#E7E7E7] bg-white px-4 shadow-[0_1px_2px_rgba(0,0,0,0.06)] focus-within:shadow-[0_8px_18px_rgba(0,0,0,0.08)]">

@@ -1,95 +1,101 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Edit3, ChevronRight } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
-import type { CommunityCategory } from '@/app/types/community';
+
+import type { CommunityCategory, CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
+import type { CommunityHighlightPost } from '../highlights';
+import { getCommunityHubMeta } from '../hubMeta';
+import { buildCommunityDetailHref, buildCommunityListHref } from '../queryParams';
 import { isLocallyContentCategory } from '../categoryMeta';
 
-// ─── 인기 체험 타입 ───────────────────────────────────────────────────────────
-interface ExperienceItem { id: number; title: string; image_url: string | null; photos: string[] | null; price: number | null; }
+interface RightSidebarProps {
+    category: CommunityCategory;
+    hub: CommunityHubFilter;
+    format: CommunityPostFormatFilter;
+    canWriteLocallyContent: boolean;
+    weeklyQuestions: CommunityHighlightPost[];
+    companionPulse: CommunityHighlightPost[];
+    locallyPicks: CommunityHighlightPost[];
+}
 
+function SidebarList({
+    title,
+    items,
+    moreHref,
+}: {
+    title: string;
+    items: CommunityHighlightPost[];
+    moreHref: string;
+}) {
+    return (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="text-[14px] font-extrabold text-gray-900 mb-4">{title}</h3>
+            <ul className="space-y-3">
+                {items.length === 0 && (
+                    <li className="text-[12px] text-gray-400">표시할 글이 없습니다.</li>
+                )}
+                {items.map((post, idx) => (
+                    <li key={post.id}>
+                        <Link
+                            href={buildCommunityDetailHref(post.id, {
+                                hub: post.destination_hub ?? 'all',
+                                format: post.post_format,
+                                category: post.category,
+                            })}
+                            className="flex items-start gap-2 group"
+                        >
+                            <span className="text-[11px] font-black text-gray-300 mt-[2px] w-4 flex-shrink-0">{idx + 1}</span>
+                            <div className="min-w-0 flex-1">
+                                <span className="block text-[13px] text-gray-700 leading-snug group-hover:underline group-hover:text-gray-900 transition-colors line-clamp-2">
+                                    {post.title}
+                                </span>
+                                {post.destination_hub && (
+                                    <span className="mt-1 block text-[11px] font-medium text-gray-400">
+                                        {getCommunityHubMeta(post.destination_hub).label}
+                                    </span>
+                                )}
+                            </div>
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+            <Link
+                href={moreHref}
+                className="mt-3 flex items-center justify-center gap-1 text-[13px] font-semibold text-gray-500 hover:text-gray-800 transition-colors pt-3 border-t border-gray-100"
+            >
+                더 보기 <ChevronRight size={14} />
+            </Link>
+        </div>
+    );
+}
 
-const getTimeAgo = (dateStr: string) => {
-    try {
-        const rtf = new Intl.RelativeTimeFormat('ko', { numeric: 'auto' });
-        const diff = (new Date(dateStr).getTime() - new Date().getTime()) / 1000;
-        if (Math.abs(diff) < 60) return '방금 전';
-        if (Math.abs(diff) < 3600) return rtf.format(Math.floor(diff / 60), 'minute');
-        if (Math.abs(diff) < 86400) return rtf.format(Math.floor(diff / 3600), 'hour');
-        return rtf.format(Math.floor(diff / 86400), 'day');
-    } catch { return dateStr.split('T')[0]; }
-};
-
-// ─── 실시간 최신글 타입 ───────────────────────────────────────────────────────
-interface RecentPost { id: string; title: string; created_at: string; }
-interface HotPost { id: string; title: string; category: string; }
-
-// ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 export default function RightSidebar({
     category,
+    hub,
+    format,
     canWriteLocallyContent,
-}: {
-    category: CommunityCategory;
-    canWriteLocallyContent: boolean;
-}) {
-    const [recentPosts, setRecentPosts] = useState<RecentPost[]>([]);
-    const [hotPosts, setHotPosts] = useState<HotPost[]>([]);
-    const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
+    weeklyQuestions,
+    companionPulse,
+    locallyPicks,
+}: RightSidebarProps) {
     const showWriteButton = !isLocallyContentCategory(category) || canWriteLocallyContent;
-
-    useEffect(() => {
-        const supabase = createClient();
-        const fetchExperiences = async () => {
-            const { data } = await supabase
-                .from('experiences')
-                .select('id, title, image_url, photos, price')
-                .eq('status', 'active')
-                .order('created_at', { ascending: false })
-                .limit(3);
-            if (data) setExperiences(data);
-        };
-        const fetchRecent = async () => {
-            const { data } = await supabase
-                .from('community_posts')
-                .select('id, title, created_at')
-                .order('created_at', { ascending: false })
-                .limit(5);
-            if (data) setRecentPosts(data);
-        };
-        const fetchHotPosts = async () => {
-            const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-            const { data } = await supabase
-                .from('community_posts')
-                .select('id, title, category')
-                .gte('created_at', since)
-                .order('like_count', { ascending: false })
-                .order('comment_count', { ascending: false })
-                .order('created_at', { ascending: false })
-                .limit(5);
-            if (data) setHotPosts(data);
-        };
-        fetchExperiences();
-        fetchRecent();
-        fetchHotPosts();
-
-        // 실시간 신규 글 구독 → 새 글 올라오면 자동 갱신
-        const channel = supabase.channel('community_realtime_sidebar')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_posts' }, () => {
-                fetchRecent();
-                fetchHotPosts();
-            }).subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, []);
+    const writeParams = new URLSearchParams();
+    writeParams.set('category', category);
+    if (hub !== 'all') writeParams.set('hub', hub);
+    if (format !== 'all') writeParams.set('format', format);
 
     return (
         <div className="sticky top-28 space-y-5">
+            <div className="rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(255,241,244,0.7)_48%,_rgba(255,255,255,0.9)_100%)] px-5 py-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#FF385C]">Instagram Flow</div>
+                <h3 className="mt-2 text-[18px] font-semibold text-slate-900">릴스에서 보고 왔다면 도시 질문부터 확인하세요.</h3>
+                <p className="mt-2 text-[13px] leading-6 text-slate-500">
+                    저장한 릴스와 같은 주제의 질문, 동행, 운영팀 정리글을 한 화면에서 이어보는 구조입니다.
+                </p>
+            </div>
 
             {showWriteButton && (
                 <Link
-                    href={`/community/write?category=${category}`}
+                    href={`/community/write?${writeParams.toString()}`}
                     role="button"
                     className="w-full rounded-xl font-bold py-3.5 bg-gradient-to-r from-[#FF385C] to-[#E31C5F] text-white shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2 text-[15px]"
                 >
@@ -98,88 +104,21 @@ export default function RightSidebar({
                 </Link>
             )}
 
-            {/* 위젯 2: 주간 인기 체험 */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h3 className="text-[14px] font-extrabold text-gray-900 mb-4">🔥 주간 인기 로컬리 체험</h3>
-                <div className="space-y-3">
-                    {experiences.length === 0 ? (
-                        <p className="text-[12px] text-gray-400">표시할 체험이 없습니다.</p>
-                    ) : experiences.map((exp, idx) => (
-                        <Link key={exp.id} href={`/experiences/${exp.id}`}>
-                            <div className="flex items-center gap-3 group cursor-pointer hover:bg-gray-50 rounded-xl p-2 -mx-2 transition-colors">
-                                <div className="relative flex-shrink-0">
-                                    <div className="w-[60px] h-[44px] rounded-lg overflow-hidden bg-gray-100">
-                                        <img src={exp.photos?.[0] || exp.image_url || '/images/logo.png'} alt={exp.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                    </div>
-                                    <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-black flex items-center justify-center">
-                                        {idx + 1}
-                                    </span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[13px] font-semibold text-gray-900 line-clamp-2 leading-snug">{exp.title}</p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-[11px] font-bold text-[#FF385C]">₩{exp.price?.toLocaleString()}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-                <Link href="/experiences" className="mt-3 flex items-center justify-center gap-1 text-[13px] font-semibold text-gray-500 hover:text-gray-800 transition-colors pt-3 border-t border-gray-100">
-                    체험 전체 보기 <ChevronRight size={14} />
-                </Link>
-            </div>
-
-            {/* 위젯 3: 지금 뜨는 라운지 글 */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h3 className="text-[14px] font-extrabold text-gray-900 mb-4">💬 지금 뜨는 라운지 글</h3>
-                <ul className="space-y-2.5">
-                    {hotPosts.map((post, idx) => (
-                        <li key={idx}>
-                            <Link href={`/community/${post.id}?category=${post.category}`} className="flex items-start gap-2 group">
-                                <span className="text-[11px] font-black text-gray-300 mt-[2px] w-4 flex-shrink-0">{idx + 1}</span>
-                                <span className="text-[13px] text-gray-700 leading-snug group-hover:underline group-hover:text-gray-900 transition-colors line-clamp-2">{post.title}</span>
-                            </Link>
-                        </li>
-                    ))}
-                    {hotPosts.length === 0 && (
-                        <li className="text-[12px] text-gray-400">표시할 인기글이 없습니다.</li>
-                    )}
-                </ul>
-            </div>
-
-            {/* 위젯 4: ⚡ 실시간 업데이트 (앱 CTA 배너 완전 대체) */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h3 className="text-[14px] font-extrabold text-gray-900 mb-4 flex items-center justify-between">
-                    <span>⚡ 실시간 업데이트</span>
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                </h3>
-                <ul className="space-y-3.5">
-                    {recentPosts.length === 0 ? (
-                        [...Array(4)].map((_, i) => (
-                            <li key={i} className="flex items-center gap-2 animate-pulse">
-                                <span className="w-1.5 h-1.5 bg-gray-200 rounded-full flex-shrink-0" />
-                                <span className="h-3 bg-gray-100 rounded-full flex-1" />
-                                <span className="h-3 w-10 bg-gray-100 rounded-full flex-shrink-0" />
-                            </li>
-                        ))
-                    ) : (
-                        recentPosts.map((post) => (
-                            <li key={post.id}>
-                                <Link href={`/community/${post.id}`} className="flex items-center gap-2 group">
-                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
-                                    <span className="text-sm font-medium text-gray-800 line-clamp-1 group-hover:underline cursor-pointer flex-1 min-w-0">
-                                        {post.title}
-                                    </span>
-                                    <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0 ml-1" suppressHydrationWarning>
-                                        {getTimeAgo(post.created_at)}
-                                    </span>
-                                </Link>
-                            </li>
-                        ))
-                    )}
-                </ul>
-            </div>
+            <SidebarList
+                title="🔥 이번 주 인기 질문"
+                items={weeklyQuestions}
+                moreHref={buildCommunityListHref({ hub, format: 'question' })}
+            />
+            <SidebarList
+                title="🤝 지금 올라오는 동행"
+                items={companionPulse}
+                moreHref={buildCommunityListHref({ hub, format: 'companion' })}
+            />
+            <SidebarList
+                title="✨ 운영팀 저장 글"
+                items={locallyPicks}
+                moreHref={buildCommunityListHref({ hub, format: 'locally_pick' })}
+            />
         </div>
     );
 }

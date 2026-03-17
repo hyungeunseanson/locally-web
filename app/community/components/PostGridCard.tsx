@@ -7,24 +7,31 @@ import type { CommunityFeedPost } from '../feedSelect';
 import { getCommunityCategoryMeta } from '../categoryMeta';
 import { getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
 import CommunityAuthorTrigger from './CommunityAuthorTrigger';
+import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
+import { buildCommunityDetailHref } from '../queryParams';
+import { getCommunityHubMeta } from '../hubMeta';
 
 interface PostGridCardProps {
     post: CommunityFeedPost;
-    category: string;
+    hub: CommunityHubFilter;
+    format: CommunityPostFormatFilter;
     query: string;
     sort: 'latest' | 'popular';
 }
 
-export default function PostGridCard({ post, category, query, sort }: PostGridCardProps) {
+export default function PostGridCard({ post, hub, format, query, sort }: PostGridCardProps) {
     const thumbnail = post.images?.[0] ?? null;
     const authorName = getCommunityAuthorName(post.profiles, post.is_anonymous);
     const authorInitial = getCommunityAuthorInitial(post.profiles, post.is_anonymous);
     const categoryMeta = getCommunityCategoryMeta(post.category);
-    const params = new URLSearchParams();
-    params.set('category', category);
-    if (query.trim()) params.set('q', query.trim());
-    if (sort !== 'latest') params.set('sort', sort);
-    const href = `/community/${post.id}?${params.toString()}`;
+    const hubLabel = post.destination_hub ? getCommunityHubMeta(post.destination_hub).shortLabel : null;
+    const href = buildCommunityDetailHref(post.id, {
+        hub,
+        format,
+        category: post.category,
+        q: query,
+        sort,
+    });
 
     return (
         <article data-testid="community-content-card" className="group relative aspect-[4/5] overflow-hidden rounded-[28px] bg-neutral-100">
@@ -54,9 +61,16 @@ export default function PostGridCard({ post, category, query, sort }: PostGridCa
 
             {/* 배지: 모바일 -20% (text-[8px] px-2), 데스크탑 기존 유지 */}
             <div className="absolute inset-x-0 top-0 z-10 flex justify-start p-3 md:p-4 pointer-events-none">
-                <span className={`rounded-full px-2 py-0.5 text-[8px] md:px-3 md:py-1 md:text-[10px] font-bold shadow-sm ${categoryMeta.badgeClassName}`}>
-                    {categoryMeta.shortLabel}
-                </span>
+                <div className="flex flex-wrap gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[8px] md:px-3 md:py-1 md:text-[10px] font-bold shadow-sm ${categoryMeta.badgeClassName}`}>
+                        {categoryMeta.shortLabel}
+                    </span>
+                    {hubLabel && (
+                        <span className="rounded-full bg-white/85 px-2 py-0.5 text-[8px] md:px-3 md:py-1 md:text-[10px] font-bold text-slate-700 shadow-sm backdrop-blur-sm">
+                            {hubLabel}
+                        </span>
+                    )}
+                </div>
             </div>
 
             <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-3 pb-3 pt-10 md:px-4 md:pb-4 md:pt-12 pointer-events-none">

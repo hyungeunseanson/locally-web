@@ -5,10 +5,14 @@ import type { CommunityFeedPost } from '../feedSelect';
 import { getCommunityCategoryMeta } from '../categoryMeta';
 import { getCommunityAuthorName } from '../authorDisplay';
 import CommunityAuthorTrigger from './CommunityAuthorTrigger';
+import type { CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
+import { buildCommunityDetailHref } from '../queryParams';
+import { getCommunityHubMeta } from '../hubMeta';
 
 interface PostListCardProps {
     post: CommunityFeedPost;
-    category: string;
+    hub: CommunityHubFilter;
+    format: CommunityPostFormatFilter;
     query: string;
     sort: 'latest' | 'popular';
 }
@@ -26,16 +30,18 @@ const getTimeAgo = (dateStr: string) => {
     }
 };
 
-export default function PostListCard({ post, category, query, sort }: PostListCardProps) {
+export default function PostListCard({ post, hub, format, query, sort }: PostListCardProps) {
     const badge = getCommunityCategoryMeta(post.category);
     const thumbnail = post.images?.[0] ?? null;
     const hasCompanionDate = post.category === 'companion' && post.companion_date;
     const authorName = getCommunityAuthorName(post.profiles, post.is_anonymous);
-    const params = new URLSearchParams();
-    params.set('category', category);
-    if (query.trim()) params.set('q', query.trim());
-    if (sort !== 'latest') params.set('sort', sort);
-    const href = `/community/${post.id}?${params.toString()}`;
+    const href = buildCommunityDetailHref(post.id, {
+        hub,
+        format,
+        category: post.category,
+        q: query,
+        sort,
+    });
 
     return (
         <article className="group relative border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150">
@@ -65,6 +71,11 @@ export default function PostListCard({ post, category, query, sort }: PostListCa
                         {post.companion_city && (
                             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500 break-words [overflow-wrap:anywhere]">
                                 📍 {post.companion_city}
+                            </span>
+                        )}
+                        {post.destination_hub && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 break-words [overflow-wrap:anywhere]">
+                                {getCommunityHubMeta(post.destination_hub).shortLabel}
                             </span>
                         )}
                         {hasCompanionDate && (

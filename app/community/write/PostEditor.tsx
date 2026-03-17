@@ -6,13 +6,28 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import DatePicker from '@/app/components/DatePicker';
-import { ArrowLeft, CalendarDays, ChevronRight, GripVertical, ImagePlus, Loader2, MapPin, X } from 'lucide-react';
-import type { CommunityCategory } from '@/app/types/community';
-import { getCommunityCategoryMeta } from '../categoryMeta';
+import { ArrowLeft, CalendarDays, ChevronRight, GripVertical, ImagePlus, Loader2, MapPin, Sparkles, X } from 'lucide-react';
+
+import type { CommunityCategory, CommunityHub, CommunityPostFormat, CommunitySourceLocale } from '@/app/types/community';
+import { getCommunityCategoryFromFormat, getCommunityFormatFromCategory, getCommunityFormatMeta } from '../categoryMeta';
+import { COMMUNITY_HUB_OPTIONS, getCommunityHubMeta } from '../hubMeta';
+import { buildCommunityDetailHref } from '../queryParams';
 
 const MAX_IMAGES = 10;
+const WRITABLE_FORMATS: CommunityPostFormat[] = ['question', 'companion', 'live_tip', 'locally_pick'];
+const LOCALE_OPTIONS: Array<{ id: CommunitySourceLocale; label: string }> = [
+    { id: 'ko', label: '한국어' },
+    { id: 'ja', label: '日本語' },
+    { id: 'en', label: 'English' },
+    { id: 'zh', label: '中文' },
+];
 
-const WRITABLE_CATEGORIES: CommunityCategory[] = ['qna', 'companion', 'info', 'locally_content'];
+const TEMPLATE_BODIES: Record<CommunityPostFormat, string> = {
+    question: '언제 가는지:\n누구와 가는지:\n예산:\n가장 고민되는 포인트:\n',
+    companion: '인원:\n대략 일정:\n원하는 분위기:\n간단한 자기소개:\n',
+    live_tip: '언제:\n어디:\n무슨 상황인지:\n참고하면 좋은 한 줄:\n',
+    locally_pick: '핵심 포인트:\n추천 동선:\n꼭 체크할 것:\n현지 팁:\n',
+};
 
 const formatDateLabel = (dateString: string) => {
     if (!dateString) return '날짜 선택';
@@ -43,20 +58,31 @@ type UploadedImage = {
 
 interface PostEditorProps {
     initialCategory: CommunityCategory;
+    initialFormat: CommunityPostFormat;
+    initialHub: CommunityHub | null;
+    initialLocale: CommunitySourceLocale;
     canWriteLocallyContent: boolean;
 }
 
-export default function PostEditor({ initialCategory, canWriteLocallyContent }: PostEditorProps) {
+export default function PostEditor({
+    initialCategory,
+    initialFormat,
+    initialHub,
+    initialLocale,
+    canWriteLocallyContent,
+}: PostEditorProps) {
     const router = useRouter();
     const supabase = createClient();
     const { showToast, showHeicUnsupportedToast } = useToast();
-    const availableCategories = useMemo(
-        () => WRITABLE_CATEGORIES.filter((item) => canWriteLocallyContent || item !== 'locally_content'),
+    const availableFormats = useMemo(
+        () => WRITABLE_FORMATS.filter((item) => canWriteLocallyContent || item !== 'locally_pick'),
         [canWriteLocallyContent],
     );
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [category, setCategory] = useState<CommunityCategory>(initialCategory);
+    const [format, setFormat] = useState<CommunityPostFormat>(initialFormat || getCommunityFormatFromCategory(initialCategory));
+    const [selectedHub, setSelectedHub] = useState<CommunityHub | null>(initialHub);
+    const [sourceLocale, setSourceLocale] = useState<CommunitySourceLocale>(initialLocale);
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -74,19 +100,37 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
         [draftCompanionDate],
     );
 
-    const isCompanion = category === 'companion';
-    const canWriteAnonymously = category !== 'locally_content';
-    const canSubmit = title.trim().length > 0 && content.trim().length > 0 && (!isCompanion || (companionDate && companionCity.trim()));
+    const category = getCommunityCategoryFromFormat(format);
+    const formatMeta = getCommunityFormatMeta(format);
+    const isCompanion = format === 'companion';
+    const canWriteAnonymously = format !== 'locally_pick';
+    const canSubmit = Boolean(
+        title.trim().length > 0
+        && content.trim().length > 0
+        && selectedHub
+        && (!isCompanion || (companionDate && companionCity.trim()))
+    );
 
     useEffect(() => {
-        if (category === 'locally_content' && isAnonymous) {
+        if (format === 'locally_pick' && isAnonymous) {
             setIsAnonymous(false);
         }
-    }, [category, isAnonymous]);
+    }, [format, isAnonymous]);
+
+    useEffect(() => {
+        if (isCompanion && !companionCity.trim() && selectedHub) {
+            setCompanionCity(getCommunityHubMeta(selectedHub).label);
+        }
+    }, [companionCity, isCompanion, selectedHub]);
 
     const openDateModal = () => {
         setDraftCompanionDate(parseStoredDate(companionDate));
         setIsDateModalOpen(true);
+    };
+
+    const applyTemplate = () => {
+        setTitle((prev) => (prev.trim() ? prev : formatMeta.templateTitlePlaceholder));
+        setContent((prev) => (prev.trim() ? prev : TEMPLATE_BODIES[format]));
     };
 
     const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,7 +183,10 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
     const handleDrop = (e: React.DragEvent, toIdx: number) => {
         e.preventDefault();
         const fromIdx = dragSrcIdx.current;
-        if (fromIdx === null || fromIdx === toIdx) { setDragOverIdx(null); return; }
+        if (fromIdx === null || fromIdx === toIdx) {
+            setDragOverIdx(null);
+            return;
+        }
         setImageFiles((prev) => {
             const next = [...prev];
             const [item] = next.splice(fromIdx, 1);
@@ -191,6 +238,11 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
     const handleSubmit = async (event?: React.FormEvent) => {
         event?.preventDefault();
 
+        if (!selectedHub) {
+            alert('도시 허브를 선택해주세요.');
+            return;
+        }
+
         if (!title.trim() || !content.trim()) {
             alert('제목과 내용을 입력해주세요.');
             return;
@@ -213,13 +265,16 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     category,
+                    post_format: format,
+                    destination_hub: selectedHub,
+                    source_locale: sourceLocale,
                     title,
                     content,
                     images: finalImageUrls,
                     image_paths: finalImagePaths,
                     is_anonymous: canWriteAnonymously ? isAnonymous : false,
-                    companion_date: companionDate || undefined,
-                    companion_city: companionCity.trim() || undefined,
+                    companion_date: isCompanion ? companionDate || undefined : undefined,
+                    companion_city: isCompanion ? companionCity.trim() || undefined : undefined,
                     linked_exp_id: null,
                 }),
             });
@@ -227,7 +282,11 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
             if (!response.ok) throw new Error('글 등록에 실패했습니다.');
 
             const { id } = await response.json();
-            window.location.href = `/community/${id}?category=${category}`;
+            window.location.href = buildCommunityDetailHref(id, {
+                hub: selectedHub,
+                format,
+                category,
+            });
         } catch (error) {
             console.error(error);
             const message = error instanceof Error ? error.message : '글 등록 중 오류가 발생했습니다.';
@@ -252,7 +311,7 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
 
                     <div className="text-center">
                         <h1 className="text-[18px] font-semibold text-slate-900 md:text-[22px]">커뮤니티 글쓰기</h1>
-                        <p className="mt-1 hidden text-[13px] text-slate-500 md:block">깔끔하게 정리해서 올리면 더 읽기 좋습니다.</p>
+                        <p className="mt-1 hidden text-[13px] text-slate-500 md:block">도시 허브와 포맷을 먼저 고르면 1분 안에 올릴 수 있습니다.</p>
                     </div>
 
                     <button
@@ -270,25 +329,93 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
                     className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]"
                 >
                     <div className="border-b border-slate-100 px-5 py-5 md:px-8 md:py-6">
-                        <div className="flex flex-wrap gap-2">
-                            {availableCategories.map((item) => (
+                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">포맷 선택</div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {availableFormats.map((item) => (
                                 <button
                                     key={item}
                                     type="button"
-                                    onClick={() => setCategory(item)}
+                                    onClick={() => setFormat(item)}
                                     className={`rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors md:text-[13px] ${
-                                        category === item
+                                        format === item
                                             ? 'border-slate-900 bg-slate-900 text-white'
                                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                                     }`}
                                 >
-                                    {getCommunityCategoryMeta(item).label}
+                                    {getCommunityFormatMeta(item).label}
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     <div className="space-y-6 px-5 py-5 md:px-8 md:py-8">
+                        <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">도시 허브</div>
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                                {COMMUNITY_HUB_OPTIONS.map((hub) => {
+                                    const hubMeta = getCommunityHubMeta(hub);
+                                    const isActive = selectedHub === hub;
+                                    return (
+                                        <button
+                                            key={hub}
+                                            type="button"
+                                            onClick={() => setSelectedHub(hub)}
+                                            className={`rounded-[20px] border px-4 py-3 text-left transition-colors ${
+                                                isActive
+                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                                            }`}
+                                        >
+                                            <div className={`text-[10px] font-black uppercase tracking-[0.16em] ${isActive ? 'text-white/65' : 'text-slate-400'}`}>
+                                                {hubMeta.eyebrow}
+                                            </div>
+                                            <div className="mt-1 text-[14px] font-semibold">{hubMeta.label}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">원문 언어</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {LOCALE_OPTIONS.map((option) => (
+                                    <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={() => setSourceLocale(option.id)}
+                                        className={`rounded-full border px-4 py-2 text-[12px] font-semibold transition-colors ${
+                                            sourceLocale === option.id
+                                                ? 'border-[#FF385C] bg-[#FFF1F4] text-[#E31C5F]'
+                                                : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="rounded-[24px] border border-[#FFD7E0] bg-[#FFF7F9] px-5 py-4 md:px-6">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#FF385C]">
+                                        <Sparkles size={14} />
+                                        Quick Template
+                                    </div>
+                                    <h3 className="mt-2 text-[16px] font-semibold text-slate-900">{formatMeta.helperTitle}</h3>
+                                    <p className="mt-1 text-[13px] leading-6 text-slate-500">{formatMeta.helperDescription}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={applyTemplate}
+                                    className="rounded-full border border-[#FFCAD6] bg-white px-4 py-2 text-[12px] font-semibold text-[#E31C5F] transition-colors hover:bg-[#FFF1F4]"
+                                >
+                                    템플릿 넣기
+                                </button>
+                            </div>
+                        </div>
+
                         {canWriteAnonymously && (
                             <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6">
                                 <div className="flex items-start justify-between gap-4">
@@ -345,7 +472,7 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
                                     </div>
                                     <input
                                         type="text"
-                                        placeholder="도시를 입력하세요"
+                                        placeholder={selectedHub ? getCommunityHubMeta(selectedHub).label : '도시를 입력하세요'}
                                         value={companionCity}
                                         onChange={(event) => setCompanionCity(event.target.value)}
                                         className="w-full bg-transparent text-[14px] font-medium text-slate-900 placeholder:text-slate-400 outline-none"
@@ -358,7 +485,7 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
                             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">제목</div>
                             <input
                                 type="text"
-                                placeholder="제목을 입력하세요"
+                                placeholder={formatMeta.templateTitlePlaceholder}
                                 value={title}
                                 onChange={(event) => setTitle(event.target.value)}
                                 className="w-full bg-transparent text-[24px] font-semibold text-slate-900 placeholder:text-slate-300 outline-none md:text-[30px]"
@@ -368,7 +495,7 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
                         <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 md:px-6 md:py-5">
                             <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">본문</div>
                             <textarea
-                                placeholder="내용을 정리해서 작성해보세요."
+                                placeholder={formatMeta.templateBodyPlaceholder}
                                 value={content}
                                 onChange={(event) => setContent(event.target.value)}
                                 className="h-[280px] w-full resize-none bg-transparent text-[15px] leading-7 text-slate-800 placeholder:text-slate-300 outline-none md:h-[340px] md:text-[16px]"
@@ -402,7 +529,6 @@ export default function PostEditor({ initialCategory, canWriteLocallyContent }: 
                                         }`}
                                     >
                                         <img src={url} alt={`preview ${index + 1}`} className="h-full w-full object-cover pointer-events-none" />
-                                        {/* 순서 표시 */}
                                         <div className="absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white text-[10px] font-bold">
                                             {index + 1}
                                         </div>

@@ -2,11 +2,19 @@ import { Profile, Experience } from './index';
 
 export type CommunityCategory = 'qna' | 'companion' | 'info' | 'locally_content';
 export type CommunityFilterCategory = CommunityCategory | 'all';
+export type CommunityPostFormat = 'question' | 'companion' | 'live_tip' | 'locally_pick';
+export type CommunityPostFormatFilter = CommunityPostFormat | 'all';
+export type CommunityHub = 'tokyo' | 'osaka_kyoto' | 'fukuoka' | 'jp_other' | 'seoul' | 'busan' | 'jeju';
+export type CommunityHubFilter = CommunityHub | 'all';
+export type CommunitySourceLocale = 'ko' | 'ja' | 'en' | 'zh';
 
 export interface CommunityPost {
     id: string;
     user_id: string;
     category: CommunityCategory;
+    post_format: CommunityPostFormat;
+    destination_hub: CommunityHub | null;
+    source_locale: CommunitySourceLocale;
     title: string;
     content: string;
     images: string[];
@@ -37,7 +45,6 @@ export interface CommunityComment {
     post_id: string;
     user_id: string;
     content: string;
-    is_selected: boolean;
     created_at: string;
     updated_at: string;
 
