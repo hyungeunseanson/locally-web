@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Ghost } from 'lucide-react';
 import Link from 'next/link';
 import HomeHero from '@/app/components/HomeHero';
@@ -20,6 +20,7 @@ type HomeExperience = HomeExperienceCardData & {
 export default function HomePageClient() {
   const { t } = useLanguage();
   const [splashDone, setSplashDone] = useState(false);
+  const handleSplashDone = useCallback(() => setSplashDone(true), []);
   const [activeTab, setActiveTab] = useState<'experience' | 'service'>('experience');
   const [activeSearchField, setActiveSearchField] = useState<'location' | 'date' | 'language' | null>(null);
   const [scrollY, setScrollY] = useState(0);
@@ -46,7 +47,7 @@ export default function HomePageClient() {
 
   return (
     <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
-      {!splashDone && <MobileSplash onDone={() => setSplashDone(true)} />}
+      {!splashDone && <MobileSplash onDone={handleSplashDone} />}
       {/* 데스크탑 전용: 검색 필드 포커스 시 배경 딤 처리 */}
       {activeSearchField && (
         <div
