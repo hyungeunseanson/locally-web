@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   Menu,
   User,
@@ -56,6 +57,14 @@ function SiteHeaderContent() {
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { t } = useLanguage();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    if (pathname === '/') {
+      e.preventDefault();
+      window.location.reload();
+    }
+  };
 
   // 🟢 [수정] 로그아웃은 AuthContext의 signOut 호출
   const handleLogout = async () => {
@@ -168,7 +177,7 @@ function SiteHeaderContent() {
 
       <header className="hidden md:block sticky top-0 z-[100] bg-white border-b border-slate-100" ref={menuRef}>
         <div className="max-w-[1760px] mx-auto px-6 h-20 flex items-center justify-between">
-          <Link href="/" className="flex-1 flex items-center gap-[2px] z-[101] group h-full">
+          <Link href="/" onClick={handleLogoClick} className="flex-1 flex items-center gap-[2px] z-[101] group h-full">
             <img
               src="/images/logo.png"
               alt="Locally Logo"

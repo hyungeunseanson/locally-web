@@ -44,6 +44,13 @@ export default function HomePageClient() {
 
   return (
     <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
+      {/* 데스크탑 전용: 검색 필드 포커스 시 배경 딤 처리 */}
+      {activeSearchField && (
+        <div
+          className="hidden md:block fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40 transition-opacity duration-300"
+          onClick={() => setActiveSearchField(null)}
+        />
+      )}
       <div
         className="md:hidden pointer-events-none absolute inset-x-0 top-0 h-[420px] z-0"
         style={{ backgroundImage: 'linear-gradient(180deg, #E6E6E6 0px, #EEEEEE 210px, #F3F3F3 420px)' }}

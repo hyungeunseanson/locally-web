@@ -66,7 +66,7 @@ export default function DatePicker({
           onClick={() => handleDateClick(d)}
           className={[
             'flex items-center justify-center transition-all rounded-full',
-            isMobile ? 'h-9 w-9 text-[12px] font-semibold' : 'h-10 w-10 text-sm font-bold',
+            isMobile ? 'h-9 w-9 text-[12px] font-semibold' : 'h-10 w-10 text-sm font-normal',
             isStart || isEnd ? 'bg-black text-white' : '',
             isInRange ? 'bg-slate-100' : '',
             !isStart && !isEnd && !isInRange ? 'hover:border border-black' : '',
@@ -98,6 +98,16 @@ export default function DatePicker({
         ))}
       </div>
       <div className={`grid grid-cols-7 ${isMobile ? 'gap-y-2' : 'gap-y-1'} justify-items-center`}>{renderDays()}</div>
+      {!isMobile && (
+        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+          <button
+            onClick={() => onChange({ start: null, end: null })}
+            className="text-[12px] font-medium text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            초기화
+          </button>
+        </div>
+      )}
     </div>
   );
 }

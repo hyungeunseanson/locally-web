@@ -26,7 +26,7 @@ interface HomeHeroProps {
   locationInput: string;
   setLocationInput: (val: string) => void;
   searchRef: React.RefObject<HTMLDivElement | null>;
-  onSearch: () => void;
+  onSearch: (locationOverride?: string) => void;
 
   // ✅ [추가] 부모(HomePage)에서 보내주는 언어 관련 Props도 받아야 함
   selectedLanguage?: string;

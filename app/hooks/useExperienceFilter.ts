@@ -45,21 +45,22 @@ export function useExperienceFilter() {
   }, [allExperiences, isSuccess]);
 
   // 🟢 3. 필터 적용 로직 (기존 로직 100% 유지)
-  const applyFilters = () => {
+  const applyFilters = (locationOverride?: string) => {
     let result = allExperiences;
+    const searchTerm = locationOverride !== undefined ? locationOverride : locationInput;
 
     // 검색어 필터
-    if (locationInput.trim()) {
+    if (searchTerm.trim()) {
       // 🟢 검색 로그 기록 (Supabase, 비동기로 백그라운드에서 실행)
       supabase.from('search_logs').insert([{
-        keyword: locationInput.trim(),
+        keyword: searchTerm.trim(),
         route: 'main',
         ...getAnalyticsTrackingMetadata(),
       }]).then(({ error }) => {
         if (error) console.error('Search Log Insert Error:', error);
       });
 
-      const searchTerms = locationInput.replace(/[·,.]/g, ' ').toLowerCase().split(/\s+/).filter(t => t.length > 0);
+      const searchTerms = searchTerm.replace(/[·,.]/g, ' ').toLowerCase().split(/\s+/).filter(t => t.length > 0);
       result = result.filter(item => {
         const targetString = `${item.title} ${item.city} ${item.description} ${item.category} ${item.tags?.join(' ')}`.toLowerCase();
         return searchTerms.every(term => targetString.includes(term));

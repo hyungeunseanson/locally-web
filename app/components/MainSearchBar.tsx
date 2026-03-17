@@ -115,7 +115,7 @@ interface MainSearchBarProps {
   setSelectedLanguage: (lang: string) => void;
   onCategorySelect?: (id: string) => void;
   isVisible: boolean;
-  onSearch: () => void;
+  onSearch: (locationOverride?: string) => void;
 }
 
 export default function MainSearchBar({
@@ -260,7 +260,7 @@ export default function MainSearchBar({
       {/* 여행지 선택 팝업 */}
       {activeSearchField === 'location' && (
         <div
-          className="absolute top-[80px] left-0 w-[360px] bg-white p-5 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out"
+          className="absolute top-[80px] left-0 w-[360px] bg-white p-5 z-50 animate-in fade-in slide-in-from-left-2 duration-200 ease-out"
           style={{
             borderRadius: '22px',
             boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)',
@@ -275,7 +275,8 @@ export default function MainSearchBar({
                 onClick={(e) => {
                   e.stopPropagation();
                   setLocationInput(place.name);
-                  setActiveSearchField('date');
+                  setActiveSearchField(null);
+                  onSearch(place.name);
                 }}
                 className="flex items-center gap-3 w-full py-2.5 px-2 rounded-xl hover:bg-[#F7F7F7] transition-colors text-left"
               >
@@ -292,14 +293,14 @@ export default function MainSearchBar({
 
       {/* 날짜 팝업 */}
       {activeSearchField === 'date' && (
-        <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
-          <DatePicker selectedRange={dateRange} onChange={(range) => { setDateRange(range); if (range.start && range.end) setActiveSearchField('language'); }} />
+        <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[360px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in duration-200 ease-out">
+          <DatePicker selectedRange={dateRange} onChange={(range) => { setDateRange(range); }} />
         </div>
       )}
 
       {/* 언어 팝업 */}
       {activeSearchField === 'language' && (
-        <div className="absolute top-[80px] right-0 w-[240px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-top-5 duration-300 ease-out">
+        <div className="absolute top-[80px] right-0 w-[240px] bg-white rounded-[32px] shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-6 z-50 animate-in fade-in slide-in-from-right-2 duration-200 ease-out">
           <h4 className="text-xs font-bold text-slate-500 mb-3 px-2">{t('mobile_language_select')}</h4>
           <div className="grid grid-cols-1 gap-1">
             {languages.map((lang) => (
