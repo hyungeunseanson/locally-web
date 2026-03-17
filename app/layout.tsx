@@ -85,14 +85,6 @@ export async function generateMetadata(): Promise<Metadata> {
       description: description,
       url: localizedHomeUrl,
       siteName: siteName,
-      images: [
-        {
-          url: 'https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png',
-          width: 1200,
-          height: 630,
-          alt: 'Locally Hero Image',
-        },
-      ],
       locale: locale === 'ko' ? 'ko_KR' : locale === 'ja' ? 'ja_JP' : locale === 'zh' ? 'zh_CN' : 'en_US',
       type: 'website',
     },
@@ -100,7 +92,6 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: title,
       description: description,
-      images: ['https://cdn.imweb.me/thumbnail/20251114/7d271dc71e667.png'],
     },
     keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', '일본 동행', '일본 현지 가이드', '맞춤 의뢰', 'Locally'],
     alternates: {
