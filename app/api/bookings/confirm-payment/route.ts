@@ -5,6 +5,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 
 // LEGACY ROUTE
 // Current admin-confirm path is `/api/admin/bookings/confirm-payment`.
@@ -69,6 +70,11 @@ export async function POST(request: Request) {
     if (fetchError || !booking) {
       console.error('Fetch Booking Error:', fetchError);
       throw new Error('예약 정보를 찾을 수 없습니다.');
+    }
+
+    // 중복 처리 방지 (LEGACY): 이미 확정된 예약이면 알림 재발송 없이 성공 반환
+    if (!isPendingBookingStatus(booking.status)) {
+      return NextResponse.json({ success: true });
     }
 
     // 2. 체험 정보 조회

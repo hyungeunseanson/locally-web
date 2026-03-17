@@ -144,8 +144,8 @@ async function getActorDisplayName(actorId: string) {
     ]);
 
     return (
-      hostAppRes.data?.name ||
       profileRes.data?.full_name ||
+      hostAppRes.data?.name ||
       profileRes.data?.email?.split('@')[0] ||
       '상대방'
     );

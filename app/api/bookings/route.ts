@@ -135,21 +135,31 @@ export async function POST(request: Request) {
         // - 에러가 나더라도 예약 진행을 막지 않도록 비동기로 별도 에러 로깅만 처리
         if (hostId) {
             const isPending = paymentMethod === 'bank';
-            const notiTitle = isPending ? '⏳ 새로운 예약 (입금 대기)' : '🎉 새로운 예약 (결제 진행중)';
-            const notiMsg = isPending
-                ? `'${experienceTitle}'에 무통장 입금 대기 중인 예약이 접수되었습니다.`
-                : `'${experienceTitle}'에 새로운 결제가 진행되고 있습니다!`;
+            const guestUserId = user.id;
+            (async () => {
+                let guestDisplayName = customerName || '게스트';
+                const { data: guestProfile } = await supabaseAdmin
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', guestUserId)
+                    .maybeSingle();
+                if (guestProfile?.full_name) guestDisplayName = guestProfile.full_name;
 
-            supabaseAdmin.from('notifications').insert({
-                user_id: hostId,
-                type: 'new_booking',
-                title: notiTitle,
-                message: notiMsg,
-                link: '/host/dashboard',
-                is_read: false
-            }).then(({ error }) => {
+                const notiTitle = isPending ? '⏳ 새로운 예약 (입금 대기)' : '🎉 새로운 예약 (결제 진행중)';
+                const notiMsg = isPending
+                    ? `'${experienceTitle}'에 ${guestDisplayName}님의 무통장 입금 대기 예약이 접수되었습니다.`
+                    : `'${experienceTitle}'에 ${guestDisplayName}님의 새로운 결제가 진행되고 있습니다!`;
+
+                const { error } = await supabaseAdmin.from('notifications').insert({
+                    user_id: hostId,
+                    type: 'new_booking',
+                    title: notiTitle,
+                    message: notiMsg,
+                    link: '/host/dashboard',
+                    is_read: false
+                });
                 if (error) console.error('Host Notification Error:', error);
-            });
+            })();
         }
 
         insertAdminAlerts({

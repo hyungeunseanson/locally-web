@@ -150,15 +150,15 @@ export function AuthProvider({
         loadUser();
       }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        loadUser();
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsHost(false);
         setApplicationStatus(null);
         setHostStatusResolved(true);
         setIsLoading(false);
+      } else if (session?.user) {
+        loadUser();
       }
     });
 

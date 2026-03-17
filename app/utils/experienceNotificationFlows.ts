@@ -34,6 +34,17 @@ export async function notifyExperiencePaymentConfirmed(
     totalAmount,
   } = params;
 
+  // Resolve actual profile name (fallback to passed guestName)
+  let displayName = guestName;
+  if (guestId) {
+    const { data: guestProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name')
+      .eq('id', guestId)
+      .maybeSingle();
+    if (guestProfile?.full_name) displayName = guestProfile.full_name;
+  }
+
   try {
     const notifications = [];
 
@@ -42,7 +53,7 @@ export async function notifyExperiencePaymentConfirmed(
         user_id: hostId,
         type: 'new_booking',
         title: '🎉 새로운 예약 도착!',
-        message: `[${experienceTitle}] 체험에 ${guestName}님의 예약이 확정되었습니다.`,
+        message: `[${experienceTitle}] 체험에 ${displayName}님의 예약이 확정되었습니다.`,
         link: '/host/dashboard',
         is_read: false,
       });
@@ -76,7 +87,7 @@ export async function notifyExperiencePaymentConfirmed(
       body: JSON.stringify({
         type: 'booking_confirmation',
         hostId,
-        guestName,
+        guestName: displayName,
         experienceTitle,
         guestsCount,
         bookingDate,

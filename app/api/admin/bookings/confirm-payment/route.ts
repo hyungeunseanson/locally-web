@@ -88,6 +88,17 @@ export async function POST(request: Request) {
     const hostId = experience?.host_id;
     const experienceTitle = experience?.title || 'Locally 체험';
 
+    // Resolve guest display name from profile
+    let guestDisplayName = booking.contact_name || '게스트';
+    if (booking.user_id) {
+      const { data: guestProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', booking.user_id)
+        .maybeSingle();
+      if (guestProfile?.full_name) guestDisplayName = guestProfile.full_name;
+    }
+
     try {
       const notifications = [];
       if (hostId) {
@@ -95,7 +106,7 @@ export async function POST(request: Request) {
           user_id: hostId,
           type: 'booking_confirmed',
           title: '💰 입금 확인 완료!',
-          message: `'${experienceTitle}' 예약의 입금 확인이 완료되었습니다.`,
+          message: `'${experienceTitle}' ${guestDisplayName}님의 입금 확인이 완료되었습니다.`,
           link: '/host/dashboard',
           is_read: false,
         });
