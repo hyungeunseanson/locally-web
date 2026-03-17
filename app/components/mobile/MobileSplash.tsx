@@ -1,22 +1,27 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function MobileSplash({ onDone }: { onDone: () => void }) {
   const [fading, setFading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
 
   useEffect(() => {
+    setMounted(true);
     const fadeTimer = setTimeout(() => setFading(true), 1000);
     const doneTimer = setTimeout(() => onDoneRef.current(), 1300);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(doneTimer);
     };
-  }, []); // onDone 참조 변화에 영향받지 않도록 빈 deps
+  }, []);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       className={`transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}
       style={{
@@ -34,6 +39,7 @@ export default function MobileSplash({ onDone }: { onDone: () => void }) {
         alt="Locally"
         className="w-[144px] h-[144px] md:w-[432px] md:h-[432px] object-contain"
       />
-    </div>
+    </div>,
+    document.body
   );
 }
