@@ -19,8 +19,8 @@ function HighlightCard({
 }) {
     return (
         <div className="w-[196px] flex-shrink-0 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-            <div className="mb-2.5 min-h-[24px]">
-                <p className="inline-flex rounded-full bg-[#111111] px-2.5 py-1 text-[10px] font-extrabold text-white">
+            <div className="mb-2.5 border-b border-gray-100 pb-2">
+                <p className="text-[11px] font-extrabold text-gray-700">
                     {title}
                 </p>
             </div>
@@ -65,9 +65,9 @@ export default function MobileWidgetStrip({
     return (
         <div className="lg:hidden mb-4 -mx-4 px-4">
             <div className="flex items-start gap-2 overflow-x-auto no-scrollbar pb-1">
-                <HighlightCard title="🔥 이번 주 인기 질문" items={weeklyQuestions} />
-                <HighlightCard title="🤝 지금 올라오는 동행" items={companionPulse} />
-                <HighlightCard title="✨ 로컬리 콘텐츠" items={locallyPicks} />
+                <HighlightCard title="이번 주 인기 질문" items={weeklyQuestions} />
+                <HighlightCard title="지금 올라오는 동행" items={companionPulse} />
+                <HighlightCard title="로컬리 콘텐츠" items={locallyPicks} />
             </div>
         </div>
     );

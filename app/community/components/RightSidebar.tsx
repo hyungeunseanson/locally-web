@@ -28,7 +28,9 @@ function SidebarList({
 }) {
     return (
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <h3 className="text-[14px] font-extrabold text-gray-900 mb-4">{title}</h3>
+            <div className="mb-4 border-b border-gray-100 pb-3">
+                <h3 className="text-[14px] font-extrabold text-gray-800">{title}</h3>
+            </div>
             <ul className="space-y-3">
                 {items.length === 0 && (
                     <li className="text-[12px] text-gray-400">표시할 글이 없습니다.</li>
@@ -97,17 +99,17 @@ export default function RightSidebar({
             )}
 
             <SidebarList
-                title="🔥 이번 주 인기 질문"
+                title="이번 주 인기 질문"
                 items={weeklyQuestions}
                 moreHref={buildCommunityListHref({ hub, format: 'question' })}
             />
             <SidebarList
-                title="🤝 지금 올라오는 동행"
+                title="지금 올라오는 동행"
                 items={companionPulse}
                 moreHref={buildCommunityListHref({ hub, format: 'companion' })}
             />
             <SidebarList
-                title="✨ 로컬리 콘텐츠"
+                title="로컬리 콘텐츠"
                 items={locallyPicks}
                 moreHref={buildCommunityListHref({ hub, format: 'locally_pick' })}
             />
