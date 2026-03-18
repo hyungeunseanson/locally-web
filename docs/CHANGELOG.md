@@ -9,8 +9,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 🔴 다국어 딕셔너리 확장 | `app/context/LanguageContext.tsx` — 호스트/게스트 프로필 모달 및 메뉴의 하드코딩된 한국어(미입력, 비공개, 자기소개 없음, 단위 등), 호스트 대시보드(예약 관리, 후기, 정산 등) 알림·토스트·기본 문구에 대응하기 위해 `not_entered`, `res_notif_new_title`, `guest_review_title` 등의 키를 `ko`, `en`, `ja`, `zh` 사전에 추가 |
-| 🟠 프로필/대시보드 UI 핀셋 치환 | `app/components/UserProfileModal.tsx`, `app/components/mobile/MobileProfileView.tsx`, `ReservationManager.tsx`, `ReservationCard.tsx`, `Earnings.tsx`, `GuestProfileModal.tsx`, `GuestReviewModal.tsx` — `useLanguage` 훅을 주입하여 하드코딩 텍스트를 `t()` 함수로 변환. 기존 UI 레이아웃 로직은 일절 건드리지 않아 회귀 면적 최소화 |
+| 🔴 다국어 딕셔너리 확장 | `app/context/LanguageContext.tsx` — 게스트 대시보드(여행스케줄 `GuestTrips.tsx`, `TripCard.tsx`, 여행 취소 모달 등) 및 위시리스트에 포함된 하드코딩된 한국어("나의 맞춤 의뢰", "예상 환불 금액", "결제 영수증", "찜 해제 실패" 등) 대응을 위해 `trip_my_custom_requests`, `receipt_title`, `modal_cancel_expected_refund` 등의 키를 `ko`, `en`, `ja`, `zh` 사전에 추가 |
+| 🟠 대시보드 UI 핀셋 치환 | `app/guest/trips`, `CancellationModal.tsx`, `ReceiptModal.tsx`, `useGuestTrips.ts`, `wishlists/page.tsx` — 하드코딩 텍스트를 `t()` 함수로 변환. 기존 UI 레이아웃 로직은 일절 건드리지 않아 회귀 면적 최소화 |
 
 ## v3.39.30 — [Global] 한글 폰트(IBM Plex Sans KR) 전역 적용 보장
 
