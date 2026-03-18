@@ -13,7 +13,7 @@ import {
 import * as React from 'react';
 import { getSiteUrl } from '@/app/utils/siteUrl';
 
-const INSTAGRAM_URL = 'https://instagram.com/locally_kr';
+const INSTAGRAM_URL = 'https://www.instagram.com/locally.official';
 
 interface EmailLayoutProps {
     previewText?: string;
