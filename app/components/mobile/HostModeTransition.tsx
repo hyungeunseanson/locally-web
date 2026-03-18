@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 interface HostModeTransitionProps {
     targetMode: 'host' | 'guest';
@@ -10,6 +11,7 @@ interface HostModeTransitionProps {
 
 export default function HostModeTransition({ targetMode, onComplete }: HostModeTransitionProps) {
     const router = useRouter();
+    const { t } = useLanguage();
 
     useEffect(() => {
         // Strict Mode 개발 환경에서는 effect cleanup이 한 번 더 실행되므로
@@ -92,13 +94,17 @@ export default function HostModeTransition({ targetMode, onComplete }: HostModeT
                 className="mt-8 text-[15px] font-semibold text-gray-600 tracking-tight"
                 style={{ animation: 'fade-up 0.6s ease-out 0.4s both' }}
             >
-                {targetMode === 'host' ? '호스트 모드로 전환 중' : '게스트 모드로 전환 중'}
+                {targetMode === 'host'
+                    ? t('host_mode_transition_title')
+                    : t('guest_mode_transition_title')}
             </p>
             <p
                 className="mt-1.5 text-[12px] text-gray-400"
                 style={{ animation: 'fade-up 0.6s ease-out 0.6s both' }}
             >
-                {targetMode === 'host' ? '여행자들을 만나볼 준비를 해요 ✨' : '새로운 여행을 떠나볼까요 🌍'}
+                {targetMode === 'host'
+                    ? t('host_mode_transition_subtitle')
+                    : t('guest_mode_transition_subtitle')}
             </p>
         </div>
     );

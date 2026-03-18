@@ -38,6 +38,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // [1. 공통 & 헤더]
     host_mode: "호스트 모드로 전환",
     guest_mode: "게스트 모드로 전환",
+    host_mode_transition_title: "호스트 모드로 전환 중",
+    guest_mode_transition_title: "게스트 모드로 전환 중",
+    host_mode_transition_subtitle: "여행자들을 만나볼 준비를 해요 ✨",
+    guest_mode_transition_subtitle: "새로운 여행을 떠나볼까요 🌍",
     become_host: "호스트 등록하기",
     login: "로그인",
     logout: "로그아웃",
@@ -1088,6 +1092,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
   en: {
     host_mode: "Switch to Host",
     guest_mode: "Switch to Guest",
+    host_mode_transition_title: "Switching to Host Mode",
+    guest_mode_transition_title: "Switching to Guest Mode",
+    host_mode_transition_subtitle: "Getting ready to meet travelers ✨",
+    guest_mode_transition_subtitle: "Ready for a new trip? 🌍",
     become_host: "Become a Host",
     login: "Log in",
     logout: "Log out",
@@ -2101,6 +2109,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
   ja: {
     host_mode: "ホストモード",
     guest_mode: "ゲストモード",
+    host_mode_transition_title: "ホストモードに切り替え中",
+    guest_mode_transition_title: "ゲストモードに切り替え中",
+    host_mode_transition_subtitle: "旅行者に会う準備をしています ✨",
+    guest_mode_transition_subtitle: "新しい旅に出かけましょうか 🌍",
     become_host: "ホストになる",
     login: "ログイン",
     logout: "ログアウト",
@@ -3119,6 +3131,10 @@ const dictionary: Record<Locale, Record<string, string>> = {
   zh: {
     host_mode: "切换房东模式",
     guest_mode: "切换游客模式",
+    host_mode_transition_title: "正在切换到房东模式",
+    guest_mode_transition_title: "正在切换到游客模式",
+    host_mode_transition_subtitle: "准备好迎接旅行者吧 ✨",
+    guest_mode_transition_subtitle: "一起开启新的旅程吧 🌍",
     become_host: "成为房东",
     login: "登录",
     logout: "退出",
