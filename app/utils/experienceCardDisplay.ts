@@ -43,13 +43,13 @@ export function getExperienceLanguageBadges(rawLanguages: unknown, locale: strin
 export function getExperiencePriceParts(locale: string) {
   switch (normalizeLocale(locale)) {
     case 'en':
-      return { prefix: 'From ', suffix: ' / guest' };
+      return { prefix: '', suffix: ' / guest' };
     case 'ja':
       return { prefix: '', suffix: 'から / 人' };
     case 'zh':
       return { prefix: '', suffix: '起 / 人' };
     case 'ko':
     default:
-      return { prefix: '1인당 ', suffix: '부터' };
+      return { prefix: '1인당 ', suffix: '' };
   }
 }
