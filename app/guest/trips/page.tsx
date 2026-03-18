@@ -111,13 +111,13 @@ export default function GuestTripsPage() {
       <div className="flex items-center justify-between mb-3 md:mb-4">
         <h2 className="text-[15px] md:text-xl font-bold flex items-center gap-2">
           <Briefcase size={18} className="text-slate-600" />
-          나의 맞춤 의뢰
+          {t('trip_my_custom_requests')}
           {hasServiceUnread && (
             <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 animate-pulse" />
           )}
         </h2>
         <Link href="/services/my" className="flex items-center gap-1 text-[11px] md:text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">
-          전체 보기 <ChevronRight size={12} />
+          {t('trip_view_all')} <ChevronRight size={12} />
         </Link>
       </div>
 
@@ -128,10 +128,10 @@ export default function GuestTripsPage() {
       ) : serviceRequests.length === 0 ? (
         <div className="border border-dashed border-slate-200 rounded-2xl py-8 text-center bg-slate-50/60">
           <Briefcase size={22} className="text-slate-300 mx-auto mb-2" />
-          <p className="text-[12px] md:text-sm text-slate-500 mb-3">아직 등록한 맞춤 의뢰가 없습니다.</p>
+          <p className="text-[12px] md:text-sm text-slate-500 mb-3">{t('trip_no_custom_requests')}</p>
           <Link href="/services/intro">
             <button className="inline-flex items-center gap-1.5 bg-slate-900 text-white px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold hover:bg-slate-800 transition-colors">
-              <Plus size={12} /> 첫 의뢰 등록하기
+              <Plus size={12} /> {t('trip_register_first')}
             </button>
           </Link>
         </div>
@@ -159,7 +159,7 @@ export default function GuestTripsPage() {
             </Link>
           ))}
           <Link href="/services/my" className="flex items-center justify-center gap-1.5 text-[11px] md:text-xs text-slate-400 hover:text-slate-700 pt-1 transition-colors">
-            <Plus size={11} /> 새 의뢰 등록 또는 전체 보기
+            <Plus size={11} /> {t('trip_register_or_view_all')}
           </Link>
         </div>
       )}
@@ -198,7 +198,7 @@ export default function GuestTripsPage() {
           {/* ── 구분선 ── */}
           <div className="flex items-center gap-2 my-6">
             <div className="h-px flex-1 bg-slate-100" />
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">일반 예약</span>
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t('trip_tab_regular')}</span>
             <div className="h-px flex-1 bg-slate-100" />
           </div>
 
@@ -245,7 +245,7 @@ export default function GuestTripsPage() {
             {/* 구분선 */}
             <div className="flex items-center gap-3 my-8">
               <div className="h-px flex-1 bg-slate-100" />
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">일반 예약</span>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('trip_tab_regular')}</span>
               <div className="h-px flex-1 bg-slate-100" />
             </div>
 

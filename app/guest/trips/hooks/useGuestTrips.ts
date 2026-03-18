@@ -3,11 +3,13 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { fetchGuestTrips, cancelGuestTrip, syncCompletedGuestTrips, type GuestTripsResponse } from '@/app/utils/api/trips';
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 
 export function useGuestTrips() {
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const hasRequestedCompletedSyncRef = useRef(false);
 
@@ -28,12 +30,12 @@ export function useGuestTrips() {
   const cancelMutation = useMutation<unknown, Error, { bookingId: number; reason: string }>({
     mutationFn: cancelGuestTrip,
     onSuccess: () => {
-      showToast('예약 취소가 완료되었습니다.', 'success');
+      showToast(t('msg_cancel_success'), 'success');
       // 취소 성공 시 캐시를 무효화하여 목록을 즉시(자동으로) 새로고침
       queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
     },
     onError: (err) => {
-      showToast(`취소 실패: ${err.message}`, 'error');
+      showToast(`${t('msg_cancel_fail')}${err.message}`, 'error');
     }
   });
 
@@ -63,7 +65,7 @@ export function useGuestTrips() {
 
   // 🟢 3. 기존 UI 컴포넌트와 연결되는 함수 (기존 구조 100% 유지)
   const requestCancel = async (bookingId: number, reason: string) => {
-    if (!confirm('정말로 예약을 취소하시겠습니까?')) return false;
+    if (!confirm(t('msg_cancel_confirm'))) return false;
     
     try {
       await cancelMutation.mutateAsync({ bookingId, reason });

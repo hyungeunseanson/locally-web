@@ -49,7 +49,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
           trip.hasReview ? (
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[11px] md:text-xs font-semibold text-green-600 flex items-center gap-1">
-                <CheckCircle className="w-[11px] h-[11px] md:w-3 md:h-3" /> 후기 작성 완료
+                <CheckCircle className="w-[11px] h-[11px] md:w-3 md:h-3" /> {t('status_review_done')}
               </span>
               {trip.review?.id && (
                 <button
@@ -59,7 +59,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
                   }}
                   className="text-[10px] md:text-[11px] font-semibold text-slate-400 hover:text-slate-700 hover:underline"
                 >
-                  수정
+                  {t('action_edit')}
                 </button>
               )}
             </div>
@@ -75,7 +75,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
             </button>
           )
         ) : (
-          <span className="text-[10px] text-slate-400 mt-1 inline-block bg-slate-100 px-1.5 py-0.5 rounded">취소됨</span>
+          <span className="text-[10px] text-slate-400 mt-1 inline-block bg-slate-100 px-1.5 py-0.5 rounded">{t('trip_status_cancelled')}</span>
         )}
       </div>
 

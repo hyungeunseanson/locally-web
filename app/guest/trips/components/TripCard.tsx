@@ -162,11 +162,11 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 
     // 🟢 [추가] 입금 대기 상태
     if (normalizedStatus === 'pending') {
-      return { label: '입금 확인 중', color: 'bg-yellow-100 text-yellow-700 animate-pulse', icon: <Receipt size={12} /> };
+      return { label: t('status_waiting_deposit'), color: 'bg-yellow-100 text-yellow-700 animate-pulse', icon: <Receipt size={12} /> };
     }
 
-    if (normalizedStatus === 'cancellation_requested') return { label: '취소 요청중', color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12} /> };
-    if (isCancelledBookingStatus(normalizedStatus)) return { label: '취소됨', color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12} /> };
+    if (normalizedStatus === 'cancellation_requested') return { label: t('status_cancel_requesting'), color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12} /> };
+    if (isCancelledBookingStatus(normalizedStatus)) return { label: t('trip_status_cancelled'), color: 'bg-red-100 text-red-600', icon: <AlertCircle size={12} /> };
 
     const today = new Date();
     const tripDate = new Date(trip.date);
@@ -273,7 +273,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                         </button>
                       ) : (
                         <button disabled className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed">
-                          {(trip.status || '').toLowerCase() === 'cancellation_requested' ? '취소 요청중' : '취소 완료됨'}
+                          {(trip.status || '').toLowerCase() === 'cancellation_requested' ? t('status_cancel_requesting') : t('trip_status_cancelled')}
                         </button>
                       )}
                     </div>

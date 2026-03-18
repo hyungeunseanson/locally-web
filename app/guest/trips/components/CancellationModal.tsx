@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, AlertTriangle, Info } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 interface RefundInfo {
   percent: number;
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export default function CancellationModal({ isOpen, onClose, onConfirm, isProcessing, refundInfo }: Props) {
+  const { t } = useLanguage();
   const [reason, setReason] = useState('');
 
   if (!isOpen) return null;
@@ -28,7 +30,7 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
         
         {/* 헤더 */}
         <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-[16px] md:text-lg text-slate-800">예약 취소 요청</h3>
+          <h3 className="font-bold text-[16px] md:text-lg text-slate-800">{t('modal_cancel_title')}</h3>
           <button onClick={onClose} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full transition-colors">
             <X className="w-[18px] h-[18px] md:w-5 md:h-5 text-slate-500" />
           </button>
@@ -39,12 +41,12 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
           
           {/* 🟢 [핵심] 예상 환불 금액 카드 */}
           <div className={`border rounded-lg md:rounded-xl p-4 md:p-5 text-center ${refundInfo.amount > 0 ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'}`}>
-            <div className="text-[11px] md:text-xs font-bold text-slate-500 uppercase mb-1">예상 환불 금액</div>
+            <div className="text-[11px] md:text-xs font-bold text-slate-500 uppercase mb-1">{t('modal_cancel_expected_refund')}</div>
             <div className={`text-[26px] md:text-3xl font-black mb-2 ${refundInfo.amount > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
               ₩{refundInfo.amount.toLocaleString()}
             </div>
             <div className="inline-block px-2.5 md:px-3 py-1 bg-white rounded-full text-[11px] md:text-xs font-bold shadow-sm border border-slate-100">
-              환불율: <span className={refundInfo.percent === 100 ? 'text-green-600' : 'text-red-500'}>{refundInfo.percent}%</span>
+              {t('modal_cancel_refund_rate')} <span className={refundInfo.percent === 100 ? 'text-green-600' : 'text-red-500'}>{refundInfo.percent}%</span>
             </div>
             <p className="text-[10px] md:text-[11px] text-slate-500 mt-2.5 md:mt-3 flex items-center justify-center gap-1">
               <Info className="w-[11px] h-[11px] md:w-3 md:h-3"/> {refundInfo.reason}
@@ -53,20 +55,20 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
 
           {/* 환불 규정 안내 (실제 계산 규칙과 동일하게 유지) */}
           <div className="text-[11px] md:text-xs text-slate-500 bg-slate-50 p-2.5 md:p-3 rounded-lg border border-slate-100 space-y-1">
-             <div className="font-bold flex items-center gap-1 text-slate-700"><AlertTriangle className="w-[11px] h-[11px] md:w-3 md:h-3"/> 취소 규정 요약</div>
-             <p>• 결제 후 24시간 이내 철회(투어 2일 전까지): 100%</p>
-             <p>• 20일 전: 100% / 8~19일 전: 80%</p>
-             <p>• 2~7일 전: 70% / 1일 전: 40%</p>
-             <p>• 당일/지난 일정: 환불 불가</p>
+             <div className="font-bold flex items-center gap-1 text-slate-700"><AlertTriangle className="w-[11px] h-[11px] md:w-3 md:h-3"/> {t('modal_cancel_policy_summary')}</div>
+             <p>{t('modal_cancel_policy_1')}</p>
+             <p>{t('modal_cancel_policy_2')}</p>
+             <p>{t('modal_cancel_policy_3')}</p>
+             <p>{t('modal_cancel_policy_4')}</p>
           </div>
 
           {/* 취소 사유 입력 */}
           <div className="space-y-1.5 md:space-y-2">
-            <label className="text-[13px] md:text-sm font-bold text-slate-700">취소 사유를 입력해주세요</label>
+            <label className="text-[13px] md:text-sm font-bold text-slate-700">{t('modal_cancel_reason_label')}</label>
             <textarea 
               className="w-full border border-slate-300 rounded-lg md:rounded-xl p-2.5 md:p-3 text-[13px] md:text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all resize-none"
               rows={3}
-              placeholder="예: 개인 사정이 생겨서 참여가 어렵습니다."
+              placeholder={t('modal_cancel_reason_placeholder')}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
@@ -79,14 +81,14 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
             onClick={onClose}
             className="flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[13px] md:text-sm text-slate-600 hover:bg-slate-50 transition-colors"
           >
-            닫기
+            {t('button_close')}
           </button>
           <button 
             onClick={() => onConfirm(reason)}
             disabled={!reason.trim() || isProcessing}
             className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm text-white transition-all ${!reason.trim() ? 'bg-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-200'}`}
           >
-            {isProcessing ? '처리 중...' : '취소 확정'}
+            {isProcessing ? t('status_processing') : t('button_confirm_cancel')}
           </button>
         </div>
       </div>

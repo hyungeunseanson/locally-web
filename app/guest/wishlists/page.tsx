@@ -113,7 +113,7 @@ export default function WishlistsPage() {
 
       if (error) {
         console.error('위시리스트 로딩 실패:', error);
-        showToast('위시리스트를 불러오는 중 오류가 발생했어요.', 'error');
+        showToast(t('msg_wishlist_load_error'), 'error');
       } else {
         setWishlists(normalizeWishlistRows((data ?? []) as unknown[]));
       }
@@ -134,7 +134,7 @@ export default function WishlistsPage() {
     const { error } = await supabase.from('wishlists').delete().eq('id', wishlistId);
     if (error) {
       console.error(error);
-      showToast('찜 해제에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
+      showToast(t('msg_wishlist_remove_error'), 'error');
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: reData } = await supabase.from('wishlists').select('id, created_at, experiences (*)').eq('user_id', user.id).order('created_at', { ascending: false });
