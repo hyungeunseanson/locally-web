@@ -5,6 +5,12 @@
 
 ---
 
+## v3.39.30 — [Global] 한글 폰트(IBM Plex Sans KR) 전역 적용 보장
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 한글 폰트 미적용 수정 | `app/globals.css` — `body {}` 블록에 `font-family: var(--font-inter), var(--font-ibm-plex-sans-kr), ui-sans-serif, system-ui, sans-serif` 직접 지정. 기존 Tailwind `@theme` CSS 변수 중첩 구조만으로는 브라우저에 따라 폴백이 안 될 수 있어, body 레벨에서 명시적으로 보장 |
+
 ## v3.39.29 — [Community] 상세 페이지 헤더·댓글·버튼 수정
 
 | 항목 | 내용 |
