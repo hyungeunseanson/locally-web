@@ -26,10 +26,10 @@ export default function BookingConfirmationEmail({
     dashboardLink = buildAbsoluteUrl('/host/dashboard'),
 }: BookingConfirmationEmailProps) {
     return (
-        <EmailLayout previewText={`🎉 새로운 예약이 도착했습니다: ${experienceTitle}`} headerTitle="Locally">
-            <Text style={greeting}>안녕하세요, {hostName}님! 😊</Text>
+        <EmailLayout previewText={`새 게스트가 찾아왔어요 🎉 ${experienceTitle}`}>
+            <Text style={greeting}>안녕하세요, {hostName}님 👋</Text>
             <Text style={introText}>
-                기쁜 소식입니다! 회원님의 <b>[{experienceTitle}]</b> 체험에 새로운 예약이 확정되었습니다.
+                <b>[{experienceTitle}]</b> 체험에 새 게스트가 찾아왔어요! 함께하는 시간이 정말 특별해질 거예요 🎉
             </Text>
 
             {/* 영수증 / 예약 정보 형태 박스 */}
@@ -58,10 +58,10 @@ export default function BookingConfirmationEmail({
             </Section>
 
             <Text style={helperText}>
-                예약된 시간에 늦지 않게 준비해주세요. 게스트와 사전에 채팅으로 인사해보는 것도 추천드립니다.
+                게스트가 설레는 마음으로 기다리고 있어요. 채팅으로 먼저 인사를 건네보시고, 멋진 체험 준비해주세요 🙌
             </Text>
 
-            <CTAButton href={dashboardLink}>예약 세부 정보 확인하기</CTAButton>
+            <CTAButton href={dashboardLink}>예약 상세 확인하기</CTAButton>
         </EmailLayout>
     );
 }

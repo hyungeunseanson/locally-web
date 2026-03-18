@@ -20,10 +20,10 @@ export default function BookingCancellationEmail({
     dashboardLink = buildAbsoluteUrl('/host/dashboard'),
 }: BookingCancellationEmailProps) {
     return (
-        <EmailLayout previewText={`😢 예약이 취소되었습니다: ${experienceTitle}`} headerTitle="Locally">
+        <EmailLayout previewText={`예약 취소 안내 — ${experienceTitle}`}>
             <Text style={greeting}>안녕하세요, {hostName}님.</Text>
             <Text style={introText}>
-                아쉽게도 회원님의 <b>[{experienceTitle}]</b> 예약이 취소되었습니다.
+                아쉬운 소식을 전해드려요. <b>[{experienceTitle}]</b> 체험 예약이 취소되었어요.
             </Text>
 
             {/* 영수증 / 예약 정보 형태 박스 */}
@@ -40,7 +40,7 @@ export default function BookingCancellationEmail({
             </Section>
 
             <Text style={helperText}>
-                관련된 위약금 정산이나 변경된 일정표는 호스트 대시보드에서 바로 확인하실 수 있습니다. 다음 멋진 만남을 기대합니다!
+                일정은 대시보드에서 다시 열어두실 수 있어요. 다음 기회에 더 좋은 인연이 이어지길 바라요. 언제나 응원할게요 💙
             </Text>
 
             <CTAButton href={dashboardLink}>대시보드 확인하기</CTAButton>
@@ -63,10 +63,10 @@ const introText = {
 };
 
 const receiptBox = {
-    backgroundColor: '#fff1f2',
+    backgroundColor: '#fafafa',
     borderRadius: '12px',
     padding: '24px',
-    border: '1px solid #fecdd3',
+    border: '1px solid #e5e7eb',
     marginBottom: '24px',
 };
 
@@ -76,7 +76,7 @@ const receiptRow = {
 
 const labelCol = {
     width: '40%',
-    color: '#9f1239',
+    color: '#6b7280',
     fontSize: '14px',
     fontWeight: '500',
 };
@@ -91,14 +91,14 @@ const valueCol = {
 
 const valueColAlert = {
     width: '60%',
-    color: '#e11d48',
+    color: '#374151',
     fontSize: '14px',
-    fontWeight: '800',
+    fontWeight: '700',
     textAlign: 'right' as const,
 };
 
 const receiptHr = {
-    borderColor: '#fecdd3',
+    borderColor: '#e5e7eb',
     margin: '12px 0',
 };
 

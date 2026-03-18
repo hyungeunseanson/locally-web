@@ -15,7 +15,7 @@ export default function CTAButton({ href, children }: CTAButtonProps) {
 }
 
 const buttonStyle = {
-    backgroundColor: '#000000',
+    backgroundColor: '#FF385C',
     borderRadius: '12px',      // 둥글게, Airbnb 스타일
     color: '#ffffff',
     fontSize: '16px',
