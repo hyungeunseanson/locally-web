@@ -19,6 +19,8 @@ import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/u
 import { createClient } from '@/app/utils/supabase/server';
 import type { User } from '@supabase/supabase-js';
 import { Analytics } from "@vercel/analytics/react";
+import { SplashProvider } from '@/app/context/SplashContext';
+import GlobalSplash from '@/app/components/GlobalSplash';
 
 const inter = localFont({
   src: [
@@ -167,19 +169,22 @@ export default async function RootLayout({
               <ToastProvider>
                 <NotificationProvider>
                   <LanguageProvider>
+                    <SplashProvider>
+                      <GlobalSplash />
 
-                    <Suspense fallback={null}>
-                      <UserPresenceTracker />
-                    </Suspense>
+                      <Suspense fallback={null}>
+                        <UserPresenceTracker />
+                      </Suspense>
 
-                    <div className="flex flex-col min-h-screen">
-                      <ClientMainWrapper>
-                        {children}
-                      </ClientMainWrapper>
-                      <SiteFooter />
-                      <BottomTabNavigation />
-                    </div>
-                    <Analytics />
+                      <div className="flex flex-col min-h-screen">
+                        <ClientMainWrapper>
+                          {children}
+                        </ClientMainWrapper>
+                        <SiteFooter />
+                        <BottomTabNavigation />
+                      </div>
+                      <Analytics />
+                    </SplashProvider>
                   </LanguageProvider>
                 </NotificationProvider>
               </ToastProvider>

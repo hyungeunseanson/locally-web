@@ -3,12 +3,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Globe, Check } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useSplash } from '@/app/context/SplashContext';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
 type Locale = 'ko' | 'en' | 'ja' | 'zh';
 
 export default function LanguageSelector() {
   const { lang, setLang } = useLanguage();
+  const { showSplash } = useSplash();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -35,6 +37,7 @@ export default function LanguageSelector() {
   }, []);
 
   const handleLanguageChange = (newLang: Locale) => {
+    showSplash();
     setLang(newLang);
     setIsOpen(false);
 
