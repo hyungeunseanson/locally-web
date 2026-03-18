@@ -2,7 +2,7 @@
 
 @theme {
   /* Tailwind font-sans: Inter(영문 우선) + IBM Plex Sans KR(한글 fallback) */
-  --font-sans: var(--font-inter), var(--font-ibm-plex-sans-kr), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-poppins), var(--font-ibm-plex-sans-kr), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
   --color-primary: #FF385C;
   --color-primary-hover: #D90B3E;
@@ -26,7 +26,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), var(--font-ibm-plex-sans-kr), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-poppins), var(--font-ibm-plex-sans-kr), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
