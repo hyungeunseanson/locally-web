@@ -230,34 +230,34 @@ function SiteHeaderContent() {
                     <>
                       <div className="py-2 border-b border-slate-100">
                         <Link href="/host/dashboard?tab=reservations" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                          <CalendarCheck size={18} /> 예약 관리
+                          <CalendarCheck size={18} /> {t('header_reservations')}
                         </Link>
                         <Link href="/host/dashboard?tab=experiences" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                          <LayoutList size={18} /> 내 체험 관리
+                          <LayoutList size={18} /> {t('header_my_experiences')}
                         </Link>
                         <Link href="/host/dashboard?tab=inquiries" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                          <MessageSquare size={18} /> 문의함
+                          <MessageSquare size={18} /> {t('header_inquiries')}
                         </Link>
                         <Link href="/host/dashboard?tab=service-jobs" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                          <Briefcase size={18} /> 서비스 매칭
+                          <Briefcase size={18} /> {t('header_service_matching')}
                         </Link>
                       </div>
 
                       <div className="py-2 border-b border-slate-100">
                         <Link href="/host/dashboard?tab=earnings" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                          <CircleDollarSign size={18} /> 수익 및 정산
+                          <CircleDollarSign size={18} /> {t('header_earnings')}
                         </Link>
                         <Link href="/host/dashboard?tab=reviews" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                          <Star size={18} /> 받은 후기
+                          <Star size={18} /> {t('header_reviews')}
                         </Link>
                         <Link href="/host/dashboard?tab=guidelines" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                          <BookOpen size={18} /> 교육 및 가이드라인
+                          <BookOpen size={18} /> {t('header_guidelines')}
                         </Link>
                         <Link href="/host/dashboard?tab=profile" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                          <Settings size={18} /> 프로필 설정
+                          <Settings size={18} /> {t('header_profile_settings')}
                         </Link>
                         <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
-                          <Users2 size={18} /> 커뮤니티
+                          <Users2 size={18} /> {t('header_community')}
                         </Link>
                         {isAdminWhitelisted && (
                           <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
@@ -282,7 +282,7 @@ function SiteHeaderContent() {
                     <>
                       <div className="py-2 border-b border-slate-100">
                         <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm font-semibold text-slate-700">
-                          <Users2 size={18} /> 커뮤니티
+                          <Users2 size={18} /> {t('header_community')}
                         </Link>
                         <Link href="/guest/inbox" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-sm font-semibold text-slate-700">
                           <span className="flex items-center gap-3"><MessageSquare size={18} /> {t('messages')}</span>

@@ -77,7 +77,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("로그인이 필요합니다.");
+      if (!user) throw new Error(t('error_login_required') as string);
 
       // 새 이미지 업로드 (최적화 적용)
       const uploadedUrls: string[] = [];

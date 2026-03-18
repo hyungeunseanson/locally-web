@@ -46,7 +46,7 @@ export default function ServiceCard({ item }: { item: LocallyService }) {
         <div className="mt-0.5 md:mt-1">
           <span className="text-[11px] md:text-[14px] text-slate-500 font-normal">{t('cat_service')} </span>
           <span className="font-black text-slate-900 text-[12px] md:text-[15px] tracking-tight">
-            ₩{item.price.toLocaleString()}부터
+            ₩{item.price.toLocaleString()}{t('price_from')}
           </span>
         </div>
       </div>

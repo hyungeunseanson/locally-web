@@ -449,6 +449,32 @@ const dictionary: Record<Locale, Record<string, string>> = {
     status_cancel_requesting: "취소 요청중",
     msg_wishlist_load_error: "위시리스트를 불러오는 중 오류가 발생했어요.",
     msg_wishlist_remove_error: "찜 해제에 실패했어요. 잠시 후 다시 시도해주세요.",
+
+    // SiteHeader host menu items
+    header_reservations: "예약 관리",
+    header_my_experiences: "내 체험 관리",
+    header_inquiries: "문의함",
+    header_service_matching: "서비스 매칭",
+    header_earnings: "수익 및 정산",
+    header_reviews: "받은 후기",
+    header_guidelines: "교육 및 가이드라인",
+    header_profile_settings: "프로필 설정",
+    header_community: "커뮤니티",
+
+    // HostProfileCard
+    host_intro_title: "호스트 {name}님 소개",
+    host_superhost: "슈퍼호스트",
+    host_view_profile: "프로필 보기",
+    host_label_job: "직업/직장",
+    host_label_dream_destination: "꼭 여행해 보고 싶은 장소",
+    host_label_favorite_song: "학창시절 최애 노래",
+    host_label_languages: "구사 언어",
+    host_intro_default: "안녕하세요! 저는 {name}입니다. 여행과 만남을 사랑하는 호스트예요. 저와 함께 특별한 추억을 만들어보세요!",
+    host_read_more: "더 읽어보기",
+
+    // ServiceCard
+    price_from: "부터",
+    error_login_required: "로그인이 필요합니다.",
     
     res_cancel_reason: "사유",
     res_reason_none: "사유 없음",
@@ -1422,6 +1448,32 @@ const dictionary: Record<Locale, Record<string, string>> = {
     status_cancel_requesting: "Cancellation Requested",
     msg_wishlist_load_error: "An error occurred while loading the wishlist.",
     msg_wishlist_remove_error: "Failed to remove from wishlist. Please try again later.",
+
+    // SiteHeader host menu items
+    header_reservations: "Reservations",
+    header_my_experiences: "My Experiences",
+    header_inquiries: "Inbox",
+    header_service_matching: "Service Matching",
+    header_earnings: "Earnings & Payouts",
+    header_reviews: "Reviews",
+    header_guidelines: "Training & Guidelines",
+    header_profile_settings: "Profile Settings",
+    header_community: "Community",
+
+    // HostProfileCard
+    host_intro_title: "About Host {name}",
+    host_superhost: "Superhost",
+    host_view_profile: "View Profile",
+    host_label_job: "Job / Workplace",
+    host_label_dream_destination: "Dream Travel Destination",
+    host_label_favorite_song: "Favorite Song from School Days",
+    host_label_languages: "Languages Spoken",
+    host_intro_default: "Hello! I'm {name}. I'm a host who loves travel and meeting people. Let's make special memories together!",
+    host_read_more: "Read more",
+
+    // ServiceCard
+    price_from: " from",
+    error_login_required: "Login is required.",
     
     res_cancel_reason: "Reason",
     res_reason_none: "No reason provided",
@@ -2398,6 +2450,32 @@ const dictionary: Record<Locale, Record<string, string>> = {
     status_cancel_requesting: "キャンセル要求中",
     msg_wishlist_load_error: "ウィッシュリストの読み込み中にエラーが発生しました。",
     msg_wishlist_remove_error: "お気に入りの解除に失敗しました。後でもう一度お試しください。",
+
+    // SiteHeader host menu items
+    header_reservations: "予約管理",
+    header_my_experiences: "体験管理",
+    header_inquiries: "問い合わせ箱",
+    header_service_matching: "サービスマッチング",
+    header_earnings: "収益・精算",
+    header_reviews: "受け取ったレビュー",
+    header_guidelines: "研修・ガイドライン",
+    header_profile_settings: "プロフィール設定",
+    header_community: "コミュニティ",
+
+    // HostProfileCard
+    host_intro_title: "ホスト{name}の紹介",
+    host_superhost: "スーパーホスト",
+    host_view_profile: "プロフィールを見る",
+    host_label_job: "職業/職場",
+    host_label_dream_destination: "必ず行ってみたい場所",
+    host_label_favorite_song: "学生時代のお気に入り曲",
+    host_label_languages: "話せる言語",
+    host_intro_default: "こんにちは！{name}です。旅行と人との出会いを大切にするホストです。一緒に素敵な思い出を作りましょう！",
+    host_read_more: "もっと読む",
+
+    // ServiceCard
+    price_from: "から",
+    error_login_required: "ログインが必要です。",
     
     res_cancel_reason: "理由",
     res_reason_none: "理由なし",
@@ -3372,6 +3450,32 @@ const dictionary: Record<Locale, Record<string, string>> = {
     status_cancel_requesting: "已请求取消",
     msg_wishlist_load_error: "加载愿望清单时出错。",
     msg_wishlist_remove_error: "取消收藏失败。请稍后重试。",
+
+    // SiteHeader host menu items
+    header_reservations: "预订管理",
+    header_my_experiences: "体验管理",
+    header_inquiries: "和我联系",
+    header_service_matching: "服务匹配",
+    header_earnings: "收益与结算",
+    header_reviews: "收到的评价",
+    header_guidelines: "培训与指南",
+    header_profile_settings: "个人资料设置",
+    header_community: "社区",
+
+    // HostProfileCard
+    host_intro_title: "介绍房东{name}",
+    host_superhost: "超级房东",
+    host_view_profile: "查看资料",
+    host_label_job: "职业 / 工作单位",
+    host_label_dream_destination: "梦想旅游目的地",
+    host_label_favorite_song: "学生时代最爱的歌",
+    host_label_languages: "使用语言",
+    host_intro_default: "你好！我是{name}。我是一个热爱旅行和交流的房东。让我们一起创造特别的回忆吧！",
+    host_read_more: "阅读更多",
+
+    // ServiceCard
+    price_from: "起在",
+    error_login_required: "需要登录。",
 
     res_cancel_reason: "理由",
     res_reason_none: "无理由",
