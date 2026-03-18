@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Star, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 type GuestBookingReviewTarget = {
   id: string | number;
@@ -19,6 +20,7 @@ interface Props {
 
 export default function GuestReviewModal({ booking, onClose, onSuccess }: Props) {
   const { showToast } = useToast();
+  const { t } = useLanguage();
   
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState('');
@@ -26,7 +28,7 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
 
   const handleSubmit = async () => {
     if (!content.trim()) {
-      showToast('후기 내용을 입력해주세요.', 'error');
+      showToast(t('guest_review_alert_empty'), 'error');
       return;
     }
     setSubmitting(true);
@@ -47,13 +49,13 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
         throw new Error(result?.error || '후기 등록 실패');
       }
 
-      showToast('게스트 후기가 등록되었습니다!', 'success');
+      showToast(t('guest_review_alert_success'), 'success');
       onSuccess();
       onClose();
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : '알 수 없는 오류';
+      const message = e instanceof Error ? e.message : 'Unknown Error';
       console.error(e);
-      showToast('후기 등록 실패: ' + message, 'error');
+      showToast(`${t('guest_review_alert_fail')}: ${message}`, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -65,7 +67,7 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
         
         {/* 헤더 */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-lg">게스트 후기 작성</h3>
+          <h3 className="font-bold text-lg">{t('guest_review_title')}</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
         </div>
 
@@ -73,7 +75,7 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
         <div className="p-6 space-y-6">
           <div className="text-center">
             <p className="text-sm text-slate-500 mb-2">
-              <span className="font-bold text-slate-900">{booking.guest?.full_name}</span>님과의 시간은 어떠셨나요?
+              <span className="font-bold text-slate-900">{booking.guest?.full_name}</span>{t('guest_review_prompt')}
             </p>
             <div className="flex justify-center gap-2">
               {[1, 2, 3, 4, 5].map((score) => (
@@ -82,13 +84,13 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
                 </button>
               ))}
             </div>
-            <p className="text-xs font-bold text-amber-500 mt-2">{rating}점</p>
+            <p className="text-xs font-bold text-amber-500 mt-2">{rating}{t('unit_points')}</p>
           </div>
 
           <textarea 
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="게스트에 대한 솔직한 후기를 남겨주세요. 이 내용은 다른 호스트들에게 큰 도움이 됩니다."
+            placeholder={t('guest_review_placeholder')}
             className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-slate-900 resize-none"
           />
 
@@ -97,7 +99,7 @@ export default function GuestReviewModal({ booking, onClose, onSuccess }: Props)
             disabled={submitting}
             className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors disabled:opacity-50"
           >
-            {submitting ? <Loader2 className="animate-spin" size={18}/> : '후기 등록 완료'}
+            {submitting ? <Loader2 className="animate-spin" size={18}/> : t('guest_review_submit')}
           </button>
         </div>
       </div>

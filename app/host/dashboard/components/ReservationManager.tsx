@@ -173,8 +173,8 @@ guest:profiles!bookings_user_id_fkey (
     } catch (error) {
       console.error(error);
       // ✅ [복구] 에러 메시지 설정
-      setErrorMsg(t('res_error_load')); // 🟢 번역
-      if (!isBackground) showToast('예약 정보를 불러오는데 실패했습니다.', 'error');
+      setErrorMsg(t('res_toast_error_load')); // 🟢 번역
+      if (!isBackground) showToast(t('res_toast_error_load'), 'error');
     } finally {
       if (!isBackground) setLoading(false);
     }
@@ -201,8 +201,8 @@ guest:profiles!bookings_user_id_fkey (
             await sendNotification({
               recipient_id: user.id,
               type: 'new_booking',
-              title: '새로운 예약 도착',
-              content: '새로운 예약이 접수되었습니다. 확인해보세요!',
+              title: t('res_notif_new_title'),
+              content: t('res_notif_new_content'),
               link_url: '/host/dashboard'
             });
           }
@@ -211,8 +211,8 @@ guest:profiles!bookings_user_id_fkey (
             await sendNotification({
               recipient_id: user.id,
               type: 'booking_cancel_request',
-              title: '예약 취소 요청',
-              content: '게스트가 예약을 취소하고 싶어합니다. 확인해주세요.',
+              title: t('res_notif_cancel_title'),
+              content: t('res_notif_cancel_content'),
               link_url: '/host/dashboard?tab=cancelled'
             });
           }
@@ -223,8 +223,8 @@ guest:profiles!bookings_user_id_fkey (
   }, [fetchReservations, supabase, showToast, t]);
 
   const addToGoogleCalendar = (res: ReservationRecord) => {
-    const title = encodeURIComponent(`[Locally] ${res.experiences?.title} - ${res.guest?.full_name}님`);
-    const details = encodeURIComponent(`예약 번호: #${String(res.order_id || res.id)}\n게스트: ${res.guest?.full_name} (${res.guests}명)\n연락처: ${res.guest?.phone || '없음'}`);
+    const title = encodeURIComponent(`${t('res_gcal_title_prefix')}${res.experiences?.title} - ${res.guest?.full_name}`);
+    const details = encodeURIComponent(`${t('res_gcal_details_order')}${String(res.order_id || res.id)}\n${t('res_gcal_details_guest')}${res.guest?.full_name} (${res.guests}${t('res_gcal_details_persons')})\n${t('res_gcal_details_contact')}${res.guest?.phone || t('res_gcal_none')}`);
 
     const startDate = new Date(`${res.date}T${res.time || '00:00:00'}`);
     const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000));
@@ -245,21 +245,21 @@ guest:profiles!bookings_user_id_fkey (
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId: booking.id, reason: '호스트 승인' }),
       });
-      if (!res.ok) throw new Error('환불 처리에 실패했습니다.');
+      if (!res.ok) throw new Error(t('res_error_refund'));
 
       await sendNotification({
         recipient_id: booking.user_id,
         booking_id: booking.id,
         type: 'cancellation_approved',
-        title: '취소 요청 승인됨',
-        content: `'${booking.experiences?.title}' 예약 취소가 승인되어 환불이 진행됩니다.`,
+        title: t('res_notif_refund_title'),
+        content: `${t('res_notif_refund_content_prefix')}${booking.experiences?.title}${t('res_notif_refund_content_suffix')}`,
         link_url: '/guest/trips'
       });
 
       showToast(t('res_toast_approved'), 'success'); // 🟢 번역
       fetchReservations(true);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '환불 처리 중 오류가 발생했습니다.';
+      const message = err instanceof Error ? err.message : t('res_error_refund_unknown');
       showToast(message, 'error');
     } finally {
       setProcessingId(null);

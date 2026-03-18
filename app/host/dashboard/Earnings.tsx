@@ -154,13 +154,13 @@ export default function Earnings() {
                 onClick={() => router.push('/host/help')}
                 className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-3 border-b border-slate-50"
               >
-                <BookOpen size={16} className="text-slate-400" /> 호스트 가이드북
+                <BookOpen size={16} className="text-slate-400" /> {t('host_guidebook')}
               </button>
               <button
                 onClick={() => router.push('/host/dashboard?tab=profile')}
                 className="w-full text-left px-4 py-3 hover:bg-slate-50 text-sm font-medium text-slate-700 flex items-center gap-3"
               >
-                <CreditCard size={16} className="text-slate-400" /> 정산 계좌 관리
+                <CreditCard size={16} className="text-slate-400" /> {t('manage_payout_account')}
               </button>
             </div>
           )}
@@ -245,7 +245,7 @@ export default function Earnings() {
             <div className="space-y-4">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">{t('hp_earn_count')}</span>
-                <span className="font-bold text-slate-900">{stats.count}건</span>
+                <span className="font-bold text-slate-900">{stats.count}{t('unit_cases')}</span>
               </div>
 
               <div className="flex justify-between items-center">

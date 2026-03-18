@@ -69,7 +69,7 @@ function toFlagEmoji(nationality: string): string {
 }
 
 export default function GuestProfileModal({ guest, onClose }: Props) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const supabase = createClient();
   const [reviews, setReviews] = useState<GuestReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
@@ -106,8 +106,8 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
   const languages = normalizeLanguageList(guest.languages);
   const joinedAt = guest.created_at
-    ? new Date(guest.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
-    : '가입일 정보 없음';
+    ? t('joined_date').replace('{date}', new Date(guest.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'long' }))
+    : t('joined_date_unknown');
 
   const genderLabel = guest.gender ? formatGenderLabel(guest.gender) : null;
   const languageDisplay = languages.length > 0
@@ -116,10 +116,10 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
   // 2×2 attribute grid items — only render non-empty ones
   const gridItems = [
-    genderLabel ? { icon: <Users size={14} />, label: 'Gender', value: genderLabel } : null,
-    languageDisplay ? { icon: <Globe size={14} />, label: 'Languages', value: languageDisplay } : null,
-    guest.mbti ? { icon: <Smile size={14} />, label: 'MBTI', value: guest.mbti } : null,
-    guest.job ? { icon: <Briefcase size={14} />, label: 'Job', value: guest.job } : null,
+    genderLabel ? { icon: <Users size={14} />, label: t('label_gender'), value: genderLabel } : null,
+    languageDisplay ? { icon: <Globe size={14} />, label: t('profile_lang'), value: languageDisplay } : null,
+    guest.mbti ? { icon: <Smile size={14} />, label: t('label_mbti'), value: guest.mbti } : null,
+    guest.job ? { icon: <Briefcase size={14} />, label: t('profile_job'), value: guest.job } : null,
   ].filter(Boolean) as Array<{ icon: React.ReactNode; label: string; value: string }>;
 
   return (
@@ -155,7 +155,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-1.5">
                 <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] md:text-[11px] font-bold text-white">
-                  Guest
+                  {t('tab_guest').split(' ')[0]}
                 </span>
                 <span className="text-[10px] md:text-[12px] font-medium text-slate-400">
                   {joinedAt}
@@ -195,7 +195,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
 
           {/* About */}
           <section className="mb-6 md:mb-8">
-            <h3 className="mb-2 md:mb-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">About</h3>
+            <h3 className="mb-2 md:mb-3 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">{t('profile_about')}</h3>
             <div className="rounded-2xl md:rounded-3xl bg-slate-50 p-4 md:p-5 text-[13px] md:text-[15px] leading-6 md:leading-7 text-slate-700">
               <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
                 {guest.introduction || guest.bio || t('guest_modal_intro_empty')}
@@ -249,7 +249,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
                       &ldquo;{review.content}&rdquo;
                     </p>
                     <p className="mt-2 text-[11px] text-slate-400 text-right">
-                      {new Date(review.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      {new Date(review.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </p>
                   </div>
                 ))}

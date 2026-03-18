@@ -367,7 +367,9 @@ export default function ReservationCard({
         <div className="mx-4 md:mx-6 mb-4 bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
           <AlertTriangle className="text-slate-400 shrink-0 mt-0.5" size={14} />
           <p className="text-[11px] text-slate-500 leading-snug">
-            호스트 사정으로 예약을 진행할 수 없는 경우, <strong>게스트에게 메시지로 상황을 설명하고 예약을 취소하도록 요청</strong>해 주세요.
+            {t('res_card_host_cancel_notice_1')}
+            <strong>{t('res_card_host_cancel_notice_2')}</strong>
+            {t('res_card_host_cancel_notice_3')}
           </p>
         </div>
       )}
