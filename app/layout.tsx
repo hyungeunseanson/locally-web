@@ -20,15 +20,15 @@ import { createClient } from '@/app/utils/supabase/server';
 import type { User } from '@supabase/supabase-js';
 import { Analytics } from "@vercel/analytics/react";
 
-const poppins = localFont({
+const inter = localFont({
   src: [
-    { path: "./fonts/Poppins/Poppins-Regular.ttf", weight: "400", style: "normal" },
-    { path: "./fonts/Poppins/Poppins-Medium.ttf", weight: "500", style: "normal" },
-    { path: "./fonts/Poppins/Poppins-SemiBold.ttf", weight: "600", style: "normal" },
-    { path: "./fonts/Poppins/Poppins-Bold.ttf", weight: "700", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/Inter/Inter_18pt-Bold.ttf", weight: "700", style: "normal" },
   ],
   display: "swap",
-  variable: "--font-poppins",
+  variable: "--font-inter",
 });
 
 const ibmPlexSansKr = localFont({
@@ -154,7 +154,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning={true}>
-      <body className={`${poppins.variable} ${ibmPlexSansKr.variable} font-sans`}>
+      <body className={`${inter.variable} ${ibmPlexSansKr.variable} font-sans`}>
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
