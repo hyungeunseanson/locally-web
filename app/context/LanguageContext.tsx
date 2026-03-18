@@ -475,6 +475,23 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // ServiceCard
     price_from: "부터",
     error_login_required: "로그인이 필요합니다.",
+
+    // Profile completion field labels
+    field_label_avatar: "프로필 사진",
+    field_label_name: "이름",
+    field_label_bio: "자기소개",
+    field_label_languages: "구사 언어",
+    field_label_nationality: "국적",
+    field_label_phone: "연락처",
+    field_label_job: "직업",
+    field_label_school: "학교",
+    field_label_mbti: "MBTI",
+
+    // Profile completion messages
+    profile_completion_all_done: "게스트 공개 프로필이 모두 채워졌습니다.",
+    profile_completion_missing_guest: "{count}개 항목이 비어 있습니다. 예약 전 신뢰 형성과 대화 연결에 도움이 되는 정보입니다.",
+    profile_completion_missing_host: "{count}개 항목이 비어 있습니다. 노출 품질과 신뢰도에 영향을 줍니다.",
+    no_reviews_yet_guest: "아직 받은 후기가 없습니다.",
     
     res_cancel_reason: "사유",
     res_reason_none: "사유 없음",
@@ -1474,6 +1491,23 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // ServiceCard
     price_from: " from",
     error_login_required: "Login is required.",
+
+    // Profile completion field labels
+    field_label_avatar: "Profile Photo",
+    field_label_name: "Name",
+    field_label_bio: "Bio",
+    field_label_languages: "Languages Spoken",
+    field_label_nationality: "Nationality",
+    field_label_phone: "Phone Number",
+    field_label_job: "Occupation",
+    field_label_school: "School",
+    field_label_mbti: "MBTI",
+
+    // Profile completion messages
+    profile_completion_all_done: "Your guest profile is fully complete.",
+    profile_completion_missing_guest: "{count} field(s) are empty. This information helps build trust and start conversations before a booking.",
+    profile_completion_missing_host: "{count} field(s) are empty. This affects your listing quality and trustworthiness.",
+    no_reviews_yet_guest: "No reviews received yet.",
     
     res_cancel_reason: "Reason",
     res_reason_none: "No reason provided",
@@ -2476,6 +2510,23 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // ServiceCard
     price_from: "から",
     error_login_required: "ログインが必要です。",
+
+    // Profile completion field labels
+    field_label_avatar: "プロフィール写真",
+    field_label_name: "名前",
+    field_label_bio: "自己紹介",
+    field_label_languages: "話せる言語",
+    field_label_nationality: "国籍",
+    field_label_phone: "連絡先",
+    field_label_job: "職業",
+    field_label_school: "学校",
+    field_label_mbti: "MBTI",
+
+    // Profile completion messages
+    profile_completion_all_done: "ゲスト公開プロフィールが全て埋まりました。",
+    profile_completion_missing_guest: "{count}項目が空白です。予約前の信頼構築と会話のコネクションに役立つ情報です。",
+    profile_completion_missing_host: "{count}項目が空白です。掲載品質と信頼度に影響します。",
+    no_reviews_yet_guest: "まだレビューが届いていません。",
     
     res_cancel_reason: "理由",
     res_reason_none: "理由なし",
@@ -3476,6 +3527,23 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // ServiceCard
     price_from: "起在",
     error_login_required: "需要登录。",
+
+    // Profile completion field labels
+    field_label_avatar: "个人照片",
+    field_label_name: "姓名",
+    field_label_bio: "自我介绍",
+    field_label_languages: "使用语言",
+    field_label_nationality: "国籍",
+    field_label_phone: "联系方式",
+    field_label_job: "职业",
+    field_label_school: "学校",
+    field_label_mbti: "MBTI",
+
+    // Profile completion messages
+    profile_completion_all_done: "您的客人公开资料已全部完成。",
+    profile_completion_missing_guest: "{count}个项目为空。这些信息有助于预订前建立信任和连接对话。",
+    profile_completion_missing_host: "{count}个项目为空。这影响房源质量和信任度。",
+    no_reviews_yet_guest: "尚无收到评价。",
 
     res_cancel_reason: "理由",
     res_reason_none: "无理由",

@@ -91,7 +91,7 @@ export default function AccountPage() {
   const profileCompletion = getProfileCompletion(profile, 'guest');
   const profileMissingLabels = profileCompletion.missingFields
     .slice(0, 5)
-    .map((field) => PROFILE_COMPLETION_FIELD_LABELS[field]);
+    .map((field) => t(`field_label_${field}` as Parameters<typeof t>[0]));
 
   // 국가 리스트 & 국가번호 매핑
   const countries = [
@@ -656,7 +656,7 @@ export default function AccountPage() {
                 </h3>
 
                 {guestReviews.length === 0 ? (
-                  <p className="text-slate-400 text-sm py-4 text-center">아직 받은 후기가 없습니다.</p>
+                  <p className="text-slate-400 text-sm py-4 text-center">{t('no_reviews_yet_guest')}</p>
                 ) : (
                   guestReviews.map(review => (
                     <div
@@ -698,12 +698,12 @@ export default function AccountPage() {
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">프로필 완성도</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t('he_profile_completion')}</p>
                     <p className="mt-1 text-2xl font-black text-slate-900">{profileCompletion.percent}%</p>
                     <p className="mt-1 text-sm text-slate-600">
                       {profileCompletion.missingFields.length === 0
-                        ? '게스트 공개 프로필이 모두 채워졌습니다.'
-                        : `${profileCompletion.missingFields.length}개 항목이 비어 있습니다. 예약 전 신뢰 형성과 대화 연결에 도움이 되는 정보입니다.`}
+                        ? t('profile_completion_all_done')
+                        : t('profile_completion_missing_guest').replace('{count}', String(profileCompletion.missingFields.length))}
                     </p>
                   </div>
                   {profileMissingLabels.length > 0 && (

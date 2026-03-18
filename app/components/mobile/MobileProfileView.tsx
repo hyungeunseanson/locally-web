@@ -88,7 +88,7 @@ export default function MobileProfileView({
     const completion = getProfileCompletion(isEditing ? editData : profile, 'guest');
     const missingLabels = completion.missingFields
         .slice(0, 4)
-        .map((field) => PROFILE_COMPLETION_FIELD_LABELS[field]);
+        .map((field) => t(`field_label_${field}` as Parameters<typeof t>[0]));
 
     // 통계 데이터 fetch
     useEffect(() => {

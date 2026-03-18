@@ -133,7 +133,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
       if (isHeicValidationResult(validation)) {
         showHeicUnsupportedToast(validation.message);
       } else {
-        showToast(validation.message || '사진 업로드 실패', 'error');
+        showToast(validation.message || t('profile_photo_fail'), 'error');
       }
       e.target.value = '';
       return;
@@ -149,10 +149,10 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
       if (error) throw error;
       const { data } = supabase.storage.from('images').getPublicUrl(fileName);
       setAvatarUrl(data.publicUrl);
-      showToast('사진이 업로드되었습니다.', 'success');
+      showToast(t('profile_photo_change_done'), 'success');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '알 수 없는 오류';
-      showToast('사진 업로드 실패: ' + message, 'error');
+      showToast(`${t('profile_photo_fail')} ${message}`, 'error');
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -206,7 +206,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
   );
   const missingLabels = completion.missingFields
     .slice(0, 4)
-    .map((field) => PROFILE_COMPLETION_FIELD_LABELS[field]);
+    .map((field) => t(`field_label_${field}` as Parameters<typeof t>[0]));
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -247,7 +247,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
                   <p className="mt-1 text-[12px] md:text-sm text-slate-600">
                     {completion.missingFields.length === 0
                       ? t('hp_completion_done')
-                      : `${completion.missingFields.length}개 항목이 비어 있습니다. 노출 품질과 신뢰도에 영향을 줍니다.`}
+                      : t('profile_completion_missing_host').replace('{count}', String(completion.missingFields.length))}
                   </p>
                 </div>
                 {missingLabels.length > 0 && (
