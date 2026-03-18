@@ -220,7 +220,7 @@ export default function MobileProfileView({
                     disabled={saving}
                     className="rounded-full border border-gray-200 px-3.5 py-1.5 text-[12px] font-semibold text-gray-800 transition-all hover:bg-gray-50 active:scale-[0.96] disabled:opacity-50"
                 >
-                    {saving ? '저장 중...' : isEditing ? '완료' : '수정하기'}
+                    {saving ? t('saving') : isEditing ? t('btn_complete') : t('btn_edit_profile')}
                 </button>
             </div>
 
@@ -265,9 +265,9 @@ export default function MobileProfileView({
                             className="text-[13px] font-bold text-gray-900 text-center bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 w-[100px] outline-none focus:border-gray-400"
                         />
                     ) : (
-                        <p className="text-[14px] font-bold text-gray-900 text-center leading-snug">{displayProfile.full_name || '이름 없음'}</p>
+                        <p className="text-[14px] font-bold text-gray-900 text-center leading-snug">{displayProfile.full_name || t('label_no_name')}</p>
                     )}
-                    <p className="text-[10px] text-gray-400 mt-0.5">로컬리 회원</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{t('locally_member')}</p>
                 </div>
 
                 {/* 구분선 */}
@@ -276,24 +276,24 @@ export default function MobileProfileView({
                 {/* 우측: 통계 3개 */}
                 <div className="flex-1 flex flex-col gap-2.5 pb-0.5">
                     <div>
-                        <p className="text-[10px] text-gray-400 leading-none">로컬리와 함께한 여행</p>
-                        <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[11px] font-semibold">회</span></p>
+                        <p className="text-[10px] text-gray-400 leading-none">{t('trips_with_locally')}</p>
+                        <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[11px] font-semibold">{t('unit_times')}</span></p>
                     </div>
                     <div className="border-t border-gray-100" />
                     <div>
-                        <p className="text-[10px] text-gray-400 leading-none">받은 후기</p>
-                        <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[11px] font-semibold">개</span></p>
+                        <p className="text-[10px] text-gray-400 leading-none">{t('reviews_received')}</p>
+                        <p className="text-[17px] font-extrabold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[11px] font-semibold">{t('unit_items')}</span></p>
                     </div>
                     <div className="border-t border-gray-100" />
                     <div>
-                        <p className="text-[10px] text-gray-400 leading-none">로컬리와 함께한 시간</p>
+                        <p className="text-[10px] text-gray-400 leading-none">{t('time_with_locally')}</p>
                         <p className="text-[17px] font-extrabold text-gray-900 leading-tight">
                             {(() => {
                                 const y = Math.floor(stats.joinMonths / 12);
                                 const m = stats.joinMonths % 12;
-                                if (y === 0) return <>{stats.joinMonths} <span className="text-[11px] font-semibold">개월</span></>;
-                                if (m === 0) return <>{y} <span className="text-[11px] font-semibold">년</span></>;
-                                return <>{y} <span className="text-[11px] font-semibold">년</span> {m} <span className="text-[11px] font-semibold">개월</span></>;
+                                if (y === 0) return <>{stats.joinMonths} <span className="text-[11px] font-semibold">{t('unit_months')}</span></>;
+                                if (m === 0) return <>{y} <span className="text-[11px] font-semibold">{t('unit_years')}</span></>;
+                                return <>{y} <span className="text-[11px] font-semibold">{t('unit_years')}</span> {m} <span className="text-[11px] font-semibold">{t('unit_months')}</span></>;
                             })()}
                         </p>
                     </div>
@@ -323,7 +323,7 @@ export default function MobileProfileView({
                     <p className="text-[11px] leading-relaxed text-slate-600">
                         {completion.missingFields.length === 0
                             ? t('he_profile_done')
-                            : `${completion.missingFields.length}개 항목이 비어 있습니다. 호스트가 예약 전 먼저 보는 정보입니다.`}
+                            : t('profile_missing_fields').replace('{count}', completion.missingFields.length.toString())}
                     </p>
                 </div>
             </div>
@@ -339,17 +339,17 @@ export default function MobileProfileView({
                             onChange={e => setEditData(prev => ({ ...prev, nationality: e.target.value }))}
                             className="flex-1 text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
                         >
-                            <option value="">국적 선택</option>
+                            <option value="">{t('ph_select_nationality')}</option>
                             {countries.map(country => (
                                 <option key={country.code} value={country.code}>{country.name}</option>
                             ))}
                         </select>
                     ) : (
                         <span className="text-[12px] text-slate-700">
-                            국적: <span className="font-medium">
+                            {t('label_nationality')}: <span className="font-medium">
                                 {displayProfile.nationality
                                     ? countries.find(c => c.code === displayProfile.nationality)?.name?.split(' (')[0] || displayProfile.nationality
-                                    : '미입력'}
+                                    : t('not_entered')}
                             </span>
                         </span>
                     )}
@@ -367,7 +367,7 @@ export default function MobileProfileView({
                         />
                     ) : (
                         <span className="text-[12px] text-slate-700">
-                            생년월일: <span className="font-medium">{displayProfile.birth_date || '미입력'}</span>
+                            {t('label_birth')}: <span className="font-medium">{displayProfile.birth_date || t('not_entered')}</span>
                         </span>
                     )}
                 </div>
@@ -381,14 +381,14 @@ export default function MobileProfileView({
                             onChange={e => setEditData(prev => ({ ...prev, gender: e.target.value }))}
                             className="flex-1 text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
                         >
-                            <option value="">성별 선택</option>
-                            <option value="Male">남성</option>
-                            <option value="Female">여성</option>
-                            <option value="Other">기타</option>
+                            <option value="">{t('ph_select_gender')}</option>
+                            <option value="Male">{t('gender_male')}</option>
+                            <option value="Female">{t('gender_female')}</option>
+                            <option value="Other">{t('gender_other')}</option>
                         </select>
                     ) : (
                         <span className="text-[12px] text-slate-700">
-                            성별: <span className="font-medium">{displayProfile.gender || '미입력'}</span>
+                            {t('label_gender')}: <span className="font-medium">{displayProfile.gender || t('not_entered')}</span>
                         </span>
                     )}
                 </div>
@@ -400,12 +400,12 @@ export default function MobileProfileView({
                         <input
                             value={editData.phone || ''}
                             onChange={e => setEditData(prev => ({ ...prev, phone: e.target.value }))}
-                            placeholder="전화번호 입력"
+                            placeholder={t('ph_input_phone')}
                             className="flex-1 text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
                         />
                     ) : (
                         <span className="text-[12px] text-slate-700">
-                            전화번호: <span className="font-medium">{displayProfile.phone || '미입력'}</span>
+                            {t('label_phone')}: <span className="font-medium">{displayProfile.phone || t('not_entered')}</span>
                         </span>
                     )}
                 </div>
@@ -414,7 +414,7 @@ export default function MobileProfileView({
                 <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
                     <Mail className="w-4 h-4 text-slate-500 shrink-0" />
                     <span className="text-[12px] text-slate-700">
-                        이메일: <span className="font-medium">{displayProfile.email || '미입력'}</span>
+                        {t('label_email')}: <span className="font-medium">{displayProfile.email || t('not_entered')}</span>
                     </span>
                 </div>
 
@@ -425,12 +425,12 @@ export default function MobileProfileView({
                         <input
                             value={editData.kakao_id || ''}
                             onChange={e => setEditData(prev => ({ ...prev, kakao_id: e.target.value }))}
-                            placeholder="카카오 ID 입력"
+                            placeholder={t('ph_input_kakao')}
                             className="flex-1 text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
                         />
                     ) : (
                         <span className="text-[12px] text-slate-700">
-                            카카오 ID: <span className="font-medium">{displayProfile.kakao_id || '미입력'}</span>
+                            {t('label_kakao').replace(' (선택)', '')}: <span className="font-medium">{displayProfile.kakao_id || t('not_entered')}</span>
                         </span>
                     )}
                 </div>
@@ -443,15 +443,15 @@ export default function MobileProfileView({
                             <input
                                 value={editData.mbti || ''}
                                 onChange={e => setEditData(prev => ({ ...prev, mbti: e.target.value.toUpperCase() }))}
-                                placeholder="MBTI 입력"
+                                placeholder={t('ph_input_mbti')}
                                 maxLength={4}
                                 className="w-full text-[12px] uppercase text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
                             />
-                            <p className="mt-1 text-[10px] text-slate-400">성향을 빠르게 보여주는 보조 정보</p>
+                            <p className="mt-1 text-[10px] text-slate-400">{t('he_profile_desc_2')}</p>
                         </div>
                     ) : (
                         <span className="text-[12px] text-slate-700">
-                            MBTI: <span className="font-medium">{displayProfile.mbti || '미입력'}</span>
+                            {t('label_mbti')}: <span className="font-medium">{displayProfile.mbti || t('not_entered')}</span>
                         </span>
                     )}
                 </div>
@@ -463,14 +463,14 @@ export default function MobileProfileView({
                             <input
                                 value={editData.job || ''}
                                 onChange={e => setEditData(prev => ({ ...prev, job: e.target.value }))}
-                                placeholder="직업/직장 입력"
+                                placeholder={t('ph_input_job')}
                                 className="w-full text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-400"
                             />
-                            <p className="mt-1 text-[10px] text-slate-400">대화 연결 포인트를 만드는 정보</p>
+                            <p className="mt-1 text-[10px] text-slate-400">{t('he_profile_desc_3')}</p>
                         </div>
                     ) : (
                         <span className="text-[12px] text-slate-700">
-                            직업/직장: <span className="font-medium">{displayProfile.job || '미입력'}</span>
+                            {t('profile_job')}: <span className="font-medium">{displayProfile.job || t('not_entered')}</span>
                         </span>
                     )}
                 </div>
@@ -505,10 +505,10 @@ export default function MobileProfileView({
                             </div>
                         ) : (
                             <span className="text-[12px] text-slate-700">
-                                구사 언어: <span className="font-medium">
+                                {t('profile_lang')}: <span className="font-medium">
                                     {(displayProfile.languages || []).length > 0
                                         ? displayProfile.languages.join(', ')
-                                        : '미입력'}
+                                        : t('not_entered')}
                                 </span>
                             </span>
                         )}
@@ -519,28 +519,28 @@ export default function MobileProfileView({
                 <div className="flex items-center gap-2.5 py-3 border-b border-slate-100">
                     <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0" />
                     <span className="text-[12px] text-pink-600 font-semibold underline underline-offset-2">
-                        본인 인증 완료
+                        {t('verified_identity')}
                     </span>
                 </div>
 
                 {/* 자기소개 */}
                 {isEditing ? (
                     <div className="py-3.5">
-                        <p className="text-[10px] text-slate-400 font-semibold mb-1.5">자기소개</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mb-1.5">{t('label_bio')}</p>
                         <textarea
                             value={editData.bio || ''}
                             onChange={e => setEditData(prev => ({ ...prev, bio: e.target.value }))}
                             rows={3}
-                            placeholder="자기소개를 입력하세요"
+                            placeholder={t('ph_input_bio')}
                             className="w-full text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl px-2.5 py-2 outline-none focus:border-slate-400 resize-none"
                         />
-                        <p className="mt-1 text-[10px] text-slate-400">호스트가 예약 전에 가장 먼저 읽는 핵심 소개입니다.</p>
+                        <p className="mt-1 text-[10px] text-slate-400">{t('he_profile_desc_4')}</p>
                     </div>
                 ) : (
                     <div className="py-3.5">
-                        <p className="text-[10px] text-slate-400 font-semibold mb-1.5">자기소개</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mb-1.5">{t('label_bio')}</p>
                         <div className="w-full text-[12px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl px-2.5 py-2">
-                            {displayProfile.bio || '미입력'}
+                            {displayProfile.bio || t('not_entered')}
                         </div>
                     </div>
                 )}
@@ -549,9 +549,9 @@ export default function MobileProfileView({
             {/* 후기 섹션 */}
             {!isEditing && (
                 <div className="mx-4 mt-5 pb-7">
-                    <h3 className="text-[13px] font-bold text-slate-900 mb-3.5">후기</h3>
+                    <h3 className="text-[13px] font-bold text-slate-900 mb-3.5">{t('reviews_received')}</h3>
                     {guestReviews.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 text-center py-5">아직 후기가 없습니다.</p>
+                        <p className="text-[11px] text-slate-400 text-center py-5">{t('no_reviews_yet')}</p>
                     ) : (
                         <div className="space-y-3">
                             {guestReviews.slice(0, 5).map((review) => (
@@ -576,12 +576,12 @@ export default function MobileProfileView({
 
                     {guestReviews.length > 0 && (
                         <button className="w-full mt-4 py-2.5 border border-slate-200 rounded-lg md:rounded-xl text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                            후기 표시하기
+                            {t('btn_show_reviews')}
                         </button>
                     )}
 
                     <p className="text-center text-[10px] text-slate-400 mt-3.5">
-                        일부 정보는 자동 번역되었습니다. <span className="underline">원문 보기</span>
+                        {t('auto_translated_info')} <span className="underline">{t('view_original_text')}</span>
                     </p>
                 </div>
             )}

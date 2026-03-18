@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { X, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { formatGenderLabel, formatProfileLanguages, getHostPublicProfile, normalizeLanguageList } from '@/app/utils/profile';
 
 interface UserProfileModalProps {
@@ -27,6 +28,7 @@ interface UserProfileModalState {
 export default function UserProfileModal({ userId, isOpen, onClose, role }: UserProfileModalProps) {
   const [displayProfile, setDisplayProfile] = useState<UserProfileModalState | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
   const supabase = createClient();
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
           .select('name, profile_photo, self_intro, host_nationality')
           .eq('user_id', userId)
           .maybeSingle();
-        const hostPublicProfile = getHostPublicProfile(baseProfile, hostData, '호스트');
+        const hostPublicProfile = getHostPublicProfile(baseProfile, hostData, t('tab_host').split(' ')[0]);
 
         finalData = {
           ...finalData,
@@ -106,9 +108,9 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
   };
 
   const formatJoinDate = (dateString: string) => {
-    if (!dateString) return '최근';
+    if (!dateString) return t('joined_recently');
     const date = new Date(dateString);
-    return `${String(date.getFullYear()).slice(2)}.${String(date.getMonth() + 1).padStart(2, '0')} 가입`;
+    return `${String(date.getFullYear()).slice(2)}.${String(date.getMonth() + 1).padStart(2, '0')}${t('joined_suffix')}`;
   };
   const displayAvatarUrl = secureUrl(displayProfile?.display_avatar);
 
@@ -147,7 +149,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
               </div>
 
               <h2 className="text-lg md:text-xl font-bold text-slate-900 mb-1">
-                {displayProfile?.display_name || (role === 'host' ? '호스트' : '게스트')}
+                {displayProfile?.display_name || (role === 'host' ? t('tab_host').split(' ')[0] : t('tab_guest').split(' ')[0])}
               </h2>
 
               <div className="flex items-center gap-2 text-[11px] md:text-xs text-slate-500 font-medium">
@@ -167,7 +169,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                   <div className="min-w-0">
                     <div className="text-[10px] text-slate-400 font-bold uppercase">Location</div>
                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
-                      {displayProfile?.location || (role === 'host' ? '비공개' : '미입력')}
+                      {displayProfile?.location || (role === 'host' ? t('private_info') : t('not_entered'))}
                     </div>
                   </div>
                 </div>
@@ -177,7 +179,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                   <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Smile size={14} className="md:w-4 md:h-4" /></div>
                   <div className="min-w-0">
                     <div className="text-[10px] text-slate-400 font-bold uppercase">MBTI</div>
-                    <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">{displayProfile?.mbti || "비공개"}</div>
+                    <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">{displayProfile?.mbti || t("private_info")}</div>
                   </div>
                 </div>
 
@@ -187,7 +189,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
                   <div className="min-w-0">
                     <div className="text-[10px] text-slate-400 font-bold uppercase">Language</div>
                     <div className="text-[12px] md:text-sm font-semibold text-slate-700 truncate">
-                      {formatProfileLanguages(displayProfile?.languages, role === 'host' ? '비공개' : '미입력')}
+                      {formatProfileLanguages(displayProfile?.languages, role === 'host' ? t('private_info') : t('not_entered'))}
                     </div>
                   </div>
                 </div>
@@ -207,7 +209,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
               <div>
                 <h3 className="text-[11px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">About Me</h3>
                 <div className="text-[12px] md:text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 md:p-4 rounded-xl md:rounded-2xl min-h-[72px] md:min-h-[80px] whitespace-pre-wrap">
-                  {displayProfile?.display_bio || "아직 작성된 자기소개가 없습니다."}
+                  {displayProfile?.display_bio || t('guest_modal_intro_empty')}
                 </div>
               </div>
             </div>
