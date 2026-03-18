@@ -23,7 +23,11 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { CATEGORY_OPTIONS } from '@/app/host/create/config';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
-import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
+import {
+  getExperienceDurationHours,
+  getExperienceLanguageBadges,
+  getExperiencePriceParts,
+} from '@/app/utils/experienceCardDisplay';
 
 export interface HomeExperienceCardData {
   id: number | string;
@@ -39,6 +43,7 @@ export interface HomeExperienceCardData {
   country?: string | null;
   location?: string | null;
   languages?: string[] | null;
+  duration?: number | string | null;
   price?: number | string | null;
   rating?: number | null;
   review_count?: number | null;
@@ -96,6 +101,8 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
   const price = Number.isFinite(rawPrice) ? rawPrice.toLocaleString() : '45,000';
   const { prefix: pricePrefix, suffix: priceSuffix } = getExperiencePriceParts(lang);
   const languageBadges = getExperienceLanguageBadges(data.languages, lang);
+  const durationHours = getExperienceDurationHours(data.duration);
+  const durationText = durationHours ? t('exp_card_duration_hours', { hours: durationHours }) : '';
   const ratingValue = Number(data.rating || 0);
   const ratingText = ratingValue > 0 ? `★${ratingValue.toFixed(1)}` : t('exp_card_new');
   const imageUrl = data.photos?.[0] || data.image_url || 'https://images.unsplash.com/photo-1542051841857-5f90071e7989';
@@ -184,9 +191,19 @@ export default function HomeExperienceCard({ data }: { data: HomeExperienceCardD
             </span>
           )}
         </div>
-        <div className="mt-0.5 flex items-center gap-1 overflow-hidden whitespace-nowrap text-[10px] text-slate-500 md:text-[14px]">
-          <span className="shrink-0">{pricePrefix}</span>
-          <span className="truncate font-semibold text-slate-900">₩{price}{priceSuffix}</span>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-0.5 overflow-hidden text-[10px] text-slate-500 md:text-[14px]">
+          <span className="shrink-0">
+            {pricePrefix ? <span>{pricePrefix} </span> : null}
+            <span className="font-semibold text-slate-900">₩{price}{priceSuffix}</span>
+          </span>
+          {durationText && (
+            <>
+              <span className="shrink-0 text-slate-300">·</span>
+              <span data-testid="experience-card-duration" className="shrink-0 font-medium">
+                {durationText}
+              </span>
+            </>
+          )}
           <span className="shrink-0 text-slate-300">·</span>
           <span className="shrink-0 font-medium">{ratingText}</span>
         </div>

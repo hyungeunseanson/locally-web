@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Star, Globe } from 'lucide-react';
+import { Share, Heart, MapPin, Check, X, Grid, Copy, ArrowLeft, Star, Globe, Clock3 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
@@ -25,6 +25,7 @@ import {
 } from './types';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getLocalizedLanguageLabel } from '@/app/utils/languageLevels';
+import { getExperienceDurationHours } from '@/app/utils/experienceCardDisplay';
 
 type AuthUser = {
   id?: string;
@@ -97,6 +98,8 @@ export default function ExperienceClient({
   const ratingValue = Number(experience.rating || 0);
   const ratingText = ratingValue > 0 ? ratingValue.toFixed(2) : t('exp_card_new');
   const reviewCount = Number(experience.review_count || 0);
+  const durationHours = getExperienceDurationHours(experience.duration);
+  const durationText = durationHours ? t('exp_card_duration_hours', { hours: durationHours }) : '';
 
   const refreshAvailability = useCallback(async () => {
     if (!experienceId) return;
@@ -305,11 +308,21 @@ export default function ExperienceClient({
             </div>
             <p className="mt-4 text-[16px] leading-[1.65] text-slate-500 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3 text-sm font-medium text-slate-800">
+            <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-slate-800">
               <button onClick={() => scrollToSection('reviews')} className="flex items-center gap-1 hover:underline underline-offset-4">
                 <span className="font-bold">★ {ratingText}</span>
                 {reviewCount > 0 && <span className="text-slate-500 underline">{t('exp_detail_reviews_count', { count: reviewCount })}</span>}
               </button>
+              {durationText && (
+                <span
+                  data-testid="experience-duration-meta-desktop"
+                  className="inline-flex items-center gap-2 text-slate-500"
+                >
+                  <span className="text-slate-300">·</span>
+                  <Clock3 size={14} className="text-slate-400" />
+                  <span>{durationText}</span>
+                </span>
+              )}
             </div>
             <p className="mt-3 text-[15px] text-slate-500">{headerLabel}</p>
           </div>
@@ -373,13 +386,23 @@ export default function ExperienceClient({
           <div className="text-center px-2">
             <h1 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.01em] mb-3">{translatedTitle}</h1>
             <p className="text-[13px] leading-[1.42] text-slate-500 font-normal mb-4 whitespace-pre-wrap line-clamp-3">{translatedDescription}</p>
-            <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium mb-4">
+            <div className="mb-4 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[11px] font-medium">
               <Star size={11} fill="black" className="mb-[1px]" />
               <span>{ratingText}</span>
               <span className="text-slate-300">·</span>
               <button onClick={() => scrollToSection('reviews')} className="underline underline-offset-2">
                 {t('exp_detail_reviews_count', { count: reviewCount })}
               </button>
+              {durationText && (
+                <span
+                  data-testid="experience-duration-meta-mobile"
+                  className="inline-flex items-center gap-1.5 text-slate-500"
+                >
+                  <span className="text-slate-300">·</span>
+                  <Clock3 size={11} className="text-slate-400" />
+                  <span>{durationText}</span>
+                </span>
+              )}
             </div>
           </div>
 

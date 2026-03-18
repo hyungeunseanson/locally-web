@@ -7,6 +7,21 @@ const normalizeLocale = (locale: string): Locale => {
   return 'ko';
 };
 
+export function getExperienceDurationHours(rawDuration: unknown): string | null {
+  if (rawDuration == null) return null;
+
+  if (typeof rawDuration === 'string' && rawDuration.trim() === '') {
+    return null;
+  }
+
+  const duration = typeof rawDuration === 'number' ? rawDuration : Number(rawDuration);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return null;
+  }
+
+  return Number.isInteger(duration) ? String(duration) : duration.toString();
+}
+
 export function getExperienceLanguageBadges(rawLanguages: unknown, locale: string, maxVisible: number = 2) {
   const normalizedLocale = normalizeLocale(locale);
   const labels = Array.isArray(rawLanguages)

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, Lightbulb, CheckCircle2, X } from 'lucide-react';
+import { Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, Lightbulb, CheckCircle2, X, Clock3 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ReviewSection from './ReviewSection';
@@ -18,6 +18,7 @@ import {
   getLocalizedExperienceText,
   getLocalizedRefundPolicyLabel,
 } from '@/app/utils/experienceTranslation';
+import { getExperienceDurationHours } from '@/app/utils/experienceCardDisplay';
 
 type MainContentProps = {
   experience: ExperienceDetail;
@@ -67,6 +68,8 @@ export default function ExpMainContent({
     ? t('exp_language_summary_list', { summary: Array.from(new Set(normalizedLanguages)).join(languageJoiner) })
     : t('exp_language_summary_default');
   const activityLevel = getLocalizedActivityLevelLabel(rules.activity_level || '보통', lang);
+  const durationHours = getExperienceDurationHours(experience.duration);
+  const durationText = durationHours ? t('exp_card_duration_hours', { hours: durationHours }) : '';
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(copyTarget);
@@ -180,6 +183,18 @@ export default function ExpMainContent({
       <div className="pt-8 pb-12 border-t border-slate-200">
         <h3 className="text-[20px] md:text-[30px] font-semibold tracking-[-0.01em] mb-5">{t('exp_things_to_know_title')}</h3>
         <div className="space-y-5">
+          {durationText && (
+            <div data-testid="experience-duration-facts" className="flex gap-3">
+              <Clock3 size={22} className="text-slate-700 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_detail_duration_label')}</h4>
+                <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed">
+                  {t('exp_detail_duration_body', { hours: durationText })}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <Users size={22} className="text-slate-700 shrink-0 mt-0.5" />
             <div>
