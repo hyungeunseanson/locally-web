@@ -27,45 +27,46 @@ function SidebarList({
     moreHref: string;
 }) {
     return (
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="mb-4 border-b border-gray-100 pb-3">
-                <h3 className="text-[14px] font-extrabold text-gray-800">{title}</h3>
-            </div>
-            <ul className="space-y-3">
-                {items.length === 0 && (
-                    <li className="text-[12px] text-gray-400">표시할 글이 없습니다.</li>
-                )}
-                {items.map((post, idx) => (
-                    <li key={post.id}>
-                        <Link
-                            href={buildCommunityDetailHref(post.id, {
-                                hub: post.destination_hub ?? 'all',
-                                format: post.post_format,
-                                category: post.category,
-                            })}
-                            className="flex items-start gap-2 group"
-                        >
-                            <span className="text-[11px] font-black text-gray-300 mt-[2px] w-4 flex-shrink-0">{idx + 1}</span>
-                            <div className="min-w-0 flex-1">
-                                <span className="block text-[13px] text-gray-700 leading-snug group-hover:underline group-hover:text-gray-900 transition-colors line-clamp-2">
-                                    {post.title}
-                                </span>
-                                {post.destination_hub && (
-                                    <span className="mt-1 block text-[11px] font-medium text-gray-400">
-                                        {getCommunityHubMeta(post.destination_hub).label}
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="h-[10px] bg-gradient-to-b from-[#E5E5E5] via-[#EFEFEF] to-transparent" />
+            <div className="p-5 pt-3">
+                <h3 className="mb-4 text-[16px] font-semibold tracking-[-0.02em] text-[#222222]">{title}</h3>
+                <ul className="space-y-3">
+                    {items.length === 0 && (
+                        <li className="text-[12px] text-gray-400">표시할 글이 없습니다.</li>
+                    )}
+                    {items.map((post, idx) => (
+                        <li key={post.id}>
+                            <Link
+                                href={buildCommunityDetailHref(post.id, {
+                                    hub: post.destination_hub ?? 'all',
+                                    format: post.post_format,
+                                    category: post.category,
+                                })}
+                                className="flex items-start gap-2 group"
+                            >
+                                <span className="mt-[2px] w-4 flex-shrink-0 text-[11px] font-black text-gray-300">{idx + 1}</span>
+                                <div className="min-w-0 flex-1">
+                                    <span className="block line-clamp-2 text-[13px] leading-snug text-gray-700 transition-colors group-hover:text-gray-900 group-hover:underline">
+                                        {post.title}
                                     </span>
-                                )}
-                            </div>
-                        </Link>
-                    </li>
-                ))}
-            </ul>
-            <Link
-                href={moreHref}
-                className="mt-3 flex items-center justify-center gap-1 text-[13px] font-semibold text-gray-500 hover:text-gray-800 transition-colors pt-3 border-t border-gray-100"
-            >
-                더 보기 <ChevronRight size={14} />
-            </Link>
+                                    {post.destination_hub && (
+                                        <span className="mt-1 block text-[11px] font-medium text-gray-400">
+                                            {getCommunityHubMeta(post.destination_hub).label}
+                                        </span>
+                                    )}
+                                </div>
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+                <Link
+                    href={moreHref}
+                    className="mt-3 flex items-center justify-center gap-1 border-t border-gray-100 pt-3 text-[13px] font-semibold text-gray-500 transition-colors hover:text-gray-800"
+                >
+                    더 보기 <ChevronRight size={14} />
+                </Link>
+            </div>
         </div>
     );
 }
