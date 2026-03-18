@@ -9,8 +9,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 🔴 다국어 딕셔너리 확장 | `app/context/LanguageContext.tsx` — 게스트 대시보드(여행스케줄 `GuestTrips.tsx`, `TripCard.tsx`, 여행 취소 모달 등) 및 위시리스트에 포함된 하드코딩된 한국어("나의 맞춤 의뢰", "예상 환불 금액", "결제 영수증", "찜 해제 실패" 등) 대응을 위해 `trip_my_custom_requests`, `receipt_title`, `modal_cancel_expected_refund` 등의 키를 `ko`, `en`, `ja`, `zh` 사전에 추가 |
-| 🟠 대시보드 UI 핀셋 치환 | `app/guest/trips`, `CancellationModal.tsx`, `ReceiptModal.tsx`, `useGuestTrips.ts`, `wishlists/page.tsx` — 하드코딩 텍스트를 `t()` 함수로 변환. 기존 UI 레이아웃 로직은 일절 건드리지 않아 회귀 면적 최소화 |
+| 🔴 다국어 딕셔너리 확장 | `app/context/LanguageContext.tsx` — 사이트헤더 호스트메뉴(`수익 및 정산`, `내 체험 관리` 등), `HostProfileCard`(슈퍼호스트, 직업/직장 등), `ServiceCard`(부터), 게스트 대시보드 및 위시리스트(YouWish로드/해제 오류 등), `ReviewModal`(로그인 필요 메시지) 등 어드민 제외 모든 페이지의 하드코딩 한국어 키를 4개 국어(ko, en, ja, zh) 사전에 등록 |
+| 🟠 공통 컴포넌트 UI 핀셋 치환 | `SiteHeader.tsx`(호스트메뉴 라벨 9개 전대), `HostProfileCard.tsx`, `ServiceCard.tsx`, `ReviewModal.tsx`, 게스트 대시보드커포넌트, 위시리스트 페이지 — `useLanguage` 훅 주입, 하드코딩 향수 4개국어 `t()` 치환완료. 레이아웃/로직 회귀 없음 |
 
 ## v3.39.30 — [Global] 한글 폰트(IBM Plex Sans KR) 전역 적용 보장
 
