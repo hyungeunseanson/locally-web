@@ -83,7 +83,10 @@ export async function notifyExperiencePaymentConfirmed(
   if (hostId) {
     void fetch(`${getSiteUrl()}/api/notifications/send-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      },
       body: JSON.stringify({
         type: 'booking_confirmation',
         hostId,

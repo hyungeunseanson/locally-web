@@ -98,10 +98,10 @@ export async function POST(request: Request) {
     const payoutAmount = Math.floor(totalExpPrice * 0.8);
     const platformRev = Number(booking.amount || 0) - payoutAmount;
 
-    // 4. 업데이트 (확정)
-    const { error: updateError } = await supabase
+    // 4. 업데이트 (확정) — [Race Guard] status 조건부 UPDATE로 동시 요청 중복 확정 방지
+    const { data: updatedRows, error: updateError } = await supabase
       .from('bookings')
-      .update({ 
+      .update({
         status: 'confirmed',
         price_at_booking: basePrice,
         total_experience_price: totalExpPrice,
@@ -109,11 +109,18 @@ export async function POST(request: Request) {
         platform_revenue: platformRev,
         payout_status: 'pending'
       })
-      .eq('id', bookingId);
+      .eq('id', bookingId)
+      .eq('status', booking.status) // 현재 status와 동일할 때만 업데이트
+      .select('id')
+      .maybeSingle();
 
     if (updateError) {
       console.error('Update Booking Error:', updateError);
       throw new Error(updateError.message);
+    }
+    if (!updatedRows) {
+      // 다른 요청이 이미 처리 완료 — 멱등성 응답
+      return NextResponse.json({ success: true });
     }
 
     // 5. 활동 로그 기록 (안전하게 내부 처리)

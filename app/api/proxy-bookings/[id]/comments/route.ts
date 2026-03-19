@@ -70,7 +70,10 @@ export async function POST(
                 if (userEmail) {
                     fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications/send-email`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+                        },
                         body: JSON.stringify({
                             type: 'proxy_comment_notify',
                             targetEmail: userEmail,
@@ -85,7 +88,10 @@ export async function POST(
                 // Assuming admin emails are predetermined or send to a generic support email
                 fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications/send-email`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+                    },
                     body: JSON.stringify({
                         type: 'proxy_comment_notify',
                         targetEmail: process.env.ADMIN_SUPPORT_EMAIL || process.env.GMAIL_USER,

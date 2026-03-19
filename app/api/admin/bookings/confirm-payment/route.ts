@@ -68,7 +68,8 @@ export async function POST(request: Request) {
 
     const snapshot = getBookingSettlementSnapshot(booking);
 
-    const { error: updateError } = await supabaseAdmin
+    // [Race Guard] status 조건부 UPDATE — 동시 요청 중복 확정 방지
+    const { data: updatedRows, error: updateError } = await supabaseAdmin
       .from('bookings')
       .update({
         status: 'confirmed',
@@ -78,10 +79,17 @@ export async function POST(request: Request) {
         platform_revenue: snapshot.platformRevenue,
         payout_status: 'pending',
       })
-      .eq('id', bookingId);
+      .eq('id', bookingId)
+      .eq('status', booking.status) // 현재 status와 동일할 때만 업데이트
+      .select('id')
+      .maybeSingle();
 
     if (updateError) {
       throw new Error(updateError.message);
+    }
+    if (!updatedRows) {
+      // 다른 요청이 이미 처리 완료 — 멱등성 응답
+      return NextResponse.json({ success: true });
     }
 
     const experience = Array.isArray(booking.experiences) ? booking.experiences[0] : booking.experiences;

@@ -7,6 +7,12 @@ import BookingConfirmationEmail from '@/app/emails/templates/BookingConfirmation
 import BookingCancellationEmail from '@/app/emails/templates/BookingCancellationEmail';
 
 export async function POST(request: Request) {
+    // [Security] 내부 서버-to-서버 전용 라우트 — 외부 호출 차단
+    const internalSecret = request.headers.get('x-internal-secret');
+    if (!internalSecret || internalSecret !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     let body: any = {};
     try {
         body = await request.json();

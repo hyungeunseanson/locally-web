@@ -214,7 +214,10 @@ export async function POST(request: Request) {
       if (hostEmail) {
         fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+          },
           body: JSON.stringify({
             type: 'booking_cancellation',
             hostId,
