@@ -1,9 +1,43 @@
+import { readFileSync } from 'fs';
 import path from 'path';
 
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
 
 const LIVE_BASE_URL = 'https://locally-web.vercel.app';
 const TEST_IMAGE_PATH = path.resolve(__dirname, 'test-image.png');
+type EnvMap = Record<string, string>;
+
+let adminClient: SupabaseClient | null = null;
+const createdAuthUserIds: string[] = [];
+const createdApplicationIds: string[] = [];
+const createdUserEmails: string[] = [];
+const createdAdminAlertMessageFragments: string[] = [];
+
+function loadEnv(): EnvMap {
+  return readFileSync('.env.local', 'utf8')
+    .split(/\n/)
+    .reduce<EnvMap>((acc, line) => {
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) acc[match[1]] = match[2];
+      return acc;
+    }, {});
+}
+
+function getAdminClient() {
+  if (adminClient) return adminClient;
+
+  const env = loadEnv();
+  adminClient = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+    }
+  );
+
+  return adminClient;
+}
 
 function createUniqueUser() {
   const timestamp = Date.now();
@@ -25,6 +59,53 @@ async function clickFooterNext(page: Page) {
     .click();
 }
 
+async function waitForProfileIdByEmail(email: string) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id) return String(data.id);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Profile was not created for auth user ${email}.`);
+}
+
+test.afterAll(async () => {
+  const supabase = getAdminClient();
+
+  for (const applicationId of createdApplicationIds) {
+    await supabase.from('host_applications').delete().eq('id', applicationId);
+  }
+
+  for (const messageFragment of createdAdminAlertMessageFragments) {
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('type', 'admin_alert')
+      .ilike('message', `%${messageFragment}%`);
+  }
+
+  for (const email of createdUserEmails) {
+    await supabase.from('host_applications').delete().eq('email', email);
+  }
+
+  for (const userId of createdAuthUserIds) {
+    await supabase.from('host_applications').delete().eq('user_id', userId);
+    await supabase.from('notifications').delete().eq('user_id', userId);
+    await supabase.from('profiles').delete().eq('id', userId);
+    await supabase.from('users').delete().eq('id', userId);
+    await supabase.auth.admin.deleteUser(userId);
+  }
+});
+
 test.describe.serial('Live host signup and registration flow', () => {
   test.use({ baseURL: LIVE_BASE_URL });
   test.setTimeout(240000);
@@ -32,6 +113,8 @@ test.describe.serial('Live host signup and registration flow', () => {
   test('signs up from host landing and submits a host application', async ({ page }, testInfo) => {
     const user = createUniqueUser();
     const browserIssues: string[] = [];
+    createdUserEmails.push(user.email);
+    createdAdminAlertMessageFragments.push(user.fullName);
 
     page.on('pageerror', (error) => {
       browserIssues.push(`[pageerror] ${error.message}`);
@@ -54,7 +137,11 @@ test.describe.serial('Live host signup and registration flow', () => {
       const modal = page.locator('div.fixed.inset-0.z-\\[200\\]').last();
       await expect(modal).toBeVisible();
 
-      await modal.locator('div.mt-6.text-center.text-sm > button').click();
+      await modal
+        .getByRole('button', {
+          name: /계정이 없으신가요|Don't have an account|アカウントをお持ちでないですか|没有账号/,
+        })
+        .click();
       await expect(modal.getByRole('button', { name: /회원가입|Sign up|登録|注册/ })).toBeVisible();
     });
 
@@ -90,6 +177,9 @@ test.describe.serial('Live host signup and registration flow', () => {
           `Signup did not complete into an authenticated session. The modal remained open with header "${header}". Email verification or signup handling is blocking the flow.`
         );
       }
+
+      const createdUserId = await waitForProfileIdByEmail(user.email);
+      createdAuthUserIds.push(createdUserId);
     });
 
     await test.step('Enter the host registration page after signup', async () => {
@@ -172,6 +262,19 @@ test.describe.serial('Live host signup and registration flow', () => {
 
       await page.waitForURL('**/host/dashboard**', { timeout: 30000 });
       await expect(page).toHaveURL(/\/host\/dashboard/);
+
+      const { data: application, error: applicationError } = await getAdminClient()
+        .from('host_applications')
+        .select('id')
+        .eq('email', user.email)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (applicationError) throw applicationError;
+      if (application?.id) {
+        createdApplicationIds.push(String(application.id));
+      }
     });
 
     await test.step('Capture the final state and attach browser-side issues', async () => {

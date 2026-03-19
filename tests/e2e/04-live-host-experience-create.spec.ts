@@ -1,10 +1,43 @@
+import { readFileSync } from 'fs';
 import path from 'path';
 
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test } from '@playwright/test';
 
 const LIVE_BASE_URL = 'https://locally-web.vercel.app';
 const HOST_EMAIL = 'codex.host.1772980212472@example.com';
 const HOST_PASSWORD = 'LocallyTest!2026';
+type EnvMap = Record<string, string>;
+
+let adminClient: SupabaseClient | null = null;
+const createdExperienceIds: number[] = [];
+const createdExperienceTitles: string[] = [];
+const createdAdminAlertMessageFragments: string[] = [];
+
+function loadEnv(): EnvMap {
+  return readFileSync('.env.local', 'utf8')
+    .split(/\n/)
+    .reduce<EnvMap>((acc, line) => {
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) acc[match[1]] = match[2];
+      return acc;
+    }, {});
+}
+
+function getAdminClient() {
+  if (adminClient) return adminClient;
+
+  const env = loadEnv();
+  adminClient = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+    }
+  );
+
+  return adminClient;
+}
 
 const IMAGE_POOL = [
   path.resolve(process.cwd(), 'public/images/host-transition.png'),
@@ -25,6 +58,38 @@ async function clickFooterButton(page: import('@playwright/test').Page, pattern:
   await page.locator('footer').getByRole('button', { name: pattern }).click();
 }
 
+test.afterAll(async () => {
+  const supabase = getAdminClient();
+  const experienceIds = new Set<number>(createdExperienceIds);
+
+  for (const messageFragment of createdAdminAlertMessageFragments) {
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('type', 'admin_alert')
+      .ilike('message', `%${messageFragment}%`);
+  }
+
+  for (const title of createdExperienceTitles) {
+    const { data, error } = await supabase
+      .from('experiences')
+      .select('id')
+      .eq('title', title);
+
+    if (error) throw error;
+    for (const row of data || []) {
+      if (row?.id != null) {
+        experienceIds.add(Number(row.id));
+      }
+    }
+  }
+
+  for (const experienceId of experienceIds) {
+    await supabase.from('experience_availability').delete().eq('experience_id', experienceId);
+    await supabase.from('experiences').delete().eq('id', experienceId);
+  }
+});
+
 test.describe.serial('Live approved host experience creation flow', () => {
   test.use({ baseURL: LIVE_BASE_URL });
   test.setTimeout(240000);
@@ -33,6 +98,8 @@ test.describe.serial('Live approved host experience creation flow', () => {
     const browserIssues: string[] = [];
     const uploads = pickUploadImages();
     const experienceTitle = `[Playwright] Live Host Experience ${Date.now()}`;
+    createdExperienceTitles.push(experienceTitle);
+    createdAdminAlertMessageFragments.push(experienceTitle);
 
     page.on('pageerror', (error) => {
       browserIssues.push(`[pageerror] ${error.message}`);
@@ -87,7 +154,7 @@ test.describe.serial('Live approved host experience creation flow', () => {
         )
         .fill(experienceTitle);
 
-      await page.locator('input[type="file"]').first().setInputFiles(uploads.heroImages);
+      await page.locator('main input[type="file"][multiple]').setInputFiles(uploads.heroImages);
       await expect(page.locator('img[alt*="preview"]').first()).toBeVisible({ timeout: 15000 });
       await expect(page.locator('img[alt*="preview"]')).toHaveCount(3, { timeout: 15000 });
 
@@ -119,7 +186,9 @@ test.describe.serial('Live approved host experience creation flow', () => {
         .first()
         .fill('We meet, introduce the route, and start a neighborhood food walk together.');
 
-      await page.locator('input[type="file"]').first().setInputFiles(uploads.itineraryImage);
+      await page
+        .getByLabel(/장소 사진 추가|Add place photo|場所の写真を追加|添加地点照片/)
+        .setInputFiles(uploads.itineraryImage);
       await expect(page.locator('img[alt*="preview"]').first()).toBeVisible({ timeout: 15000 });
 
       await clickFooterButton(page, /다음|Next|次へ|下一步/);
@@ -171,7 +240,20 @@ test.describe.serial('Live approved host experience creation flow', () => {
 
       await page.waitForURL('**/host/dashboard?tab=experiences', { timeout: 30000 });
       await expect(page).toHaveURL(/\/host\/dashboard\?tab=experiences/);
-      await expect(page.getByText(experienceTitle)).toBeVisible({ timeout: 20000 });
+      await expect(page.getByRole('heading', { name: experienceTitle })).toBeVisible({ timeout: 20000 });
+
+      const { data: createdExperience, error: createdExperienceError } = await getAdminClient()
+        .from('experiences')
+        .select('id')
+        .eq('title', experienceTitle)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (createdExperienceError) throw createdExperienceError;
+      if (createdExperience?.id != null) {
+        createdExperienceIds.push(Number(createdExperience.id));
+      }
     });
 
     await test.step('Capture final state and attach created experience metadata', async () => {
