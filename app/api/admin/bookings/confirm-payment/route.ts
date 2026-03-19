@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     }
 
     const { bookingId } = await request.json();
-    if (!bookingId) {
+    // [Security] bookingId 타입 검증 — object injection으로 쿼리 조건 우회 방어
+    if (!bookingId || typeof bookingId !== 'string') {
       return NextResponse.json({ success: false, error: 'bookingId is required' }, { status: 400 });
     }
 
@@ -93,6 +94,12 @@ export async function POST(request: Request) {
     }
 
     const experience = Array.isArray(booking.experiences) ? booking.experiences[0] : booking.experiences;
+    // [Safety] experience null 시 알림 전송 자체를 중단 — 삭제된 체험에 대한 확정 알림 방지
+    if (!experience) {
+      console.error('[ADMIN confirm-payment] experience not found for booking:', bookingId);
+      revalidatePath(`/experiences/${booking.experience_id}`);
+      return NextResponse.json({ success: true });
+    }
     const hostId = experience?.host_id;
     const experienceTitle = experience?.title || 'Locally 체험';
 
@@ -164,18 +171,23 @@ export async function POST(request: Request) {
       console.error('[ADMIN] booking confirm-payment side effect error:', notificationError);
     }
 
-    await recordAuditLog({
-      admin_id: user.id,
-      admin_email: user.email,
-      action_type: 'ADMIN_CONFIRM_BOOKING_PAYMENT',
-      target_type: 'booking',
-      target_id: String(bookingId),
-      details: {
-        experience_title: experienceTitle,
-        amount: booking.amount,
-        guest_name: booking.contact_name,
-      },
-    });
+    // [Fix] recordAuditLog 실패 시 이미 확정된 예약이 500으로 응답되는 것 방지
+    try {
+      await recordAuditLog({
+        admin_id: user.id,
+        admin_email: user.email,
+        action_type: 'ADMIN_CONFIRM_BOOKING_PAYMENT',
+        target_type: 'booking',
+        target_id: String(bookingId),
+        details: {
+          experience_title: experienceTitle,
+          amount: booking.amount,
+          guest_name: booking.contact_name,
+        },
+      });
+    } catch (auditErr) {
+      console.error('[ADMIN confirm-payment] audit log failed (ignored):', auditErr);
+    }
 
     revalidatePath(`/experiences/${booking.experience_id}`);
 

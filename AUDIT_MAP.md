@@ -125,7 +125,7 @@
 | - [ ] | `app/host/experiences/[id]/dates/page.tsx` | 날짜/슬롯 관리 | 이미 예약된 슬롯 삭제 방어 |
 | - [ ] | `app/api/host/experiences/route.ts` | 체험 목록 조회/생성 | 호스트 본인 체험만 반환 검증 |
 | - [x] | `app/api/host/experiences/[id]/route.ts` | 체험 수정/삭제 | ✅ 수정완료: DELETE 전 활성 예약 존재 시 409 차단 |
-| - [ ] | `app/api/host/experiences/[id]/availability/route.ts` | 가용 슬롯 관리 | 동시 수정 충돌, 슬롯 삭제 시 기존 예약 처리 |
+| - [x] | `app/api/host/experiences/[id]/availability/route.ts` | 가용 슬롯 관리 | ✅ 수정완료: insert→upsert(ignoreDuplicates) 동시 슬롯 중복 삽입 방어. TOCTOU 삭제 race는 RPC 없이 해결 불가 → 알려진 리스크로 기록 |
 | - [x] | `app/api/host/experiences/shared.ts` | 체험 공통 유틸 | ✅ 수정완료: CRITICAL — updateQuery 재할당 버그 수정 (호스트 소유권 필터 미적용) |
 
 ### 3-3. 호스트 대시보드
@@ -156,8 +156,8 @@
 | - [x] | `app/api/payment/paypal/create-order/route.ts` | PayPal 주문 생성 | ✅ 감사완료: 금액 DB에서 조회, 중복 주문 생성 가능하나 capture 단계에서 차단됨 |
 | - [x] | `app/api/payment/paypal/capture-order/route.ts` | PayPal 결제 캡처 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE로 중복 캡처 DB 반영 차단 |
 | - [x] | `app/api/payment/cancel/route.ts` | 결제 취소/환불 | ✅ 수정완료: PG 환불 전 atomic lock (status→cancellation_requested), DB 업데이트 에러 체크 추가 |
-| - [x] | `app/api/bookings/confirm-payment/route.ts` | 무통장 입금 확인 (호스트) | ✅ 수정완료: `.eq('status', booking.status)` 조건부 UPDATE + 멱등성 응답 |
-| - [x] | `app/api/admin/bookings/confirm-payment/route.ts` | 무통장 어드민 확인 | ✅ 수정완료: 동일 atomic CAS 패턴 적용 |
+| - [x] | `app/api/bookings/confirm-payment/route.ts` | 무통장 입금 확인 (호스트) | ✅ 수정완료: CAS 조건부 UPDATE; payment_method!='bank' guard 추가; 非pending→409 반환; 이메일 호출 개별 try/catch 분리; bookingId 타입 검증 |
+| - [x] | `app/api/admin/bookings/confirm-payment/route.ts` | 무통장 어드민 확인 | ✅ 수정완료: CAS 조건부 UPDATE; bookingId 타입 검증; experience null guard; recordAuditLog 독립 try/catch 분리 |
 | - [x] | `app/utils/paypal/server.ts` | PayPal 서버 유틸 | ✅ 수정완료: capture/refund에 `PayPal-Request-Id` 멱등성 헤더 추가 |
 | - [x] | `app/utils/portone/server.ts` | PortOne/NicePay 서버 유틸 | ✅ 감사완료: 서버사이드 금액 검증 정상 |
 | - [x] | `app/utils/bookingFinance.ts` | 결제 금액 계산 | ✅ 감사완료: Math.floor 다단계 1~2원 오차 허용 범위 (KRW 특성상 무시 가능) |

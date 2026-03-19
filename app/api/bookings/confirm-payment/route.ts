@@ -58,7 +58,10 @@ export async function POST(request: Request) {
     }
     const { bookingId } = await request.json();
 
-    if (!bookingId) throw new Error('Missing bookingId');
+    // [Security] bookingId 타입 검증 — object injection으로 쿼리 조건 우회 방어
+    if (!bookingId || typeof bookingId !== 'string') {
+      return NextResponse.json({ error: 'Invalid bookingId' }, { status: 400 });
+    }
 
     // 1. 예약 정보 조회
     const { data: booking, error: fetchError } = await supabase
@@ -72,9 +75,14 @@ export async function POST(request: Request) {
       throw new Error('예약 정보를 찾을 수 없습니다.');
     }
 
-    // 중복 처리 방지 (LEGACY): 이미 확정된 예약이면 알림 재발송 없이 성공 반환
+    // [Payment method guard] 무통장 예약만 입금 확인 가능 — 카드 예약을 관리자가 이중 확정하는 것 차단
+    if (booking.payment_method !== 'bank') {
+      return NextResponse.json({ error: '무통장 예약만 입금 확인할 수 있습니다.' }, { status: 409 });
+    }
+
+    // 중복 처리 방지 (LEGACY): 이미 확정된 예약이면 409 반환 (caller가 silent 200과 구분 가능하도록)
     if (!isPendingBookingStatus(booking.status)) {
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: false, error: '현재 상태에서는 입금 확인할 수 없습니다.' }, { status: 409 });
     }
 
     // 2. 체험 정보 조회
@@ -165,33 +173,47 @@ export async function POST(request: Request) {
         await supabase.from('notifications').insert(notifications);
       }
 
+      // [Fix] 이메일 호출을 각각 독립 try/catch로 분리
+      // — 호스트 이메일 실패 시 게스트 이메일이 묻혀버리는 버그 방지
       if (experience.host_id) {
-        await sendImmediateGenericEmail({
-          recipientUserId: experience.host_id,
-          subject: `[Locally] 💰 입금 확인 완료!`,
-          title: '입금 확인 완료!',
-          message: `'${experience.title}' 예약의 입금 확인이 완료되었습니다.`,
-          link: '/host/dashboard',
-          ctaLabel: '호스트 대시보드 열기',
-        });
+        try {
+          await sendImmediateGenericEmail({
+            recipientUserId: experience.host_id,
+            subject: `[Locally] 💰 입금 확인 완료!`,
+            title: '입금 확인 완료!',
+            message: `'${experience.title}' 예약의 입금 확인이 완료되었습니다.`,
+            link: '/host/dashboard',
+            ctaLabel: '호스트 대시보드 열기',
+          });
+        } catch (hostEmailErr) {
+          console.error('Host email failed (ignored):', hostEmailErr);
+        }
       }
 
       if (booking.user_id) {
-        await sendImmediateGenericEmail({
-          recipientUserId: booking.user_id,
-          subject: `[Locally] ✅ 예약이 확정되었습니다`,
-          title: '예약 확정 알림',
-          message: `'${experience.title}' 입금이 확인되어 예약이 확정되었습니다.`,
-          link: '/guest/trips',
-          ctaLabel: '내 여행 보기',
-        });
+        try {
+          await sendImmediateGenericEmail({
+            recipientUserId: booking.user_id,
+            subject: `[Locally] ✅ 예약이 확정되었습니다`,
+            title: '예약 확정 알림',
+            message: `'${experience.title}' 입금이 확인되어 예약이 확정되었습니다.`,
+            link: '/guest/trips',
+            ctaLabel: '내 여행 보기',
+          });
+        } catch (guestEmailErr) {
+          console.error('Guest email failed (ignored):', guestEmailErr);
+        }
       }
 
-      await insertAdminAlerts({
-        title: '체험 예약 무통장 입금이 확인되었습니다',
-        message: `'${experience.title}' 예약의 무통장 입금 확인이 완료되었습니다.`,
-        link: '/admin/dashboard?tab=LEDGER',
-      });
+      try {
+        await insertAdminAlerts({
+          title: '체험 예약 무통장 입금이 확인되었습니다',
+          message: `'${experience.title}' 예약의 무통장 입금 확인이 완료되었습니다.`,
+          link: '/admin/dashboard?tab=LEDGER',
+        });
+      } catch (alertErr) {
+        console.error('Admin alert failed (ignored):', alertErr);
+      }
     } catch (notiError) {
       console.error('Notification Failed (Ignored):', notiError);
     }

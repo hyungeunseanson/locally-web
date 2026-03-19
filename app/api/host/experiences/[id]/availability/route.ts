@@ -164,8 +164,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     if (toInsert.length > 0) {
-      const { error } = await supabaseAdmin.from('experience_availability').insert(toInsert);
-      if (error) throw error;
+      // [Fix] upsert + ignoreDuplicates: 동시 POST 요청에서 같은 슬롯을 중복 삽입해도 23505 에러 없이 처리
+      const { error } = await supabaseAdmin
+        .from('experience_availability')
+        .upsert(toInsert, { onConflict: 'experience_id,date,start_time', ignoreDuplicates: true });
+      if (error && (error as { code?: string }).code !== '23505') throw error;
     }
 
     let deletedCount = 0;
