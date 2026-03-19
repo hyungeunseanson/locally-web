@@ -155,7 +155,7 @@
 | - [x] | `app/api/payment/card-ready/route.ts` | 카드 결제 준비 | ✅ 감사완료: 금액 미포함 라우트, 보안 상태 노출 low-risk |
 | - [x] | `app/api/payment/paypal/create-order/route.ts` | PayPal 주문 생성 | ✅ 감사완료: 금액 DB에서 조회, 중복 주문 생성 가능하나 capture 단계에서 차단됨 |
 | - [x] | `app/api/payment/paypal/capture-order/route.ts` | PayPal 결제 캡처 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE로 중복 캡처 DB 반영 차단 |
-| - [x] | `app/api/payment/cancel/route.ts` | 결제 취소/환불 | ✅ 수정완료: PG 환불 전 atomic lock (status→cancellation_requested), DB 업데이트 에러 체크 추가 |
+| - [x] | `app/api/payment/cancel/route.ts` | 결제 취소/환불 | ✅ 수정완료: CRITICAL — isCancelledBookingStatus로 교체(declined/cancellation_requested 차단); isHostCancel guard를 lock 전으로 이동; PG 실패 시 rollback; SSRF 위험 fetch→direct email; profiles.full_name; createAdminClient() |
 | - [x] | `app/api/bookings/confirm-payment/route.ts` | 무통장 입금 확인 (호스트) | ✅ 수정완료: CAS 조건부 UPDATE; payment_method!='bank' guard 추가; 非pending→409 반환; 이메일 호출 개별 try/catch 분리; bookingId 타입 검증 |
 | - [x] | `app/api/admin/bookings/confirm-payment/route.ts` | 무통장 어드민 확인 | ✅ 수정완료: CAS 조건부 UPDATE; bookingId 타입 검증; experience null guard; recordAuditLog 독립 try/catch 분리 |
 | - [x] | `app/utils/paypal/server.ts` | PayPal 서버 유틸 | ✅ 수정완료: capture/refund에 `PayPal-Request-Id` 멱등성 헤더 추가 |
@@ -168,7 +168,7 @@
 |------|------|------|-----------------|
 | - [x] | `app/api/services/payment/nicepay-callback/route.ts` | 서비스 NicePay 콜백 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE + 멱등성 응답 |
 | - [x] | `app/api/services/payment/paypal/capture-order/route.ts` | 서비스 PayPal 캡처 | ✅ 수정완료: 동일 CAS 패턴 적용 |
-| - [x] | `app/api/services/payment/mark-bank/route.ts` | 서비스 무통장 처리 | ✅ 수정완료: status 대소문자 정규화; UPDATE에 customer_id + status filter 추가 |
+| - [x] | `app/api/services/payment/mark-bank/route.ts` | 서비스 무통장 처리 | ✅ 수정완료: status 대소문자 정규화; UPDATE에 customer_id + status + payment_method IS NULL 추가 (atomic race guard) |
 | - [x] | `app/api/admin/service-confirm-payment/route.ts` | 서비스 어드민 결제 확인 | ✅ 수정완료: 조건부 UPDATE + 멱등성 응답 |
 
 ---

@@ -42,13 +42,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // [Race Guard] status 조건 포함 UPDATE — 동시 요청에서 체크-후-수정 불일치 방어
+    // [Race Guard] status + payment_method 조건 포함 UPDATE — 동시 요청에서 체크-후-수정 불일치 방어
     const { error } = await supabaseAdmin
       .from('service_bookings')
       .update({ payment_method: 'bank' })
       .eq('order_id', orderId)
       .eq('customer_id', user.id)
-      .filter('status', 'ilike', 'PENDING');
+      .filter('status', 'ilike', 'PENDING')
+      .is('payment_method', null);
 
     if (error) throw error;
 

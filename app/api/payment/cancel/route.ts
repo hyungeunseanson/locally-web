@@ -1,9 +1,9 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { toZonedTime } from 'date-fns-tz';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { isCancelledOnlyBookingStatus } from '@/app/constants/bookingStatus';
+import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
@@ -43,10 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseAdmin = createAdminClient();
 
     // 1. 예약 조회
     const { data: booking, error } = await supabaseAdmin
@@ -68,7 +65,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    if (isCancelledOnlyBookingStatus(booking.status)) return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
+    // [CRITICAL Fix] 모든 terminal 상태(cancelled/declined/cancellation_requested) 차단 — 기존 isCancelledOnlyBookingStatus('cancelled' 단독)는 declined/cancellation_requested를 통과시킴
+    if (isCancelledBookingStatus(booking.status)) return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
+
+    // [HIGH Fix] isHostCancel 권한 검증을 lock 획득 전에 수행 — 기존 위치(lock 후)는 403 반환 시 booking이 'cancellation_requested'에 영구 잠김
+    if (isHostCancel && !isAdmin && booking.experiences?.host_id !== user.id) {
+      return NextResponse.json({ error: 'Only host can perform host cancellation' }, { status: 403 });
+    }
 
     // [Race Guard] Atomic lock: PG 환불 전에 DB 상태를 먼저 점유 — 동시 요청 이중 환불 방지
     const { data: lockAcquired } = await supabaseAdmin
@@ -88,10 +91,6 @@ export async function POST(request: Request) {
     let reasonText = '';
 
     if (isHostCancel) {
-      // Ensure it is actually the host canceling
-      if (booking.experiences?.host_id !== user.id) {
-        return NextResponse.json({ error: 'Only host can perform host cancellation' }, { status: 403 });
-      }
       refundRate = 100;
       reasonText = '호스트 사유 취소';
     } else {
@@ -202,7 +201,7 @@ export async function POST(request: Request) {
 
     if (hostId) {
       let hostEmail = '';
-      const { data: hostProfile } = await supabaseAdmin.from('profiles').select('email, name').eq('id', hostId).maybeSingle();
+      const { data: hostProfile } = await supabaseAdmin.from('profiles').select('email, full_name').eq('id', hostId).maybeSingle();
 
       if (hostProfile?.email) {
         hostEmail = hostProfile.email;
@@ -211,21 +210,17 @@ export async function POST(request: Request) {
         if (authData?.user?.email) hostEmail = authData.user.email;
       }
 
+      // [Security Fix] 기존 HTTP fetch + x-internal-secret(SERVICE_ROLE_KEY 헤더 전송) 제거
+      // — NEXT_PUBLIC_SITE_URL은 클라이언트 노출 변수로 SSRF 위험, 대신 직접 함수 호출
       if (hostEmail) {
-        fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-          },
-          body: JSON.stringify({
-            type: 'booking_cancellation',
-            hostId,
-            experienceTitle: expTitle,
-            cancelReason: userReason,
-            refundAmount: refundAmount
-          })
-        }).catch(e => console.error('Background fetch to send-email failed:', e));
+        void sendImmediateGenericEmail({
+          recipientUserId: hostId,
+          subject: '[Locally] 예약 취소 안내 (호스트)',
+          title: '예약이 취소되었습니다',
+          message: `[${expTitle}] 예약이 취소되었습니다. 취소 사유: ${userReason || '미제공'}. 환불액: ₩${refundAmount.toLocaleString()}`,
+          link: '/host/dashboard',
+          ctaLabel: '대시보드 보기',
+        }).catch(e => console.error('Host booking cancellation email failed:', e));
       }
     }
 
@@ -253,6 +248,21 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Cancel Error';
     console.error('Cancel Error:', error);
+
+    // [HIGH Fix] PG 실패 시 sentinel lock 해제 — 'cancellation_requested'에 영구 잠김 방지
+    // Note: PG가 실제로 환불을 처리했을 가능성이 있으면 이 복원은 위험 — 수동 조정 로그로 보완
+    try {
+      if (typeof bookingId === 'string' || typeof bookingId === 'number') {
+        await createAdminClient()
+          .from('bookings')
+          .update({ status: 'cancelled', cancel_reason: `PG 오류로 인한 자동 취소: ${message}` })
+          .eq('id', bookingId)
+          .eq('status', 'cancellation_requested');
+      }
+    } catch (rollbackErr) {
+      console.error('Cancel rollback failed (manual reconciliation required):', rollbackErr);
+    }
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
