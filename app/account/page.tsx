@@ -16,7 +16,7 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
-import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { fetchAdminAccess } from '@/app/utils/adminAccessClient';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
@@ -177,10 +177,7 @@ export default function AccountPage() {
       if (!user) { router.push('/'); return; }
       setUser(user);
 
-      const adminAccess = await resolveAdminAccess(supabase, {
-        userId: user.id,
-        email: user.email,
-      });
+      const adminAccess = await fetchAdminAccess();
       setHasAdminAccess(adminAccess.isAdmin);
 
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();

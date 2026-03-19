@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { User, CheckCircle2, Star } from 'lucide-react';
 import ExperienceCard from '@/app/components/ExperienceCard';
 
-export default function UserProfilePage({ params }: { params: { id: string } }) {
+export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
   const [profile, setProfile] = useState<any>(null);
   const [hostExperiences, setHostExperiences] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,29 +15,26 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     const fetchProfile = async () => {
-      // 1. 프로필 정보 가져오기
-      // [Security] select 필드 제한 — phone 등 PII 컬럼 공개 노출 방지
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url, bio, introduction')
-        .eq('id', params.id)
-        .maybeSingle();
-
-      setProfile(profileData);
-
-      // 2. 호스트 승인 여부 확인
+      // 공개 호스트 프로필은 safe projection view만 사용한다.
       const { data: hostApp } = await supabase
         .from('public_host_applications')
-        .select('status')
-        .eq('user_id', params.id)
+        .select('status, name, profile_photo, self_intro')
+        .eq('user_id', resolvedParams.id)
         .maybeSingle();
 
-      // 3. 승인된 호스트의 경우에만 운영 중인 활성 체험 가져오기
+      setProfile(hostApp ? {
+        full_name: hostApp.name,
+        avatar_url: hostApp.profile_photo,
+        bio: hostApp.self_intro,
+        introduction: hostApp.self_intro,
+      } : null);
+
+      // 승인된 호스트의 경우에만 운영 중인 활성 체험 가져오기
       if (hostApp?.status === 'approved') {
         const { data: expData } = await supabase
           .from('experiences')
           .select('*')
-          .eq('host_id', params.id)
+          .eq('host_id', resolvedParams.id)
           .eq('status', 'active');
 
         if (expData) setHostExperiences(expData);
@@ -45,7 +43,7 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
     };
 
     fetchProfile();
-  }, [params.id]);
+  }, [resolvedParams.id]);
 
   if (loading) return <div className="min-h-screen bg-white" />;
 

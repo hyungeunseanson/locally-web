@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e:live:gate": "node scripts/run-live-smoke.mjs --bundle gate",
+    "test:e2e:live:shared": "node scripts/run-live-smoke.mjs --bundle shared",
+    "test:e2e:live:noisy": "node scripts/run-live-smoke.mjs --bundle noisy"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

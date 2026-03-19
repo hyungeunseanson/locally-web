@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -21,7 +21,6 @@ import {
   Star,
   BookOpen,
 } from 'lucide-react';
-import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useNotification } from '@/app/context/NotificationContext';
@@ -29,7 +28,7 @@ import { useViewMode } from '@/app/context/ViewModeContext';
 import dynamic from 'next/dynamic';
 import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만든 파일 불러오기
 import DesktopModeTransition from './DesktopModeTransition';
-import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { fetchAdminAccess } from '@/app/utils/adminAccessClient';
 
 
 // 🟢 LoginModal 동적 로딩 (SSR false)
@@ -50,7 +49,6 @@ function SiteHeaderContent() {
 
   // 🟢 [핵심] 로컬 상태 대신 전역 AuthContext 사용 (깜빡임 해결)
   const { user, isHost, applicationStatus, isLoading, signOut } = useAuth();
-  const supabase = useMemo(() => createClient(), []);
 
   const { unreadCount } = useNotification();
   const { isHostView, canUseHostView, setGuestView, setHostView } = useViewMode();
@@ -105,10 +103,7 @@ function SiteHeaderContent() {
         return;
       }
 
-      const adminAccess = await resolveAdminAccess(supabase, {
-        userId: user.id,
-        email: user.email,
-      });
+      const adminAccess = await fetchAdminAccess();
 
       if (cancelled) return;
       setHasAdminAccess(adminAccess.isAdmin);
@@ -118,7 +113,7 @@ function SiteHeaderContent() {
     return () => {
       cancelled = true;
     };
-  }, [supabase, user?.email, user?.id]);
+  }, [user?.id]);
 
   const startDesktopModeTransition = (targetPath: string, targetMode: 'host' | 'guest') => {
     setIsMenuOpen(false);

@@ -124,11 +124,32 @@ test.describe.serial('analytics ingest routes', () => {
     const userId = await createAuthUser(user);
     const uniqueSuffix = `${Date.now()}`;
     const keyword = `analytics ingest keyword ${uniqueSuffix}`;
-    const targetId = `analytics-ingest-target-${uniqueSuffix}`;
+    const eventPayloads = [
+      {
+        event_type: 'view',
+        target_id: `analytics-view-${uniqueSuffix}`,
+        landing_path: '/experiences/1',
+      },
+      {
+        event_type: 'click',
+        target_id: `analytics-click-${uniqueSuffix}`,
+        landing_path: '/experiences/1',
+      },
+      {
+        event_type: 'payment_init',
+        target_id: `analytics-payment-init-${uniqueSuffix}`,
+        landing_path: '/experiences/1/payment',
+      },
+      {
+        event_type: 'booking_confirmed',
+        target_id: `analytics-booking-confirmed-${uniqueSuffix}`,
+        landing_path: '/experiences/1/payment/complete',
+      },
+    ] as const;
 
     await login(page, user);
 
-    const ingestResult = await page.evaluate(async ({ keyword: inputKeyword, targetId: inputTargetId }) => {
+    const ingestResult = await page.evaluate(async ({ keyword: inputKeyword, events }) => {
       const searchResponse = await fetch('/api/analytics/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,38 +166,46 @@ test.describe.serial('analytics ingest routes', () => {
         }),
       });
 
-      const eventResponse = await fetch('/api/analytics/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_type: 'click',
-          target_id: inputTargetId,
-          session_id: 'session-e2e-analytics',
-          referrer: 'https://example.com/ref',
-          referrer_host: 'example.com',
-          utm_source: 'newsletter',
-          utm_medium: 'email',
-          utm_campaign: 'spring-launch',
-          landing_path: '/experiences/1',
-        }),
-      });
+      const eventResults = [];
+      for (const event of events) {
+        const eventResponse = await fetch('/api/analytics/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...event,
+            session_id: 'session-e2e-analytics',
+            referrer: 'https://example.com/ref',
+            referrer_host: 'example.com',
+            utm_source: 'newsletter',
+            utm_medium: 'email',
+            utm_campaign: 'spring-launch',
+          }),
+        });
+
+        eventResults.push({
+          target_id: event.target_id,
+          event_type: event.event_type,
+          status: eventResponse.status,
+          body: await eventResponse.json(),
+        });
+      }
 
       return {
         search: {
           status: searchResponse.status,
           body: await searchResponse.json(),
         },
-        event: {
-          status: eventResponse.status,
-          body: await eventResponse.json(),
-        },
+        events: eventResults,
       };
-    }, { keyword, targetId });
+    }, { keyword, events: eventPayloads });
 
     expect(ingestResult.search.status).toBe(200);
     expect(ingestResult.search.body.success).toBe(true);
-    expect(ingestResult.event.status).toBe(200);
-    expect(ingestResult.event.body.success).toBe(true);
+    expect(ingestResult.events).toHaveLength(eventPayloads.length);
+    for (const eventResult of ingestResult.events) {
+      expect(eventResult.status).toBe(200);
+      expect(eventResult.body.success).toBe(true);
+    }
 
     const supabase = getAdminClient();
     const { data: searchRow, error: searchError } = await supabase
@@ -190,26 +219,29 @@ test.describe.serial('analytics ingest routes', () => {
 
     if (searchError) throw searchError;
 
-    const { data: eventRow, error: eventError } = await supabase
+    const { data: eventRows, error: eventError } = await supabase
       .from('analytics_events')
       .select('id, event_type, target_id, user_id')
-      .eq('target_id', targetId)
-      .eq('event_type', 'click')
       .eq('user_id', userId)
+      .in('target_id', eventPayloads.map((event) => event.target_id))
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(eventPayloads.length);
 
     if (eventError) throw eventError;
 
     expect(searchRow?.keyword).toBe(keyword);
     expect(searchRow?.route).toBe('main');
     expect(searchRow?.user_id).toBe(userId);
-    expect(eventRow?.event_type).toBe('click');
-    expect(eventRow?.target_id).toBe(targetId);
-    expect(eventRow?.user_id).toBe(userId);
+
+    const eventMap = new Map((eventRows || []).map((row) => [String(row.target_id), row]));
+    for (const expectedEvent of eventPayloads) {
+      const row = eventMap.get(expectedEvent.target_id);
+      expect(row?.event_type).toBe(expectedEvent.event_type);
+      expect(row?.target_id).toBe(expectedEvent.target_id);
+      expect(row?.user_id).toBe(userId);
+      if (row?.id) createdAnalyticsEventIds.push(String(row.id));
+    }
 
     if (searchRow?.id) createdSearchLogIds.push(String(searchRow.id));
-    if (eventRow?.id) createdAnalyticsEventIds.push(String(eventRow.id));
   });
 });
