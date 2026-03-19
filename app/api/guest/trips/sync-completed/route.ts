@@ -35,11 +35,13 @@ export async function POST() {
       return NextResponse.json({ success: true, updatedCount: 0, updatedIds: [] });
     }
 
+    // [Safety] status precondition: SELECT와 UPDATE 사이에 취소된 예약을 completed로 덮어쓰지 않도록 방어
     const { error: updateError } = await supabase
       .from('bookings')
       .update({ status: 'completed' })
       .eq('user_id', user.id)
-      .in('id', bookingIdsToComplete);
+      .in('id', bookingIdsToComplete)
+      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
     if (updateError) throw updateError;
 

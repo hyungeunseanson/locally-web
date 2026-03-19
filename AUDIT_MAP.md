@@ -85,7 +85,7 @@
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
 | - [ ] | `app/experiences/[id]/payment/page.tsx` | 결제 페이지 | 결제 전 세션 만료 처리, 금액 위변조 방어 |
-| - [ ] | `app/experiences/[id]/payment/complete/page.tsx` | 결제 완료 페이지 | 결제 결과 검증, 중복 완료 처리 방어 |
+| - [x] | `app/experiences/[id]/payment/complete/page.tsx` | 결제 완료 페이지 | ✅ 수정완료: CRITICAL — 본인 예약 소유권 검증(.eq user_id) 추가; analytics 확정상태 게이팅; 취소/거절 예약 별도 UI 분기 |
 | - [ ] | `app/payment/success/page.tsx` | 무통장 결제 성공 페이지 | 상태 전환 타이밍 |
 
 ### 2-4. 여행 목록 & 취소
@@ -367,7 +367,7 @@
 | - [x] | `app/api/cron/cancel-pending/route.ts` | PENDING 예약 자동 취소 | ✅ 수정완료: CRON_SECRET 필수화 (조건부→강제), UPDATE에 .eq('status','PENDING') guard 추가 |
 | - [x] | `app/api/cron/complete-trips/route.ts` | 여행 완료 자동 처리 | ✅ 수정완료: CRON_SECRET 필수화, UPDATE에 .in('status', ACTIVE_STATUSES) guard 추가 |
 | - [x] | `app/api/cron/experience-translations/route.ts` | 체험 자동 번역 | ✅ 수정완료: CRON_SECRET 필수화. lease/CAS/retry 로직 자체는 정상 (RPC 기반 atomic lease + translation_version guard) |
-| - [ ] | `app/api/guest/trips/sync-completed/route.ts` | 완료 여행 동기화 | 동기화 중복 처리 방어 |
+| - [x] | `app/api/guest/trips/sync-completed/route.ts` | 완료 여행 동기화 | ✅ 수정완료: UPDATE에 .in('status', BOOKING_ACTIVE_STATUS_FOR_CAPACITY) guard 추가 — 취소된 예약 completed 덮어쓰기 방지 |
 | - [ ] | `app/utils/experienceTranslation/index.ts` | 번역 로직 | 번역 provider 폴백 처리 |
 
 ---

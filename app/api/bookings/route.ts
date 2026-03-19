@@ -49,6 +49,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
         }
 
+        // [Security] customerName/customerPhone 길이 + 전화번호 형식 검증
+        // — 무제한 입력 허용 시 DB 및 이메일 템플릿에 비정상 데이터 삽입 가능
+        if (typeof customerName !== 'string' || customerName.trim().length > 100) {
+            return NextResponse.json({ success: false, error: '이름은 100자 이하여야 합니다.' }, { status: 400 });
+        }
+        if (typeof customerPhone !== 'string' || !/^[\d\s\-\+\(\)]{7,20}$/.test(customerPhone.trim())) {
+            return NextResponse.json({ success: false, error: '올바른 전화번호 형식이 아닙니다.' }, { status: 400 });
+        }
+
         if (normalizedIsSoloGuarantee && (normalizedIsPrivate || guestCount !== 1)) {
             return NextResponse.json({ success: false, error: '1인 출발 확정 옵션은 1명 일반 예약에서만 사용할 수 있습니다.' }, { status: 400 });
         }

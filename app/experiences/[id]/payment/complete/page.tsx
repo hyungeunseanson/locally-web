@@ -10,7 +10,7 @@ import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, MessageC
 import { useToast } from '@/app/context/ToastContext';
 import Spinner from '@/app/components/ui/Spinner';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
-import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
+import { isPendingBookingStatus, isConfirmedBookingStatus, isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
@@ -71,10 +71,18 @@ function PaymentCompleteContent() {
     const fetchBooking = async () => {
       if (!orderId) return;
 
+      // [Security] 본인 예약만 조회 — user_id 필터로 타인 orderId 탈취 방어
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('bookings')
         .select('*, experiences(*)')
         .eq('order_id', orderId)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (error || !data) {
@@ -82,19 +90,21 @@ function PaymentCompleteContent() {
         showToast('예약 정보를 불러오지 못했어요. 주문 번호를 확인해주세요.', 'error');
       } else {
         setBooking(data);
-        // 🎉 데이터 로드 성공 시 폭죽 발사!
-        fireConfetti();
-        // 결제 완료 analytics 이벤트 기록
-        const experienceId = data.experiences?.id;
-        if (experienceId) {
-          supabase.from('analytics_events').insert([{
-            event_type: 'booking_confirmed',
-            target_id: String(experienceId),
-            user_id: data.user_id ?? null,
-            ...getAnalyticsTrackingMetadata(),
-          }]).then(({ error }) => {
-            if (error) console.error('booking_confirmed event error:', error);
-          });
+        // 🎉 결제 완료(PAID/confirmed) 상태일 때만 폭죽 + analytics 발사
+        // — 무통장 대기(PENDING) 또는 취소 상태에서 재방문 시 중복 이벤트 방지
+        if (isConfirmedBookingStatus(data.status || '')) {
+          fireConfetti();
+          const experienceId = data.experiences?.id;
+          if (experienceId) {
+            supabase.from('analytics_events').insert([{
+              event_type: 'booking_confirmed',
+              target_id: String(experienceId),
+              user_id: data.user_id ?? null,
+              ...getAnalyticsTrackingMetadata(),
+            }]).then(({ error }) => {
+              if (error) console.error('booking_confirmed event error:', error);
+            });
+          }
         }
       }
       setLoading(false);
@@ -171,6 +181,14 @@ function PaymentCompleteContent() {
                 <p className="font-bold text-slate-700 text-[13px] md:text-base">{bankInfo.bankName} (예금주: {bankInfo.accountHolder})</p>
                 <p className="text-[11px] md:text-xs text-rose-500 mt-1.5 md:mt-2 font-bold">* 1시간 내 미입금 시 자동 취소</p>
               </div>
+            </>
+          ) : isCancelledBookingStatus(booking.status || '') ? (
+            <>
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-slate-400 shadow-sm">
+                <AlertCircle className="w-7 h-7 md:w-10 md:h-10" strokeWidth={3} />
+              </div>
+              <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">예약이 취소되었습니다</h1>
+              <p className="text-slate-500 text-[14px] md:text-lg">예약이 취소 또는 거절된 상태입니다. 궁금한 점은 고객센터에 문의해주세요.</p>
             </>
           ) : (
             <>
