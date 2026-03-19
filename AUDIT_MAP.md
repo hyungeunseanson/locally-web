@@ -225,10 +225,10 @@
 | - [ ] | `app/context/NotificationContext.tsx` | 알림 전역 상태 | 실시간 구독 메모리 누수, unread count 정확성 |
 | - [ ] | `app/notifications/page.tsx` | 알림 센터 페이지 | 읽음 처리 타이밍, 알림 타입별 라우팅 |
 | - [ ] | `app/host/notifications/page.tsx` | 호스트 알림 페이지 | 동일 컴포넌트 re-export 여부 확인 |
-| - [ ] | `app/api/notifications/read/route.ts` | 읽음 처리 API | 본인 알림만 읽음 처리 권한 |
-| - [x] | `app/api/notifications/send-email/route.ts` | 이메일 발송 API | ✅ 수정완료: x-internal-secret 헤더 가드; proxy_comment_notify content XSS — escapeHtml() 적용 |
-| - [ ] | `app/api/notifications/email/route.ts` | 이메일 라우트 (별도) | send-email과 중복 여부 확인 |
-| - [ ] | `app/utils/notification.ts` | 알림 생성 공통 유틸 | 알림 타입 enum 완결성 |
+| - [x] | `app/api/notifications/read/route.ts` | 읽음 처리 API | ✅ 확인완료: .eq('user_id', user.id) 소유권 체크 정상 |
+| - [x] | `app/api/notifications/send-email/route.ts` | 이메일 발송 API | ✅ 수정완료: createAdminClient() 마이그레이션(×2); profiles.full_name 수정; listUsers()→profiles 조회로 교체; 알려진위험: x-internal-secret=SERVICE_ROLE_KEY 분리 필요(INTERNAL_API_SECRET env 추가 권장) |
+| - [x] | `app/api/notifications/email/route.ts` | 이메일 라우트 (별도) | ✅ 수정완료: CRITICAL — new_booking 소유권 로직 수정(booking 행 기반 검증); DB insert 400 guard 순서 수정+실패 시 early return |
+| - [x] | `app/utils/notification.ts` | 알림 생성 공통 유틸 | ✅ 확인완료: NotificationType 완결성 OK, 순수 fetch 래퍼 — 보안 이슈 없음 |
 | - [x] | `app/utils/emailNotificationJobs.ts` | 이메일 발송 잡 | ✅ 수정완료: sendHtmlEmail 반환값 체크 — 발송 실패 시 sent:false 반환 |
 | - [ ] | `app/utils/experienceNotificationFlows.ts` | 체험 알림 흐름 | 모든 예약 상태전환 커버리지 |
 | - [x] | `app/utils/teamNotificationPolicy.ts` | 팀 알림 정책 | ✅ 수정완료: actorEmail 미확인 시 return true→false (fail-closed) — 이메일 불명 시 작성자 본인 수신 버그 수정 |

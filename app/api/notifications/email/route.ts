@@ -59,7 +59,22 @@ async function canSendSingleRecipientNotification(params: {
   if (!type) return false;
 
   if (type === 'new_booking' || type === 'booking_cancel_request') {
-    return recipientId === actorId;
+    // [CRITICAL Fix] 기존 recipientId === actorId는 자기 자신에게만 발송 가능한 잘못된 로직:
+    // - 정상 케이스(게스트→호스트)를 항상 403으로 차단
+    // - 자기 자신에게 발송하는 것만 허용 (보안 의미 없음)
+    // → booking 행 기반으로 actor=게스트, recipient=호스트임을 검증
+    if (!bookingId) return false;
+
+    const { data: bookingData } = await supabaseAdmin
+      .from('bookings')
+      .select('user_id, experiences(host_id)')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    const booking = bookingData as BookingOwnershipRow | null;
+    const hostId = getRelatedHostId(booking?.experiences);
+
+    return Boolean(booking && booking.user_id === actorId && hostId === recipientId);
   }
 
   if (type === 'review_reply') {
@@ -174,42 +189,41 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ success: true, count: recipient_ids.length });
     }
-    // 🟢 [추가됨] 2. DB 알림 테이블에 저장 (이게 없어서 알림창에 안 떴던 것!)
-    if (recipient_id) {
-      const canSend = await canSendSingleRecipientNotification({
-        actorId: user.id,
-        recipientId: recipient_id,
-        type,
-        bookingId: booking_id,
-        reviewId: review_id,
-      });
-
-      if (!canSend) {
-        console.error(`🚨 [Security Warning] Unauthorized single notification attempt by ${user.email} (${type || 'unknown'})`);
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-
-      const { error: dbError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: recipient_id, // 받는 사람
-          type: type || 'general',
-          title: title,
-          message: message, // 내용
-          link: link,
-          is_read: false
-        });
-
-      if (dbError) {
-        console.error('🔥 [Notification API] DB 저장 실패:', dbError);
-      } else {
-        console.log('✅ [Notification API] DB 저장 성공 (알림창 노출)');
-      }
-    }
-
+    // [Fix] 400 guard를 DB insert 전으로 이동 — insert 후 실패 시 이메일 발송 계속되는 문제 방지
     if (!recipient_id) {
       return NextResponse.json({ error: 'recipient_id is required' }, { status: 400 });
     }
+
+    // 2. DB 알림 테이블에 저장
+    const canSend = await canSendSingleRecipientNotification({
+      actorId: user.id,
+      recipientId: recipient_id,
+      type,
+      bookingId: booking_id,
+      reviewId: review_id,
+    });
+
+    if (!canSend) {
+      console.error(`🚨 [Security Warning] Unauthorized single notification attempt by ${user.email} (${type || 'unknown'})`);
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { error: dbError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: recipient_id,
+        type: type || 'general',
+        title: title,
+        message: message,
+        link: link,
+        is_read: false
+      });
+
+    if (dbError) {
+      console.error('🔥 [Notification API] DB 저장 실패:', dbError);
+      return NextResponse.json({ error: 'DB insert failed' }, { status: 500 });
+    }
+    console.log('✅ [Notification API] DB 저장 성공 (알림창 노출)');
 
     // 3. 수신자 이메일 찾기 (기존 로직)
     let emailToSend = '';

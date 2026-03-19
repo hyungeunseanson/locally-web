@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import nodemailer from 'nodemailer';
 import * as React from 'react';
 import { render } from '@react-email/render';
@@ -31,14 +31,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
+        const supabase = createAdminClient();
 
         // Fetch host's email
         let hostEmail = '';
-        const { data: hostProfile } = await supabase.from('profiles').select('email, name').eq('id', hostId).maybeSingle();
+        // [Fix] profiles.name → profiles.full_name (profiles 테이블에 name 컬럼 없음 — 42703 방지)
+        const { data: hostProfile } = await supabase.from('profiles').select('email, full_name').eq('id', hostId).maybeSingle();
 
         if (hostProfile?.email) {
             hostEmail = hostProfile.email;
@@ -61,7 +59,7 @@ export async function POST(request: Request) {
             subject = `[Locally] 🎉 새로운 예약이 도착했습니다!`;
             emailHtml = await render(
                 React.createElement(BookingConfirmationEmail, {
-                    hostName: hostProfile?.name || '로컬리 호스트',
+                    hostName: hostProfile?.full_name || '로컬리 호스트',
                     guestName: guestName || '게스트',
                     experienceTitle: experienceTitle || '체험',
                     guestsCount: guestsCount || 1,
@@ -75,7 +73,7 @@ export async function POST(request: Request) {
             subject = `[Locally] 예약 취소 알림`;
             emailHtml = await render(
                 React.createElement(BookingCancellationEmail, {
-                    hostName: hostProfile?.name || '로컬리 호스트',
+                    hostName: hostProfile?.full_name || '로컬리 호스트',
                     experienceTitle: experienceTitle || '체험',
                     cancelReason: cancelReason || '사유 없음',
                     refundAmount: refundAmount || 0,
@@ -120,22 +118,14 @@ export async function POST(request: Request) {
 
         // Phase 3: 명확한 DB 에러 로그 기록 (notifications 테이블에 system_error 로 저장)
         try {
-            const supabase = createClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!
-            );
+            const supabase = createAdminClient();
 
-            // Fix: Do not call request.clone().json() as stream is already read by await request.json()
-            // Look up target Email to get the actual user ID if hostId isn't provided
             let errorHostId = body?.hostId || null;
             if (!errorHostId && body?.targetEmail) {
+                // [Fix] listUsers() 전체 테이블 스캔 제거 — profiles 조회로만 처리
                 const { data: userProfile } = await supabase.from('profiles').select('id').eq('email', body.targetEmail).maybeSingle();
                 if (userProfile?.id) {
                     errorHostId = userProfile.id;
-                } else {
-                    const { data: authData } = await supabase.auth.admin.listUsers();
-                    const matchedUser = authData?.users?.find((u: any) => u.email === body.targetEmail);
-                    if (matchedUser) errorHostId = matchedUser.id;
                 }
             }
 
