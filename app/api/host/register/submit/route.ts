@@ -92,11 +92,13 @@ export async function POST(request: NextRequest) {
       throw latestApplicationError;
     }
 
+    // [Guard] 이미 승인된 호스트가 재제출 시 승인 데이터 덮어쓰기 방지
+    if (latestApplication?.status === 'approved') {
+      return NextResponse.json({ success: true, applicationId: latestApplication.id, status: 'approved', notifyAdmin: false });
+    }
+
     const languageNames = getLanguageNames(languageLevels);
-    const nextStatus =
-      latestApplication && latestApplication.status === 'approved'
-        ? 'approved'
-        : 'pending';
+    const nextStatus = 'pending';
 
     const payload = {
       user_id: user.id,
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
         .from('host_applications')
         .insert(payload)
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (insertError || !insertedApplication?.id) {
         throw insertError ?? new Error('Failed to create host application.');

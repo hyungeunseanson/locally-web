@@ -111,7 +111,7 @@
 |------|------|------|-----------------|
 | - [ ] | `app/host/register/page.tsx` | 호스트 신청 페이지 | 중복 신청 방어 |
 | - [ ] | `app/host/register/components/HostRegisterForm.tsx` | 신청 폼 | 파일 업로드 크기/형식 검증, 언어레벨 이중구조 처리 |
-| - [ ] | `app/api/host/register/submit/route.ts` | 신청 제출 API | 이미 호스트인 유저 재신청 처리, DB upsert 안전성 |
+| - [x] | `app/api/host/register/submit/route.ts` | 신청 제출 API | ✅ 수정완료: approved 호스트 재제출 데이터 덮어쓰기 방어; insert .single()→.maybeSingle(). 동시 중복 삽입은 DB unique constraint 필요 — known risk |
 | - [ ] | `app/api/host/register/admin-alert/route.ts` | 신청 어드민 알림 | 알림 중복 발송 방어 |
 
 ### 3-2. 체험 생성/편집
@@ -135,7 +135,7 @@
 | - [ ] | `app/host/dashboard/page.tsx` | 대시보드 진입점 | 탭별 lazy loading, 초기 데이터 패칭 오류 처리 |
 | - [ ] | `app/host/dashboard/components/ReservationManager.tsx` | 예약 관리 | 예약 상태 전환 버튼 권한, 낙관적 업데이트 롤백 |
 | - [ ] | `app/host/dashboard/components/ReservationCard.tsx` | 예약 카드 | 게스트 이름 표시 버그 (이슈 보고됨) |
-| - [ ] | `app/host/dashboard/components/GuestProfileModal.tsx` | 게스트 프로필 모달 | profiles.school 컬럼 미존재 → select 제외 확인 |
+| - [x] | `app/host/dashboard/components/GuestProfileModal.tsx` | 게스트 프로필 모달 | ✅ 수정완료: profiles.school 없음 확인 완료; guest_reviews 에러 무시 수정; supabase useRef 안정화로 반복 재요청 버그 수정 |
 | - [ ] | `app/host/dashboard/Earnings.tsx` | 수익 현황 | 정산 금액 계산, 통화 변환 |
 | - [ ] | `app/host/dashboard/InquiryChat.tsx` | 문의 채팅 | 실시간 구독 메모리 누수, 읽음 처리 |
 | - [ ] | `app/host/dashboard/MyExperiences.tsx` | 내 체험 목록 | 체험 상태(활성/비활성) 토글 |

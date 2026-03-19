@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -70,7 +70,8 @@ function toFlagEmoji(nationality: string): string {
 
 export default function GuestProfileModal({ guest, onClose }: Props) {
   const { t, lang } = useLanguage();
-  const supabase = createClient();
+  // [Fix] supabase 인스턴스를 ref로 안정화 — 매 렌더마다 새 객체가 생성되어 useEffect가 반복 실행되는 버그 방지
+  const supabaseRef = useRef(createClient());
   const [reviews, setReviews] = useState<GuestReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
@@ -78,7 +79,7 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
     const fetchReviews = async () => {
       if (!guest?.id) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabaseRef.current
         .from('guest_reviews')
         .select(`
           *,
@@ -87,11 +88,13 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
         .eq('guest_id', guest.id)
         .order('created_at', { ascending: false });
 
+      // [Fix] 에러 무시 방지 — RLS 설정 문제로 데이터 없을 때 빈 후기로 오표시
+      if (error) console.error('[GuestProfileModal] guest_reviews fetch error:', error);
       if (data) setReviews(data);
       setLoadingReviews(false);
     };
     fetchReviews();
-  }, [guest, supabase]);
+  }, [guest]);
 
   useEffect(() => {
     if (!guest) return undefined;
