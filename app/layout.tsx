@@ -10,12 +10,14 @@ import { ToastProvider } from '@/app/context/ToastContext';
 import SiteFooter from "@/app/components/SiteFooter";
 import BottomTabNavigation from "@/app/components/mobile/BottomTabNavigation";
 import ClientMainWrapper from '@/app/components/ClientMainWrapper';
+import KakaoIabEscapeGate from '@/app/components/KakaoIabEscapeGate';
 import Script from "next/script";
 import QueryProvider from '@/app/providers/QueryProvider';
 import { AuthProvider } from '@/app/context/AuthContext';
 import { ViewModeProvider, type ViewMode } from '@/app/context/ViewModeContext';
 import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl, getSiteUrl } from '@/app/utils/siteUrl';
+import { IAB_ESCAPE_BYPASS_PARAM } from '@/app/utils/iab';
 import { createClient } from '@/app/utils/supabase/server';
 import type { User } from '@supabase/supabase-js';
 import { Analytics } from "@vercel/analytics/react";
@@ -122,6 +124,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getCurrentLocale();
+  const kakaoIabEscapeEnabled = process.env.NEXT_PUBLIC_ENABLE_KAKAO_IAB_ESCAPE === 'true';
   const cookieStore = await cookies();
   const initialViewModeCookie = cookieStore.get('locally_view_mode')?.value;
   const initialViewMode: ViewMode | null =
@@ -154,15 +157,44 @@ export default async function RootLayout({
     }
   }
 
+  const kakaoIabBootstrapScript = `
+    (() => {
+      try {
+        if (!${JSON.stringify(kakaoIabEscapeEnabled)}) return;
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.get(${JSON.stringify(IAB_ESCAPE_BYPASS_PARAM)}) === '1') return;
+
+        const userAgent = navigator.userAgent || '';
+        if (!/KAKAOTALK/i.test(userAgent)) return;
+
+        document.documentElement.dataset.iab = 'kakao';
+        document.documentElement.dataset.iabLock = 'true';
+        window.__LOCALLY_KAKAO_IAB__ = {
+          detected: true,
+          kind: 'kakao',
+          currentUrl: window.location.href,
+        };
+      } catch {}
+    })();
+  `;
+
   return (
     <html lang={locale} suppressHydrationWarning={true}>
       <body className={`${inter.variable} ${ibmPlexSansKr.variable} font-sans`}>
+        {kakaoIabEscapeEnabled && (
+          <Script
+            id="locally-kakao-iab-bootstrap"
+            strategy="beforeInteractive"
+            dangerouslySetInnerHTML={{ __html: kakaoIabBootstrapScript }}
+          />
+        )}
         {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY && (
           <Script
             src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
             strategy="beforeInteractive"
           />
         )}
+        <KakaoIabEscapeGate enabled={kakaoIabEscapeEnabled} locale={locale} />
         <QueryProvider>
           <AuthProvider initialUser={initialUser}>
             <ViewModeProvider initialViewMode={initialViewMode}>
@@ -176,7 +208,7 @@ export default async function RootLayout({
                         <UserPresenceTracker />
                       </Suspense>
 
-                      <div className="flex flex-col min-h-screen">
+                      <div className="flex flex-col min-h-screen" id="locally-app-shell">
                         <ClientMainWrapper>
                           {children}
                         </ClientMainWrapper>

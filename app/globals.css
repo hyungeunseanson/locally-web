@@ -30,6 +30,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+[data-iab-lock="true"] body {
+  overflow: hidden;
+}
+
+[data-iab-lock="true"] #locally-app-shell {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.kakao-iab-gate {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
 .text-primary {
   color: var(--color-primary);
 }
