@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   // [M-2] Auto Cancel Scheduler
   // Secure this endpoint with a secret key
   const authHeader = request.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
@@ -32,11 +32,12 @@ export async function GET(request: Request) {
     const expiredIds = expiredBookings.map(b => b.id);
     const { error: updateError } = await supabase
       .from('bookings')
-      .update({ 
-        status: 'cancelled', 
-        cancel_reason: '입금 기한 만료 (1시간 경과 자동 취소)' 
+      .update({
+        status: 'cancelled',
+        cancel_reason: '입금 기한 만료 (1시간 경과 자동 취소)'
       })
-      .in('id', expiredIds);
+      .in('id', expiredIds)
+      .eq('status', 'PENDING');
 
     if (updateError) throw updateError;
 

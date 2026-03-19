@@ -84,12 +84,21 @@ export async function POST(request: Request) {
       : calculateBookingCancellationSettlement(booking, 100);
 
     if (settlement.refundAmount > 0 && booking.tid) {
-      // 🔒 Phase A: PG 환불 직전 DB에 진행 중 마커 기록
-      // 이후 PG 성공 + DB update 실패 시, 관리자 재시도를 위에서 차단함
-      await supabaseAdmin
+      // 🔒 Phase A: PG 환불 직전 DB에 진행 중 마커 기록 (atomic CAS — 동시 요청 중 1개만 성공)
+      const { data: markerSet } = await supabaseAdmin
         .from('bookings')
         .update({ cancel_reason: `${cancelReason} ${REFUND_IN_PROGRESS_MARKER}` })
-        .eq('id', bookingId);
+        .eq('id', bookingId)
+        .not('cancel_reason', 'ilike', `%${REFUND_IN_PROGRESS_MARKER}%`)
+        .select('id')
+        .maybeSingle();
+
+      if (!markerSet) {
+        return NextResponse.json(
+          { success: false, error: '환불이 이미 처리 중입니다. 잠시 후 예약 상태를 확인해주세요.' },
+          { status: 409 }
+        );
+      }
 
       if (booking.payment_method === 'paypal') {
         const refund = await refundPayPalCapture(booking.tid, settlement.refundAmount, 'KRW');

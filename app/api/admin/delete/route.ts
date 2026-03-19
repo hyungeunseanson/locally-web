@@ -107,6 +107,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // [Guard] 허용된 테이블만 삭제 가능 — 임의 테이블명 주입 방지
+    const ALLOWED_DELETE_TABLES = new Set([
+      'experiences', 'community_posts', 'reviews', 'guest_reviews',
+      'host_applications', 'inquiries', 'inquiry_messages',
+    ]);
+    if (!ALLOWED_DELETE_TABLES.has(table)) {
+      return NextResponse.json({ error: 'Invalid table' }, { status: 400 });
+    }
+
     // 일반 테이블 데이터 삭제 (체험 등) - 삭제 전 제목 확보 시도
     let targetName = id;
     if (table === 'experiences') {

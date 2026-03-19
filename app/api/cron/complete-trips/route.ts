@@ -6,7 +6,7 @@ export async function GET(request: Request) {
     // [M-2] Auto Complete Scheduler
     // Secure this endpoint with a secret key
     const authHeader = request.headers.get('authorization');
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -40,7 +40,8 @@ export async function GET(request: Request) {
         const { error: updateError } = await supabase
             .from('bookings')
             .update({ status: 'completed' })
-            .in('id', idsToComplete);
+            .in('id', idsToComplete)
+            .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
         if (updateError) throw updateError;
 
