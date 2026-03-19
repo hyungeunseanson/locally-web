@@ -209,9 +209,9 @@
 | - [ ] | `app/proxy-bookings/page.tsx` | 전화대행 목록 | 권한 분기 (어드민/호스트) |
 | - [ ] | `app/proxy-bookings/new/page.tsx` | 전화대행 생성 | 어드민 전용 접근 제한 |
 | - [ ] | `app/proxy-bookings/[id]/page.tsx` | 전화대행 상세 | 댓글 로딩, 상태 표시 |
-| - [ ] | `app/api/proxy-bookings/route.ts` | 전화대행 생성/조회 API | 권한 검증, 입력 sanitize |
-| - [ ] | `app/api/proxy-bookings/[id]/route.ts` | 전화대행 상세/수정 | 상태 전환 권한 |
-| - [ ] | `app/api/proxy-bookings/[id]/comments/route.ts` | 댓글 CRUD | **이메일 알림 발송 로직 (이슈 보고됨)**, 댓글 작성자 제외 수신자 처리 |
+| - [x] | `app/api/proxy-bookings/route.ts` | 전화대행 생성/조회 API | ✅ 수정완료: profiles.name → full_name (42703 에러 방지) |
+| - [x] | `app/api/proxy-bookings/[id]/route.ts` | 전화대행 상세/수정 | ✅ 수정완료: .single()→.maybeSingle(); admin PATCH에 status/payment_status allowlist 추가 |
+| - [x] | `app/api/proxy-bookings/[id]/comments/route.ts` | 댓글 CRUD | ✅ 수정완료: 5000자 max length guard; profiles.name→full_name |
 | - [ ] | `app/schemas/proxyRequestSchema.ts` | 전화대행 입력 스키마 | Zod 검증 완결성 |
 
 ---
@@ -226,10 +226,10 @@
 | - [ ] | `app/notifications/page.tsx` | 알림 센터 페이지 | 읽음 처리 타이밍, 알림 타입별 라우팅 |
 | - [ ] | `app/host/notifications/page.tsx` | 호스트 알림 페이지 | 동일 컴포넌트 re-export 여부 확인 |
 | - [ ] | `app/api/notifications/read/route.ts` | 읽음 처리 API | 본인 알림만 읽음 처리 권한 |
-| - [x] | `app/api/notifications/send-email/route.ts` | 이메일 발송 API | ✅ 수정완료: x-internal-secret 헤더 가드 추가 (외부 직접 호출 차단) |
+| - [x] | `app/api/notifications/send-email/route.ts` | 이메일 발송 API | ✅ 수정완료: x-internal-secret 헤더 가드; proxy_comment_notify content XSS — escapeHtml() 적용 |
 | - [ ] | `app/api/notifications/email/route.ts` | 이메일 라우트 (별도) | send-email과 중복 여부 확인 |
 | - [ ] | `app/utils/notification.ts` | 알림 생성 공통 유틸 | 알림 타입 enum 완결성 |
-| - [ ] | `app/utils/emailNotificationJobs.ts` | 이메일 발송 잡 | `sendImmediateGenericEmail` 실패 처리, 무통장 이중 발송 케이스 |
+| - [x] | `app/utils/emailNotificationJobs.ts` | 이메일 발송 잡 | ✅ 수정완료: sendHtmlEmail 반환값 체크 — 발송 실패 시 sent:false 반환 |
 | - [ ] | `app/utils/experienceNotificationFlows.ts` | 체험 알림 흐름 | 모든 예약 상태전환 커버리지 |
 | - [ ] | `app/utils/teamNotificationPolicy.ts` | 팀 알림 정책 | MEMO/댓글 작성자 제외 로직 (수정 완료 확인) |
 
