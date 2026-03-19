@@ -67,6 +67,16 @@ export async function POST(request: Request) {
 
         const supabaseAdmin = createAdminClient();
 
+        // [Security] admin 검증을 body 파싱 전에 수행 — 비관리자 대용량 페이로드로 메모리 소진 방지
+        const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
+            userId: user.id,
+            email: user.email,
+        });
+        if (!isAdmin) {
+            console.warn(`🚨 Unauthorized team notify attempt by ${user.email}`);
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
         const body = await request.json();
         const { title, message, link, eventType } = body as {
             title?: string;
@@ -79,13 +89,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Title and message are required' }, { status: 400 });
         }
 
-        const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
-            userId: user.id,
-            email: user.email,
-        });
-        if (!isAdmin) {
-            console.warn(`🚨 Unauthorized team notify attempt by ${user.email}`);
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        // [Security] 길이 제한 — DB/이메일 페이로드 블로팅 방지
+        if (title.length > 200) {
+            return NextResponse.json({ error: 'Title must be 200 characters or fewer' }, { status: 400 });
+        }
+        if (message.length > 2000) {
+            return NextResponse.json({ error: 'Message must be 2000 characters or fewer' }, { status: 400 });
         }
 
         console.log(`🚀 [Admin Notify API] 팀 알림 처리 준비: ${title} (${eventType || 'unknown'})`);

@@ -262,13 +262,13 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [x] | `app/api/admin/team/tasks/route.ts` | 팀 태스크 CRUD | ✅ 수정완료: content 5000자 길이 제한 추가 |
-| - [ ] | `app/api/admin/team/tasks/[id]/route.ts` | 개별 태스크 수정 | 작성자 vs 어드민 권한 분기 |
+| - [x] | `app/api/admin/team/tasks/route.ts` | 팀 태스크 CRUD | ✅ 수정완료: content 5000자 길이 제한 추가 (POST) |
+| - [x] | `app/api/admin/team/tasks/[id]/route.ts` | 개별 태스크 수정 | ✅ 수정완료: PATCH content 2000자 길이 제한 |
 | - [x] | `app/api/admin/team/comments/route.ts` | 팀 댓글 CRUD | ✅ 수정완료: SSRF(https:// 강제), content 5000자 제한, emoji키 길이/개수 제한 |
-| - [ ] | `app/api/admin/team/comments/[id]/route.ts` | 개별 댓글 수정/삭제 | 권한 검증 |
+| - [x] | `app/api/admin/team/comments/[id]/route.ts` | 개별 댓글 수정/삭제 | ✅ 수정완료: HIGH — author_id 소유권 검증(수평권한상승 방지); emoji 20개/user 100개 DoS 제한 |
 | - [x] | `app/api/admin/team/whitelist/route.ts` | 팀 화이트리스트 | ✅ 수정완료: 이메일 형식 regex 검증 + 254자 상한 (인증 오판 방지) |
 | - [ ] | `app/api/admin/team/_shared.ts` | 팀 공통 유틸 | 재사용 패턴 |
-| - [ ] | `app/api/admin/notify-team/route.ts` | 팀 전체 알림 | 발송 대상 필터링 |
+| - [x] | `app/api/admin/notify-team/route.ts` | 팀 전체 알림 | ✅ 수정완료: HIGH — admin 검증을 body 파싱 전으로 이동; title 200자/message 2000자 상한 |
 
 ### 8-3. 어드민 대시보드 UI
 

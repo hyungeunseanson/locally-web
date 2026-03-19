@@ -61,6 +61,10 @@ export async function PATCH(
       if (!content) {
         return teamError('내용을 입력해주세요.', 400);
       }
+      // [Security] content 길이 제한 — DB 컬럼 overflow 방지
+      if (content.length > 2000) {
+        return teamError('내용은 2000자 이내로 입력해주세요.', 400);
+      }
       payload.content = content;
     }
 
