@@ -5,7 +5,8 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
-import { isCancelledOnlyBookingStatus, isPendingBookingStatus } from '@/app/constants/bookingStatus';
+import crypto from 'crypto';
+import { isCancelledBookingStatus, isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 
 type ForceCancelBody = {
@@ -62,19 +63,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    if (isCancelledOnlyBookingStatus(booking.status)) {
-      return NextResponse.json({ success: false, error: '이미 취소된 예약입니다.' }, { status: 409 });
-    }
-
-    // 🔒 Phase A: 중복 환불 방지 — 환불 진행 중 마커 감지
-    // PG 환불 성공 + DB 업데이트 실패 시 관리자 재시도로 인한 중복 환불 차단
-    const REFUND_IN_PROGRESS_MARKER = '[환불처리중]';
-    if (booking.cancel_reason?.includes(REFUND_IN_PROGRESS_MARKER)) {
-      console.error('[ADMIN] force-cancel: 환불 처리 중인 예약 재시도 감지', { bookingId });
-      return NextResponse.json(
-        { success: false, error: '환불이 이미 처리 중입니다. 잠시 후 예약 상태를 확인해주세요.' },
-        { status: 409 }
-      );
+    if (isCancelledBookingStatus(booking.status)) {
+      return NextResponse.json({ success: false, error: '이미 취소 또는 거절된 예약입니다.' }, { status: 409 });
     }
 
     const cancelReason = (reason || '관리자 직권 취소').trim();
@@ -84,16 +74,17 @@ export async function POST(request: Request) {
       : calculateBookingCancellationSettlement(booking, 100);
 
     if (settlement.refundAmount > 0 && booking.tid) {
-      // 🔒 Phase A: PG 환불 직전 DB에 진행 중 마커 기록 (atomic CAS — 동시 요청 중 1개만 성공)
-      const { data: markerSet } = await supabaseAdmin
+      // 🔒 Sentinel lock: status → cancellation_requested (atomic CAS, mirrors service-cancel)
+      const { data: lockRow } = await supabaseAdmin
         .from('bookings')
-        .update({ cancel_reason: `${cancelReason} ${REFUND_IN_PROGRESS_MARKER}` })
+        .update({ status: 'cancellation_requested' })
         .eq('id', bookingId)
-        .not('cancel_reason', 'ilike', `%${REFUND_IN_PROGRESS_MARKER}%`)
+        .neq('status', 'cancelled')
+        .neq('status', 'cancellation_requested')
         .select('id')
         .maybeSingle();
 
-      if (!markerSet) {
+      if (!lockRow) {
         return NextResponse.json(
           { success: false, error: '환불이 이미 처리 중입니다. 잠시 후 예약 상태를 확인해주세요.' },
           { status: 409 }
@@ -112,6 +103,15 @@ export async function POST(request: Request) {
           throw new Error('Server Config Error: NICEPAY_MID missing');
         }
 
+        const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
+        if (!MER_KEY) {
+          throw new Error('Server Config Error: NICEPAY_MERCHANT_KEY missing');
+        }
+        const ediDate = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+        const signData = crypto
+          .createHash('sha256')
+          .update(ediDate + mid + settlement.refundAmount.toString() + MER_KEY)
+          .digest('hex');
         const formBody = new URLSearchParams({
           TID: booking.tid,
           MID: mid,
@@ -119,6 +119,8 @@ export async function POST(request: Request) {
           CancelAmt: settlement.refundAmount.toString(),
           CancelMsg: cancelReason,
           PartialCancelCode: settlement.refundAmount < totalAmount ? '1' : '0',
+          EdiDate: ediDate,
+          SignData: signData,
         });
 
         const pgResponse = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
@@ -158,7 +160,19 @@ export async function POST(request: Request) {
       .eq('id', bookingId);
 
     if (updateError) {
-      throw new Error(updateError.message);
+      console.error('[ADMIN] CRITICAL: PG refund succeeded but DB update failed. Manual resolution required.', {
+        bookingId,
+        updateError: updateError.message,
+      });
+      await insertAdminAlerts({
+        title: '[긴급] 환불 완료 후 DB 업데이트 실패',
+        message: `예약 ID ${bookingId}: PG 환불 성공했으나 DB 상태 미갱신. 수동 확인 필요.`,
+        link: '/admin/dashboard?tab=LEDGER',
+      });
+      return NextResponse.json(
+        { success: false, error: 'PG 환불은 완료됐으나 DB 업데이트 실패. 관리자 수동 확인 필요.' },
+        { status: 500 }
+      );
     }
 
     const experience = Array.isArray(booking.experiences) ? booking.experiences[0] : booking.experiences;
@@ -203,7 +217,7 @@ export async function POST(request: Request) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+            'x-internal-secret': process.env.INTERNAL_API_SECRET || '',
           },
           body: JSON.stringify({
             type: 'booking_cancellation',

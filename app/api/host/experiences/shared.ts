@@ -431,7 +431,7 @@ async function enqueueTranslationJob(params: {
       status: 'queued',
     })
     .select('id')
-    .single();
+    .maybeSingle();
 
   if (jobError || !job) {
     throw jobError ?? new Error('Failed to create translation job.');
@@ -528,7 +528,7 @@ export async function createExperienceFromBody(body: ExperienceWriteBody, actor:
       ...translationState.localizedContentColumns,
     })
     .select('id')
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     throw error ?? new Error('Failed to create experience.');

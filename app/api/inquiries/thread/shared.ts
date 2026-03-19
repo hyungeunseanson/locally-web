@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { sanitizeText } from '@/app/utils/sanitize';
+import { sanitizeText, sanitizeUrl } from '@/app/utils/sanitize';
 
 type AuthActor = {
   id: string;
@@ -169,6 +169,10 @@ async function findRecipientEmail(recipientId: string) {
   return authData?.user?.email || '';
 }
 
+function escapeHtml(str: string) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 async function notifyRecipient(params: {
   recipientId: string;
   title: string;
@@ -203,7 +207,7 @@ async function notifyRecipient(params: {
         from: `"Locally Team" <${process.env.GMAIL_USER}>`,
         to: email,
         subject: `[Locally] ${title}`,
-        html: `<p>${message}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${link}">확인하기</a>`,
+        html: `<p>${escapeHtml(message)}</p><br/><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}${encodeURI(link)}">확인하기</a>`,
       })
       .catch((error) => {
         console.warn('[inquiries/thread] message notification email failed:', error);
@@ -259,6 +263,18 @@ async function resolveExperienceThread(params: {
 
   if (!guestId) {
     throw new InquiryThreadError(400, 'guestId is required');
+  }
+
+  // [Security] host_experience path: caller-supplied guestId must reference a real profile
+  if (body.contextType === 'host_experience') {
+    const { data: guestProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', guestId)
+      .maybeSingle();
+    if (!guestProfile) {
+      throw new InquiryThreadError(400, '유효하지 않은 게스트입니다.');
+    }
   }
 
   const { data: existing } = await supabaseAdmin
@@ -454,7 +470,8 @@ export async function createInquiryMessage(params: {
   const inquiryId = body.inquiryId != null ? String(body.inquiryId) : '';
   const cleanContent = sanitizeText(body.content || '').trim();
   const normalizedType = body.type === 'image' ? 'image' : 'text';
-  const imageUrl = body.imageUrl || null;
+  const rawImageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : null;
+  const imageUrl = rawImageUrl ? (sanitizeUrl(rawImageUrl) || null) : null;
 
   if (!inquiryId) {
     throw new InquiryThreadError(400, 'inquiryId is required');

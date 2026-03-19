@@ -35,6 +35,10 @@ export async function GET(request: Request) {
         const from = parseInt(searchParams.get('from') || '0', 10);
         const to = parseInt(searchParams.get('to') || '19', 10);
 
+        if (isNaN(from) || isNaN(to) || from < 0 || to < from || (to - from) > 99) {
+          return NextResponse.json({ success: false, error: 'Invalid pagination parameters' }, { status: 400 });
+        }
+
         const { data: bookings, error } = await supabaseAdmin
             .from('bookings')
             .select('*')

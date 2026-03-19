@@ -58,14 +58,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Host application not found' }, { status: 404 });
     }
 
+    const MAX = { name: 80, job: 80, place: 120, song: 120, url: 500, intro: 2000 };
     const profileUpdates = {
       updated_at: new Date().toISOString(),
-      full_name: asTrimmedString(body.fullName),
-      job: asNullableTrimmedString(body.job),
-      dream_destination: asNullableTrimmedString(body.dreamDestination),
-      favorite_song: asNullableTrimmedString(body.favoriteSong),
+      full_name: asTrimmedString(body.fullName).slice(0, MAX.name),
+      job: asNullableTrimmedString(body.job)?.slice(0, MAX.job) ?? null,
+      dream_destination: asNullableTrimmedString(body.dreamDestination)?.slice(0, MAX.place) ?? null,
+      favorite_song: asNullableTrimmedString(body.favoriteSong)?.slice(0, MAX.song) ?? null,
       languages: normalizeLanguageList(body.languages),
-      avatar_url: asNullableTrimmedString(body.avatarUrl),
+      avatar_url: asNullableTrimmedString(body.avatarUrl)?.slice(0, MAX.url) ?? null,
     };
 
     const [profileUpdateRes, hostApplicationUpdateRes] = await Promise.all([
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id),
       supabaseAdmin
         .from('host_applications')
-        .update({ self_intro: asTrimmedString(body.introduction) })
+        .update({ self_intro: asTrimmedString(body.introduction).slice(0, MAX.intro) })
         .eq('id', latestApplication.id),
     ]);
 

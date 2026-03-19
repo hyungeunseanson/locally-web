@@ -26,8 +26,12 @@ type ExperienceRow = {
   host_id: string | null;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const from = Math.max(0, parseInt(searchParams.get('from') || '0', 10));
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10)));
+    const to = from + pageSize - 1;
     const supabaseServer = await createServerClient();
     const {
       data: { user },
@@ -51,7 +55,8 @@ export async function GET() {
     const { data: reviewRows, error: reviewsError } = await supabaseAdmin
       .from('reviews')
       .select('id, rating, content, reply, created_at, photos, user_id, experience_id')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (reviewsError) throw reviewsError;
 

@@ -60,6 +60,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
+    // 날짜 범위 최대 366일 제한 (전체 테이블 덤프 방지)
+    if (startDate && endDate) {
+      const diffMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+      if (diffMs / (1000 * 60 * 60 * 24) > 366) {
+        return NextResponse.json({ success: false, error: '날짜 범위는 최대 366일입니다.' }, { status: 400 });
+      }
+    }
+
     // 🔧 Issue #4 Phase A: 날짜 필터 없을 때 최대 500건으로 제한 (무제한 조회 방지)
     const LEDGER_MAX_ROWS = 500;
     let bookingsQuery = supabaseAdmin
