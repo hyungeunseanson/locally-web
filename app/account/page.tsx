@@ -428,14 +428,14 @@ export default function AccountPage() {
               onClick={() => navigate('/notifications')}
               disabled={isNavigating}
               aria-busy={pendingHref === '/notifications'}
-              className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 active:scale-[0.96] disabled:cursor-not-allowed ${pendingHref === '/notifications' ? 'bg-gray-200' : 'bg-gray-100 active:bg-gray-200'}`}
+              className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 active:scale-[0.96] disabled:cursor-not-allowed ${pendingHref === '/notifications' ? 'bg-gray-200' : 'bg-gray-100 active:bg-gray-200'}`}
             >
               {pendingHref === '/notifications'
                 ? <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
                 : <Bell className="w-4 h-4 text-gray-600" />
               }
               {unreadCount > 0 && pendingHref !== '/notifications' && (
-                <span data-testid="guest-account-unread-dot" className="absolute right-0.5 top-0.5">
+                <span data-testid="guest-account-unread-dot" className="absolute -right-0.5 -top-0.5">
                   <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 opacity-75 animate-ping" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
                 </span>
