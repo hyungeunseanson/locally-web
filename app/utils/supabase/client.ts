@@ -8,8 +8,7 @@ export function createClient() {
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    // 키가 없을 때 앱이 죽지 않도록 방어
-    return createBrowserClient('https://missing.com', 'missing');
+    throw new Error('[Supabase] 환경변수 NEXT_PUBLIC_SUPABASE_URL 또는 NEXT_PUBLIC_SUPABASE_ANON_KEY가 누락되었습니다.');
   }
 
   if (typeof window === 'undefined') {

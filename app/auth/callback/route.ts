@@ -3,8 +3,9 @@ import { createClient } from '@/app/utils/supabase/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  // "next" 파라미터가 있으면 거기로, 없으면 홈(/)으로 이동
-  const next = searchParams.get('next') ?? '/';
+  // [Security] next는 반드시 상대경로 "/" 시작이어야 함 — 외부 도메인 오픈 리다이렉트 방지
+  const rawNext = searchParams.get('next') ?? '/';
+  const next = /^\/(?!\/)/.test(rawNext) ? rawNext : '/';
 
   if (code) {
     // 🟢 [수정됨] 복잡한 설정 코드 삭제 -> 유틸리티 함수 한 줄로 대체

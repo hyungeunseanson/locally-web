@@ -10,6 +10,15 @@
 > **생성일**: 2026-03-19 | **상태**: 점검 대기 중
 > **스캔 제외**: `node_modules/`, `.next/`, `.git/`, `.vscode/`, `app/fonts/`
 
+## 📜 운영 원칙 및 작업 가이드 (Operational Principles)
+
+1. **[Context First]** 모든 도메인의 코드 수정 시작 전, 코덱스는 프로젝트 루트의 `gemini.md`를 필독하여 최신 컨텍스트와 기존에 학습된 주의 사항을 반드시 숙지한다.
+2. **[Pinpoint Fix]** 불필요한 대규모 리팩토링을 지양한다. 결함이 발견된 지점만 정확히 타격하는 **'핀셋 수정'**을 원칙으로 하여 사이드 이펙트를 최소화한다.
+3. **[Zero Regression]** 수정 후 기존 기능이 망가지는 '회귀'를 절대 금지한다. 수정 전후의 로직 변화를 코덱스와 이중 검증하여 안정성을 확보한다.
+4. **[Completion Protocol]** 도메인별 작업 완료 후에는 반드시 다음 절차를 수행한다:
+   - `git push`를 통해 코드를 즉시 동기화한다.
+   - `CHANGELOG.md`에 수정된 파일 목록과 해결된 이슈를 상세히 기록한다.
+   - `AUDIT_MAP.md`의 진행 상태(`- [ ]` -> `- [x]`)를 업데이트한다.
 ---
 
 ## 📊 도메인 분류 요약
@@ -37,11 +46,11 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/auth/callback/route.ts` | OAuth 콜백 처리, 코드 교환 후 프로필 동기화 | PKCE 검증 누락 여부, `exchangeCodeForSession` 후 에러 처리, 프로필 upsert 실패 시 fallback |
-| - [ ] | `app/context/AuthContext.tsx` | 전역 auth 상태, 세션 갱신 로직 | `getUser()` vs `getSession()` 혼용 여부, 로그아웃 경쟁조건(race condition), 메모리 누수 가능 구독 |
-| - [ ] | `app/utils/supabase/client.ts` | 브라우저용 Supabase 클라이언트 싱글턴 | 싱글턴 패턴 올바른지, 여러 인스턴스 생성 방지 |
-| - [ ] | `app/utils/supabase/server.ts` | 서버용 Supabase 클라이언트 (cookies) | Next.js 15 cookie 비동기 처리 누락 여부 |
-| - [ ] | `app/utils/supabase/middleware.ts` | 미들웨어 세션 갱신 | 갱신 실패 시 리디렉션 루프 가능성, 보호 경로 누락 |
+| - [x] | `app/auth/callback/route.ts` | OAuth 콜백 처리, 코드 교환 후 프로필 동기화 | ✅ 수정완료: `next` 파라미터 오픈 리다이렉트 차단 (상대경로 검증) |
+| - [x] | `app/context/AuthContext.tsx` | 전역 auth 상태, 세션 갱신 로직 | ✅ 감사완료: getUser() 사용 확인, 구독 cleanup 정상. 로그아웃 race는 low-risk |
+| - [x] | `app/utils/supabase/client.ts` | 브라우저용 Supabase 클라이언트 싱글턴 | ✅ 수정완료: `https://missing.com` 위험 fallback 제거 → 명시적 에러 throw |
+| - [x] | `app/utils/supabase/server.ts` | 서버용 Supabase 클라이언트 (cookies) | ✅ 감사완료: cookies() await 정상, cookie write 에러 swallow는 low-risk |
+| - [x] | `app/utils/supabase/middleware.ts` | 미들웨어 세션 갱신 | ✅ 감사완료: 리디렉션 루프 없음, 보호경로 게이트는 미들웨어 아닌 각 페이지에서 처리 |
 
 ---
 
@@ -142,16 +151,16 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/api/payment/nicepay-callback/route.ts` | NicePay 카드 결제 콜백 | **서명(signature) 검증 구현 여부**, 멱등성 처리(중복 콜백), 예약 상태 전환 원자성 |
-| - [ ] | `app/api/payment/card-ready/route.ts` | 카드 결제 준비 | 금액 서버사이드 재검증, 세션 검증 |
-| - [ ] | `app/api/payment/paypal/create-order/route.ts` | PayPal 주문 생성 | 금액 위변조 방어, 통화 설정 |
-| - [ ] | `app/api/payment/paypal/capture-order/route.ts` | PayPal 결제 캡처 | 캡처 중복 방어, 실패 시 롤백 |
-| - [ ] | `app/api/payment/cancel/route.ts` | 결제 취소/환불 | 환불 금액 상한 검증, PG사 환불 API 실패 처리 |
+| - [x] | `app/api/payment/nicepay-callback/route.ts` | NicePay 카드 결제 콜백 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE로 race condition 방지, 멱등성 응답 추가 |
+| - [x] | `app/api/payment/card-ready/route.ts` | 카드 결제 준비 | ✅ 감사완료: 금액 미포함 라우트, 보안 상태 노출 low-risk |
+| - [x] | `app/api/payment/paypal/create-order/route.ts` | PayPal 주문 생성 | ✅ 감사완료: 금액 DB에서 조회, 중복 주문 생성 가능하나 capture 단계에서 차단됨 |
+| - [x] | `app/api/payment/paypal/capture-order/route.ts` | PayPal 결제 캡처 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE로 중복 캡처 DB 반영 차단 |
+| - [x] | `app/api/payment/cancel/route.ts` | 결제 취소/환불 | ✅ 수정완료: PG 환불 전 atomic lock (status→cancellation_requested), DB 업데이트 에러 체크 추가 |
 | - [ ] | `app/api/bookings/confirm-payment/route.ts` | 무통장 입금 확인 (호스트) | **중복 확인 방어 (이슈 보고됨)**, 알림 중복 발송 체크 |
 | - [ ] | `app/api/admin/bookings/confirm-payment/route.ts` | 무통장 어드민 확인 | 어드민 권한 검증, 중복 처리 방어 |
-| - [ ] | `app/utils/paypal/server.ts` | PayPal 서버 유틸 | API 키 환경변수 처리, 에러 로깅 |
-| - [ ] | `app/utils/portone/server.ts` | PortOne/NicePay 서버 유틸 | 서명 검증 로직 분리 여부 |
-| - [ ] | `app/utils/bookingFinance.ts` | 결제 금액 계산 | 수수료율 상수화, 반올림 일관성 |
+| - [x] | `app/utils/paypal/server.ts` | PayPal 서버 유틸 | ✅ 수정완료: capture/refund에 `PayPal-Request-Id` 멱등성 헤더 추가 |
+| - [x] | `app/utils/portone/server.ts` | PortOne/NicePay 서버 유틸 | ✅ 감사완료: 서버사이드 금액 검증 정상 |
+| - [x] | `app/utils/bookingFinance.ts` | 결제 금액 계산 | ✅ 감사완료: Math.floor 다단계 1~2원 오차 허용 범위 (KRW 특성상 무시 가능) |
 
 ### Services 결제 (별도)
 

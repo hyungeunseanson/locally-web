@@ -70,6 +70,19 @@ export async function POST(request: Request) {
 
     if (isCancelledOnlyBookingStatus(booking.status)) return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
 
+    // [Race Guard] Atomic lock: PG 환불 전에 DB 상태를 먼저 점유 — 동시 요청 이중 환불 방지
+    const { data: lockAcquired } = await supabaseAdmin
+      .from('bookings')
+      .update({ status: 'cancellation_requested' })
+      .eq('id', bookingId)
+      .eq('status', booking.status)
+      .select('id')
+      .maybeSingle();
+
+    if (!lockAcquired) {
+      return NextResponse.json({ error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
+    }
+
     // 2. 환불액 및 정산액 계산
     let refundRate = 0;
     let reasonText = '';
@@ -140,14 +153,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. DB 업데이트
-    await supabaseAdmin.from('bookings').update({
+    // 4. DB 업데이트 (lock 상태에서만 진행 보장)
+    const { error: updateError } = await supabaseAdmin.from('bookings').update({
       status: 'cancelled',
       cancel_reason: `${userReason} (${reasonText})`,
       refund_amount: refundAmount,
       host_payout_amount: hostPayout,
       platform_revenue: platformRevenue
-    }).eq('id', bookingId);
+    }).eq('id', bookingId).eq('status', 'cancellation_requested');
+
+    if (updateError) throw new Error('DB update failed after refund: ' + updateError.message);
 
     // 🟢 5. 알림 및 이메일 발송 로직
     const hostId = booking.experiences?.host_id;

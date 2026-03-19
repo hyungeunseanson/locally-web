@@ -140,11 +140,16 @@ export async function POST(request: Request) {
         payout_status: 'pending',
       })
       .eq('id', bookingId)
+      .eq('status', 'PENDING') // [Race Guard] PENDING 상태일 때만 업데이트 — 중복 처리 방지
       .select('*, experiences (host_id, title)')
       .maybeSingle();
 
-    if (updateError || !bookingData) {
-      throw new Error(updateError?.message || '결제 확정 업데이트에 실패했습니다.');
+    if (updateError) {
+      throw new Error(updateError.message || '결제 확정 업데이트에 실패했습니다.');
+    }
+    if (!bookingData) {
+      // 다른 요청이 이미 처리 완료 — 멱등성 응답
+      return NextResponse.json({ success: true, message: 'Already processed' });
     }
 
     const bookingExperienceMeta = Array.isArray(bookingData.experiences)

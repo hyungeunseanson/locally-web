@@ -224,6 +224,7 @@ export async function capturePayPalOrder(orderId: string): Promise<PayPalCapture
     {
       method: 'POST',
       body: JSON.stringify({}),
+      headers: { 'PayPal-Request-Id': `capture-${orderId}` }, // 멱등성: 재시도 시 이중 캡처 방지
     }
   );
 
@@ -259,6 +260,7 @@ export async function refundPayPalCapture(
     {
       method: 'POST',
       body,
+      headers: { 'PayPal-Request-Id': `refund-${captureId}` }, // 멱등성: 재시도 시 이중 환불 방지
     }
   );
 
