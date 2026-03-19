@@ -366,7 +366,7 @@
 |------|------|------|-----------------|
 | - [x] | `app/api/cron/cancel-pending/route.ts` | PENDING 예약 자동 취소 | ✅ 수정완료: CRON_SECRET 필수화 (조건부→강제), UPDATE에 .eq('status','PENDING') guard 추가 |
 | - [x] | `app/api/cron/complete-trips/route.ts` | 여행 완료 자동 처리 | ✅ 수정완료: CRON_SECRET 필수화, UPDATE에 .in('status', ACTIVE_STATUSES) guard 추가 |
-| - [ ] | `app/api/cron/experience-translations/route.ts` | 체험 자동 번역 | 번역 실패 재시도, 번역 비용 최적화 |
+| - [x] | `app/api/cron/experience-translations/route.ts` | 체험 자동 번역 | ✅ 수정완료: CRON_SECRET 필수화. lease/CAS/retry 로직 자체는 정상 (RPC 기반 atomic lease + translation_version guard) |
 | - [ ] | `app/api/guest/trips/sync-completed/route.ts` | 완료 여행 동기화 | 동기화 중복 처리 방어 |
 | - [ ] | `app/utils/experienceTranslation/index.ts` | 번역 로직 | 번역 provider 폴백 처리 |
 
