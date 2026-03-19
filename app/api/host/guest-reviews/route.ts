@@ -12,6 +12,7 @@ type GuestReviewBody = {
 type BookingOwnershipRow = {
   id: string | number;
   user_id: string;
+  status: string;
   experiences: { host_id: string | null } | { host_id: string | null }[] | null;
 };
 
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = createAdminClient();
     const { data: bookingData, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, user_id, experiences!inner(host_id)')
+      .select('id, user_id, status, experiences!inner(host_id)')
       .eq('id', bookingId)
       .maybeSingle();
 
@@ -62,6 +63,11 @@ export async function POST(request: NextRequest) {
 
     if (hostId !== user.id) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+
+    // [Guard] 완료된 예약에 대해서만 후기 작성 허용
+    if (booking.status !== 'completed') {
+      return NextResponse.json({ success: false, error: '완료된 예약에 대해서만 후기를 작성할 수 있습니다.' }, { status: 400 });
     }
 
     const { data: existingReview, error: existingReviewError } = await supabaseAdmin
@@ -86,7 +92,13 @@ export async function POST(request: NextRequest) {
         content,
       });
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      // [Race Guard] DB unique constraint(booking_id, host_id) 위반 → 중복 후기 차단
+      if ((insertError as { code?: string }).code === '23505') {
+        return NextResponse.json({ success: false, error: 'Guest review already exists' }, { status: 409 });
+      }
+      throw insertError;
+    }
 
     return NextResponse.json({ success: true, guestId: booking.user_id });
   } catch (error) {

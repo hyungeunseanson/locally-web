@@ -681,13 +681,14 @@ export async function updateExperienceFromBody(params: {
     });
   }
 
-  const updateQuery = supabaseAdmin
+  let updateQuery = supabaseAdmin
     .from('experiences')
     .update(updatePayload)
     .eq('id', experienceId);
 
   if (!actor.isAdmin) {
-    updateQuery.eq('host_id', actor.id);
+    // [CRITICAL FIX] query builder는 immutable — 반드시 재할당해야 host_id 필터가 실제 쿼리에 반영됨
+    updateQuery = updateQuery.eq('host_id', actor.id);
   }
 
   const { data, error } = await updateQuery.select('id').maybeSingle();

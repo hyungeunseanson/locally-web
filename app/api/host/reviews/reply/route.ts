@@ -11,6 +11,7 @@ type ReviewReplyBody = {
 type ReviewOwnershipRow = {
   id: number;
   user_id: string | null;
+  experience_id: number;
   experiences: { host_id: string | null } | { host_id: string | null }[] | null;
 };
 
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = createAdminClient();
     const { data: reviewData, error: reviewError } = await supabaseAdmin
       .from('reviews')
-      .select('id, user_id, experiences!inner(host_id)')
+      .select('id, user_id, experience_id, experiences!inner(host_id)')
       .eq('id', reviewId)
       .maybeSingle();
 
@@ -69,7 +70,8 @@ export async function POST(request: NextRequest) {
         reply,
         reply_at: replyAt,
       })
-      .eq('id', reviewId);
+      .eq('id', reviewId)
+      .eq('experience_id', review.experience_id); // [TOCTOU Guard] 소유권 재확인
 
     if (updateError) throw updateError;
 
