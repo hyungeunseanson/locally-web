@@ -15,6 +15,11 @@ export async function POST(request: NextRequest) {
     if (!postId) {
       return NextResponse.json({ success: false, error: 'postId is required' }, { status: 400 });
     }
+    // [Security] UUID 형식 검증 — 비정상 postId로 불필요한 DB 쿼리/쿠키명 오염 방지
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(postId)) {
+      return NextResponse.json({ success: false, error: 'Invalid postId' }, { status: 400 });
+    }
 
     const cookieName = buildViewCookieName(postId);
     const alreadyCounted = request.cookies.get(cookieName)?.value === '1';

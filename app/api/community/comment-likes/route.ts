@@ -71,7 +71,10 @@ export async function POST(request: NextRequest) {
             if (isMissingCommentLikesTableError(insertError)) {
                 return NextResponse.json({ error: '댓글 좋아요 기능을 사용하려면 최신 커뮤니티 마이그레이션이 필요합니다.' }, { status: 503 });
             }
-
+            // [Fix] 23505 = unique_violation — 동시 요청 중복 삽입 시 500 대신 409 반환
+            if (insertError.code === '23505') {
+                return NextResponse.json({ liked: true, likeCount: await fetchLikeCount(supabase, comment_id) }, { status: 409 });
+            }
             return NextResponse.json({ error: insertError.message }, { status: 500 });
         }
 

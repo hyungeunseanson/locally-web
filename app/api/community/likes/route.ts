@@ -48,6 +48,11 @@ export async function POST(request: NextRequest) {
         } else {
             const { error: insertError } = await supabase.from('community_likes').insert({ post_id, user_id: user.id });
             if (insertError) {
+                // [Fix] 23505 = unique_violation — 동시 요청 중복 삽입 시 500 대신 409 반환
+                if (insertError.code === '23505') {
+                    const likeCount = await fetchLikeCount(supabase, post_id);
+                    return NextResponse.json({ liked: true, likeCount }, { status: 409 });
+                }
                 return NextResponse.json({ error: insertError.message }, { status: 500 });
             }
 

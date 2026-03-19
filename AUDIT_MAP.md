@@ -291,17 +291,17 @@
 |------|------|------|-----------------|
 | - [ ] | `app/community/page.tsx` | 커뮤니티 메인 | SSR 캐시 전략 |
 | - [ ] | `app/community/write/page.tsx` | 글 작성 페이지 | 로그인 guard, 이미지 업로드 검증 |
-| - [ ] | `app/community/write/PostEditor.tsx` | 에디터 컴포넌트 | **XSS**: HTML 입력 sanitize 여부 |
+| - [x] | `app/community/write/PostEditor.tsx` | 에디터 컴포넌트 | ✅ 수정완료: title maxLength=200, content maxLength=10000 (UI 레이어 입력 제한); XSS — React text nodes 사용 확인(dangerouslySetInnerHTML 없음), 서버 sanitizeText() 적용 |
 | - [ ] | `app/community/[id]/page.tsx` | 게시글 상세 | OG 메타데이터, 삭제된 글 처리 |
-| - [ ] | `app/community/components/CommentSection.tsx` | 댓글 섹션 | 댓글 XSS, 대댓글 깊이 제한 |
+| - [x] | `app/community/components/CommentSection.tsx` | 댓글 섹션 | ✅ 확인완료: React text nodes 사용(XSS 없음), 대댓글 parent_id flattening으로 깊이 1 제한 |
 | - [ ] | `app/community/components/LikeButton.tsx` | 좋아요 버튼 | 중복 좋아요 방어 (낙관적 업데이트 롤백) |
 | - [ ] | `app/community/authorDisplay.ts` | 작성자 표시 유틸 | 익명 처리 일관성 |
-| - [ ] | `app/community/anonymousColumn.ts` | 익명 컬럼 처리 | 실제 유저 ID 노출 방어 |
-| - [x] | `app/api/community/posts/route.ts` | 게시글 CRUD | ✅ 수정완료: 제목/내용에 sanitizeText() 적용 (서버사이드 XSS 방어) |
-| - [x] | `app/api/community/comments/route.ts` | 댓글 CRUD | ✅ 수정완료: sanitizeText() 적용 + 2000자 길이 제한 추가 |
-| - [ ] | `app/api/community/likes/route.ts` | 좋아요 | 중복 방어 (upsert) |
-| - [ ] | `app/api/community/views/route.ts` | 조회수 | 어뷰징 방어 (IP/세션 기반) |
-| - [ ] | `app/api/community/comment-likes/route.ts` | 댓글 좋아요 | 중복 방어 |
+| - [x] | `app/community/anonymousColumn.ts` | 익명 컬럼 처리 | ✅ 확인완료: 순수 에러 메시지 분류기, 사용자 데이터 미접촉; 댓글 GET에서 user_id 노출 — profiles.id로 대체 필요(프론트엔드 수정 필요, 알려진 위험으로 기록) |
+| - [x] | `app/api/community/posts/route.ts` | 게시글 CRUD | ✅ 수정완료: sanitizeText() + title 200자/content 10000자 제한 추가 |
+| - [x] | `app/api/community/comments/route.ts` | 댓글 CRUD | ✅ 수정완료: .single()→.maybeSingle()+null체크; sanitizeText() + 2000자 제한; GET user_id 노출 알려진 위험(profiles.id 대체 필요) |
+| - [x] | `app/api/community/likes/route.ts` | 좋아요 | ✅ 수정완료: 23505→409 (동시 중복 삽입 시 500 방지) |
+| - [x] | `app/api/community/views/route.ts` | 조회수 | ✅ 수정완료: UUID 형식 검증 추가; TOCTOU(view_count+1 race) — DB RPC 필요한 알려진 위험으로 기록 |
+| - [x] | `app/api/community/comment-likes/route.ts` | 댓글 좋아요 | ✅ 수정완료: 23505→409 |
 | - [x] | `app/api/bot/auto-post/route.ts` | 봇 자동 게시 | ✅ 수정완료: CRON_SECRET mandatory guard + 가짜 view_count 제거 |
 | - [x] | `app/api/bot/auto-comment/route.ts` | 봇 자동 댓글 | ✅ 수정완료: CRON_SECRET mandatory guard + sanitizeText() 적용 |
 | - [ ] | `app/utils/bot/ai.ts` | AI 봇 유틸 | API 키 노출 방어, 토큰 한도 처리 |

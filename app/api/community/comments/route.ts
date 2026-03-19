@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
             .from('community_comments')
             .insert(insertPayload)
             .select('*')
-            .single();
+            .maybeSingle();
 
         if (insertResult.error) {
             if (normalizedParentId && isMissingParentColumnError(insertResult.error)) {
@@ -205,6 +205,11 @@ export async function POST(request: NextRequest) {
             }
 
             return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
+        }
+
+        // [Fix] .maybeSingle() null 체크 — RLS 무음 차단 시 PGRST116 대신 명시적 500 반환
+        if (!insertResult.data) {
+            return NextResponse.json({ error: '댓글 등록에 실패했습니다.' }, { status: 500 });
         }
 
         inserted = insertResult.data as CommentRow;

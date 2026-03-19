@@ -487,6 +487,7 @@ export default function PostEditor({
                                 type="text"
                                 placeholder={formatMeta.templateTitlePlaceholder}
                                 value={title}
+                                maxLength={200}
                                 onChange={(event) => setTitle(event.target.value)}
                                 className="w-full bg-transparent text-[24px] font-semibold text-slate-900 placeholder:text-slate-300 outline-none md:text-[30px]"
                             />
@@ -497,6 +498,7 @@ export default function PostEditor({
                             <textarea
                                 placeholder={formatMeta.templateBodyPlaceholder}
                                 value={content}
+                                maxLength={10000}
                                 onChange={(event) => setContent(event.target.value)}
                                 className="h-[280px] w-full resize-none bg-transparent text-[15px] leading-7 text-slate-800 placeholder:text-slate-300 outline-none md:h-[340px] md:text-[16px]"
                             />

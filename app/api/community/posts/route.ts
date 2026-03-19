@@ -67,6 +67,13 @@ export async function POST(request: NextRequest) {
         if (!category || !title || !content) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
+        // [Security] 제목/본문 길이 제한 — DB overflow 및 이메일 페이로드 블로팅 방지
+        if (title.trim().length > 200) {
+            return NextResponse.json({ error: '제목은 200자를 초과할 수 없습니다.' }, { status: 400 });
+        }
+        if (content.trim().length > 10000) {
+            return NextResponse.json({ error: '본문은 10000자를 초과할 수 없습니다.' }, { status: 400 });
+        }
         if (!allowedCategories.has(resolvedCategory)) {
             return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
         }
