@@ -327,12 +327,12 @@
 | - [ ] | `app/utils/supabase/server.ts` | 서버 클라이언트 | *(D-01에서 중복 점검)* |
 | - [ ] | `app/utils/supabase/admin.ts` | 서비스롤 클라이언트 | `SUPABASE_SERVICE_ROLE_KEY` 사용처 최소화 확인 |
 | - [ ] | `app/utils/supabase/middleware.ts` | 미들웨어 | *(D-01에서 중복 점검)* |
-| - [ ] | `app/lib/supabase.ts` | 레거시 supabase 클라이언트 | 신규 utils/supabase/와 중복 여부, 마이그레이션 필요 여부 |
+| - [x] | `app/lib/supabase.ts` | 레거시 supabase 클라이언트 | ✅ 수정완료: ExperienceClient.tsx 유일 임포터 → utils/supabase/client로 마이그레이션 |
 | - [ ] | `app/utils/contentHelper.ts` | i18n 콘텐츠 헬퍼 | 누락 번역 키 fallback 처리 |
 | - [ ] | `app/utils/locale.ts` | 로케일 유틸 | 지원 언어 상수 관리 |
 | - [ ] | `app/utils/siteUrl.ts` | 절대 URL 생성 | 환경변수 누락 시 fallback |
 | - [ ] | `app/utils/image.ts` | 이미지 유틸 | Supabase Storage URL 생성, 만료 처리 |
-| - [ ] | `app/utils/profile.ts` | 프로필 유틸 | full_name 조회 로직, null 처리 |
+| - [x] | `app/utils/profile.ts` | 프로필 유틸 | ✅ 수정완료: school 필드 타입/레이블에서 제거 (DB 미존재 컬럼) |
 | - [ ] | `app/constants/bookingStatus.ts` | 예약 상태 상수 | 상태 유니온 완결성, 전체 사용처 일관성 |
 | - [ ] | `app/types/index.ts` | 공통 타입 | any 타입 사용 빈도 |
 | - [ ] | `app/types/proxy.ts` | 전화대행 타입 | 완결성 |
@@ -353,7 +353,7 @@
 | - [ ] | `app/about/page.tsx` | 소개 페이지 | 메타데이터, 모바일 반응형 |
 | - [ ] | `app/become-a-host/page.tsx` | 호스트 지원 랜딩 | CTA 버튼 동작, 리디렉션 |
 | - [ ] | `app/help/page.tsx` | 고객센터 | 연락처 정보 최신화 |
-| - [ ] | `app/users/[id]/page.tsx` | 공개 유저 프로필 | 비공개 정보 노출 방어 |
+| - [x] | `app/users/[id]/page.tsx` | 공개 유저 프로필 | ✅ 수정완료: select('*') → 명시적 안전 컬럼만 조회 (phone PII 노출 방지) |
 | - [ ] | `app/[...rest]/` | catch-all 라우트 | 404 처리, 언어 프리픽스 처리 |
 
 ---
