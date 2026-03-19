@@ -110,17 +110,24 @@ export async function POST(request: Request) {
     const reqDuration = requestInfo?.duration_hours ?? 0;
     const reqGuests = requestInfo?.guest_count ?? 0;
 
-    const { error: bookingUpdateErr } = await supabaseAdmin
+    // [Race Guard] PENDING 상태일 때만 업데이트 — 중복 처리 방지
+    const { data: updatedBooking, error: bookingUpdateErr } = await supabaseAdmin
       .from('service_bookings')
       .update({
         status: 'PAID',
         payment_method: 'paypal',
         tid: captured.captureId,
       })
-      .eq('id', bookingId);
+      .eq('id', bookingId)
+      .eq('status', 'PENDING')
+      .select('id')
+      .maybeSingle();
 
     if (bookingUpdateErr) {
       throw new Error(`[SERVICE][PAYPAL] Booking update failed: ${bookingUpdateErr.message}`);
+    }
+    if (!updatedBooking) {
+      return NextResponse.json({ success: true, message: 'Already processed' });
     }
 
     const { error: requestUpdateErr } = await supabaseAdmin

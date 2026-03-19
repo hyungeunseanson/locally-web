@@ -54,6 +54,18 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ success: false, error: '삭제 권한이 없습니다.' }, { status: 403 });
     }
 
+    // [Guard] 활성 예약이 있으면 삭제 차단
+    const { data: activeBookings } = await supabaseAdmin
+      .from('bookings')
+      .select('id')
+      .eq('experience_id', experienceId)
+      .in('status', ['PENDING', 'PAID', 'confirmed'])
+      .limit(1);
+
+    if (activeBookings && activeBookings.length > 0) {
+      return NextResponse.json({ success: false, error: '활성 예약이 있는 체험은 삭제할 수 없습니다.' }, { status: 409 });
+    }
+
     const { error: deleteError } = await supabaseAdmin
       .from('experiences')
       .delete()

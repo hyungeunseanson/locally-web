@@ -223,8 +223,9 @@ guest:profiles!bookings_user_id_fkey (
   }, [fetchReservations, supabase, showToast, t]);
 
   const addToGoogleCalendar = (res: ReservationRecord) => {
-    const title = encodeURIComponent(`${t('res_gcal_title_prefix')}${res.experiences?.title} - ${res.guest?.full_name}`);
-    const details = encodeURIComponent(`${t('res_gcal_details_order')}${String(res.order_id || res.id)}\n${t('res_gcal_details_guest')}${res.guest?.full_name} (${res.guests}${t('res_gcal_details_persons')})\n${t('res_gcal_details_contact')}${res.guest?.phone || t('res_gcal_none')}`);
+    const guestDisplayName = res.guest?.full_name || res.contact_name || t('res_gcal_none');
+    const title = encodeURIComponent(`${t('res_gcal_title_prefix')}${res.experiences?.title} - ${guestDisplayName}`);
+    const details = encodeURIComponent(`${t('res_gcal_details_order')}${String(res.order_id || res.id)}\n${t('res_gcal_details_guest')}${guestDisplayName} (${res.guests}${t('res_gcal_details_persons')})\n${t('res_gcal_details_contact')}${res.guest?.phone || t('res_gcal_none')}`);
 
     const startDate = new Date(`${res.date}T${res.time || '00:00:00'}`);
     const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000));
@@ -236,7 +237,7 @@ guest:profiles!bookings_user_id_fkey (
   };
 
   const handleApproveCancel = async (booking: ReservationRecord) => {
-    if (!confirm(`${t('res_refund_confirm_prefix')}${booking.guest?.full_name}${t('res_refund_confirm_suffix')}`)) return; // 🟢 번역
+    if (!confirm(`${t('res_refund_confirm_prefix')}${booking.guest?.full_name || booking.contact_name || ''}${t('res_refund_confirm_suffix')}`)) return; // 🟢 번역
     setProcessingId(booking.id);
 
     try {

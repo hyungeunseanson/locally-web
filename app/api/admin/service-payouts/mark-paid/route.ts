@@ -65,10 +65,12 @@ export async function POST(request: Request) {
       );
     }
 
+    // [Race Guard] payout_status='pending' 조건부 UPDATE — 이중 정산 방지
     const { error: updateError } = await supabaseAdmin
       .from('service_bookings')
       .update({ payout_status: 'paid' })
-      .in('id', bookingIds);
+      .in('id', bookingIds)
+      .eq('payout_status', 'pending');
 
     if (updateError) {
       throw updateError;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { sanitizeText } from '@/app/utils/sanitize';
 import { revalidatePath } from 'next/cache';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { createCommunityInsertPayload } from '@/app/community/feedSelect';
@@ -83,12 +84,12 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Insert new post into DB
+        // Insert new post into DB — [XSS] 서버사이드 HTML 태그 제거
         const insertPayload = createCommunityInsertPayload({
             userId: user.id,
             category: resolvedCategory,
-            title,
-            content,
+            title: sanitizeText(title),
+            content: sanitizeText(content),
             images: normalizedImages,
             isAnonymous: normalizedIsAnonymous,
             companionDate: companion_date || null,

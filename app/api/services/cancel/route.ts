@@ -217,6 +217,19 @@ export async function POST(request: Request) {
 
     // 5. PAID + open (호스트 미선택) → NicePay 전액 환불
     if (booking.status === 'PAID' && requestStatus === 'open') {
+      // [Race Guard] PG 환불 전 atomic lock — 이중 환불 방지
+      const { data: lockAcquired } = await supabaseAdmin
+        .from('service_bookings')
+        .update({ status: 'cancellation_requested' })
+        .eq('order_id', order_id)
+        .eq('status', 'PAID')
+        .select('order_id')
+        .maybeSingle();
+
+      if (!lockAcquired) {
+        return NextResponse.json({ success: false, error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
+      }
+
       const refundResult = await refundPaidOpenServiceBooking(
         {
           amount: booking.amount,
@@ -234,7 +247,8 @@ export async function POST(request: Request) {
       await supabaseAdmin
         .from('service_bookings')
         .update({ status: 'cancelled', cancel_reason, refund_amount: refundResult.refundAmount })
-        .eq('order_id', order_id);
+        .eq('order_id', order_id)
+        .eq('status', 'cancellation_requested');
       await supabaseAdmin
         .from('service_requests')
         .update({ status: 'cancelled' })

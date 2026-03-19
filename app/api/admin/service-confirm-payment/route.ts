@@ -65,13 +65,19 @@ export async function POST(request: Request) {
     const reqDuration = (serviceRequest as { duration_hours?: number } | null)?.duration_hours ?? 0;
     const reqGuests = (serviceRequest as { guest_count?: number } | null)?.guest_count ?? 0;
 
-    // 5. service_bookings: PENDING → PAID (identical to nicepay-callback)
-    const { error: bookingUpdateErr } = await supabaseAdmin
+    // 5. service_bookings: PENDING → PAID — [Race Guard] 조건부 UPDATE 중복 확정 방지
+    const { data: updatedBooking, error: bookingUpdateErr } = await supabaseAdmin
       .from('service_bookings')
       .update({ status: 'PAID' })
-      .eq('order_id', orderId);
+      .eq('order_id', orderId)
+      .eq('status', 'PENDING')
+      .select('id')
+      .maybeSingle();
 
     if (bookingUpdateErr) throw new Error(`Booking update failed: ${bookingUpdateErr.message}`);
+    if (!updatedBooking) {
+      return NextResponse.json({ success: true, message: 'Already processed' });
+    }
 
     // 6. service_requests: pending_payment → open (identical to nicepay-callback)
     const { error: requestUpdateErr } = await supabaseAdmin
