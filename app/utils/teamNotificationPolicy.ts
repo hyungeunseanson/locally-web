@@ -28,7 +28,8 @@ export function buildTeamEmailRecipients(params: {
     .filter(Boolean);
 
   return Array.from(new Set(recipients)).filter((email) => {
-    if (!actorEmail) return true;
+    // [Fix] actorEmail 미확인 시 fail-closed — 발신자 이메일 모를 때 모두에게 발송하면 작성자 본인도 수신
+    if (!actorEmail) return false;
     return email !== actorEmail;
   });
 }

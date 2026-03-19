@@ -54,7 +54,8 @@ export async function GET(request: Request) {
         const userIdsParam = searchParams.get('user_ids');
         const summarySelect = 'id,user_id,created_at,name,status,host_nationality,profile_photo,languages,language_levels,target_language';
         const detailSelect = 'id,user_id,created_at,name,email,phone,status,host_nationality,dob,instagram,source,language_cert,profile_photo,self_intro,id_card_file,bank_name,account_number,account_holder,motivation,languages,language_levels,target_language,admin_comment';
-        const selectParam = searchParams.get('select') || (idParam ? detailSelect : summarySelect);
+        // [Security] select 파라미터는 서버에서만 결정 — 클라이언트 제공 select로 임의 컬럼 탈취 방어
+        const selectParam = idParam ? detailSelect : summarySelect;
 
         let query = supabaseAdmin
             .from('host_applications')

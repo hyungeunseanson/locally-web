@@ -231,7 +231,7 @@
 | - [ ] | `app/utils/notification.ts` | 알림 생성 공통 유틸 | 알림 타입 enum 완결성 |
 | - [x] | `app/utils/emailNotificationJobs.ts` | 이메일 발송 잡 | ✅ 수정완료: sendHtmlEmail 반환값 체크 — 발송 실패 시 sent:false 반환 |
 | - [ ] | `app/utils/experienceNotificationFlows.ts` | 체험 알림 흐름 | 모든 예약 상태전환 커버리지 |
-| - [ ] | `app/utils/teamNotificationPolicy.ts` | 팀 알림 정책 | MEMO/댓글 작성자 제외 로직 (수정 완료 확인) |
+| - [x] | `app/utils/teamNotificationPolicy.ts` | 팀 알림 정책 | ✅ 수정완료: actorEmail 미확인 시 return true→false (fail-closed) — 이메일 불명 시 작성자 본인 수신 버그 수정 |
 
 ---
 
@@ -248,14 +248,14 @@
 | - [ ] | `app/api/admin/bookings/route.ts` | 예약 전체 조회 | 권한 검증, 페이지네이션 |
 | - [x] | `app/api/admin/bookings/force-cancel/route.ts` | 강제 취소 | ✅ 수정완료: 마커 UPDATE를 atomic CAS로 변환 (.not+maybeSingle), 동시 요청 이중환불 차단 |
 | - [x] | `app/api/admin/delete/route.ts` | 유저 삭제 | ✅ 수정완료: 일반 삭제 경로에 ALLOWED_DELETE_TABLES 허용목록 추가 (임의 테이블 주입 차단) |
-| - [ ] | `app/api/admin/host-applications/route.ts` | 호스트 신청 관리 | 승인/거절 시 알림 발송 |
+| - [x] | `app/api/admin/host-applications/route.ts` | 호스트 신청 관리 | ✅ 수정완료: caller 제공 ?select= 파라미터 제거 — 서버사이드 summarySelect/detailSelect만 사용 |
 | - [ ] | `app/api/admin/master-ledger/route.ts` | 마스터 장부 | 금액 집계 쿼리 정확성 |
 | - [ ] | `app/api/admin/sales-summary/route.ts` | 매출 요약 | 집계 기준 (결제 완료 기준 vs 체험 완료 기준) |
 | - [ ] | `app/api/admin/reviews/route.ts` | 후기 관리 | 후기 삭제 시 평점 재계산 트리거 |
 | - [ ] | `app/api/admin/reviews/[id]/route.ts` | 개별 후기 삭제 | 권한 검증 |
 | - [ ] | `app/api/admin/users-summary/route.ts` | 유저 통계 | 집계 성능 (인덱스 활용) |
 | - [ ] | `app/api/admin/users/[userId]/timeline/route.ts` | 유저 활동 타임라인 | 조회 범위 및 성능 |
-| - [ ] | `app/api/admin/service-cancel/route.ts` | 서비스 강제 취소 | 감사로그, 환불 처리 |
+| - [x] | `app/api/admin/service-cancel/route.ts` | 서비스 강제 취소 | ✅ 수정완료: HIGH — PAID 취소 전 atomic sentinel lock(cancellation_requested) 추가로 이중환불 차단; refund_amount 음수/초과 검증; PENDING 취소 에러 체크 추가 |
 | - [x] | `app/api/admin/service-payouts/mark-paid/route.ts` | 정산 완료 처리 | ✅ 수정완료: `.eq('payout_status','pending')` 조건부 UPDATE로 이중 정산 방어 |
 
 ### 8-2. 어드민 팀 워크스페이스

@@ -66,10 +66,15 @@ export async function POST(request: Request) {
 
     // 4. PENDING booking: DB cancel only, no PG call needed
     if (booking.status === 'PENDING') {
-      await supabaseAdmin
+      // [Safety] PENDING 취소도 상태 조건 guard — 동시 요청에서 이중 처리 방어
+      const { error: pendingCancelErr } = await supabaseAdmin
         .from('service_bookings')
         .update({ status: 'cancelled', cancel_reason })
-        .eq('order_id', order_id);
+        .eq('order_id', order_id)
+        .eq('status', 'PENDING');
+      if (pendingCancelErr) {
+        return NextResponse.json({ success: false, error: '취소 처리 중 오류가 발생했습니다.' }, { status: 500 });
+      }
 
       await supabaseAdmin
         .from('service_requests')
@@ -117,7 +122,31 @@ export async function POST(request: Request) {
     }
 
     // 5. PAID booking: call NicePay cancel FIRST — only update DB if PG succeeds
+
+    // [Validation] refund_amount 범위 검증 — 음수 또는 booking.amount 초과 방어
+    if (refund_amount !== undefined && (refund_amount < 0 || refund_amount > booking.amount)) {
+      return NextResponse.json({ success: false, error: '환불 금액이 올바르지 않습니다.' }, { status: 400 });
+    }
+
     const actualRefundAmount = refund_amount ?? booking.amount;
+
+    // [Race Guard] PG 환불 전 atomic sentinel lock — 동시 어드민 요청의 이중 환불 차단
+    // booking 상태를 cancellation_requested로 먼저 변경. 이미 변경됐으면 409 반환.
+    const { data: lockRow, error: lockErr } = await supabaseAdmin
+      .from('service_bookings')
+      .update({ status: 'cancellation_requested' })
+      .eq('order_id', order_id)
+      .neq('status', 'cancelled')
+      .neq('status', 'cancellation_requested')
+      .select('id')
+      .maybeSingle();
+
+    if (lockErr) {
+      return NextResponse.json({ success: false, error: '취소 처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    if (!lockRow) {
+      return NextResponse.json({ success: false, error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
+    }
 
     if (booking.tid && actualRefundAmount > 0) {
       if (booking.payment_method === 'paypal') {
@@ -202,11 +231,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // 6. PG succeeded (or refund_amount=0): update DB
+    // 6. PG succeeded (or refund_amount=0): update DB — sentinel 상태에서만 최종 cancelled로 전환
     await supabaseAdmin
       .from('service_bookings')
       .update({ status: 'cancelled', cancel_reason, refund_amount: actualRefundAmount })
-      .eq('order_id', order_id);
+      .eq('order_id', order_id)
+      .eq('status', 'cancellation_requested');
 
     await supabaseAdmin
       .from('service_requests')
