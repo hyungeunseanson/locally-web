@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -11,13 +12,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { data: adminData } = await supabase
-            .from('admin_whitelist')
-            .select('email')
-            .eq('email', user.email)
-            .maybeSingle();
-
-        const isAdmin = !!adminData;
+        // [Fix] resolveAdminAccess()로 교체 — users.role 기반 체크 포함, null email 안전
+        const { isAdmin } = await resolveAdminAccess(supabase, { userId: user.id, email: user.email });
 
         let query = supabase
             .from('proxy_requests')
@@ -68,13 +64,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { data: adminData } = await supabase
-            .from('admin_whitelist')
-            .select('email')
-            .eq('email', user.email)
-            .maybeSingle();
-
-        const isAdmin = !!adminData;
+        // [Fix] resolveAdminAccess()로 교체 — users.role 기반 체크 포함, null email 안전
+        const { isAdmin } = await resolveAdminAccess(supabase, { userId: user.id, email: user.email });
         const body = await request.json();
         const { status, payment_status } = body;
 
@@ -92,16 +83,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             if (status === 'CANCELLED') updates.status = 'CANCELLED';
         }
 
-        if (Object.keys(updates).length > 0) {
-            query = supabase.from('proxy_requests').update(updates).eq('id', id);
-            if (!isAdmin) {
-                query = query.eq('user_id', user.id);
-            }
+        if (Object.keys(updates).length === 0) {
+            return NextResponse.json({ success: false, error: 'No valid fields to update' }, { status: 400 });
+        }
 
-            const { error: updateError } = await query;
-            if (updateError) {
-                throw updateError;
+        // [Security] 비관리자: update 전에 소유권 사전 확인 — 0-row update 시 silent 200 방지
+        if (!isAdmin) {
+            const { data: existing } = await supabase
+                .from('proxy_requests')
+                .select('id, status')
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+            if (!existing) {
+                return NextResponse.json({ success: false, error: 'Not found or forbidden' }, { status: 404 });
             }
+            if (existing.status === 'CANCELLED' || existing.status === 'COMPLETED') {
+                return NextResponse.json({ success: false, error: 'Cannot cancel a request in this state' }, { status: 409 });
+            }
+        }
+
+        query = supabase.from('proxy_requests').update(updates).eq('id', id);
+        if (!isAdmin) {
+            query = query.eq('user_id', user.id);
+        }
+
+        const { error: updateError } = await query;
+        if (updateError) {
+            throw updateError;
         }
 
         return NextResponse.json({ success: true });

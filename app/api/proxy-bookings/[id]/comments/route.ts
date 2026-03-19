@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 export async function POST(
     request: Request,
@@ -20,19 +21,14 @@ export async function POST(
             .from('proxy_requests')
             .select('id, user_id, profiles!user_id(email)')
             .eq('id', requestId)
-            .single();
+            .maybeSingle();
 
         if (reqError || !proxyReq) {
             return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
         }
 
-        const { data: adminData } = await supabase
-            .from('admin_whitelist')
-            .select('email')
-            .eq('email', user.email)
-            .maybeSingle();
-
-        const isAdmin = !!adminData;
+        // [Fix] resolveAdminAccess()로 교체 — users.role 기반 체크 포함, null email 안전
+        const { isAdmin } = await resolveAdminAccess(supabase, { userId: user.id, email: user.email });
 
         // Must be either the owner or an admin
         if (proxyReq.user_id !== user.id && !isAdmin) {
@@ -44,8 +40,9 @@ export async function POST(
         if (!content || typeof content !== 'string' || content.trim().length === 0) {
             return NextResponse.json({ success: false, error: 'Invalid content' }, { status: 400 });
         }
-        if (content.trim().length > 5000) {
-            return NextResponse.json({ success: false, error: 'Comment too long (max 5000 chars)' }, { status: 400 });
+        // [Fix] 5000→2000 (프로젝트 컨텐츠 길이 제한 정책 준수)
+        if (content.trim().length > 2000) {
+            return NextResponse.json({ success: false, error: 'Comment too long (max 2000 chars)' }, { status: 400 });
         }
 
         const { data: newComment, error: insertError } = await supabase
@@ -57,9 +54,9 @@ export async function POST(
                 is_admin: isAdmin,
             })
             .select('*, profiles(full_name, avatar_url)')
-            .single();
+            .maybeSingle();
 
-        if (insertError) {
+        if (insertError || !newComment) {
             console.error('Comment Insert Error:', insertError);
             return NextResponse.json({ success: false, error: 'Failed to add comment' }, { status: 500 });
         }

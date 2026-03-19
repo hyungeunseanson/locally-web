@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
 
 export async function POST(request: Request) {
@@ -35,15 +36,19 @@ export async function POST(request: Request) {
                 payment_channel: data.payment_channel,
                 payment_status: 'WAITING', // Will be updated by PG or Manual Admin
                 naver_buyer_name: isNaver ? data.naver_buyer_name : null,
-                locally_order_id: !isNaver ? `LOCALLY-PROXY-${Date.now()}` : null,
+                locally_order_id: !isNaver ? `LOCALLY-PROXY-${crypto.randomUUID()}` : null,
                 agreed_to_terms: data.agreed_to_terms,
                 status: 'PENDING',
             })
             .select('id, locally_order_id')
-            .single();
+            .maybeSingle();
 
         if (insertError || !newRequest) {
             console.error('Proxy Request Create Error:', insertError);
+            // [Fix] 23505 = unique_violation — 중복 order ID 시 500 대신 409 반환
+            if (insertError?.code === '23505') {
+                return NextResponse.json({ success: false, error: 'Duplicate request' }, { status: 409 });
+            }
             return NextResponse.json({ success: false, error: 'Failed to create request' }, { status: 500 });
         }
 
@@ -67,14 +72,8 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Role check to fetch all requests if admin
-        const { data: adminData } = await supabase
-            .from('admin_whitelist')
-            .select('email')
-            .eq('email', user.email)
-            .maybeSingle();
-
-        const isAdmin = !!adminData;
+        // [Fix] resolveAdminAccess()로 교체 — users.role 기반 체크 포함, null email 안전
+        const { isAdmin } = await resolveAdminAccess(supabase, { userId: user.id, email: user.email });
 
         let query = supabase
             .from('proxy_requests')

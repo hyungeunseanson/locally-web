@@ -6,13 +6,13 @@ import { z } from 'zod';
 
 // A. 식당 카테고리 (RESTAURANT)
 export const RestaurantFormSchema = z.object({
-    restaurant_name: z.string().min(1, '식당 이름을 입력해주세요.'),
-    branch_name: z.string().optional(),
+    restaurant_name: z.string().min(1, '식당 이름을 입력해주세요.').max(200, '식당 이름은 200자 이하'),
+    branch_name: z.string().max(200).optional(),
     target_date: z.string().min(1, '예약 날짜를 선택해주세요.'),
     target_time: z.string().min(1, '예약 시간을 입력해주세요.'),
     guest_number: z.number().min(1, '방문 인원을 입력해주세요.'),
-    alternative_times: z.string().optional().describe('대안 시간대'),
-    special_requests: z.string().optional().describe('특별 요청사항 (알레르기, 기념일 등)'),
+    alternative_times: z.string().max(500).optional().describe('대안 시간대'),
+    special_requests: z.string().max(2000).optional().describe('특별 요청사항 (알레르기, 기념일 등)'),
 });
 
 export type RestaurantFormData = z.infer<typeof RestaurantFormSchema>;
@@ -20,8 +20,8 @@ export type RestaurantFormData = z.infer<typeof RestaurantFormSchema>;
 // B. 교통 (택시/버스 예약) 카테고리 (TRANSPORT)
 export const TransportFormSchema = z.object({
     transport_type: z.enum(['TAXI', 'BUS', 'TRAIN']),
-    departure_location: z.string().min(1, '출발지를 입력해주세요.'),
-    arrival_location: z.string().min(1, '도착지를 입력해주세요.'),
+    departure_location: z.string().min(1, '출발지를 입력해주세요.').max(200),
+    arrival_location: z.string().min(1, '도착지를 입력해주세요.').max(200),
     departure_date: z.string().min(1, '출발 날짜를 선택해주세요.'),
     departure_time: z.string().min(1, '출발 시간을 입력해주세요.'),
     passenger_number: z.number().min(1, '탑승 인원을 입력해주세요.'),
@@ -59,7 +59,7 @@ const BaseProxyRequestSchema = z.object({
 // A. NAVER (스마트스토어) 트랙: buyer_name 필수
 const NaverPaymentTrackSchema = BaseProxyRequestSchema.extend({
     payment_channel: z.literal('NAVER'),
-    naver_buyer_name: z.string().min(2, '스마트스토어 구매자명을 정확히 입력해주세요.'),
+    naver_buyer_name: z.string().min(2, '스마트스토어 구매자명을 정확히 입력해주세요.').max(200),
 });
 
 // B. LOCALLY (자체 웹 결제) 트랙: buyer_name 불필요 (자체 PG 프로세스)

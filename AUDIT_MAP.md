@@ -209,10 +209,10 @@
 | - [ ] | `app/proxy-bookings/page.tsx` | 전화대행 목록 | 권한 분기 (어드민/호스트) |
 | - [ ] | `app/proxy-bookings/new/page.tsx` | 전화대행 생성 | 어드민 전용 접근 제한 |
 | - [ ] | `app/proxy-bookings/[id]/page.tsx` | 전화대행 상세 | 댓글 로딩, 상태 표시 |
-| - [x] | `app/api/proxy-bookings/route.ts` | 전화대행 생성/조회 API | ✅ 수정완료: profiles.name → full_name (42703 에러 방지) |
-| - [x] | `app/api/proxy-bookings/[id]/route.ts` | 전화대행 상세/수정 | ✅ 수정완료: .single()→.maybeSingle(); admin PATCH에 status/payment_status allowlist 추가 |
-| - [x] | `app/api/proxy-bookings/[id]/comments/route.ts` | 댓글 CRUD | ✅ 수정완료: 5000자 max length guard; profiles.name→full_name |
-| - [ ] | `app/schemas/proxyRequestSchema.ts` | 전화대행 입력 스키마 | Zod 검증 완결성 |
+| - [x] | `app/api/proxy-bookings/route.ts` | 전화대행 생성/조회 API | ✅ 수정완료: resolveAdminAccess() 교체; Date.now()→crypto.randomUUID(); .single()→.maybeSingle(); 23505→409 |
+| - [x] | `app/api/proxy-bookings/[id]/route.ts` | 전화대행 상세/수정 | ✅ 수정완료: resolveAdminAccess() ×2; PATCH 빈 updates→400; 비관리자 소유권 사전확인 추가 |
+| - [x] | `app/api/proxy-bookings/[id]/comments/route.ts` | 댓글 CRUD | ✅ 수정완료: resolveAdminAccess(); .single()→.maybeSingle() ×2; content 5000→2000; 알려진위험: x-internal-secret=SERVICE_ROLE_KEY |
+| - [x] | `app/schemas/proxyRequestSchema.ts` | 전화대행 입력 스키마 | ✅ 수정완료: RestaurantFormSchema .max() 추가(restaurant_name 200, alternative_times 500, special_requests 2000); TransportFormSchema .max(200) 추가(departure/arrival_location); naver_buyer_name .max(200) 추가 |
 
 ---
 
