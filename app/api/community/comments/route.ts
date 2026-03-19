@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import type { CommunityComment, CommunityProfilePreview } from '@/app/types/community';
 import { createClient } from '@/app/utils/supabase/server';
+import { sanitizeText } from '@/app/utils/sanitize';
 
 type CommentRow = {
     id: string;
@@ -158,6 +159,9 @@ export async function POST(request: NextRequest) {
         if (!post_id || !content?.trim()) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
+        if (content.trim().length > 2000) {
+            return NextResponse.json({ error: '댓글은 2000자를 초과할 수 없습니다.' }, { status: 400 });
+        }
 
         let normalizedParentId: string | null = null;
         if (typeof parent_id === 'string' && parent_id.trim()) {
@@ -181,7 +185,7 @@ export async function POST(request: NextRequest) {
         const insertPayload: Record<string, unknown> = {
             post_id,
             user_id: user.id,
-            content: content.trim(),
+            content: sanitizeText(content.trim()),
         };
 
         if (normalizedParentId) {

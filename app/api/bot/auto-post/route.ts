@@ -8,6 +8,9 @@ const BOT_UUIDS: string[] = [
 
 export async function GET(request: Request) {
     // 1. 보안 검증
+    if (!process.env.CRON_SECRET) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -44,7 +47,7 @@ export async function GET(request: Request) {
                 content: postData.content,
                 category: postData.category || 'info',
                 images: [], // 봇은 당분간 텍스트 전용
-                view_count: Math.floor(Math.random() * 50) + 12 // 적당히 초기 조회수 주입 (선택사항)
+                view_count: 0
             })
             .select('id')
             .single();

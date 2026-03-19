@@ -24,5 +24,5 @@ export const sanitizeUrl = (url: string) => {
   ) {
     return ''; // 위험한 URL은 빈 문자열로 바꿔버림
   }
-  return url;
+  return url.trim();
 };

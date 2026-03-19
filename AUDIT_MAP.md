@@ -298,14 +298,14 @@
 | - [ ] | `app/community/authorDisplay.ts` | 작성자 표시 유틸 | 익명 처리 일관성 |
 | - [ ] | `app/community/anonymousColumn.ts` | 익명 컬럼 처리 | 실제 유저 ID 노출 방어 |
 | - [x] | `app/api/community/posts/route.ts` | 게시글 CRUD | ✅ 수정완료: 제목/내용에 sanitizeText() 적용 (서버사이드 XSS 방어) |
-| - [ ] | `app/api/community/comments/route.ts` | 댓글 CRUD | 입력 길이 제한, XSS |
+| - [x] | `app/api/community/comments/route.ts` | 댓글 CRUD | ✅ 수정완료: sanitizeText() 적용 + 2000자 길이 제한 추가 |
 | - [ ] | `app/api/community/likes/route.ts` | 좋아요 | 중복 방어 (upsert) |
 | - [ ] | `app/api/community/views/route.ts` | 조회수 | 어뷰징 방어 (IP/세션 기반) |
 | - [ ] | `app/api/community/comment-likes/route.ts` | 댓글 좋아요 | 중복 방어 |
-| - [ ] | `app/api/bot/auto-post/route.ts` | 봇 자동 게시 | 크론 인증, 콘텐츠 생성 실패 처리 |
-| - [ ] | `app/api/bot/auto-comment/route.ts` | 봇 자동 댓글 | 크론 인증 |
+| - [x] | `app/api/bot/auto-post/route.ts` | 봇 자동 게시 | ✅ 수정완료: CRON_SECRET mandatory guard + 가짜 view_count 제거 |
+| - [x] | `app/api/bot/auto-comment/route.ts` | 봇 자동 댓글 | ✅ 수정완료: CRON_SECRET mandatory guard + sanitizeText() 적용 |
 | - [ ] | `app/utils/bot/ai.ts` | AI 봇 유틸 | API 키 노출 방어, 토큰 한도 처리 |
-| - [ ] | `app/utils/sanitize.ts` | HTML sanitize 유틸 | DOMPurify 설정, 허용 태그 목록 |
+| - [x] | `app/utils/sanitize.ts` | HTML sanitize 유틸 | ✅ 수정완료: sanitizeUrl() return url.trim() 버그 수정 |
 | - [ ] | `app/types/community.ts` | 커뮤니티 타입 | 타입 완결성 |
 
 ---

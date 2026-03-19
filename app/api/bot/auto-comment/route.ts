@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateFriendlyComment } from '@/app/utils/bot/ai';
+import { sanitizeText } from '@/app/utils/sanitize';
 
 // 봇 유저 UUID 리스트 (추후 Supabase profiles에서 봇 계정을 생성하고 UUID를 입력하세요)
 // 현재는 봇 계정이 없어도 테스트 통과를 위해 임시로 admin 또는 봇용 서비스 계정이라고 가정
@@ -11,6 +12,9 @@ const BOT_UUIDS: string[] = [
 
 export async function GET(request: Request) {
     // 1. 보안 검증: 크론 스케줄러(Github Actions)만 호출 가능하게 시크릿 확인
+    if (!process.env.CRON_SECRET) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -64,7 +68,7 @@ export async function GET(request: Request) {
             .insert({
                 post_id: latestPost.id,
                 user_id: botId,
-                content: commentContent
+                content: sanitizeText(commentContent)
             });
 
         if (insertError) throw insertError;
