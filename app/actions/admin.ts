@@ -163,8 +163,18 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
   return { success: true };
 }
 
+// [Security] 삭제 가능한 테이블 허용 목록 — service-role 클라이언트로 임의 테이블 삭제 방지
+const ADMIN_DELETABLE_TABLES = [
+  'profiles', 'experiences', 'host_applications', 'bookings',
+  'community_posts', 'community_comments', 'admin_tasks', 'reviews',
+] as const;
+type AdminDeletableTable = typeof ADMIN_DELETABLE_TABLES[number];
+
 // 🗑️ 데이터 삭제 (Server Action 사용 시 대비 - 로직 일치화)
 export async function deleteAdminItem(table: string, id: string) {
+  if (!ADMIN_DELETABLE_TABLES.includes(table as AdminDeletableTable)) {
+    throw new Error(`Forbidden: table "${table}" is not deletable via this action`);
+  }
   const supabase = await getAdminClient();
   const { data: { user: adminUser } } = await supabase.auth.getUser();
   const supabaseAdmin = createAdminClient();

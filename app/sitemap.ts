@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 import { stat } from 'fs/promises';
 import path from 'path';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
 
 // 1시간 캐시: 매 크롤러 요청마다 DB 조회하지 않도록
@@ -129,10 +129,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // 동적 체험 URL — Supabase에서 active 체험 조회
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = createAdminClient();
 
     const { data: experiences } = await supabase
       .from('experiences')

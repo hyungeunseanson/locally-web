@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 
 export async function GET(request: Request) {
   // [M-2] Auto Cancel Scheduler
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabase = createAdminClient();
 
     // 1 hour ago
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();

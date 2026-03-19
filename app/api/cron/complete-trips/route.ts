@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
 export async function GET(request: Request) {
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        const supabase = createAdminClient();
         const now = new Date().toISOString();
 
         // 1. 상태가 PAID 또는 confirmed 인 예약 중, 날짜/시간이 현재보다 과거인 예약 물색

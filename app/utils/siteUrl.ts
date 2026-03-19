@@ -7,6 +7,11 @@ export function getSiteUrl(): string {
 export function buildAbsoluteUrl(pathname: string = '/'): string {
   const baseUrl = getSiteUrl();
 
+  // [Security] 절대 URL 또는 프로토콜 상대 문자열 차단 — open redirect 방지
+  if (/^(https?:)?\/\//i.test(pathname)) {
+    return baseUrl;
+  }
+
   if (pathname === '/' || pathname === '') {
     return baseUrl;
   }

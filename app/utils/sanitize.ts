@@ -5,8 +5,8 @@
 export const sanitizeText = (text: string) => {
   if (!text) return '';
 
-  // 🟢 모든 HTML 태그 제거 (순수 텍스트만 허용) Vercel SSR 에러 방지를 위해 정규식 사용
-  return text.replace(/<[^>]*>?/gm, '');
+  // 🟢 모든 HTML 태그 제거 — `>?` 제거(닫힘 없는 태그 통과 방지)
+  return text.replace(/<[^>]*>/gm, '');
 };
 
 /**
@@ -20,7 +20,8 @@ export const sanitizeUrl = (url: string) => {
   if (
     cleanUrl.startsWith('javascript:') ||
     cleanUrl.startsWith('vbscript:') ||
-    cleanUrl.startsWith('data:')
+    cleanUrl.startsWith('data:') ||
+    cleanUrl.startsWith('blob:')  // [Security] blob: URL도 차단 — 일부 브라우저에서 XSS 가능
   ) {
     return ''; // 위험한 URL은 빈 문자열로 바꿔버림
   }

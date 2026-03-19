@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 
@@ -69,9 +69,7 @@ export async function POST(request: Request) {
         }
 
         // 2. 관리자 권한 클라이언트 생성 (DB 제어용)
-        const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-        const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+        const supabaseAdmin = createAdminClient();
 
         // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 검증 + 삽입)
         // [Note] solo-guarantee 사전 DB 조회(TOCTOU 취약)는 제거. RPC가 atomic하게 동일 조건 검증함.

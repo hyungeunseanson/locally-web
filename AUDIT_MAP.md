@@ -243,7 +243,7 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/actions/admin.ts` | 서버액션 권한 처리 | admin_whitelist 검증 일관성 |
+| - [x] | `app/actions/admin.ts` | 서버액션 권한 처리 | ✅ 수정완료: HIGH — deleteAdminItem 테이블 허용 목록 추가(service-role 임의 테이블 삭제 차단) |
 | - [ ] | `app/utils/adminAccess.ts` | 어드민 접근 유틸 | 권한 체크 함수 재사용 패턴 |
 | - [ ] | `app/api/admin/bookings/route.ts` | 예약 전체 조회 | 권한 검증, 페이지네이션 |
 | - [x] | `app/api/admin/bookings/force-cancel/route.ts` | 강제 취소 | ✅ 수정완료: 마커 UPDATE를 atomic CAS로 변환 (.not+maybeSingle), 동시 요청 이중환불 차단 |
@@ -305,7 +305,7 @@
 | - [x] | `app/api/bot/auto-post/route.ts` | 봇 자동 게시 | ✅ 수정완료: CRON_SECRET mandatory guard + 가짜 view_count 제거 |
 | - [x] | `app/api/bot/auto-comment/route.ts` | 봇 자동 댓글 | ✅ 수정완료: CRON_SECRET mandatory guard + sanitizeText() 적용 |
 | - [ ] | `app/utils/bot/ai.ts` | AI 봇 유틸 | API 키 노출 방어, 토큰 한도 처리 |
-| - [x] | `app/utils/sanitize.ts` | HTML sanitize 유틸 | ✅ 수정완료: sanitizeUrl() return url.trim() 버그 수정 |
+| - [x] | `app/utils/sanitize.ts` | HTML sanitize 유틸 | ✅ 수정완료: sanitizeUrl() return url.trim() 버그; sanitizeText regex `>?`→`>` (unclosed tag 통과 방지); sanitizeUrl blob: 추가 |
 | - [ ] | `app/types/community.ts` | 커뮤니티 타입 | 타입 완결성 |
 
 ---
@@ -330,10 +330,10 @@
 | - [x] | `app/lib/supabase.ts` | 레거시 supabase 클라이언트 | ✅ 수정완료: ExperienceClient.tsx 유일 임포터 → utils/supabase/client로 마이그레이션 |
 | - [ ] | `app/utils/contentHelper.ts` | i18n 콘텐츠 헬퍼 | 누락 번역 키 fallback 처리 |
 | - [ ] | `app/utils/locale.ts` | 로케일 유틸 | 지원 언어 상수 관리 |
-| - [ ] | `app/utils/siteUrl.ts` | 절대 URL 생성 | 환경변수 누락 시 fallback |
+| - [x] | `app/utils/siteUrl.ts` | 절대 URL 생성 | ✅ 수정완료: buildAbsoluteUrl에 절대URL/프로토콜상대 문자열 차단 guard 추가 (open redirect 방지) |
 | - [ ] | `app/utils/image.ts` | 이미지 유틸 | Supabase Storage URL 생성, 만료 처리 |
 | - [x] | `app/utils/profile.ts` | 프로필 유틸 | ✅ 수정완료: school 필드 타입/레이블에서 제거 (DB 미존재 컬럼) |
-| - [ ] | `app/constants/bookingStatus.ts` | 예약 상태 상수 | 상태 유니온 완결성, 전체 사용처 일관성 |
+| - [x] | `app/constants/bookingStatus.ts` | 예약 상태 상수 | ✅ 확인완료: helper 함수들은 normalize 기반으로 안전; BOOKING_LEDGER_VISIBLE_STATUSES_UPPER 직접 includes 사용처 확인 필요 — 알려진 위험으로 기록 |
 | - [ ] | `app/types/index.ts` | 공통 타입 | any 타입 사용 빈도 |
 | - [ ] | `app/types/proxy.ts` | 전화대행 타입 | 완결성 |
 
@@ -364,8 +364,8 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [x] | `app/api/cron/cancel-pending/route.ts` | PENDING 예약 자동 취소 | ✅ 수정완료: CRON_SECRET 필수화 (조건부→강제), UPDATE에 .eq('status','PENDING') guard 추가 |
-| - [x] | `app/api/cron/complete-trips/route.ts` | 여행 완료 자동 처리 | ✅ 수정완료: CRON_SECRET 필수화, UPDATE에 .in('status', ACTIVE_STATUSES) guard 추가 |
+| - [x] | `app/api/cron/cancel-pending/route.ts` | PENDING 예약 자동 취소 | ✅ 수정완료: CRON_SECRET 필수화; UPDATE guard; createAdminClient() 마이그레이션 |
+| - [x] | `app/api/cron/complete-trips/route.ts` | 여행 완료 자동 처리 | ✅ 수정완료: CRON_SECRET 필수화; UPDATE guard; createAdminClient() 마이그레이션 |
 | - [x] | `app/api/cron/experience-translations/route.ts` | 체험 자동 번역 | ✅ 수정완료: CRON_SECRET 필수화. lease/CAS/retry 로직 자체는 정상 (RPC 기반 atomic lease + translation_version guard) |
 | - [x] | `app/api/guest/trips/sync-completed/route.ts` | 완료 여행 동기화 | ✅ 수정완료: UPDATE에 .in('status', BOOKING_ACTIVE_STATUS_FOR_CAPACITY) guard 추가 — 취소된 예약 completed 덮어쓰기 방지 |
 | - [ ] | `app/utils/experienceTranslation/index.ts` | 번역 로직 | 번역 provider 폴백 처리 |

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
@@ -11,26 +11,6 @@ import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
 // Current admin-confirm path is `/api/admin/bookings/confirm-payment`.
 // Keep this file only for compatibility until legacy callers are fully retired.
 
-// 🔒 API Route 내부에서 직접 관리자 클라이언트 생성 (의존성 제거)
-const createAdminClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('🔥 [Server Error] Missing Env Vars:', { 
-      url: !!supabaseUrl, 
-      key: !!serviceRoleKey 
-    });
-    throw new Error('Server Configuration Error: Missing Supabase Keys');
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-};
 
 export async function POST(request: Request) {
   console.log('💰 [API] Confirm Payment Started');
