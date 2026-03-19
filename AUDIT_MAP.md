@@ -126,7 +126,7 @@
 | - [ ] | `app/api/host/experiences/route.ts` | 체험 목록 조회/생성 | 호스트 본인 체험만 반환 검증 |
 | - [x] | `app/api/host/experiences/[id]/route.ts` | 체험 수정/삭제 | ✅ 수정완료: DELETE 전 활성 예약 존재 시 409 차단 |
 | - [ ] | `app/api/host/experiences/[id]/availability/route.ts` | 가용 슬롯 관리 | 동시 수정 충돌, 슬롯 삭제 시 기존 예약 처리 |
-| - [ ] | `app/api/host/experiences/shared.ts` | 체험 공통 유틸 | 재사용 함수 타입 안전성 |
+| - [x] | `app/api/host/experiences/shared.ts` | 체험 공통 유틸 | ✅ 수정완료: CRITICAL — updateQuery 재할당 버그 수정 (호스트 소유권 필터 미적용) |
 
 ### 3-3. 호스트 대시보드
 
@@ -140,8 +140,8 @@
 | - [ ] | `app/host/dashboard/InquiryChat.tsx` | 문의 채팅 | 실시간 구독 메모리 누수, 읽음 처리 |
 | - [ ] | `app/host/dashboard/MyExperiences.tsx` | 내 체험 목록 | 체험 상태(활성/비활성) 토글 |
 | - [ ] | `app/api/host/profile/route.ts` | 호스트 프로필 조회/수정 | 본인 프로필만 수정 권한 |
-| - [ ] | `app/api/host/guest-reviews/route.ts` | 호스트가 게스트에게 쓰는 후기 | 중복 후기 방어, 완료된 예약만 허용 |
-| - [ ] | `app/api/host/reviews/reply/route.ts` | 후기 답글 | 본인 체험 후기만 답글 권한 |
+| - [x] | `app/api/host/guest-reviews/route.ts` | 호스트가 게스트에게 쓰는 후기 | ✅ 수정완료: CRITICAL — booking.status==='completed' guard 추가; 23505 중복 삽입 방어 |
+| - [x] | `app/api/host/reviews/reply/route.ts` | 후기 답글 | ✅ 수정완료: UPDATE에 .eq('experience_id') TOCTOU 방어 추가 |
 
 ---
 
