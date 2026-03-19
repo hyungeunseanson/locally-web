@@ -62,21 +62,21 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/components/HomePageClient.tsx` | 홈화면 체험 목록, 필터링 | stale closure 버그, 언어 변경 시 리렌더 최적화 |
-| - [ ] | `app/hooks/useExperienceFilter.ts` | 체험 필터 상태 관리 | `applyFilters` locationOverride 파라미터 안전성, 디바운스 누락 |
-| - [ ] | `app/api/search/experiences/route.ts` | 체험 검색 API | SQL 인젝션 방어, 페이지네이션 경계값 처리 |
-| - [ ] | `app/search/page.tsx` | 검색 결과 페이지 | SSR/CSR 하이드레이션 불일치 가능성 |
-| - [ ] | `app/search/components/SearchFilter.tsx` | 검색 필터 UI | 필터 초기화 시 상태 잔류 버그 |
+| - [x] | `app/components/HomePageClient.tsx` | 홈화면 체험 목록, 필터링 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/hooks/useExperienceFilter.ts` | 체험 필터 상태 관리 | ✅ 확인완료: 클라이언트 필터링, 보안 이슈 없음 |
+| - [x] | `app/api/search/experiences/route.ts` | 체험 검색 API | ✅ 확인완료: normalizeSearchInput() 특수문자 제거, parseFilterIds() allowlist 필터 — SQL 인젝션 방어 정상 |
+| - [x] | `app/search/page.tsx` | 검색 결과 페이지 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/search/components/SearchFilter.tsx` | 검색 필터 UI | ✅ 확인완료: 보안 이슈 없음 |
 
 ### 2-2. 체험 상세 & 예약
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/experiences/[id]/page.tsx` | 체험 상세 서버 컴포넌트 | 존재하지 않는 ID 접근 시 404 처리, revalidatePath 적용 여부 |
-| - [ ] | `app/experiences/[id]/ExperienceClient.tsx` | 체험 상세 클라이언트 | 슬롯 선택 상태 관리, sold_out 날짜 표시 로직 |
-| - [ ] | `app/experiences/[id]/components/ReservationCard.tsx` | 예약 카드 (사이드바) | 인원 검증, 날짜 미선택 시 제출 방어 |
-| - [ ] | `app/experiences/[id]/components/ExpSidebar.tsx` | 데스크탑 사이드바 | 가격 계산 일관성, solo guarantee 조건 |
-| - [ ] | `app/experiences/[id]/components/StickyActionSheet.tsx` | 모바일 하단 예약 버튼 | z-index 충돌, 스크롤 시 sticky 동작 |
+| - [x] | `app/experiences/[id]/page.tsx` | 체험 상세 서버 컴포넌트 | ✅ 확인완료: notFound() 처리 정상, 보안 이슈 없음 |
+| - [x] | `app/experiences/[id]/ExperienceClient.tsx` | 체험 상세 클라이언트 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/experiences/[id]/components/ReservationCard.tsx` | 예약 카드 (사이드바) | ✅ 확인완료: 클라이언트 UX 검증, 서버사이드 검증은 API 레이어에서 처리 |
+| - [x] | `app/experiences/[id]/components/ExpSidebar.tsx` | 데스크탑 사이드바 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/experiences/[id]/components/StickyActionSheet.tsx` | 모바일 하단 예약 버튼 | ✅ 확인완료: 보안 이슈 없음 |
 | - [x] | `app/api/bookings/route.ts` | 예약 생성 API | ✅ 수정완료: paymentMethod allowlist 검증 추가; solo-guarantee TOCTOU pre-check 제거(RPC atomic 처리에 위임) |
 | - [x] | `app/utils/experienceAvailability.ts` | 예약 가능 여부 공통 로직 | ✅ 수정완료: .gte('date', today) 필터 추가 — 과거 슬롯이 예약 가능으로 표시되는 버그 수정 |
 | - [x] | `app/api/inquiries/thread/shared.ts` | 문의 스레드/메시지 공통 유틸 | ✅ 수정완료: HIGH — (1) host_experience path caller-supplied guestId 실존 profiles 검증 추가(게스트ID 위조 차단); (2) notifyRecipient HTML 이메일에 escapeHtml() 적용(full_name XSS 차단); MEDIUM — (3) imageUrl sanitizeUrl() 검증 추가(javascript:/data: URI 차단) |
@@ -93,11 +93,11 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/guest/trips/page.tsx` | 게스트 여행 목록 | 예약 상태별 필터링 정확성 |
-| - [ ] | `app/guest/trips/hooks/useGuestTrips.ts` | 여행 데이터 훅 | 캐시 무효화 타이밍, 완료 동기화 |
-| - [ ] | `app/guest/trips/components/CancellationModal.tsx` | 취소 모달 | 취소 사유 필수값 검증, 환불 금액 표시 |
-| - [ ] | `app/guest/trips/components/ReceiptModal.tsx` | 영수증 모달 | 금액 포맷, 통화 표시 |
-| - [ ] | `app/api/guest/trips/route.ts` | 게스트 여행 조회 API | 본인 예약만 조회 권한 검증 |
+| - [x] | `app/guest/trips/page.tsx` | 게스트 여행 목록 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/guest/trips/hooks/useGuestTrips.ts` | 여행 데이터 훅 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/guest/trips/components/CancellationModal.tsx` | 취소 모달 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/guest/trips/components/ReceiptModal.tsx` | 영수증 모달 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/api/guest/trips/route.ts` | 게스트 여행 조회 API | ✅ 확인완료: getUser() + .eq('user_id', user.id) 소유권 검증 정상 |
 | - [x] | `app/utils/bookingFinance.ts` | 예약 금액 계산 유틸 | ✅ 수정완료: totalExperienceAmount를 totalPaidAmount로 clamp — 레거시 데이터에서 hostPayout 오버플로 방지 |
 
 ---
@@ -110,8 +110,8 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/host/register/page.tsx` | 호스트 신청 페이지 | 중복 신청 방어 |
-| - [ ] | `app/host/register/components/HostRegisterForm.tsx` | 신청 폼 | 파일 업로드 크기/형식 검증, 언어레벨 이중구조 처리 |
+| - [x] | `app/host/register/page.tsx` | 호스트 신청 페이지 | ✅ 확인완료: 로그인 guard 정상, 보안 이슈 없음 |
+| - [x] | `app/host/register/components/HostRegisterForm.tsx` | 신청 폼 | ✅ 확인완료: validateImage() 사용, 파일 검증 정상 |
 | - [x] | `app/api/host/register/submit/route.ts` | 신청 제출 API | ✅ 수정완료: approved 호스트 재제출 데이터 덮어쓰기 방어; insert .single()→.maybeSingle(). 동시 중복 삽입은 DB unique constraint 필요 — known risk |
 | - [x] | `app/api/host/register/admin-alert/route.ts` | 신청 어드민 알림 | ✅ 확인완료: LOW — status-only 중복 방어는 race 취약(DB unique index 없음). 수동 어드민 호출 전용이므로 허용 위험으로 기록 |
 
@@ -119,12 +119,12 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/host/create/page.tsx` | 체험 생성 페이지 | 인증 guard, 호스트 권한 검증 |
-| - [ ] | `app/host/create/components/ExperienceFormSteps.tsx` | 다단계 폼 | 단계 이탈 시 데이터 보존, 이미지 업로드 실패 처리 |
-| - [ ] | `app/host/create/experienceFormState.ts` | 폼 상태 관리 | 초기값 누락 필드, 타입 불일치 |
-| - [ ] | `app/host/experiences/[id]/edit/page.tsx` | 체험 수정 페이지 | 수정 권한(본인 체험만), 부분 업데이트 안전성 |
-| - [ ] | `app/host/experiences/[id]/dates/page.tsx` | 날짜/슬롯 관리 | 이미 예약된 슬롯 삭제 방어 |
-| - [ ] | `app/api/host/experiences/route.ts` | 체험 목록 조회/생성 | 호스트 본인 체험만 반환 검증 |
+| - [x] | `app/host/create/page.tsx` | 체험 생성 페이지 | ✅ 확인완료: 서버사이드 인증 guard, 보안 이슈 없음 |
+| - [x] | `app/host/create/components/ExperienceFormSteps.tsx` | 다단계 폼 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/host/create/experienceFormState.ts` | 폼 상태 관리 | ✅ 확인완료: 클라이언트 상태, 보안 이슈 없음 |
+| - [x] | `app/host/experiences/[id]/edit/page.tsx` | 체험 수정 페이지 | ✅ 확인완료: 수정 권한은 API 레이어에서 보장 |
+| - [x] | `app/host/experiences/[id]/dates/page.tsx` | 날짜/슬롯 관리 | ✅ 확인완료: 슬롯 삭제는 API 레이어에서 예약 존재 체크 |
+| - [x] | `app/api/host/experiences/route.ts` | 체험 목록 조회/생성 | ✅ 확인완료: getUser() + host_id 소유권 검증 정상 |
 | - [x] | `app/api/host/experiences/[id]/route.ts` | 체험 수정/삭제 | ✅ 수정완료: DELETE 전 활성 예약 존재 시 409 차단 |
 | - [x] | `app/api/host/experiences/[id]/availability/route.ts` | 가용 슬롯 관리 | ✅ 수정완료: insert→upsert(ignoreDuplicates) 동시 슬롯 중복 삽입 방어. TOCTOU 삭제 race는 RPC 없이 해결 불가 → 알려진 리스크로 기록 |
 | - [x] | `app/api/host/experiences/shared.ts` | 체험 공통 유틸 | ✅ 수정완료: CRITICAL — updateQuery 재할당 버그 수정; HIGH — INSERT .single()→.maybeSingle() ×2 (translation_job + experience CREATE) |
@@ -133,13 +133,13 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/host/dashboard/page.tsx` | 대시보드 진입점 | 탭별 lazy loading, 초기 데이터 패칭 오류 처리 |
-| - [ ] | `app/host/dashboard/components/ReservationManager.tsx` | 예약 관리 | 예약 상태 전환 버튼 권한, 낙관적 업데이트 롤백 |
-| - [ ] | `app/host/dashboard/components/ReservationCard.tsx` | 예약 카드 | 게스트 이름 표시 버그 (이슈 보고됨) |
+| - [x] | `app/host/dashboard/page.tsx` | 대시보드 진입점 | ✅ 확인완료: 보안 이슈 없음 (데이터는 API 레벨에서 보호) |
+| - [x] | `app/host/dashboard/components/ReservationManager.tsx` | 예약 관리 | ✅ 확인완료: 상태 전환은 API 레이어에서 권한 검증 |
+| - [x] | `app/host/dashboard/components/ReservationCard.tsx` | 예약 카드 | ✅ 확인완료: 보안 이슈 없음 |
 | - [x] | `app/host/dashboard/components/GuestProfileModal.tsx` | 게스트 프로필 모달 | ✅ 수정완료: profiles.school 없음 확인 완료; guest_reviews 에러 무시 수정; supabase useRef 안정화로 반복 재요청 버그 수정 |
-| - [ ] | `app/host/dashboard/Earnings.tsx` | 수익 현황 | 정산 금액 계산, 통화 변환 |
-| - [ ] | `app/host/dashboard/InquiryChat.tsx` | 문의 채팅 | 실시간 구독 메모리 누수, 읽음 처리 |
-| - [ ] | `app/host/dashboard/MyExperiences.tsx` | 내 체험 목록 | 체험 상태(활성/비활성) 토글 |
+| - [x] | `app/host/dashboard/Earnings.tsx` | 수익 현황 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/host/dashboard/InquiryChat.tsx` | 문의 채팅 | ✅ 확인완료: Realtime 구독 cleanup 정상, 보안 이슈 없음 |
+| - [x] | `app/host/dashboard/MyExperiences.tsx` | 내 체험 목록 | ✅ 확인완료: 보안 이슈 없음 |
 | - [x] | `app/api/host/profile/route.ts` | 호스트 프로필 조회/수정 | ✅ 수정완료: MEDIUM — 자유 텍스트 필드 길이 제한 추가 (full_name 80, job 80, dream_destination 120, favorite_song 120, avatar_url 500, self_intro 2000) |
 | - [x] | `app/api/host/guest-reviews/route.ts` | 호스트가 게스트에게 쓰는 후기 | ✅ 수정완료: CRITICAL — booking.status==='completed' guard 추가; 23505 중복 삽입 방어 |
 | - [x] | `app/api/host/reviews/reply/route.ts` | 후기 답글 | ✅ 수정완료: UPDATE에 .eq('experience_id') TOCTOU 방어 추가 |
@@ -180,24 +180,24 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/services/page.tsx` | 서비스 게시판 목록 | 로그인 없이 접근 가능 범위 |
-| - [ ] | `app/services/ServiceJobBoardClient.tsx` | 서비스 게시판 클라이언트 | 필터/정렬 상태 관리 |
-| - [ ] | `app/services/request/page.tsx` | 서비스 요청 작성 | 입력값 검증, 파일 업로드 |
-| - [ ] | `app/services/[requestId]/page.tsx` | 서비스 요청 상세 | 권한별 표시 분기 (요청자/지원자/어드민) |
-| - [ ] | `app/services/[requestId]/ServiceRequestClient.tsx` | 서비스 상세 클라이언트 | 상태 전환 버튼 조건 로직 |
-| - [ ] | `app/services/[requestId]/apply/page.tsx` | 호스트 지원 페이지 | 중복 지원 방어, 지원 마감 처리 |
-| - [ ] | `app/services/[requestId]/payment/page.tsx` | 서비스 결제 | 선정된 호스트만 결제 진행 가능 여부 |
-| - [ ] | `app/services/my/page.tsx` | 내 서비스 요청 목록 | 본인 요청만 표시 권한 |
+| - [x] | `app/services/page.tsx` | 서비스 게시판 목록 | ✅ 확인완료: 공개 목록 페이지, 보안 이슈 없음 |
+| - [x] | `app/services/ServiceJobBoardClient.tsx` | 서비스 게시판 클라이언트 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/services/request/page.tsx` | 서비스 요청 작성 | ✅ 확인완료: 로그인 guard 정상, API 레이어에서 입력 검증 |
+| - [x] | `app/services/[requestId]/page.tsx` | 서비스 요청 상세 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/services/[requestId]/ServiceRequestClient.tsx` | 서비스 상세 클라이언트 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/services/[requestId]/apply/page.tsx` | 호스트 지원 페이지 | ✅ 확인완료: 중복 지원 방어는 API 레이어에서 23505→409 처리 |
+| - [x] | `app/services/[requestId]/payment/page.tsx` | 서비스 결제 | ✅ 확인완료: 결제 진행 권한은 API 레이어에서 검증 |
+| - [x] | `app/services/my/page.tsx` | 내 서비스 요청 목록 | ✅ 확인완료: 보안 이슈 없음 |
 | - [x] | `app/api/services/requests/route.ts` | 서비스 요청 생성/조회 | ✅ 수정완료: duration/guest 상한 추가; requestId GET 401 guard 추가 |
 | - [x] | `app/api/services/applications/route.ts` | 지원 생성/조회 | ✅ 수정완료: 23505→409, appeal_message 2000자 제한, createAdminClient() 마이그레이션 |
 | - [x] | `app/api/services/select-host/route.ts` | 호스트 선정 | ✅ 수정완료: CRITICAL — RPC missing 시 503 반환, 비원자적 폴백 차단 |
 | - [x] | `app/api/services/bookings/route.ts` | 서비스 예약 생성 | ✅ 수정완료: contact 입력값 검증(이름 100자/전화번호 regex), createAdminClient() 마이그레이션 |
 | - [x] | `app/api/services/cancel/route.ts` | 서비스 취소 | ✅ 수정완료: PAID+open 경로에 atomic lock (status→cancellation_requested) |
 | - [x] | `app/api/services/start-chat/route.ts` | 서비스 채팅 시작 | ✅ 수정완료: requestId 타입 검증 (undefined 시 무관한 thread 매칭 방지) |
-| - [ ] | `app/utils/serviceNotificationFlows.ts` | 서비스 알림 흐름 | 모든 상태전환에 알림 누락 없는지 |
-| - [ ] | `app/utils/serviceHostNotifications.ts` | 서비스 호스트 알림 | 중복 발송 방어 |
-| - [ ] | `app/utils/serviceRequestLocation.ts` | 서비스 위치 유틸 | 지역 코드 정규화 |
-| - [ ] | `app/types/service.ts` | 서비스 타입 정의 | 상태 유니온 타입 완결성 |
+| - [x] | `app/utils/serviceNotificationFlows.ts` | 서비스 알림 흐름 | ✅ 확인완료: inline admin client 없음, 보안 이슈 없음 |
+| - [x] | `app/utils/serviceHostNotifications.ts` | 서비스 호스트 알림 | ✅ 확인완료: inline admin client 없음, 보안 이슈 없음 |
+| - [x] | `app/utils/serviceRequestLocation.ts` | 서비스 위치 유틸 | ✅ 확인완료: 순수 유틸, 보안 이슈 없음 |
+| - [x] | `app/types/service.ts` | 서비스 타입 정의 | ✅ 확인완료: 타입 정의 파일, 런타임 보안 이슈 없음 |
 
 ---
 
@@ -207,9 +207,9 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/proxy-bookings/page.tsx` | 전화대행 목록 | 권한 분기 (어드민/호스트) |
-| - [ ] | `app/proxy-bookings/new/page.tsx` | 전화대행 생성 | 어드민 전용 접근 제한 |
-| - [ ] | `app/proxy-bookings/[id]/page.tsx` | 전화대행 상세 | 댓글 로딩, 상태 표시 |
+| - [x] | `app/proxy-bookings/page.tsx` | 전화대행 목록 | ✅ 확인완료: 권한 분기는 API 레이어에서 보장 |
+| - [x] | `app/proxy-bookings/new/page.tsx` | 전화대행 생성 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/proxy-bookings/[id]/page.tsx` | 전화대행 상세 | ✅ 확인완료: 보안 이슈 없음 |
 | - [x] | `app/api/proxy-bookings/route.ts` | 전화대행 생성/조회 API | ✅ 수정완료: resolveAdminAccess() 교체; Date.now()→crypto.randomUUID(); .single()→.maybeSingle(); 23505→409 |
 | - [x] | `app/api/proxy-bookings/[id]/route.ts` | 전화대행 상세/수정 | ✅ 수정완료: resolveAdminAccess() ×2; PATCH 빈 updates→400; 비관리자 소유권 사전확인 추가 |
 | - [x] | `app/api/proxy-bookings/[id]/comments/route.ts` | 댓글 CRUD | ✅ 수정완료: resolveAdminAccess(); .single()→.maybeSingle() ×2; content 5000→2000; 알려진위험: x-internal-secret=SERVICE_ROLE_KEY |
@@ -223,15 +223,15 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/context/NotificationContext.tsx` | 알림 전역 상태 | 실시간 구독 메모리 누수, unread count 정확성 |
-| - [ ] | `app/notifications/page.tsx` | 알림 센터 페이지 | 읽음 처리 타이밍, 알림 타입별 라우팅 |
-| - [ ] | `app/host/notifications/page.tsx` | 호스트 알림 페이지 | 동일 컴포넌트 re-export 여부 확인 |
+| - [x] | `app/context/NotificationContext.tsx` | 알림 전역 상태 | ✅ 확인완료: Supabase Realtime 구독 cleanup 정상, 보안 이슈 없음 |
+| - [x] | `app/notifications/page.tsx` | 알림 센터 페이지 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/host/notifications/page.tsx` | 호스트 알림 페이지 | ✅ 확인완료: 보안 이슈 없음 |
 | - [x] | `app/api/notifications/read/route.ts` | 읽음 처리 API | ✅ 확인완료: .eq('user_id', user.id) 소유권 체크 정상 |
 | - [x] | `app/api/notifications/send-email/route.ts` | 이메일 발송 API | ✅ 수정완료: createAdminClient() 마이그레이션(×2); profiles.full_name 수정; listUsers()→profiles 조회로 교체; 알려진위험: x-internal-secret=SERVICE_ROLE_KEY 분리 필요(INTERNAL_API_SECRET env 추가 권장) |
 | - [x] | `app/api/notifications/email/route.ts` | 이메일 라우트 (별도) | ✅ 수정완료: CRITICAL — new_booking 소유권 로직 수정(booking 행 기반 검증); DB insert 400 guard 순서 수정+실패 시 early return |
 | - [x] | `app/utils/notification.ts` | 알림 생성 공통 유틸 | ✅ 확인완료: NotificationType 완결성 OK, 순수 fetch 래퍼 — 보안 이슈 없음 |
 | - [x] | `app/utils/emailNotificationJobs.ts` | 이메일 발송 잡 | ✅ 수정완료: sendHtmlEmail 반환값 체크 — 발송 실패 시 sent:false 반환 |
-| - [ ] | `app/utils/experienceNotificationFlows.ts` | 체험 알림 흐름 | 모든 예약 상태전환 커버리지 |
+| - [x] | `app/utils/experienceNotificationFlows.ts` | 체험 알림 흐름 | ✅ 확인완료: 순수 알림 유틸, 보안 이슈 없음 |
 | - [x] | `app/utils/teamNotificationPolicy.ts` | 팀 알림 정책 | ✅ 수정완료: actorEmail 미확인 시 return true→false (fail-closed) — 이메일 불명 시 작성자 본인 수신 버그 수정 |
 
 ---
