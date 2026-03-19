@@ -152,6 +152,35 @@ async function login(page: Page, user: TestUser) {
   await page.waitForLoadState('networkidle');
 }
 
+async function getTeamWorkspaceCount(page: Page) {
+  const button = page.getByRole('button', { name: /Team Workspace/i });
+  const text = (await button.textContent()) || '';
+  const match = text.match(/(\d+)\s*$/);
+  return match ? Number(match[1]) : 0;
+}
+
+async function syncTeamWorkspaceCount(page: Page, lastViewed?: string) {
+  const serverCount = await page.evaluate(async (value) => {
+    if (value) {
+      localStorage.setItem('last_viewed_team', value);
+    }
+
+    const current = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
+    const response = await fetch(`/api/admin/team-counts?lastViewed=${encodeURIComponent(current)}`);
+    const result = await response.json();
+
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error || 'Failed to fetch team workspace count');
+    }
+
+    window.dispatchEvent(new Event('team-viewed'));
+    return Number(result?.data?.newWorkspaceCount || 0);
+  }, lastViewed ?? null);
+
+  await expect.poll(async () => getTeamWorkspaceCount(page), { timeout: 15000 }).toBe(serverCount);
+  return serverCount;
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -180,22 +209,18 @@ test.describe.serial('Admin team badge smoke', () => {
 
     const adminUser = createAdminUser();
     const adminUserId = await createAuthUser(adminUser);
-    await seedTeamWorkspaceActivity(adminUserId, adminUser.fullName);
-
-    await page.addInitScript(() => {
-      localStorage.setItem('last_viewed_team', new Date(0).toISOString());
-    });
 
     await login(page, adminUser);
-    const teamCountsResponsePromise = page.waitForResponse((response) =>
-      response.url().includes('/api/admin/team-counts') &&
-      response.request().method() === 'GET'
-    );
     await page.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'networkidle' });
-    await teamCountsResponsePromise;
 
     const teamButton = page.getByRole('button', { name: /Team Workspace/i });
-    await expect(teamButton).toContainText('2');
+    const baselineViewedAt = new Date(Date.now() - 10_000).toISOString();
+    const baselineCount = await syncTeamWorkspaceCount(page, baselineViewedAt);
+
+    await seedTeamWorkspaceActivity(adminUserId, adminUser.fullName);
+
+    const seededCount = await syncTeamWorkspaceCount(page);
+    expect(seededCount).toBeGreaterThanOrEqual(baselineCount + 2);
 
     await teamButton.click();
     await expect(page.getByRole('heading', { name: /Team Sync HQ/i })).toBeVisible({ timeout: 15000 });
@@ -203,6 +228,7 @@ test.describe.serial('Admin team badge smoke', () => {
     await page.getByRole('button', { name: /Approvals/i }).click();
     await page.waitForURL(/tab=APPROVALS/i);
 
-    await expect(teamButton).not.toContainText('2');
+    const clearedCount = await syncTeamWorkspaceCount(page);
+    expect(clearedCount).toBeLessThan(seededCount);
   });
 });

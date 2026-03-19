@@ -15,7 +15,7 @@ const TEST_PASSWORD = 'LocallyTest!2026';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
-const createdApplicationIds: number[] = [];
+const createdApplicationIds: string[] = [];
 const createdNotificationIds: number[] = [];
 
 function loadEnv(): EnvMap {
@@ -133,7 +133,7 @@ async function createApprovedHostApplication(userId: string, user: TestUser) {
     throw error || new Error('Failed to create approved host application.');
   }
 
-  createdApplicationIds.push(Number(data.id));
+  createdApplicationIds.push(String(data.id));
 }
 
 async function insertUnreadNotification(userId: string, link: string) {
