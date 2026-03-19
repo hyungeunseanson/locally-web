@@ -114,11 +114,11 @@ export async function sendImmediateGenericEmail(params: {
     ctaLabel: params.ctaLabel || '확인하기',
   });
 
-  await sendHtmlEmail({
+  const sent = await sendHtmlEmail({
     to: email,
     subject: params.subject,
     html,
   });
 
-  return { success: true, sent: true };
+  return { success: true, sent: sent === true };
 }

@@ -6,6 +6,15 @@ import { render } from '@react-email/render';
 import BookingConfirmationEmail from '@/app/emails/templates/BookingConfirmationEmail';
 import BookingCancellationEmail from '@/app/emails/templates/BookingCancellationEmail';
 
+function escapeHtml(value: string) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 export async function POST(request: Request) {
     // [Security] 내부 서버-to-서버 전용 라우트 — 외부 호출 차단
     const internalSecret = request.headers.get('x-internal-secret');
@@ -80,7 +89,7 @@ export async function POST(request: Request) {
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2>${headerText}</h2>
                 <div style="padding: 16px; background-color: #f9fafb; border-radius: 8px; margin: 16px 0;">
-                  <p style="white-space: pre-wrap; margin: 0;">${content}</p>
+                  <p style="white-space: pre-wrap; margin: 0;">${escapeHtml(String(content || ''))}</p>
                 </div>
                 <p>로컬리 웹사이트에서 확인해주세요.</p>
                 <a href="${process.env.NEXT_PUBLIC_SITE_URL}/proxy-bookings/${requestId}" style="display: inline-block; padding: 12px 24px; background-color: #000; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold;">예약 확인하기</a>

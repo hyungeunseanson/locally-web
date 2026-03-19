@@ -21,14 +21,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         let query = supabase
             .from('proxy_requests')
-            .select('*, profiles(name, email, avatar_url)')
+            .select('*, profiles(full_name, email, avatar_url)')
             .eq('id', id);
 
         if (!isAdmin) {
             query = query.eq('user_id', user.id);
         }
 
-        const { data, error } = await query.single();
+        const { data, error } = await query.maybeSingle();
 
         if (error || !data) {
             return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
@@ -37,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // Fetch comments
         const { data: comments, error: commentsError } = await supabase
             .from('proxy_comments')
-            .select('*, profiles(name, avatar_url)')
+            .select('*, profiles(full_name, avatar_url)')
             .eq('request_id', id)
             .order('created_at', { ascending: true });
 
@@ -81,9 +81,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         let query = supabase.from('proxy_requests').update({});
         let updates: Record<string, any> = {};
 
+        const ALLOWED_STATUSES = new Set(['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED']);
+        const ALLOWED_PAYMENT_STATUSES = new Set(['WAITING', 'PAID', 'REFUNDED']);
+
         if (isAdmin) {
-            if (status) updates.status = status;
-            if (payment_status) updates.payment_status = payment_status;
+            if (status && ALLOWED_STATUSES.has(status)) updates.status = status;
+            if (payment_status && ALLOWED_PAYMENT_STATUSES.has(payment_status)) updates.payment_status = payment_status;
         } else {
             // User can only cancel their request
             if (status === 'CANCELLED') updates.status = 'CANCELLED';

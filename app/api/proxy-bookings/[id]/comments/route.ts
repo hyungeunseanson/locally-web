@@ -44,6 +44,9 @@ export async function POST(
         if (!content || typeof content !== 'string' || content.trim().length === 0) {
             return NextResponse.json({ success: false, error: 'Invalid content' }, { status: 400 });
         }
+        if (content.trim().length > 5000) {
+            return NextResponse.json({ success: false, error: 'Comment too long (max 5000 chars)' }, { status: 400 });
+        }
 
         const { data: newComment, error: insertError } = await supabase
             .from('proxy_comments')
@@ -53,7 +56,7 @@ export async function POST(
                 content: content.trim(),
                 is_admin: isAdmin,
             })
-            .select('*, profiles(name, avatar_url)')
+            .select('*, profiles(full_name, avatar_url)')
             .single();
 
         if (insertError) {

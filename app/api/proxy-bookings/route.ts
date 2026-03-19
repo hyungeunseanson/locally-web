@@ -78,7 +78,7 @@ export async function GET(request: Request) {
 
         let query = supabase
             .from('proxy_requests')
-            .select('*, profiles(name, email)') // Fetch basic client profile
+            .select('*, profiles(full_name, email)') // Fetch basic client profile
             .order('created_at', { ascending: false })
             .limit(50);
 
