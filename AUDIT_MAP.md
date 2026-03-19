@@ -187,10 +187,10 @@
 | - [ ] | `app/services/[requestId]/apply/page.tsx` | 호스트 지원 페이지 | 중복 지원 방어, 지원 마감 처리 |
 | - [ ] | `app/services/[requestId]/payment/page.tsx` | 서비스 결제 | 선정된 호스트만 결제 진행 가능 여부 |
 | - [ ] | `app/services/my/page.tsx` | 내 서비스 요청 목록 | 본인 요청만 표시 권한 |
-| - [ ] | `app/api/services/requests/route.ts` | 서비스 요청 생성/조회 | 입력 sanitize, 권한 분기 |
-| - [ ] | `app/api/services/applications/route.ts` | 지원 생성/조회 | 중복 지원, 마감 상태 체크 |
-| - [ ] | `app/api/services/select-host/route.ts` | 호스트 선정 | **핵심**: 선정 후 다른 지원자 알림, 상태 전환 원자성 |
-| - [ ] | `app/api/services/bookings/route.ts` | 서비스 예약 생성 | 선정된 호스트만 예약 생성 가능 |
+| - [x] | `app/api/services/requests/route.ts` | 서비스 요청 생성/조회 | ✅ 수정완료: duration/guest 상한 추가; requestId GET 401 guard 추가 |
+| - [ ] | `app/api/services/applications/route.ts` | 지원 생성/조회 | HIGH: TOCTOU — DB unique constraint 필요 (schema 레벨) |
+| - [x] | `app/api/services/select-host/route.ts` | 호스트 선정 | ✅ 수정완료: CRITICAL — RPC missing 시 503 반환, 비원자적 폴백 차단 |
+| - [ ] | `app/api/services/bookings/route.ts` | 서비스 예약 생성 | RPC가 SVC_FORBIDDEN 처리 (DB 레벨 보호됨) |
 | - [x] | `app/api/services/cancel/route.ts` | 서비스 취소 | ✅ 수정완료: PAID+open 경로에 atomic lock (status→cancellation_requested) |
 | - [ ] | `app/api/services/start-chat/route.ts` | 서비스 채팅 시작 | 권한 검증 |
 | - [ ] | `app/utils/serviceNotificationFlows.ts` | 서비스 알림 흐름 | 모든 상태전환에 알림 누락 없는지 |
