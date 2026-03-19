@@ -403,6 +403,12 @@ export async function POST(request: Request) {
           { status: atomicSelectResult.status }
         );
       }
+
+      // [CRITICAL] RPC 미배포(missing) → 비원자적 폴백은 이중 선택 race 위험 → 503 차단
+      return NextResponse.json(
+        { success: false, error: '서비스를 일시적으로 이용할 수 없습니다. 잠시 후 다시 시도해주세요.' },
+        { status: 503 }
+      );
     }
 
     const { data: bookingSnapshots, error: bookingFetchError } = await supabaseAdmin

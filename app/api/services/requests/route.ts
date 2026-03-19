@@ -188,8 +188,8 @@ export async function POST(request: Request) {
 
     if (
       !title || !description || !city || !service_date || !start_time ||
-      !Number.isFinite(durationNum) || durationNum < 4 ||
-      !Number.isFinite(guestNum) || guestNum < 1 ||
+      !Number.isFinite(durationNum) || durationNum < 4 || durationNum > 168 ||
+      !Number.isFinite(guestNum) || guestNum < 1 || guestNum > 100 ||
       !contact_name || !contact_phone ||
       !resolvedCountry
     ) {
@@ -357,6 +357,10 @@ export async function GET(request: Request) {
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     if (requestId) {
+      if (!currentUser) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      }
+
       const { data, error } = await supabaseAdmin
         .from('service_requests')
         .select('id, user_id, title, description, city, country, service_date, start_time, duration_hours, languages, guest_count, hourly_rate_customer, hourly_rate_host, total_customer_price, total_host_payout, status, selected_application_id, selected_host_id, contact_name, contact_phone, created_at, updated_at, expires_at')
