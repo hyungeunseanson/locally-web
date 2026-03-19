@@ -91,7 +91,8 @@ export function calculateBookingCancellationSettlement(
 ) {
   const clampedRefundRate = Math.max(0, Math.min(100, refundRate));
   const totalPaidAmount = getBookingPaidAmount(booking);
-  const totalExperienceAmount = getBookingExperienceAmount(booking);
+  // [Guard] 레거시 데이터 방어: totalExperienceAmount가 실결제액을 초과하면 hostPayout 오버플로 발생
+  const totalExperienceAmount = Math.min(getBookingExperienceAmount(booking), totalPaidAmount);
   const guestFeeAmount = Math.max(0, totalPaidAmount - totalExperienceAmount);
 
   const refundedExperienceAmount = Math.floor(totalExperienceAmount * (clampedRefundRate / 100));

@@ -53,41 +53,19 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: '1인 출발 확정 옵션은 1명 일반 예약에서만 사용할 수 있습니다.' }, { status: 400 });
         }
 
+        // [Guard] paymentMethod 런타임 허용값 검증
+        const ALLOWED_PAYMENT_METHODS = new Set(['card', 'bank', 'paypal']);
+        if (paymentMethod && !ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
+            return NextResponse.json({ success: false, error: 'Invalid payment method' }, { status: 400 });
+        }
+
         // 2. 관리자 권한 클라이언트 생성 (DB 제어용)
         const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
         const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
         const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-        if (normalizedIsSoloGuarantee) {
-            const { data: confirmedBookings, error: confirmedBookingError } = await supabaseAdmin
-                .from('bookings')
-                .select('id, guests, type')
-                .eq('experience_id', normalizedExperienceId)
-                .eq('date', date)
-                .eq('time', normalizedTime)
-                .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
-
-            if (confirmedBookingError) {
-                throw new Error(confirmedBookingError.message);
-            }
-
-            const confirmedGuestCount =
-                (confirmedBookings || []).reduce((sum, booking) => sum + Number(booking.guests || 0), 0);
-            const hasConfirmedPrivateBooking =
-                (confirmedBookings || []).some((booking) => booking.type === 'private');
-
-            if (confirmedGuestCount > 0 || hasConfirmedPrivateBooking) {
-                return NextResponse.json(
-                    {
-                        success: false,
-                        error: '이미 확정된 예약이 있는 일정에는 1인 출발 확정 옵션을 사용할 수 없습니다.',
-                    },
-                    { status: 400 }
-                );
-            }
-        }
-
         // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 검증 + 삽입)
+        // [Note] solo-guarantee 사전 DB 조회(TOCTOU 취약)는 제거. RPC가 atomic하게 동일 조건 검증함.
         const { data: bookingData, error: bookingError } = await supabaseAdmin
             .rpc('create_booking_atomic', {
                 p_user_id: user.id,

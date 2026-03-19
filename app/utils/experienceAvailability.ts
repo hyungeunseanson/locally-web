@@ -131,12 +131,14 @@ export async function fetchExperienceAvailabilitySummary(
   experienceId: string | number,
   maxGuests: number
 ) {
+  const today = new Date().toISOString().slice(0, 10);
   const [availabilityResult, bookingsResult] = await Promise.all([
     supabase
       .from('experience_availability')
       .select('date, start_time')
       .eq('experience_id', experienceId)
-      .eq('is_booked', false),
+      .eq('is_booked', false)
+      .gte('date', today),
     supabase
       .from('bookings')
       .select('date, time, guests, type')
