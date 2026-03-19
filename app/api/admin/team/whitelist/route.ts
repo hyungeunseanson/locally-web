@@ -21,6 +21,12 @@ export async function POST(request: NextRequest) {
       return teamError('이메일을 입력해주세요.', 400);
     }
 
+    // [Security] 이메일 형식 검증 — 잘못된 문자열이 admin_whitelist에 삽입되어 인증 오판 방지
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email) || email.length > 254) {
+      return teamError('유효하지 않은 이메일 형식입니다.', 400);
+    }
+
     const { data, error } = await context.supabaseAdmin
       .from('admin_whitelist')
       .insert({ email })

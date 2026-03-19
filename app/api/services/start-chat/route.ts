@@ -14,6 +14,12 @@ export async function POST(req: NextRequest) {
     }
 
     const { requestId } = (await req.json()) as { requestId?: string };
+
+    // [Security] requestId 검증 — undefined/null 시 관련 없는 기존 inquiry thread가 매칭될 수 있음
+    if (!requestId || typeof requestId !== 'string') {
+      return NextResponse.json({ error: 'requestId is required' }, { status: 400 });
+    }
+
     const result = await upsertInquiryThread({
       actor: { id: user.id, email: user.email },
       body: {

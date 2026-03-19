@@ -45,6 +45,11 @@ export async function POST(request: NextRequest) {
       return teamError('내용을 입력해주세요.', 400);
     }
 
+    // [Security] content 길이 제한 — DB JSONB 블로팅 방지
+    if (content.length > 5000) {
+      return teamError('내용은 5000자를 초과할 수 없습니다.', 400);
+    }
+
     const { data, error } = await context.supabaseAdmin
       .from('admin_tasks')
       .insert({

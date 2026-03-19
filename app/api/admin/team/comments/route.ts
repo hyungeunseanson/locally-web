@@ -8,7 +8,10 @@ function sanitizeCommentMetadata(rawMetadata: unknown) {
 
   const metadata = rawMetadata as Record<string, unknown>;
   if (typeof metadata.image_url === 'string' && metadata.image_url.trim()) {
-    return { image_url: metadata.image_url.trim() };
+    const url = metadata.image_url.trim();
+    // [Security] https://만 허용 — javascript: / data: / 내부망 URL SSRF 방어
+    if (!url.startsWith('https://')) return null;
+    return { image_url: url };
   }
 
   return null;
@@ -30,6 +33,9 @@ function sanitizeReactions(rawReactions: unknown) {
   const nextReactions: Record<string, string[]> = {};
   for (const [emoji, rawUsers] of Object.entries(rawReactions as Record<string, unknown>)) {
     if (!Array.isArray(rawUsers)) continue;
+    // [Security] 이모지 키 길이 제한 + 최대 키 수 제한 — JSONB 컬럼 블로팅 방어
+    if (emoji.length > 10) continue;
+    if (Object.keys(nextReactions).length >= 50) break;
     const users = Array.from(new Set(rawUsers.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)));
     nextReactions[emoji] = users;
   }
@@ -58,6 +64,10 @@ export async function POST(request: NextRequest) {
 
     if (!content) {
       return teamError('댓글 내용을 입력해주세요.', 400);
+    }
+
+    if (content.length > 5000) {
+      return teamError('댓글은 5000자를 초과할 수 없습니다.', 400);
     }
 
     if (taskId !== TEAM_CHAT_ROOM_ID) {

@@ -188,11 +188,11 @@
 | - [ ] | `app/services/[requestId]/payment/page.tsx` | 서비스 결제 | 선정된 호스트만 결제 진행 가능 여부 |
 | - [ ] | `app/services/my/page.tsx` | 내 서비스 요청 목록 | 본인 요청만 표시 권한 |
 | - [x] | `app/api/services/requests/route.ts` | 서비스 요청 생성/조회 | ✅ 수정완료: duration/guest 상한 추가; requestId GET 401 guard 추가 |
-| - [ ] | `app/api/services/applications/route.ts` | 지원 생성/조회 | HIGH: TOCTOU — DB unique constraint 필요 (schema 레벨) |
+| - [x] | `app/api/services/applications/route.ts` | 지원 생성/조회 | ✅ 수정완료: 23505→409, appeal_message 2000자 제한, createAdminClient() 마이그레이션 |
 | - [x] | `app/api/services/select-host/route.ts` | 호스트 선정 | ✅ 수정완료: CRITICAL — RPC missing 시 503 반환, 비원자적 폴백 차단 |
-| - [ ] | `app/api/services/bookings/route.ts` | 서비스 예약 생성 | RPC가 SVC_FORBIDDEN 처리 (DB 레벨 보호됨) |
+| - [x] | `app/api/services/bookings/route.ts` | 서비스 예약 생성 | ✅ 수정완료: contact 입력값 검증(이름 100자/전화번호 regex), createAdminClient() 마이그레이션 |
 | - [x] | `app/api/services/cancel/route.ts` | 서비스 취소 | ✅ 수정완료: PAID+open 경로에 atomic lock (status→cancellation_requested) |
-| - [ ] | `app/api/services/start-chat/route.ts` | 서비스 채팅 시작 | 권한 검증 |
+| - [x] | `app/api/services/start-chat/route.ts` | 서비스 채팅 시작 | ✅ 수정완료: requestId 타입 검증 (undefined 시 무관한 thread 매칭 방지) |
 | - [ ] | `app/utils/serviceNotificationFlows.ts` | 서비스 알림 흐름 | 모든 상태전환에 알림 누락 없는지 |
 | - [ ] | `app/utils/serviceHostNotifications.ts` | 서비스 호스트 알림 | 중복 발송 방어 |
 | - [ ] | `app/utils/serviceRequestLocation.ts` | 서비스 위치 유틸 | 지역 코드 정규화 |
@@ -262,11 +262,11 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/api/admin/team/tasks/route.ts` | 팀 태스크 CRUD | 어드민 전용 접근 |
+| - [x] | `app/api/admin/team/tasks/route.ts` | 팀 태스크 CRUD | ✅ 수정완료: content 5000자 길이 제한 추가 |
 | - [ ] | `app/api/admin/team/tasks/[id]/route.ts` | 개별 태스크 수정 | 작성자 vs 어드민 권한 분기 |
-| - [ ] | `app/api/admin/team/comments/route.ts` | 팀 댓글 CRUD | MEMO 댓글 알림 수신자 로직 |
+| - [x] | `app/api/admin/team/comments/route.ts` | 팀 댓글 CRUD | ✅ 수정완료: SSRF(https:// 강제), content 5000자 제한, emoji키 길이/개수 제한 |
 | - [ ] | `app/api/admin/team/comments/[id]/route.ts` | 개별 댓글 수정/삭제 | 권한 검증 |
-| - [ ] | `app/api/admin/team/whitelist/route.ts` | 팀 화이트리스트 | 화이트리스트 추가/제거 감사로그 |
+| - [x] | `app/api/admin/team/whitelist/route.ts` | 팀 화이트리스트 | ✅ 수정완료: 이메일 형식 regex 검증 + 254자 상한 (인증 오판 방지) |
 | - [ ] | `app/api/admin/team/_shared.ts` | 팀 공통 유틸 | 재사용 패턴 |
 | - [ ] | `app/api/admin/notify-team/route.ts` | 팀 전체 알림 | 발송 대상 필터링 |
 

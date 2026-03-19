@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 
 // LEGACY ROUTE
 // Current service payment flow pre-creates `service_bookings` from `/api/services/requests`
@@ -39,10 +39,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '필수 항목이 누락되었습니다.' }, { status: 400 });
     }
 
+    // [Security] 이름/전화번호 길이 + 형식 검증 — DB 및 알림 템플릿에 비정상 데이터 삽입 방지
+    if (typeof contact_name !== 'string' || contact_name.trim().length > 100) {
+      return NextResponse.json({ success: false, error: '이름은 100자 이하여야 합니다.' }, { status: 400 });
+    }
+    if (typeof contact_phone !== 'string' || !/^[\d\s\-\+\(\)]{7,30}$/.test(contact_phone.trim())) {
+      return NextResponse.json({ success: false, error: '올바른 전화번호 형식이 아닙니다.' }, { status: 400 });
+    }
+
     // 2. 관리자 권한 클라이언트
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const supabaseAdmin = createAdminClient();
 
     // 3. 원자적 예약 생성 RPC
     const { data: bookingData, error: bookingError } = await supabaseAdmin

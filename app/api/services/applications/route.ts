@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { isApprovedHostEligibleForServiceRequest } from '@/app/utils/serviceHostNotifications';
@@ -26,9 +26,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '필수 항목이 누락되었습니다.' }, { status: 400 });
     }
 
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    // [Security] appeal_message 길이 제한 — 무제한 입력 시 DB/알림에 비정상 데이터 삽입 방지
+    if (appeal_message.trim().length > 2000) {
+      return NextResponse.json({ success: false, error: '지원 메시지는 2000자 이하여야 합니다.' }, { status: 400 });
+    }
+
+    const supabaseAdmin = createAdminClient();
 
     // 1. 의뢰 존재 + open 상태 + 본인 의뢰 아님 검증
     const { data: serviceRequest, error: reqError } = await supabaseAdmin
@@ -105,6 +108,10 @@ export async function POST(request: Request) {
 
       if (insertErr) {
         console.error('Service Application Insert Error:', insertErr);
+        // [Fix] 23505 = unique_violation — 동시 요청으로 중복 삽입 시 500 대신 409 반환
+        if ((insertErr as { code?: string }).code === '23505') {
+          return NextResponse.json({ success: false, error: '이미 지원한 의뢰입니다.' }, { status: 409 });
+        }
         return NextResponse.json({ success: false, error: '지원 중 오류가 발생했습니다.' }, { status: 500 });
       }
     }
@@ -167,9 +174,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'requestId is required' }, { status: 400 });
     }
 
-    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const supabaseAdmin = createAdminClient();
 
     // 의뢰 소유자 확인
     const { data: serviceRequest } = await supabaseAdmin
