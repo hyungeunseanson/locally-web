@@ -15,9 +15,10 @@ export default function UserProfilePage({ params }: { params: { id: string } }) 
   useEffect(() => {
     const fetchProfile = async () => {
       // 1. 프로필 정보 가져오기
+      // [Security] select 필드 제한 — phone 등 PII 컬럼 공개 노출 방지
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('*')
+        .select('full_name, avatar_url, bio, introduction')
         .eq('id', params.id)
         .maybeSingle();
 

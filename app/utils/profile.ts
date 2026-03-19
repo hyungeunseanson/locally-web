@@ -8,7 +8,6 @@ export type ProfileCompletionFieldKey =
   | 'nationality'
   | 'phone'
   | 'job'
-  | 'school'
   | 'mbti';
 
 export interface ProfileCompletionStatus {
@@ -28,7 +27,6 @@ type AnyProfile = {
   host_nationality?: string | null;
   phone?: string | null;
   job?: string | null;
-  school?: string | null;
   mbti?: string | null;
 };
 
@@ -88,7 +86,6 @@ export const PROFILE_COMPLETION_FIELD_LABELS: Record<ProfileCompletionFieldKey, 
   nationality: '국적',
   phone: '연락처',
   job: '직업',
-  school: '학교',
   mbti: 'MBTI',
 };
 

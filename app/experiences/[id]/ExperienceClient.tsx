@@ -14,7 +14,8 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
-import { supabase } from '@/app/lib/supabase'; // 🟢 추가: 퍼널 트래킹용
+import { createClient as createSupabaseClient } from '@/app/utils/supabase/client'; // 퍼널 트래킹용
+const supabase = createSupabaseClient();
 import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 import {
   ExperienceCalendarDayStatus,
