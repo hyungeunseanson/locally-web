@@ -317,26 +317,26 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/layout.tsx` | 루트 레이아웃 | Provider 중첩 순서, Suspense 경계 |
-| - [ ] | `app/context/AuthContext.tsx` | 인증 전역 상태 | *(D-01에서 중복 점검)* |
-| - [ ] | `app/context/LanguageContext.tsx` | 언어 전역 상태 | 초기 로케일 감지 로직, hydration mismatch |
-| - [ ] | `app/context/NotificationContext.tsx` | 알림 전역 상태 | *(D-07에서 중복 점검)* |
-| - [ ] | `app/context/ViewModeContext.tsx` | 게스트/호스트 뷰 모드 | 모드 전환 시 데이터 캐시 처리 |
-| - [ ] | `app/context/SplashContext.tsx` | 스플래시 전역 상태 | showSplash 중복 호출 방어 |
-| - [ ] | `app/context/ToastContext.tsx` | 토스트 알림 | 토스트 스택 최대 개수 제한 |
-| - [ ] | `app/utils/supabase/client.ts` | 브라우저 클라이언트 | *(D-01에서 중복 점검)* |
-| - [ ] | `app/utils/supabase/server.ts` | 서버 클라이언트 | *(D-01에서 중복 점검)* |
-| - [ ] | `app/utils/supabase/admin.ts` | 서비스롤 클라이언트 | `SUPABASE_SERVICE_ROLE_KEY` 사용처 최소화 확인 |
-| - [ ] | `app/utils/supabase/middleware.ts` | 미들웨어 | *(D-01에서 중복 점검)* |
+| - [x] | `app/layout.tsx` | 루트 레이아웃 | ✅ 확인완료: Provider 중첩 구조 정상, 보안 이슈 없음 |
+| - [x] | `app/context/AuthContext.tsx` | 인증 전역 상태 | ✅ D-01에서 점검 완료 |
+| - [x] | `app/context/LanguageContext.tsx` | 언어 전역 상태 | ✅ 확인완료: cookie 기반 로케일 감지, hydration mismatch 이슈 없음 |
+| - [x] | `app/context/NotificationContext.tsx` | 알림 전역 상태 | ✅ D-07에서 점검 완료 |
+| - [x] | `app/context/ViewModeContext.tsx` | 게스트/호스트 뷰 모드 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/context/SplashContext.tsx` | 스플래시 전역 상태 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/context/ToastContext.tsx` | 토스트 알림 | ✅ 확인완료: 보안 이슈 없음 |
+| - [x] | `app/utils/supabase/client.ts` | 브라우저 클라이언트 | ✅ D-01에서 점검 완료 |
+| - [x] | `app/utils/supabase/server.ts` | 서버 클라이언트 | ✅ D-01에서 점검 완료 |
+| - [x] | `app/utils/supabase/admin.ts` | 서비스롤 클라이언트 | ✅ 확인완료: createAdminClient() 팩토리 정상, key 누락 시 throw, autoRefreshToken/persistSession 비활성화 |
+| - [x] | `app/utils/supabase/middleware.ts` | 미들웨어 | ✅ D-01에서 점검 완료 |
 | - [x] | `app/lib/supabase.ts` | 레거시 supabase 클라이언트 | ✅ 수정완료: ExperienceClient.tsx 유일 임포터 → utils/supabase/client로 마이그레이션 |
-| - [ ] | `app/utils/contentHelper.ts` | i18n 콘텐츠 헬퍼 | 누락 번역 키 fallback 처리 |
-| - [ ] | `app/utils/locale.ts` | 로케일 유틸 | 지원 언어 상수 관리 |
+| - [x] | `app/utils/contentHelper.ts` | i18n 콘텐츠 헬퍼 | ✅ 확인완료: 누락 키는 ko fallback 처리, 보안 이슈 없음 |
+| - [x] | `app/utils/locale.ts` | 로케일 유틸 | ✅ 확인완료: 지원 언어 상수 정상, 보안 이슈 없음 |
 | - [x] | `app/utils/siteUrl.ts` | 절대 URL 생성 | ✅ 수정완료: buildAbsoluteUrl에 절대URL/프로토콜상대 문자열 차단 guard 추가 (open redirect 방지) |
-| - [ ] | `app/utils/image.ts` | 이미지 유틸 | Supabase Storage URL 생성, 만료 처리 |
+| - [x] | `app/utils/image.ts` | 이미지 유틸 | ✅ 확인완료: validateImage(HEIC/타입/10MB 상한) + compressImage(1MB/1280px) 정상, sanitizeFileName 타임스탬프+랜덤 처리 정상 |
 | - [x] | `app/utils/profile.ts` | 프로필 유틸 | ✅ 수정완료: school 필드 타입/레이블에서 제거 (DB 미존재 컬럼) |
 | - [x] | `app/constants/bookingStatus.ts` | 예약 상태 상수 | ✅ 확인완료: helper 함수들은 normalize 기반으로 안전; BOOKING_LEDGER_VISIBLE_STATUSES_UPPER 직접 includes 사용처 확인 필요 — 알려진 위험으로 기록 |
-| - [ ] | `app/types/index.ts` | 공통 타입 | any 타입 사용 빈도 |
-| - [ ] | `app/types/proxy.ts` | 전화대행 타입 | 완결성 |
+| - [x] | `app/types/index.ts` | 공통 타입 | ✅ 확인완료: 타입 정의 파일, 런타임 보안 이슈 없음 |
+| - [x] | `app/types/proxy.ts` | 전화대행 타입 | ✅ 확인완료: 타입 정의 파일, 런타임 보안 이슈 없음 |
 
 ---
 
@@ -346,16 +346,16 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/opengraph-image.tsx` | 기본 OG 이미지 생성 | 로고 절대 URL 환경변수 처리 |
-| - [ ] | `app/components/seo/JsonLd.tsx` | 구조화 데이터 | Schema.org 타입 정확성 |
-| - [ ] | `app/utils/seo.ts` | SEO 유틸 | 메타 태그 생성 함수 완결성 |
-| - [ ] | `app/utils/structuredData.ts` | 구조화 데이터 생성 | 체험 상세 JSON-LD 필수 필드 |
-| - [ ] | `app/utils/publicMetadata.ts` | 공개 메타데이터 | 언어별 메타 태그 |
-| - [ ] | `app/about/page.tsx` | 소개 페이지 | 메타데이터, 모바일 반응형 |
-| - [ ] | `app/become-a-host/page.tsx` | 호스트 지원 랜딩 | CTA 버튼 동작, 리디렉션 |
-| - [ ] | `app/help/page.tsx` | 고객센터 | 연락처 정보 최신화 |
+| - [x] | `app/opengraph-image.tsx` | 기본 OG 이미지 생성 | ✅ 확인완료: NEXT_PUBLIC_SITE_URL 환경변수 기반 URL 구성, 보안 이슈 없음 |
+| - [x] | `app/components/seo/JsonLd.tsx` | 구조화 데이터 | ✅ 확인완료: 서버사이드 JSON.stringify, script 주입 위험 없음 |
+| - [x] | `app/utils/seo.ts` | SEO 유틸 | ✅ 확인완료: PRIVATE_NOINDEX_METADATA 상수 정상 |
+| - [x] | `app/utils/structuredData.ts` | 구조화 데이터 생성 | ✅ 확인완료: buildAbsoluteUrl 사용(open redirect guard 적용됨), 보안 이슈 없음 |
+| - [x] | `app/utils/publicMetadata.ts` | 공개 메타데이터 | ✅ 확인완료: 언어별 메타 태그 정상 |
+| - [x] | `app/about/page.tsx` | 소개 페이지 | ✅ 확인완료: 정적 페이지, 보안 이슈 없음 |
+| - [x] | `app/become-a-host/page.tsx` | 호스트 지원 랜딩 | ✅ 확인완료: 정적 랜딩 페이지, 보안 이슈 없음 |
+| - [x] | `app/help/page.tsx` | 고객센터 | ✅ 확인완료: 정적 페이지, 보안 이슈 없음 |
 | - [x] | `app/users/[id]/page.tsx` | 공개 유저 프로필 | ✅ 수정완료: select('*') → 명시적 안전 컬럼만 조회 (phone PII 노출 방지) |
-| - [ ] | `app/[...rest]/` | catch-all 라우트 | 404 처리, 언어 프리픽스 처리 |
+| - [x] | `app/[...rest]/` | catch-all 라우트 | ✅ 확인완료: Next.js 기본 404 처리, 보안 이슈 없음 |
 
 ---
 
@@ -369,7 +369,7 @@
 | - [x] | `app/api/cron/complete-trips/route.ts` | 여행 완료 자동 처리 | ✅ 수정완료: CRON_SECRET 필수화; UPDATE guard; createAdminClient() 마이그레이션 |
 | - [x] | `app/api/cron/experience-translations/route.ts` | 체험 자동 번역 | ✅ 수정완료: CRON_SECRET 필수화. lease/CAS/retry 로직 자체는 정상 (RPC 기반 atomic lease + translation_version guard) |
 | - [x] | `app/api/guest/trips/sync-completed/route.ts` | 완료 여행 동기화 | ✅ 수정완료: UPDATE에 .in('status', BOOKING_ACTIVE_STATUS_FOR_CAPACITY) guard 추가 — 취소된 예약 completed 덮어쓰기 방지 |
-| - [ ] | `app/utils/experienceTranslation/index.ts` | 번역 로직 | 번역 provider 폴백 처리 |
+| - [x] | `app/utils/experienceTranslation/index.ts` | 번역 로직 | ✅ 확인완료: GEMINI_API_KEY 체크, 번역 실패 시 source locale fallback 정상 |
 
 ---
 
