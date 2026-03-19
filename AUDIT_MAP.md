@@ -124,7 +124,7 @@
 | - [ ] | `app/host/experiences/[id]/edit/page.tsx` | 체험 수정 페이지 | 수정 권한(본인 체험만), 부분 업데이트 안전성 |
 | - [ ] | `app/host/experiences/[id]/dates/page.tsx` | 날짜/슬롯 관리 | 이미 예약된 슬롯 삭제 방어 |
 | - [ ] | `app/api/host/experiences/route.ts` | 체험 목록 조회/생성 | 호스트 본인 체험만 반환 검증 |
-| - [ ] | `app/api/host/experiences/[id]/route.ts` | 체험 수정/삭제 | 소유권 검증, 활성 예약 있을 때 삭제 방어 |
+| - [x] | `app/api/host/experiences/[id]/route.ts` | 체험 수정/삭제 | ✅ 수정완료: DELETE 전 활성 예약 존재 시 409 차단 |
 | - [ ] | `app/api/host/experiences/[id]/availability/route.ts` | 가용 슬롯 관리 | 동시 수정 충돌, 슬롯 삭제 시 기존 예약 처리 |
 | - [ ] | `app/api/host/experiences/shared.ts` | 체험 공통 유틸 | 재사용 함수 타입 안전성 |
 
@@ -156,8 +156,8 @@
 | - [x] | `app/api/payment/paypal/create-order/route.ts` | PayPal 주문 생성 | ✅ 감사완료: 금액 DB에서 조회, 중복 주문 생성 가능하나 capture 단계에서 차단됨 |
 | - [x] | `app/api/payment/paypal/capture-order/route.ts` | PayPal 결제 캡처 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE로 중복 캡처 DB 반영 차단 |
 | - [x] | `app/api/payment/cancel/route.ts` | 결제 취소/환불 | ✅ 수정완료: PG 환불 전 atomic lock (status→cancellation_requested), DB 업데이트 에러 체크 추가 |
-| - [ ] | `app/api/bookings/confirm-payment/route.ts` | 무통장 입금 확인 (호스트) | **중복 확인 방어 (이슈 보고됨)**, 알림 중복 발송 체크 |
-| - [ ] | `app/api/admin/bookings/confirm-payment/route.ts` | 무통장 어드민 확인 | 어드민 권한 검증, 중복 처리 방어 |
+| - [x] | `app/api/bookings/confirm-payment/route.ts` | 무통장 입금 확인 (호스트) | ✅ 수정완료: `.eq('status', booking.status)` 조건부 UPDATE + 멱등성 응답 |
+| - [x] | `app/api/admin/bookings/confirm-payment/route.ts` | 무통장 어드민 확인 | ✅ 수정완료: 동일 atomic CAS 패턴 적용 |
 | - [x] | `app/utils/paypal/server.ts` | PayPal 서버 유틸 | ✅ 수정완료: capture/refund에 `PayPal-Request-Id` 멱등성 헤더 추가 |
 | - [x] | `app/utils/portone/server.ts` | PortOne/NicePay 서버 유틸 | ✅ 감사완료: 서버사이드 금액 검증 정상 |
 | - [x] | `app/utils/bookingFinance.ts` | 결제 금액 계산 | ✅ 감사완료: Math.floor 다단계 1~2원 오차 허용 범위 (KRW 특성상 무시 가능) |
@@ -166,10 +166,10 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/api/services/payment/nicepay-callback/route.ts` | 서비스 NicePay 콜백 | 체험 결제와 동일한 검증 패턴 일관성 |
-| - [ ] | `app/api/services/payment/paypal/capture-order/route.ts` | 서비스 PayPal 캡처 | 캡처 중복 방어 |
+| - [x] | `app/api/services/payment/nicepay-callback/route.ts` | 서비스 NicePay 콜백 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE + 멱등성 응답 |
+| - [x] | `app/api/services/payment/paypal/capture-order/route.ts` | 서비스 PayPal 캡처 | ✅ 수정완료: 동일 CAS 패턴 적용 |
 | - [ ] | `app/api/services/payment/mark-bank/route.ts` | 서비스 무통장 처리 | 중복 처리 방어 |
-| - [ ] | `app/api/admin/service-confirm-payment/route.ts` | 서비스 어드민 결제 확인 | 권한 검증 |
+| - [x] | `app/api/admin/service-confirm-payment/route.ts` | 서비스 어드민 결제 확인 | ✅ 수정완료: 조건부 UPDATE + 멱등성 응답 |
 
 ---
 
@@ -191,7 +191,7 @@
 | - [ ] | `app/api/services/applications/route.ts` | 지원 생성/조회 | 중복 지원, 마감 상태 체크 |
 | - [ ] | `app/api/services/select-host/route.ts` | 호스트 선정 | **핵심**: 선정 후 다른 지원자 알림, 상태 전환 원자성 |
 | - [ ] | `app/api/services/bookings/route.ts` | 서비스 예약 생성 | 선정된 호스트만 예약 생성 가능 |
-| - [ ] | `app/api/services/cancel/route.ts` | 서비스 취소 | 취소 시 환불 + 상태 전환 |
+| - [x] | `app/api/services/cancel/route.ts` | 서비스 취소 | ✅ 수정완료: PAID+open 경로에 atomic lock (status→cancellation_requested) |
 | - [ ] | `app/api/services/start-chat/route.ts` | 서비스 채팅 시작 | 권한 검증 |
 | - [ ] | `app/utils/serviceNotificationFlows.ts` | 서비스 알림 흐름 | 모든 상태전환에 알림 누락 없는지 |
 | - [ ] | `app/utils/serviceHostNotifications.ts` | 서비스 호스트 알림 | 중복 발송 방어 |
@@ -226,7 +226,7 @@
 | - [ ] | `app/notifications/page.tsx` | 알림 센터 페이지 | 읽음 처리 타이밍, 알림 타입별 라우팅 |
 | - [ ] | `app/host/notifications/page.tsx` | 호스트 알림 페이지 | 동일 컴포넌트 re-export 여부 확인 |
 | - [ ] | `app/api/notifications/read/route.ts` | 읽음 처리 API | 본인 알림만 읽음 처리 권한 |
-| - [ ] | `app/api/notifications/send-email/route.ts` | 이메일 발송 API | **호스트 알림 게스트 이름 버그 (이슈 보고됨)**, 발송 실패 재시도 로직 |
+| - [x] | `app/api/notifications/send-email/route.ts` | 이메일 발송 API | ✅ 수정완료: x-internal-secret 헤더 가드 추가 (외부 직접 호출 차단) |
 | - [ ] | `app/api/notifications/email/route.ts` | 이메일 라우트 (별도) | send-email과 중복 여부 확인 |
 | - [ ] | `app/utils/notification.ts` | 알림 생성 공통 유틸 | 알림 타입 enum 완결성 |
 | - [ ] | `app/utils/emailNotificationJobs.ts` | 이메일 발송 잡 | `sendImmediateGenericEmail` 실패 처리, 무통장 이중 발송 케이스 |
@@ -246,8 +246,8 @@
 | - [ ] | `app/actions/admin.ts` | 서버액션 권한 처리 | admin_whitelist 검증 일관성 |
 | - [ ] | `app/utils/adminAccess.ts` | 어드민 접근 유틸 | 권한 체크 함수 재사용 패턴 |
 | - [ ] | `app/api/admin/bookings/route.ts` | 예약 전체 조회 | 권한 검증, 페이지네이션 |
-| - [ ] | `app/api/admin/bookings/force-cancel/route.ts` | 강제 취소 | **파괴적 작업**: 감사로그 기록, 환불 처리 |
-| - [ ] | `app/api/admin/delete/route.ts` | 유저 삭제 | **파괴적 작업**: 연관 데이터 cascade 처리 |
+| - [x] | `app/api/admin/bookings/force-cancel/route.ts` | 강제 취소 | ✅ 수정완료: 마커 UPDATE를 atomic CAS로 변환 (.not+maybeSingle), 동시 요청 이중환불 차단 |
+| - [x] | `app/api/admin/delete/route.ts` | 유저 삭제 | ✅ 수정완료: 일반 삭제 경로에 ALLOWED_DELETE_TABLES 허용목록 추가 (임의 테이블 주입 차단) |
 | - [ ] | `app/api/admin/host-applications/route.ts` | 호스트 신청 관리 | 승인/거절 시 알림 발송 |
 | - [ ] | `app/api/admin/master-ledger/route.ts` | 마스터 장부 | 금액 집계 쿼리 정확성 |
 | - [ ] | `app/api/admin/sales-summary/route.ts` | 매출 요약 | 집계 기준 (결제 완료 기준 vs 체험 완료 기준) |
@@ -256,7 +256,7 @@
 | - [ ] | `app/api/admin/users-summary/route.ts` | 유저 통계 | 집계 성능 (인덱스 활용) |
 | - [ ] | `app/api/admin/users/[userId]/timeline/route.ts` | 유저 활동 타임라인 | 조회 범위 및 성능 |
 | - [ ] | `app/api/admin/service-cancel/route.ts` | 서비스 강제 취소 | 감사로그, 환불 처리 |
-| - [ ] | `app/api/admin/service-payouts/mark-paid/route.ts` | 정산 완료 처리 | 중복 정산 방어 |
+| - [x] | `app/api/admin/service-payouts/mark-paid/route.ts` | 정산 완료 처리 | ✅ 수정완료: `.eq('payout_status','pending')` 조건부 UPDATE로 이중 정산 방어 |
 
 ### 8-2. 어드민 팀 워크스페이스
 
@@ -297,7 +297,7 @@
 | - [ ] | `app/community/components/LikeButton.tsx` | 좋아요 버튼 | 중복 좋아요 방어 (낙관적 업데이트 롤백) |
 | - [ ] | `app/community/authorDisplay.ts` | 작성자 표시 유틸 | 익명 처리 일관성 |
 | - [ ] | `app/community/anonymousColumn.ts` | 익명 컬럼 처리 | 실제 유저 ID 노출 방어 |
-| - [ ] | `app/api/community/posts/route.ts` | 게시글 CRUD | 입력 sanitize, 권한 |
+| - [x] | `app/api/community/posts/route.ts` | 게시글 CRUD | ✅ 수정완료: 제목/내용에 sanitizeText() 적용 (서버사이드 XSS 방어) |
 | - [ ] | `app/api/community/comments/route.ts` | 댓글 CRUD | 입력 길이 제한, XSS |
 | - [ ] | `app/api/community/likes/route.ts` | 좋아요 | 중복 방어 (upsert) |
 | - [ ] | `app/api/community/views/route.ts` | 조회수 | 어뷰징 방어 (IP/세션 기반) |
@@ -364,8 +364,8 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/api/cron/cancel-pending/route.ts` | PENDING 예약 자동 취소 | `CRON_SECRET` 헤더 검증, 취소 대상 조건 |
-| - [ ] | `app/api/cron/complete-trips/route.ts` | 여행 완료 자동 처리 | 완료 조건, 후기 요청 알림 발송 |
+| - [x] | `app/api/cron/cancel-pending/route.ts` | PENDING 예약 자동 취소 | ✅ 수정완료: CRON_SECRET 필수화 (조건부→강제), UPDATE에 .eq('status','PENDING') guard 추가 |
+| - [x] | `app/api/cron/complete-trips/route.ts` | 여행 완료 자동 처리 | ✅ 수정완료: CRON_SECRET 필수화, UPDATE에 .in('status', ACTIVE_STATUSES) guard 추가 |
 | - [ ] | `app/api/cron/experience-translations/route.ts` | 체험 자동 번역 | 번역 실패 재시도, 번역 비용 최적화 |
 | - [ ] | `app/api/guest/trips/sync-completed/route.ts` | 완료 여행 동기화 | 동기화 중복 처리 방어 |
 | - [ ] | `app/utils/experienceTranslation/index.ts` | 번역 로직 | 번역 provider 폴백 처리 |
