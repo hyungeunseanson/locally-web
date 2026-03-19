@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       .eq('order_id', orderId)
       .maybeSingle();
 
-    if (!booking || booking.customer_id !== user.id || booking.status !== 'PENDING') {
+    // [Fix] status 대소문자 정규화 — DB가 lowercase 'pending' 저장 시 guard 우회 방지
+    if (!booking || booking.customer_id !== user.id || booking.status?.toUpperCase() !== 'PENDING') {
       return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
 
@@ -41,10 +42,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // [Race Guard] status 조건 포함 UPDATE — 동시 요청에서 체크-후-수정 불일치 방어
     const { error } = await supabaseAdmin
       .from('service_bookings')
       .update({ payment_method: 'bank' })
-      .eq('order_id', orderId);
+      .eq('order_id', orderId)
+      .eq('customer_id', user.id)
+      .filter('status', 'ilike', 'PENDING');
 
     if (error) throw error;
 

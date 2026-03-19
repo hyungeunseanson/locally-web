@@ -84,9 +84,9 @@
 
 | 상태 | 파일 | 역할 | Codex 점검 포인트 |
 |------|------|------|-----------------|
-| - [ ] | `app/experiences/[id]/payment/page.tsx` | 결제 페이지 | 결제 전 세션 만료 처리, 금액 위변조 방어 |
+| - [x] | `app/experiences/[id]/payment/page.tsx` | 결제 페이지 | ✅ 수정완료: 클라이언트 용량 체크 BLOCKING→ACTIVE (PENDING 포함 시 false "자리 없음" 버그 수정) |
 | - [x] | `app/experiences/[id]/payment/complete/page.tsx` | 결제 완료 페이지 | ✅ 수정완료: CRITICAL — 본인 예약 소유권 검증(.eq user_id) 추가; analytics 확정상태 게이팅; 취소/거절 예약 별도 UI 분기 |
-| - [ ] | `app/payment/success/page.tsx` | 무통장 결제 성공 페이지 | 상태 전환 타이밍 |
+| - [x] | `app/payment/success/page.tsx` | 무통장 결제 성공 페이지 | ✅ 수정완료: getUser() + .eq('user_id') 추가 — 비인증 방문자 orderId 탐지 방지 |
 
 ### 2-4. 여행 목록 & 취소
 
@@ -168,7 +168,7 @@
 |------|------|------|-----------------|
 | - [x] | `app/api/services/payment/nicepay-callback/route.ts` | 서비스 NicePay 콜백 | ✅ 수정완료: `.eq('status','PENDING')` 조건부 UPDATE + 멱등성 응답 |
 | - [x] | `app/api/services/payment/paypal/capture-order/route.ts` | 서비스 PayPal 캡처 | ✅ 수정완료: 동일 CAS 패턴 적용 |
-| - [ ] | `app/api/services/payment/mark-bank/route.ts` | 서비스 무통장 처리 | 중복 처리 방어 |
+| - [x] | `app/api/services/payment/mark-bank/route.ts` | 서비스 무통장 처리 | ✅ 수정완료: status 대소문자 정규화; UPDATE에 customer_id + status filter 추가 |
 | - [x] | `app/api/admin/service-confirm-payment/route.ts` | 서비스 어드민 결제 확인 | ✅ 수정완료: 조건부 UPDATE + 멱등성 응답 |
 
 ---

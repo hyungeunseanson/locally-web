@@ -30,10 +30,18 @@ function SuccessContent() {
       }
 
       try {
+        // [Security] 본인 예약만 조회 — 비인증 방문자가 orderId로 상태 탐지 방지
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsSaving(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('bookings')
           .select('status')
           .eq('order_id', orderId)
+          .eq('user_id', user.id)
           .maybeSingle();
 
         if (error) throw error;

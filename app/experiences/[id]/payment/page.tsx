@@ -9,7 +9,7 @@ import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
 import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
 import { useToast } from '@/app/context/ToastContext';
-import { BOOKING_BLOCKING_STATUSES_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 import { ExperienceAvailabilitySummary, ExperienceSlotSummary } from '../types';
@@ -399,7 +399,10 @@ function PaymentContent() {
       .eq('experience_id', experienceId)
       .eq('date', date)
       .eq('time', time)
-      .in('status', [...BOOKING_BLOCKING_STATUSES_FOR_CAPACITY]);
+      // [Fix] PENDING 포함 BLOCKING → ACTIVE 전용으로 교체
+      // — PENDING 예약이 자동 취소되기 전 클라이언트 용량 체크가 false "자리 없음"을 반환하는 버그 수정
+      // 실제 용량 보호는 서버 RPC가 atomic하게 담당
+      .in('status', [...BOOKING_ACTIVE_STATUS_FOR_CAPACITY]);
 
     const bookingRows = (bookings || []) as BookingCheckRow[];
     const currentBookedCount = bookingRows.reduce((sum, b) => sum + Number(b.guests || 0), 0);
