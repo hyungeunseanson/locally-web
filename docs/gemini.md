@@ -105,8 +105,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 민감 API는 반드시 서버에서 권한 확인 후 처리
 - **[팀 알림 아키텍처 결정]** `/api/admin/notify-team`의 수신자 수집은 `admin_whitelist` 단일 소스만 사용한다. `users.role='admin'`을 병행 소스로 쓰면 whitelist에서 삭제된 관리자에게 계속 발송되는 버그 발생. 팀원 추가/제거는 반드시 `admin_whitelist` 테이블만 통해 관리한다.
 - **[권한 Source 결정]** 관리자 권한 판정 source는 `users.role + admin_whitelist`다. `profiles`는 표시/프로필 데이터용이며, `profiles.role`을 권한 판정에 사용하지 않는다.
+- **[관리자 읽기 경계 결정]** `admin_tasks`, `admin_task_comments`, `admin_whitelist`, `admin_audit_logs`는 쓰기(write)가 아니라 읽기(select)만 admin-only client 경로를 허용한다. TEAM/감사 로그의 목록·realtime 읽기는 유지하되, mutation은 서버 경계 또는 service-role 정책으로만 처리한다.
 - **[관리자 알림센터 결정]** 운영 알림센터는 신규 테이블을 만들지 않고 기존 `notifications`를 재사용한다. 관리자 전용 누적 알림은 `type='admin_alert'`로 저장하고, Admin Dashboard `ALERTS` 탭에서 소비한다.
 - **[알림 API 보안 결정]** `/api/notifications/email`의 단일 수신자 경로는 범용 발송 API로 사용하지 않는다. self 알림이나 서버 검증 가능한 소유권 컨텍스트(`review_reply`, `cancellation_approved` 등)만 허용하고, 그 외는 각 도메인 서버 라우트에서 직접 발송한다.
+- **[알림 mutation 경계 결정]** 일반 `notifications`의 읽음 처리와 삭제는 `/api/notifications/read`, `DELETE /api/notifications/[id]`만 사용한다. 브라우저에서 `notifications`를 direct `update/delete`하지 않는다. 인앱 알림 생성 역시 서버 route/service-role 경계에서만 수행한다.
 
 ### 3.3 결제/정합성 원칙
 - 결제 확정/취소는 서버 검증 경로를 단일 소스로 유지
@@ -137,6 +139,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/inquiries/thread`는 fast-path 문의방 생성용으로 첫 메시지 메타데이터(`messageId`, `displayContent`, `updatedAt`)까지 함께 반환한다. `useChat.createInquiry()`는 이 응답을 사용해 새 문의방 리스트/선택 상태/첫 메시지를 즉시 구성하고, 메일 발송은 응답 안에서 기다리지 않는다.
 - 메시징 읽음 처리(`is_read`, `read_at`)는 `/api/inquiries/read` 서버 API를 단일 source로 유지한다. 클라이언트 훅(`useChat`)은 unread UI를 낙관적으로 갱신할 수 있지만, 실제 `inquiry_messages` 읽음 업데이트는 브라우저 direct write를 하지 않는다.
 - 일반 알림(`notifications.is_read`) 읽음 처리 역시 `/api/notifications/read` 서버 API를 단일 source로 유지한다. `NotificationContext`는 단건/전체 읽음을 optimistic하게 반영할 수 있지만, 실제 DB update는 브라우저 direct write를 하지 않는다.
+- 알림 삭제는 `DELETE /api/notifications/[id]` 서버 API를 단일 source로 유지한다. `/notifications` 페이지는 optimistic UI를 유지하되, 실제 DB delete는 브라우저 direct write를 하지 않는다.
 - 기존 inquiry의 텍스트 답장은 `useChat.sendMessage()`가 optimistic append를 기본으로 사용한다. 성공 후 `loadMessages()`로 전체 스레드를 강제 재조회하지 않고, 현재 열린 스레드의 임시 message를 서버 id로 치환한 뒤 inquiry 목록만 background refresh한다. 새 문의방 최초 생성과 이미지 메시지는 기존 서버 round-trip 흐름을 유지한다.
 - 기존 inquiry의 이미지 답장도 성공 후 `loadMessages()` 전체 재조회를 강제하지 않는다. 현재 열린 스레드에 서버 응답 기반 message를 즉시 append하고, inquiry 목록만 background refresh한다. 새 문의방 최초 생성은 기존 round-trip 흐름을 유지한다.
 - `/guest/inbox`는 `hostId`만 있는 deep link에서도 caller query에 `hostName/hostAvatar`가 없으면 `profiles + host_applications`를 직접 조회해 host summary를 복구한다. 결제 완료 페이지나 예약카드에서 host summary를 못 넘긴 진입도 초기 `?` 아바타가 뜨지 않아야 한다.
@@ -151,7 +154,11 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `User Management` 탭은 `/api/admin/users-summary`와 presence 구독을 쓰는 `useAdminUsersData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다.
 - `Approvals` 및 레거시 `APPS`/`EXPS` 경로는 `/api/admin/host-applications` 요약 API + `experiences` 클라이언트 조회를 쓰는 `useAdminApprovalsData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다.
 - `TEAM` 탭은 아직 목록/실시간 읽기는 client Supabase를 유지하지만, `TeamTab`, `GlobalTeamChat`, `MiniChatBar`의 `admin_tasks / admin_task_comments / admin_whitelist` 쓰기(create/update/delete/reaction)는 전용 `/api/admin/team/*` 경로로만 처리한다.
+- `TEAM`/`Audit Logs` 읽기 경로는 admin-only SELECT 정책 위에서 client Supabase 목록/realtime을 유지한다. server-only로 전면 전환하지 않고, write 봉쇄와 read 회귀 방지를 동시에 맞춘다.
 - `TEAM` 탭 진입 시 `last_viewed_team`을 현재 시각으로 갱신하고 `team-viewed` 이벤트를 발생시켜, 사이드바 `Team Workspace` 배지가 같은 탭 세션에서도 즉시 0으로 돌아가게 유지한다.
+- 공개 호스트 projection은 당분간 `public_host_applications` safe-view를 유지하고 `security_invoker=off`로 운영한다. 홈/검색/체험상세/공개 프로필이 이 public projection에 의존하므로, `host_applications` RLS 기준 공개 렌더링이 깨지지 않도록 한다.
+- 체험 analytics 수집은 `POST /api/analytics/events`, `POST /api/analytics/search` 서버 ingest 경로를 단일 source로 사용한다. 브라우저는 tracking metadata만 전송하고 `analytics_events`, `search_logs` direct insert를 하지 않는다.
+- `create_booking_atomic` RPC는 public execute를 허용하지 않는다. 브라우저는 직접 RPC를 호출하지 않고 `/api/bookings`만 사용하며, service-role 경계에서만 예약 원자화 함수를 실행한다.
 - 맞춤 의뢰 결제 무통장 입금 추가(v3.9.1): `/services/[requestId]/payment`에 결제 수단 선택 UI(카드 결제 / 무통장 입금)를 추가. 무통장 선택 시 IMP 호출 없이 계좌번호 안내 후 `/payment/complete?method=bank`로 직접 이동. 계좌 정보는 `NEXT_PUBLIC_BANK_ACCOUNT`/`NEXT_PUBLIC_BANK_NAME` 환경변수로 관리.
 - 맞춤 의뢰 무통장 백엔드 연동(v3.9.2): 무통장 선택 시 `/api/services/payment/mark-bank` 호출로 `service_bookings.payment_method='bank'` 저장(service_role 전용 쓰기 → 서버 API 경유). Admin `ServiceAdminTab`에 "결제수단" 컬럼(🏛️ 무통장/💳 카드) 및 PENDING+무통장 행에 "💰 입금 확인" 버튼 추가 → `/api/admin/service-confirm-payment` 호출 → PENDING→PAID, pending_payment→open + 호스트 알림 + 감사 로그.
 - 어드민 대시보드 권한 및 무통장 버그 수정(v3.9.3): `service_bookings` 영역의 RLS 권한 누락으로 인한 관리자 데이터 블락/사이드바 카운트 증발 현상을 우회하기 위해 `createAdminClient`를 쓰는 전용 백엔드 API 신설 (`/api/admin/service-bookings`, `/api/admin/sidebar-counts`). 또한, 일반 `bookings` 테이블에 `payment_method` 컬럼을 신규 추가하고 `create_booking_atomic` 함수에서 이를 저장하도록 수정.

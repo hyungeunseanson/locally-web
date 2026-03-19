@@ -220,4 +220,54 @@ test.describe.serial('notification read route', () => {
     expect(allMap.get(secondId)).toBe(true);
     expect(allMap.get(otherId)).toBe(false);
   });
+
+  test('deletes only the current user notification through the server route', async ({ page }) => {
+    const user = createUser('delete-owner');
+    const other = createUser('delete-other');
+    const userId = await createAuthUser(user);
+    const otherUserId = await createAuthUser(other);
+
+    const ownId = await insertUnreadNotification(userId, '/notifications');
+    const otherId = await insertUnreadNotification(otherUserId, '/notifications');
+
+    await login(page, user);
+
+    const forbiddenDelete = await page.evaluate(async (notificationId) => {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'DELETE',
+      });
+      return {
+        status: response.status,
+        body: await response.json(),
+      };
+    }, otherId);
+
+    expect(forbiddenDelete.status).toBe(404);
+    expect(forbiddenDelete.body.success).toBe(false);
+
+    const ownDelete = await page.evaluate(async (notificationId) => {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'DELETE',
+      });
+      return {
+        status: response.status,
+        body: await response.json(),
+      };
+    }, ownId);
+
+    expect(ownDelete.status).toBe(200);
+    expect(ownDelete.body.success).toBe(true);
+
+    const supabase = getAdminClient();
+    const { data: remainingRows, error: remainingRowsError } = await supabase
+      .from('notifications')
+      .select('id, user_id')
+      .in('id', [ownId, otherId]);
+
+    if (remainingRowsError) throw remainingRowsError;
+
+    const remainingIds = new Set((remainingRows || []).map((row) => Number(row.id)));
+    expect(remainingIds.has(ownId)).toBe(false);
+    expect(remainingIds.has(otherId)).toBe(true);
+  });
 });

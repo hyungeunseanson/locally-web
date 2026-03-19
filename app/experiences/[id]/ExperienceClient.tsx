@@ -14,9 +14,7 @@ import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
-import { createClient as createSupabaseClient } from '@/app/utils/supabase/client'; // 퍼널 트래킹용
-const supabase = createSupabaseClient();
-import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
+import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import {
   ExperienceCalendarDayStatus,
   ExperienceAvailabilitySummary,
@@ -127,16 +125,9 @@ export default function ExperienceClient({
   // 🟢 체험 상세페이지 진입 시 조회(view) 이벤트 기록
   useEffect(() => {
     if (experience?.id) {
-      supabase.from('analytics_events').insert([{
-        event_type: 'view',
-        target_id: String(experience.id),
-        user_id: user?.id || null,
-        ...getAnalyticsTrackingMetadata(),
-      }]).then(({ error }) => {
-        if (error) console.error('View Event Log Error:', error);
-      });
+      sendAnalyticsEvent('view', String(experience.id));
     }
-  }, [experience?.id, user?.id]);
+  }, [experience?.id]);
 
   useEffect(() => {
     void refreshAvailability();
@@ -194,14 +185,7 @@ export default function ExperienceClient({
     if (!time) return showToast(t('exp_detail_select_time'), 'error');
 
     // 🟢 결제하기 버튼 클릭 기록 (퍼널 2단계: 클릭)
-    supabase.from('analytics_events').insert([{
-      event_type: 'click',
-      target_id: String(experience.id),
-      user_id: user.id,
-      ...getAnalyticsTrackingMetadata(),
-    }]).then(({ error }) => {
-      if (error) console.error('Click Event Log Error:', error);
-    });
+    sendAnalyticsEvent('click', String(experience.id));
 
     const query = new URLSearchParams({
       date,

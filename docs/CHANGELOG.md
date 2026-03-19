@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.32 — [Security] Live SQL Patch 1-8 Reconciliation
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 DB 보정 migration 추가 | `docs/migrations/v3_39_14_live_security_patch_reconciliation.sql` — `is_admin_reader()` helper 추가, `admin_whitelist/admin_tasks/admin_task_comments/admin_audit_logs` admin-only SELECT 복구 + service-role write 유지, `public_host_applications security_invoker=off` 복구, `create_booking_atomic` public execute revoke/service-role only, translation/search_path/analytics policy 상태를 저장소에 동기화 |
+| 🔴 알림 mutation 서버 경계 고정 | `app/api/notifications/read/route.ts`, `app/api/notifications/[id]/route.ts`, `app/notifications/page.tsx`, `app/api/reviews/route.ts` — 알림 읽음/삭제/후기 호스트 알림 insert를 service-role 서버 경계로 이동, 브라우저 direct `notifications` write 제거 |
+| 🟠 관리자 권한 source 정렬 | `app/components/SiteHeader.tsx`, `app/account/page.tsx`, `app/utils/adminAccess.ts` — 헤더/계정 화면의 Admin 노출 기준을 `users.role + admin_whitelist`로 통일 |
+| 🟠 analytics ingest 서버화 | `app/api/analytics/events/route.ts`, `app/api/analytics/search/route.ts`, `app/utils/analytics/client.ts`, `app/utils/analytics/server.ts`, `app/hooks/useExperienceFilter.ts`, `app/experiences/[id]/ExperienceClient.tsx`, `app/experiences/[id]/payment/page.tsx`, `app/experiences/[id]/payment/complete/page.tsx` — 브라우저 direct insert를 `/api/analytics/*` fetch ingest로 교체, source-tracking 컬럼 드리프트 fallback 포함 |
+| 🟡 보호막 추가 | `tests/e2e/56-notification-read-route.spec.ts`, `tests/e2e/67-analytics-ingest-routes.spec.ts`, `tests/e2e/68-booking-rpc-public-guard.spec.ts` — notification delete own-only, analytics ingest route, public `create_booking_atomic` 차단 회귀 테스트 추가 |
+
 ## v3.39.31 — [Profile] 기본 프로필 메뉴 및 모달 다국어 지원 핀셋 보강
 
 | 항목 | 내용 |

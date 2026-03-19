@@ -32,8 +32,14 @@ function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDa
 }
 
 export async function POST(request: Request) {
+  let bookingId: string | number | null = null;
+
   try {
-    const { bookingId, reason: userReason, isHostCancel } = await request.json();
+    const body = await request.json();
+    bookingId = typeof body?.bookingId === 'string' || typeof body?.bookingId === 'number'
+      ? body.bookingId
+      : null;
+    const { reason: userReason, isHostCancel } = body;
 
     // [C-3] Auth Check
     const supabaseAuth = await createClient();

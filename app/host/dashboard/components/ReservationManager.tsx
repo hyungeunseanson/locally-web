@@ -55,6 +55,7 @@ type ReservationRecord = {
   guests?: number | null;
   amount?: number | null;
   status: string;
+  contact_name?: string | null;
   cancel_reason?: string | null;
   refund_amount?: number | null;
   host_payout_amount?: number | null;

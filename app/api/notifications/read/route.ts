@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 type NotificationReadRequestBody = {
@@ -10,6 +11,7 @@ type NotificationReadRequestBody = {
 export async function POST(req: NextRequest) {
   try {
     const supabaseServer = await createServerClient();
+    const supabaseAdmin = createAdminClient();
     const {
       data: { user },
       error: authError,
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'notificationId is required' }, { status: 400 });
     }
 
-    const query = supabaseServer
+    const query = supabaseAdmin
       .from('notifications')
       .update({ is_read: true })
       .eq('user_id', user.id)

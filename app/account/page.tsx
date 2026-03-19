@@ -14,8 +14,9 @@ import MobileLanguageSwitcher from '@/app/components/mobile/MobileLanguageSwitch
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
-import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
+import { getProfileCompletion, normalizeLanguageList, normalizeProfileLanguageValue } from '@/app/utils/profile';
 import { validateImage, compressImage, sanitizeFileName, isHeicValidationResult } from '@/app/utils/image';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
@@ -58,7 +59,7 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [isAdminWhitelisted, setIsAdminWhitelisted] = useState(false);
+  const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showHostTransition, setShowHostTransition] = useState(false);
   const [activeLinkModal, setActiveLinkModal] = useState<null | 'notices' | 'community' | 'news' | 'social'>(null);
@@ -176,16 +177,11 @@ export default function AccountPage() {
       if (!user) { router.push('/'); return; }
       setUser(user);
 
-      if (user.email) {
-        const { data: whitelistEntry } = await supabase
-          .from('admin_whitelist')
-          .select('id')
-          .eq('email', user.email)
-          .maybeSingle();
-        setIsAdminWhitelisted(!!whitelistEntry);
-      } else {
-        setIsAdminWhitelisted(false);
-      }
+      const adminAccess = await resolveAdminAccess(supabase, {
+        userId: user.id,
+        email: user.email,
+      });
+      setHasAdminAccess(adminAccess.isAdmin);
 
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
 
@@ -527,7 +523,7 @@ export default function AccountPage() {
         {/* ── 메뉴 그룹 2: 설정 ── */}
         <div className="px-4">
           <MobileMenuItem icon={<Settings className="w-4 h-4" />} label="계정 관리" onPress={() => setShowProfileView(true)} />
-          {isAdminWhitelisted && <MobileMenuItem icon={<Shield className="w-4 h-4" />} label="Admin" onPress={() => navigate('/admin/dashboard')} isPending={pendingHref === '/admin/dashboard'} disabled={isNavigating} />}
+          {hasAdminAccess && <MobileMenuItem icon={<Shield className="w-4 h-4" />} label="Admin" onPress={() => navigate('/admin/dashboard')} isPending={pendingHref === '/admin/dashboard'} disabled={isNavigating} />}
           <MobileMenuItem icon={<Users className="w-4 h-4" />} label="호스트 되기" onPress={() => navigate('/become-a-host')} isPending={pendingHref === '/become-a-host'} disabled={isNavigating} />
           <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label="도움말 센터" onPress={() => navigate('/help')} isPending={pendingHref === '/help'} disabled={isNavigating} />
         </div>

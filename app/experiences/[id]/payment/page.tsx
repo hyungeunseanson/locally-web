@@ -7,7 +7,7 @@ import Spinner from '@/app/components/ui/Spinner';
 import Script from 'next/script';
 import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
-import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
+import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
@@ -378,14 +378,7 @@ function PaymentContent() {
         }
 
         if (experienceId) {
-          supabase.from('analytics_events').insert([{
-            event_type: 'payment_init',
-            target_id: experienceId,
-            user_id: user.id,
-            ...getAnalyticsTrackingMetadata(),
-          }]).then(({ error }) => {
-            if (error) console.error('Payment Init Log Error:', error);
-          });
+          sendAnalyticsEvent('payment_init', experienceId);
         }
       }
     };

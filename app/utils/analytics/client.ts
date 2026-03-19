@@ -1,4 +1,4 @@
-type AnalyticsTrackingMetadata = {
+export type AnalyticsTrackingMetadata = {
   session_id: string | null;
   referrer: string | null;
   referrer_host: string | null;
@@ -7,6 +7,8 @@ type AnalyticsTrackingMetadata = {
   utm_campaign: string | null;
   landing_path: string | null;
 };
+
+export type AnalyticsEventType = 'view' | 'click' | 'payment_init' | 'booking_confirmed';
 
 const SESSION_STORAGE_KEY = 'locally.analytics.session_id';
 const ATTRIBUTION_STORAGE_KEY = 'locally.analytics.attribution';
@@ -123,4 +125,36 @@ export function getAnalyticsTrackingMetadata(): AnalyticsTrackingMetadata {
   );
 
   return mergedSnapshot;
+}
+
+function postAnalytics(url: string, payload: Record<string, unknown>) {
+  if (typeof window === 'undefined') return;
+
+  void fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch((error) => {
+    console.error(`[analytics] ${url} request failed:`, error);
+  });
+}
+
+export function sendAnalyticsEvent(eventType: AnalyticsEventType, targetId?: string | null) {
+  postAnalytics('/api/analytics/events', {
+    event_type: eventType,
+    target_id: normalizeValue(targetId),
+    ...getAnalyticsTrackingMetadata(),
+  });
+}
+
+export function sendSearchLog(keyword: string, route = 'main') {
+  const normalizedKeyword = normalizeValue(keyword);
+  if (!normalizedKeyword) return;
+
+  postAnalytics('/api/analytics/search', {
+    keyword: normalizedKeyword,
+    route: normalizeValue(route) || 'main',
+    ...getAnalyticsTrackingMetadata(),
+  });
 }

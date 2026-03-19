@@ -7,7 +7,7 @@
 > - 기술 감사관: **Codex 5.4 xhigh** — 도메인별 정밀 정적 분석, 버그 탐색
 > - 운영 방식: Codex에게 도메인 단위로 파일 목록 + 점검 포인트를 전달 → 병렬 분석 후 결과 보고 → Claude가 수정 실행
 >
-> **생성일**: 2026-03-19 | **상태**: 점검 대기 중
+> **생성일**: 2026-03-19 | **상태**: 1차 전수 점검 완료 / Patch 1-8 보안 보정 반영 중
 > **스캔 제외**: `node_modules/`, `.next/`, `.git/`, `.vscode/`, `app/fonts/`
 
 ## 📜 운영 원칙 및 작업 가이드 (Operational Principles)
@@ -19,6 +19,21 @@
    - `git push`를 통해 코드를 즉시 동기화한다.
    - `CHANGELOG.md`에 수정된 파일 목록과 해결된 이슈를 상세히 기록한다.
    - `AUDIT_MAP.md`의 진행 상태(`- [ ]` -> `- [x]`)를 업데이트한다.
+
+## 🔐 Patch 1-8 Reconciliation Follow-up
+
+- 목적: live DB에 먼저 적용된 Patch 1-8의 보안 이득은 유지하고, 저장소 코드/문서와 충돌하는 지점만 핀셋 보정한다.
+- 저장소 반영:
+  - `admin_whitelist`, `admin_tasks`, `admin_task_comments`, `admin_audit_logs`: service-role write 유지 + admin-only SELECT 복구
+  - `notifications`: 읽음/삭제/생성 mutation을 서버 경계로 통일
+  - `analytics_events`, `search_logs`: 브라우저 direct insert 제거, `/api/analytics/*` ingest 경로로 전환
+  - `public_host_applications`: 단기적으로 `security_invoker=off` safe-view 유지
+  - `create_booking_atomic`: public execute 금지, `/api/bookings`만 허용
+- 회귀 금지 기준:
+  - TEAM/감사 로그 realtime 읽기 유지
+  - Admin badge 판정은 `users.role + admin_whitelist` 단일 기준 유지
+  - 홈/검색/체험상세/공개 프로필의 공개 호스트 렌더링 유지
+  - notification center, analytics dashboard, booking flow 사용자 체감 회귀 금지
 ---
 
 ## 📊 도메인 분류 요약

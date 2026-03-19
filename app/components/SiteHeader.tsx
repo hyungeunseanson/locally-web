@@ -29,6 +29,7 @@ import { useViewMode } from '@/app/context/ViewModeContext';
 import dynamic from 'next/dynamic';
 import LanguageSelector from './LanguageSelector'; // 🟢 [추가] 새로 만든 파일 불러오기
 import DesktopModeTransition from './DesktopModeTransition';
+import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 
 // 🟢 LoginModal 동적 로딩 (SSR false)
@@ -44,7 +45,7 @@ import { useAuth } from '@/app/context/AuthContext'; // 🟢 Auth 훅 사용
 function SiteHeaderContent() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAdminWhitelisted, setIsAdminWhitelisted] = useState(false);
+  const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [desktopTransitionTarget, setDesktopTransitionTarget] = useState<'host' | 'guest' | null>(null);
 
   // 🟢 [핵심] 로컬 상태 대신 전역 AuthContext 사용 (깜빡임 해결)
@@ -98,31 +99,26 @@ function SiteHeaderContent() {
   useEffect(() => {
     let cancelled = false;
 
-    const checkAdminWhitelist = async () => {
-      if (!user?.email) {
-        if (!cancelled) setIsAdminWhitelisted(false);
+    const checkAdminAccess = async () => {
+      if (!user?.id) {
+        if (!cancelled) setHasAdminAccess(false);
         return;
       }
 
-      const { data, error } = await supabase
-        .from('admin_whitelist')
-        .select('id')
-        .eq('email', user.email)
-        .maybeSingle();
+      const adminAccess = await resolveAdminAccess(supabase, {
+        userId: user.id,
+        email: user.email,
+      });
 
       if (cancelled) return;
-      if (error) {
-        setIsAdminWhitelisted(false);
-        return;
-      }
-      setIsAdminWhitelisted(!!data);
+      setHasAdminAccess(adminAccess.isAdmin);
     };
 
-    checkAdminWhitelist();
+    checkAdminAccess();
     return () => {
       cancelled = true;
     };
-  }, [supabase, user?.email]);
+  }, [supabase, user?.email, user?.id]);
 
   const startDesktopModeTransition = (targetPath: string, targetMode: 'host' | 'guest') => {
     setIsMenuOpen(false);
@@ -259,7 +255,7 @@ function SiteHeaderContent() {
                         <Link href="/community" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                           <Users2 size={18} /> {t('header_community')}
                         </Link>
-                        {isAdminWhitelisted && (
+                        {hasAdminAccess && (
                           <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                             <ShieldCheck size={18} /> Admin
                           </Link>
@@ -299,7 +295,7 @@ function SiteHeaderContent() {
                         <Link href="/account" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                           <User size={18} /> {t('account')}
                         </Link>
-                        {isAdminWhitelisted && (
+                        {hasAdminAccess && (
                           <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-sm text-slate-700">
                             <ShieldCheck size={18} /> Admin
                           </Link>

@@ -11,7 +11,7 @@ import { useToast } from '@/app/context/ToastContext';
 import Spinner from '@/app/components/ui/Spinner';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 import { isPendingBookingStatus, isConfirmedBookingStatus, isCancelledBookingStatus } from '@/app/constants/bookingStatus';
-import { getAnalyticsTrackingMetadata } from '@/app/utils/analytics/client';
+import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
 type BookingExperience = {
@@ -96,14 +96,7 @@ function PaymentCompleteContent() {
           fireConfetti();
           const experienceId = data.experiences?.id;
           if (experienceId) {
-            supabase.from('analytics_events').insert([{
-              event_type: 'booking_confirmed',
-              target_id: String(experienceId),
-              user_id: data.user_id ?? null,
-              ...getAnalyticsTrackingMetadata(),
-            }]).then(({ error }) => {
-              if (error) console.error('booking_confirmed event error:', error);
-            });
+            sendAnalyticsEvent('booking_confirmed', String(experienceId));
           }
         }
       }

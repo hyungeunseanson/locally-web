@@ -1,4 +1,5 @@
 import { createClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { NextResponse } from 'next/server';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
@@ -92,7 +93,8 @@ export async function POST(request: Request) {
 
     // [R1] 호스트에게 새 후기 알림 발송
     if (experience?.host_id) {
-      await supabase.from('notifications').insert({
+      const supabaseAdmin = createAdminClient();
+      const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
         user_id: experience.host_id,
         type: 'new_review',
         title: '새 후기가 등록되었습니다',
@@ -101,6 +103,9 @@ export async function POST(request: Request) {
         is_read: false,
         created_at: new Date().toISOString(),
       });
+      if (notificationError) {
+        console.error('Review host notification error:', notificationError);
+      }
 
       sendImmediateGenericEmail({
         recipientUserId: experience.host_id,

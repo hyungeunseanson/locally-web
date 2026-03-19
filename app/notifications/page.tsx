@@ -8,7 +8,6 @@ import {
   Info, AlertTriangle, ChevronRight, ArrowLeft
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@/app/utils/supabase/client';
 import Skeleton from '@/app/components/ui/Skeleton';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. Import
@@ -35,27 +34,38 @@ export default function NotificationsPage() {
 
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
   const isHostNotifications = pathname?.startsWith('/host');
 
   // 🟢 [정석] Context(DB) 데이터와 동기화
   // 더 이상 booking 테이블을 직접 조회하지 않습니다.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalNotifications(notifications);
     setIsLoading(false);
   }, [notifications]);
 
   // 🟢 [정석] 알림 삭제 (DB에서 영구 삭제)
   const deleteNotification = async (id: number) => {
+    let rollbackSnapshot: NotificationItem[] = [];
+
     // UI 즉시 반영 (낙관적 업데이트)
-    setLocalNotifications(prev => prev.filter(n => n.id !== id));
+    setLocalNotifications(prev => {
+      rollbackSnapshot = prev;
+      return prev.filter(n => n.id !== id);
+    });
+
     try {
-      await supabase.from('notifications').delete().eq('id', id);
+      const response = await fetch(`/api/notifications/${id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || '알림 삭제에 실패했습니다.');
+      }
     } catch (error) {
       console.error('삭제 실패:', error);
       showToast(t('noti_delete_fail'), 'error'); // 🟢 번역
-      setLocalNotifications([...notifications]);
+      setLocalNotifications(rollbackSnapshot);
     }
   };
 
