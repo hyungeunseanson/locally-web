@@ -77,8 +77,8 @@
 | - [ ] | `app/experiences/[id]/components/ReservationCard.tsx` | 예약 카드 (사이드바) | 인원 검증, 날짜 미선택 시 제출 방어 |
 | - [ ] | `app/experiences/[id]/components/ExpSidebar.tsx` | 데스크탑 사이드바 | 가격 계산 일관성, solo guarantee 조건 |
 | - [ ] | `app/experiences/[id]/components/StickyActionSheet.tsx` | 모바일 하단 예약 버튼 | z-index 충돌, 스크롤 시 sticky 동작 |
-| - [ ] | `app/api/bookings/route.ts` | 예약 생성 API | 중복 예약 방어(동시 요청), 슬롯 capacity 검증, PENDING 상태 생성 로직 |
-| - [ ] | `app/utils/experienceAvailability.ts` | 예약 가능 여부 공통 로직 | PAID/confirmed 기준 카운트 일관성, solo 조건 엣지케이스 |
+| - [x] | `app/api/bookings/route.ts` | 예약 생성 API | ✅ 수정완료: paymentMethod allowlist 검증 추가; solo-guarantee TOCTOU pre-check 제거(RPC atomic 처리에 위임) |
+| - [x] | `app/utils/experienceAvailability.ts` | 예약 가능 여부 공통 로직 | ✅ 수정완료: .gte('date', today) 필터 추가 — 과거 슬롯이 예약 가능으로 표시되는 버그 수정 |
 
 ### 2-3. 결제
 
@@ -97,7 +97,7 @@
 | - [ ] | `app/guest/trips/components/CancellationModal.tsx` | 취소 모달 | 취소 사유 필수값 검증, 환불 금액 표시 |
 | - [ ] | `app/guest/trips/components/ReceiptModal.tsx` | 영수증 모달 | 금액 포맷, 통화 표시 |
 | - [ ] | `app/api/guest/trips/route.ts` | 게스트 여행 조회 API | 본인 예약만 조회 권한 검증 |
-| - [ ] | `app/utils/bookingFinance.ts` | 예약 금액 계산 유틸 | 환불율 계산 로직, 소수점 반올림 |
+| - [x] | `app/utils/bookingFinance.ts` | 예약 금액 계산 유틸 | ✅ 수정완료: totalExperienceAmount를 totalPaidAmount로 clamp — 레거시 데이터에서 hostPayout 오버플로 방지 |
 
 ---
 
