@@ -113,6 +113,20 @@ async function login(page: Page, user: TestUser) {
   await page.waitForLoadState('networkidle');
 }
 
+async function waitForAdminAccessFetch(page: Page) {
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get('/api/admin/access', { failOnStatusCode: false });
+        if (!response.ok()) return false;
+        const result = await response.json();
+        return result?.success === true && result?.isAdmin === true;
+      },
+      { timeout: 15000 }
+    )
+    .toBe(true);
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -132,6 +146,7 @@ test.describe.serial('Admin role-only access', () => {
 
     await login(page, adminUser);
     await page.goto('/', { waitUntil: 'networkidle' });
+    await waitForAdminAccessFetch(page);
 
     const desktopMenuTrigger = page.locator('header div.select-none').first();
     await desktopMenuTrigger.click();
@@ -139,6 +154,7 @@ test.describe.serial('Admin role-only access', () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    await waitForAdminAccessFetch(page);
     await expect(page.getByText('Admin', { exact: true }).last()).toBeVisible({ timeout: 15000 });
 
     await page.setViewportSize({ width: 1280, height: 720 });

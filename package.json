@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:e2e:contracts:baseline": "playwright test -c playwright.contracts.config.ts tests/e2e/20-service-cancel-error-safe.spec.ts tests/e2e/21-service-payment-method-lock.spec.ts tests/e2e/56-notification-read-route.spec.ts tests/e2e/61-community-view-count.spec.ts tests/e2e/68-booking-rpc-public-guard.spec.ts tests/e2e/69-admin-role-access.spec.ts tests/e2e/71-public-host-profile.spec.ts tests/e2e/74-card-payment-precutover-contract.spec.ts --project=chromium --workers=1",
+    "test:e2e:contracts:guards": "playwright test -c playwright.contracts.config.ts tests/e2e/75-experience-cancel-error-safe.spec.ts tests/e2e/76-card-callback-contract.spec.ts tests/e2e/77-notification-email-policy.spec.ts tests/e2e/78-internal-email-route-guard.spec.ts tests/e2e/79-team-notify-guard.spec.ts tests/e2e/80-public-service-role-contract.spec.ts tests/e2e/81-cron-secret-guards.spec.ts --project=chromium --workers=1",
+    "test:e2e:contracts": "npm run test:e2e:contracts:baseline && npm run test:e2e:contracts:guards",
     "test:e2e:live:gate": "node scripts/run-live-smoke.mjs --bundle gate",
     "test:e2e:live:shared": "node scripts/run-live-smoke.mjs --bundle shared",
     "test:e2e:live:noisy": "node scripts/run-live-smoke.mjs --bundle noisy"

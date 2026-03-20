@@ -392,9 +392,26 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       inquiriesRef.current = nextInquiries;
       setInquiries(nextInquiries);
       const updatedSelectedInquiry = nextInquiries.find((inq) => String(inq.id) === String(inquiryId)) || null;
-      selectedInquiryRef.current = updatedSelectedInquiry;
       if (updatedSelectedInquiry) {
-        setSelectedInquiry(updatedSelectedInquiry);
+        // DB 재조립 시 host.avatar_url이 placeholder/null로 내려오면 기존 정상 avatar를 보존
+        const isPlaceholder = (url: string | null | undefined) =>
+          !url || url === '/default-avatar.png';
+        const prevHost = selectedInquiryRef.current?.host;
+        const mergedHost = updatedSelectedInquiry.host
+          ? {
+              id: updatedSelectedInquiry.host.id ?? prevHost?.id ?? null,
+              name: updatedSelectedInquiry.host.name ?? prevHost?.name ?? '호스트',
+              avatar_url:
+                isPlaceholder(updatedSelectedInquiry.host.avatar_url) && !isPlaceholder(prevHost?.avatar_url)
+                  ? prevHost?.avatar_url ?? null
+                  : updatedSelectedInquiry.host.avatar_url ?? null,
+            }
+          : undefined;
+        const mergedInquiry = { ...updatedSelectedInquiry, host: mergedHost };
+        selectedInquiryRef.current = mergedInquiry;
+        setSelectedInquiry(mergedInquiry);
+      } else {
+        selectedInquiryRef.current = null;
       }
 
       const senderName =
