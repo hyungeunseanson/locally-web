@@ -141,6 +141,29 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Community view count policy', () => {
+  test('rejects invalid post ids and missing posts safely', async ({ request }) => {
+    const invalidResponse = await request.post('/api/community/views', {
+      data: {
+        postId: 'not-a-uuid',
+      },
+    });
+    expect(invalidResponse.status()).toBe(400);
+    await expect(invalidResponse.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Invalid postId',
+    });
+
+    const missingResponse = await request.post('/api/community/views', {
+      data: {
+        postId: '11111111-1111-1111-1111-111111111111',
+      },
+    });
+    expect(missingResponse.status()).toBe(404);
+    await expect(missingResponse.json()).resolves.toMatchObject({
+      success: false,
+    });
+  });
+
   test('counts the detail view once per browser within the cookie window', async ({ page }) => {
     test.setTimeout(90000);
 

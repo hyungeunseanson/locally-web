@@ -241,6 +241,74 @@ async function createPendingUnselectedFixture(customerId: string, customer: Test
   };
 }
 
+async function createLegacyUntouchedCardFixture(customerId: string, customer: TestUser) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+  const serviceDate = new Date();
+  serviceDate.setDate(serviceDate.getDate() + 10);
+  const createdAt = new Date();
+  createdAt.setMinutes(createdAt.getMinutes() - 10);
+  const untouchedAt = createdAt.toISOString();
+
+  const { data: requestData, error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      user_id: customerId,
+      title: `[Playwright] Service Legacy Card ${timestamp}`,
+      description: 'legacy untouched card placeholder에서 무통장 전환 가능한지 검증합니다.',
+      city: 'Seoul',
+      country: 'KR',
+      service_date: formatDate(serviceDate),
+      start_time: '16:00',
+      duration_hours: 4,
+      languages: ['한국어'],
+      guest_count: 2,
+      contact_name: customer.fullName,
+      contact_phone: customer.phone,
+      status: 'pending_payment',
+      created_at: untouchedAt,
+      updated_at: untouchedAt,
+    })
+    .select('id, total_customer_price')
+    .single();
+
+  if (requestError || !requestData?.id) {
+    throw requestError || new Error('Failed to create legacy card service request.');
+  }
+  createdServiceRequestIds.push(requestData.id);
+
+  const bookingId = `SVC-LEGACY-CARD-${timestamp}`;
+  const orderId = `SVC-LEGACY-CARD-ORD-${timestamp}`;
+  const { error: bookingError } = await supabase.from('service_bookings').insert({
+    id: bookingId,
+    order_id: orderId,
+    request_id: requestData.id,
+    application_id: null,
+    customer_id: customerId,
+    host_id: null,
+    amount: requestData.total_customer_price,
+    host_payout_amount: 80000,
+    platform_revenue: Number(requestData.total_customer_price || 0) - 80000,
+    status: 'PENDING',
+    payment_method: 'card',
+    tid: null,
+    payout_status: 'pending',
+    contact_name: customer.fullName,
+    contact_phone: customer.phone,
+    created_at: untouchedAt,
+    updated_at: untouchedAt,
+  });
+
+  if (bookingError) throw bookingError;
+  createdServiceBookingIds.push(bookingId);
+
+  return {
+    bookingId,
+    orderId,
+    requestId: requestData.id,
+  };
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -337,6 +405,15 @@ test.describe.serial('Service payment method lock', () => {
       success: true,
     });
 
+    const repeatedMarkCardResponse = await page.request.post('/api/services/payment/mark-card', {
+      data: { orderId: fixture.orderId },
+    });
+    expect(repeatedMarkCardResponse.status()).toBe(200);
+    await expect(repeatedMarkCardResponse.json()).resolves.toMatchObject({
+      success: true,
+      alreadyMarked: true,
+    });
+
     const markBankWhileCardResponse = await page.request.post('/api/services/payment/mark-bank', {
       data: { orderId: fixture.orderId },
     });
@@ -348,6 +425,15 @@ test.describe.serial('Service payment method lock', () => {
     expect(releaseCardResponse.status()).toBe(200);
     await expect(releaseCardResponse.json()).resolves.toMatchObject({
       success: true,
+    });
+
+    const repeatedReleaseCardResponse = await page.request.post('/api/services/payment/release-card', {
+      data: { orderId: fixture.orderId },
+    });
+    expect(repeatedReleaseCardResponse.status()).toBe(200);
+    await expect(repeatedReleaseCardResponse.json()).resolves.toMatchObject({
+      success: true,
+      alreadyReleased: true,
     });
 
     const markBankAfterReleaseResponse = await page.request.post('/api/services/payment/mark-bank', {
@@ -434,5 +520,37 @@ test.describe.serial('Service payment method lock', () => {
     expect(booking?.status).toBe('PENDING');
     expect(booking?.payment_method).toBe('bank');
     expect(serviceRequest?.status).toBe('pending_payment');
+  });
+
+  test('allows a legacy untouched card placeholder to fall back to bank', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const fixture = await createLegacyUntouchedCardFixture(customerId, customerUser);
+
+    await login(page, customerUser);
+
+    const response = await page.request.post('/api/services/payment/mark-bank', {
+      data: { orderId: fixture.orderId },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const supabase = getAdminClient();
+    const { data: booking, error } = await supabase
+      .from('service_bookings')
+      .select('status, payment_method, tid')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    expect(booking?.status).toBe('PENDING');
+    expect(booking?.payment_method).toBe('bank');
+    expect(booking?.tid).toBeNull();
   });
 });

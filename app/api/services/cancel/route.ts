@@ -98,6 +98,11 @@ async function refundPaidOpenServiceBooking(
 }
 
 export async function POST(request: Request) {
+  let targetOrderId: string | null = null;
+  let bookingStatusBeforeLock: string | null = null;
+  let cancellationLockAcquired = false;
+  let cancellationCommitted = false;
+
   try {
     const supabaseServer = await createServerClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
@@ -108,6 +113,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as CancelBody;
     const { order_id, cancel_reason = '고객 요청 취소' } = body;
+    targetOrderId = typeof order_id === 'string' ? order_id : null;
 
     if (!order_id) {
       return NextResponse.json({ success: false, error: '주문 번호가 필요합니다.' }, { status: 400 });
@@ -125,6 +131,8 @@ export async function POST(request: Request) {
     if (bookingError || !booking) {
       return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
+
+    bookingStatusBeforeLock = typeof booking.status === 'string' ? booking.status : null;
 
     // 2. 권한 검증 (고객 또는 호스트만)
     const isCustomer = booking.customer_id === user.id;
@@ -201,6 +209,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
       }
 
+      cancellationLockAcquired = true;
+
       const refundResult = await refundPaidOpenServiceBooking(
         {
           amount: booking.amount,
@@ -212,6 +222,13 @@ export async function POST(request: Request) {
       );
 
       if (!refundResult.ok) {
+        await supabaseAdmin
+          .from('service_bookings')
+          .update({ status: 'PAID' })
+          .eq('order_id', order_id)
+          .eq('status', 'cancellation_requested');
+
+        cancellationLockAcquired = false;
         return NextResponse.json({ success: false, error: refundResult.error }, { status: refundResult.status });
       }
 
@@ -220,6 +237,9 @@ export async function POST(request: Request) {
         .update({ status: 'cancelled', cancel_reason, refund_amount: refundResult.refundAmount })
         .eq('order_id', order_id)
         .eq('status', 'cancellation_requested');
+
+      cancellationCommitted = true;
+
       await supabaseAdmin
         .from('service_requests')
         .update({ status: 'cancelled' })
@@ -292,6 +312,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, message: '취소 요청이 접수되었습니다. 관리자 검토 후 환불이 처리됩니다.' });
 
   } catch (error: unknown) {
+    if (cancellationLockAcquired && !cancellationCommitted && bookingStatusBeforeLock && targetOrderId) {
+      try {
+        await createAdminClient()
+          .from('service_bookings')
+          .update({ status: bookingStatusBeforeLock })
+          .eq('order_id', targetOrderId)
+          .eq('status', 'cancellation_requested');
+      } catch (rollbackError) {
+        console.error('[SERVICE] cancel rollback failed:', rollbackError);
+      }
+    }
+
     captureServerException(error, { route: '/api/services/cancel', method: 'POST' });
     console.error('API Service Cancel Error:', error);
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });

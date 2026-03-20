@@ -35,6 +35,9 @@ function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDa
 
 export async function POST(request: Request) {
   let bookingId: string | number | null = null;
+  let bookingStatusBeforeLock: string | null = null;
+  let cancellationLockAcquired = false;
+  let cancellationCommitted = false;
 
   try {
     const body = await request.json();
@@ -61,6 +64,8 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (error || !booking) return NextResponse.json({ error: '예약 없음' }, { status: 404 });
+
+    bookingStatusBeforeLock = typeof booking.status === 'string' ? booking.status : null;
 
     // [보안 패치] 관리자인지 확인 (관리자는 모든 예약 취소 가능)
     const { isAdmin } = await resolveAdminAccess(supabaseAdmin, {
@@ -93,6 +98,8 @@ export async function POST(request: Request) {
     if (!lockAcquired) {
       return NextResponse.json({ error: '이미 취소 처리 중이거나 취소된 예약입니다.' }, { status: 409 });
     }
+
+    cancellationLockAcquired = true;
 
     // 2. 환불액 및 정산액 계산
     let refundRate = 0;
@@ -139,6 +146,8 @@ export async function POST(request: Request) {
     }).eq('id', bookingId).eq('status', 'cancellation_requested');
 
     if (updateError) throw new Error('DB update failed after refund: ' + updateError.message);
+
+    cancellationCommitted = true;
 
     // 🟢 5. 알림 및 이메일 발송 로직
     const hostId = booking.experiences?.host_id;
@@ -227,18 +236,16 @@ export async function POST(request: Request) {
     captureServerException(error, { route: '/api/payment/cancel', method: 'POST' });
     console.error('Cancel Error:', error);
 
-    // [HIGH Fix] PG 실패 시 sentinel lock 해제 — 'cancellation_requested'에 영구 잠김 방지
-    // Note: PG가 실제로 환불을 처리했을 가능성이 있으면 이 복원은 위험 — 수동 조정 로그로 보완
-    try {
-      if (typeof bookingId === 'string' || typeof bookingId === 'number') {
+    if (cancellationLockAcquired && !cancellationCommitted && bookingStatusBeforeLock && (typeof bookingId === 'string' || typeof bookingId === 'number')) {
+      try {
         await createAdminClient()
           .from('bookings')
-          .update({ status: 'cancelled', cancel_reason: `PG 오류로 인한 자동 취소: ${message}` })
+          .update({ status: bookingStatusBeforeLock })
           .eq('id', bookingId)
           .eq('status', 'cancellation_requested');
+      } catch (rollbackErr) {
+        console.error('Cancel rollback failed (manual reconciliation required):', rollbackErr);
       }
-    } catch (rollbackErr) {
-      console.error('Cancel rollback failed (manual reconciliation required):', rollbackErr);
     }
 
     return NextResponse.json({ error: message }, { status: 500 });
