@@ -78,12 +78,14 @@ const syncNotifications = useCallback(async (userId: string) => {
 
   const cursor = sessionStorage.getItem('lastSeenNotiCreatedAt');
 
-  // cursor가 없는 첫 진입: 현재 최신 알림 시점으로 cursor만 초기화, 토스트 없음
-  // (과거 알림을 신규 알림으로 오인하지 않기 위해)
+  // cursor가 없는 첫 진입: cursor만 초기화하고 토스트 없음
+  // 알림 있음 → 최신 알림 시점, 알림 없음 → 현재 시각을 기준점으로 심어둠
+  // (과거 알림을 신규로 오인하지 않고, 빈 함에서 첫 알림도 정상 감지하기 위해)
   if (!cursor) {
-    if (data.length > 0) {
-      sessionStorage.setItem('lastSeenNotiCreatedAt', data[0].created_at);
-    }
+    sessionStorage.setItem(
+      'lastSeenNotiCreatedAt',
+      data.length > 0 ? data[0].created_at : new Date().toISOString()
+    );
     return;
   }
 
