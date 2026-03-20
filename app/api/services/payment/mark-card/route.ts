@@ -1,28 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient as createServerClient } from '@/app/utils/supabase/server';
+
 import { createAdminClient } from '@/app/utils/supabase/admin';
-
-function isLegacyUntouchedCardSelection(booking: {
-  payment_method: string | null;
-  tid: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-}) {
-  if ((booking.payment_method || '').toLowerCase() !== 'card' || booking.tid) {
-    return false;
-  }
-
-  if (!booking.created_at || !booking.updated_at) {
-    return false;
-  }
-
-  return booking.created_at === booking.updated_at;
-}
+import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 export async function POST(request: Request) {
   try {
     const supabaseServer = await createServerClient();
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseServer.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -34,34 +21,32 @@ export async function POST(request: Request) {
     }
 
     const supabaseAdmin = createAdminClient();
-
-    // 본인 소유 PENDING 예약인지 확인
     const { data: booking } = await supabaseAdmin
       .from('service_bookings')
-      .select('id, customer_id, status, payment_method, tid, created_at, updated_at')
+      .select('id, customer_id, status, payment_method, tid, updated_at')
       .eq('order_id', orderId)
       .maybeSingle();
 
-    // [Fix] status 대소문자 정규화 — DB가 lowercase 'pending' 저장 시 guard 우회 방지
     if (!booking || booking.customer_id !== user.id || booking.status?.toUpperCase() !== 'PENDING') {
       return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    const currentMethod = (booking.payment_method || '').toLowerCase();
-    if (currentMethod === 'bank') {
-      return NextResponse.json({ success: true, alreadyMarked: true });
-    }
-
     if (booking.tid) {
       return NextResponse.json(
-        { success: false, error: '이미 카드 결제가 진행 중인 예약입니다.' },
+        { success: false, error: '이미 카드 결제가 확정되었거나 검증 중인 예약입니다.' },
         { status: 409 }
       );
     }
 
-    const canSwitchFromLegacyCard = isLegacyUntouchedCardSelection(booking);
+    const currentMethod = (booking.payment_method || '').toLowerCase();
+    if (currentMethod === 'bank') {
+      return NextResponse.json(
+        { success: false, error: '이미 무통장 입금 대기 상태로 전환된 예약입니다.' },
+        { status: 409 }
+      );
+    }
 
-    if (currentMethod && currentMethod !== 'bank' && !canSwitchFromLegacyCard) {
+    if (currentMethod && currentMethod !== 'card') {
       return NextResponse.json(
         { success: false, error: '이미 다른 결제수단으로 진행 중인 예약입니다.' },
         { status: 409 }
@@ -71,21 +56,21 @@ export async function POST(request: Request) {
     const nextUpdatedAt = new Date().toISOString();
     let updateQuery = supabaseAdmin
       .from('service_bookings')
-      .update({ payment_method: 'bank', updated_at: nextUpdatedAt })
+      .update({ payment_method: 'card', updated_at: nextUpdatedAt })
       .eq('order_id', orderId)
       .eq('customer_id', user.id)
       .filter('status', 'ilike', 'PENDING')
       .is('tid', null);
 
-    if (canSwitchFromLegacyCard) {
+    if (currentMethod === 'card') {
       updateQuery = updateQuery.eq('payment_method', 'card').eq('updated_at', booking.updated_at);
     } else {
       updateQuery = updateQuery.is('payment_method', null);
     }
 
-    const { data: updatedBooking, error } = await updateQuery.select('id').maybeSingle();
+    const { data: updatedBooking, error: updateError } = await updateQuery.select('id').maybeSingle();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     if (!updatedBooking) {
       const { data: latestBooking, error: latestError } = await supabaseAdmin
@@ -98,27 +83,27 @@ export async function POST(request: Request) {
       if (latestError) throw latestError;
 
       const latestMethod = (latestBooking?.payment_method || '').toLowerCase();
-      if (latestMethod === 'bank') {
+      if (latestMethod === 'card' && latestBooking?.status?.toUpperCase() === 'PENDING' && !latestBooking?.tid) {
         return NextResponse.json({ success: true, alreadyMarked: true });
       }
 
-      if (latestMethod === 'card' || latestBooking?.tid) {
+      if (latestMethod === 'bank') {
         return NextResponse.json(
-          { success: false, error: '이미 카드 결제가 시작된 예약입니다.' },
+          { success: false, error: '이미 무통장 입금 대기 상태로 전환된 예약입니다.' },
           { status: 409 }
         );
       }
 
       return NextResponse.json(
-        { success: false, error: '무통장 전환에 실패했습니다. 다시 시도해주세요.' },
+        { success: false, error: '카드 결제 시작 준비에 실패했습니다. 다시 시도해주세요.' },
         { status: 409 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, alreadyMarked: currentMethod === 'card' });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[SERVICE] mark-bank error:', msg);
+    console.error('[SERVICE] mark-card error:', msg);
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

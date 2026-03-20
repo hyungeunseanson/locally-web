@@ -193,12 +193,13 @@ async function createActiveExperience(hostId: string, city: string, country: str
 }
 
 async function login(page: Page, user: TestUser) {
-  await page.goto('/login');
-  await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 15000 });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
   await page.locator('input[type="email"]').fill(user.email);
   await page.locator('input[type="password"]').fill(user.password);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
+  await page.waitForLoadState('domcontentloaded');
 }
 
 test.afterAll(async () => {
@@ -272,7 +273,7 @@ test.describe.serial('Service request contract alignment', () => {
 
     const { data: bookingRow, error: bookingError } = await supabase
       .from('service_bookings')
-      .select('id')
+      .select('id, payment_method')
       .eq('request_id', json.requestId)
       .maybeSingle();
 
@@ -280,6 +281,7 @@ test.describe.serial('Service request contract alignment', () => {
     if (bookingRow?.id) {
       createdServiceBookingIds.push(bookingRow.id);
     }
+    expect(bookingRow?.payment_method).toBeNull();
   });
 
   test('cleans up the pending service request when booking pre-create fails', async ({ page }) => {

@@ -165,6 +165,27 @@ async function cleanupCreatedServiceRequestState(
   }
 }
 
+async function normalizePendingServiceBookingPaymentMethod(
+  supabaseAdmin: ServiceAdminClient,
+  params: {
+    bookingId: string;
+    requestId: string;
+  }
+) {
+  const { bookingId, requestId } = params;
+
+  const { error } = await supabaseAdmin
+    .from('service_bookings')
+    .update({ payment_method: null })
+    .eq('id', bookingId)
+    .eq('request_id', requestId)
+    .eq('status', 'PENDING')
+    .is('tid', null)
+    .eq('payment_method', 'card');
+
+  return { error };
+}
+
 export async function POST(request: Request) {
   try {
     const supabaseServer = await createServerClient();
@@ -226,6 +247,23 @@ export async function POST(request: Request) {
       });
 
       if (atomicCreateResult.kind === 'success') {
+        const normalizationResult = await normalizePendingServiceBookingPaymentMethod(supabaseAdmin, {
+          bookingId: atomicCreateResult.data.booking_id,
+          requestId: atomicCreateResult.data.request_id,
+        });
+
+        if (normalizationResult.error) {
+          console.error('Service Booking Payment Method Normalize Error:', normalizationResult.error);
+          await cleanupCreatedServiceRequestState(supabaseAdmin, {
+            requestId: atomicCreateResult.data.request_id,
+            bookingId: atomicCreateResult.data.booking_id,
+          });
+          return NextResponse.json(
+            { success: false, error: '예약 생성 중 오류가 발생했습니다.' },
+            { status: 500 }
+          );
+        }
+
         insertAdminAlerts({
           title: '새 맞춤 의뢰가 생성되었습니다',
           message: `'${normalizedTitle}' 맞춤 의뢰가 생성되었습니다.`,
@@ -292,7 +330,7 @@ export async function POST(request: Request) {
       status: 'PENDING' as const,
       contact_name: normalizedContactName,
       contact_phone: normalizedContactPhone,
-      payment_method: 'card',
+      payment_method: null,
       payout_status: 'pending',
     };
 

@@ -2,23 +2,20 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
 import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
-import { getPortOnePayment } from '@/app/utils/portone/server';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 type BookingNicePayCallbackBody = {
   imp_uid?: string;
+  approvalId?: string;
   merchant_uid?: string;
   orderId?: string;
 };
-
-function parsePortOneAmount(value: number | string | undefined) {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
 export async function POST(request: Request) {
   console.log('🔒 [SECURE] Experience Payment Callback Received');
@@ -40,11 +37,14 @@ export async function POST(request: Request) {
 
     if (contentType.includes('application/json')) {
       const body = (await request.json()) as BookingNicePayCallbackBody;
-      impUid = (body.imp_uid || '').trim();
+      impUid = (body.imp_uid || body.approvalId || '').trim();
       orderId = (body.merchant_uid || body.orderId || '').trim();
     } else {
       const formData = await request.formData();
-      impUid = formData.get('imp_uid')?.toString().trim() || '';
+      impUid =
+        formData.get('imp_uid')?.toString().trim() ||
+        formData.get('approvalId')?.toString().trim() ||
+        '';
       orderId =
         formData.get('merchant_uid')?.toString().trim() ||
         formData.get('moid')?.toString().trim() ||
@@ -96,32 +96,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const payment = await getPortOnePayment(impUid);
-    const verifiedMerchantUid = String(payment.merchant_uid || '').trim();
-    const verifiedAmount = parsePortOneAmount(payment.amount);
-
-    if (String(payment.status || '').toLowerCase() !== 'paid') {
-      return NextResponse.json(
-        { success: false, error: 'PortOne 결제 상태가 paid가 아닙니다.' },
-        { status: 400 }
-      );
-    }
-
     const expectedOrderId = originalBooking.order_id || originalBooking.id;
     const expectedAmount = Number(originalBooking.amount || 0);
 
-    if (verifiedMerchantUid !== expectedOrderId) {
-      return NextResponse.json(
-        { success: false, error: 'PortOne 주문번호가 예약과 일치하지 않습니다.' },
-        { status: 400 }
-      );
-    }
-
-    if (verifiedAmount !== expectedAmount) {
-      return NextResponse.json(
-        { success: false, error: 'PortOne 결제 금액이 예약 금액과 일치하지 않습니다.' },
-        { status: 400 }
-      );
+    let verificationResult;
+    try {
+      verificationResult = await verifyApprovedCardPayment({
+        provider: getCurrentCardPaymentProvider(),
+        approvalId: impUid,
+        orderId: expectedOrderId,
+        expectedAmount,
+      });
+    } catch (verificationError) {
+      const message =
+        verificationError instanceof Error
+          ? verificationError.message
+          : '카드 결제 승인 검증에 실패했습니다.';
+      return NextResponse.json({ success: false, error: message }, { status: 400 });
     }
 
     const experienceMeta = Array.isArray(originalBooking.experiences)
@@ -164,7 +155,7 @@ export async function POST(request: Request) {
       .update({
         status: 'PAID',
         payment_method: 'card',
-        tid: payment.pg_tid || payment.imp_uid || impUid,
+        tid: verificationResult.providerTransactionId,
         price_at_booking: snapshot.basePrice,
         total_experience_price: snapshot.totalExperiencePrice,
         host_payout_amount: snapshot.hostPayout,
@@ -217,6 +208,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : '결제 처리 중 서버 오류가 발생했습니다.';
+    captureServerException(error, { route: '/api/payment/nicepay-callback', method: 'POST' });
     console.error('🔥 [DEBUG] Experience payment callback error:', error);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

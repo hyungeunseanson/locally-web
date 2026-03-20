@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import crypto from 'crypto';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
+import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { notifyServiceCancellationCompleted } from '@/app/utils/serviceNotificationFlows';
 
@@ -166,63 +166,25 @@ export async function POST(request: Request) {
           );
         }
       } else {
-        const MID = process.env.NICEPAY_MID;
-        const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
-
-        if (!MID || !MER_KEY) {
-          return NextResponse.json(
-            { success: false, error: 'NicePay 환경변수 미설정. 수동 환불이 필요합니다.' },
-            { status: 500 }
-          );
-        }
-
         try {
-          const ediDate = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-          const signData = crypto
-            .createHash('sha256')
-            .update(ediDate + MID + String(actualRefundAmount) + MER_KEY)
-            .digest('hex');
-
-          const cancelParams = new URLSearchParams({
-            MID,
-            TID: booking.tid,
-            Moid: booking.order_id,
-            CancelAmt: String(actualRefundAmount),
-            CancelMsg: cancel_reason,
-            PartialCancelCode: actualRefundAmount < booking.amount ? '1' : '0',
-            EdiDate: ediDate,
-            SignData: signData,
+          await cancelCardPayment({
+            providerTransactionId: booking.tid,
+            orderId: booking.order_id,
+            cancelAmount: actualRefundAmount,
+            cancelReason: cancel_reason,
+            totalAmount: booking.amount,
+            requireMerchantKey: true,
+            acceptedResultCodes: ['2001', '2030'],
           });
-
-          const cancelRes = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: cancelParams.toString(),
-          });
-
-          if (!cancelRes.ok) {
-            console.error('[ADMIN] NicePay cancel HTTP error:', cancelRes.status);
+        } catch (pgErr) {
+          console.error('[ADMIN] NicePay cancel exception:', pgErr);
+          const message = pgErr instanceof Error ? pgErr.message : '';
+          if (message.startsWith('Server Config Error')) {
             return NextResponse.json(
-              { success: false, error: `NicePay API 오류 (HTTP ${cancelRes.status}). DB 상태는 변경되지 않았습니다.` },
+              { success: false, error: 'NicePay 환경변수 미설정. 수동 환불이 필요합니다.' },
               { status: 500 }
             );
           }
-
-          // Check NicePay result code
-          const resText = await cancelRes.text();
-          const resParams = new URLSearchParams(resText);
-          const resultCode = resParams.get('ResultCode');
-          // 2001 = 취소 성공, 2030 = 이미 취소됨
-          if (resultCode && resultCode !== '2001' && resultCode !== '2030') {
-            const resultMsg = resParams.get('ResultMsg') || '알 수 없는 오류';
-            console.error('[ADMIN] NicePay cancel ResultCode:', resultCode, resultMsg);
-            return NextResponse.json(
-              { success: false, error: `NicePay 환불 거절: ${resultMsg}` },
-              { status: 400 }
-            );
-          }
-        } catch (pgErr) {
-          console.error('[ADMIN] NicePay cancel exception:', pgErr);
           return NextResponse.json(
             { success: false, error: 'NicePay 환불 네트워크 오류. DB 상태는 변경되지 않았습니다.' },
             { status: 500 }

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
-import { isPortOneCardReady } from '@/app/utils/portone/server';
+import { getCardPaymentReadiness } from '@/app/utils/payments/card/server';
 
 export async function GET() {
-  const readiness = isPortOneCardReady();
+  const readiness = getCardPaymentReadiness();
 
   return NextResponse.json(readiness, {
     headers: {

@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server';
 
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
+import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
-import { getPortOnePayment } from '@/app/utils/portone/server';
 import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
 
 type ServiceNicePayCallbackBody = {
   imp_uid?: string;
+  approvalId?: string;
   merchant_uid?: string;
   orderId?: string;
 };
-
-function parsePortOneAmount(value: number | string | undefined) {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
 export async function POST(request: Request) {
   console.log('🔒 [SERVICE] Payment Callback Received');
@@ -32,7 +29,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as ServiceNicePayCallbackBody;
-    const impUid = (body.imp_uid || '').trim();
+    const impUid = (body.imp_uid || body.approvalId || '').trim();
     const orderId = (body.merchant_uid || body.orderId || '').trim();
 
     if (!impUid || !orderId) {
@@ -84,29 +81,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const payment = await getPortOnePayment(impUid);
-    const verifiedMerchantUid = String(payment.merchant_uid || '').trim();
-    const verifiedAmount = parsePortOneAmount(payment.amount);
-
-    if (String(payment.status || '').toLowerCase() !== 'paid') {
-      return NextResponse.json(
-        { success: false, error: 'PortOne 결제 상태가 paid가 아닙니다.' },
-        { status: 400 }
-      );
-    }
-
-    if (verifiedMerchantUid !== serviceBooking.order_id) {
-      return NextResponse.json(
-        { success: false, error: 'PortOne 주문번호가 서비스 예약과 일치하지 않습니다.' },
-        { status: 400 }
-      );
-    }
-
-    if (verifiedAmount !== Number(serviceBooking.amount || 0)) {
-      return NextResponse.json(
-        { success: false, error: 'PortOne 결제 금액이 서비스 예약 금액과 일치하지 않습니다.' },
-        { status: 400 }
-      );
+    let verificationResult;
+    try {
+      verificationResult = await verifyApprovedCardPayment({
+        provider: getCurrentCardPaymentProvider(),
+        approvalId: impUid,
+        orderId: serviceBooking.order_id,
+        expectedAmount: Number(serviceBooking.amount || 0),
+      });
+    } catch (verificationError) {
+      const message =
+        verificationError instanceof Error
+          ? verificationError.message
+          : '카드 결제 승인 검증에 실패했습니다.';
+      return NextResponse.json({ success: false, error: message }, { status: 400 });
     }
 
     const requestInfo =
@@ -125,7 +113,7 @@ export async function POST(request: Request) {
       .update({
         status: 'PAID',
         payment_method: 'card',
-        tid: payment.pg_tid || payment.imp_uid || impUid,
+        tid: verificationResult.providerTransactionId,
       })
       .eq('order_id', orderId)
       .eq('status', 'PENDING')
@@ -171,6 +159,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
+    captureServerException(error, { route: '/api/services/payment/nicepay-callback', method: 'POST' });
     console.error('[SERVICE] Payment Callback Error:', errMsg);
     return NextResponse.json(
       { success: false, error: '결제 처리 중 서버 오류가 발생했습니다.' },

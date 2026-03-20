@@ -11,6 +11,8 @@ import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { useToast } from '@/app/context/ToastContext';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
+import { launchCardPayment } from '@/app/utils/payments/card/client';
+import type { CardPaymentProvider, CardPaymentReadiness } from '@/app/utils/payments/card/types';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 import { ExperienceAvailabilitySummary, ExperienceSlotSummary } from '../types';
 
@@ -38,11 +40,8 @@ type BookingApiResponse = {
 };
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
-type ExperienceCardReadyReason = 'missing_portone_credentials' | 'missing_imp_code';
-type ExperienceCardReadyResponse = {
-  ready?: boolean;
-  reason?: ExperienceCardReadyReason;
-};
+type ExperienceCardReadyReason = CardPaymentReadiness['reason'];
+type ExperienceCardReadyResponse = CardPaymentReadiness;
 
 type PayPalCreateOrderResponse = {
   success?: boolean;
@@ -55,26 +54,6 @@ type PayPalCaptureResponse = {
   captureId?: string | null;
   paypalOrderId?: string;
   error?: string;
-};
-
-type ImpRequestData = {
-  pg: string;
-  pay_method: 'card';
-  merchant_uid: string;
-  name: string;
-  amount: number;
-  buyer_email?: string;
-  buyer_name: string;
-  buyer_tel: string;
-  m_redirect_url: string;
-};
-
-type ImpResponse = {
-  success?: boolean;
-  code?: string;
-  status?: string;
-  imp_uid?: string;
-  error_msg?: string;
 };
 
 type PayPalButtonStyle = {
@@ -125,10 +104,6 @@ type PayPalCheckoutContext = {
 
 declare global {
   interface Window {
-    IMP?: {
-      init: (merchantCode: string) => void;
-      request_pay: (data: ImpRequestData, callback: (rsp: ImpResponse) => void) => void;
-    };
     paypal?: PayPalNamespace;
   }
 }
@@ -151,6 +126,7 @@ function PaymentContent() {
   const [agreeSafety, setAgreeSafety] = useState(false);
   const [agreeNoOffPlatform, setAgreeNoOffPlatform] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [cardProvider, setCardProvider] = useState<CardPaymentProvider>('portone');
   const [isCardReady, setIsCardReady] = useState(false);
   const [isCardReadyResolved, setIsCardReadyResolved] = useState(false);
   const [cardReadyReason, setCardReadyReason] = useState<ExperienceCardReadyReason | ''>('');
@@ -285,11 +261,13 @@ function PaymentContent() {
         if (!isMounted) return;
 
         setIsCardReady(Boolean(response.ok && result.ready));
+        setCardProvider(result.provider || 'portone');
         setCardReadyReason(response.ok && !result.ready ? result.reason || '' : '');
       } catch {
         if (!isMounted) return;
 
         setIsCardReady(false);
+        setCardProvider('portone');
         setCardReadyReason('missing_portone_credentials');
       } finally {
         if (isMounted) {
@@ -710,76 +688,47 @@ function PaymentContent() {
         return;
       }
 
-      const imp = window.IMP;
-      if (!imp) {
-        const message = '결제 모듈을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.';
+      try {
+        const paymentSession = await launchCardPayment({
+          provider: cardProvider,
+          merchantCode: portOneImpCode,
+          orderId: newOrderId,
+          productName: experience?.title || 'Locally 체험 예약',
+          amount: Number(secureFinalAmount),
+          buyerEmail: user.email,
+          buyerName: customerName,
+          buyerTel: customerPhone,
+          redirectUrl: `${window.location.origin}/api/payment/nicepay-callback`,
+        });
+
+        const response = await fetch('/api/payment/nicepay-callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imp_uid: paymentSession.approvalId,
+            approvalId: paymentSession.approvalId,
+            merchant_uid: newOrderId,
+            orderId: newOrderId,
+          }),
+        });
+        const callbackResult = (await response.json()) as { success?: boolean; error?: string };
+
+        if (!response.ok || !callbackResult.success) {
+          const message = `결제 검증 중 오류가 발생했습니다. ${callbackResult.error || ''}`.trim();
+          setPaymentError(message);
+          showToast(message, 'error');
+          setIsProcessing(false);
+          return;
+        }
+
+        router.push(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : '카드 결제 처리 중 오류가 발생했습니다.';
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
-        return;
       }
-
-      imp.init(portOneImpCode);
-
-      const data: ImpRequestData = {
-        pg: 'nice_v2',
-        pay_method: 'card',
-        merchant_uid: newOrderId,
-        name: experience?.title || 'Locally 체험 예약',
-        amount: Number(secureFinalAmount),
-        buyer_email: user.email,
-        buyer_name: customerName,
-        buyer_tel: customerPhone,
-        m_redirect_url: `${window.location.origin}/api/payment/nicepay-callback`,
-      };
-
-      imp.request_pay(data, async (rsp: ImpResponse) => {
-        const isSuccess = rsp.success === true || rsp.code === '0' || rsp.status === 'paid' || (Boolean(rsp.imp_uid) && !rsp.error_msg);
-
-        if (!isSuccess) {
-          const message = `결제 실패: ${rsp.error_msg || '알 수 없는 오류'}`;
-          setPaymentError(message);
-          showToast(message, 'error');
-          setIsProcessing(false);
-          return;
-        }
-
-        if (!rsp.imp_uid) {
-          const message = '결제 확인용 imp_uid를 받지 못했습니다. 다시 시도해주세요.';
-          setPaymentError(message);
-          showToast(message, 'error');
-          setIsProcessing(false);
-          return;
-        }
-
-        try {
-          const response = await fetch('/api/payment/nicepay-callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imp_uid: rsp.imp_uid,
-              merchant_uid: newOrderId,
-              orderId: newOrderId,
-            }),
-          });
-          const callbackResult = (await response.json()) as { success?: boolean; error?: string };
-
-          if (!response.ok || !callbackResult.success) {
-            const message = `결제 검증 중 오류가 발생했습니다. ${callbackResult.error || ''}`.trim();
-            setPaymentError(message);
-            showToast(message, 'error');
-            setIsProcessing(false);
-            return;
-          }
-
-          router.push(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`);
-        } catch (err: unknown) {
-          const message = err instanceof Error ? `네트워크 통신 오류: ${err.message}` : '네트워크 통신 오류가 발생했습니다.';
-          setPaymentError(message);
-          showToast(message, 'error');
-          setIsProcessing(false);
-        }
-      });
 
     } catch (error: unknown) {
       console.error(error);

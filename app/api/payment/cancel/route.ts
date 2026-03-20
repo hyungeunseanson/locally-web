@@ -7,7 +7,9 @@ import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 
 const TIMEZONE = 'Asia/Seoul';
 
@@ -116,45 +118,14 @@ export async function POST(request: Request) {
           throw new Error(`PayPal refund failed: ${refund.status || 'unknown status'}`);
         }
       } else {
-        const MID = process.env.NICEPAY_MID;
-        if (!MID) throw new Error('Server Config Error: NICEPAY_MID missing');
-
-        const isPartial = refundAmount < totalAmount ? '1' : '0';
-        const formBody = new URLSearchParams({
-          TID: booking.tid,
-          MID: MID,
-          Moid: booking.order_id,
-          CancelAmt: refundAmount.toString(),
-          CancelMsg: userReason || reasonText,
-          PartialCancelCode: isPartial,
+        await cancelCardPayment({
+          providerTransactionId: booking.tid,
+          orderId: booking.order_id,
+          cancelAmount: refundAmount,
+          cancelReason: userReason || reasonText,
+          totalAmount,
+          acceptedResultCodes: ['2001', '2211'],
         });
-
-        // [H-2] Verify Response (강화된 PG 응답 검열)
-        const pgResponse = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formBody.toString()
-        });
-
-        if (!pgResponse.ok) {
-          throw new Error(`PG Network Timeout: ${pgResponse.status} ${pgResponse.statusText}`);
-        }
-
-        const pgResult = await pgResponse.text();
-        let pgJson;
-        try {
-          pgJson = JSON.parse(pgResult.replace(/'/g, '"'));
-        } catch {
-          throw new Error(`PG Format Error: Failed to parse PG response: ${pgResult}`);
-        }
-
-        // 🚨 [핵심 보안] PG사에서 승인 취소가 떨어지지 않으면, DB 업데이트 로직으로 절대 못 넘어가게 원천 차단
-        if (pgJson.ResultCode !== '2001' && pgJson.ResultCode !== '2211') {
-          console.error('🔥 [CRITICAL] PG Cancel Failed (DB Callback Blocked):', pgJson);
-          throw new Error(`PG Cancel Failed: [${pgJson.ResultCode}] ${pgJson.ResultMsg}`);
-        }
-
-        console.log(`✅ [INFO] PG Cancel Success (Amount: ${refundAmount}) -> Proceeding to DB Update`);
       }
     }
 
@@ -253,6 +224,7 @@ export async function POST(request: Request) {
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Cancel Error';
+    captureServerException(error, { route: '/api/payment/cancel', method: 'POST' });
     console.error('Cancel Error:', error);
 
     // [HIGH Fix] PG 실패 시 sentinel lock 해제 — 'cancellation_requested'에 영구 잠김 방지

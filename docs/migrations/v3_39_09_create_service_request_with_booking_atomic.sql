@@ -110,7 +110,7 @@ BEGIN
     'PENDING',
     trim(p_contact_name),
     trim(p_contact_phone),
-    'card',
+    NULL,
     'pending'
   );
 

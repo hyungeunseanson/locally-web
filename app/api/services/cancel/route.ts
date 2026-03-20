@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import crypto from 'crypto';
 import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
+import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import {
   notifyServiceCancellationCompleted,
   notifyServiceCancellationRequested,
 } from '@/app/utils/serviceNotificationFlows';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 
 type CancelBody = {
   order_id?: string;
@@ -58,10 +59,7 @@ async function refundPaidOpenServiceBooking(
     }
   }
 
-  const MID = process.env.NICEPAY_MID;
-  const MER_KEY = process.env.NICEPAY_MERCHANT_KEY;
-
-  if (!MID || !MER_KEY || !booking.tid) {
+  if (!booking.tid) {
     return {
       ok: false,
       error: '카드 환불 정보가 없어 취소를 완료하지 못했습니다. 관리자에게 문의해주세요.',
@@ -70,53 +68,26 @@ async function refundPaidOpenServiceBooking(
   }
 
   try {
-    const ediDate = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-    const signData = crypto
-      .createHash('sha256')
-      .update(ediDate + MID + String(refundAmount) + MER_KEY)
-      .digest('hex');
-
-    const cancelParams = new URLSearchParams({
-      MID,
-      TID: booking.tid,
-      Moid: booking.order_id,
-      CancelAmt: String(refundAmount),
-      CancelMsg: cancelReason,
-      PartialCancelCode: '0',
-      EdiDate: ediDate,
-      SignData: signData,
+    await cancelCardPayment({
+      providerTransactionId: booking.tid,
+      orderId: booking.order_id,
+      cancelAmount: refundAmount,
+      cancelReason,
+      totalAmount: refundAmount,
+      requireMerchantKey: true,
+      acceptedResultCodes: ['2001', '2030'],
     });
-
-    const cancelRes = await fetch('https://webapi.nicepay.co.kr/webapi/cancel_process.jsp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: cancelParams.toString(),
-    });
-
-    if (!cancelRes.ok) {
-      console.error('[SERVICE] NicePay cancel HTTP error:', cancelRes.status);
+    return { ok: true, refundAmount };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.startsWith('Server Config Error')) {
       return {
         ok: false,
-        error: `NicePay API 오류 (HTTP ${cancelRes.status}). DB 상태는 변경되지 않았습니다.`,
+        error: '카드 환불 정보가 없어 취소를 완료하지 못했습니다. 관리자에게 문의해주세요.',
         status: 500,
       };
     }
 
-    const resText = await cancelRes.text();
-    const resParams = new URLSearchParams(resText);
-    const resultCode = resParams.get('ResultCode');
-    if (resultCode && resultCode !== '2001' && resultCode !== '2030') {
-      const resultMsg = resParams.get('ResultMsg') || '알 수 없는 오류';
-      console.error('[SERVICE] NicePay cancel ResultCode:', resultCode, resultMsg);
-      return {
-        ok: false,
-        error: `NicePay 환불 거절: ${resultMsg}`,
-        status: 400,
-      };
-    }
-
-    return { ok: true, refundAmount };
-  } catch (error) {
     console.error('[SERVICE] NicePay cancel exception:', error);
     return {
       ok: false,
@@ -321,6 +292,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, message: '취소 요청이 접수되었습니다. 관리자 검토 후 환불이 처리됩니다.' });
 
   } catch (error: unknown) {
+    captureServerException(error, { route: '/api/services/cancel', method: 'POST' });
     console.error('API Service Cancel Error:', error);
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }

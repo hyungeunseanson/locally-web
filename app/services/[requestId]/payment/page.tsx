@@ -7,34 +7,12 @@ import Script from 'next/script';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { launchCardPayment } from '@/app/utils/payments/card/client';
+import type { CardPaymentProvider, CardPaymentReadiness } from '@/app/utils/payments/card/types';
 import type { ServiceRequest } from '@/app/types/service';
-
-type ImpRequestData = {
-  pg: string;
-  pay_method: 'card';
-  merchant_uid: string;
-  name: string;
-  amount: number;
-  buyer_email?: string;
-  buyer_name: string;
-  buyer_tel: string;
-  m_redirect_url: string;
-};
-
-type ImpResponse = {
-  success?: boolean;
-  code?: string;
-  status?: string;
-  imp_uid?: string;
-  error_msg?: string;
-};
 
 declare global {
   interface Window {
-    IMP?: {
-      init: (merchantCode: string) => void;
-      request_pay: (data: ImpRequestData, callback: (rsp: ImpResponse) => void) => void;
-    };
     paypal?: PayPalNamespace;
   }
 }
@@ -49,12 +27,8 @@ type PendingBooking = {
 
 type PaymentMethod = 'card' | 'bank' | 'paypal';
 
-type ServiceCardReadyReason = 'missing_portone_credentials' | 'missing_imp_code';
-
-type ServiceCardReadyResponse = {
-  ready: boolean;
-  reason?: ServiceCardReadyReason;
-};
+type ServiceCardReadyReason = CardPaymentReadiness['reason'];
+type ServiceCardReadyResponse = CardPaymentReadiness;
 
 type PayPalCreateOrderResponse = {
   success?: boolean;
@@ -118,6 +92,7 @@ function ServicePaymentContent() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [cardProvider, setCardProvider] = useState<CardPaymentProvider>('portone');
   const [isCardReady, setIsCardReady] = useState(false);
   const [isCardReadyResolved, setIsCardReadyResolved] = useState(false);
   const [cardReadyReason, setCardReadyReason] = useState<ServiceCardReadyReason | ''>('');
@@ -198,11 +173,13 @@ function ServicePaymentContent() {
         if (!isMounted) return;
 
         setIsCardReady(Boolean(response.ok && result.ready));
+        setCardProvider(result.provider || 'portone');
         setCardReadyReason(response.ok && !result.ready ? result.reason || '' : '');
       } catch {
         if (!isMounted) return;
 
         setIsCardReady(false);
+        setCardProvider('portone');
         setCardReadyReason('missing_portone_credentials');
       } finally {
         if (isMounted) {
@@ -334,6 +311,18 @@ function ServicePaymentContent() {
     }
   }, [pendingBooking, requestId, router, showToast]);
 
+  const releaseCardSelection = useCallback(async (orderId: string) => {
+    try {
+      await fetch('/api/services/payment/release-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+    } catch (error) {
+      console.error('[SERVICE] release-card request failed:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (paymentMethod !== 'paypal') {
       if (paypalButtonRef.current) {
@@ -386,7 +375,7 @@ function ServicePaymentContent() {
     };
   }, [createPayPalOrder, handlePayPalApprove, isPayPalEnabled, isPayPalSdkReady, paymentMethod, showToast]);
 
-  const handlePayment = async () => {
+  const handlePayment = useCallback(async () => {
     setPaymentError('');
 
     const validationMessage = getCheckoutValidationError();
@@ -439,63 +428,74 @@ function ServicePaymentContent() {
         return;
       }
 
-      if (!window.IMP) {
-        setPaymentError(t('sp_err_module') as string);
-        setIsProcessing(false);
-        return;
-      }
-
       // v2 에스크로: 사전 생성된 orderId 사용 (새 예약 생성 불필요)
       const { order_id: orderId, amount } = currentBooking;
+      let cardSelectionLocked = false;
 
-      window.IMP.init(portOneImpCode);
-      window.IMP.request_pay(
-        {
-          pg: 'nice_v2',
-          pay_method: 'card',
-          merchant_uid: orderId,
-          name: currentRequest.title,
-          amount,
-          buyer_email: user?.email,
-          buyer_name: contactName.trim(),
-          buyer_tel: contactPhone.trim(),
-          m_redirect_url: `${window.location.origin}/services/${requestId}/payment/complete`,
-        },
-        async (rsp: ImpResponse) => {
-          if (!rsp.success) {
-            setPaymentError(rsp.error_msg || (t('sp_err_cancel') as string));
-            setIsProcessing(false);
-            return;
-          }
+      try {
+        const markCardRes = await fetch('/api/services/payment/mark-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        });
+        const markCardResult = (await markCardRes.json()) as { success?: boolean; error?: string };
 
-          // 서버 검증 (서비스 전용 callback 엔드포인트)
-          const callbackRes = await fetch('/api/services/payment/nicepay-callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imp_uid: rsp.imp_uid,
-              merchant_uid: orderId,
-              orderId,
-            }),
-          });
-
-          const callbackResult = (await callbackRes.json()) as { success?: boolean; error?: string };
-
-          if (!callbackRes.ok || !callbackResult.success) {
-            setPaymentError(callbackResult.error || (t('sp_err_verify') as string));
-            setIsProcessing(false);
-            return;
-          }
-
-          router.push(`/services/${requestId}/payment/complete?orderId=${orderId}`);
+        if (!markCardRes.ok || !markCardResult.success) {
+          setPaymentError(markCardResult.error || (t('sp_err_process') as string));
+          setIsProcessing(false);
+          return;
         }
-      );
+
+        cardSelectionLocked = true;
+
+        const paymentSession = await launchCardPayment({
+          provider: cardProvider,
+          merchantCode: portOneImpCode,
+          orderId,
+          productName: currentRequest.title,
+          amount,
+          buyerEmail: user?.email,
+          buyerName: contactName.trim(),
+          buyerTel: contactPhone.trim(),
+          redirectUrl: `${window.location.origin}/services/${requestId}/payment/complete`,
+        });
+
+        // 서버 검증 (서비스 전용 callback 엔드포인트)
+        const callbackRes = await fetch('/api/services/payment/nicepay-callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imp_uid: paymentSession.approvalId,
+            approvalId: paymentSession.approvalId,
+            merchant_uid: orderId,
+            orderId,
+          }),
+        });
+
+        const callbackResult = (await callbackRes.json()) as { success?: boolean; error?: string };
+
+        if (!callbackRes.ok || !callbackResult.success) {
+          await releaseCardSelection(orderId);
+          setPaymentError(callbackResult.error || (t('sp_err_verify') as string));
+          setIsProcessing(false);
+          return;
+        }
+
+        router.push(`/services/${requestId}/payment/complete?orderId=${orderId}`);
+      } catch (error: unknown) {
+        if (cardSelectionLocked) {
+          await releaseCardSelection(orderId);
+        }
+        const message = error instanceof Error ? error.message : (t('sp_err_process') as string);
+        setPaymentError(message);
+        setIsProcessing(false);
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : (t('sp_err_process') as string);
       setPaymentError(message);
       setIsProcessing(false);
     }
-  };
+  }, [cardProvider, contactName, contactPhone, getCheckoutValidationError, isCardReady, paymentMethod, pendingBooking, portOneImpCode, releaseCardSelection, request, requestId, router, showToast, supabase, t]);
 
   if (!request || !pendingBooking) {
     return (

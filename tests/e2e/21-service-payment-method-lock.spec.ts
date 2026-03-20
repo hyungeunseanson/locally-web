@@ -174,6 +174,73 @@ async function createBankLockedPendingFixture(customerId: string, customer: Test
   };
 }
 
+async function createPendingUnselectedFixture(customerId: string, customer: TestUser) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+  const serviceDate = new Date();
+  serviceDate.setDate(serviceDate.getDate() + 9);
+  const createdAt = new Date();
+  createdAt.setMinutes(createdAt.getMinutes() - 15);
+
+  const { data: requestData, error: requestError } = await supabase
+    .from('service_requests')
+    .insert({
+      user_id: customerId,
+      title: `[Playwright] Service Card To Bank ${timestamp}`,
+      description: '서비스 카드 기본값에서 무통장 전환 회귀 테스트용 의뢰입니다.',
+      city: 'Seoul',
+      country: 'KR',
+      service_date: formatDate(serviceDate),
+      start_time: '11:00',
+      duration_hours: 4,
+      languages: ['한국어'],
+      guest_count: 2,
+      contact_name: customer.fullName,
+      contact_phone: customer.phone,
+      status: 'pending_payment',
+      created_at: createdAt.toISOString(),
+      updated_at: createdAt.toISOString(),
+    })
+    .select('id, total_customer_price')
+    .single();
+
+  if (requestError || !requestData?.id) {
+    throw requestError || new Error('Failed to create switchable service request.');
+  }
+  createdServiceRequestIds.push(requestData.id);
+
+  const bookingId = `SVC-CARD-SWITCH-${timestamp}`;
+  const orderId = `SVC-CARD-SWITCH-ORD-${timestamp}`;
+  const { error: bookingError } = await supabase.from('service_bookings').insert({
+    id: bookingId,
+    order_id: orderId,
+    request_id: requestData.id,
+    application_id: null,
+    customer_id: customerId,
+    host_id: null,
+    amount: requestData.total_customer_price,
+    host_payout_amount: 80000,
+    platform_revenue: Number(requestData.total_customer_price || 0) - 80000,
+    status: 'PENDING',
+    payment_method: null,
+    tid: null,
+    payout_status: 'pending',
+    contact_name: customer.fullName,
+    contact_phone: customer.phone,
+    created_at: createdAt.toISOString(),
+    updated_at: createdAt.toISOString(),
+  });
+
+  if (bookingError) throw bookingError;
+  createdServiceBookingIds.push(bookingId);
+
+  return {
+    bookingId,
+    orderId,
+    requestId: requestData.id,
+  };
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
 
@@ -204,6 +271,104 @@ test.afterAll(async () => {
 });
 
 test.describe.serial('Service payment method lock', () => {
+  test('allows a pending unselected service booking to switch to bank', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const fixture = await createPendingUnselectedFixture(customerId, customerUser);
+
+    await login(page, customerUser);
+
+    const markBankResponse = await page.request.post('/api/services/payment/mark-bank', {
+      data: { orderId: fixture.orderId },
+    });
+    expect(markBankResponse.status()).toBe(200);
+    await expect(markBankResponse.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const cardCallbackResponse = await page.request.post('/api/services/payment/nicepay-callback', {
+      data: {
+        imp_uid: 'imp_card_to_bank_switch',
+        merchant_uid: fixture.orderId,
+        orderId: fixture.orderId,
+      },
+    });
+    expect(cardCallbackResponse.status()).toBe(409);
+
+    const supabase = getAdminClient();
+    const { data: booking, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('status, payment_method, tid')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    const { data: serviceRequest, error: requestError } = await supabase
+      .from('service_requests')
+      .select('status')
+      .eq('id', fixture.requestId)
+      .maybeSingle();
+
+    if (requestError) throw requestError;
+
+    expect(booking?.status).toBe('PENDING');
+    expect(booking?.payment_method).toBe('bank');
+    expect(booking?.tid).toBeNull();
+    expect(serviceRequest?.status).toBe('pending_payment');
+  });
+
+  test('blocks bank conversion after card start is marked, then allows it again after release', async ({ page }) => {
+    test.setTimeout(90000);
+
+    const customerUser = createCustomerUser();
+    const customerId = await createAuthUser(customerUser);
+    const fixture = await createPendingUnselectedFixture(customerId, customerUser);
+
+    await login(page, customerUser);
+
+    const markCardResponse = await page.request.post('/api/services/payment/mark-card', {
+      data: { orderId: fixture.orderId },
+    });
+    expect(markCardResponse.status()).toBe(200);
+    await expect(markCardResponse.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const markBankWhileCardResponse = await page.request.post('/api/services/payment/mark-bank', {
+      data: { orderId: fixture.orderId },
+    });
+    expect(markBankWhileCardResponse.status()).toBe(409);
+
+    const releaseCardResponse = await page.request.post('/api/services/payment/release-card', {
+      data: { orderId: fixture.orderId },
+    });
+    expect(releaseCardResponse.status()).toBe(200);
+    await expect(releaseCardResponse.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const markBankAfterReleaseResponse = await page.request.post('/api/services/payment/mark-bank', {
+      data: { orderId: fixture.orderId },
+    });
+    expect(markBankAfterReleaseResponse.status()).toBe(200);
+
+    const supabase = getAdminClient();
+    const { data: booking, error: bookingError } = await supabase
+      .from('service_bookings')
+      .select('status, payment_method, tid')
+      .eq('id', fixture.bookingId)
+      .maybeSingle();
+
+    if (bookingError) throw bookingError;
+
+    expect(booking?.status).toBe('PENDING');
+    expect(booking?.payment_method).toBe('bank');
+    expect(booking?.tid).toBeNull();
+  });
+
   test('keeps bank-marked pending booking locked to bank across UI and payment routes', async ({ page }) => {
     test.setTimeout(90000);
 
