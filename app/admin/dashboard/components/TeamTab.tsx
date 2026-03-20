@@ -566,7 +566,7 @@ export default function TeamTab() {
         {innerTab === 'todo' ? (
           <>
             {/* Left: Daily Logs */}
-            <div className="flex-[2.5] flex flex-col bg-white rounded-xl md:rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-300">
+            <div className="order-2 lg:order-1 flex-[2.5] flex flex-col bg-white rounded-xl md:rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-300">
               <div className="p-2 md:p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                 <h3 className="text-[8px] md:text-base font-bold text-slate-800 flex items-center gap-1"><Clock size={11} className="text-blue-500" /> 업무 일지</h3>
               </div>
@@ -645,7 +645,7 @@ export default function TeamTab() {
             </div>
 
             {/* Right: Todo List */}
-            <div className="flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-2 md:p-4 overflow-hidden shadow-sm" ref={threadRef}>
+            <div className="order-1 lg:order-2 flex-1 flex flex-col bg-slate-50/50 rounded-xl md:rounded-2xl border border-slate-200 p-2 md:p-4 overflow-hidden shadow-sm" ref={threadRef}>
               <div className="flex items-center gap-1 mb-2"><CheckSquare size={11} className="text-green-500" /><h3 className="text-[8px] md:text-base font-bold text-slate-800">팀 할 일</h3></div>
               <div className="flex flex-col md:flex-row gap-1.5 mb-2.5">
                 <textarea
