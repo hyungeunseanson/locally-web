@@ -76,14 +76,21 @@ const syncNotifications = useCallback(async (userId: string) => {
   if (!data) return;
   setNotifications(data);
 
-  // cursor: 이 세션에서 이미 토스트로 보여준 마지막 알림 created_at
   const cursor = sessionStorage.getItem('lastSeenNotiCreatedAt');
-  const candidate = data.find(n =>
-    !cursor || new Date(n.created_at) > new Date(cursor)
-  );
+
+  // cursor가 없는 첫 진입: 현재 최신 알림 시점으로 cursor만 초기화, 토스트 없음
+  // (과거 알림을 신규 알림으로 오인하지 않기 위해)
+  if (!cursor) {
+    if (data.length > 0) {
+      sessionStorage.setItem('lastSeenNotiCreatedAt', data[0].created_at);
+    }
+    return;
+  }
+
+  // cursor가 있는 경우에만: cursor 이후 신규 알림만 토스트 대상
+  const candidate = data.find(n => new Date(n.created_at) > new Date(cursor));
 
   if (candidate) {
-    // cursor 갱신 (가장 최신 알림 기준)
     sessionStorage.setItem('lastSeenNotiCreatedAt', data[0].created_at);
     setToast({
       title: candidate.title,
