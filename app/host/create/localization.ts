@@ -130,13 +130,13 @@ export const ACTIVITY_LEVEL_OPTIONS: Array<
   },
 ];
 
-export const FIXED_REFUND_POLICY = '표준 정책 (7일 전 무료 취소)';
+export const FIXED_REFUND_POLICY = '표준 정책 (20일 전 무료 취소)';
 
 export const FIXED_REFUND_POLICY_LABELS: LocalizedText = {
-  ko: '표준 정책 (7일 전 무료 취소)',
-  en: 'Standard policy (free cancellation up to 7 days before)',
-  ja: '標準ポリシー（7日前まで無料キャンセル）',
-  zh: '标准政策（7天前可免费取消）',
+  ko: '표준 정책 (20일 전 무료 취소)',
+  en: 'Standard policy (free cancellation up to 20 days before)',
+  ja: '標準ポリシー（20日前まで無料キャンセル）',
+  zh: '标准政策（20天前可免费取消）',
 };
 
 export const MAX_EXPERIENCE_PHOTOS = 5;
