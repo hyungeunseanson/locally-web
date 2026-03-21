@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import React, { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import { getUnviewedPendingBookingCount } from '@/app/utils/adminViewedBookings';
+import { isAdminAlertNotification } from '@/app/utils/adminNotifications';
 import {
   Users, CheckCircle2, MessageSquare,
   BarChart2, CreditCard, LayoutDashboard,
@@ -27,6 +28,9 @@ type SidebarUser = {
 type PresenceUser = {
   user_id?: string;
 };
+
+const SIDEBAR_COUNTS_REFRESH_DEBOUNCE_MS = 300;
+const SIDEBAR_TEAM_REFRESH_DEBOUNCE_MS = 300;
 
 const NavButton = ({ active, onClick, icon, label, count }: NavButtonProps) => (
   <button
@@ -58,6 +62,8 @@ export default function Sidebar() {
   const [activeTab, setActiveTab] = useState<string>('APPS');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<SidebarUser>(null);
+  const countsRefreshTimeoutRef = useRef<number | null>(null);
+  const teamRefreshTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const savedTab = localStorage.getItem('admin_active_tab');
@@ -132,16 +138,53 @@ export default function Sidebar() {
     }
   }, [supabase]);
 
+  const scheduleFetchCounts = useCallback(() => {
+    if (countsRefreshTimeoutRef.current) {
+      clearTimeout(countsRefreshTimeoutRef.current);
+    }
+
+    countsRefreshTimeoutRef.current = window.setTimeout(() => {
+      countsRefreshTimeoutRef.current = null;
+      void fetchCounts();
+    }, SIDEBAR_COUNTS_REFRESH_DEBOUNCE_MS);
+  }, [fetchCounts]);
+
+  const scheduleFetchTeamCounts = useCallback(() => {
+    if (teamRefreshTimeoutRef.current) {
+      clearTimeout(teamRefreshTimeoutRef.current);
+    }
+
+    teamRefreshTimeoutRef.current = window.setTimeout(() => {
+      teamRefreshTimeoutRef.current = null;
+      void fetchTeamCounts();
+    }, SIDEBAR_TEAM_REFRESH_DEBOUNCE_MS);
+  }, [fetchTeamCounts]);
+
   useEffect(() => {
     fetchCounts();
     fetchTeamCounts();
     fetchCurrentUser();
 
-    // 열람 상태 변경 감지를 위한 이벤트 리스너
-    window.addEventListener('booking-viewed', fetchCounts);
-    window.addEventListener('team-viewed', fetchTeamCounts);
+    window.addEventListener('booking-viewed', scheduleFetchCounts);
+    window.addEventListener('team-viewed', scheduleFetchTeamCounts);
     const intervalId = window.setInterval(fetchCounts, 300000); // 45초 -> 5분으로 완화
 
+    return () => {
+      if (countsRefreshTimeoutRef.current) {
+        clearTimeout(countsRefreshTimeoutRef.current);
+        countsRefreshTimeoutRef.current = null;
+      }
+      if (teamRefreshTimeoutRef.current) {
+        clearTimeout(teamRefreshTimeoutRef.current);
+        teamRefreshTimeoutRef.current = null;
+      }
+      window.removeEventListener('booking-viewed', scheduleFetchCounts);
+      window.removeEventListener('team-viewed', scheduleFetchTeamCounts);
+      window.clearInterval(intervalId);
+    };
+  }, [fetchCounts, fetchCurrentUser, fetchTeamCounts, scheduleFetchCounts, scheduleFetchTeamCounts]);
+
+  useEffect(() => {
     const channel = supabase.channel('online_users_sidebar')
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -156,32 +199,44 @@ export default function Sidebar() {
       .subscribe();
 
     const teamChannel = supabase.channel('team_notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_tasks' }, () => { fetchTeamCounts(); })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { fetchTeamCounts(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_tasks' }, () => { scheduleFetchTeamCounts(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, () => { scheduleFetchTeamCounts(); })
       .subscribe();
-
-    const adminAlertsChannel = supabase.channel('admin_alert_notifications_sidebar');
-    
-    if (currentUser?.id) {
-      adminAlertsChannel
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'notifications', 
-          filter: `user_id=eq.${currentUser.id}` 
-        }, () => { fetchCounts(); })
-        .subscribe();
-    }
 
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(teamChannel);
-      supabase.removeChannel(adminAlertsChannel);
-      window.removeEventListener('booking-viewed', fetchCounts);
-      window.removeEventListener('team-viewed', fetchTeamCounts);
-      window.clearInterval(intervalId);
     };
-  }, [fetchCounts, fetchCurrentUser, fetchTeamCounts, supabase]);
+  }, [scheduleFetchTeamCounts, supabase]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const adminAlertsChannel = supabase
+      .channel(`admin_alert_notifications_sidebar_${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          const nextRow = payload.new as { type?: string | null; link?: string | null } | null;
+          const prevRow = payload.old as { type?: string | null; link?: string | null } | null;
+          const targetRow = nextRow || prevRow;
+
+          if (!targetRow || !isAdminAlertNotification(targetRow)) return;
+          scheduleFetchCounts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(adminAlertsChannel);
+    };
+  }, [currentUser?.id, scheduleFetchCounts, supabase]);
 
   const handleTabChange = (tab: string) => {
     router.push(`/admin/dashboard?tab=${tab}`);

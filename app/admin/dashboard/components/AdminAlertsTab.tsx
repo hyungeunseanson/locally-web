@@ -84,8 +84,8 @@ export default function AdminAlertsTab() {
       }
 
       channelRef.current = supabase
-        .channel('admin-alerts-tab')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
+        .channel(`admin-alerts-tab-${user.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
           const nextRow = payload.new as AdminNotificationItem | undefined;
           const prevRow = payload.old as AdminNotificationItem | undefined;
           const targetRow = nextRow || prevRow;
