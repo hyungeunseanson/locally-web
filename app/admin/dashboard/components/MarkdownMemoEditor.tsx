@@ -2,7 +2,7 @@ import React, { useState, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Bold, Italic, Code, Quote, Image as ImageIcon, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Bold, Italic, Code, Quote, Image as ImageIcon, CheckCircle2, X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { compressImage } from '@/app/utils/image';
 
@@ -72,7 +72,7 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
             const filePath = `markdown_images/${fileName}`;
             const compressedFile = await compressImage(file);
 
-            const { data, error } = await supabase.storage
+            const { error } = await supabase.storage
                 .from('admin_files')
                 .upload(filePath, compressedFile);
 
@@ -137,7 +137,9 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                    img: ({ node, ...props }) => (
+                                    // Keep raw <img> in markdown preview because memo content can reference arbitrary external URLs.
+                                    img: (props) => (
+                                        // eslint-disable-next-line @next/next/no-img-element
                                         <img
                                             {...props}
                                             onClick={() => {
@@ -176,6 +178,8 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
                     >
                         <X size={24} />
                     </button>
+                    {/* Keep raw <img> for the fullscreen zoom overlay because the source can be any markdown-linked URL. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={zoomImage}
                         alt="Zoomed"
