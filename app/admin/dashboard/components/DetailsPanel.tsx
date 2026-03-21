@@ -355,7 +355,15 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
                 <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3">등록된 사진</h4>
                 <div className="grid grid-cols-4 gap-1.5 md:gap-2">
                   {selectedItem.photos.map((url: string, i: number) => (
-                    <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-100"><img src={url} className="w-full h-full object-cover" /></div>
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-100">
+                      <Image
+                        src={url}
+                        alt={`${selectedItem.title || 'Experience'} photo ${i + 1}`}
+                        fill
+                        sizes="(max-width: 768px) 25vw, 96px"
+                        className="object-cover"
+                      />
+                    </div>
                   ))}
                 </div>
               </div>

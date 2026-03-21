@@ -55,7 +55,9 @@
 ## Executed In This Pass
 - Converted fixed-size mobile/profile avatar hot paths from raw `<img>` to `next/image`
 - Converted additional fixed-size admin/host avatar surfaces to `next/image`
+- Converted fixed-size admin experience gallery thumbnails in `DetailsPanel` to `next/image`
 - Narrowed hot-path `select('*')` queries where the consumed fields are explicit
+- Narrowed admin chat, notification, sidebar, and alerts realtime refetch paths without changing user-visible behavior
 - Aligned guest mobile avatar upload with desktop flows by compressing before `avatars` bucket upload
 - Compressed admin team chat image attachments before `admin_files` bucket upload
 
@@ -63,7 +65,7 @@
 - schema changes
 - caching strategy changes
 - upload pipeline redesign
-- realtime subscription narrowing
+- remaining broader realtime subscription narrowing outside the already-patched chat/notification/admin alert surfaces
 - image compression/thumbnail generation policy changes
 
 ## Validation Baseline
