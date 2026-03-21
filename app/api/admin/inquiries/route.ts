@@ -27,6 +27,33 @@ type HostApplicationRow = {
   status?: string | null;
 };
 
+type InquiryExperience = {
+  id: number | string;
+  title?: string | null;
+  photos?: string[] | null;
+  image_url?: string | null;
+  host_id?: string | null;
+};
+
+type InquiryExperienceRelation = InquiryExperience | InquiryExperience[] | null | undefined;
+
+type InquiryListRow = {
+  id: number | string;
+  user_id: string;
+  host_id: string | null;
+  experience_id?: string | number | null;
+  type?: string | null;
+  status?: string | null;
+  content?: string | null;
+  updated_at?: string | null;
+  experiences?: InquiryExperienceRelation;
+};
+
+function normalizeInquiryExperience(experience: InquiryExperienceRelation): InquiryExperience | null {
+  if (Array.isArray(experience)) return experience[0] ?? null;
+  return experience ?? null;
+}
+
 export async function GET() {
   try {
     const supabaseServer = await createServerClient();
@@ -50,13 +77,13 @@ export async function GET() {
     // 1. 최근 문의 100건 조회
     const { data: inquiriesData, error: inquiriesError } = await supabaseAdmin
       .from('inquiries')
-      .select('*, experiences (id, title, photos, image_url, host_id)')
+      .select('id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id)')
       .order('updated_at', { ascending: false })
       .limit(100);
 
     if (inquiriesError) throw inquiriesError;
 
-    const inquiryRows = inquiriesData || [];
+    const inquiryRows = (inquiriesData || []) as InquiryListRow[];
     
     if (inquiryRows.length === 0) {
       return NextResponse.json({ success: true, data: [] });
@@ -103,6 +130,7 @@ export async function GET() {
 
     // 4. 최종 JSON 데이터 조립
     const safeData = inquiryRows.map((item) => {
+      const experience = normalizeInquiryExperience(item.experiences);
       const hostApp = appsMap.get(item.host_id || '');
       const hostProfile = profilesMap.get(item.host_id || '');
       const hostPublicProfile = getHostPublicProfile(hostProfile, hostApp, '호스트');
@@ -135,10 +163,10 @@ export async function GET() {
           phone: hostProfile?.phone || hostApp?.phone || null,
           status: hostApp?.status || null,
         },
-        experiences: item.experiences
+        experiences: experience
           ? {
-            ...item.experiences,
-            image_url: secureUrl(item.experiences.image_url || item.experiences.photos?.[0] || null)
+            ...experience,
+            image_url: secureUrl(experience.image_url || experience.photos?.[0] || null)
           }
           : null
       };

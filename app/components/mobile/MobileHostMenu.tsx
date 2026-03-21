@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Bell, Settings, HelpCircle, Star,
@@ -80,8 +81,16 @@ export default function MobileHostMenu() {
                 }
 
                 const [profileRes, hostRes] = await Promise.all([
-                    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-                    supabase.from('host_applications').select('*').eq('user_id', user.id).maybeSingle(),
+                    supabase
+                        .from('profiles')
+                        .select('avatar_url, full_name, bio, introduction, languages, job, phone, nationality, host_nationality')
+                        .eq('id', user.id)
+                        .maybeSingle(),
+                    supabase
+                        .from('host_applications')
+                        .select('user_id, name, profile_photo, self_intro, languages, profession, host_nationality, phone')
+                        .eq('user_id', user.id)
+                        .maybeSingle(),
                 ]);
 
                 if (profileRes.data || hostRes.data) {
@@ -169,9 +178,9 @@ export default function MobileHostMenu() {
                             </span>
                         )}
                     </button>
-                    <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
+                    <div className="relative w-9 h-9 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
                         {profile?.avatar_url
-                            ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="profile" />
+                            ? <Image src={profile.avatar_url} fill sizes="36px" className="object-cover" alt="profile" />
                             : <div className="w-full h-full flex items-center justify-center">
                                 <User size={16} className="text-gray-400" />
                             </div>

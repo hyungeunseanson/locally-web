@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
@@ -31,6 +32,10 @@ type GuestReview = {
     full_name?: string | null;
     avatar_url?: string | null;
   } | null;
+};
+
+type GuestReviewQueryRow = Omit<GuestReview, 'host'> & {
+  host?: GuestReview['host'] | GuestReview['host'][];
 };
 
 export default function AccountPage() {
@@ -180,7 +185,11 @@ export default function AccountPage() {
       const adminAccess = await fetchAdminAccess();
       setHasAdminAccess(adminAccess.isAdmin);
 
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, email, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job, school')
+        .eq('id', user.id)
+        .maybeSingle();
 
       if (data) {
         setProfile({
@@ -211,24 +220,32 @@ export default function AccountPage() {
       const { data: reviewData } = await supabase
         .from('guest_reviews')
         .select(`
-          *,
+          id,
+          rating,
+          content,
+          created_at,
           host:profiles!guest_reviews_host_id_fkey ( full_name, avatar_url )
         `)
         .eq('guest_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (reviewData) setGuestReviews(reviewData);
+      const normalizedReviews = ((reviewData || []) as GuestReviewQueryRow[]).map((review) => ({
+        ...review,
+        host: Array.isArray(review.host) ? review.host[0] ?? null : review.host ?? null,
+      }));
+
+      setGuestReviews(normalizedReviews);
 
       // 📊 통계: 여행 횟수, 후기 수, 가입 기간
       const { count: tripCount } = await supabase
         .from('bookings')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .in('status', [...BOOKING_CONFIRMED_STATUSES]);
 
       const { count: reviewCount } = await supabase
         .from('guest_reviews')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('guest_id', user.id);
 
       const createdAt = new Date(user.created_at);
@@ -238,7 +255,7 @@ export default function AccountPage() {
 
       setStats({
         tripCount: tripCount || 0,
-        reviewCount: reviewCount || (reviewData?.length || 0),
+        reviewCount: reviewCount || normalizedReviews.length,
         joinMonths,
       });
 
@@ -334,7 +351,7 @@ export default function AccountPage() {
 
     const { data: existingProfile, error: loadError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, nationality, birth_date, gender, bio, phone, mbti, kakao_id, avatar_url, languages, job, updated_at')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -457,9 +474,9 @@ export default function AccountPage() {
           {/* 좌측: 아바타 + 인증 배지 + 이름/도시 */}
           <div className="flex flex-col items-center shrink-0">
             <div className="relative mb-2">
-              <div className="w-[64px] h-[64px] rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-md">
+              <div className="relative w-[64px] h-[64px] rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-md">
                 {profile.avatar_url
-                  ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                  ? <Image src={profile.avatar_url} fill sizes="64px" className="object-cover" alt="avatar" />
                   : <div className="w-full h-full flex items-center justify-center">
                     <User className="w-6 h-6 text-gray-400" />
                   </div>
@@ -601,7 +618,7 @@ export default function AccountPage() {
               <div className="relative w-32 h-32 mx-auto mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                 <div className="w-32 h-32 bg-slate-200 rounded-full overflow-hidden border border-slate-100 shadow-inner relative">
                   {profile.avatar_url ? (
-                    <img src={profile.avatar_url} className="w-full h-full object-cover" alt="게스트 프로필 사진" />
+                    <Image src={profile.avatar_url} fill sizes="128px" className="object-cover" alt="게스트 프로필 사진" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={48} /></div>
                   )}
@@ -662,7 +679,7 @@ export default function AccountPage() {
                           {/* 호스트 아바타 (있으면 표시) */}
                           <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden relative">
                             {review.host?.avatar_url ? (
-                              <img src={review.host.avatar_url} className="w-full h-full object-cover" alt="후기 작성 호스트 사진" />
+                              <Image src={review.host.avatar_url} fill sizes="24px" className="object-cover" alt="후기 작성 호스트 사진" />
                             ) : <User size={14} className="text-slate-400 m-auto mt-1" />}
                           </div>
                           <span className="font-bold text-slate-900 group-hover:underline">
@@ -1045,7 +1062,7 @@ export default function AccountPage() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 relative">
                   {selectedReview.host?.avatar_url ? (
-                    <img src={selectedReview.host.avatar_url} className="w-full h-full object-cover" alt="선택한 후기 호스트 사진" />
+                    <Image src={selectedReview.host.avatar_url} fill sizes="48px" className="object-cover" alt="선택한 후기 호스트 사진" />
                   ) : <User size={24} className="text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />}
                 </div>
                 <div>

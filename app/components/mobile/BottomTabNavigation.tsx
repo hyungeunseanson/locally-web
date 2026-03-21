@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -72,8 +73,15 @@ export default function BottomTabNavigation() {
             href: '/guest/trips',
             requireAuth: false,
             icon: (isActive: boolean) => (
-                <div className={`w-6 h-6 flex items-center justify-center overflow-hidden ${isActive ? '' : 'opacity-50'}`}>
-                    <img src="/images/logo.png" alt={t('nav_trips')} className="w-full h-full object-cover" style={{ transform: 'scale(1.35)' }} />
+                <div className={`relative w-6 h-6 flex items-center justify-center overflow-hidden ${isActive ? '' : 'opacity-50'}`}>
+                    <Image
+                        src="/images/logo.png"
+                        alt={t('nav_trips')}
+                        fill
+                        sizes="24px"
+                        className="object-cover"
+                        style={{ transform: 'scale(1.35)' }}
+                    />
                 </div>
             )
         },
@@ -91,8 +99,14 @@ export default function BottomTabNavigation() {
                 if (avatarUrl) {
                     return (
                         <div className="relative">
-                            <div className={`w-6 h-6 rounded-full overflow-hidden border-2 ${isActive ? 'border-[#FF385C]' : 'border-gray-200'}`}>
-                                <img src={avatarUrl} alt="profile" className="w-full h-full object-cover" />
+                            <div className={`relative w-6 h-6 rounded-full overflow-hidden border-2 ${isActive ? 'border-[#FF385C]' : 'border-gray-200'}`}>
+                                <Image
+                                    src={avatarUrl}
+                                    alt="profile"
+                                    fill
+                                    sizes="24px"
+                                    className="object-cover"
+                                />
                             </div>
                             {unreadCount > 0 && (
                                 <span data-testid="guest-mobile-profile-unread-dot" className="absolute -right-1 -top-1">

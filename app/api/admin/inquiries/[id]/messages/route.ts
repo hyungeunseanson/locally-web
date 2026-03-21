@@ -51,7 +51,7 @@ export async function GET(
     // 메시지 쿼리
     const { data: messagesData, error: messagesError } = await supabaseAdmin
       .from('inquiry_messages')
-      .select('*')
+      .select('id, inquiry_id, sender_id, content, image_url, type, is_read, read_at, created_at')
       .eq('inquiry_id', inquiryId)
       .order('created_at', { ascending: true });
 

@@ -34,6 +34,8 @@ type InquiryExperience = {
   host_id?: string | null;
 };
 
+type InquiryExperienceRelation = InquiryExperience | InquiryExperience[] | null | undefined;
+
 type InquiryRow = {
   id: number | string;
   user_id: string;
@@ -43,7 +45,7 @@ type InquiryRow = {
   status?: string | null;  // CS 전용 상태: 'open' | 'in_progress' | 'resolved' | null (C2C)
   content?: string;
   updated_at?: string | null;
-  experiences?: InquiryExperience | null;
+  experiences?: InquiryExperienceRelation;
 };
 
 type InquiryListItem = InquiryRow & {
@@ -85,6 +87,11 @@ type InquiryMessageView = InquiryMessageRow & {
 
 function sortInquiriesByUpdatedAt(items: InquiryListItem[]) {
   return [...items].sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime());
+}
+
+function normalizeInquiryExperience(experience: InquiryExperienceRelation): InquiryExperience | null {
+  if (Array.isArray(experience)) return experience[0] ?? null;
+  return experience ?? null;
 }
 
 type RealtimeMessagePayload = {
@@ -135,7 +142,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
       let query = supabase
         .from('inquiries')
-        .select('*, experiences (id, title, photos, image_url, host_id)')
+        .select('id, user_id, host_id, experience_id, type, status, content, updated_at, experiences (id, title, photos, image_url, host_id)')
         .order('updated_at', { ascending: false })
         .limit(100); // 🟢 OOM 방지 및 빠른 렌더링을 위한 최근 100개 제한
 
@@ -179,6 +186,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         });
 
         const safeData: InquiryListItem[] = inquiryRows.map((item) => {
+          const experience = normalizeInquiryExperience(item.experiences);
           const hostApp = appsMap.get(item.host_id || '');
           const hostProfile = profilesMap.get(item.host_id || '');
           const hostPublicProfile = getHostPublicProfile(hostProfile, hostApp, '호스트');
@@ -202,10 +210,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
               name: hostPublicProfile.name,
               avatar_url: secureUrl(hostPublicProfile.avatarUrl ?? null)
             },
-            experiences: item.experiences
+            experiences: experience
               ? {
-                ...item.experiences,
-                image_url: secureUrl(item.experiences.image_url || item.experiences.photos?.[0] || null)
+                ...experience,
+                image_url: secureUrl(experience.image_url || experience.photos?.[0] || null)
               }
               : null
           };
@@ -245,7 +253,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
     try {
       const { data, error } = await supabase
         .from('inquiry_messages')
-        .select('*')
+        .select('id, inquiry_id, sender_id, content, image_url, type, is_read, read_at, created_at')
         .eq('inquiry_id', inquiryId)
         .order('created_at', { ascending: true });
 
