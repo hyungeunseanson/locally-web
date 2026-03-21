@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useEffect, useRef, useState } from 'react';
 import { User, X, Star, Globe, Smile, MessageCircle, Briefcase, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
@@ -148,7 +149,15 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
             {/* 아바타 */}
             <div className="h-12 w-12 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-slate-200 shadow-lg flex items-center justify-center">
               {guest.avatar_url ? (
-                <img src={guest.avatar_url} className="h-full w-full object-cover" alt={guest.full_name ?? 'Guest'} />
+                <div className="relative h-full w-full">
+                  <Image
+                    src={guest.avatar_url}
+                    alt={guest.full_name ?? 'Guest'}
+                    fill
+                    sizes="(max-width: 768px) 48px, 96px"
+                    className="object-cover"
+                  />
+                </div>
               ) : (
                 <User size={18} className="text-slate-400 md:hidden" />
               )}
