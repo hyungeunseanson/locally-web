@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Bold, Italic, Code, Quote, Image as ImageIcon, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
+import { compressImage } from '@/app/utils/image';
 
 interface MarkdownMemoEditorProps {
     initialValue?: string;
@@ -69,10 +70,11 @@ export default function MarkdownMemoEditor({ initialValue = '', onSave, onCancel
             const fileExt = file.name.split('.').pop();
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const filePath = `markdown_images/${fileName}`;
+            const compressedFile = await compressImage(file);
 
             const { data, error } = await supabase.storage
                 .from('admin_files')
-                .upload(filePath, file);
+                .upload(filePath, compressedFile);
 
             if (error) throw error;
 

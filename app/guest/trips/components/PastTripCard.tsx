@@ -7,9 +7,14 @@ import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { useRouter } from 'next/navigation';
 import type { GuestTrip } from './TripCard';
 
+type PastGuestTrip = GuestTrip & {
+  hasReview?: boolean;
+  review?: { id?: number | string | null } | null;
+};
+
 interface PastTripCardProps {
-  trip: GuestTrip;
-  onOpenReview: (trip: GuestTrip) => void;
+  trip: PastGuestTrip;
+  onOpenReview: (trip: PastGuestTrip) => void;
 }
 
 export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) {

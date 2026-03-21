@@ -68,6 +68,7 @@
 - Narrowed admin chat, notification, sidebar, and alerts realtime refetch paths without changing user-visible behavior
 - Aligned guest mobile avatar upload with desktop flows by compressing before `avatars` bucket upload
 - Compressed admin team chat image attachments before `admin_files` bucket upload
+- Compressed admin markdown memo image attachments before `admin_files` bucket upload
 
 ## Explicitly Deferred
 - schema changes
