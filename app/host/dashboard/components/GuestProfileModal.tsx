@@ -243,7 +243,15 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
                       <div className="flex items-center gap-2">
                         <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-200">
                           {review.host?.avatar_url ? (
-                            <img src={review.host.avatar_url} className="h-full w-full object-cover" alt="" />
+                            <div className="relative h-full w-full">
+                              <Image
+                                src={review.host.avatar_url}
+                                alt=""
+                                fill
+                                sizes="28px"
+                                className="object-cover"
+                              />
+                            </div>
                           ) : (
                             <User size={14} className="text-slate-400 m-auto mt-1.5" />
                           )}
