@@ -5,6 +5,31 @@
 
 ---
 
+## v3.39.35 — [Admin Chat Monitor] 참여자 프로필 카드를 경량 모달로 전환
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 참여자 정보 노출 방식 전환 | `app/admin/dashboard/components/ChatMonitor.tsx`, `app/admin/dashboard/components/ChatParticipantProfileModal.tsx` — 메시지 모니터링의 정적 guest/host 연락처 박스를 클릭형 프로필 카드 2개로 교체하고, 클릭 시 avatar/이름/이메일/전화번호만 담은 경량 read-only 모달을 띄우도록 변경 |
+| 🟠 기존 경계 유지 | 새 API 없이 기존 `selectedInquiry.guest/host` read-model만 사용해, chat moderation·soft delete·realtime 경계를 건드리지 않고 UI 상호작용만 보강 |
+| 🟡 회귀 테스트 보강 | `tests/e2e/83-chat-policy-monitoring.spec.ts` — admin monitor에서 guest/host 카드 클릭, 모달 open/close, participant 연락처 표시 계약을 추가 검증 |
+
+## v3.39.34 — [Admin Chat Monitor] 정책위반 soft delete placeholder 정합성 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 admin soft delete route 추가 | `app/api/admin/inquiries/messages/[messageId]/route.ts`, `app/utils/inquiry.ts` — hard delete 없이 `inquiry_messages` row를 유지한 채 `type='deleted'`, placeholder content, `is_read/read_at` 정리로 운영 삭제를 수행하도록 추가 |
+| 🟠 unread/preview/realtime 동기화 | `app/hooks/useChat.ts`, `app/api/admin/inquiries/route.ts`, `app/api/admin/inquiries/[id]/messages/route.ts`, `app/api/admin/sidebar-counts/route.ts`, `app/admin/dashboard/components/ChatMonitor.tsx`, `app/admin/dashboard/hooks/useAdminChatQuery.ts`, `app/guest/inbox/page.tsx`, `app/host/dashboard/InquiryChat.tsx` — 삭제된 메시지를 guest/host/admin 모두 placeholder로 읽고, inquiry preview·unread count·realtime UPDATE가 같은 기준으로 반영되도록 정렬 |
+| 🟡 soft delete 스모크 추가 | `tests/e2e/83-chat-policy-monitoring.spec.ts` — flagged message soft delete 후 DB 상태, preview, guest/host placeholder 렌더를 직접 검증 |
+
+## v3.39.33 — [Messaging Policy] 채팅 정책위반 신호 1차 도입
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 입력창 경고 UI 추가 | `app/utils/chatPolicySignals.ts`, `app/guest/inbox/page.tsx`, `app/host/dashboard/InquiryChat.tsx` — `phone/email/external_url` 고신뢰 패턴만 탐지해 전송 차단 없이 inline warning banner를 표시 |
+| 🟠 서버 탐지 및 운영 알림 추가 | `app/api/inquiries/thread/shared.ts`, `app/utils/adminAlertCenter.ts` 연계 — 일반 inquiry 저장 경계에서 정책위반 의심 메시지를 탐지하면 admin alert·admin email·audit log를 best-effort로 남기도록 추가. `admin_support` 계열은 제외 |
+| 🟠 admin read-model 보강 | `app/api/admin/inquiries/route.ts`, `app/api/admin/inquiries/[id]/messages/route.ts`, `app/admin/dashboard/hooks/useAdminChatQuery.ts`, `app/admin/dashboard/components/ChatMonitor.tsx` — `has_policy_signal`, `policy_signal_categories`를 재계산해 목록/상세에서 `정책위반 의심` 뱃지로 표시 |
+| 🟡 정책위반 스모크 추가 | `tests/e2e/82-chat-policy-signal-util.spec.ts`, `tests/e2e/83-chat-policy-monitoring.spec.ts` — false positive guard, admin alert 생성, admin monitor 표기 흐름을 직접 검증 |
+
 ## v3.39.32 — [Security] Live SQL Patch 1-8 Reconciliation
 
 | 항목 | 내용 |

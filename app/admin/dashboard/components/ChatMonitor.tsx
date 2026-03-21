@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Mail, Phone, Trash2 } from 'lucide-react';
+import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Trash2 } from 'lucide-react';
 import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
 import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inquiry';
 import { useToast } from '@/app/context/ToastContext';
+import ChatParticipantProfileModal, { type ChatParticipantProfile } from './ChatParticipantProfileModal';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
 type CSStatusFilter = 'ALL' | CSStatus;
@@ -61,11 +62,16 @@ export default function ChatMonitor() {
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [replyText, setReplyText] = useState('');
+  const [profileModal, setProfileModal] = useState<ChatParticipantProfile | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    setProfileModal(null);
+  }, [selectedInquiry?.id]);
 
   // URL ?inquiryId=X 파라미터로 특정 1:1 문의 자동 선택 (DetailsPanel에서 CS 개시 후 이동)
   useEffect(() => {
@@ -163,6 +169,56 @@ export default function ChatMonitor() {
     return guest.full_name || guest.name || guest.email || '익명 고객';
   };
 
+  const getHostName = (inquiry?: MonitorInquiry | null) => {
+    if (!inquiry?.host) return '호스트 정보 없음';
+    return inquiry.host.name || inquiry.host.email || '호스트 정보 없음';
+  };
+
+  const buildGuestProfile = (inquiry?: MonitorInquiry | null): ChatParticipantProfile | null => {
+    if (!inquiry?.guest) return null;
+    return {
+      kind: 'guest',
+      name: getGuestName(inquiry.guest),
+      email: inquiry.guest.email || null,
+      phone: inquiry.guest.phone || null,
+      avatar_url: inquiry.guest.avatar_url || null,
+    };
+  };
+
+  const buildHostProfile = (inquiry?: MonitorInquiry | null): ChatParticipantProfile | null => {
+    if (!inquiry?.host) return null;
+
+    const hasAnyHostProfile = Boolean(
+      inquiry.host.id ||
+      inquiry.host.name ||
+      inquiry.host.email ||
+      inquiry.host.phone ||
+      inquiry.host.avatar_url
+    );
+
+    if (!hasAnyHostProfile) return null;
+
+    return {
+      kind: 'host',
+      name: inquiry.host.name || inquiry.host.email || '호스트 정보 없음',
+      email: inquiry.host.email || null,
+      phone: inquiry.host.phone || null,
+      avatar_url: inquiry.host.avatar_url || null,
+    };
+  };
+
+  const openGuestProfile = () => {
+    const guestProfile = buildGuestProfile(selectedInquiry);
+    if (!guestProfile) return;
+    setProfileModal(guestProfile);
+  };
+
+  const openHostProfile = () => {
+    const hostProfile = buildHostProfile(selectedInquiry);
+    if (!hostProfile) return;
+    setProfileModal(hostProfile);
+  };
+
   const filteredInquiries = (inquiries || []).filter((inq) => {
     if (activeTab === 'monitor') return !isAdminSupportInquiry(inq.type);
     if (!isAdminSupportInquiry(inq.type)) return false;
@@ -176,6 +232,8 @@ export default function ChatMonitor() {
   const hasWarning = selectedInquiry
     ? Boolean(selectedInquiry.has_policy_signal || messages.some((message) => message.has_policy_signal))
     : false;
+  const guestProfile = buildGuestProfile(selectedInquiry);
+  const hostProfile = buildHostProfile(selectedInquiry);
 
   return (
     <div className="flex h-[calc(100dvh-190px)] md:h-[calc(100dvh-230px)] lg:h-[calc(100dvh-260px)] gap-4 md:gap-6 w-full relative">
@@ -335,13 +393,13 @@ export default function ChatMonitor() {
                     )}
                   </div>
                   <div className="text-[8px] md:text-[11px] text-slate-500 font-medium truncate leading-none">
-                    {selectedInquiry.guest?.email || '이메일 정보 없음'} {selectedInquiry.guest?.phone ? ` | ${selectedInquiry.guest.phone}` : ''}
+                    {selectedInquiry.experiences?.title ? `체험: ${selectedInquiry.experiences.title}` : `문의 ID #${selectedInquiry.id}`}
                   </div>
                   <div className="text-[8px] md:text-[11px] text-slate-400 flex items-center gap-1 mt-0 md:mt-0.5 truncate leading-none">
                     {selectedIsAdminSupport ? (
                       <span className="text-emerald-600 font-medium whitespace-nowrap">💬 관리자 직통 상담 중</span>
                     ) : (
-                      <span className="truncate">호스트: <span className="font-bold text-slate-700 bg-slate-100 px-1 py-0 md:px-1.5 md:py-0.5 rounded">{selectedInquiry.host?.name || '알수없음'}</span> 님과의 대화 모니터링</span>
+                      <span className="truncate">게스트·호스트 프로필 카드를 눌러 연락처를 확인하세요.</span>
                     )}
                   </div>
                 </div>
@@ -350,37 +408,70 @@ export default function ChatMonitor() {
 
             <div className="px-3 md:px-4 py-3 border-b border-slate-100 bg-white">
               <div className="grid gap-2 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase mb-2">Guest</div>
-                  <div className="text-xs md:text-sm font-bold text-slate-900">{getGuestName(selectedInquiry.guest)}</div>
-                  <div className="mt-1 space-y-1">
-                    <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
-                      <Mail size={12} className="shrink-0" />
-                      <span className="truncate">{selectedInquiry.guest?.email || '이메일 정보 없음'}</span>
+                <button
+                  type="button"
+                  data-participant-card="guest"
+                  aria-label="게스트 프로필 열기"
+                  onClick={openGuestProfile}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/70"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+                      {guestProfile?.avatar_url ? (
+                        <Image
+                          src={guestProfile.avatar_url}
+                          className="h-full w-full object-cover"
+                          alt="게스트 프로필"
+                          width={44}
+                          height={44}
+                        />
+                      ) : (
+                        <User className="h-5 w-5 text-slate-400" />
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
-                      <Phone size={12} className="shrink-0" />
-                      <span className="truncate">{selectedInquiry.guest?.phone || '전화번호 정보 없음'}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[10px] md:text-[11px] font-bold uppercase text-slate-500">Guest</div>
+                      <div className="truncate text-xs font-bold text-slate-900 md:text-sm">{guestProfile?.name || '게스트 정보 없음'}</div>
+                      <div className="mt-1 text-[10px] text-slate-500 md:text-[11px]">클릭하여 프로필 보기</div>
                     </div>
                   </div>
-                </div>
+                </button>
 
-                {!selectedIsAdminSupport && (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase mb-2">Host</div>
-                    <div className="text-xs md:text-sm font-bold text-slate-900">{selectedInquiry.host?.name || '호스트 정보 없음'}</div>
-                    <div className="mt-1 space-y-1">
-                      <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
-                        <Mail size={12} className="shrink-0" />
-                        <span className="truncate">{selectedInquiry.host?.email || '이메일 정보 없음'}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
-                        <Phone size={12} className="shrink-0" />
-                        <span className="truncate">{selectedInquiry.host?.phone || '전화번호 정보 없음'}</span>
+                <button
+                  type="button"
+                  data-participant-card="host"
+                  aria-label="호스트 프로필 열기"
+                  onClick={openHostProfile}
+                  disabled={!hostProfile}
+                  className={`rounded-xl border p-3 text-left transition-colors ${
+                    hostProfile
+                      ? 'border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70'
+                      : 'cursor-not-allowed border-slate-200 bg-slate-50/70 opacity-70'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+                      {hostProfile?.avatar_url ? (
+                        <Image
+                          src={hostProfile.avatar_url}
+                          className="h-full w-full object-cover"
+                          alt="호스트 프로필"
+                          width={44}
+                          height={44}
+                        />
+                      ) : (
+                        <User className="h-5 w-5 text-slate-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[10px] md:text-[11px] font-bold uppercase text-slate-500">Host</div>
+                      <div className="truncate text-xs font-bold text-slate-900 md:text-sm">{getHostName(selectedInquiry)}</div>
+                      <div className="mt-1 text-[10px] text-slate-500 md:text-[11px]">
+                        {hostProfile ? '클릭하여 프로필 보기' : '연결된 호스트 정보 없음'}
                       </div>
                     </div>
                   </div>
-                )}
+                </button>
               </div>
             </div>
 
@@ -478,6 +569,8 @@ export default function ChatMonitor() {
           </div>
         )}
       </div>
+
+      <ChatParticipantProfileModal participant={profileModal} onClose={() => setProfileModal(null)} />
     </div>
   );
 }

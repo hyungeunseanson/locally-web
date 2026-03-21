@@ -436,10 +436,26 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'networkidle' });
 
     await expect(adminSession.page.getByText('정책위반 의심').first()).toBeVisible({ timeout: 15000 });
+
+    const guestCard = adminSession.page.locator('[data-participant-card="guest"]');
+    const hostCard = adminSession.page.locator('[data-participant-card="host"]');
+
+    await expect(guestCard).toBeVisible();
+    await expect(hostCard).toBeVisible();
+
+    await guestCard.click();
+    await expect(adminSession.page.getByRole('dialog', { name: '게스트 프로필' })).toBeVisible();
     await expect(adminSession.page.getByText(fixture.guest.email, { exact: true }).first()).toBeVisible();
     await expect(adminSession.page.getByText(fixture.guest.phone, { exact: true }).first()).toBeVisible();
+    await adminSession.page.keyboard.press('Escape');
+    await expect(adminSession.page.getByRole('dialog', { name: '게스트 프로필' })).toHaveCount(0);
+
+    await hostCard.click();
+    await expect(adminSession.page.getByRole('dialog', { name: '호스트 프로필' })).toBeVisible();
     await expect(adminSession.page.getByText(fixture.host.email, { exact: true }).first()).toBeVisible();
     await expect(adminSession.page.getByText(fixture.host.phone, { exact: true }).first()).toBeVisible();
+    await adminSession.page.keyboard.press('Escape');
+    await expect(adminSession.page.getByRole('dialog', { name: '호스트 프로필' })).toHaveCount(0);
 
     await adminSession.context.close();
   });
