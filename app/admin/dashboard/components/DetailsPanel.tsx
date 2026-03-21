@@ -320,7 +320,13 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
               {signedUrl ? (
                 <div className="space-y-3">
                   <div className="relative aspect-[1.6] w-full bg-slate-200 rounded-lg overflow-hidden border border-slate-300 group">
-                    <img src={signedUrl} className="w-full h-full object-contain bg-black/5" />
+                    <Image
+                      src={signedUrl}
+                      alt="Host application identification document"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 420px"
+                      className="object-contain bg-black/5"
+                    />
                     <a href={signedUrl} rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm">
                       <Download size={16} className="mr-2" /> 원본 다운로드
                     </a>
