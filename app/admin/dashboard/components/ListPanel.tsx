@@ -2,8 +2,8 @@
 
 import Image from 'next/image';
 import React from 'react';
-import { Search, ChevronRight, User } from 'lucide-react';
-import { getLanguageNames } from '@/app/utils/languageLevels';
+import { ChevronRight, User } from 'lucide-react';
+import { type LanguageLevelEntry, getLanguageNames } from '@/app/utils/languageLevels';
 
 const OPTIMIZED_IMAGE_HOSTS = new Set([
   'images.unsplash.com',
@@ -27,9 +27,41 @@ function canUseOptimizedImage(src: string | null) {
   }
 }
 
+type ListPanelItem = {
+  id: string | number;
+  created_at: string;
+  status?: string | null;
+  title?: string | null;
+  name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  profile_photo?: string | null;
+  nationality?: string | null;
+  host_nationality?: string | null;
+  languages?: string[] | null;
+  language_levels?: LanguageLevelEntry[] | null;
+  target_language?: string | null;
+  photos?: string[] | null;
+  price?: number | null;
+  profiles?: { full_name?: string | null } | null;
+  sender_name?: string | null;
+  receiver_name?: string | null;
+  content?: string | null;
+};
+
+interface ListPanelProps {
+  activeTab: string;
+  filter: string;
+  setFilter: (value: string) => void;
+  listItems: ListPanelItem[];
+  selectedItem: { id?: string | number } | null;
+  setSelectedItem: (item: ListPanelItem | null) => void;
+}
+
 export default function ListPanel({
   activeTab, filter, setFilter, listItems, selectedItem, setSelectedItem
-}: any) {
+}: ListPanelProps) {
   const filterOptions = [
     { value: 'ALL', label: 'ALL' },
     { value: 'PENDING', label: 'PENDING' },
@@ -39,7 +71,7 @@ export default function ListPanel({
     },
   ];
 
-  const getAppLanguageSummary = (item: any) => {
+  const getAppLanguageSummary = (item: ListPanelItem) => {
     if (Array.isArray(item.languages) && item.languages.length > 0) {
       return item.languages.join(', ');
     }
@@ -73,7 +105,7 @@ export default function ListPanel({
 
       {/* 🟢 리스트 아이템 (스크롤 영역) */}
       <div className="overflow-y-auto flex-1 p-2 md:p-2.5 space-y-1.5">
-        {listItems.map((item: any) => {
+        {listItems.map((item) => {
 
           // 🟢 [이미지 소스 결정 로직 추가] 탭에 따라 올바른 이미지 필드를 가져옵니다.
           let imgSrc = null;
@@ -118,6 +150,8 @@ export default function ListPanel({
                     />
                   </div>
                 ) : (
+                  // Keep raw <img> fallback for URLs outside the current Next image allowlist.
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={imgSrc} alt={item.title || item.name || item.full_name || 'List item thumbnail'} className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0" />
                 )
               ) : (
