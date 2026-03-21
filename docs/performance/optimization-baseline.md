@@ -55,6 +55,7 @@
 ## Executed In This Pass
 - Converted fixed-size mobile/profile avatar hot paths from raw `<img>` to `next/image`
 - Converted additional fixed-size admin/host avatar surfaces to `next/image`
+- Optimized fixed-size admin dashboard list thumbnails in `ListPanel` for supported image hosts
 - Converted fixed-size admin experience gallery thumbnails in `DetailsPanel` to `next/image`
 - Converted the signed admin host-application ID preview in `DetailsPanel` to `next/image`
 - Narrowed hot-path `select('*')` queries where the consumed fields are explicit

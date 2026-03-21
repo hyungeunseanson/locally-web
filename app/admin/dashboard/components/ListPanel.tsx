@@ -1,8 +1,31 @@
 'use client';
 
+import Image from 'next/image';
 import React from 'react';
 import { Search, ChevronRight, User } from 'lucide-react';
 import { getLanguageNames } from '@/app/utils/languageLevels';
+
+const OPTIMIZED_IMAGE_HOSTS = new Set([
+  'images.unsplash.com',
+  'lh3.googleusercontent.com',
+  'k.kakaocdn.net',
+  't1.kakaocdn.net',
+  'uhinvcydgzqlpnvieyal.supabase.co',
+  'via.placeholder.com',
+  'placehold.co',
+]);
+
+function canUseOptimizedImage(src: string | null) {
+  if (!src) return false;
+  if (src.startsWith('/')) return true;
+
+  try {
+    const url = new URL(src);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && OPTIMIZED_IMAGE_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 export default function ListPanel({
   activeTab, filter, setFilter, listItems, selectedItem, setSelectedItem
@@ -84,7 +107,19 @@ export default function ListPanel({
             >
               {/* 🟢 [수정됨] 위에서 구한 imgSrc 사용 */}
               {imgSrc ? (
-                <img src={imgSrc} className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0" />
+                canUseOptimizedImage(imgSrc) ? (
+                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 shrink-0">
+                    <Image
+                      src={imgSrc}
+                      alt={item.title || item.name || item.full_name || 'List item thumbnail'}
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <img src={imgSrc} alt={item.title || item.name || item.full_name || 'List item thumbnail'} className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0" />
+                )
               ) : (
                 <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0"><User size={16} /></div>
               )}
