@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -252,7 +253,13 @@ export default function Sidebar() {
         className="mb-10 px-2 mt-4 inline-flex items-center gap-3 group select-none self-start focus:outline-none focus-visible:outline-none"
       >
         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden">
-          <img src="/images/logo-new-white.png" alt="Locally Logo" className="w-8 h-8 object-contain group-hover:scale-105 transition-transform duration-300" />
+          <Image
+            src="/images/logo-new-white.png"
+            alt="Locally Logo"
+            width={32}
+            height={32}
+            className="w-8 h-8 object-contain group-hover:scale-105 transition-transform duration-300"
+          />
         </div>
         <div className="flex flex-col">
           <h1 className="text-[19px] font-bold text-white tracking-tight leading-none mb-0.5">Locally</h1>
@@ -331,7 +338,13 @@ export default function Sidebar() {
       {/* 🟢 모바일 전용: 상단 헤더 (햄버거 메뉴) */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-[60] bg-black text-white h-14 flex items-center justify-between px-4 shadow-lg">
         <div className="flex items-center gap-2">
-          <img src="/images/logo-new-white.png" alt="Logo" className="w-7 h-7 object-contain" />
+          <Image
+            src="/images/logo-new-white.png"
+            alt="Logo"
+            width={28}
+            height={28}
+            className="w-7 h-7 object-contain"
+          />
           <span className="text-[15px] font-bold tracking-tight">Locally</span>
           <span className="text-[9px] text-slate-400 font-medium tracking-wider uppercase ml-1">Admin</span>
         </div>
