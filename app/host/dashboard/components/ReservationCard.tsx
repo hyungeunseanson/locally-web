@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React from 'react';
 import {
   Clock, User, CheckCircle2, MessageSquare,
@@ -185,9 +186,9 @@ export default function ReservationCard({
                   onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
                   className="min-w-0 flex items-center gap-2.5 text-left"
                 >
-                  <div className="h-8 w-8 shrink-0 rounded-full border border-slate-200 bg-slate-100 overflow-hidden">
+                  <div className="relative h-8 w-8 shrink-0 rounded-full border border-slate-200 bg-slate-100 overflow-hidden">
                     {res.guest?.avatar_url ? (
-                      <img src={secureUrl(res.guest.avatar_url)!} className="h-full w-full object-cover" alt="" />
+                      <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="32px" className="object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <User size={14} className="text-slate-400" />
@@ -310,9 +311,9 @@ export default function ReservationCard({
               onClick={(e) => { e.stopPropagation(); onShowProfile(); }}
               className="flex items-center gap-4 text-left cursor-pointer group/profile"
             >
-              <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 group-hover/profile:ring-2 ring-slate-900 transition-all shrink-0">
+              <div className="relative w-12 h-12 rounded-full bg-slate-100 overflow-hidden border border-slate-200 group-hover/profile:ring-2 ring-slate-900 transition-all shrink-0">
                 {res.guest?.avatar_url ? (
-                  <img src={secureUrl(res.guest.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                  <Image src={secureUrl(res.guest.avatar_url)!} alt={guestName} fill sizes="48px" className="object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={20} /></div>
                 )}

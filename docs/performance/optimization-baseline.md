@@ -54,6 +54,7 @@
 
 ## Executed In This Pass
 - Converted fixed-size mobile/profile avatar hot paths from raw `<img>` to `next/image`
+- Converted additional fixed-size admin/host avatar surfaces to `next/image`
 - Narrowed hot-path `select('*')` queries where the consumed fields are explicit
 - Aligned guest mobile avatar upload with desktop flows by compressing before `avatars` bucket upload
 - Compressed admin team chat image attachments before `admin_files` bucket upload

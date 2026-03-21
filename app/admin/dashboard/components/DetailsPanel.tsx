@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -172,9 +173,15 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
           </button>
 
           <div className="flex items-center gap-2.5 md:gap-4 pr-10">
-            <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+            <div className="relative w-10 h-10 md:w-14 md:h-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
               {selectedItem.profile_photo || selectedItem.avatar_url ? (
-                <img src={selectedItem.profile_photo || selectedItem.avatar_url} className="w-full h-full object-cover" />
+                <Image
+                  src={selectedItem.profile_photo || selectedItem.avatar_url}
+                  alt={selectedItem.name || selectedItem.title || 'Selected item avatar'}
+                  fill
+                  sizes="56px"
+                  className="object-cover"
+                />
               ) : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}
             </div>
             <div>
@@ -249,8 +256,12 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
 
             {/* 프로필 사진 */}
             <div className="flex items-center gap-3 bg-slate-50 p-2.5 md:p-3.5 rounded-xl border border-slate-100">
-              <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white overflow-hidden border border-slate-200 flex-shrink-0">
-                {selectedItem.profile_photo ? <img src={selectedItem.profile_photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>}
+              <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-white overflow-hidden border border-slate-200 flex-shrink-0">
+                {selectedItem.profile_photo ? (
+                  <Image src={selectedItem.profile_photo} alt="Host application profile photo" fill sizes="64px" className="object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={24} /></div>
+                )}
               </div>
               <div>
                 <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5">프로필 사진</div>
