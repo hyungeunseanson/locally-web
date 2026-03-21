@@ -14,6 +14,7 @@ import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile'
 import { useNotification } from '@/app/context/NotificationContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 
 type MobileHostProfile = {
@@ -27,6 +28,20 @@ type MobileHostProfile = {
     host_nationality?: string | null;
 };
 
+function formatHostMenuMonthLabel(lang: string, date: Date) {
+    const localeMap: Record<string, string> = {
+        ko: 'ko-KR',
+        en: 'en-US',
+        ja: 'ja-JP',
+        zh: 'zh-CN',
+    };
+
+    return new Intl.DateTimeFormat(localeMap[lang] || 'ko-KR', {
+        year: 'numeric',
+        month: 'long',
+    }).format(date);
+}
+
 export default function MobileHostMenu() {
     const [profile, setProfile] = useState<MobileHostProfile | null>(null);
     const [earnings, setEarnings] = useState<{ month: string; amount: number } | null>(null);
@@ -39,7 +54,7 @@ export default function MobileHostMenu() {
     const profileCompletion = profile ? getProfileCompletion(profile, 'host') : null;
     const { pendingHref, isNavigating, navigate } = usePendingNavigation();
     const { setGuestView } = useViewMode();
-
+    const { t, lang } = useLanguage();
     const { notifications, unreadCount } = useNotification();
     const serviceUnread = notifications.some(
         (n) => !n.is_read && [
@@ -51,8 +66,8 @@ export default function MobileHostMenu() {
 
     useEffect(() => {
         if (loading) return;
-        const t = setTimeout(() => setGuestBtnReady(true), 300);
-        return () => clearTimeout(t);
+        const timer = setTimeout(() => setGuestBtnReady(true), 300);
+        return () => clearTimeout(timer);
     }, [loading]);
 
     useEffect(() => {
@@ -70,7 +85,7 @@ export default function MobileHostMenu() {
                 ]);
 
                 if (profileRes.data || hostRes.data) {
-                    const hostPublicProfile = getHostPublicProfile(profileRes.data, hostRes.data, '호스트');
+                    const hostPublicProfile = getHostPublicProfile(profileRes.data, hostRes.data, t('host_default_name_short'));
                     setProfile({
                         ...(profileRes.data || {}),
                         avatar_url: hostPublicProfile.avatarUrl,
@@ -99,7 +114,7 @@ export default function MobileHostMenu() {
                     0
                 );
 
-                setEarnings({ month: `${now.getMonth() + 1}월 ${now.getFullYear()}`, amount: totalEarning });
+                setEarnings({ month: formatHostMenuMonthLabel(lang, now), amount: totalEarning });
 
                 const { data: reviewData } = await supabase
                     .from('reviews')
@@ -117,7 +132,7 @@ export default function MobileHostMenu() {
             }
         };
         fetchData();
-    }, [supabase]);
+    }, [supabase, t, lang]);
 
     if (loading) return (
         <div className="min-h-screen bg-white flex items-center justify-center">
@@ -133,7 +148,7 @@ export default function MobileHostMenu() {
 
             {/* ── 헤더 ── */}
             <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-4">
-                <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">메뉴</h1>
+                <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">{t('nav_more')}</h1>
                 <div className="flex items-center gap-2">
                     <MobileLanguageSwitcher />
                     <button
@@ -168,7 +183,7 @@ export default function MobileHostMenu() {
             {/* ── 수입/인사이트 카드 ── */}
             <div className="px-5 mb-5 grid grid-cols-2 gap-3">
                 <DashboardShortcutCard
-                    title="호스팅 수입"
+                    title={t('host_menu_hosting_income')}
                     subtitle={earnings?.month || '-'}
                     href="/host/dashboard?tab=earnings"
                     isPending={pendingHref === '/host/dashboard?tab=earnings'}
@@ -180,8 +195,8 @@ export default function MobileHostMenu() {
                     </p>
                 </DashboardShortcutCard>
                 <DashboardShortcutCard
-                    title="인사이트"
-                    subtitle={reviewSummary.count > 0 ? `${reviewSummary.count}개의 후기` : '아직 후기 없음'}
+                    title={t('host_menu_insights')}
+                    subtitle={reviewSummary.count > 0 ? t('exp_review_count', { count: reviewSummary.count }) : t('exp_review_empty_title')}
                     href="/host/dashboard?tab=reviews"
                     isPending={pendingHref === '/host/dashboard?tab=reviews'}
                     disabled={isNavigating}
@@ -201,19 +216,19 @@ export default function MobileHostMenu() {
 
             {/* ── 메뉴 그룹 1 ── */}
             <div className="px-5 mb-1">
-                <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label="예약 관리" isPending={pendingHref === '/host/dashboard?tab=reservations'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label="내 체험 관리" isPending={pendingHref === '/host/dashboard?tab=experiences'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label="문의함" isPending={pendingHref === '/host/dashboard?tab=inquiries'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label="서비스 매칭" showDot={serviceUnread} isPending={pendingHref === '/host/dashboard?tab=service-jobs'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=reservations" icon={<CalendarCheck size={17} />} label={t('nav_reservations')} isPending={pendingHref === '/host/dashboard?tab=reservations'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=experiences" icon={<LayoutList size={17} />} label={t('nav_manage')} isPending={pendingHref === '/host/dashboard?tab=experiences'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=inquiries" icon={<MessageSquare size={17} />} label={t('nav_messages')} isPending={pendingHref === '/host/dashboard?tab=inquiries'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=service-jobs" icon={<Briefcase size={17} />} label={t('host_menu_service_matching')} showDot={serviceUnread} isPending={pendingHref === '/host/dashboard?tab=service-jobs'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />
 
             {/* ── 메뉴 그룹 2 ── */}
             <div className="px-5 mb-1">
-                <HostMenuItem href="/host/dashboard?tab=earnings" icon={<CircleDollarSign size={17} />} label="수익 및 정산" isPending={pendingHref === '/host/dashboard?tab=earnings'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=reviews" icon={<Star size={17} />} label="받은 후기" isPending={pendingHref === '/host/dashboard?tab=reviews'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/dashboard?tab=guidelines" icon={<BookOpen size={17} />} label="교육 및 가이드라인" isPending={pendingHref === '/host/dashboard?tab=guidelines'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=earnings" icon={<CircleDollarSign size={17} />} label={t('host_menu_earnings')} isPending={pendingHref === '/host/dashboard?tab=earnings'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=reviews" icon={<Star size={17} />} label={t('host_menu_received_reviews')} isPending={pendingHref === '/host/dashboard?tab=reviews'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/dashboard?tab=guidelines" icon={<BookOpen size={17} />} label={t('host_menu_education')} isPending={pendingHref === '/host/dashboard?tab=guidelines'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             <div className="my-3 mx-5 border-t border-gray-100" />
@@ -223,14 +238,14 @@ export default function MobileHostMenu() {
                 <HostMenuItem
                     href="/host/dashboard?tab=profile"
                     icon={<Settings size={17} />}
-                    label="프로필 설정"
+                    label={t('host_menu_profile_settings')}
                     badge={profileCompletion && profileCompletion.percent < 100 ? `${profileCompletion.percent}%` : null}
                     isPending={pendingHref === '/host/dashboard?tab=profile'}
                     disabled={isNavigating}
                     onNavigate={navigate}
                 />
-                <HostMenuItem href="/community" icon={<Users size={17} />} label="커뮤니티" isPending={pendingHref === '/community'} disabled={isNavigating} onNavigate={navigate} />
-                <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label="도움말 센터" isPending={pendingHref === '/host/help'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/community" icon={<Users size={17} />} label={t('profile_menu_community')} isPending={pendingHref === '/community'} disabled={isNavigating} onNavigate={navigate} />
+                <HostMenuItem href="/host/help" icon={<HelpCircle size={17} />} label={t('profile_menu_help')} isPending={pendingHref === '/host/help'} disabled={isNavigating} onNavigate={navigate} />
             </div>
 
             {/* ── 게스트 모드 전환 플로팅 버튼 ── */}
@@ -242,7 +257,7 @@ export default function MobileHostMenu() {
                     }}
                     className="pointer-events-auto flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-lg text-[13px] font-semibold active:scale-95 transition-transform"
                 >
-                    게스트 모드로 전환
+                    {t('profile_menu_switch_guest')}
                     <CornerUpRight size={14} />
                 </button>
             </div>

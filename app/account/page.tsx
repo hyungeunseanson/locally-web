@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { createClient } from '@/app/utils/supabase/client';
-import { User, ShieldCheck, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
+import { User, ShieldCheck, Heart, Star, Save, Smile, Camera, Loader2, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Settings, HelpCircle, Bell, FileText, Shield, BookOpen, Users, Globe, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
@@ -134,29 +134,29 @@ export default function AccountPage() {
 
   const linkModalConfig = {
     notices: {
-      title: '공지사항',
-      desc: 'Locally의 주요 공지와 업데이트를 확인하세요.',
+      title: t('profile_link_notices_title'),
+      desc: t('profile_link_notices_desc'),
       actions: [
-        { label: '공지사항 보기', href: '/company/notices', external: false },
+        { label: t('profile_link_notices_action'), href: '/company/notices', external: false },
       ]
     },
     community: {
-      title: '커뮤니티',
-      desc: '여행자와 호스트의 이야기를 모았습니다.',
+      title: t('profile_link_community_title'),
+      desc: t('profile_link_community_desc'),
       actions: [
-        { label: '커뮤니티 보기', href: '/community', external: false },
+        { label: t('profile_link_community_action'), href: '/community', external: false },
       ]
     },
     news: {
-      title: '뉴스',
-      desc: 'Locally의 언론 보도를 확인하세요.',
+      title: t('profile_link_news_title'),
+      desc: t('profile_link_news_desc'),
       actions: [
-        { label: '뉴스룸 보기', href: '/company/news', external: false },
+        { label: t('profile_link_news_action'), href: '/company/news', external: false },
       ]
     },
     social: {
-      title: '소셜 미디어',
-      desc: '원하는 채널을 선택해 연결하세요.',
+      title: t('profile_link_social_title'),
+      desc: t('profile_link_social_desc'),
       actions: [
         { label: 'Instagram (KR)', href: 'https://www.instagram.com/locally.official/', external: true },
         { label: 'Instagram (JP)', href: 'https://www.instagram.com/locally.japan/', external: true },
@@ -509,30 +509,30 @@ export default function AccountPage() {
 
         {/* ── 메뉴 그룹 1: 기본 메뉴 ── */}
         <div className="px-4">
-          <MobileMenuItem icon={<MessageSquare className="w-4 h-4" />} label="메시지" onPress={() => navigate('/guest/inbox')} isPending={pendingHref === '/guest/inbox'} disabled={isNavigating} />
-          <MobileMenuItem icon={<Smile className="w-4 h-4" />} label="나의 여행" onPress={() => navigate('/guest/trips')} isPending={pendingHref === '/guest/trips'} disabled={isNavigating} />
-          <MobileMenuItem icon={<Star className="w-4 h-4" />} label="위시리스트" onPress={() => navigate('/guest/wishlists')} isPending={pendingHref === '/guest/wishlists'} disabled={isNavigating} />
-          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="커뮤니티" onPress={() => navigate('/community')} isPending={pendingHref === '/community'} disabled={isNavigating} />
+          <MobileMenuItem icon={<MessageSquare className="w-4 h-4" />} label={t('profile_menu_messages')} onPress={() => navigate('/guest/inbox')} isPending={pendingHref === '/guest/inbox'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Smile className="w-4 h-4" />} label={t('profile_menu_my_trips')} onPress={() => navigate('/guest/trips')} isPending={pendingHref === '/guest/trips'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Heart className="w-4 h-4" />} label={t('profile_menu_wishlist')} onPress={() => navigate('/guest/wishlists')} isPending={pendingHref === '/guest/wishlists'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label={t('profile_menu_community')} onPress={() => navigate('/community')} isPending={pendingHref === '/community'} disabled={isNavigating} />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
 
         {/* ── 메뉴 그룹 2: 설정 ── */}
         <div className="px-4">
-          <MobileMenuItem icon={<Settings className="w-4 h-4" />} label="계정 관리" onPress={() => setShowProfileView(true)} />
+          <MobileMenuItem icon={<Settings className="w-4 h-4" />} label={t('profile_menu_account')} onPress={() => setShowProfileView(true)} />
           {hasAdminAccess && <MobileMenuItem icon={<Shield className="w-4 h-4" />} label="Admin" onPress={() => navigate('/admin/dashboard')} isPending={pendingHref === '/admin/dashboard'} disabled={isNavigating} />}
-          <MobileMenuItem icon={<Users className="w-4 h-4" />} label="호스트 되기" onPress={() => navigate('/become-a-host')} isPending={pendingHref === '/become-a-host'} disabled={isNavigating} />
-          <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label="도움말 센터" onPress={() => navigate('/help')} isPending={pendingHref === '/help'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Users className="w-4 h-4" />} label={t('profile_menu_become_host')} onPress={() => navigate('/become-a-host')} isPending={pendingHref === '/become-a-host'} disabled={isNavigating} />
+          <MobileMenuItem icon={<HelpCircle className="w-4 h-4" />} label={t('profile_menu_help')} onPress={() => navigate('/help')} isPending={pendingHref === '/help'} disabled={isNavigating} />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
 
         {/* ── 메뉴 그룹 3: Locally ── */}
         <div className="px-4">
-          <MobileMenuItem icon={<FileText className="w-4 h-4" />} label="로컬리 소개" onPress={() => navigate('/about')} isPending={pendingHref === '/about'} disabled={isNavigating} />
-          <MobileMenuItem icon={<Bell className="w-4 h-4" />} label="공지사항" onPress={() => setActiveLinkModal('notices')} />
-          <MobileMenuItem icon={<BookOpen className="w-4 h-4" />} label="뉴스" onPress={() => setActiveLinkModal('news')} />
-          <MobileMenuItem icon={<Globe className="w-4 h-4" />} label="소셜 미디어" onPress={() => setActiveLinkModal('social')} />
+          <MobileMenuItem icon={<FileText className="w-4 h-4" />} label={t('profile_menu_about')} onPress={() => navigate('/about')} isPending={pendingHref === '/about'} disabled={isNavigating} />
+          <MobileMenuItem icon={<Bell className="w-4 h-4" />} label={t('profile_menu_notices')} onPress={() => setActiveLinkModal('notices')} />
+          <MobileMenuItem icon={<BookOpen className="w-4 h-4" />} label={t('profile_menu_news')} onPress={() => setActiveLinkModal('news')} />
+          <MobileMenuItem icon={<Globe className="w-4 h-4" />} label={t('profile_menu_social')} onPress={() => setActiveLinkModal('social')} />
         </div>
 
         <div className="my-3.5 mx-4 border-t border-gray-100" />
@@ -550,7 +550,7 @@ export default function AccountPage() {
             className="inline-flex items-center gap-2 py-1 text-[12px] font-semibold text-gray-500 disabled:opacity-60"
           >
             {signingOut ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            로그아웃
+            {t('profile_menu_signout')}
           </button>
         </div>
       </div>
@@ -575,11 +575,11 @@ export default function AccountPage() {
           {!hostStatusResolved ? (
             <>
               <Loader2 className="w-[14px] h-[14px] animate-spin" />
-              불러오는 중
+              {t('profile_menu_loading')}
             </>
           ) : (
             <>
-              {canUseHostView ? '호스트 모드로 전환' : '호스트 되기'}
+              {canUseHostView ? t('profile_menu_switch_host') : t('profile_menu_become_host')}
               <ChevronRight className="w-[14px] h-[14px]" strokeWidth={2.5} />
             </>
           )}

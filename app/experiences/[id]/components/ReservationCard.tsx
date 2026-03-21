@@ -69,7 +69,7 @@ export default function ReservationCard({
   };
   const getSoldOutLabel = (soldOutReason?: ExperienceSlotSoldOutReason) => {
     if (soldOutReason === 'private_booked') {
-      return '프라이빗 예약 마감';
+      return t('exp_reservation_private_booked');
     }
 
     return t('exp_reservation_sold_out');
@@ -294,7 +294,7 @@ export default function ReservationCard({
           )}
           {selectedDateStatus === 'sold_out' && !hasBookableTimeOnSelectedDate && (
             <div className="mt-3 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] leading-relaxed text-rose-600">
-              선택한 날짜는 현재 예약이 마감되었습니다. 다른 날짜를 선택해 주세요.
+              {t('exp_reservation_date_soldout_msg')}
             </div>
           )}
         </div>

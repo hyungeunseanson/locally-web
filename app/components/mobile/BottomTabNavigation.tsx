@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/app/context/AuthContext';
 import { useNotification } from '@/app/context/NotificationContext';
 import { useViewMode } from '@/app/context/ViewModeContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import LoginModal from '@/app/components/LoginModal';
 import { usePendingNavigation } from '@/app/hooks/usePendingNavigation';
 
@@ -26,6 +27,7 @@ export default function BottomTabNavigation() {
     const avatarUrl = user?.user_metadata?.avatar_url;
     const [showLogin, setShowLogin] = useState(false);
     const { pendingHref, isNavigating, navigate } = usePendingNavigation();
+    const { t } = useLanguage();
 
     // 어드민/인증/결제 플로우에서는 하단 탭바 숨김
     // 호스트 모드에서는 dashboard/menu에서만 노출해 생성/수정 화면과 충돌 방지
@@ -54,35 +56,35 @@ export default function BottomTabNavigation() {
 
     const guestTabs = [
         {
-            name: '검색',
+            name: t('nav_search'),
             href: '/',
             requireAuth: false,
             icon: (isActive: boolean) => <Search size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
-            name: '위시리스트',
+            name: t('nav_wishlist'),
             href: '/guest/wishlists',
             requireAuth: true,
             icon: (isActive: boolean) => <Heart size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
-            name: '여행',
+            name: t('nav_trips'),
             href: '/guest/trips',
             requireAuth: false,
             icon: (isActive: boolean) => (
                 <div className={`w-6 h-6 flex items-center justify-center overflow-hidden ${isActive ? '' : 'opacity-50'}`}>
-                    <img src="/images/logo.png" alt="여행" className="w-full h-full object-cover" style={{ transform: 'scale(1.35)' }} />
+                    <img src="/images/logo.png" alt={t('nav_trips')} className="w-full h-full object-cover" style={{ transform: 'scale(1.35)' }} />
                 </div>
             )
         },
         {
-            name: '메시지',
+            name: t('nav_messages'),
             href: '/guest/inbox',
             requireAuth: true,
             icon: (isActive: boolean) => <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
-            name: '프로필',
+            name: t('nav_profile'),
             href: '/account',
             requireAuth: true,
             icon: (isActive: boolean) => {
@@ -119,31 +121,31 @@ export default function BottomTabNavigation() {
     // 새로운 호스트 탭 구조: 예약 | 관리 | 교육 | 메시지 | 메뉴
     const hostTabs = [
         {
-            name: '예약',
+            name: t('nav_reservations'),
             href: '/host/dashboard?tab=reservations',
             requireAuth: true,
             icon: (isActive: boolean) => <CalendarCheck size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
-            name: '관리',
+            name: t('nav_manage'),
             href: '/host/dashboard?tab=experiences',
             requireAuth: true,
             icon: (isActive: boolean) => <LayoutList size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
-            name: '교육',
+            name: t('nav_education'),
             href: '/host/dashboard?tab=guidelines',
             requireAuth: true,
             icon: (isActive: boolean) => <BookOpen size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={isActive ? 2.5 : 2} />
         },
         {
-            name: '메시지',
+            name: t('nav_messages'),
             href: '/host/dashboard?tab=inquiries',
             requireAuth: true,
             icon: (isActive: boolean) => <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
         },
         {
-            name: '더보기',
+            name: t('nav_more'),
             href: '/host/menu',
             requireAuth: true,
             icon: (isActive: boolean) => (
