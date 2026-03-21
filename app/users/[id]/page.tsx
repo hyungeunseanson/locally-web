@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { use, useEffect, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -60,7 +61,15 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               <div className="flex flex-col items-center text-center">
                 <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-slate-100 mb-4 md:mb-6">
                   {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} className="w-full h-full object-cover" />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={profile.avatar_url}
+                        alt={profile?.full_name || 'Host profile'}
+                        fill
+                        sizes="(max-width: 768px) 96px, 128px"
+                        className="object-cover"
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={64} /></div>
                   )}
