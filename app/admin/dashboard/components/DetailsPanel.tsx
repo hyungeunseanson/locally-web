@@ -6,17 +6,31 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search, User, Mail, Globe, MessageCircle, Phone, Smile, Clock,
-  MapPin, Cake, CheckCircle2, ShoppingBag, StickyNote, Star, Trash2, Link as LinkIcon, Edit,
-  CreditCard, FileText, Camera, Shield, Download, AlertTriangle, Check, X
+  MapPin, Cake, CheckCircle2, ShoppingBag, Trash2, Edit,
+  CreditCard, FileText, Shield, Download, Check, X
 } from 'lucide-react';
 import { formatLanguageLevelSummary, getLanguageNames, normalizeLanguageLevels, LanguageLevelEntry } from '@/app/utils/languageLevels';
-import { AdminDetailsPanelProps } from '@/app/types/admin';
+import { AdminDetailsPanelProps, type ExperienceApprovalItem, type HostApplication } from '@/app/types/admin';
+
+type ExperienceItineraryItem = NonNullable<ExperienceApprovalItem['itinerary']>[number];
+
+interface InfoBoxProps {
+  label: string;
+  value?: string | number | null;
+  icon?: React.ReactNode;
+}
+
+interface StatSmallProps {
+  label: string;
+  value: string | number;
+  color?: string;
+}
 
 export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem, setSelectedItem, updateStatus, deleteItem }: AdminDetailsPanelProps) {
   const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [csLoading, setCsLoading] = useState(false);
-  const [appDetails, setAppDetails] = useState<any>(null);
+  const [appDetails, setAppDetails] = useState<HostApplication | null>(null);
   const [appDetailsLoading, setAppDetailsLoading] = useState(false);
 
   const handleStartCSChat = async () => {
@@ -442,7 +456,7 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
               <div>
                 <h4 className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2 md:mb-3">진행 코스</h4>
                 <div className="space-y-2 md:space-y-3 pl-3 md:pl-4 border-l-2 border-slate-100">
-                  {selectedItem.itinerary.map((it: any, i: number) => <div key={i} className="relative pl-4 md:pl-6"><div className="absolute -left-[19px] md:-left-[21px] top-1 w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300 border-2 border-white"></div><div className="font-bold text-[11px] md:text-xs">{it.title}</div><div className="text-[10px] md:text-[11px] text-slate-500 mt-0.5 md:mt-1">{it.description}</div></div>)}
+                  {selectedItem.itinerary.map((it: ExperienceItineraryItem, i: number) => <div key={i} className="relative pl-4 md:pl-6"><div className="absolute -left-[19px] md:-left-[21px] top-1 w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300 border-2 border-white"></div><div className="font-bold text-[11px] md:text-xs">{it.title}</div><div className="text-[10px] md:text-[11px] text-slate-500 mt-0.5 md:mt-1">{it.description}</div></div>)}
                 </div>
               </div>
             )}
@@ -497,10 +511,10 @@ export default function DetailsPanel({ activeTab, selectedItem: rawSelectedItem,
 }
 
 // 🟡 내부 컴포넌트
-function InfoBox({ label, value, icon }: any) {
+function InfoBox({ label, value, icon }: InfoBoxProps) {
   return <div className="bg-slate-50 p-2 md:p-3 rounded-lg border border-slate-100"><div className="flex items-center gap-1 md:gap-1.5 text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-0.5 md:mb-1">{icon} {label}</div><div className="font-bold text-slate-900 text-xs md:text-sm truncate">{value || '-'}</div></div>;
 }
 
-function StatSmall({ label, value, color }: any) {
+function StatSmall({ label, value, color }: StatSmallProps) {
   return <div className={`p-2.5 md:p-3 rounded-xl border border-transparent ${color || 'bg-slate-50 text-slate-700'}`}><div className="text-[9px] md:text-[10px] font-bold opacity-70 mb-0.5 uppercase">{label}</div><div className="text-sm md:text-base font-black truncate">{value}</div></div>;
 }
