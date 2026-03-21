@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { compressImage } from '@/app/utils/image';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Paperclip, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -282,10 +283,11 @@ export default function GlobalTeamChat() {
         if (!ALLOWED_IMAGE_MIME.includes(file.type)) {
             throw new Error('허용되지 않는 파일 형식입니다.');
         }
-        const fileExt = file.type.split('/')[1] || 'jpg'; // 안전한 확장자 추론
+        const compressedFile = await compressImage(file);
+        const fileExt = compressedFile.type.split('/')[1] || 'jpg'; // 안전한 확장자 추론
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `chat_images/${fileName}`;
-        const { error } = await supabase.storage.from('admin_files').upload(filePath, file);
+        const { error } = await supabase.storage.from('admin_files').upload(filePath, compressedFile);
         if (error) throw error;
         const { data } = supabase.storage.from('admin_files').getPublicUrl(filePath);
         return data.publicUrl;

@@ -33,9 +33,30 @@
 - profile/host/community uploads
 - large original image reuse paths
 
+#### Current Upload Findings
+- `app/components/mobile/MobileProfileView.tsx`
+  - guest mobile avatar upload was sending the original file while desktop account/profile flows already compress before upload
+- `app/host/create/page.tsx`
+  - experience hero/itinerary uploads already pass compressed files via preview state and are lower-risk to leave unchanged for now
+- `app/host/register/page.tsx`
+  - profile/id-card uploads already compress before storage upload
+- `app/components/ReviewModal.tsx`
+  - review photos already compress before upload
+- `app/community/write/PostEditor.tsx`
+  - post images already compress before upload
+- `app/admin/dashboard/components/GlobalTeamChat.tsx`
+  - admin team chat attachments now compress before upload; message/preview flow remains unchanged
+
+#### Next Low-Risk Storage Candidates
+- narrow raw image upload on admin/internal tools before touching user-facing experience flows
+- audit repeated public original-image rendering paths before introducing thumbnail/derivative policy
+- keep storage bucket/layout unchanged until low-risk upload wins are exhausted
+
 ## Executed In This Pass
 - Converted fixed-size mobile/profile avatar hot paths from raw `<img>` to `next/image`
 - Narrowed hot-path `select('*')` queries where the consumed fields are explicit
+- Aligned guest mobile avatar upload with desktop flows by compressing before `avatars` bucket upload
+- Compressed admin team chat image attachments before `admin_files` bucket upload
 
 ## Explicitly Deferred
 - schema changes

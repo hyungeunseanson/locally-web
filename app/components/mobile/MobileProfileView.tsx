@@ -12,7 +12,7 @@ import { BOOKING_CONFIRMED_STATUSES } from '@/app/constants/bookingStatus';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
 import { getProfileCompletion, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { validateImage, isHeicValidationResult } from '@/app/utils/image';
+import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image';
 
 type GuestReview = {
     id: string | number;
@@ -136,7 +136,8 @@ export default function MobileProfileView({
         const fileExt = file.name.split('.').pop();
         const filePath = `${userId}-${Math.random()}.${fileExt}`;
         try {
-            const { error } = await supabase.storage.from('avatars').upload(filePath, file);
+            const compressedFile = await compressImage(file);
+            const { error } = await supabase.storage.from('avatars').upload(filePath, compressedFile);
             if (error) throw error;
             const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
             setEditData(prev => ({ ...prev, avatar_url: publicUrl }));
