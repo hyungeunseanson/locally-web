@@ -58,6 +58,7 @@ export function useAdminChatQuery() {
   const inquiriesRef = useRef<MonitorInquiry[]>([]);
   const selectedInquiryRef = useRef<MonitorInquiry | null>(null);
   const processedEventRef = useRef<Set<string>>(new Set());
+  const fetchInquiriesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getAuthenticatedUser = useCallback(async (): Promise<User | null> => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -154,6 +155,17 @@ export function useAdminChatQuery() {
     setMessages([]);
   };
 
+  const scheduleFetchInquiries = useCallback((delay = 250) => {
+    if (fetchInquiriesTimerRef.current) {
+      clearTimeout(fetchInquiriesTimerRef.current);
+    }
+
+    fetchInquiriesTimerRef.current = setTimeout(() => {
+      fetchInquiriesTimerRef.current = null;
+      void fetchInquiries(false);
+    }, delay);
+  }, [fetchInquiries]);
+
   // 실시간 구독 로직
   useEffect(() => {
     fetchInquiries();
@@ -166,7 +178,7 @@ export function useAdminChatQuery() {
       .channel(`admin-chat-realtime-${currentUser.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'inquiry_messages' },
+        { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
           const newPayload = payload.new as InquiryMessageRealtimeRow | null;
           const oldPayload = payload.old as InquiryMessageRealtimeRow | null;
@@ -182,9 +194,22 @@ export function useAdminChatQuery() {
             if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
               loadMessages(selectedInquiryRef.current.id);
             } else {
-              // 아닌 경우 목록 갱신 (선택적 최적화 가능)
-              fetchInquiries(false);
+              scheduleFetchInquiries();
             }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' },
+        (payload) => {
+          const newPayload = payload.new as InquiryMessageRealtimeRow | null;
+          const oldPayload = payload.old as InquiryMessageRealtimeRow | null;
+          const inquiryId = newPayload?.inquiry_id || oldPayload?.inquiry_id;
+          if (!inquiryId || !selectedInquiryRef.current) return;
+
+          if (String(inquiryId) === String(selectedInquiryRef.current.id)) {
+            loadMessages(selectedInquiryRef.current.id);
           }
         }
       )
@@ -195,7 +220,7 @@ export function useAdminChatQuery() {
           const newPayload = payload.new as InquiryRealtimeRow | null;
           if (!newPayload?.id) return;
           // 문의 상태 변경, 내용 업데이트 시
-          fetchInquiries(false);
+          scheduleFetchInquiries();
           // 열려있는 문의가 업데이트 된 경우 객체 갱신
           if (selectedInquiryRef.current && String(newPayload.id) === String(selectedInquiryRef.current.id)) {
              setSelectedInquiry((prev) => prev ? { ...prev, ...newPayload } : prev);
@@ -205,9 +230,12 @@ export function useAdminChatQuery() {
       .subscribe();
 
     return () => {
+      if (fetchInquiriesTimerRef.current) {
+        clearTimeout(fetchInquiriesTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, fetchInquiries, loadMessages]);
+  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries]);
 
   return {
     inquiries,
