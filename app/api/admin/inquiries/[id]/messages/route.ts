@@ -3,6 +3,7 @@ import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
+import { getInquiryMessageDisplayContent } from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -92,6 +93,10 @@ export async function GET(
 
       return {
         ...msg,
+        content: getInquiryMessageDisplayContent({
+          type: msg.type,
+          content: msg.content,
+        }),
         created_at: msg.created_at || new Date().toISOString(),
         has_policy_signal: signal.matched,
         policy_signal_categories: signal.categories,

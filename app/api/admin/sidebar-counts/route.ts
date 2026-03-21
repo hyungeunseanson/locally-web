@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { SOFT_DELETED_INQUIRY_MESSAGE_TYPE } from '@/app/utils/inquiry';
 
 export async function GET() {
     try {
@@ -51,6 +52,7 @@ export async function GET() {
                 .select('*', { count: 'exact', head: true })
                 .in('inquiry_id', csIds)
                 .neq('sender_id', user.id)
+                .neq('type', SOFT_DELETED_INQUIRY_MESSAGE_TYPE)
                 .eq('is_read', false);
             csUnreadCount = count || 0;
         }

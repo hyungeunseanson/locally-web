@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
+import { isDeletedInquiryMessage } from '@/app/utils/inquiry';
 
 const CHAT_POLICY_WARNING_COPY = {
   ko: {
@@ -266,9 +267,10 @@ export default function InquiryChat() {
 
             {/* 메시지 영역 */}
             <div className="flex-1 overflow-y-auto px-3 py-3 md:px-5 md:py-4 space-y-3 md:space-y-4 bg-gray-50" ref={scrollRef}>
-              {messages.map((msg) => {
-                const isMe = String(msg.sender_id) === String(currentUser?.id);
-                return (
+	              {messages.map((msg) => {
+	                const isMe = String(msg.sender_id) === String(currentUser?.id);
+	                const isDeletedMessage = isDeletedInquiryMessage(msg.type);
+	                return (
                   <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
                     {!isMe && (
                       <div
@@ -310,10 +312,12 @@ export default function InquiryChat() {
                           </div>
                         )}
 
-                        <div className={`px-3 py-2 md:px-4 md:py-2.5 rounded-2xl text-[13px] md:text-[14px] leading-relaxed shadow-sm break-words ${isMe
-                          ? 'bg-black text-white rounded-tr-sm'
-                          : 'bg-white border border-gray-200 rounded-tl-sm'
-                          }`}>
+	                        <div className={`px-3 py-2 md:px-4 md:py-2.5 rounded-2xl text-[13px] md:text-[14px] leading-relaxed shadow-sm break-words ${isDeletedMessage
+	                          ? 'bg-slate-100 border border-dashed border-slate-300 text-slate-500 italic'
+	                          : isMe
+	                            ? 'bg-black text-white rounded-tr-sm'
+	                            : 'bg-white border border-gray-200 rounded-tl-sm'
+	                          }`}>
                           {msg.type === 'image' && msg.image_url && (
                             <div className="mb-1 rounded-lg overflow-hidden">
                               <a href={msg.image_url} rel="noopener noreferrer">

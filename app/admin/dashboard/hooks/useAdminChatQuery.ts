@@ -25,6 +25,7 @@ type MonitorMessage = {
   id: number | string;
   sender_id: string;
   content: string;
+  type?: string | null;
   sender?: { name?: string | null };
   has_policy_signal?: boolean;
   policy_signal_categories?: string[];

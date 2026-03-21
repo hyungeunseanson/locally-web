@@ -37,6 +37,7 @@ const HOST_CHAT_INPUT_SELECTOR = [
 ].join(', ');
 const WARNING_BANNER_TEXT =
   /연락처·외부 링크 공유는 제재 대상입니다|Sharing contact details or external links may lead to penalties|連絡先や外部リンクの共有は制裁対象となる場合があります|分享联系方式或外部链接可能会导致处罚/;
+const SOFT_DELETE_PLACEHOLDER = '[운영 정책에 의해 삭제된 메시지입니다.]';
 
 let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
@@ -441,5 +442,116 @@ test.describe.serial('Chat policy monitoring flow', () => {
     await expect(adminSession.page.getByText(fixture.host.phone, { exact: true }).first()).toBeVisible();
 
     await adminSession.context.close();
+  });
+
+  test('soft deletes a flagged message without breaking preview or participant views', async ({ browser }) => {
+    const flaggedMessage = `soft delete target 010-4444-5555 ${Date.now()}`;
+
+    const guestSession = await withLoggedInPage(browser, fixture.guest);
+    await openGuestInquiry(guestSession.page, fixture.inquiryId);
+
+    const guestInput = guestSession.page.locator(GUEST_CHAT_INPUT_SELECTOR).first();
+    await guestInput.fill(flaggedMessage);
+    await guestInput.press('Enter');
+
+    await expect.poll(async () => {
+      const { data, error } = await getAdminClient()
+        .from('inquiry_messages')
+        .select('id')
+        .eq('inquiry_id', fixture.inquiryId)
+        .eq('content', flaggedMessage)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data?.id ? Number(data.id) : null;
+    }, {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).not.toBeNull();
+
+    const { data: softDeletedMessageRow, error: softDeletedMessageError } = await getAdminClient()
+      .from('inquiry_messages')
+      .select('id')
+      .eq('inquiry_id', fixture.inquiryId)
+      .eq('content', flaggedMessage)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (softDeletedMessageError || !softDeletedMessageRow?.id) {
+      throw softDeletedMessageError || new Error('Failed to resolve soft delete target message id.');
+    }
+
+    const softDeletedMessageId = Number(softDeletedMessageRow.id);
+
+    createdMessageIds.push(softDeletedMessageId);
+
+    await guestSession.context.close();
+
+    const adminSession = await withLoggedInPage(browser, fixture.admin);
+    await adminSession.page.goto(`/admin/dashboard?tab=CHATS&inquiryId=${fixture.inquiryId}`, { waitUntil: 'networkidle' });
+
+    const deleteButton = adminSession.page.locator(`[data-delete-message-id="${softDeletedMessageId}"]`);
+    await expect(deleteButton).toBeVisible({ timeout: 15000 });
+    adminSession.page.once('dialog', (dialog) => dialog.accept());
+    await deleteButton.click();
+
+    await expect(adminSession.page.getByText('운영 삭제').first()).toBeVisible({ timeout: 15000 });
+    await expect(adminSession.page.getByText(SOFT_DELETE_PLACEHOLDER).first()).toBeVisible({ timeout: 15000 });
+
+    await expect.poll(async () => {
+      const { data, error } = await getAdminClient()
+        .from('inquiry_messages')
+        .select('type, content, is_read, read_at')
+        .eq('id', softDeletedMessageId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      return {
+        type: data?.type || null,
+        content: data?.content || null,
+        is_read: Boolean(data?.is_read),
+        hasReadAt: Boolean(data?.read_at),
+      };
+    }, {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).toEqual({
+      type: 'deleted',
+      content: SOFT_DELETE_PLACEHOLDER,
+      is_read: true,
+      hasReadAt: true,
+    });
+
+    await expect.poll(async () => {
+      const { data, error } = await getAdminClient()
+        .from('inquiries')
+        .select('content')
+        .eq('id', fixture.inquiryId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data?.content || null;
+    }, {
+      timeout: 15000,
+      intervals: [500, 1000, 1500],
+    }).toBe(SOFT_DELETE_PLACEHOLDER);
+
+    auditLogTargetIds.push(String(softDeletedMessageId));
+
+    await adminSession.context.close();
+
+    const guestVerifySession = await withLoggedInPage(browser, fixture.guest);
+    await openGuestInquiry(guestVerifySession.page, fixture.inquiryId);
+    await expect(guestVerifySession.page.getByText(SOFT_DELETE_PLACEHOLDER).first()).toBeVisible({ timeout: 15000 });
+    await guestVerifySession.context.close();
+
+    const hostVerifySession = await withLoggedInPage(browser, fixture.host);
+    await openHostInquiry(hostVerifySession.page, fixture.inquiryId);
+    await expect(hostVerifySession.page.getByText(SOFT_DELETE_PLACEHOLDER).first()).toBeVisible({ timeout: 15000 });
+    await hostVerifySession.context.close();
   });
 });

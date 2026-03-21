@@ -6,7 +6,11 @@ import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { sanitizeText } from '@/app/utils/sanitize';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
-import { InquiryType } from '@/app/utils/inquiry';
+import {
+  getInquiryMessageDisplayContent,
+  InquiryType,
+  SOFT_DELETED_INQUIRY_MESSAGE_TYPE,
+} from '@/app/utils/inquiry';
 import { getHostPublicProfile } from '@/app/utils/profile';
 
 type ProfileRow = {
@@ -155,6 +159,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
             .select('inquiry_id')
             .in('inquiry_id', inquiryIds)
             .eq('is_read', false)
+            .neq('type', SOFT_DELETED_INQUIRY_MESSAGE_TYPE)
             .neq('sender_id', user.id)
         ]);
 
@@ -259,7 +264,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
         const profileMap = new Map(profileRows.map((p) => [p.id, p]));
         const appMap = new Map(appRows.map((a) => [a.user_id, a]));
 
-        const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => {
+          const safeMessages: InquiryMessageView[] = rawMessages.map((msg) => {
           const profile = profileMap.get(msg.sender_id);
           const app = appMap.get(msg.sender_id);
           const hostPublicProfile = getHostPublicProfile(profile, app, '알 수 없음');
@@ -268,6 +273,10 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
 
           return {
             ...msg,
+            content: getInquiryMessageDisplayContent({
+              type: msg.type,
+              content: msg.content,
+            }),
             created_at: msg.created_at || new Date().toISOString(),
             sender: {
               id: msg.sender_id,
@@ -600,6 +609,14 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
           if (processedEventRef.current.has(eventKey)) return;
           processedEventRef.current.add(eventKey);
           setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
+
+          if (payload.eventType === 'UPDATE' && newPayload?.inquiry_id) {
+            fetchInquiries(false);
+            if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
+              loadMessages(selectedInquiryRef.current.id);
+            }
+            return;
+          }
 
           if (newPayload && newPayload.sender_id !== currentUser.id) {
             fetchInquiries(false);

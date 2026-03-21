@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Mail, Phone } from 'lucide-react';
+import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Mail, Phone, Trash2 } from 'lucide-react';
 import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
-import { isAdminSupportInquiry } from '@/app/utils/inquiry';
+import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inquiry';
 import { useToast } from '@/app/context/ToastContext';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
@@ -72,7 +72,7 @@ export default function ChatMonitor() {
     if (!targetInquiryId || !inquiries?.length) return;
     const target = inquiries.find((inq: MonitorInquiry) => String(inq.id) === String(targetInquiryId));
     if (target) {
-      setActiveTab('admin');
+      setActiveTab(isAdminSupportInquiry(target.type) ? 'admin' : 'monitor');
       loadMessages(target.id);
     }
   }, [targetInquiryId, inquiries, loadMessages]);
@@ -126,6 +126,35 @@ export default function ChatMonitor() {
         const message = error instanceof Error ? error.message : '메시지 전송 실패';
         showToast(message, 'error');
       }
+    }
+  };
+
+  const handleSoftDeleteMessage = async (messageId: number | string) => {
+    if (!selectedInquiry) return;
+    if (!confirm('이 메시지를 운영 정책 위반으로 삭제하시겠습니까?')) return;
+
+    try {
+      const response = await fetch(`/api/admin/inquiries/messages/${messageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'soft_delete',
+          reason: 'policy_violation',
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.error || '메시지 삭제 실패');
+      }
+
+      await refresh(false);
+      await loadMessages(selectedInquiry.id);
+      showToast('메시지가 운영 정책 기준으로 삭제되었습니다.', 'success');
+    } catch (error) {
+      console.error('[ChatMonitor] soft delete failed:', error);
+      const message = error instanceof Error ? error.message : '메시지 삭제 실패';
+      showToast(message, 'error');
     }
   };
 
@@ -368,26 +397,53 @@ export default function ChatMonitor() {
               {messages.map((msg) => {
                 const isGuest = String(msg.sender_id) === String(selectedInquiry.user_id);
                 const alignRight = !isGuest;
+                const isDeletedMessage = isDeletedInquiryMessage(msg.type);
                 // 🟢 관리자 탭 한정: 관리자가 답변 시 "로컬리 (실명)" 형식으로 표출하여 팀 내 추적성 확보
                 const isAdminReply = alignRight && isAdminSupportInquiry(selectedInquiry.type);
                 const displayName = isAdminReply ? `로컬리 (${msg.sender?.name || '알 수 없음'})` : (msg.sender?.name || '알 수 없음');
 
                 return (
-                  <div key={msg.id} className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}>
-                    <span className="text-[9px] md:text-[10px] text-slate-400 mb-0.5 md:mb-1 px-1">
-                      {displayName}
-                    </span>
-                    {msg.has_policy_signal && (
-                      <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200">
-                        <AlertTriangle size={10} />
-                        정책위반 의심
-                      </div>
-                    )}
-                    <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed ${msg.has_policy_signal
-                      ? 'border border-rose-200 bg-rose-50 text-rose-900'
-                      : alignRight
-                        ? 'bg-black text-white rounded-tr-none'
-                        : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'
+                  <div
+                    key={msg.id}
+                    data-message-id={String(msg.id)}
+                    className={`flex flex-col ${alignRight ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="mb-0.5 md:mb-1 flex items-center gap-2 px-1">
+                      <span className="text-[9px] md:text-[10px] text-slate-400">
+                        {displayName}
+                      </span>
+                      {msg.has_policy_signal && !isDeletedMessage && (
+                        <div className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200">
+                          <AlertTriangle size={10} />
+                          정책위반 의심
+                        </div>
+                      )}
+                      {isDeletedMessage && (
+                        <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-slate-600 border border-slate-200">
+                          <Shield size={10} />
+                          운영 삭제
+                        </div>
+                      )}
+                      {activeTab === 'monitor' && !selectedIsAdminSupport && msg.has_policy_signal && !isDeletedMessage && (
+                        <button
+                          type="button"
+                          onClick={() => handleSoftDeleteMessage(msg.id)}
+                          data-delete-message-id={String(msg.id)}
+                          className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-50"
+                          title="정책위반 메시지 삭제"
+                        >
+                          <Trash2 size={10} />
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                    <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed ${isDeletedMessage
+                      ? 'border border-slate-200 border-dashed bg-slate-100 text-slate-500 italic'
+                      : msg.has_policy_signal
+                        ? 'border border-rose-200 bg-rose-50 text-rose-900'
+                        : alignRight
+                          ? 'bg-black text-white rounded-tr-none'
+                          : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'
                       }`}>
                       {msg.content}
                     </div>

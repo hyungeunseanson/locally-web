@@ -3,6 +3,7 @@ import {
   ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
   detectChatPolicySignals,
 } from '@/app/utils/chatPolicySignals';
+import { SOFT_DELETED_INQUIRY_MESSAGE_TYPE } from '@/app/utils/inquiry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -75,6 +76,7 @@ export async function GET() {
         .select('inquiry_id')
         .in('inquiry_id', inquiryIds)
         .eq('is_read', false)
+        .neq('type', SOFT_DELETED_INQUIRY_MESSAGE_TYPE)
         .neq('sender_id', user.id)
     ]);
 
