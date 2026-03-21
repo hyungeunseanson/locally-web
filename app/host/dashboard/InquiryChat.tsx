@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useChat } from '@/app/hooks/useChat';
 import UserProfileModal from '@/app/components/UserProfileModal';
 import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
@@ -8,6 +8,26 @@ import Spinner from '@/app/components/ui/Spinner';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
+
+const CHAT_POLICY_WARNING_COPY = {
+  ko: {
+    title: '연락처·외부 링크 공유는 제재 대상입니다.',
+    body: '전화번호, 이메일, URL 등이 포함된 메시지는 운영팀에 전달될 수 있습니다.',
+  },
+  en: {
+    title: 'Sharing contact details or external links may lead to penalties.',
+    body: 'Messages containing phone numbers, emails, or URLs may be reviewed by the team.',
+  },
+  ja: {
+    title: '連絡先や外部リンクの共有は制裁対象となる場合があります。',
+    body: '電話番号、メールアドレス、URL を含むメッセージは運営チームが確認することがあります。',
+  },
+  zh: {
+    title: '分享联系方式或外部链接可能会导致处罚。',
+    body: '包含电话号码、邮箱或 URL 的消息可能会被运营团队审核。',
+  },
+} as const;
 
 export default function InquiryChat() {
   const {
@@ -22,7 +42,7 @@ export default function InquiryChat() {
     refresh,
   } = useChat('host');
 
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -36,6 +56,8 @@ export default function InquiryChat() {
   const guestIdFromUrl = searchParams.get('guestId');
   const expIdFromUrl = searchParams.get('expId');
   const [pendingChatCreated, setPendingChatCreated] = useState(false);
+  const chatPolicySignals = useMemo(() => detectChatPolicySignals(replyText), [replyText]);
+  const chatPolicyWarningCopy = CHAT_POLICY_WARNING_COPY[lang] ?? CHAT_POLICY_WARNING_COPY.ko;
 
   const [modalUserId, setModalUserId] = useState<string | null>(null);
 
@@ -321,7 +343,14 @@ export default function InquiryChat() {
             </div>
 
             {/* 입력 바 */}
-            <div className="px-3 py-2.5 md:px-5 md:py-3 bg-white border-t border-gray-100 flex items-center gap-2 md:gap-3 shrink-0">
+            <div className="px-3 py-2.5 md:px-5 md:py-3 bg-white border-t border-gray-100 shrink-0">
+              {chatPolicySignals.matched && (
+                <div className="mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2">
+                  <div className="text-[11px] md:text-[12px] font-bold text-rose-700">{chatPolicyWarningCopy.title}</div>
+                  <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{chatPolicyWarningCopy.body}</div>
+                </div>
+              )}
+              <div className="flex items-center gap-2 md:gap-3">
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -349,6 +378,7 @@ export default function InquiryChat() {
               >
                 {isSending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
               </button>
+              </div>
             </div>
           </>
         ) : (

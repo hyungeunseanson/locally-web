@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield } from 'lucide-react';
+import Image from 'next/image';
+import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shield, Mail, Phone } from 'lucide-react';
 import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
 import { useToast } from '@/app/context/ToastContext';
@@ -29,30 +30,13 @@ type MonitorInquiry = {
   id: number | string;
   type?: string | null;
   guest?: MonitorGuest;
-  host?: { name?: string | null; avatar_url?: string | null };
+  host?: { id?: string | null; name?: string | null; avatar_url?: string | null; email?: string | null; phone?: string | null; status?: string | null };
   experiences?: { title?: string | null } | null;
   user_id: string;
   updated_at?: string | null;
   content?: string | null;
-};
-
-type MonitorMessage = {
-  id: number | string;
-  sender_id: string;
-  content: string;
-  sender?: { name?: string | null };
-};
-
-type AdminChatState = {
-  inquiries: MonitorInquiry[];
-  selectedInquiry: MonitorInquiry | null;
-  messages: MonitorMessage[];
-  loadMessages: (inquiryId: number | string) => void;
-  clearSelected: () => void;
-  sendMessage: (inquiryId: number | string, content: string) => Promise<void>;
-  refresh: () => void;
-  isLoading: boolean;
-  error?: string;
+  has_policy_signal?: boolean;
+  policy_signal_categories?: string[];
 };
 
 export default function ChatMonitor() {
@@ -91,7 +75,7 @@ export default function ChatMonitor() {
       setActiveTab('admin');
       loadMessages(target.id);
     }
-  }, [targetInquiryId, inquiries?.length]);
+  }, [targetInquiryId, inquiries, loadMessages]);
 
   const handleClearSelected = () => {
     clearSelected();
@@ -132,7 +116,7 @@ export default function ChatMonitor() {
 
         // 🟢 첫 번째 답변 시: '대기(open)' 상태를 '처리중(in_progress)'으로 자동 전환
         if (activeTab === 'admin' && isAdminSupportInquiry(selectedInquiry.type)) {
-          const currentStatus = (selectedInquiry as any).status;
+          const currentStatus = selectedInquiry.status;
           if (!currentStatus || currentStatus === 'open') {
             await handleUpdateCSStatus(selectedInquiry.id, 'in_progress');
           }
@@ -150,7 +134,7 @@ export default function ChatMonitor() {
     return guest.full_name || guest.name || guest.email || '익명 고객';
   };
 
-  const filteredInquiries = (inquiries || []).filter((inq: any) => {
+  const filteredInquiries = (inquiries || []).filter((inq) => {
     if (activeTab === 'monitor') return !isAdminSupportInquiry(inq.type);
     if (!isAdminSupportInquiry(inq.type)) return false;
     if (csStatusFilter === 'ALL') return true;
@@ -159,32 +143,10 @@ export default function ChatMonitor() {
     return inq.status === csStatusFilter;
   });
 
-  // --- Keyword Detection Logic ---
-  const RESTRICTED_KEYWORDS = ['전화번호', '번호', '연락처', '010', '카톡', '계좌', '입금', '송금', '오픈채팅'];
-
-  const detectWarning = (msgs: MonitorMessage[]) => {
-    if (activeTab === 'admin') return false; // Only warn in monitor mode
-    return msgs.some(m => RESTRICTED_KEYWORDS.some(k => m.content?.includes(k)));
-  };
-
-  const renderMessageContent = (content: string) => {
-    if (!content) return '';
-    if (activeTab === 'admin') return content; // Don't highlight in 1:1 inquiries
-
-    // Create a regex to match any of the keywords
-    const regex = new RegExp(`(${RESTRICTED_KEYWORDS.join('|')})`, 'gi');
-    const parts = content.split(regex);
-
-    return parts.map((part, i) => {
-      if (RESTRICTED_KEYWORDS.some(k => k.toLowerCase() === part.toLowerCase())) {
-        return <span key={i} className="text-red-500 font-bold underline decoration-red-300 underline-offset-2 bg-red-50 px-0.5 rounded-sm">{part}</span>;
-      }
-      return part;
-    });
-  };
-
   const selectedIsAdminSupport = isAdminSupportInquiry(selectedInquiry?.type);
-  const hasWarning = selectedInquiry ? detectWarning(messages) : false;
+  const hasWarning = selectedInquiry
+    ? Boolean(selectedInquiry.has_policy_signal || messages.some((message) => message.has_policy_signal))
+    : false;
 
   return (
     <div className="flex h-[calc(100dvh-190px)] md:h-[calc(100dvh-230px)] lg:h-[calc(100dvh-260px)] gap-4 md:gap-6 w-full relative">
@@ -266,8 +228,8 @@ export default function ChatMonitor() {
                     {activeTab === 'monitor' ? (
                       <span className="text-[8px] md:text-[10px] bg-slate-100 text-slate-500 px-1 md:px-1.5 py-0.5 rounded whitespace-nowrap">유저↔호스트</span>
                     ) : (
-                      <span className={`text-[8px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded border whitespace-nowrap ${CS_STATUS_COLORS[(inq as any).status as CSStatus] || CS_STATUS_COLORS.open}`}>
-                        {CS_STATUS_LABELS[(inq as any).status as CSStatus] || '대기'}
+                      <span className={`text-[8px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded border whitespace-nowrap ${CS_STATUS_COLORS[(inq.status as CSStatus) || 'open'] || CS_STATUS_COLORS.open}`}>
+                        {CS_STATUS_LABELS[(inq.status as CSStatus) || 'open'] || '대기'}
                       </span>
                     )}
                     <span className="truncate max-w-[80px] md:max-w-[100px]">{getGuestName(inq.guest)}</span>
@@ -277,7 +239,15 @@ export default function ChatMonitor() {
                 <div className="text-[10px] md:text-xs text-slate-500 mb-0.5 md:mb-1 truncate">
                   {inq.experiences?.title ? `🏠 ${inq.experiences.title}` : '📄 문의 내용'}
                 </div>
-                <p className="text-xs md:text-sm text-slate-600 line-clamp-1">{inq.content || '(내용 없음)'}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs md:text-sm text-slate-600 line-clamp-1 flex-1">{inq.content || '(내용 없음)'}</p>
+                  {inq.has_policy_signal && (
+                    <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200">
+                      <AlertTriangle size={10} />
+                      정책위반 의심
+                    </span>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -294,7 +264,7 @@ export default function ChatMonitor() {
               {activeTab === 'admin' && selectedIsAdminSupport && (
                 <div className="absolute top-2 right-2 md:top-3 md:right-3 flex gap-1 z-10">
                   {(['open', 'in_progress', 'resolved'] as CSStatus[]).map((s) => {
-                    const currentStatus = (selectedInquiry as any)?.status;
+                    const currentStatus = selectedInquiry.status;
                     const isActive = currentStatus === s || (!currentStatus && s === 'open');
                     return (
                       <button
@@ -321,7 +291,7 @@ export default function ChatMonitor() {
 
                 <div className="w-8 h-8 md:w-12 md:h-12 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-200 shadow-sm shrink-0">
                   {selectedInquiry.guest?.avatar_url ? (
-                    <img src={selectedInquiry.guest.avatar_url} className="w-full h-full object-cover" alt="Profile" />
+                    <Image src={selectedInquiry.guest.avatar_url} className="w-full h-full object-cover" alt="Profile" width={48} height={48} />
                   ) : (
                     <User className="text-slate-400 w-4 h-4 md:w-6 md:h-6" />
                   )}
@@ -349,6 +319,42 @@ export default function ChatMonitor() {
               </div>
             </div>
 
+            <div className="px-3 md:px-4 py-3 border-b border-slate-100 bg-white">
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase mb-2">Guest</div>
+                  <div className="text-xs md:text-sm font-bold text-slate-900">{getGuestName(selectedInquiry.guest)}</div>
+                  <div className="mt-1 space-y-1">
+                    <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
+                      <Mail size={12} className="shrink-0" />
+                      <span className="truncate">{selectedInquiry.guest?.email || '이메일 정보 없음'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
+                      <Phone size={12} className="shrink-0" />
+                      <span className="truncate">{selectedInquiry.guest?.phone || '전화번호 정보 없음'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {!selectedIsAdminSupport && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase mb-2">Host</div>
+                    <div className="text-xs md:text-sm font-bold text-slate-900">{selectedInquiry.host?.name || '호스트 정보 없음'}</div>
+                    <div className="mt-1 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
+                        <Mail size={12} className="shrink-0" />
+                        <span className="truncate">{selectedInquiry.host?.email || '이메일 정보 없음'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] md:text-[12px] text-slate-600">
+                        <Phone size={12} className="shrink-0" />
+                        <span className="truncate">{selectedInquiry.host?.phone || '전화번호 정보 없음'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="flex-1 p-3 md:p-6 overflow-y-auto bg-slate-50 space-y-3 md:space-y-4 relative custom-scrollbar" ref={scrollRef}>
               {hasWarning && (
                 <div className="sticky top-0 z-10 mx-auto max-w-[80%] mb-4 animate-in slide-in-from-top-2">
@@ -371,8 +377,19 @@ export default function ChatMonitor() {
                     <span className="text-[9px] md:text-[10px] text-slate-400 mb-0.5 md:mb-1 px-1">
                       {displayName}
                     </span>
-                    <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed ${alignRight ? 'bg-black text-white rounded-tr-none' : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'}`}>
-                      {renderMessageContent(msg.content)}
+                    {msg.has_policy_signal && (
+                      <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200">
+                        <AlertTriangle size={10} />
+                        정책위반 의심
+                      </div>
+                    )}
+                    <div className={`p-2.5 md:p-3 rounded-lg md:rounded-xl max-w-[85%] md:max-w-[70%] text-xs md:text-sm shadow-sm leading-relaxed ${msg.has_policy_signal
+                      ? 'border border-rose-200 bg-rose-50 text-rose-900'
+                      : alignRight
+                        ? 'bg-black text-white rounded-tr-none'
+                        : 'bg-white border border-slate-200 rounded-tl-none text-slate-800'
+                      }`}>
+                      {msg.content}
                     </div>
                   </div>
                 );

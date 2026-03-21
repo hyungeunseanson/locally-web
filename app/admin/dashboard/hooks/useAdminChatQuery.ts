@@ -10,13 +10,15 @@ type MonitorInquiry = {
   id: number | string;
   type?: string | null;
   guest?: { full_name?: string | null; name?: string | null; email?: string | null; avatar_url?: string | null; phone?: string | null; };
-  host?: { name?: string | null; avatar_url?: string | null };
+  host?: { id?: string | null; name?: string | null; avatar_url?: string | null; email?: string | null; phone?: string | null; status?: string | null };
   experiences?: { title?: string | null } | null;
   user_id: string;
   updated_at?: string | null;
   content?: string | null;
   status?: string | null;
   unread_count?: number;
+  has_policy_signal?: boolean;
+  policy_signal_categories?: string[];
 };
 
 type MonitorMessage = {
@@ -24,6 +26,21 @@ type MonitorMessage = {
   sender_id: string;
   content: string;
   sender?: { name?: string | null };
+  has_policy_signal?: boolean;
+  policy_signal_categories?: string[];
+};
+
+type InquiryMessageRealtimeRow = {
+  id?: number | string;
+  sender_id?: string;
+  inquiry_id?: number | string;
+};
+
+type InquiryRealtimeRow = {
+  id?: number | string;
+  status?: string | null;
+  content?: string | null;
+  updated_at?: string | null;
 };
 
 export function useAdminChatQuery() {
@@ -124,7 +141,7 @@ export function useAdminChatQuery() {
       await loadMessages(inquiryId);
       await fetchInquiries(false); // Update list snippet & timestamp
     } catch (err: unknown) {
-      let message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
+      const message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
       showToast('메시지 전송 실패: ' + message, 'error');
       throw err instanceof Error ? err : new Error(message);
     }
@@ -150,8 +167,8 @@ export function useAdminChatQuery() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
-          const newPayload = payload.new as any;
-          const oldPayload = payload.old as any;
+          const newPayload = payload.new as InquiryMessageRealtimeRow | null;
+          const oldPayload = payload.old as InquiryMessageRealtimeRow | null;
           const rawId = newPayload?.id || oldPayload?.id || 'unknown';
           const eventKey = `${payload.eventType}:${rawId}`;
           
@@ -174,7 +191,8 @@ export function useAdminChatQuery() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'inquiries' },
         (payload) => {
-          const newPayload = payload.new as any;
+          const newPayload = payload.new as InquiryRealtimeRow | null;
+          if (!newPayload?.id) return;
           // 문의 상태 변경, 내용 업데이트 시
           fetchInquiries(false);
           // 열려있는 문의가 업데이트 된 경우 객체 갱신

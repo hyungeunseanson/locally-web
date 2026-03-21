@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import {
+  ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+  detectChatPolicySignals,
+} from '@/app/utils/chatPolicySignals';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -10,12 +14,16 @@ type ProfileRow = {
   full_name?: string | null;
   email?: string | null;
   avatar_url?: string | null;
+  phone?: string | null;
 };
 
 type HostApplicationRow = {
   user_id: string;
   name?: string | null;
   profile_photo?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: string | null;
 };
 
 export async function GET() {
@@ -60,9 +68,9 @@ export async function GET() {
 
     // 3. 프로필, 애플리케이션, 그리고 안 읽은 메시지 수 조회
     const [profilesRes, appsRes, guestProfilesRes, unreadRes] = await Promise.all([
-      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', hostIds),
-      supabaseAdmin.from('host_applications').select('user_id, name, profile_photo').in('user_id', hostIds),
-      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', guestIds),
+      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url, phone').in('id', hostIds),
+      supabaseAdmin.from('host_applications').select('user_id, name, profile_photo, email, phone, status').in('user_id', hostIds),
+      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url, phone').in('id', guestIds),
       supabaseAdmin.from('inquiry_messages')
         .select('inquiry_id')
         .in('inquiry_id', inquiryIds)
@@ -100,21 +108,30 @@ export async function GET() {
       const guestProfile = guestMap.get(item.user_id);
       const guestName = guestProfile?.full_name || guestProfile?.email?.split('@')[0] || '게스트';
       const guestAvatar = guestProfile?.avatar_url;
+      const signal = detectChatPolicySignals(String(item.content || ''), {
+        activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+      });
 
       return {
         ...item,
         experience_id: item.experience_id ?? '',
         unread_count: unreadCounts[String(item.id)] || 0,
+        has_policy_signal: signal.matched,
+        policy_signal_categories: signal.categories,
         guest: {
           id: item.user_id,
           name: guestName,
           avatar_url: secureUrl(guestAvatar ?? null),
-          email: guestProfile?.email
+          email: guestProfile?.email,
+          phone: guestProfile?.phone ?? null,
         },
         host: {
           id: item.host_id,
           name: hostPublicProfile.name,
-          avatar_url: secureUrl(hostPublicProfile.avatarUrl ?? null)
+          avatar_url: secureUrl(hostPublicProfile.avatarUrl ?? null),
+          email: hostProfile?.email || hostApp?.email || null,
+          phone: hostProfile?.phone || hostApp?.phone || null,
+          status: hostApp?.status || null,
         },
         experiences: item.experiences
           ? {

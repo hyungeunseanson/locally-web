@@ -9,11 +9,30 @@ import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달
 import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
+import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
 import { isAdminSupportInquiry } from '@/app/utils/inquiry';
 import { createClient } from '@/app/utils/supabase/client';
 import { getHostPublicProfile } from '@/app/utils/profile';
 
 const ADMIN_SUPPORT_AVATAR_SRC = '/images/logos/Frame%201545423142.png';
+const CHAT_POLICY_WARNING_COPY = {
+  ko: {
+    title: '연락처·외부 링크 공유는 제재 대상입니다.',
+    body: '전화번호, 이메일, URL 등이 포함된 메시지는 운영팀에 전달될 수 있습니다.',
+  },
+  en: {
+    title: 'Sharing contact details or external links may lead to penalties.',
+    body: 'Messages containing phone numbers, emails, or URLs may be reviewed by the team.',
+  },
+  ja: {
+    title: '連絡先や外部リンクの共有は制裁対象となる場合があります。',
+    body: '電話番号、メールアドレス、URL を含むメッセージは運営チームが確認することがあります。',
+  },
+  zh: {
+    title: '分享联系方式或外部链接可能会导致处罚。',
+    body: '包含电话号码、邮箱或 URL 的消息可能会被运营团队审核。',
+  },
+} as const;
 
 function InboxContent() {
   const { t, lang } = useLanguage(); // 🟢 lang 추가 필수!
@@ -59,6 +78,8 @@ function InboxContent() {
   const expTitle = searchParams.get('expTitle');
 
   const [isUrlProcessed, setIsUrlProcessed] = useState(false);
+  const chatPolicySignals = useMemo(() => detectChatPolicySignals(inputText), [inputText]);
+  const chatPolicyWarningCopy = CHAT_POLICY_WARNING_COPY[lang] ?? CHAT_POLICY_WARNING_COPY.ko;
 
   // 🟢 [헬퍼] 보안 이미지 및 시간 포맷
   const secureUrl = (url: string | null | undefined) => {
@@ -486,7 +507,14 @@ function InboxContent() {
               </div>
 
               {/* 입력 바 */}
-              <div className="px-2.5 md:px-5 py-2 md:py-3 bg-white border-t border-gray-100 flex items-center gap-1.5 md:gap-3 shrink-0">
+              <div className="px-2.5 md:px-5 py-2 md:py-3 bg-white border-t border-gray-100 shrink-0">
+                {chatPolicySignals.matched && (
+                  <div className="mb-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2">
+                    <div className="text-[11px] md:text-[12px] font-bold text-rose-700">{chatPolicyWarningCopy.title}</div>
+                    <div className="mt-0.5 text-[10px] md:text-[11px] text-rose-600">{chatPolicyWarningCopy.body}</div>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 md:gap-3">
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -514,6 +542,7 @@ function InboxContent() {
                 >
                   {isSending ? <Loader2 className="animate-spin w-[14px] h-[14px] md:w-[15px] md:h-[15px]" /> : <Send className="w-[14px] h-[14px] md:w-[15px] md:h-[15px]" />}
                 </button>
+                </div>
               </div>
             </>
           ) : (

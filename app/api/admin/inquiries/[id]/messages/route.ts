@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import {
+  ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+  detectChatPolicySignals,
+} from '@/app/utils/chatPolicySignals';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -9,6 +13,7 @@ type ProfileRow = {
   full_name?: string | null;
   email?: string | null;
   avatar_url?: string | null;
+  phone?: string | null;
 };
 
 type HostApplicationRow = {
@@ -60,7 +65,7 @@ export async function GET(
     const senderIds = Array.from(new Set(rawMessages.map((m) => m.sender_id)));
     
     const [proRes, appRes] = await Promise.all([
-      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url').in('id', senderIds),
+      supabaseAdmin.from('profiles').select('id, full_name, email, avatar_url, phone').in('id', senderIds),
       supabaseAdmin.from('host_applications').select('user_id, name, profile_photo').in('user_id', senderIds)
     ]);
 
@@ -81,10 +86,15 @@ export async function GET(
       const hostPublicProfile = getHostPublicProfile(profile, app, '알 수 없음');
       const name = hostPublicProfile.name;
       const avatar = hostPublicProfile.avatarUrl;
+      const signal = detectChatPolicySignals(String(msg.content || ''), {
+        activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+      });
 
       return {
         ...msg,
         created_at: msg.created_at || new Date().toISOString(),
+        has_policy_signal: signal.matched,
+        policy_signal_categories: signal.categories,
         sender: {
           id: msg.sender_id,
           name,

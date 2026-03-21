@@ -1,5 +1,11 @@
 import nodemailer from 'nodemailer';
 
+import {
+  ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+  CHAT_POLICY_SIGNAL_LABELS,
+  detectChatPolicySignals,
+} from '@/app/utils/chatPolicySignals';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sanitizeText, sanitizeUrl } from '@/app/utils/sanitize';
@@ -427,6 +433,76 @@ function isAdminSupportType(type?: string | null) {
   return type === 'admin' || type === 'admin_support';
 }
 
+function shouldDetectPolicySignals(type?: string | null) {
+  return !isAdminSupportType(type);
+}
+
+async function emitChatPolicySignal(params: {
+  inquiryId: number | string;
+  messageId: number | string;
+  inquiryType?: string | null;
+  actor: AuthActor;
+  content: string;
+  hasImage: boolean;
+}) {
+  const { inquiryId, messageId, inquiryType, actor, content, hasImage } = params;
+
+  if (!shouldDetectPolicySignals(inquiryType)) return;
+
+  const signal = detectChatPolicySignals(content, {
+    activeCategories: ACTIVE_CHAT_POLICY_SIGNAL_CATEGORIES,
+  });
+
+  if (!signal.matched) return;
+
+  const categoryLabels = signal.categories
+    .map((category) => CHAT_POLICY_SIGNAL_LABELS[category])
+    .join(', ');
+
+  const adminLink = buildAdminChatLink(inquiryId);
+
+  try {
+    await insertAdminAlerts({
+      title: '채팅 정책위반 의심 메시지 감지',
+      message: `문의방 ${inquiryId}에서 정책위반 의심 메시지가 감지되었습니다. (${categoryLabels})`,
+      link: adminLink,
+    });
+  } catch (error) {
+    console.warn('[inquiries/thread] policy admin alert failed:', error);
+  }
+
+  void sendAdminAlertEmails({
+    subject: '[Locally Admin] 채팅 정책위반 의심 메시지 감지',
+    title: '채팅 정책위반 의심 메시지 감지',
+    message: [
+      `문의방 ID: ${inquiryId}`,
+      `메시지 ID: ${messageId}`,
+      `보낸 사용자 ID: ${actor.id}`,
+      `탐지 항목: ${categoryLabels}`,
+    ].join('\n'),
+    link: adminLink,
+    ctaLabel: '메시지 모니터링 보기',
+  }).catch((error) => {
+    console.warn('[inquiries/thread] policy admin email failed:', error);
+  });
+
+  await recordAuditLog({
+    action_type: 'CHAT_POLICY_SIGNAL_DETECTED',
+    target_type: 'inquiries',
+    target_id: String(inquiryId),
+    details: {
+      inquiry_id: String(inquiryId),
+      message_id: String(messageId),
+      actor_id: actor.id,
+      actor_email: actor.email || null,
+      inquiry_type: inquiryType || null,
+      categories: signal.categories,
+      has_image: hasImage,
+      content_preview_length: content.length,
+    },
+  });
+}
+
 async function resolveInquiryMessageAccess(params: {
   actor: AuthActor;
   inquiryId: number | string;
@@ -555,6 +631,15 @@ export async function createInquiryMessage(params: {
       link: notificationLink,
     });
   }
+
+  await emitChatPolicySignal({
+    inquiryId: inquiry.id,
+    messageId: insertedMessage.id,
+    inquiryType: inquiry.type,
+    actor,
+    content: displayContent,
+    hasImage: Boolean(imageUrl),
+  });
 
   // 🟢 관리자가 CS 문의에 답변할 경우 운영 감사로그 추가
   if (actorIsAdmin && isAdminSupport) {
@@ -773,6 +858,15 @@ export async function upsertInquiryThread(params: {
         link: notificationLink,
       });
     }
+
+    await emitChatPolicySignal({
+      inquiryId: inquiry.id,
+      messageId: insertedMessage.id,
+      inquiryType: inquiry.type,
+      actor,
+      content: cleanMessage,
+      hasImage: false,
+    });
 
   }
 
