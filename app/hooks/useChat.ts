@@ -100,6 +100,8 @@ type RealtimeMessagePayload = {
   inquiry_id?: number | string;
 };
 
+const REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS = 300;
+
 export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [inquiries, setInquiries] = useState<InquiryListItem[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<InquiryListItem | null>(null);
@@ -115,6 +117,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   // 실시간 핸들러가 최신 상태를 참조하기 위한 refs (의존성 배열 안정화)
   const inquiriesRef = useRef<InquiryListItem[]>([]);
   const selectedInquiryRef = useRef<InquiryListItem | null>(null);
+  const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return null;
@@ -307,6 +310,17 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       console.error(err);
     }
   }, [supabase, markAsRead]);
+
+  const scheduleRealtimeInquiryRefresh = useCallback(() => {
+    if (realtimeRefreshTimeoutRef.current) {
+      clearTimeout(realtimeRefreshTimeoutRef.current);
+    }
+
+    realtimeRefreshTimeoutRef.current = setTimeout(() => {
+      realtimeRefreshTimeoutRef.current = null;
+      void fetchInquiries(false);
+    }, REALTIME_INQUIRY_REFRESH_DEBOUNCE_MS);
+  }, [fetchInquiries]);
 
   const sendMessage = async (inquiryId: number | string, content: string, file?: File, senderId?: string) => {
     const cleanContent = sanitizeText(content);
@@ -604,30 +618,28 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   useEffect(() => {
     if (!currentUser) return;
 
+    const inquiryRealtimeConfig =
+      role === 'guest'
+        ? { event: 'UPDATE' as const, schema: 'public', table: 'inquiries', filter: `user_id=eq.${currentUser.id}` }
+        : role === 'host'
+          ? { event: 'UPDATE' as const, schema: 'public', table: 'inquiries', filter: `host_id=eq.${currentUser.id}` }
+          : { event: 'UPDATE' as const, schema: 'public', table: 'inquiries' };
+
     const channel = supabase
       .channel(`chat-realtime-updates-${currentUser.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'inquiry_messages' },
+        { event: 'INSERT', schema: 'public', table: 'inquiry_messages' },
         (payload) => {
           const newPayload = payload.new as RealtimeMessagePayload | null;
-          const oldPayload = payload.old as RealtimeMessagePayload | null;
-          const rawId = newPayload?.id || oldPayload?.id || 'unknown';
-          const eventKey = `${payload.eventType}:${rawId}`;
+          const rawId = newPayload?.id || 'unknown';
+          const eventKey = `INSERT:${rawId}`;
           if (processedEventRef.current.has(eventKey)) return;
           processedEventRef.current.add(eventKey);
           setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
 
-          if (payload.eventType === 'UPDATE' && newPayload?.inquiry_id) {
-            fetchInquiries(false);
-            if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
-              loadMessages(selectedInquiryRef.current.id);
-            }
-            return;
-          }
-
           if (newPayload && newPayload.sender_id !== currentUser.id) {
-            fetchInquiries(false);
+            scheduleRealtimeInquiryRefresh();
             if (selectedInquiryRef.current && String(newPayload.inquiry_id) === String(selectedInquiryRef.current.id)) {
               loadMessages(selectedInquiryRef.current.id);
             }
@@ -636,15 +648,41 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'inquiries' },
-        () => fetchInquiries(false)
+        { event: 'UPDATE', schema: 'public', table: 'inquiry_messages' },
+        (payload) => {
+          const newPayload = payload.new as RealtimeMessagePayload | null;
+          const oldPayload = payload.old as RealtimeMessagePayload | null;
+          const rawId = newPayload?.id || oldPayload?.id || 'unknown';
+          const eventKey = `UPDATE:${rawId}`;
+          if (processedEventRef.current.has(eventKey)) return;
+          processedEventRef.current.add(eventKey);
+          setTimeout(() => processedEventRef.current.delete(eventKey), 1500);
+
+          const inquiryId = newPayload?.inquiry_id || oldPayload?.inquiry_id;
+          if (!inquiryId) return;
+
+          scheduleRealtimeInquiryRefresh();
+
+          if (selectedInquiryRef.current && String(inquiryId) === String(selectedInquiryRef.current.id)) {
+            loadMessages(selectedInquiryRef.current.id);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        inquiryRealtimeConfig,
+        () => scheduleRealtimeInquiryRefresh()
       )
       .subscribe();
 
     return () => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
+        realtimeRefreshTimeoutRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
-  }, [supabase, fetchInquiries, currentUser, loadMessages]);
+  }, [supabase, currentUser, loadMessages, role, scheduleRealtimeInquiryRefresh]);
 
   const clearSelected = () => {
     selectedInquiryRef.current = null;
