@@ -35,6 +35,9 @@ interface NotificationContextType {
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NOTIFICATION_SELECT_COLUMNS = 'id, user_id, type, title, message, link, is_read, created_at';
+const TOAST_DURATION_MS = 5000;
+const VISIBILITY_SYNC_MIN_INTERVAL_MS = 2500;
 
 async function markNotificationsRead(params: { notificationId?: number; markAll?: boolean }) {
   const response = await fetch('/api/notifications/read', {
@@ -61,113 +64,167 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const router = useRouter();
   const queryClient = useQueryClient();
 
-// 🟢 [추가] 채널 관리를 위해 useRef 사용 (구독 중복 방지)
-const channelRef = useRef<RealtimeChannel | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncPromiseRef = useRef<Promise<void> | null>(null);
+  const syncingUserIdRef = useRef<string | null>(null);
+  const lastSyncAtRef = useRef(0);
+  const currentUserIdRef = useRef<string | null>(null);
 
-// 초기 로드 + 포그라운드 복귀 공용 알림 동기화 함수
-const syncNotifications = useCallback(async (userId: string) => {
-  const { data } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(20);
-
-  if (!data) return;
-  setNotifications(data);
-
-  const cursor = sessionStorage.getItem('lastSeenNotiCreatedAt');
-
-  // cursor가 없는 첫 진입: cursor만 초기화하고 토스트 없음
-  // 알림 있음 → 최신 알림 시점, 알림 없음 → 현재 시각을 기준점으로 심어둠
-  // (과거 알림을 신규로 오인하지 않고, 빈 함에서 첫 알림도 정상 감지하기 위해)
-  if (!cursor) {
-    sessionStorage.setItem(
-      'lastSeenNotiCreatedAt',
-      data.length > 0 ? data[0].created_at : new Date().toISOString()
-    );
-    return;
-  }
-
-  // cursor가 있는 경우에만: cursor 이후 신규 알림만 토스트 대상
-  const candidate = data.find(n => new Date(n.created_at) > new Date(cursor));
-
-  if (candidate) {
-    sessionStorage.setItem('lastSeenNotiCreatedAt', data[0].created_at);
-    setToast({
-      title: candidate.title,
-      message: candidate.message,
-      link: candidate.link,
-      type: candidate.type.includes('message') ? 'message' : 'notification'
-    });
-    setTimeout(() => setToast(null), 5000);
-
-    // 놓친 booking_confirmed 알림이면 guestTrips 캐시도 무효화
-    if (candidate.type === 'booking_confirmed' && candidate.link === '/guest/trips') {
-      queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
+  const showToast = useCallback((payload: NotificationDB) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
     }
-  }
-}, [supabase, queryClient]);
 
-useEffect(() => {
-  const setupRealtime = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    setToast({
+      title: payload.title,
+      message: payload.message,
+      link: payload.link,
+      type: payload.type.includes('message') ? 'message' : 'notification',
+    });
 
-    // 1. 초기 알림 동기화 (놓친 알림 보정 포함)
-    await syncNotifications(user.id);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimeoutRef.current = null;
+    }, TOAST_DURATION_MS);
+  }, []);
 
-    // 🟢 이미 구독 중이면 해제 후 다시 구독 (중복 방지)
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
+  const syncNotifications = useCallback((userId: string) => {
+    if (syncPromiseRef.current && syncingUserIdRef.current === userId) {
+      return syncPromiseRef.current;
+    }
 
-    // 2. 리얼타임 구독 — notifications 테이블 INSERT만 감지 (서버사이드 user_id 필터)
-    // (채팅 알림은 /api/inquiries/thread, /api/inquiries/message 서버 경로가 DB에 저장 후
-    //  여기 Channel A가 감지하므로, inquiry_messages를 별도 구독할 필요 없음)
-    channelRef.current = supabase
-      .channel('global-alerts')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const newNoti = payload.new as NotificationDB;
-          if (newNoti.user_id !== user.id) return;
+    syncingUserIdRef.current = userId;
+    const currentSync = (async () => {
+      const { data } = await supabase
+        .from('notifications')
+        .select(NOTIFICATION_SELECT_COLUMNS)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-          setNotifications((prev) => [newNoti, ...prev]);
-          sessionStorage.setItem('lastSeenNotiCreatedAt', newNoti.created_at);
+      if (!data) return;
 
-          setToast({
-            title: newNoti.title,
-            message: newNoti.message,
-            link: newNoti.link,
-            type: newNoti.type.includes('message') ? 'message' : 'notification'
-          });
-          setTimeout(() => setToast(null), 5000);
+      lastSyncAtRef.current = Date.now();
+      setNotifications(data);
 
-          // booking_confirmed + /guest/trips 링크 조합에서만 캐시 무효화
-          if (newNoti.type === 'booking_confirmed' && newNoti.link === '/guest/trips') {
-            queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
+      const cursor = sessionStorage.getItem('lastSeenNotiCreatedAt');
+
+      if (!cursor) {
+        sessionStorage.setItem(
+          'lastSeenNotiCreatedAt',
+          data.length > 0 ? data[0].created_at : new Date().toISOString()
+        );
+        return;
+      }
+
+      const candidate = data.find((notification) => new Date(notification.created_at) > new Date(cursor));
+
+      if (!candidate) return;
+
+      sessionStorage.setItem('lastSeenNotiCreatedAt', data[0].created_at);
+      showToast(candidate);
+
+      if (candidate.type === 'booking_confirmed' && candidate.link === '/guest/trips') {
+        queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
+      }
+    })().finally(() => {
+      if (syncPromiseRef.current === currentSync) {
+        syncPromiseRef.current = null;
+      }
+      if (syncingUserIdRef.current === userId) {
+        syncingUserIdRef.current = null;
+      }
+    });
+
+    syncPromiseRef.current = currentSync;
+    return currentSync;
+  }, [supabase, queryClient, showToast]);
+
+  useEffect(() => {
+    const setupRealtime = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        currentUserIdRef.current = null;
+        return;
+      }
+
+      currentUserIdRef.current = user.id;
+      await syncNotifications(user.id);
+
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+
+      channelRef.current = supabase
+        .channel('global-alerts')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            const newNoti = payload.new as NotificationDB;
+            if (newNoti.user_id !== user.id) return;
+
+            setNotifications((prev) => {
+              if (prev.some((notification) => notification.id === newNoti.id)) {
+                return prev;
+              }
+              return [newNoti, ...prev];
+            });
+
+            lastSyncAtRef.current = Date.now();
+            sessionStorage.setItem('lastSeenNotiCreatedAt', newNoti.created_at);
+            showToast(newNoti);
+
+            if (newNoti.type === 'booking_confirmed' && newNoti.link === '/guest/trips') {
+              queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
+            }
           }
-        }
-      )
-      .subscribe();
-  };
+        )
+        .subscribe();
+    };
 
-  setupRealtime();
+    setupRealtime();
 
-  // 탭 백그라운드 → 포그라운드 복귀 시 놓친 알림 보정
-  const handleVisibility = async () => {
-    if (document.visibilityState !== 'visible') return;
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (currentUser) await syncNotifications(currentUser.id);
-  };
-  document.addEventListener('visibilitychange', handleVisibility);
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (syncPromiseRef.current) return;
+      if (Date.now() - lastSyncAtRef.current < VISIBILITY_SYNC_MIN_INTERVAL_MS) return;
 
-  return () => {
-    // 컴포넌트가 사라질 때만 채널 정리
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
-    document.removeEventListener('visibilitychange', handleVisibility);
-  };
-}, [supabase, syncNotifications, queryClient]); // 🟢 pathname 제거 (페이지 이동해도 연결 유지)
+      const currentUserId = currentUserIdRef.current;
+
+      if (currentUserId) {
+        await syncNotifications(currentUserId);
+        return;
+      }
+
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+
+      if (!currentUser) return;
+      currentUserIdRef.current = currentUser.id;
+      await syncNotifications(currentUser.id);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+        toastTimeoutRef.current = null;
+      }
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [supabase, syncNotifications, queryClient, showToast]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
