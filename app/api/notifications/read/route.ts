@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 type NotificationReadRequestBody = {
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       markedCount: markedIds.length,
     });
   } catch (error) {
+    captureServerException(error, { route: '/api/notifications/read', method: 'POST' });
     console.error('[notifications/read] error:', error);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
   }

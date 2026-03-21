@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import { captureClientException } from '@/app/utils/monitoring/sentry'
 
 export default function Error({
   error,
@@ -13,6 +14,7 @@ export default function Error({
   useEffect(() => {
     // 에러 로깅 서비스(Sentry 등)가 있다면 여기서 호출
     console.error(error)
+    captureClientException(error, { boundary: 'app/experiences/[id]/error' })
   }, [error])
 
   return (

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
 import { notifyServicePaymentOpened } from '@/app/utils/serviceNotificationFlows';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 
 type CaptureOrderBody = {
   bookingId?: string;
@@ -166,6 +167,7 @@ export async function POST(request: Request) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
+    captureServerException(error, { route: '/api/services/payment/paypal/capture-order', method: 'POST' });
     console.error('[PAYPAL][SERVICE] capture-order error:', error);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

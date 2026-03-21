@@ -8,6 +8,7 @@ import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
 import { getBookingSettlementSnapshot } from '@/app/utils/bookingFinance';
 import { notifyExperiencePaymentConfirmed } from '@/app/utils/experienceNotificationFlows';
 import { capturePayPalOrder, getPayPalOrder } from '@/app/utils/paypal/server';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 
 type CaptureOrderBody = {
   bookingId?: string;
@@ -189,6 +190,7 @@ export async function POST(request: Request) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal Server Error';
+    captureServerException(error, { route: '/api/payment/paypal/capture-order', method: 'POST' });
     console.error('[PAYPAL] capture-order error:', error);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

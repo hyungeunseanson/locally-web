@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "codex": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "codex-mcp-server"
+            ]
+        }
+    }
+}

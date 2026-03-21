@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { captureClientException } from '@/app/utils/monitoring/sentry';
 
 export default function Error({
   error,
@@ -13,6 +14,7 @@ export default function Error({
   useEffect(() => {
     // 에러 발생 시 콘솔에 로그 (추후 센트리 등 연동 가능)
     console.error(error);
+    captureClientException(error, { boundary: 'app/error' });
   }, [error]);
 
   return (

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { insertAdminAlerts } from '@/app/utils/adminAlertCenter';
-import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
+import { captureServerException } from '@/app/utils/monitoring/sentry';
 
 type BookingRequestBody = {
     experienceId?: string | number;
@@ -159,6 +159,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, newOrderId, finalAmount });
 
     } catch (error: unknown) {
+        captureServerException(error, { route: '/api/bookings', method: 'POST' });
         console.error('API Booking Transaction Error:', error);
         return NextResponse.json({ success: false, error: '예약 처리 중 서버 오류가 발생했습니다.' }, { status: 500 });
     }
