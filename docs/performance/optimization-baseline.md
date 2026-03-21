@@ -63,6 +63,7 @@
 - Converted the guest profile modal review-host avatar in host reservations to `next/image`
 - Converted fixed-size admin sidebar logos to `next/image`
 - Converted fixed-size admin review guest avatars and review photo thumbnails to `next/image`
+- Converted fixed-size guest past-trip thumbnails to `next/image`
 - Narrowed hot-path `select('*')` queries where the consumed fields are explicit
 - Narrowed admin chat, notification, sidebar, and alerts realtime refetch paths without changing user-visible behavior
 - Aligned guest mobile avatar upload with desktop flows by compressing before `avatars` bucket upload
