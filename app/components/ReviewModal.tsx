@@ -6,9 +6,22 @@ import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
 import { useLanguage } from '@/app/context/LanguageContext';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
+import type { GuestTrip } from '@/app/guest/trips/components/TripCard';
+
+type EditableReview = {
+  id?: number | string | null;
+  rating?: number | null;
+  content?: string | null;
+  photos?: string[] | null;
+};
+
+type ReviewTrip = GuestTrip & {
+  host?: string | null;
+  review?: EditableReview | null;
+};
 
 interface ReviewModalProps {
-  trip: any;
+  trip: ReviewTrip;
   onClose: () => void;
   onReviewSubmitted?: () => void; // 🟢 후기 작성/수정 완료 후 목록 새로고침용 콜백
 }
@@ -20,7 +33,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
 
   // [R5] 수정 모드 감지: trip.review가 있으면 수정 모드
   const isEditMode = !!(trip.review?.id);
-  const existingReview = trip.review || null;
+  const existingReview: EditableReview = trip.review || {};
 
   const [rating, setRating] = useState(isEditMode ? (existingReview.rating || 0) : 0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -133,9 +146,10 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
       if (onReviewSubmitted) onReviewSubmitted();
       onClose();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      showToast((isEditMode ? `${t('rv_edit_fail')} ` : `${t('rv_save_fail')} `) + error.message, 'error');
+      const message = error instanceof Error ? error.message : String(error);
+      showToast((isEditMode ? `${t('rv_edit_fail')} ` : `${t('rv_save_fail')} `) + message, 'error');
     } finally {
       setIsSubmitting(false);
     }
