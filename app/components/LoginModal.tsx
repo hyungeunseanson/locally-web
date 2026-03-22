@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -63,7 +63,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [isFocused, setIsFocused] = useState<string | null>(null);
 
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const copy = getLoginModalCopy(lang);
   const nationalityOptions = getLoginModalNationalityOptions(lang);
