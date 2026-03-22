@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle, Users } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
@@ -32,7 +32,7 @@ const CITY_MAP: Record<string, string> = {
 
 export default function MyExperiences() {
   const { t } = useLanguage();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
   const [experiences, setExperiences] = useState<ExperienceRecord[]>([]);
