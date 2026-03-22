@@ -1,18 +1,47 @@
 'use client';
 
 import Image from 'next/image';
-import React, { use, useEffect, useState } from 'react';
+import React, { use, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { User, CheckCircle2, Star } from 'lucide-react';
 import ExperienceCard from '@/app/components/ExperienceCard';
 
+type PublicHostProfile = {
+  full_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  introduction: string | null;
+};
+
+type HostExperienceCardData = {
+  id: number | string;
+  title?: string | null;
+  title_en?: string | null;
+  title_ja?: string | null;
+  title_zh?: string | null;
+  category?: string | null;
+  category_en?: string | null;
+  category_ja?: string | null;
+  category_zh?: string | null;
+  city?: string | null;
+  subCity?: string | null;
+  country?: string | null;
+  location?: string | null;
+  languages?: string[] | null;
+  image_url?: string | null;
+  photos?: string[] | null;
+  rating?: number | null;
+  review_count?: number | null;
+  price?: number | string | null;
+};
+
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const [profile, setProfile] = useState<any>(null);
-  const [hostExperiences, setHostExperiences] = useState<any[]>([]);
+  const [profile, setProfile] = useState<PublicHostProfile | null>(null);
+  const [hostExperiences, setHostExperiences] = useState<HostExperienceCardData[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -44,7 +73,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     };
 
     fetchProfile();
-  }, [resolvedParams.id]);
+  }, [resolvedParams.id, supabase]);
 
   if (loading) return <div className="min-h-screen bg-white" />;
 
