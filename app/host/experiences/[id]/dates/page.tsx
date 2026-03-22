@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
@@ -28,7 +28,7 @@ type ScheduleSaveResponse = {
 
 export default function ManageDatesPage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const params = useParams();
   const router = useRouter();
   const { showToast } = useToast();
