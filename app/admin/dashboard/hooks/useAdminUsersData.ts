@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import type { Profile } from '@/app/types';
@@ -15,7 +15,7 @@ function isOnlineUser(value: unknown): value is OnlineUser {
 }
 
 export function useAdminUsersData() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
   const [users, setUsers] = useState<Profile[]>([]);
