@@ -63,6 +63,45 @@ async function waitForProfile(userId: string) {
   throw new Error(`Profile was not created for auth user ${userId}.`);
 }
 
+async function waitForNotification(params: {
+  userId: string;
+  title: string;
+  type?: string;
+  linkIncludes?: string;
+}) {
+  const supabase = getAdminClient();
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    let query = supabase
+      .from('notifications')
+      .select('id, user_id, type, title, message, link, created_at')
+      .eq('user_id', params.userId)
+      .eq('title', params.title)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (params.type) {
+      query = query.eq('type', params.type);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const matched = (data || []).find((row) => {
+      if (!params.linkIncludes) return true;
+      return typeof row.link === 'string' && row.link.includes(params.linkIncludes);
+    });
+
+    if (matched) {
+      return matched;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Notification not found for ${params.userId}: ${params.title}`);
+}
+
 function createTestUser(prefix: string): TestUser {
   const timestamp = Date.now();
   return {
@@ -162,7 +201,7 @@ test.describe.serial('Proxy booking team workspace flow', () => {
     const adminUser = createTestUser('proxy.admin');
     const customerUser = createTestUser('proxy.customer');
 
-    await createAuthUser(adminUser, { whitelistAdmin: true });
+    const adminUserId = await createAuthUser(adminUser, { whitelistAdmin: true });
     const customerUserId = await createAuthUser(customerUser);
 
     try {
@@ -223,12 +262,39 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       expect(createdRequest?.id).toBeTruthy();
       createdProxyRequestIds.push(String(createdRequest!.id));
 
+      const adminAlert = await waitForNotification({
+        userId: adminUserId,
+        type: 'admin_alert',
+        title: '새 전화 예약 요청이 접수되었습니다',
+        linkIncludes: `proxyRequestId=${createdRequest!.id}`,
+      });
+      expect(adminAlert.link).toContain('teamTab=proxy');
+      expect(adminAlert.message).toContain('식당 예약 문의');
+
       const adminSession = await createIsolatedPage(browser, adminUser);
       const adminPage = adminSession.page;
 
-      await adminPage.goto('/admin/dashboard?tab=TEAM', { waitUntil: 'networkidle' });
-      await adminPage.getByRole('button', { name: /전화 예약/ }).click();
-      await expect(adminPage.getByRole('heading', { name: '전화 예약' })).toBeVisible({ timeout: 15000 });
+      await adminPage.goto(`/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${createdRequest!.id}`, { waitUntil: 'networkidle' });
+      await expect(adminPage.getByRole('heading', { name: '전화 예약', exact: true })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeDisabled();
+      await expect(adminPage.getByRole('button', { name: '완료', exact: true })).toBeDisabled();
+
+      await adminPage.getByRole('button', { name: '입금 확인' }).click();
+      await expect(adminPage.getByText('현재 결제 상태:')).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByText('결제 완료').first()).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeEnabled();
+
+      await waitForNotification({
+        userId: customerUserId,
+        type: 'booking_confirmed',
+        title: '전화 예약 결제가 확인되었습니다',
+        linkIncludes: `inquiryId=${inquiryId}`,
+      });
+
+      await adminPage.getByRole('button', { name: '진행 중', exact: true }).click();
+      await expect(adminPage.locator('div').filter({ hasText: /현재 상태:\s*진행 중/ }).first()).toBeVisible({ timeout: 15000 });
+
       const replyInput = adminPage.getByPlaceholder('고객에게 보낼 답글을 입력하세요.');
       await expect(replyInput).toBeVisible({ timeout: 15000 });
 

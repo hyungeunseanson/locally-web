@@ -16,7 +16,12 @@ import { ko } from 'date-fns/locale';
 import { AdminTask, AdminComment } from '@/app/types/admin';
 import { useToast } from '@/app/context/ToastContext';
 
-export default function TeamTab() {
+type TeamTabProps = {
+  initialInnerTab?: 'todo' | 'memo' | 'proxy';
+  initialProxyRequestId?: string | null;
+};
+
+export default function TeamTab({ initialInnerTab, initialProxyRequestId }: TeamTabProps) {
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
@@ -26,7 +31,7 @@ export default function TeamTab() {
   const tasksRef = useRef<AdminTask[]>([]); // ⭐ 추가: stale closure 방지를 위한 ref
   const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
-  const [innerTab, setInnerTab] = useState<'todo' | 'memo' | 'proxy'>('todo'); // 🟢 새로운 서브 탭
+  const [innerTab, setInnerTab] = useState<'todo' | 'memo' | 'proxy'>(initialInnerTab || 'todo'); // 🟢 새로운 서브 탭
   const [isComposingMemo, setIsComposingMemo] = useState(false);
   const [editingMemo, setEditingMemo] = useState<any>(null); // ⭐ 수정 모드용 상태
   const [memoCommentInputs, setMemoCommentInputs] = useState<Record<string, string>>({}); // ⭐ 메모별 댓글 입력 상태
@@ -233,6 +238,12 @@ export default function TeamTab() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (initialInnerTab === 'proxy') {
+      setInnerTab('proxy');
+    }
+  }, [initialInnerTab]);
 
   useEffect(() => {
     autoResizeTextarea(newTodoTextareaRef.current, 112);
@@ -890,7 +901,7 @@ export default function TeamTab() {
             )}
           </div>
         ) : (
-          <PhoneReservationTab />
+          <PhoneReservationTab initialSelectedRequestId={initialProxyRequestId} />
         )}
       </div>
 

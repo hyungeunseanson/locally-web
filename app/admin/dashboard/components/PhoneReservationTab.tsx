@@ -30,6 +30,10 @@ type ProxyDetailResponse = {
   data?: ProxyRequestDetail;
 };
 
+type PhoneReservationTabProps = {
+  initialSelectedRequestId?: string | null;
+};
+
 function getStatusBadge(status: string) {
   switch (status) {
     case 'PENDING':
@@ -58,7 +62,7 @@ function getPaymentStatusLabel(status: PaymentStatus) {
   }
 }
 
-export default function PhoneReservationTab() {
+export default function PhoneReservationTab({ initialSelectedRequestId = null }: PhoneReservationTabProps) {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,6 +116,27 @@ export default function PhoneReservationTab() {
     selectedRequestRef.current = selectedRequest;
   }, [selectedRequest]);
 
+  const refreshSelectedRequest = useCallback(async (requestId?: string | null) => {
+    const nextRequests = await fetchRequests();
+    const preferredId = requestId || selectedIdRef.current || initialSelectedRequestId;
+
+    if (preferredId && nextRequests.some((item) => item.id === preferredId)) {
+      setSelectedId(preferredId);
+      await loadDetail(preferredId);
+      return nextRequests;
+    }
+
+    if (nextRequests[0]?.id) {
+      setSelectedId(nextRequests[0].id);
+      await loadDetail(nextRequests[0].id);
+    } else {
+      setSelectedId(null);
+      setSelectedRequest(null);
+    }
+
+    return nextRequests;
+  }, [fetchRequests, initialSelectedRequestId, loadDetail]);
+
   const scheduleRefresh = useCallback((requestId?: string | null) => {
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
@@ -119,37 +144,20 @@ export default function PhoneReservationTab() {
 
     refreshTimerRef.current = setTimeout(async () => {
       try {
-        const nextRequests = await fetchRequests();
-
-        const preferredId = requestId || selectedId;
-        if (preferredId && nextRequests.some((item) => item.id === preferredId)) {
-          await loadDetail(preferredId);
-          return;
-        }
-
-        if (nextRequests[0]?.id) {
-          setSelectedId(nextRequests[0].id);
-        } else {
-          setSelectedId(null);
-          setSelectedRequest(null);
-        }
+        await refreshSelectedRequest(requestId);
       } catch (error) {
         console.error('[PhoneReservationTab] refresh failed:', error);
       }
     }, 200);
-  }, [fetchRequests, loadDetail, selectedId]);
+  }, [refreshSelectedRequest]);
 
   useEffect(() => {
     let isMounted = true;
 
     const init = async () => {
       try {
-        const nextRequests = await fetchRequests();
+        await refreshSelectedRequest(initialSelectedRequestId);
         if (!isMounted) return;
-
-        if (nextRequests[0]?.id) {
-          setSelectedId(nextRequests[0].id);
-        }
       } catch (error) {
         console.error('[PhoneReservationTab] init failed:', error);
         if (isMounted) {
@@ -196,7 +204,13 @@ export default function PhoneReservationTab() {
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [fetchRequests, scheduleRefresh, showToast, supabase]);
+  }, [initialSelectedRequestId, refreshSelectedRequest, scheduleRefresh, showToast, supabase]);
+
+  useEffect(() => {
+    if (initialSelectedRequestId && requests.some((item) => item.id === initialSelectedRequestId)) {
+      setSelectedId(initialSelectedRequestId);
+    }
+  }, [initialSelectedRequestId, requests]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -226,8 +240,7 @@ export default function PhoneReservationTab() {
         throw new Error(result?.error || '상태 변경에 실패했습니다.');
       }
 
-      setRequests((prev) => prev.map((item) => (item.id === selectedId ? { ...item, status: nextStatus } : item)));
-      setSelectedRequest((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      await refreshSelectedRequest(selectedId);
       showToast('전화 예약 상태를 업데이트했습니다.', 'success');
     } catch (error) {
       console.error('[PhoneReservationTab] update status failed:', error);
@@ -235,17 +248,46 @@ export default function PhoneReservationTab() {
     } finally {
       setUpdating(false);
     }
-  }, [selectedId, showToast]);
+  }, [refreshSelectedRequest, selectedId, showToast]);
 
-  const handleUpdatePayment = useCallback(async (nextStatus: PaymentStatus) => {
+  const applyLocalPaymentState = useCallback((
+    requestId: string,
+    nextPaymentStatus: PaymentStatus,
+    nextRequestStatus?: ProxyStatus
+  ) => {
+    setRequests((prev) => prev.map((item) => (
+      item.id === requestId
+        ? {
+            ...item,
+            payment_status: nextPaymentStatus,
+            ...(nextRequestStatus ? { status: nextRequestStatus } : {}),
+          }
+        : item
+    )));
+
+    setSelectedRequest((prev) => (
+      prev && prev.id === requestId
+        ? {
+            ...prev,
+            payment_status: nextPaymentStatus,
+            ...(nextRequestStatus ? { status: nextRequestStatus } : {}),
+          }
+        : prev
+    ));
+  }, []);
+
+  const handlePaymentAction = useCallback(async (
+    endpoint: '/api/admin/proxy-bookings/confirm-payment' | '/api/admin/proxy-bookings/cancel-payment' | '/api/admin/proxy-bookings/refund-payment',
+    successMessage: string
+  ) => {
     if (!selectedId) return;
 
     setUpdating(true);
     try {
-      const response = await fetch(`/api/proxy-bookings/${selectedId}`, {
-        method: 'PATCH',
+      const response = await fetch(endpoint, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payment_status: nextStatus }),
+        body: JSON.stringify({ requestId: selectedId }),
       });
 
       const result = await response.json().catch(() => null);
@@ -253,16 +295,25 @@ export default function PhoneReservationTab() {
         throw new Error(result?.error || '결제 상태 변경에 실패했습니다.');
       }
 
-      setRequests((prev) => prev.map((item) => (item.id === selectedId ? { ...item, payment_status: nextStatus } : item)));
-      setSelectedRequest((prev) => (prev ? { ...prev, payment_status: nextStatus } : prev));
-      showToast('결제 상태를 업데이트했습니다.', 'success');
+      if (endpoint === '/api/admin/proxy-bookings/confirm-payment') {
+        applyLocalPaymentState(selectedId, 'COMPLETED');
+      } else if (endpoint === '/api/admin/proxy-bookings/cancel-payment') {
+        applyLocalPaymentState(selectedId, 'FAILED', 'CANCELLED');
+      } else {
+        applyLocalPaymentState(selectedId, 'REFUNDED');
+      }
+
+      void refreshSelectedRequest(selectedId).catch((error) => {
+        console.error('[PhoneReservationTab] refresh after payment action failed:', error);
+      });
+      showToast(successMessage, 'success');
     } catch (error) {
       console.error('[PhoneReservationTab] update payment failed:', error);
       showToast(error instanceof Error ? error.message : '결제 상태 변경에 실패했습니다.', 'error');
     } finally {
       setUpdating(false);
     }
-  }, [selectedId, showToast]);
+  }, [applyLocalPaymentState, refreshSelectedRequest, selectedId, showToast]);
 
   const handleSubmitReply = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
@@ -308,6 +359,21 @@ export default function PhoneReservationTab() {
   const selectedFormEntries = selectedRequest
     ? getProxyFormDisplayEntries(selectedRequest.form_data)
     : [];
+  const selectedPaymentMethod = selectedRequest
+    ? getProxyPaymentMethod(selectedRequest.form_data)
+    : null;
+  const canStartProcessing = selectedRequest?.payment_status === 'COMPLETED';
+  const showManualPaymentActions = Boolean(
+    selectedRequest &&
+    selectedRequest.payment_status === 'WAITING' &&
+    (selectedRequest.payment_channel === 'NAVER' || selectedPaymentMethod === 'bank')
+  );
+  const showCardWaitingHint = Boolean(
+    selectedRequest &&
+    selectedRequest.payment_status === 'WAITING' &&
+    selectedPaymentMethod === 'card'
+  );
+  const showRefundAction = Boolean(selectedRequest && selectedRequest.payment_status === 'COMPLETED');
 
   if (loadingList) {
     return (
@@ -395,24 +461,6 @@ export default function PhoneReservationTab() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5">
-              <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-900">운영 액션</h4>
-                    <p className="text-xs text-slate-500 mt-1">담당자가 현재 진행 상태를 바로 변경할 수 있습니다.</p>
-                  </div>
-                  <div className="text-xs font-semibold text-slate-500">
-                    현재 상태: <span className="text-slate-900">{selectedRequest.status === 'PENDING' ? '대기 중' : selectedRequest.status === 'IN_PROGRESS' ? '진행 중' : selectedRequest.status === 'COMPLETED' ? '완료' : '취소'}</span>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('PENDING')} className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">대기 중</button>
-                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('IN_PROGRESS')} className="w-full rounded-xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60">진행 중</button>
-                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('COMPLETED')} className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60">완료</button>
-                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('CANCELLED')} className="w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">취소</button>
-                </div>
-              </div>
-
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 space-y-3 text-sm">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h4 className="font-bold text-slate-900">결제 정보</h4>
@@ -422,7 +470,7 @@ export default function PhoneReservationTab() {
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 채널</span><span className="font-semibold">{selectedRequest.payment_channel}</span></div>
-                  <div className="flex justify-between gap-3"><span className="text-slate-500">결제 수단</span><span className="font-semibold">{getProxyPaymentMethod(selectedRequest.form_data) === 'card' ? '카드' : getProxyPaymentMethod(selectedRequest.form_data) === 'bank' ? '무통장' : '미지정'}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-500">결제 수단</span><span className="font-semibold">{selectedPaymentMethod === 'card' ? '카드' : selectedPaymentMethod === 'bank' ? '무통장' : '미지정'}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-slate-500">서비스 수수료</span><span className="font-semibold">₩{selectedServiceFee?.toLocaleString()}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 상태</span><span className="font-semibold">{getPaymentStatusLabel(selectedRequest.payment_status)}</span></div>
                   {selectedRequest.locally_order_id && (
@@ -432,11 +480,83 @@ export default function PhoneReservationTab() {
                     <div className="flex justify-between gap-3 md:col-span-2"><span className="text-slate-500">네이버 구매자명</span><span className="font-semibold">{selectedRequest.naver_buyer_name}</span></div>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('WAITING')} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">결제 대기</button>
-                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('COMPLETED')} className="w-full rounded-xl border border-emerald-200 px-3 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60">입금 확인</button>
-                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('FAILED')} className="w-full rounded-xl border border-rose-200 px-3 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60">결제 취소</button>
-                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('REFUNDED')} className="w-full rounded-xl border border-amber-200 px-3 py-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-60">환불 완료</button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900">결제 액션</h4>
+                    <p className="text-xs text-slate-500 mt-1">현재 결제 상태에서 가능한 작업만 노출됩니다.</p>
+                  </div>
+                </div>
+
+                {showManualPaymentActions && (
+                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handlePaymentAction('/api/admin/proxy-bookings/confirm-payment', '결제 확인을 완료했습니다.')}
+                      className="w-full rounded-xl border border-emerald-200 px-3 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60"
+                    >
+                      입금 확인
+                    </button>
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handlePaymentAction('/api/admin/proxy-bookings/cancel-payment', '결제 취소 처리를 완료했습니다.')}
+                      className="w-full rounded-xl border border-rose-200 px-3 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
+                    >
+                      결제 취소
+                    </button>
+                  </div>
+                )}
+
+                {showCardWaitingHint && (
+                  <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                    고객 카드 결제 대기 중입니다. 카드 결제 완료 후 자동으로 반영됩니다.
+                  </div>
+                )}
+
+                {showRefundAction && (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handlePaymentAction('/api/admin/proxy-bookings/refund-payment', '환불 처리를 완료했습니다.')}
+                      className="w-full rounded-xl border border-amber-200 px-3 py-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-60"
+                    >
+                      환불 처리
+                    </button>
+                  </div>
+                )}
+
+                {!showManualPaymentActions && !showCardWaitingHint && !showRefundAction && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    현재 결제 상태에서는 추가 결제 액션이 없습니다.
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900">운영 액션</h4>
+                    <p className="text-xs text-slate-500 mt-1">결제 완료 후에만 실제 전화 진행을 시작하거나 완료로 변경할 수 있습니다.</p>
+                  </div>
+                  <div className="text-xs font-semibold text-slate-500">
+                    현재 상태: <span className="text-slate-900">{selectedRequest.status === 'PENDING' ? '대기 중' : selectedRequest.status === 'IN_PROGRESS' ? '진행 중' : selectedRequest.status === 'COMPLETED' ? '완료' : '취소'}</span>
+                  </div>
+                </div>
+                {!canStartProcessing && (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    결제 완료 후에만 전화 예약 진행을 시작할 수 있습니다.
+                  </div>
+                )}
+                <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('PENDING')} className="w-full rounded-xl bg-slate-900 px-3 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">대기 중</button>
+                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => handleUpdateStatus('IN_PROGRESS')} className="w-full rounded-xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60">진행 중</button>
+                  <button type="button" disabled={updating || !canStartProcessing} onClick={() => handleUpdateStatus('COMPLETED')} className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60">완료</button>
+                  <button type="button" disabled={updating} onClick={() => handleUpdateStatus('CANCELLED')} className="w-full rounded-xl bg-rose-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60">취소</button>
                 </div>
               </div>
 

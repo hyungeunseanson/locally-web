@@ -192,37 +192,52 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         // [Fix] resolveAdminAccess()로 교체 — users.role 기반 체크 포함, null email 안전
         const { isAdmin } = await resolveAdminAccess(supabase, { userId: user.id, email: user.email });
         const body = await request.json();
-        const { status, payment_status } = body;
+        const { status } = body;
 
         const updates: Record<string, string> = {};
 
         const ALLOWED_STATUSES = new Set(['PENDING', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED']);
-        const ALLOWED_PAYMENT_STATUSES = new Set(['WAITING', 'COMPLETED', 'FAILED', 'REFUNDED']);
+        const nextStatus = typeof status === 'string' ? status.toUpperCase() : '';
+
+        const { data: existingRequest, error: existingError } = await supabase
+            .from('proxy_requests')
+            .select('id, user_id, status, payment_status')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (existingError || !existingRequest) {
+            return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
+        }
 
         if (isAdmin) {
-            if (status && ALLOWED_STATUSES.has(status)) updates.status = status;
-            if (payment_status && ALLOWED_PAYMENT_STATUSES.has(payment_status)) updates.payment_status = payment_status;
+            if (nextStatus && ALLOWED_STATUSES.has(nextStatus)) updates.status = nextStatus;
         } else {
             // User can only cancel their request
-            if (status === 'CANCELLED') updates.status = 'CANCELLED';
+            if (nextStatus === 'CANCELLED') updates.status = 'CANCELLED';
         }
 
         if (Object.keys(updates).length === 0) {
             return NextResponse.json({ success: false, error: 'No valid fields to update' }, { status: 400 });
         }
 
+        if (
+            isAdmin &&
+            updates.status &&
+            (updates.status === 'IN_PROGRESS' || updates.status === 'COMPLETED') &&
+            String(existingRequest.payment_status || '').toUpperCase() !== 'COMPLETED'
+        ) {
+            return NextResponse.json(
+                { success: false, error: '결제 완료 후에만 전화 예약 진행을 시작할 수 있습니다.' },
+                { status: 409 }
+            );
+        }
+
         // [Security] 비관리자: update 전에 소유권 사전 확인 — 0-row update 시 silent 200 방지
         if (!isAdmin) {
-            const { data: existing } = await supabase
-                .from('proxy_requests')
-                .select('id, status')
-                .eq('id', id)
-                .eq('user_id', user.id)
-                .maybeSingle();
-            if (!existing) {
+            if (existingRequest.user_id !== user.id) {
                 return NextResponse.json({ success: false, error: 'Not found or forbidden' }, { status: 404 });
             }
-            if (existing.status === 'CANCELLED' || existing.status === 'COMPLETED') {
+            if (existingRequest.status === 'CANCELLED' || existingRequest.status === 'COMPLETED') {
                 return NextResponse.json({ success: false, error: 'Cannot cancel a request in this state' }, { status: 409 });
             }
         }

@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
 import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
+import { notifyProxyPaymentEvent } from '@/app/utils/proxyBookingNotifications';
 import type { ProxyCategory } from '@/app/types/proxy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { updateProxyPaymentState } from '@/app/api/admin/proxy-bookings/shared';
 
 type ProxyCardCallbackBody = {
   imp_uid?: string;
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
     const supabaseAdmin = createAdminClient();
     const { data: originalRequest, error: requestError } = await supabaseAdmin
       .from('proxy_requests')
-      .select('id, user_id, category, payment_channel, payment_status, locally_order_id, form_data')
+      .select('*')
       .eq('locally_order_id', orderId)
       .maybeSingle();
 
@@ -73,13 +75,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Already processed' });
     }
 
+    let verificationResult;
+
     try {
       const expectedAmount = getProxyRequestFeeKrw(
         String(originalRequest.category || 'RESTAURANT') as ProxyCategory,
         (originalRequest.form_data as Record<string, unknown> | null | undefined) ?? undefined
       );
 
-      await verifyApprovedCardPayment({
+      verificationResult = await verifyApprovedCardPayment({
         provider: getCurrentCardPaymentProvider(),
         approvalId,
         orderId,
@@ -93,14 +97,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: message }, { status: 400 });
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('proxy_requests')
-      .update({ payment_status: 'COMPLETED' })
-      .eq('id', originalRequest.id);
+    const updated = await updateProxyPaymentState({
+      supabaseAdmin,
+      requestId: originalRequest.id,
+      currentPaymentStatus: 'WAITING',
+      paymentStatus: 'COMPLETED',
+      tid: verificationResult.providerTransactionId,
+      paidAt: new Date().toISOString(),
+    });
 
-    if (updateError) {
-      throw updateError;
+    if (!updated) {
+      return NextResponse.json({ success: true, message: 'Already processed' });
     }
+
+    await notifyProxyPaymentEvent({
+      event: 'confirmed',
+      request: {
+        id: originalRequest.id,
+        user_id: originalRequest.user_id,
+        category: originalRequest.category,
+        form_data: originalRequest.form_data,
+      },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

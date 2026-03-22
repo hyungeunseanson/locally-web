@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.38 — [Phone Reservation] 관리자 알림 · 전용 결제 액션 · 결제 게이트
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 관리자 접수 알림 추가 | `app/api/proxy-bookings/route.ts`, `app/utils/adminAlertCenter.ts` — 새 전화 예약 요청 생성 직후 관리자 인앱 alert와 관리자 이메일을 best-effort로 발송하고, `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=...` deep link로 바로 해당 요청을 열 수 있도록 연결 |
+| 🔴 전용 admin 결제 route 분리 | `app/api/admin/proxy-bookings/confirm-payment/route.ts`, `app/api/admin/proxy-bookings/cancel-payment/route.ts`, `app/api/admin/proxy-bookings/refund-payment/route.ts`, `app/api/admin/proxy-bookings/shared.ts` — 전화 예약 결제 상태 변경을 generic `PATCH /api/proxy-bookings/[id]`에서 분리해 `NAVER/무통장 수동 확인`, `결제 대기 취소`, `완료 후 환불` 전용 admin 경계로 고정 |
+| 🟠 카드 결제 추적 보강 | `app/api/proxy-bookings/payment/nicepay-callback/route.ts`, `app/utils/proxyBookingNotifications.ts`, `docs/migrations/v3_39_15_proxy_request_payment_tracking.sql` — 카드 결제 승인 시 `payment_status=COMPLETED`와 함께 `tid/paid_at` 저장을 시도하고, 컬럼 미적용 환경에서도 `payment_status`만 fallback 갱신하도록 보강. 카드 결제 완료 고객 알림도 즉시 발송 |
+| 🟠 진행 상태 결제 게이트 | `app/api/proxy-bookings/[id]/route.ts`, `app/admin/dashboard/components/PhoneReservationTab.tsx`, `app/proxy-bookings/[id]/page.tsx` — 결제 완료 전에는 `IN_PROGRESS`/`COMPLETED`로 넘어갈 수 없게 서버와 UI를 함께 잠그고, Team 전화 예약 탭은 상태별로 가능한 결제 액션만 노출하도록 단순화 |
+| 🟡 Team deep-link 및 회귀 테스트 | `app/admin/dashboard/page.tsx`, `app/admin/dashboard/components/TeamTab.tsx`, `tests/e2e/86-proxy-booking-team-workspace.spec.ts` — admin alert 링크로 `TEAM > 전화 예약` 특정 요청을 바로 열 수 있게 하고, 관리자 알림 생성·입금 확인·결제 전 진행 차단·고객 결제 확인 알림까지 E2E로 검증 |
+
 ## v3.39.37 — [Phone Reservation] 서비스 안내 · 확장 폼 · 동적 수수료
 
 | 항목 | 내용 |

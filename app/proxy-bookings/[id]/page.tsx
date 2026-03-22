@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { ArrowLeft, Send, CheckCircle, Clock, XCircle, AlertCircle, Phone } from 'lucide-react';
-import type { PaymentStatus, ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
+import type { ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
 import {
     getProxyCategoryLabel,
     getProxyFormDisplayEntries,
@@ -96,17 +96,24 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
         }
     };
 
-    const handleUpdatePayment = async (newStatus: PaymentStatus) => {
+    const handlePaymentAction = async (
+        endpoint: '/api/admin/proxy-bookings/confirm-payment' | '/api/admin/proxy-bookings/cancel-payment' | '/api/admin/proxy-bookings/refund-payment'
+    ) => {
         if (!isAdmin) return;
         setUpdating(true);
         try {
-            const res = await fetch(`/api/proxy-bookings/${id}`, {
-                method: 'PATCH',
+            const res = await fetch(endpoint, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payment_status: newStatus }),
+                body: JSON.stringify({ requestId: id }),
             });
             if (res.ok) {
-                setRequest(prev => prev ? { ...prev, payment_status: newStatus } : null);
+                const detailRes = await fetch(`/api/proxy-bookings/${id}`);
+                const detailData = await detailRes.json() as { success?: boolean; data?: ProxyRequestDetail };
+                if (detailData.success && detailData.data) {
+                    setRequest(detailData.data);
+                    setComments(detailData.data.comments ?? []);
+                }
             }
         } catch (err) {
             console.error(err);
@@ -156,6 +163,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
     const paymentMethod = getProxyPaymentMethod(request.form_data);
     const serviceFee = getProxyRequestFeeKrw(request.category, request.form_data);
     const formEntries = getProxyFormDisplayEntries(request.form_data);
+    const canStartProcessing = request.payment_status === 'COMPLETED';
     const paymentStatusLabel = request.payment_status === 'COMPLETED'
         ? '결제 완료'
         : request.payment_status === 'FAILED'
@@ -341,19 +349,26 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                             <div className="text-xs text-slate-400 font-bold mb-1">상태 변경</div>
                             <div className="grid grid-cols-2 gap-2">
                                 <button disabled={updating} onClick={() => handleUpdateStatus('PENDING')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors">대기 중</button>
-                                <button disabled={updating} onClick={() => handleUpdateStatus('IN_PROGRESS')} className="px-3 py-2 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 transition-colors">진행 중</button>
-                                <button disabled={updating} onClick={() => handleUpdateStatus('COMPLETED')} className="px-3 py-2 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 transition-colors">완료 처리</button>
+                                <button disabled={updating || !canStartProcessing} onClick={() => handleUpdateStatus('IN_PROGRESS')} className="px-3 py-2 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50">진행 중</button>
+                                <button disabled={updating || !canStartProcessing} onClick={() => handleUpdateStatus('COMPLETED')} className="px-3 py-2 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50">완료 처리</button>
                                 <button disabled={updating} onClick={() => handleUpdateStatus('CANCELLED')} className="px-3 py-2 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 transition-colors">취소/반려</button>
                             </div>
                         </div>
 
                         <div className="space-y-3 pt-3 border-t border-slate-700">
-                            <div className="text-xs text-slate-400 font-bold mb-1">결제 상태 업데이트</div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button disabled={updating} onClick={() => handleUpdatePayment('COMPLETED')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-emerald-400">결제 완료 승인</button>
-                                <button disabled={updating} onClick={() => handleUpdatePayment('FAILED')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-rose-400">결제 실패 처리</button>
-                                <button disabled={updating} onClick={() => handleUpdatePayment('WAITING')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-yellow-400">대기 중 롤백</button>
-                            </div>
+                            <div className="text-xs text-slate-400 font-bold mb-1">결제 액션</div>
+                            {request.payment_status === 'WAITING' && (request.payment_channel === 'NAVER' || paymentMethod === 'bank') ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button disabled={updating} onClick={() => handlePaymentAction('/api/admin/proxy-bookings/confirm-payment')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-emerald-400">입금 확인</button>
+                                    <button disabled={updating} onClick={() => handlePaymentAction('/api/admin/proxy-bookings/cancel-payment')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-rose-400">결제 취소</button>
+                                </div>
+                            ) : request.payment_status === 'WAITING' && paymentMethod === 'card' ? (
+                                <p className="text-xs text-slate-400">고객 카드 결제 대기 중입니다.</p>
+                            ) : request.payment_status === 'COMPLETED' ? (
+                                <button disabled={updating} onClick={() => handlePaymentAction('/api/admin/proxy-bookings/refund-payment')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-amber-300">환불 처리</button>
+                            ) : (
+                                <p className="text-xs text-slate-400">추가 결제 액션이 없습니다.</p>
+                            )}
                         </div>
                     </div>
                 )}

@@ -4,7 +4,8 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { upsertInquiryThread } from '@/app/api/inquiries/thread/shared';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
-import { buildProxyInquiryInitialMessage, getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
+import { insertAdminAlerts, sendAdminAlertEmails } from '@/app/utils/adminAlertCenter';
+import { buildProxyInquiryInitialMessage, getProxyCategoryLabel, getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
 
 type ProxyRequestRow = {
     id: string;
@@ -28,6 +29,25 @@ type ProfileRow = {
     avatar_url: string | null;
     phone: string | null;
 };
+
+function getAdminAlertRequesterName(params: {
+    fallbackEmail?: string | null;
+    intakeFormData: Record<string, unknown>;
+    contactName?: string | null;
+}) {
+    const directContactName = typeof params.contactName === 'string' ? params.contactName.trim() : '';
+    if (directContactName) return directContactName;
+
+    const reservationName = typeof params.intakeFormData.reservation_name === 'string'
+        ? params.intakeFormData.reservation_name.trim()
+        : '';
+    if (reservationName) return reservationName;
+
+    const fallbackEmail = typeof params.fallbackEmail === 'string' ? params.fallbackEmail.trim() : '';
+    if (fallbackEmail) return fallbackEmail.split('@')[0];
+
+    return '고객';
+}
 
 export async function POST(request: Request) {
     try {
@@ -119,6 +139,36 @@ export async function POST(request: Request) {
                 return NextResponse.json({ success: false, error: 'Duplicate request' }, { status: 409 });
             }
             return NextResponse.json({ success: false, error: 'Failed to create request' }, { status: 500 });
+        }
+
+        try {
+            const requesterName = getAdminAlertRequesterName({
+                fallbackEmail: user.email,
+                intakeFormData,
+                contactName: 'contact_name' in data ? data.contact_name : null,
+            });
+            const categoryLabel = getProxyCategoryLabel(data.category_data.category);
+            const paymentLabel = isNaver
+                ? 'NAVER'
+                : `LOCALLY · ${data.payment_method === 'card' ? '카드' : '무통장'}`;
+            const alertLink = `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${newRequest.id}`;
+            const alertMessage = `${categoryLabel} · ${requesterName} · ${paymentLabel} · ₩${finalAmount.toLocaleString()}`;
+
+            await insertAdminAlerts({
+                title: '새 전화 예약 요청이 접수되었습니다',
+                message: alertMessage,
+                link: alertLink,
+            });
+
+            void sendAdminAlertEmails({
+                subject: '[Locally Admin] 새 전화 예약 요청이 접수되었습니다',
+                title: '새 전화 예약 요청이 접수되었습니다',
+                message: `${alertMessage}\n\nTEAM > 전화 예약 탭에서 요청을 확인해주세요.`,
+                link: alertLink,
+                ctaLabel: '전화 예약 열기',
+            });
+        } catch (adminAlertError) {
+            console.error('[proxy-bookings] admin alert side effect failed:', adminAlertError);
         }
 
         return NextResponse.json({

@@ -140,6 +140,8 @@ function AdminDashboardContent() {
     getServerStoredAdminTab
   );
   const activeTab = urlTab || savedTab?.toUpperCase() || 'APPROVALS';
+  const teamTab = searchParams.get('teamTab');
+  const proxyRequestId = searchParams.get('proxyRequestId');
 
   useEffect(() => {
     if (urlTab) {
@@ -152,7 +154,7 @@ function AdminDashboardContent() {
   return (
     <div className="bg-white p-2 md:p-6 rounded-lg md:rounded-2xl shadow-sm border border-slate-100 min-h-[80vh] flex flex-col h-full lg:h-auto overflow-hidden lg:overflow-visible">
       {activeTab === 'TEAM' ? (
-        <TeamTab />
+        <TeamTab initialInnerTab={teamTab === 'proxy' ? 'proxy' : undefined} initialProxyRequestId={proxyRequestId} />
       ) : activeTab === 'ALERTS' ? (
         <AdminAlertsTab />
       ) : activeTab === 'CHATS' ? (

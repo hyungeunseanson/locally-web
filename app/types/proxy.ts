@@ -28,6 +28,9 @@ export interface ProxyRequest {
     created_at: string;
     updated_at: string;
     linked_inquiry_id?: string | null;
+    tid?: string | null;
+    paid_at?: string | null;
+    refunded_at?: string | null;
 
     // Relations
     profiles?: {

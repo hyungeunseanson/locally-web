@@ -1,7 +1,7 @@
 # Locally-Web Project Guide (GEMINI.md)
 
-**Last Updated:** 2026-03-22 (v3.39.36 phone reservation team workspace)
-**Version:** 3.39.36 (Phone Reservation Team Workspace)
+**Last Updated:** 2026-03-22 (v3.39.38 phone reservation payment simplification)
+**Version:** 3.39.38 (Phone Reservation Payment Simplification)
 **Purpose:** 코드 계획/구현 시 참조하는 단일 운영 기준 문서
 
 ---
@@ -31,7 +31,10 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `/api/admin/team/whitelist`: Team Workspace Admin Whitelist 추가 API
 - `/api/admin/team/whitelist/[id]`: Team Workspace Admin Whitelist 삭제 API (+ audit log)
 - `/api/admin/team-counts`: Team Workspace 사이드바 배지 집계 API (`lastViewed` 기준 새 작업/댓글 개별 count + 합산 `newWorkspaceCount`)
-- `components/PhoneReservationTab.tsx`: Team Workspace `전화 예약` 서브탭 — `proxy_requests / proxy_comments` 기반 운영 요청 목록, 상세, 상태 변경, 운영 답글 전용 UI
+- `components/PhoneReservationTab.tsx`: Team Workspace `전화 예약` 서브탭 — `proxy_requests` 기반 운영 요청 목록/상세, 전용 결제 액션(confirm/cancel/refund), 진행 상태 변경, linked inquiry 답글 UI
+- `/api/admin/proxy-bookings/confirm-payment`: 전화 예약 수동 입금 확인 API (`NAVER`, `LOCALLY + bank` 전용)
+- `/api/admin/proxy-bookings/cancel-payment`: 전화 예약 결제 대기 취소 API (`WAITING -> FAILED`, 요청 상태 `CANCELLED`)
+- `/api/admin/proxy-bookings/refund-payment`: 전화 예약 환불 처리 API (`COMPLETED -> REFUNDED`, 카드 결제는 PG 환불 성공 후 반영)
 - `types/admin.ts`: 관리자 전용 타입 중앙화 (`AdminServiceBooking` 포함)
 - `/api/admin/users-summary`: User Management/Analytics 공용 경량 회원 목록 API (`profiles + users.role` 병합)
 - `/api/admin/users-activity-summary`: User Management 리스트 전용 활동 summary API (`총 결제액/예약·의뢰 수/최근 활동` 지연 집계)
@@ -155,15 +158,19 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - `User Management` 탭은 `/api/admin/users-summary`와 presence 구독을 쓰는 `useAdminUsersData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다.
 - `Approvals` 및 레거시 `APPS`/`EXPS` 경로는 `/api/admin/host-applications` 요약 API + `experiences` 클라이언트 조회를 쓰는 `useAdminApprovalsData.ts` 경량 훅으로 `page.tsx`에서 직접 렌더링한다.
 - `TEAM` 탭은 아직 목록/실시간 읽기는 client Supabase를 유지하지만, `TeamTab`, `GlobalTeamChat`, `MiniChatBar`의 `admin_tasks / admin_task_comments / admin_whitelist` 쓰기(create/update/delete/reaction)는 전용 `/api/admin/team/*` 경로로만 처리한다.
-- 전화 예약 서비스는 별도 admin 시스템으로 복제하지 않고 `proxy_requests / proxy_comments`를 단일 source로 유지한다. 홈 `서비스` 카드의 전화 예약은 `/proxy-bookings/new`로 바로 진입하고, admin 운영은 `TEAM` 탭 내부 `전화 예약` 서브탭(`PhoneReservationTab`)에서 기존 proxy API(`GET/POST/PATCH /api/proxy-bookings`, `POST /api/proxy-bookings/[id]/comments`)를 그대로 사용한다.
-- 전화 예약 `LOCALLY` 결제는 `proxy_requests.locally_order_id`와 `/api/proxy-bookings/payment/nicepay-callback`을 사용해 카드결제 검증을 수행한다. `NAVER`는 구매자명 기반 수동 확인 흐름을 유지하고, `LOCALLY`는 `card | bank`만 허용한다.
-- 전화 예약 운영 답글의 source of truth는 `/api/proxy-bookings/[id]/comments`다. admin 답글이 생성되면 고객에게 `notifications(type='new_message', link=/proxy-bookings/[id])` 인앱 알림과 즉시 이메일을 함께 보낸다.
+- 전화 예약 서비스는 별도 admin 시스템이나 Master Ledger로 복제하지 않고 `proxy_requests`를 단일 source로 유지한다. 홈 `서비스` 카드의 전화 예약은 `/proxy-bookings/new`로 바로 진입하고, admin 운영은 `TEAM` 탭 내부 `전화 예약` 서브탭(`PhoneReservationTab`)에서만 처리한다.
+- 전화 예약 `LOCALLY` 결제는 `proxy_requests.locally_order_id`와 `/api/proxy-bookings/payment/nicepay-callback`을 사용해 카드결제 검증을 수행한다. `NAVER`와 `LOCALLY + bank`는 수동 입금 확인 흐름, `LOCALLY + card`는 callback 자동 완료 흐름으로 고정한다.
+- 새 전화 예약 요청 생성 owner인 `/api/proxy-bookings`는 성공 직후 `adminAlertCenter`를 통해 관리자 인앱 alert + 관리자 이메일을 best-effort로 보낸다. deep link는 `/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=...` 를 사용한다.
+- 전화 예약 결제 상태 변경 owner는 더 이상 `PATCH /api/proxy-bookings/[id]`가 아니다. 수동 결제 처리는 전용 admin route (`confirm-payment`, `cancel-payment`, `refund-payment`)만 사용하고, `PATCH /api/proxy-bookings/[id]`는 운영 상태 변경 전용으로 유지한다.
+- 전화 예약은 `payment_status`와 `status`를 분리 유지한다. `payment_status !== COMPLETED` 인 요청은 `IN_PROGRESS` 또는 `COMPLETED`로 진행 상태를 바꿀 수 없고, UI와 API 모두 같은 결제 게이트를 적용한다.
+- 전화 예약 운영 답글의 source of truth는 `/api/proxy-bookings/[id]/comments`다. linked inquiry가 있는 요청은 기존 `inquiries / inquiry_messages` 알림 흐름을 그대로 재사용하고, legacy 요청만 `proxy_comments` fallback을 유지한다.
 - 전화 예약 입력 화면 `/proxy-bookings/new`는 서비스 안내 섹션과 5개 카테고리(식당, 숙소, 교통, 일반 문의, 분실물) JSON form을 단일 페이지에서 처리한다. DB 스키마는 늘리지 않고 `proxy_requests.form_data`를 계속 source of truth로 사용하며, category별 상세 양식과 `service_fee_krw`는 서버 생성 시점에 함께 저장한다.
 - 전화 예약 수수료는 helper `getProxyRequestFeeKrw()`를 단일 source로 유지한다. 기본 요금은 식당 4,500원, 숙소/교통/일반 문의 6,000원, 분실물 9,000원이며, 식당 카테고리만 `restaurant_service_option`으로 `0120/0570=8,000원`, `쿠이테이=9,000원` 특수 요금을 선택할 수 있다. 고객 상세와 admin `PhoneReservationTab`은 저장된 `service_fee_krw`를 우선 표시한다.
 - 전화 예약 상단 안내는 수수료 표를 따로 두지 않고, 일본 현지인 팀원이 직접 전화한다는 메시지를 강조한 소개 카드와 별도의 서비스 안내 카드로 상하 분리한다. 실제 가격 노출은 카테고리 선택 카드와 결제 섹션만 source of truth로 사용한다.
 - 식당 예약 양식은 체험 상세 예약 카드 톤앤매너를 참고한 커스텀 슬롯 picker로 1/2/3지망 일시를 모두 필수로 받고, `대체 식당 진행(1회 대체 동의)`을 결제 옵션이 아닌 form field로 처리한다. 숙소 양식은 `booking_platform`(예: Agoda, Booking.com)을 추가로 수집한다.
 - 새 전화 예약 요청은 생성 시점에 `admin_support` inquiry를 같이 만들고, `proxy_requests.form_data.linked_inquiry_id`로 연결한다. 고객은 `/proxy-bookings/[id]` 상세 대신 바로 `/guest/inbox?inquiryId=...` 로 이동해 담당자 소통 스레드에서 이어서 대화한다.
 - `TEAM > 전화 예약`은 계속 `proxy_requests`를 source of truth로 쓰되, linked inquiry가 있는 요청의 대화는 더 이상 `proxy_comments`가 아니라 기존 `inquiries / inquiry_messages`를 읽고 쓴다. 즉 전화 예약 탭은 요청 보드이고, 실제 고객 대화 엔진은 기존 문의함 하나로 통일한다.
+- 카드 환불을 위해 `proxy_requests`에는 `tid`, `paid_at`, `refunded_at` nullable 컬럼을 추가하는 migration 문서를 유지한다 (`docs/migrations/v3_39_15_proxy_request_payment_tracking.sql`). callback은 컬럼이 있는 환경에서 결제 추적 값을 저장하고, 컬럼이 아직 없는 환경에서는 `payment_status`만 fallback 갱신한다.
 - `TEAM`/`Audit Logs` 읽기 경로는 admin-only SELECT 정책 위에서 client Supabase 목록/realtime을 유지한다. server-only로 전면 전환하지 않고, write 봉쇄와 read 회귀 방지를 동시에 맞춘다.
 - `TEAM` 탭 진입 시 `last_viewed_team`을 현재 시각으로 갱신하고 `team-viewed` 이벤트를 발생시켜, 사이드바 `Team Workspace` 배지가 같은 탭 세션에서도 즉시 0으로 돌아가게 유지한다.
 - 공개 호스트 projection은 당분간 `public_host_applications` safe-view를 유지하고 `security_invoker=off`로 운영한다. 홈/검색/체험상세/공개 프로필이 이 public projection에 의존하므로, `host_applications` RLS 기준 공개 렌더링이 깨지지 않도록 한다.
