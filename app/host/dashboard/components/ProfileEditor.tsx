@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { User, Briefcase, Globe, Music, MessageCircle, Save, Camera, Lock, CreditCard, FileText, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
 import { PROFILE_LANGUAGE_OPTIONS } from '@/app/constants/profile';
-import { getProfileCompletion, normalizeLanguageList, PROFILE_COMPLETION_FIELD_LABELS } from '@/app/utils/profile';
+import { getProfileCompletion, normalizeLanguageList } from '@/app/utils/profile';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { compressImage, validateImage, isHeicValidationResult } from '@/app/utils/image'; // 🟢 이미지 압축 추가
 
@@ -84,7 +84,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (profile) {
