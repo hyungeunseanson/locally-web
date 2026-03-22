@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { X, Languages, Smile, User, Globe, Loader2 } from 'lucide-react';
 import Image from 'next/image';
@@ -29,7 +29,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
   const [displayProfile, setDisplayProfile] = useState<UserProfileModalState | null>(null);
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (!isOpen || !userId) return;
@@ -99,7 +99,7 @@ export default function UserProfileModal({ userId, isOpen, onClose, role }: User
     return () => {
       cancelled = true;
     };
-  }, [isOpen, role, supabase, userId]);
+  }, [isOpen, role, supabase, t, userId]);
 
   const secureUrl = (url: string | null | undefined) => {
     if (!url || url === '') return null;
