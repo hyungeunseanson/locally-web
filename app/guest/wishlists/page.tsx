@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Heart, Share2, ArrowRight, ArrowLeft } from 'lucide-react';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -81,7 +81,7 @@ const normalizeWishlistRows = (rows: unknown[]): WishlistItem[] => {
 
 export default function WishlistsPage() {
   const { lang, t } = useLanguage(); // 🟢 추가
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { showToast } = useToast();
   const [wishlists, setWishlists] = useState<WishlistItem[]>([]);
@@ -121,7 +121,7 @@ export default function WishlistsPage() {
     };
 
     fetchWishlists();
-  }, [router, showToast, supabase]);
+  }, [router, showToast, supabase, t]);
 
   // 🟢 [추가] 찜 해제 기능 (화면에서 바로 사라지게)
   const handleRemove = async (e: React.MouseEvent, wishlistId: number) => {
