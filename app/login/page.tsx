@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import LoginModal from '@/app/components/LoginModal';
@@ -17,12 +17,11 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [checking, setChecking] = useState(true);
+  const supabase = useMemo(() => createClient(), []);
 
   const returnUrl = searchParams.get('returnUrl') || searchParams.get('next') || '/';
 
   useEffect(() => {
-    const supabase = createClient();
-    
     const checkSession = async () => {
       try {
         const {
@@ -39,7 +38,7 @@ function LoginPageContent() {
     };
     
     checkSession();
-  }, [returnUrl, router]);
+  }, [returnUrl, router, supabase]);
 
   const handleClose = () => {
     router.push(returnUrl || '/');
