@@ -65,6 +65,9 @@ const NaverPaymentTrackSchema = BaseProxyRequestSchema.extend({
 // B. LOCALLY (자체 웹 결제) 트랙: buyer_name 불필요 (자체 PG 프로세스)
 const LocallyPaymentTrackSchema = BaseProxyRequestSchema.extend({
     payment_channel: z.literal('LOCALLY'),
+    payment_method: z.enum(['card', 'bank']),
+    contact_name: z.string().min(1, '결제자 이름을 입력해주세요.').max(100, '이름은 100자 이하'),
+    contact_phone: z.string().min(7, '연락처를 입력해주세요.').max(30, '연락처 형식이 올바르지 않습니다.'),
 });
 
 // 최상위 검증 엔트리 스키마 (Union Schema)

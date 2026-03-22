@@ -5,6 +5,17 @@
 
 ---
 
+## v3.39.36 — [Phone Reservation] 홈 진입 복구 · Team Workspace 통합 · 운영 답글 알림
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 홈 서비스 카드 진입 복구 | `app/constants.ts`, `app/components/HomePageClient.tsx` — 서비스 탭 전화 예약 카드를 `/proxy-bookings/new`로 직접 연결하고, 기존 `id === 5` 하드코딩 Link 분기를 `item.href` 기반 일반화로 교체 |
+| 🔴 전화 예약 결제/폼 흐름 정리 | `app/proxy-bookings/new/page.tsx`, `app/schemas/proxyRequestSchema.ts`, `app/types/proxy.ts`, `app/utils/proxyBooking.ts`, `app/api/proxy-bookings/route.ts`, `app/api/proxy-bookings/payment/nicepay-callback/route.ts` — `NAVER` 구매자명 제출은 유지하고, `LOCALLY`는 `card | bank` 결제 수단과 연락처를 받아 요청 생성 후 카드 검증 또는 무통장 상세 안내로 연결 |
+| 🟠 Team Workspace `전화 예약` 서브탭 추가 | `app/admin/dashboard/components/PhoneReservationTab.tsx`, `app/admin/dashboard/components/TeamTab.tsx` — 별도 admin 페이지 없이 `TEAM` 내부 세 번째 탭에서 `proxy_requests / proxy_comments` 목록, 상세, 상태/결제 상태 변경, 운영 답글을 처리하도록 통합 |
+| 🟠 proxy read-model manual join 정리 | `app/api/proxy-bookings/route.ts`, `app/api/proxy-bookings/[id]/route.ts`, `app/api/proxy-bookings/[id]/comments/route.ts` — DB에 없는 `proxy_requests -> profiles`, `proxy_comments -> profiles` embedded relation을 제거하고 `user_id`/`author_id` 기준 manual join으로 목록·상세·답글 경계를 안정화 |
+| 🟠 고객 알림 추가 | `app/api/proxy-bookings/[id]/comments/route.ts` — admin 답글 생성 시 고객에게 `notifications(type='new_message', link=/proxy-bookings/[id])` 인앱 알림을 적재하고 즉시 이메일도 함께 발송하도록 추가 |
+| 🟡 회귀 테스트 추가 | `tests/e2e/86-proxy-booking-team-workspace.spec.ts` — 홈 서비스 카드에서 전화 예약 폼으로 진입하고, 고객이 NAVER 요청을 생성한 뒤 admin `TEAM > 전화 예약` 탭에서 답글을 남길 수 있는 흐름을 검증 |
+
 ## v3.39.35 — [Admin Chat Monitor] 참여자 프로필 카드를 경량 모달로 전환
 
 | 항목 | 내용 |

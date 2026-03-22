@@ -2,10 +2,12 @@
 
 import React, { useEffect, useMemo, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { ArrowLeft, Send, CheckCircle, Clock, XCircle, AlertCircle, Phone } from 'lucide-react';
 import type { PaymentStatus, ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
+import { getProxyPaymentMethod, getProxyRequestTitle, getProxyRequesterDisplayName, PROXY_REQUEST_PRICE_KRW } from '@/app/utils/proxyBooking';
 
 type ProxyRequestDetail = ProxyRequest & {
     comments?: ProxyComment[];
@@ -13,6 +15,7 @@ type ProxyRequestDetail = ProxyRequest & {
 
 export default function ProxyBookingDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { id } = use(params);
     const supabase = useMemo(() => createClient(), []);
 
@@ -39,20 +42,13 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                 }
                 setUserId(user.id);
 
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
-
-                setIsAdmin(profile?.role === 'admin');
-
                 const res = await fetch(`/api/proxy-bookings/${id}`);
-                const data = await res.json() as { success?: boolean; data?: ProxyRequestDetail };
+                const data = await res.json() as { success?: boolean; data?: ProxyRequestDetail; viewerIsAdmin?: boolean };
 
                 if (data.success && data.data) {
                     setRequest(data.data);
                     setComments(data.data.comments ?? []);
+                    setIsAdmin(Boolean(data.viewerIsAdmin));
                 } else {
                     router.push('/proxy-bookings');
                 }
@@ -141,6 +137,16 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
     if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">로딩 중...</div>;
     if (!request) return <div className="p-8 text-center text-slate-500">요청을 찾을 수 없습니다.</div>;
 
+    const paymentState = searchParams.get('payment');
+    const paymentMethod = getProxyPaymentMethod(request.form_data);
+    const paymentStatusLabel = request.payment_status === 'COMPLETED'
+        ? '결제 완료'
+        : request.payment_status === 'FAILED'
+            ? '결제 실패'
+            : request.payment_status === 'REFUNDED'
+                ? '환불 완료'
+                : '결제 대기';
+
     return (
         <div className="max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column: Detail Info */}
@@ -156,14 +162,24 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                         <div>
                             <span className="text-xs font-bold text-slate-400 tracking-wider mb-2 block">{request.category}</span>
                             <h1 className="text-2xl font-bold text-slate-900 break-words">
-                                {request.category === 'RESTAURANT' ? request.form_data?.restaurant_name :
-                                    request.category === 'TRANSPORT' ? `${request.form_data?.departure_location} → ${request.form_data?.arrival_location}` :
-                                        '전화 대행 요청 상세보기'}
+                                {getProxyRequestTitle(request)}
                             </h1>
                         </div>
                         <div className="shrink-0 ml-4">{getStatusBadge(request.status)}</div>
                     </div>
                 </div>
+
+                {paymentState === 'completed' && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
+                        카드 결제가 확인되었습니다. 운영팀이 요청 내용을 확인한 뒤 답변을 남겨드립니다.
+                    </div>
+                )}
+
+                {paymentState === 'failed' && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+                        카드 결제가 완료되지 않았습니다. 요청은 접수되어 있으며, 필요하면 운영팀 답변을 기다리거나 새로 다시 접수해 주세요.
+                    </div>
+                )}
 
                 {/* 1:1 Message Thread (Scrollable) */}
                 <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col overflow-hidden">
@@ -190,7 +206,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                                     )}
                                     <div className={`p-4 rounded-2xl ${fromMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'}`}>
                                         {comment.is_admin && !fromMe && <div className="text-[10px] font-bold text-slate-400 mb-1">Locally 운영팀</div>}
-                                        {!comment.is_admin && !fromMe && <div className="text-[10px] font-bold text-slate-400 mb-1">{comment.profiles?.name || '고객'}</div>}
+                                        {!comment.is_admin && !fromMe && <div className="text-[10px] font-bold text-slate-400 mb-1">{getProxyRequesterDisplayName(comment.profiles)}</div>}
                                         <div className="text-sm whitespace-pre-wrap leading-relaxed">{comment.content}</div>
                                         <div className={`text-[10px] mt-2 ${fromMe ? 'text-blue-200' : 'text-slate-400'}`}>
                                             {new Date(comment.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -245,26 +261,36 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                             </div>
                         )}
                         {request.payment_channel === 'LOCALLY' && (
-                            <div className="flex justify-between items-center">
-                                <span className="text-slate-500">주문번호</span>
-                                <span className="font-mono text-xs">{request.locally_order_id}</span>
-                            </div>
+                            <>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">주문번호</span>
+                                    <span className="font-mono text-xs">{request.locally_order_id}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">결제 수단</span>
+                                    <span className="font-semibold">{paymentMethod === 'card' ? '카드' : paymentMethod === 'bank' ? '무통장 입금' : '미지정'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">서비스 수수료</span>
+                                    <span className="font-semibold">₩{PROXY_REQUEST_PRICE_KRW.toLocaleString()}</span>
+                                </div>
+                            </>
                         )}
 
                         <div className="flex justify-between items-center">
                             <span className="text-slate-500">결제 상태</span>
                             <span className={`font-bold ${request.payment_status === 'COMPLETED' ? 'text-emerald-600' : request.payment_status === 'WAITING' ? 'text-yellow-600' : 'text-red-500'}`}>
-                                {request.payment_status}
+                                {paymentStatusLabel}
                             </span>
                         </div>
                     </div>
 
-                    {request.payment_channel === 'LOCALLY' && request.payment_status === 'WAITING' && !isAdmin && (
+                    {request.payment_channel === 'LOCALLY' && request.payment_status === 'WAITING' && paymentMethod === 'bank' && !isAdmin && (
                         <div className="mt-4 pt-4 border-t border-slate-100">
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                                 <div className="text-sm font-bold text-slate-800 mb-2">무통장 입금 안내</div>
                                 <div className="text-xs text-slate-600 mb-3 leading-relaxed">
-                                    서비스 수수료 <span className="font-bold text-blue-600">3,000원</span>을 아래 계좌로 입금해 주시면, 확인 후 담당자가 전화를 진행합니다.
+                                    서비스 수수료 <span className="font-bold text-blue-600">₩{PROXY_REQUEST_PRICE_KRW.toLocaleString()}</span>을 아래 계좌로 입금해 주시면, 확인 후 담당자가 전화를 진행합니다.
                                 </div>
                                 <div className="bg-white p-3 rounded text-sm font-mono text-center font-bold border border-slate-200 cursor-text select-all">
                                     {process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'} {process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-01-1234567'}
@@ -279,12 +305,12 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                     <h3 className="font-bold border-b border-slate-100 pb-3 text-sm">상세 입력 정보</h3>
                     <div className="space-y-4 text-sm">
                         {Object.entries(request.form_data).map(([key, val]) => (
-                            val && (
+                            val ? (
                                 <div key={key}>
                                     <div className="text-xs text-slate-400 font-semibold uppercase mb-1">{key.replace(/_/g, ' ')}</div>
                                     <div className="font-medium text-slate-800 break-words">{String(val)}</div>
                                 </div>
-                            )
+                            ) : null
                         ))}
                     </div>
                 </div>
@@ -310,6 +336,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                             <div className="text-xs text-slate-400 font-bold mb-1">결제 상태 업데이트</div>
                             <div className="grid grid-cols-2 gap-2">
                                 <button disabled={updating} onClick={() => handleUpdatePayment('COMPLETED')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-emerald-400">결제 완료 승인</button>
+                                <button disabled={updating} onClick={() => handleUpdatePayment('FAILED')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-rose-400">결제 실패 처리</button>
                                 <button disabled={updating} onClick={() => handleUpdatePayment('WAITING')} className="px-3 py-2 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 text-yellow-400">대기 중 롤백</button>
                             </div>
                         </div>

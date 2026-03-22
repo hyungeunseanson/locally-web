@@ -2,13 +2,20 @@ export type ProxyCategory = 'RESTAURANT' | 'TRANSPORT' | 'HOTEL' | 'LOST_AND_FOU
 export type ProxyStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type PaymentChannel = 'NAVER' | 'LOCALLY';
 export type PaymentStatus = 'WAITING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+export type ProxyPaymentMethod = 'card' | 'bank';
+
+export type ProxyFormData = Record<string, unknown> & {
+    payment_method?: ProxyPaymentMethod | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+};
 
 export interface ProxyRequest {
     id: string;
     user_id: string;
     category: ProxyCategory;
     status: ProxyStatus;
-    form_data: Record<string, any>;
+    form_data: ProxyFormData;
     payment_channel: PaymentChannel;
     payment_status: PaymentStatus;
     naver_buyer_name: string | null;
@@ -19,9 +26,10 @@ export interface ProxyRequest {
 
     // Relations
     profiles?: {
-        name: string;
-        email: string;
-        avatar_url: string;
+        full_name?: string | null;
+        email?: string | null;
+        avatar_url?: string | null;
+        phone?: string | null;
     };
 }
 
@@ -36,7 +44,7 @@ export interface ProxyComment {
 
     // Relations
     profiles?: {
-        name: string;
-        avatar_url: string;
+        full_name?: string | null;
+        avatar_url?: string | null;
     };
 }

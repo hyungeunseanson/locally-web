@@ -4,11 +4,12 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import MarkdownMemoEditor from './MarkdownMemoEditor';
+import PhoneReservationTab from './PhoneReservationTab';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   ClipboardList, CheckSquare, FileText, Plus, Trash2,
-  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings, Edit2
+  Clock, CheckCircle2, Circle, X, NotebookPen, MessageCircle, Send, Settings, Edit2, Phone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -25,7 +26,7 @@ export default function TeamTab() {
   const tasksRef = useRef<AdminTask[]>([]); // ⭐ 추가: stale closure 방지를 위한 ref
   const [newLog, setNewLog] = useState({ task: '', note: '' });
   const [newTodo, setNewTodo] = useState('');
-  const [innerTab, setInnerTab] = useState<'todo' | 'memo'>('todo'); // 🟢 새로운 서브 탭
+  const [innerTab, setInnerTab] = useState<'todo' | 'memo' | 'proxy'>('todo'); // 🟢 새로운 서브 탭
   const [isComposingMemo, setIsComposingMemo] = useState(false);
   const [editingMemo, setEditingMemo] = useState<any>(null); // ⭐ 수정 모드용 상태
   const [memoCommentInputs, setMemoCommentInputs] = useState<Record<string, string>>({}); // ⭐ 메모별 댓글 입력 상태
@@ -558,6 +559,12 @@ export default function TeamTab() {
               <span className="w-4 h-4 bg-rose-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>
             )}
           </button>
+          <button
+            onClick={() => setInnerTab('proxy')}
+            className={`flex-1 md:flex-initial px-2.5 md:px-6 py-1 rounded-md text-[9px] md:text-sm font-bold transition-all flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap ${innerTab === 'proxy' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <Phone size={11} /> 전화 예약
+          </button>
         </div>
       </div>
 
@@ -738,7 +745,7 @@ export default function TeamTab() {
             </div>
 
           </>
-        ) : (
+        ) : innerTab === 'memo' ? (
           /* 팀 메모장 탭 */
           <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
             {isComposingMemo ? (
@@ -882,6 +889,8 @@ export default function TeamTab() {
               </div>
             )}
           </div>
+        ) : (
+          <PhoneReservationTab />
         )}
       </div>
 

@@ -2,7 +2,40 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+type ProxyRequestRow = {
+    id: string;
+    user_id: string;
+    category: string;
+    status: string;
+    form_data: Record<string, unknown> | null;
+    payment_channel: string;
+    payment_status: string;
+    naver_buyer_name: string | null;
+    locally_order_id: string | null;
+    agreed_to_terms: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+type ProfileRow = {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+    phone: string | null;
+};
+
+type ProxyCommentRow = {
+    id: string;
+    request_id: string;
+    author_id: string;
+    content: string;
+    is_admin: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
         const supabase = await createServerClient();
@@ -17,7 +50,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         let query = supabase
             .from('proxy_requests')
-            .select('*, profiles(full_name, email, avatar_url)')
+            .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
             .eq('id', id);
 
         if (!isAdmin) {
@@ -30,10 +63,28 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 });
         }
 
+        const requestRow = data as ProxyRequestRow;
+        let profile: ProfileRow | null = null;
+
+        if (requestRow.user_id) {
+            const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, avatar_url, phone')
+                .eq('id', requestRow.user_id)
+                .maybeSingle();
+
+            if (profileError) {
+                console.error('Proxy Request Detail Profile Fetch Error:', profileError);
+                return NextResponse.json({ success: false, error: 'Failed to fetch request detail' }, { status: 500 });
+            }
+
+            profile = (profileData as ProfileRow | null) ?? null;
+        }
+
         // Fetch comments
         const { data: comments, error: commentsError } = await supabase
             .from('proxy_comments')
-            .select('*, profiles(full_name, avatar_url)')
+            .select('id, request_id, author_id, content, is_admin, created_at, updated_at')
             .eq('request_id', id)
             .order('created_at', { ascending: true });
 
@@ -41,14 +92,51 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             console.error('Proxy Comments Fetch Error:', commentsError);
         }
 
+        const commentRows = (comments ?? []) as ProxyCommentRow[];
+        const commentAuthorIds = [...new Set(commentRows.map((comment) => comment.author_id).filter(Boolean))];
+        const commentProfilesById = new Map<string, Pick<ProfileRow, 'id' | 'full_name' | 'avatar_url'>>();
+
+        if (commentAuthorIds.length > 0) {
+            const { data: commentProfiles, error: commentProfilesError } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url')
+                .in('id', commentAuthorIds);
+
+            if (commentProfilesError) {
+                console.error('Proxy Comment Profiles Fetch Error:', commentProfilesError);
+                return NextResponse.json({ success: false, error: 'Failed to fetch request detail' }, { status: 500 });
+            }
+
+            for (const commentProfile of (commentProfiles ?? []) as Array<Pick<ProfileRow, 'id' | 'full_name' | 'avatar_url'>>) {
+                commentProfilesById.set(commentProfile.id, commentProfile);
+            }
+        }
+
         return NextResponse.json({
             success: true,
             data: {
-                ...data,
-                comments: comments ?? [],
+                ...requestRow,
+                profiles: profile
+                    ? {
+                        full_name: profile.full_name,
+                        email: profile.email,
+                        avatar_url: profile.avatar_url,
+                        phone: profile.phone,
+                    }
+                    : undefined,
+                comments: commentRows.map((comment) => ({
+                    ...comment,
+                    profiles: commentProfilesById.get(comment.author_id)
+                        ? {
+                            full_name: commentProfilesById.get(comment.author_id)?.full_name ?? null,
+                            avatar_url: commentProfilesById.get(comment.author_id)?.avatar_url ?? null,
+                        }
+                        : undefined,
+                })),
             },
+            viewerIsAdmin: isAdmin,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Proxy Request Detail GET Error:', error);
         return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
     }
@@ -69,11 +157,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const body = await request.json();
         const { status, payment_status } = body;
 
-        let query = supabase.from('proxy_requests').update({});
-        let updates: Record<string, any> = {};
+        const updates: Record<string, string> = {};
 
-        const ALLOWED_STATUSES = new Set(['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED']);
-        const ALLOWED_PAYMENT_STATUSES = new Set(['WAITING', 'PAID', 'REFUNDED']);
+        const ALLOWED_STATUSES = new Set(['PENDING', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED']);
+        const ALLOWED_PAYMENT_STATUSES = new Set(['WAITING', 'COMPLETED', 'FAILED', 'REFUNDED']);
 
         if (isAdmin) {
             if (status && ALLOWED_STATUSES.has(status)) updates.status = status;
@@ -103,18 +190,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             }
         }
 
-        query = supabase.from('proxy_requests').update(updates).eq('id', id);
+        let updateQuery = supabase.from('proxy_requests').update(updates).eq('id', id);
         if (!isAdmin) {
-            query = query.eq('user_id', user.id);
+            updateQuery = updateQuery.eq('user_id', user.id);
         }
 
-        const { error: updateError } = await query;
+        const { error: updateError } = await updateQuery;
         if (updateError) {
             throw updateError;
         }
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Proxy Request PATCH Error:', error);
         return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
     }

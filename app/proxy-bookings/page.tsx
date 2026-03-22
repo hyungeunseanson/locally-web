@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { Plus, Phone, Clock, CheckCircle, XCircle } from 'lucide-react';
 import type { ProxyRequest } from '@/app/types/proxy';
+import { getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
 
 export default function ProxyBookingsBoard() {
     const supabase = useMemo(() => createClient(), []);
@@ -18,19 +19,12 @@ export default function ProxyBookingsBoard() {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return;
 
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
-
-                setIsAdmin(profile?.role === 'admin');
-
                 const res = await fetch('/api/proxy-bookings');
-                const data = await res.json();
+                const data = await res.json() as { success?: boolean; data?: ProxyRequest[]; viewerIsAdmin?: boolean };
 
                 if (data.success) {
                     setRequests(data.data as ProxyRequest[]);
+                    setIsAdmin(Boolean(data.viewerIsAdmin));
                 }
             } catch (error) {
                 console.error('Failed to fetch proxy requests', error);
@@ -96,11 +90,9 @@ export default function ProxyBookingsBoard() {
                             <div className="border border-slate-100 bg-white rounded-2xl p-5 hover:shadow-md transition-all cursor-pointer group">
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{req.category}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{req.category}</span>
                                         <h3 className="font-bold text-slate-900 text-[15px] group-hover:text-blue-600 transition-colors">
-                                            {req.category === 'RESTAURANT' ? req.form_data?.restaurant_name :
-                                                req.category === 'TRANSPORT' ? `${req.form_data?.departure_location} → ${req.form_data?.arrival_location}` :
-                                                    '대행 서비스 상세 보기'}
+                                            {getProxyRequestTitle(req)}
                                         </h3>
                                     </div>
                                     <div className="shrink-0">{getStatusBadge(req.status)}</div>
@@ -114,7 +106,7 @@ export default function ProxyBookingsBoard() {
 
                                     {isAdmin && (
                                         <span className="text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full">
-                                            요청자: {req.profiles?.name || '고객'}
+                                            요청자: {getProxyRequesterDisplayName(req.profiles)}
                                         </span>
                                     )}
                                 </div>

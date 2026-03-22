@@ -2,6 +2,30 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
+import { PROXY_REQUEST_PRICE_KRW } from '@/app/utils/proxyBooking';
+
+type ProxyRequestRow = {
+    id: string;
+    user_id: string;
+    category: string;
+    status: string;
+    form_data: Record<string, unknown> | null;
+    payment_channel: string;
+    payment_status: string;
+    naver_buyer_name: string | null;
+    locally_order_id: string | null;
+    agreed_to_terms: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+type ProfileRow = {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+    phone: string | null;
+};
 
 export async function POST(request: Request) {
     try {
@@ -25,6 +49,15 @@ export async function POST(request: Request) {
 
         const data = validationResult.data;
         const isNaver = data.payment_channel === 'NAVER';
+        const baseFormData = data.category_data.form_data;
+        const formData = isNaver
+          ? baseFormData
+          : {
+              ...baseFormData,
+              payment_method: data.payment_method,
+              contact_name: data.contact_name,
+              contact_phone: data.contact_phone,
+            };
 
         // Insert into proxy_requests
         const { data: newRequest, error: insertError } = await supabase
@@ -32,7 +65,7 @@ export async function POST(request: Request) {
             .insert({
                 user_id: user.id,
                 category: data.category_data.category,
-                form_data: data.category_data.form_data,
+                form_data: formData,
                 payment_channel: data.payment_channel,
                 payment_status: 'WAITING', // Will be updated by PG or Manual Admin
                 naver_buyer_name: isNaver ? data.naver_buyer_name : null,
@@ -56,14 +89,15 @@ export async function POST(request: Request) {
             success: true,
             requestId: newRequest.id,
             locallyOrderId: newRequest.locally_order_id,
+            finalAmount: PROXY_REQUEST_PRICE_KRW,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Proxy Request POST Error:', error);
         return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
     }
 }
 
-export async function GET(request: Request) {
+export async function GET() {
     try {
         const supabase = await createServerClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -77,7 +111,7 @@ export async function GET(request: Request) {
 
         let query = supabase
             .from('proxy_requests')
-            .select('*, profiles(full_name, email)') // Fetch basic client profile
+            .select('id, user_id, category, status, form_data, payment_channel, payment_status, naver_buyer_name, locally_order_id, agreed_to_terms, created_at, updated_at')
             .order('created_at', { ascending: false })
             .limit(50);
 
@@ -93,8 +127,40 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: 'Failed to fetch requests' }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, data: data ?? [] });
-    } catch (error: any) {
+        const rows = (data ?? []) as ProxyRequestRow[];
+        const profileIds = [...new Set(rows.map((item) => item.user_id).filter(Boolean))];
+        const profilesById = new Map<string, ProfileRow>();
+
+        if (profileIds.length > 0) {
+            const { data: profiles, error: profilesError } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, avatar_url, phone')
+                .in('id', profileIds);
+
+            if (profilesError) {
+                console.error('Proxy Request Profiles Fetch Error:', profilesError);
+                return NextResponse.json({ success: false, error: 'Failed to fetch requests' }, { status: 500 });
+            }
+
+            for (const profile of (profiles ?? []) as ProfileRow[]) {
+                profilesById.set(profile.id, profile);
+            }
+        }
+
+        const mergedRows = rows.map((item) => ({
+            ...item,
+            profiles: profilesById.get(item.user_id)
+                ? {
+                    full_name: profilesById.get(item.user_id)?.full_name ?? null,
+                    email: profilesById.get(item.user_id)?.email ?? null,
+                    avatar_url: profilesById.get(item.user_id)?.avatar_url ?? null,
+                    phone: profilesById.get(item.user_id)?.phone ?? null,
+                }
+                : undefined,
+        }));
+
+        return NextResponse.json({ success: true, data: mergedRows, viewerIsAdmin: isAdmin });
+    } catch (error: unknown) {
         console.error('API Proxy Requests GET Error:', error);
         return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
     }

@@ -1,9 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
+import Script from 'next/script';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+
+import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
+import { createClient } from '@/app/utils/supabase/client';
+import { launchCardPayment } from '@/app/utils/payments/card/client';
+import { PROXY_REQUEST_PRICE_KRW } from '@/app/utils/proxyBooking';
+
+type PaymentMethod = 'card' | 'bank';
+type CardReadyResponse = {
+    provider: 'portone' | 'nicepay';
+    ready: boolean;
+    reason?: string;
+};
 
 type TransportType = 'TAXI' | 'BUS' | 'TRAIN';
 
@@ -13,14 +25,19 @@ function isTransportType(value: string): value is TransportType {
 
 export default function NewProxyBooking() {
     const router = useRouter();
+    const supabase = useMemo(() => createClient(), []);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Form states
     const [category, setCategory] = useState<'RESTAURANT' | 'TRANSPORT'>('RESTAURANT');
     const [paymentChannel, setPaymentChannel] = useState<'NAVER' | 'LOCALLY'>('NAVER');
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
     const [naverBuyerName, setNaverBuyerName] = useState('');
+    const [contactName, setContactName] = useState('');
+    const [contactPhone, setContactPhone] = useState('');
     const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
 
     // Restaurant specific
     const [restName, setRestName] = useState('');
@@ -42,11 +59,19 @@ export default function NewProxyBooking() {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        const requiresLocallyPayment = paymentChannel === 'LOCALLY';
 
         const baseData = {
             agreed_to_terms: agreedToTerms,
             payment_channel: paymentChannel,
             ...(paymentChannel === 'NAVER' ? { naver_buyer_name: naverBuyerName } : {}),
+            ...(requiresLocallyPayment
+                ? {
+                    payment_method: paymentMethod,
+                    contact_name: contactName,
+                    contact_phone: contactPhone,
+                }
+                : {}),
             category_data: category === 'RESTAURANT'
                 ? {
                     category: 'RESTAURANT',
@@ -81,7 +106,28 @@ export default function NewProxyBooking() {
             return;
         }
 
+        let readiness: CardReadyResponse | null = null;
+
         try {
+            const { data: authData } = await supabase.auth.getUser();
+            const user = authData.user;
+
+            if (!user) {
+                router.push('/login');
+                return;
+            }
+
+            if (requiresLocallyPayment && paymentMethod === 'card') {
+                const readinessRes = await fetch('/api/payment/card-ready', { cache: 'no-store' });
+                readiness = (await readinessRes.json()) as CardReadyResponse;
+
+                if (!readinessRes.ok || !readiness?.ready || !portOneImpCode) {
+                    setError('카드 결제를 지금 사용할 수 없습니다. 무통장 입금을 이용해주세요.');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const res = await fetch('/api/proxy-bookings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -93,9 +139,59 @@ export default function NewProxyBooking() {
                 throw new Error(data.error || 'Failed to submit request');
             }
 
-            // If LOCALLY payment, trigger PG or redirect to payment page
-            // Assuming straightforward PG trigger or success page
-            router.push(`/proxy-bookings/${data.requestId}`);
+            const requestId = String(data.requestId || '').trim();
+            const locallyOrderId = String(data.locallyOrderId || '').trim();
+            const finalAmount = Number(data.finalAmount || PROXY_REQUEST_PRICE_KRW);
+
+            if (!requestId) {
+                throw new Error('전화 예약 요청 생성에 실패했습니다.');
+            }
+
+            if (!requiresLocallyPayment || paymentMethod === 'bank') {
+                router.push(`/proxy-bookings/${requestId}`);
+                return;
+            }
+
+            if (!locallyOrderId) {
+                router.push(`/proxy-bookings/${requestId}?payment=failed`);
+                return;
+            }
+
+            try {
+                const paymentSession = await launchCardPayment({
+                    provider: readiness?.provider || 'portone',
+                    merchantCode: portOneImpCode,
+                    orderId: locallyOrderId,
+                    productName: category === 'RESTAURANT' ? 'Locally 식당 전화 예약 대행' : 'Locally 교통 전화 예약 대행',
+                    amount: finalAmount,
+                    buyerEmail: user.email,
+                    buyerName: contactName.trim(),
+                    buyerTel: contactPhone.trim(),
+                    redirectUrl: `${window.location.origin}/proxy-bookings/${requestId}`,
+                });
+
+                const callbackRes = await fetch('/api/proxy-bookings/payment/nicepay-callback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imp_uid: paymentSession.approvalId,
+                        approvalId: paymentSession.approvalId,
+                        merchant_uid: locallyOrderId,
+                        orderId: locallyOrderId,
+                    }),
+                });
+
+                const callbackResult = await callbackRes.json();
+                if (!callbackRes.ok || !callbackResult?.success) {
+                    router.push(`/proxy-bookings/${requestId}?payment=failed`);
+                    return;
+                }
+
+                router.push(`/proxy-bookings/${requestId}?payment=completed`);
+            } catch (paymentError) {
+                console.error('Proxy card payment failed:', paymentError);
+                router.push(`/proxy-bookings/${requestId}?payment=failed`);
+            }
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to submit request');
         } finally {
@@ -105,6 +201,7 @@ export default function NewProxyBooking() {
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8">
+            <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="afterInteractive" />
             <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 mb-6 transition-colors">
                 <ArrowLeft size={16} /> 돌아가기
             </button>
@@ -225,7 +322,7 @@ export default function NewProxyBooking() {
                             <input type="radio" value="LOCALLY" checked={paymentChannel === 'LOCALLY'} onChange={() => setPaymentChannel('LOCALLY')} className="w-4 h-4 text-blue-600" />
                             <div className="flex-1">
                                 <div className="font-semibold text-sm">로컬리 웹 자체 결제</div>
-                                <div className="text-xs text-slate-500">신용카드 / 토스페이 등 (개발 중 환경)</div>
+                                <div className="text-xs text-slate-500">카드 결제 또는 무통장 입금으로 바로 접수할 수 있습니다.</div>
                             </div>
                         </label>
                     </div>
@@ -235,6 +332,45 @@ export default function NewProxyBooking() {
                             <label className="text-xs font-semibold text-green-800">스마트스토어 구매자명 <span className="text-red-500">*</span></label>
                             <input type="text" value={naverBuyerName} onChange={e => setNaverBuyerName(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="결제 시 입력한 구매자 성함을 입력해주세요." />
                             <p className="text-[11px] text-green-700 mt-1">이탈 방지를 위해 주문번호 14자리 대신 직관적인 구매자 성함으로 대조하고 있습니다.</p>
+                        </div>
+                    )}
+
+                    {paymentChannel === 'LOCALLY' && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'card' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                    <input type="radio" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} className="w-4 h-4 text-blue-600" />
+                                    <div className="flex-1">
+                                        <div className="font-semibold text-sm">카드 즉시 결제</div>
+                                        <div className="text-xs text-slate-500">요청 제출 직후 바로 결제를 진행합니다.</div>
+                                    </div>
+                                </label>
+                                <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'bank' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                    <input type="radio" value="bank" checked={paymentMethod === 'bank'} onChange={() => setPaymentMethod('bank')} className="w-4 h-4 text-blue-600" />
+                                    <div className="flex-1">
+                                        <div className="font-semibold text-sm">무통장 입금</div>
+                                        <div className="text-xs text-slate-500">요청 접수 후 상세 페이지에서 입금 안내를 확인합니다.</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-600">결제자 이름 <span className="text-red-500">*</span></label>
+                                    <input type="text" value={contactName} onChange={e => setContactName(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" placeholder="예: 홍길동" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-600">연락처 <span className="text-red-500">*</span></label>
+                                    <input type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" placeholder="예: 01012345678" />
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-900">
+                                서비스 수수료는 <span className="font-bold">₩{PROXY_REQUEST_PRICE_KRW.toLocaleString()}</span> 입니다.
+                                {paymentMethod === 'card'
+                                    ? ' 제출 후 카드 결제가 이어집니다.'
+                                    : ' 제출 후 상세 페이지에서 입금 안내를 확인할 수 있습니다.'}
+                            </div>
                         </div>
                     )}
                 </section>
@@ -252,7 +388,7 @@ export default function NewProxyBooking() {
 
                 <button disabled={loading || !agreedToTerms} type="submit" className="w-full bg-black text-white font-bold text-lg py-4 rounded-xl hover:bg-slate-800 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                     {loading && <Loader2 size={20} className="animate-spin" />}
-                    요청 제출하기
+                    {paymentChannel === 'LOCALLY' && paymentMethod === 'card' ? '결제 후 요청 제출하기' : '요청 제출하기'}
                 </button>
             </form>
         </div>
