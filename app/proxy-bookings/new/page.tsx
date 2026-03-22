@@ -2,8 +2,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ProxyRequestValidationSchema, type ProxyRequestPayload } from '@/app/schemas/proxyRequestSchema';
+import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+
+type TransportType = 'TAXI' | 'BUS' | 'TRAIN';
+
+function isTransportType(value: string): value is TransportType {
+    return value === 'TAXI' || value === 'BUS' || value === 'TRAIN';
+}
 
 export default function NewProxyBooking() {
     const router = useRouter();
@@ -25,7 +31,7 @@ export default function NewProxyBooking() {
     const [restSpecial, setRestSpecial] = useState('');
 
     // Transport specific
-    const [transType, setTransType] = useState<'TAXI' | 'BUS' | 'TRAIN'>('TAXI');
+    const [transType, setTransType] = useState<TransportType>('TAXI');
     const [transDepart, setTransDepart] = useState('');
     const [transArrival, setTransArrival] = useState('');
     const [transDate, setTransDate] = useState('');
@@ -90,8 +96,8 @@ export default function NewProxyBooking() {
             // If LOCALLY payment, trigger PG or redirect to payment page
             // Assuming straightforward PG trigger or success page
             router.push(`/proxy-bookings/${data.requestId}`);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to submit request');
         } finally {
             setLoading(false);
         }
@@ -165,7 +171,15 @@ export default function NewProxyBooking() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1.5 md:col-span-2">
                                 <label className="text-xs font-semibold text-slate-600">수단 <span className="text-red-500">*</span></label>
-                                <select value={transType} onChange={e => setTransType(e.target.value as any)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent">
+                                <select
+                                    value={transType}
+                                    onChange={(e) => {
+                                        if (isTransportType(e.target.value)) {
+                                            setTransType(e.target.value);
+                                        }
+                                    }}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                                >
                                     <option value="TAXI">택시/대절</option>
                                     <option value="BUS">버스</option>
                                     <option value="TRAIN">기차</option>
