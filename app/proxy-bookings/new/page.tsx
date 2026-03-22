@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
-import { AlertCircle, ArrowLeft, Loader2, PhoneCall } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Clock3, Loader2, PhoneCall, X } from 'lucide-react';
 
 import type {
   GeneralInquiryFormData,
@@ -215,30 +215,266 @@ function InputField({
   );
 }
 
+const SLOT_TIME_OPTIONS = Array.from({ length: 33 }, (_, index) => {
+  const totalMinutes = (10 * 60) + index * 30;
+  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+  const minutes = String(totalMinutes % 60).padStart(2, '0');
+  return `${hours}:${minutes}`;
+});
+
+const SLOT_WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function parseSlotValue(value: string) {
+  if (!value || !value.includes('T')) {
+    return { date: '', time: '' };
+  }
+
+  const [date, time] = value.split('T');
+  return {
+    date: date || '',
+    time: (time || '').slice(0, 5),
+  };
+}
+
+function formatSlotDisplay(value: string) {
+  const { date, time } = parseSlotValue(value);
+  if (!date || !time) return '월일 시간을 선택해주세요';
+
+  const parsed = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(parsed.getTime())) return '월일 시간을 선택해주세요';
+
+  return `${parsed.getMonth() + 1}월 ${parsed.getDate()}일 (${SLOT_WEEKDAY_LABELS[parsed.getDay()]}) · ${time}`;
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function parseDateKey(value: string) {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map((part) => Number(part));
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function getMonthDays(currentMonth: Date) {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const firstWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<{ type: 'empty' } | { type: 'day'; date: Date }> = [];
+
+  for (let index = 0; index < firstWeekday; index += 1) {
+    cells.push({ type: 'empty' });
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push({ type: 'day', date: new Date(year, month, day) });
+  }
+
+  return cells;
+}
+
 function DateTimeChoiceField({
   label,
   value,
   onChange,
+  fieldId,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  fieldId: string;
 }) {
+  const today = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }, []);
+  const maxDate = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 18, today.getDate()), [today]);
+  const parsedValue = useMemo(() => parseSlotValue(value), [value]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftDate, setDraftDate] = useState(parsedValue.date);
+  const [draftTime, setDraftTime] = useState(parsedValue.time);
+  const [visibleMonth, setVisibleMonth] = useState(() => parseDateKey(parsedValue.date) || today);
+
+  const openPicker = () => {
+    const nextDate = parsedValue.date || toDateKey(today);
+    const nextMonth = parseDateKey(nextDate) || today;
+    setDraftDate(nextDate);
+    setDraftTime(parsedValue.time || '');
+    setVisibleMonth(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1));
+    setIsOpen(true);
+  };
+
+  const closePicker = () => {
+    setIsOpen(false);
+  };
+
+  const confirmSelection = () => {
+    if (!draftDate || !draftTime) return;
+    onChange(`${draftDate}T${draftTime}`);
+    closePicker();
+  };
+
+  const monthDays = getMonthDays(visibleMonth);
+  const canGoPrev = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1) > new Date(today.getFullYear(), today.getMonth(), 1);
+  const canGoNext = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1) <= new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-      <label className="text-xs font-semibold text-slate-600">
-        {label}
-        <span className="text-red-500"> *</span>
-      </label>
-      <input
-        type="datetime-local"
-        required
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2.5 w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-      />
-      <p className="mt-2 text-[11px] text-slate-500">월/일/시간을 한 번에 선택해주세요.</p>
-    </div>
+    <>
+      <div className="rounded-[1.75rem] border border-stone-200 bg-gradient-to-b from-white to-stone-50 p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <label className="text-xs font-semibold text-stone-600">
+              {label}
+              <span className="text-red-500"> *</span>
+            </label>
+            <p className="mt-1 text-[11px] text-stone-400">월일과 시간을 한 번에 선택하는 슬롯입니다.</p>
+          </div>
+          <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-500">필수</span>
+        </div>
+        <button
+          type="button"
+          data-testid={`${fieldId}-trigger`}
+          onClick={openPicker}
+          className="mt-4 flex w-full items-center justify-between rounded-[1.4rem] border border-stone-200 bg-white px-4 py-4 text-left transition hover:border-stone-300 hover:shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-stone-900 p-2.5 text-white shadow-sm">
+              <CalendarDays size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-stone-900">{formatSlotDisplay(value)}</p>
+              <p className="mt-1 text-xs text-stone-500">{value ? '선택한 슬롯을 다시 눌러 수정할 수 있습니다.' : '탭해서 달력과 시간 슬롯을 선택하세요.'}</p>
+            </div>
+          </div>
+          <Clock3 size={16} className="shrink-0 text-stone-400" />
+        </button>
+      </div>
+
+      {isOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/35 p-4 backdrop-blur-[2px] sm:items-center">
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-5">
+              <div>
+                <p className="text-xs font-bold tracking-[0.18em] text-stone-400">RESERVATION SLOT</p>
+                <h3 className="mt-2 text-lg font-black text-stone-950">{label}</h3>
+                <p className="mt-1 text-sm text-stone-500">체험 상세 예약 카드처럼 날짜와 시간을 고르면, 아래 필드에 바로 반영됩니다.</p>
+              </div>
+              <button
+                type="button"
+                aria-label={`${label} 닫기`}
+                onClick={closePicker}
+                className="rounded-full border border-stone-200 p-2 text-stone-500 transition hover:bg-stone-50"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-6 overflow-y-auto px-5 py-5">
+              <div className="rounded-[1.5rem] border border-stone-200 bg-stone-50/80 p-4">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => canGoPrev && setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))}
+                    disabled={!canGoPrev}
+                    className="rounded-full border border-stone-200 bg-white p-2 text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <p className="text-sm font-bold text-stone-900">
+                    {visibleMonth.getFullYear()}년 {visibleMonth.getMonth() + 1}월
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => canGoNext && setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1))}
+                    disabled={!canGoNext}
+                    className="rounded-full border border-stone-200 bg-white p-2 text-stone-500 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-7 gap-2 text-center text-[11px] font-semibold text-stone-400">
+                  {SLOT_WEEKDAY_LABELS.map((weekday) => (
+                    <span key={weekday}>{weekday}</span>
+                  ))}
+                </div>
+
+                <div className="mt-3 grid grid-cols-7 gap-2">
+                  {monthDays.map((cell, index) => {
+                    if (cell.type === 'empty') {
+                      return <div key={`empty-${fieldId}-${index}`} className="h-10 rounded-full" />;
+                    }
+
+                    const dateKey = toDateKey(cell.date);
+                    const isDisabled = cell.date < today || cell.date > maxDate;
+                    const isSelected = draftDate === dateKey;
+
+                    return (
+                      <button
+                        key={dateKey}
+                        type="button"
+                        data-testid={`${fieldId}-day-${dateKey}`}
+                        disabled={isDisabled}
+                        onClick={() => setDraftDate(dateKey)}
+                        className={`h-10 rounded-full text-sm font-semibold transition ${
+                          isSelected
+                            ? 'bg-stone-900 text-white shadow-sm'
+                            : isDisabled
+                              ? 'cursor-not-allowed text-stone-300'
+                              : 'border border-transparent text-stone-700 hover:border-stone-300 hover:bg-white'
+                        }`}
+                      >
+                        {cell.date.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-stone-600">시간 선택</p>
+                <div className="mt-3 grid max-h-56 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-5">
+                  {SLOT_TIME_OPTIONS.map((time) => {
+                    const isSelected = draftTime === time;
+                    return (
+                      <button
+                        key={time}
+                        type="button"
+                        data-testid={`${fieldId}-time-${time}`}
+                        onClick={() => setDraftTime(time)}
+                        className={`rounded-2xl border px-3 py-2 text-sm font-semibold transition ${
+                          isSelected
+                            ? 'border-stone-900 bg-stone-900 text-white'
+                            : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:bg-white'
+                        }`}
+                      >
+                        {time}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-stone-200 px-5 py-4">
+              <p className="text-sm font-medium text-stone-500">{draftDate && draftTime ? formatSlotDisplay(`${draftDate}T${draftTime}`) : '날짜와 시간을 모두 선택해주세요.'}</p>
+              <button
+                type="button"
+                data-testid={`${fieldId}-confirm`}
+                disabled={!draftDate || !draftTime}
+                onClick={confirmSelection}
+                className="rounded-full bg-stone-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+              >
+                선택 완료
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -611,16 +847,19 @@ export default function NewProxyBooking() {
                 label="예약 희망 일시 1지망"
                 value={restaurantForm.preferred_slot_primary}
                 onChange={(value) => updateRestaurantField('preferred_slot_primary', value)}
+                fieldId="preferred-slot-primary"
               />
               <DateTimeChoiceField
                 label="예약 희망 일시 2지망"
                 value={restaurantForm.preferred_slot_secondary}
                 onChange={(value) => updateRestaurantField('preferred_slot_secondary', value)}
+                fieldId="preferred-slot-secondary"
               />
               <DateTimeChoiceField
                 label="예약 희망 일시 3지망"
                 value={restaurantForm.preferred_slot_tertiary}
                 onChange={(value) => updateRestaurantField('preferred_slot_tertiary', value)}
+                fieldId="preferred-slot-tertiary"
               />
             </div>
             <InputField
@@ -1089,53 +1328,63 @@ export default function NewProxyBooking() {
         <ArrowLeft size={16} /> 돌아가기
       </button>
 
-      <div className="mb-8 overflow-hidden rounded-[2rem] border border-stone-200 bg-[linear-gradient(135deg,#f7f2eb_0%,#ffffff_45%,#f5f7fb_100%)] shadow-sm">
-        <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="mb-8 space-y-6">
+        <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-[linear-gradient(135deg,#f7f2eb_0%,#ffffff_45%,#f5f7fb_100%)] shadow-sm">
           <div className="p-6 md:p-8">
-            <div className="flex items-start gap-3">
-              <div className="mt-1 rounded-full bg-stone-900 p-2 text-white shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="mt-1 rounded-full bg-stone-900 p-2.5 text-white shadow-sm">
                 <PhoneCall size={18} />
               </div>
-              <div>
+              <div className="max-w-4xl">
                 <p className="text-sm font-bold tracking-wide text-stone-500">PHONE RESERVATION SUPPORT</p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight text-stone-950 md:text-4xl">
                   일본인이 대신 전화 예약을 도와드립니다
                 </h1>
-                <p className="mt-4 max-w-3xl text-sm leading-7 text-stone-700 md:text-base">
-                  일본의 일부 식당과 업체는 전화로만 예약이나 문의를 받습니다. 로컬리에서는 일본 현지인 팀원이 직접 일본어로 전화를 걸어
-                  예약, 변경, 취소, 재고 확인, 분실물 문의까지 대신 진행합니다. 예약이 확정되거나 확인이 끝나면 상세 페이지 답글과 알림으로 안내드립니다.
+                <p className="mt-4 text-sm leading-7 text-stone-700 md:text-base">
+                  일본의 일부 식당과 업체는 지금도 전화로만 예약이나 변경, 문의를 받습니다. 로컬리에서는 일본 현지인 팀원이 직접 일본어로 전화를 걸어
+                  예약 가능 여부부터 변경, 취소, 재고 확인, 분실물 문의까지 대신 진행합니다. 예약이 확정되거나 확인이 끝나면 상세 페이지 답글과 알림으로
+                  안내드리고, 남겨주신 연락처를 기준으로 운영팀이 후속 조율을 이어갑니다.
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="mt-8 grid gap-3 md:grid-cols-3">
               {SERVICE_HIGHLIGHTS.map((item) => (
-                <div key={item} className="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm leading-6 text-stone-700 shadow-sm">
+                <div key={item} className="rounded-[1.6rem] border border-stone-200 bg-white/85 px-4 py-4 text-sm leading-6 text-stone-700 shadow-sm">
                   {item}
                 </div>
               ))}
             </div>
 
-            <div className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm">
-              <p className="text-sm font-bold text-stone-500">리뷰 확인은</p>
-              <p className="mt-2 text-xl font-black tracking-tight text-stone-950">🔖 locally-travel.com</p>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl bg-stone-100 px-4 py-4 text-center">
-                  <p className="text-lg font-black text-stone-900">한국인 ❌</p>
-                  <p className="mt-2 text-sm leading-6 text-stone-600">한국어만 가능한 대행이 아니라, 일본 현지 업체가 신뢰할 수 있는 방식으로 연락합니다.</p>
+            <div className="mt-8 rounded-[2rem] border border-stone-200 bg-white/80 p-5 shadow-sm md:p-6">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-stone-500">리뷰 확인은</p>
+                  <p className="mt-2 text-xl font-black tracking-tight text-stone-950 md:text-2xl">🔖 locally-travel.com</p>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
+                    일본 현지 업체와 실제로 통화하는 주체가 누구인지가 응답률과 신뢰도에 직접 영향을 줍니다. 로컬리는 일본 현지인 팀원이 직접 전화해 보다 자연스럽고 신뢰도 높은 예약 진행을 돕습니다.
+                  </p>
                 </div>
-                <div className="rounded-2xl bg-emerald-50 px-4 py-4 text-center">
-                  <p className="text-lg font-black text-emerald-700">일본 현지인 ✅</p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-800">실제 일본인 이름으로 직접 통화하여 일본 식당과 업체에서도 신뢰도와 응답률을 높입니다.</p>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:min-w-[360px]">
+                  <div className="rounded-2xl bg-stone-100 px-4 py-4 text-center">
+                    <p className="text-lg font-black text-stone-900">한국인 ❌</p>
+                    <p className="mt-2 text-sm leading-6 text-stone-600">한국어만 가능한 대행이 아니라, 일본 현지 업체가 신뢰할 수 있는 방식으로 연락합니다.</p>
+                  </div>
+                  <div className="rounded-2xl bg-emerald-50 px-4 py-4 text-center">
+                    <p className="text-lg font-black text-emerald-700">일본 현지인 ✅</p>
+                    <p className="mt-2 text-sm leading-6 text-emerald-800">실제 일본인 이름으로 직접 통화하여 일본 식당과 업체에서도 신뢰도와 응답률을 높입니다.</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="border-t border-stone-200 bg-white/70 p-6 md:p-8 lg:border-l lg:border-t-0">
-            <SectionTitle>서비스 안내</SectionTitle>
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-1">
-            <div>
+        <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm md:p-8">
+          <SectionTitle>서비스 안내</SectionTitle>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div className="rounded-[1.5rem] border border-slate-100 bg-slate-50/80 p-5">
               <h3 className="mb-2 text-sm font-bold text-slate-900">서비스 내용</h3>
               <ul className="space-y-2 text-sm leading-6 text-slate-600">
                 {SERVICE_SCOPE.map((item) => (
@@ -1146,7 +1395,7 @@ export default function NewProxyBooking() {
                 ))}
               </ul>
             </div>
-            <div>
+            <div className="rounded-[1.5rem] border border-slate-100 bg-slate-50/80 p-5">
               <h3 className="mb-2 text-sm font-bold text-slate-900">서비스 기준</h3>
               <ul className="space-y-2 text-sm leading-6 text-slate-600">
                 {SERVICE_RULES.map((item) => (
@@ -1157,7 +1406,7 @@ export default function NewProxyBooking() {
                 ))}
               </ul>
             </div>
-            <div>
+            <div className="rounded-[1.5rem] border border-slate-100 bg-slate-50/80 p-5">
               <h3 className="mb-2 text-sm font-bold text-slate-900">진행 불가 또는 별도 문의</h3>
               <ul className="space-y-2 text-sm leading-6 text-slate-600">
                 {SERVICE_EXCLUSIONS.map((item) => (
@@ -1168,7 +1417,7 @@ export default function NewProxyBooking() {
                 ))}
               </ul>
             </div>
-            <div>
+            <div className="rounded-[1.5rem] border border-slate-100 bg-slate-50/80 p-5">
               <h3 className="mb-2 text-sm font-bold text-slate-900">유의 사항</h3>
               <ul className="space-y-2 text-sm leading-6 text-slate-600">
                 {SERVICE_NOTES.map((item) => (
@@ -1179,7 +1428,6 @@ export default function NewProxyBooking() {
                 ))}
               </ul>
             </div>
-          </div>
           </div>
         </div>
       </div>

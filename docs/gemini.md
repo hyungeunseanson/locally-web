@@ -160,8 +160,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 전화 예약 운영 답글의 source of truth는 `/api/proxy-bookings/[id]/comments`다. admin 답글이 생성되면 고객에게 `notifications(type='new_message', link=/proxy-bookings/[id])` 인앱 알림과 즉시 이메일을 함께 보낸다.
 - 전화 예약 입력 화면 `/proxy-bookings/new`는 서비스 안내 섹션과 5개 카테고리(식당, 숙소, 교통, 일반 문의, 분실물) JSON form을 단일 페이지에서 처리한다. DB 스키마는 늘리지 않고 `proxy_requests.form_data`를 계속 source of truth로 사용하며, category별 상세 양식과 `service_fee_krw`는 서버 생성 시점에 함께 저장한다.
 - 전화 예약 수수료는 helper `getProxyRequestFeeKrw()`를 단일 source로 유지한다. 기본 요금은 식당 4,500원, 숙소/교통/일반 문의 6,000원, 분실물 9,000원이며, 식당 카테고리만 `restaurant_service_option`으로 `0120/0570=8,000원`, `쿠이테이=9,000원` 특수 요금을 선택할 수 있다. 고객 상세와 admin `PhoneReservationTab`은 저장된 `service_fee_krw`를 우선 표시한다.
-- 전화 예약 상단 안내는 수수료 표를 따로 두지 않고, 일본 현지인 팀원이 직접 전화한다는 메시지와 서비스 기준/진행 불가/유의사항 중심의 긴 소개 섹션으로 유지한다. 실제 가격 노출은 카테고리 선택 카드와 결제 섹션만 source of truth로 사용한다.
-- 식당 예약 양식은 `datetime-local` 기반 1/2/3지망 일시를 모두 필수로 받고, `대체 식당 진행(1회 대체 동의)`을 결제 옵션이 아닌 form field로 처리한다. 숙소 양식은 `booking_platform`(예: Agoda, Booking.com)을 추가로 수집한다.
+- 전화 예약 상단 안내는 수수료 표를 따로 두지 않고, 일본 현지인 팀원이 직접 전화한다는 메시지를 강조한 소개 카드와 별도의 서비스 안내 카드로 상하 분리한다. 실제 가격 노출은 카테고리 선택 카드와 결제 섹션만 source of truth로 사용한다.
+- 식당 예약 양식은 체험 상세 예약 카드 톤앤매너를 참고한 커스텀 슬롯 picker로 1/2/3지망 일시를 모두 필수로 받고, `대체 식당 진행(1회 대체 동의)`을 결제 옵션이 아닌 form field로 처리한다. 숙소 양식은 `booking_platform`(예: Agoda, Booking.com)을 추가로 수집한다.
 - `TEAM`/`Audit Logs` 읽기 경로는 admin-only SELECT 정책 위에서 client Supabase 목록/realtime을 유지한다. server-only로 전면 전환하지 않고, write 봉쇄와 read 회귀 방지를 동시에 맞춘다.
 - `TEAM` 탭 진입 시 `last_viewed_team`을 현재 시각으로 갱신하고 `team-viewed` 이벤트를 발생시켜, 사이드바 `Team Workspace` 배지가 같은 탭 세션에서도 즉시 0으로 돌아가게 유지한다.
 - 공개 호스트 projection은 당분간 `public_host_applications` safe-view를 유지하고 `security_invoker=off`로 운영한다. 홈/검색/체험상세/공개 프로필이 이 public projection에 의존하므로, `host_applications` RLS 기준 공개 렌더링이 깨지지 않도록 한다.

@@ -164,6 +164,9 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       const customerPage = customerSession.page;
 
       const restaurantName = `테스트 스시 ${Date.now()}`;
+      const today = new Date();
+      const targetDay = Math.min(today.getDate() + 3, new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate());
+      const targetDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
 
       await customerPage.goto('/', { waitUntil: 'networkidle' });
       await customerPage.getByRole('button', { name: '서비스' }).first().click();
@@ -172,9 +175,23 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await expect(customerPage.getByRole('heading', { name: '일본인이 대신 전화 예약을 도와드립니다' })).toBeVisible({ timeout: 15000 });
 
       await customerPage.getByPlaceholder('예: 스시 지로').fill(restaurantName);
-      await customerPage.locator('input[type="datetime-local"]').nth(0).fill('2026-04-02T19:00');
-      await customerPage.locator('input[type="datetime-local"]').nth(1).fill('2026-04-02T19:30');
-      await customerPage.locator('input[type="datetime-local"]').nth(2).fill('2026-04-02T20:00');
+      await customerPage.getByTestId('preferred-slot-primary-trigger').click();
+      await customerPage.getByTestId(`preferred-slot-primary-day-${targetDate}`).click();
+      await customerPage.getByTestId('preferred-slot-primary-time-19:00').click();
+      await customerPage.getByTestId('preferred-slot-primary-confirm').scrollIntoViewIfNeeded();
+      await customerPage.getByTestId('preferred-slot-primary-confirm').click();
+
+      await customerPage.getByTestId('preferred-slot-secondary-trigger').click();
+      await customerPage.getByTestId(`preferred-slot-secondary-day-${targetDate}`).click();
+      await customerPage.getByTestId('preferred-slot-secondary-time-19:30').click();
+      await customerPage.getByTestId('preferred-slot-secondary-confirm').scrollIntoViewIfNeeded();
+      await customerPage.getByTestId('preferred-slot-secondary-confirm').click();
+
+      await customerPage.getByTestId('preferred-slot-tertiary-trigger').click();
+      await customerPage.getByTestId(`preferred-slot-tertiary-day-${targetDate}`).click();
+      await customerPage.getByTestId('preferred-slot-tertiary-time-20:00').click();
+      await customerPage.getByTestId('preferred-slot-tertiary-confirm').scrollIntoViewIfNeeded();
+      await customerPage.getByTestId('preferred-slot-tertiary-confirm').click();
       await customerPage.getByPlaceholder('예: 홍길동').first().fill(customerUser.fullName);
       await customerPage.locator('input[type="number"]').first().fill('2');
       await customerPage.getByPlaceholder('예: 01012345678').first().fill(customerUser.phone);
