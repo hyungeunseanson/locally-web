@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { Plus, Phone, Clock, CheckCircle, XCircle } from 'lucide-react';
 import type { ProxyRequest } from '@/app/types/proxy';
 
 export default function ProxyBookingsBoard() {
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const [requests, setRequests] = useState<ProxyRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -55,10 +55,6 @@ export default function ProxyBookingsBoard() {
             default:
                 return <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold">{status}</span>;
         }
-    };
-
-    const truncate = (text: string, length: number) => {
-        return text.length > length ? text.substring(0, length) + '...' : text;
     };
 
     return (
