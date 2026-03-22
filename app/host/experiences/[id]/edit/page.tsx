@@ -32,6 +32,12 @@ import {
   normalizeExperienceLocaleArray,
 } from '@/app/utils/experienceTranslation';
 
+type ProcessedImageFile = File & {
+  readonly __processedImage: true;
+};
+
+const asProcessedImageFile = (file: File): ProcessedImageFile => file as ProcessedImageFile;
+
 export default function EditExperiencePage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
   const copy = getExperienceFormCopy(lang);
@@ -124,7 +130,7 @@ export default function EditExperiencePage() {
       throw new Error(validation.message || copy.imageValidationFallback);
     }
 
-    const compressedFile = await compressImage(file);
+    const compressedFile = asProcessedImageFile(await compressImage(file));
     const fileName = `experience/${formData.host_id}/${folder}/${Date.now()}_${sanitizeFileName(compressedFile.name)}`;
     const { error } = await supabase.storage.from('experiences').upload(fileName, compressedFile);
 
