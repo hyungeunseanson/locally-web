@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -36,7 +36,7 @@ type BookingData = {
 function PaymentCompleteContent() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
   const orderId = searchParams.get('orderId');
