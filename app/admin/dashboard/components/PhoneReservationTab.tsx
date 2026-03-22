@@ -50,7 +50,7 @@ function getPaymentStatusLabel(status: PaymentStatus) {
     case 'COMPLETED':
       return '결제 완료';
     case 'FAILED':
-      return '결제 실패';
+      return '결제 취소';
     case 'REFUNDED':
       return '환불 완료';
     default:
@@ -395,6 +395,36 @@ export default function PhoneReservationTab() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-5">
+              <div className="rounded-2xl border border-slate-100 p-4">
+                <h4 className="font-bold text-slate-900 mb-3">폼 작성 내용</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  {selectedFormEntries.map((entry) => (
+                    <div key={entry.key} className="rounded-xl bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{entry.label}</p>
+                      <p className="text-slate-800 mt-1 break-words whitespace-pre-wrap">{entry.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900">결제 액션</h4>
+                    <p className="text-xs text-slate-500 mt-1">무통장 입금 확인이나 결제 취소 상태를 여기서 바로 정리하세요.</p>
+                  </div>
+                  <div className="text-xs font-semibold text-slate-500">
+                    현재 상태: <span className="text-slate-900">{getPaymentStatusLabel(selectedRequest.payment_status)}</span>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('WAITING')} className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">결제 대기</button>
+                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('COMPLETED')} className="w-full rounded-xl border border-emerald-200 px-3 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60">입금 확인</button>
+                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('FAILED')} className="w-full rounded-xl border border-rose-200 px-3 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60">결제 취소</button>
+                  <button type="button" disabled={updating} onClick={() => handleUpdatePayment('REFUNDED')} className="w-full rounded-xl border border-amber-200 px-3 py-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-60">환불 완료</button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 space-y-2 text-sm">
                   <h4 className="font-bold text-slate-900">결제 정보</h4>
@@ -418,23 +448,6 @@ export default function PhoneReservationTab() {
                     <button type="button" disabled={updating} onClick={() => handleUpdateStatus('COMPLETED')} className="px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-60">완료</button>
                     <button type="button" disabled={updating} onClick={() => handleUpdateStatus('CANCELLED')} className="px-3 py-2 text-xs font-semibold rounded-xl bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-60">취소</button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button type="button" disabled={updating} onClick={() => handleUpdatePayment('WAITING')} className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-60">결제 대기</button>
-                    <button type="button" disabled={updating} onClick={() => handleUpdatePayment('COMPLETED')} className="px-3 py-2 text-xs font-semibold rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">결제 완료</button>
-                    <button type="button" disabled={updating} onClick={() => handleUpdatePayment('FAILED')} className="px-3 py-2 text-xs font-semibold rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-60">결제 실패</button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-100 p-4">
-                <h4 className="font-bold text-slate-900 mb-3">폼 작성 내용</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {selectedFormEntries.map((entry) => (
-                    <div key={entry.key} className="rounded-xl bg-slate-50 px-3 py-2">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{entry.label}</p>
-                      <p className="text-slate-800 mt-1 break-words whitespace-pre-wrap">{entry.value}</p>
-                    </div>
-                  ))}
                 </div>
               </div>
 
