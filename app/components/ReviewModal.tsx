@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Star, X, Camera, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client'; // 🟢 Supabase 클라이언트 추가
 import { useToast } from '@/app/context/ToastContext'; // 🟢 토스트 알림 추가
@@ -27,7 +27,7 @@ interface ReviewModalProps {
 }
 
 export default function ReviewModal({ trip, onClose, onReviewSubmitted }: ReviewModalProps) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast, showHeicUnsupportedToast } = useToast();
   const { t } = useLanguage();
 
