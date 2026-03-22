@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Star, Trash2, Search, RefreshCw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
 
@@ -27,7 +27,7 @@ export default function ReviewsTab() {
   const [ratingFilter, setRatingFilter] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/admin/reviews', { cache: 'no-store' });
@@ -44,11 +44,11 @@ export default function ReviewsTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     void fetchReviews();
-  }, []);
+  }, [fetchReviews]);
 
   const handleDelete = async (reviewId: number) => {
     if (!confirm('이 후기를 삭제하시겠습니까? 취소할 수 없습니다.')) return;
