@@ -21,6 +21,12 @@ import { buildExperienceWritePayload, syncManualContentWithLocales, type Experie
 import { getManualLocalesFromLanguageLevels, isExperienceLocale } from '@/app/utils/experienceTranslation';
 import HostPhotoActionSheet from '@/app/host/components/HostPhotoActionSheet';
 
+type ProcessedImageFile = File & {
+  readonly __processedImage: true;
+};
+
+const asProcessedImageFile = (file: File): ProcessedImageFile => file as ProcessedImageFile;
+
 export default function CreateExperiencePage() {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
@@ -39,8 +45,8 @@ export default function CreateExperiencePage() {
 
   // UI용 임시 상태
   const [isCustomCity, setIsCustomCity] = useState(false);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [itineraryImageFiles, setItineraryImageFiles] = useState<(File | null)[]>(
+  const [imageFiles, setImageFiles] = useState<ProcessedImageFile[]>([]);
+  const [itineraryImageFiles, setItineraryImageFiles] = useState<(ProcessedImageFile | null)[]>(
     INITIAL_FORM_DATA.itinerary.map(() => null)
   );
   const [tempInclusion, setTempInclusion] = useState('');
@@ -263,7 +269,7 @@ export default function CreateExperiencePage() {
 
   const buildPreviewFiles = async (files: File[]) => {
     const previewUrls: string[] = [];
-    const processedFiles: File[] = [];
+    const processedFiles: ProcessedImageFile[] = [];
 
     for (const file of files) {
       const validation = validateImage(file);
@@ -279,7 +285,7 @@ export default function CreateExperiencePage() {
       try {
         const compressedFile = await compressImage(file);
         previewUrls.push(URL.createObjectURL(compressedFile));
-        processedFiles.push(compressedFile);
+        processedFiles.push(asProcessedImageFile(compressedFile));
       } catch (err) {
         console.error('Compression error:', err);
         showToast(copy.imageProcessingError, 'error');
@@ -364,7 +370,7 @@ export default function CreateExperiencePage() {
     });
   };
 
-  const uploadImageToStorage = async (userId: string, file: File, folder: 'hero' | 'itinerary') => {
+  const uploadImageToStorage = async (userId: string, file: ProcessedImageFile, folder: 'hero' | 'itinerary') => {
     const safeName = sanitizeFileName(file.name);
     const fileName = `experience/${userId}/${folder}/${Date.now()}_${safeName}`;
 
