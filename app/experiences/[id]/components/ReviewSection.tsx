@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Star, X } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import Image from 'next/image';
@@ -39,7 +39,7 @@ type ReviewView = ReviewRow & {
 };
 
 export default function ReviewSection({ experienceId, hostName }: ReviewSectionProps) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { t } = useLanguage();
   const guestLabel = t('exp_review_guest_label');
   const [reviews, setReviews] = useState<ReviewView[]>([]);
@@ -81,7 +81,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         // 1. 후기 데이터 가져오기
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
-          .select('*')
+          .select('id, user_id, rating, content, created_at, reply, reply_at, photos')
           .eq('experience_id', experienceId)
           .order('created_at', { ascending: false });
 
@@ -100,7 +100,7 @@ export default function ReviewSection({ experienceId, hostName }: ReviewSectionP
         // 3. 프로필 가져오기
         const { data: profilesData, error: profileError } = await supabase
           .from('profiles')
-          .select('*') 
+          .select('id, full_name, name, username, email, avatar_url')
           .in('id', userIds);
 
         if (profileError) console.error("프로필 조회 에러:", profileError);
