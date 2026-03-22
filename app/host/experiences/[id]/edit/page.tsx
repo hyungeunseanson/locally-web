@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
@@ -41,7 +41,7 @@ const asProcessedImageFile = (file: File): ProcessedImageFile => file as Process
 export default function EditExperiencePage() {
   const { t, lang } = useLanguage(); // 🟢 2. Hook
   const copy = getExperienceFormCopy(lang);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const params = useParams();
   const { showToast, showHeicUnsupportedToast } = useToast();
