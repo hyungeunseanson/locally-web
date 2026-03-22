@@ -3,11 +3,14 @@ export type ProxyStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type PaymentChannel = 'NAVER' | 'LOCALLY';
 export type PaymentStatus = 'WAITING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
 export type ProxyPaymentMethod = 'card' | 'bank';
+export type RestaurantServiceOption = 'STANDARD' | 'ZERO_ONE_TWO_ZERO' | 'KUITEI';
 
 export type ProxyFormData = Record<string, unknown> & {
     payment_method?: ProxyPaymentMethod | null;
     contact_name?: string | null;
     contact_phone?: string | null;
+    service_fee_krw?: number | null;
+    restaurant_service_option?: RestaurantServiceOption | null;
 };
 
 export interface ProxyRequest {

@@ -3,394 +3,1323 @@
 import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2, PhoneCall } from 'lucide-react';
 
+import type {
+  GeneralInquiryFormData,
+  HotelFormData,
+  LostAndFoundFormData,
+  RestaurantFormData,
+  TransportFormData,
+} from '@/app/schemas/proxyRequestSchema';
+import type { ProxyCategory, RestaurantServiceOption } from '@/app/types/proxy';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
 import { createClient } from '@/app/utils/supabase/client';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
-import { PROXY_REQUEST_PRICE_KRW } from '@/app/utils/proxyBooking';
+import {
+  getProxyCategoryLabel,
+  getProxyRequestFeeKrw,
+  PROXY_REQUEST_PRICE_KRW,
+  PROXY_RESTAURANT_SERVICE_OPTION_PRICES,
+} from '@/app/utils/proxyBooking';
 
 type PaymentMethod = 'card' | 'bank';
+type PaymentChannel = 'NAVER' | 'LOCALLY';
+
 type CardReadyResponse = {
-    provider: 'portone' | 'nicepay';
-    ready: boolean;
-    reason?: string;
+  provider: 'portone' | 'nicepay';
+  ready: boolean;
+  reason?: string;
 };
 
-type TransportType = 'TAXI' | 'BUS' | 'TRAIN';
+type CategoryOption = {
+  id: ProxyCategory;
+  label: string;
+  description: string;
+  priceLabel: string;
+};
 
-function isTransportType(value: string): value is TransportType {
-    return value === 'TAXI' || value === 'BUS' || value === 'TRAIN';
+const CATEGORY_OPTIONS: CategoryOption[] = [
+  {
+    id: 'RESTAURANT',
+    label: '식당 예약 문의',
+    description: '식당 예약, 예약 가능 여부, 일반 문의까지 한 번에 접수합니다.',
+    priceLabel: '₩4,500~',
+  },
+  {
+    id: 'HOTEL',
+    label: '호텔 · 료칸 · 숙소 문의',
+    description: '예약 변경, 취소, 일반 문의를 일본어로 대신 확인합니다.',
+    priceLabel: '₩6,000',
+  },
+  {
+    id: 'TRANSPORT',
+    label: '택시 · 버스 · 교통 예약 문의',
+    description: '택시, 호텔택시, 셔틀버스 등 교통 예약/문의 접수용입니다.',
+    priceLabel: '₩6,000',
+  },
+  {
+    id: 'GENERAL',
+    label: '재고 확인 · 업체 일반 문의',
+    description: '재고, 영업 여부, 예약 가능 여부 등 일반 확인 전화를 진행합니다.',
+    priceLabel: '₩6,000',
+  },
+  {
+    id: 'LOST_AND_FOUND',
+    label: '분실물 문의',
+    description: '분실물 접수, 확인 요청, 회수 가능 여부 문의를 대신 진행합니다.',
+    priceLabel: '₩9,000',
+  },
+];
+
+const SERVICE_HIGHLIGHTS = [
+  '일본 현지 업체에 일본어로 직접 전화해 예약 가능 여부와 문의 내용을 대신 확인합니다.',
+  '식당, 숙소, 교통, 재고 확인, 분실물 문의까지 일본 전국 기준으로 접수할 수 있습니다.',
+  '진행 결과는 전화 예약 상세 페이지 답글과 알림으로 안내드립니다.',
+];
+
+const SERVICE_SCOPE = [
+  '식당 예약 및 예약 가능 여부 확인',
+  '호텔 · 료칸 · 숙소 예약 변경 / 취소 / 일반 문의',
+  '택시 · 호텔택시 · 셔틀버스 · 기타 교통 예약 문의',
+  '재고 확인, 영업 여부 확인, 일반 문의',
+  '분실물 접수 및 회수 가능 여부 확인',
+];
+
+const SERVICE_RULES = [
+  '상대 업체가 전화를 받는 순간 1통으로 간주됩니다.',
+  '영업시간 내 여러 차례 시도했더라도 연결 불가, 만석, 업장 사정에 따른 불가 건은 진행 완료로 처리될 수 있습니다.',
+  '추가 통화나 복잡한 문제 해결이 필요한 건은 별도 문의가 필요할 수 있습니다.',
+];
+
+const SERVICE_EXCLUSIONS = [
+  '예약금 · 취소료가 있는 식당의 취소 대행',
+  '노쇼 이력이 있어 재예약이 불가한 식당',
+  '오마카세, 미슐랭, 고급 코스 요리 선주문 식당 등 고위험 예약 건',
+];
+
+const SERVICE_NOTES = [
+  '예약 희망일 기준 1~2달 전에 접수할수록 성공 가능성이 높습니다.',
+  '가능한 예약 시간 폭을 넓게 적어주시면 한 번에 예약이 성사될 확률이 높습니다.',
+  '업무 시간은 10:00~18:00 기준이며, 주말에는 응답이 지연될 수 있습니다.',
+  '요청사항에 카카오톡 아이디 등 추가 연락 수단을 적어주시면 운영팀 확인 시 참고합니다.',
+];
+
+const SERVICE_FEES = [
+  { label: '식당 예약', value: '₩4,500', note: '기본 식당 예약/문의' },
+  { label: '호텔 · 료칸 · 숙소 문의', value: '₩6,000', note: '변경 / 취소 / 일반 문의' },
+  { label: '택시 · 버스 · 교통 예약', value: '₩6,000', note: '택시, 셔틀버스, 기타 교통' },
+  { label: '재고 확인 · 업체 일반 문의', value: '₩6,000', note: '재고/영업 여부/예약 가능 여부' },
+  { label: '0120 / 0570 번호', value: '₩8,000', note: '식당 카테고리에서 선택' },
+  { label: '분실물 문의', value: '₩9,000', note: '분실 장소 확인 및 문의' },
+  { label: '쿠이테이', value: '₩9,000', note: '식당 카테고리 특수 옵션' },
+];
+
+const DEFAULT_RESTAURANT_FORM: RestaurantFormData = {
+  restaurant_name: '',
+  google_map_url: '',
+  restaurant_phone: '',
+  target_date: '',
+  preferred_time_primary: '',
+  preferred_time_secondary: '',
+  reservation_name: '',
+  guest_number: 2,
+  korean_contact: '',
+  local_hotel_contact: '',
+  request_notes: '',
+  notice_acknowledged: false,
+  deposit_fee_checked: 'UNKNOWN',
+  restaurant_service_option: 'STANDARD',
+};
+
+const DEFAULT_HOTEL_FORM: HotelFormData = {
+  property_name: '',
+  property_phone: '',
+  reservation_number: '',
+  reservation_name: '',
+  checkin_date: '',
+  checkout_date: '',
+  hotel_inquiry_type: 'GENERAL',
+  request_content: '',
+  desired_change: '',
+  korean_contact: '',
+  additional_notes: '',
+  notice_acknowledged: false,
+  fee_policy_checked: 'UNKNOWN',
+};
+
+const DEFAULT_TRANSPORT_FORM: TransportFormData = {
+  reservation_type: 'TAXI',
+  service_area: '',
+  reservation_name: '',
+  korean_contact: '',
+  use_date: '',
+  use_time: '',
+  departure_location: '',
+  arrival_location: '',
+  passenger_number: 1,
+  baggage_count: 0,
+  accommodation_reference: '',
+  flight_number: '',
+  additional_notes: '',
+  notice_acknowledged: false,
+};
+
+const DEFAULT_GENERAL_FORM: GeneralInquiryFormData = {
+  business_name: '',
+  business_phone: '',
+  business_link: '',
+  general_inquiry_type: 'STOCK_CHECK',
+  inquiry_content: '',
+  preferred_check_time: '',
+  korean_contact: '',
+  additional_notes: '',
+  notice_acknowledged: false,
+};
+
+const DEFAULT_LOST_FORM: LostAndFoundFormData = {
+  location_name: '',
+  location_phone: '',
+  lost_date: '',
+  lost_time_window: '',
+  item_type: '',
+  item_description: '',
+  last_seen_context: '',
+  reservation_name: '',
+  korean_contact: '',
+  local_stay_name: '',
+  additional_notes: '',
+  notice_acknowledged: false,
+};
+
+function normalizeOptionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="font-bold text-slate-900 mb-4">{children}</h2>;
+}
+
+function InputField({
+  label,
+  required,
+  className = '',
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; required?: boolean }) {
+  return (
+    <div className={className}>
+      <label className="text-xs font-semibold text-slate-600">
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </label>
+      <input
+        {...props}
+        required={required}
+        className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+      />
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  required,
+  className = '',
+  children,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement> & {
+  label: string;
+  required?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={className}>
+      <label className="text-xs font-semibold text-slate-600">
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </label>
+      <select
+        {...props}
+        required={required}
+        className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+      >
+        {children}
+      </select>
+    </div>
+  );
+}
+
+function TextareaField({
+  label,
+  required,
+  className = '',
+  ...props
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; required?: boolean }) {
+  return (
+    <div className={className}>
+      <label className="text-xs font-semibold text-slate-600">
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </label>
+      <textarea
+        {...props}
+        required={required}
+        className="mt-1.5 w-full resize-none rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+      />
+    </div>
+  );
 }
 
 export default function NewProxyBooking() {
-    const router = useRouter();
-    const supabase = useMemo(() => createClient(), []);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+  const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
 
-    // Form states
-    const [category, setCategory] = useState<'RESTAURANT' | 'TRANSPORT'>('RESTAURANT');
-    const [paymentChannel, setPaymentChannel] = useState<'NAVER' | 'LOCALLY'>('NAVER');
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
-    const [naverBuyerName, setNaverBuyerName] = useState('');
-    const [contactName, setContactName] = useState('');
-    const [contactPhone, setContactPhone] = useState('');
-    const [agreedToTerms, setAgreedToTerms] = useState(false);
-    const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<ProxyCategory>('RESTAURANT');
+  const [paymentChannel, setPaymentChannel] = useState<PaymentChannel>('NAVER');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [naverBuyerName, setNaverBuyerName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-    // Restaurant specific
-    const [restName, setRestName] = useState('');
-    const [restDate, setRestDate] = useState('');
-    const [restTime, setRestTime] = useState('');
-    const [restGuests, setRestGuests] = useState(1);
-    const [restAlternative, setRestAlternative] = useState('');
-    const [restSpecial, setRestSpecial] = useState('');
+  const [restaurantForm, setRestaurantForm] = useState<RestaurantFormData>(DEFAULT_RESTAURANT_FORM);
+  const [hotelForm, setHotelForm] = useState<HotelFormData>(DEFAULT_HOTEL_FORM);
+  const [transportForm, setTransportForm] = useState<TransportFormData>(DEFAULT_TRANSPORT_FORM);
+  const [generalForm, setGeneralForm] = useState<GeneralInquiryFormData>(DEFAULT_GENERAL_FORM);
+  const [lostForm, setLostForm] = useState<LostAndFoundFormData>(DEFAULT_LOST_FORM);
 
-    // Transport specific
-    const [transType, setTransType] = useState<TransportType>('TAXI');
-    const [transDepart, setTransDepart] = useState('');
-    const [transArrival, setTransArrival] = useState('');
-    const [transDate, setTransDate] = useState('');
-    const [transTime, setTransTime] = useState('');
-    const [transPassengers, setTransPassengers] = useState(1);
+  const updateRestaurantField = <K extends keyof RestaurantFormData>(key: K, value: RestaurantFormData[K]) => {
+    setRestaurantForm((prev) => ({ ...prev, [key]: value }));
+  };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-        const requiresLocallyPayment = paymentChannel === 'LOCALLY';
+  const updateHotelField = <K extends keyof HotelFormData>(key: K, value: HotelFormData[K]) => {
+    setHotelForm((prev) => ({ ...prev, [key]: value }));
+  };
 
-        const baseData = {
-            agreed_to_terms: agreedToTerms,
-            payment_channel: paymentChannel,
-            ...(paymentChannel === 'NAVER' ? { naver_buyer_name: naverBuyerName } : {}),
-            ...(requiresLocallyPayment
-                ? {
-                    payment_method: paymentMethod,
-                    contact_name: contactName,
-                    contact_phone: contactPhone,
-                }
-                : {}),
-            category_data: category === 'RESTAURANT'
-                ? {
-                    category: 'RESTAURANT',
-                    form_data: {
-                        restaurant_name: restName,
-                        target_date: restDate,
-                        target_time: restTime,
-                        guest_number: Number(restGuests),
-                        alternative_times: restAlternative || undefined,
-                        special_requests: restSpecial || undefined,
-                    }
-                }
-                : {
-                    category: 'TRANSPORT',
-                    form_data: {
-                        transport_type: transType,
-                        departure_location: transDepart,
-                        arrival_location: transArrival,
-                        departure_date: transDate,
-                        departure_time: transTime,
-                        passenger_number: Number(transPassengers),
-                    }
-                }
+  const updateTransportField = <K extends keyof TransportFormData>(key: K, value: TransportFormData[K]) => {
+    setTransportForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateGeneralField = <K extends keyof GeneralInquiryFormData>(
+    key: K,
+    value: GeneralInquiryFormData[K]
+  ) => {
+    setGeneralForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateLostField = <K extends keyof LostAndFoundFormData>(key: K, value: LostAndFoundFormData[K]) => {
+    setLostForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const categoryData = useMemo(() => {
+    switch (category) {
+      case 'RESTAURANT':
+        return {
+          category: 'RESTAURANT' as const,
+          form_data: {
+            restaurant_name: restaurantForm.restaurant_name.trim(),
+            google_map_url: normalizeOptionalText(restaurantForm.google_map_url || ''),
+            restaurant_phone: normalizeOptionalText(restaurantForm.restaurant_phone || ''),
+            target_date: restaurantForm.target_date,
+            preferred_time_primary: restaurantForm.preferred_time_primary,
+            preferred_time_secondary: normalizeOptionalText(restaurantForm.preferred_time_secondary || ''),
+            reservation_name: restaurantForm.reservation_name.trim(),
+            guest_number: Number(restaurantForm.guest_number),
+            korean_contact: restaurantForm.korean_contact.trim(),
+            local_hotel_contact: normalizeOptionalText(restaurantForm.local_hotel_contact || ''),
+            request_notes: normalizeOptionalText(restaurantForm.request_notes || ''),
+            notice_acknowledged: restaurantForm.notice_acknowledged,
+            deposit_fee_checked: restaurantForm.deposit_fee_checked,
+            restaurant_service_option: restaurantForm.restaurant_service_option,
+          },
         };
+      case 'HOTEL':
+        return {
+          category: 'HOTEL' as const,
+          form_data: {
+            property_name: hotelForm.property_name.trim(),
+            property_phone: normalizeOptionalText(hotelForm.property_phone || ''),
+            reservation_number: normalizeOptionalText(hotelForm.reservation_number || ''),
+            reservation_name: hotelForm.reservation_name.trim(),
+            checkin_date: hotelForm.checkin_date,
+            checkout_date: hotelForm.checkout_date,
+            hotel_inquiry_type: hotelForm.hotel_inquiry_type,
+            request_content: hotelForm.request_content.trim(),
+            desired_change: normalizeOptionalText(hotelForm.desired_change || ''),
+            korean_contact: hotelForm.korean_contact.trim(),
+            additional_notes: normalizeOptionalText(hotelForm.additional_notes || ''),
+            notice_acknowledged: hotelForm.notice_acknowledged,
+            fee_policy_checked: hotelForm.fee_policy_checked,
+          },
+        };
+      case 'TRANSPORT':
+        return {
+          category: 'TRANSPORT' as const,
+          form_data: {
+            reservation_type: transportForm.reservation_type,
+            service_area: transportForm.service_area.trim(),
+            reservation_name: transportForm.reservation_name.trim(),
+            korean_contact: transportForm.korean_contact.trim(),
+            use_date: transportForm.use_date,
+            use_time: transportForm.use_time,
+            departure_location: transportForm.departure_location.trim(),
+            arrival_location: transportForm.arrival_location.trim(),
+            passenger_number: Number(transportForm.passenger_number),
+            baggage_count: Number(transportForm.baggage_count || 0),
+            accommodation_reference: normalizeOptionalText(transportForm.accommodation_reference || ''),
+            flight_number: normalizeOptionalText(transportForm.flight_number || ''),
+            additional_notes: normalizeOptionalText(transportForm.additional_notes || ''),
+            notice_acknowledged: transportForm.notice_acknowledged,
+          },
+        };
+      case 'GENERAL':
+        return {
+          category: 'GENERAL' as const,
+          form_data: {
+            business_name: generalForm.business_name.trim(),
+            business_phone: normalizeOptionalText(generalForm.business_phone || ''),
+            business_link: normalizeOptionalText(generalForm.business_link || ''),
+            general_inquiry_type: generalForm.general_inquiry_type,
+            inquiry_content: generalForm.inquiry_content.trim(),
+            preferred_check_time: normalizeOptionalText(generalForm.preferred_check_time || ''),
+            korean_contact: generalForm.korean_contact.trim(),
+            additional_notes: normalizeOptionalText(generalForm.additional_notes || ''),
+            notice_acknowledged: generalForm.notice_acknowledged,
+          },
+        };
+      case 'LOST_AND_FOUND':
+      default:
+        return {
+          category: 'LOST_AND_FOUND' as const,
+          form_data: {
+            location_name: lostForm.location_name.trim(),
+            location_phone: normalizeOptionalText(lostForm.location_phone || ''),
+            lost_date: lostForm.lost_date,
+            lost_time_window: lostForm.lost_time_window.trim(),
+            item_type: lostForm.item_type.trim(),
+            item_description: lostForm.item_description.trim(),
+            last_seen_context: lostForm.last_seen_context.trim(),
+            reservation_name: lostForm.reservation_name.trim(),
+            korean_contact: lostForm.korean_contact.trim(),
+            local_stay_name: normalizeOptionalText(lostForm.local_stay_name || ''),
+            additional_notes: normalizeOptionalText(lostForm.additional_notes || ''),
+            notice_acknowledged: lostForm.notice_acknowledged,
+          },
+        };
+    }
+  }, [category, generalForm, hotelForm, lostForm, restaurantForm, transportForm]);
 
-        const validation = ProxyRequestValidationSchema.safeParse(baseData);
+  const currentServiceFee = useMemo(
+    () => getProxyRequestFeeKrw(categoryData.category, categoryData.form_data),
+    [categoryData]
+  );
 
-        if (!validation.success) {
-            const firstError = validation.error.issues[0];
-            setError(firstError.message);
-            setLoading(false);
-            return;
-        }
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
 
-        let readiness: CardReadyResponse | null = null;
-
-        try {
-            const { data: authData } = await supabase.auth.getUser();
-            const user = authData.user;
-
-            if (!user) {
-                router.push('/login');
-                return;
-            }
-
-            if (requiresLocallyPayment && paymentMethod === 'card') {
-                const readinessRes = await fetch('/api/payment/card-ready', { cache: 'no-store' });
-                readiness = (await readinessRes.json()) as CardReadyResponse;
-
-                if (!readinessRes.ok || !readiness?.ready || !portOneImpCode) {
-                    setError('카드 결제를 지금 사용할 수 없습니다. 무통장 입금을 이용해주세요.');
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            const res = await fetch('/api/proxy-bookings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(validation.data),
-            });
-
-            const data = await res.json();
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to submit request');
-            }
-
-            const requestId = String(data.requestId || '').trim();
-            const locallyOrderId = String(data.locallyOrderId || '').trim();
-            const finalAmount = Number(data.finalAmount || PROXY_REQUEST_PRICE_KRW);
-
-            if (!requestId) {
-                throw new Error('전화 예약 요청 생성에 실패했습니다.');
-            }
-
-            if (!requiresLocallyPayment || paymentMethod === 'bank') {
-                router.push(`/proxy-bookings/${requestId}`);
-                return;
-            }
-
-            if (!locallyOrderId) {
-                router.push(`/proxy-bookings/${requestId}?payment=failed`);
-                return;
-            }
-
-            try {
-                const paymentSession = await launchCardPayment({
-                    provider: readiness?.provider || 'portone',
-                    merchantCode: portOneImpCode,
-                    orderId: locallyOrderId,
-                    productName: category === 'RESTAURANT' ? 'Locally 식당 전화 예약 대행' : 'Locally 교통 전화 예약 대행',
-                    amount: finalAmount,
-                    buyerEmail: user.email,
-                    buyerName: contactName.trim(),
-                    buyerTel: contactPhone.trim(),
-                    redirectUrl: `${window.location.origin}/proxy-bookings/${requestId}`,
-                });
-
-                const callbackRes = await fetch('/api/proxy-bookings/payment/nicepay-callback', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        imp_uid: paymentSession.approvalId,
-                        approvalId: paymentSession.approvalId,
-                        merchant_uid: locallyOrderId,
-                        orderId: locallyOrderId,
-                    }),
-                });
-
-                const callbackResult = await callbackRes.json();
-                if (!callbackRes.ok || !callbackResult?.success) {
-                    router.push(`/proxy-bookings/${requestId}?payment=failed`);
-                    return;
-                }
-
-                router.push(`/proxy-bookings/${requestId}?payment=completed`);
-            } catch (paymentError) {
-                console.error('Proxy card payment failed:', paymentError);
-                router.push(`/proxy-bookings/${requestId}?payment=failed`);
-            }
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to submit request');
-        } finally {
-            setLoading(false);
-        }
+    const requiresLocallyPayment = paymentChannel === 'LOCALLY';
+    const payload = {
+      agreed_to_terms: agreedToTerms,
+      payment_channel: paymentChannel,
+      ...(paymentChannel === 'NAVER' ? { naver_buyer_name: naverBuyerName.trim() } : {}),
+      ...(requiresLocallyPayment
+        ? {
+            payment_method: paymentMethod,
+            contact_name: contactName.trim(),
+            contact_phone: contactPhone.trim(),
+          }
+        : {}),
+      category_data: categoryData,
     };
 
-    return (
-        <div className="max-w-3xl mx-auto px-4 py-8">
-            <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="afterInteractive" />
-            <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 mb-6 transition-colors">
-                <ArrowLeft size={16} /> 돌아가기
-            </button>
+    const validation = ProxyRequestValidationSchema.safeParse(payload);
+    if (!validation.success) {
+      const firstError = validation.error.issues[0];
+      setError(firstError?.message || '입력값을 다시 확인해주세요.');
+      setLoading(false);
+      return;
+    }
 
-            <h1 className="text-2xl font-bold mb-2">새 전화 대행 요청</h1>
-            <p className="text-slate-500 mb-8 text-sm">필요하신 서비스 카테고리를 선택하고 상세 정보를 입력해주세요.</p>
+    let readiness: CardReadyResponse | null = null;
 
-            {error && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm mb-6 border border-red-100">
-                    {error}
-                </div>
-            )}
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-                {/* 카테고리 선택 */}
-                <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <h2 className="font-bold mb-4">서비스 카테고리</h2>
-                    <div className="flex gap-4">
-                        <label className={`flex-1 p-4 border rounded-xl cursor-pointer transition-colors ${category === 'RESTAURANT' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}>
-                            <input type="radio" value="RESTAURANT" checked={category === 'RESTAURANT'} onChange={() => setCategory('RESTAURANT')} className="sr-only" />
-                            <div className="font-semibold text-sm">식당 예약/확인</div>
-                        </label>
-                        <label className={`flex-1 p-4 border rounded-xl cursor-pointer transition-colors ${category === 'TRANSPORT' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}>
-                            <input type="radio" value="TRANSPORT" checked={category === 'TRANSPORT'} onChange={() => setCategory('TRANSPORT')} className="sr-only" />
-                            <div className="font-semibold text-sm">교통 예매/문의</div>
-                        </label>
-                    </div>
-                </section>
+      if (!user) {
+        router.push('/login');
+        return;
+      }
 
-                {/* 동적 폼 영역 */}
-                <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-                    <h2 className="font-bold mb-4">상세 정보 입력</h2>
+      if (requiresLocallyPayment && paymentMethod === 'card') {
+        const readinessRes = await fetch('/api/payment/card-ready', { cache: 'no-store' });
+        readiness = (await readinessRes.json()) as CardReadyResponse;
 
-                    {category === 'RESTAURANT' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-xs font-semibold text-slate-600">식당 이름 <span className="text-red-500">*</span></label>
-                                <input type="text" required value={restName} onChange={e => setRestName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" placeholder="예: 스시 지로" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">예약 희망 날짜 <span className="text-red-500">*</span></label>
-                                <input type="date" required value={restDate} onChange={e => setRestDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">예약 희망 시간 <span className="text-red-500">*</span></label>
-                                <input type="time" required value={restTime} onChange={e => setRestTime(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" />
-                            </div>
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-xs font-semibold text-slate-600">대안 시간대</label>
-                                <input type="text" value={restAlternative} onChange={e => setRestAlternative(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" placeholder="예: 오후 1시 예약 불가 시 오후 1시 30분 가능" />
-                            </div>
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-xs font-semibold text-slate-600">방문 인원 <span className="text-red-500">*</span></label>
-                                <input type="number" min="1" required value={restGuests} onChange={e => setRestGuests(Number(e.target.value))} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" />
-                            </div>
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-xs font-semibold text-slate-600">요청 및 특이사항</label>
-                                <textarea rows={3} value={restSpecial} onChange={e => setRestSpecial(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none" placeholder="예: 땅콩 알레르기가 있습니다. 생일입니다." />
-                            </div>
-                        </div>
-                    )}
+        if (!readinessRes.ok || !readiness?.ready || !portOneImpCode) {
+          setError('카드 결제를 지금 사용할 수 없습니다. 무통장 입금을 이용해주세요.');
+          setLoading(false);
+          return;
+        }
+      }
 
-                    {category === 'TRANSPORT' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-xs font-semibold text-slate-600">수단 <span className="text-red-500">*</span></label>
-                                <select
-                                    value={transType}
-                                    onChange={(e) => {
-                                        if (isTransportType(e.target.value)) {
-                                            setTransType(e.target.value);
-                                        }
-                                    }}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                                >
-                                    <option value="TAXI">택시/대절</option>
-                                    <option value="BUS">버스</option>
-                                    <option value="TRAIN">기차</option>
-                                </select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">출발지 <span className="text-red-500">*</span></label>
-                                <input type="text" required value={transDepart} onChange={e => setTransDepart(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200" placeholder="예: 신주쿠역" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">도착지 <span className="text-red-500">*</span></label>
-                                <input type="text" required value={transArrival} onChange={e => setTransArrival(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200" placeholder="예: 요코하마역" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">날짜 <span className="text-red-500">*</span></label>
-                                <input type="date" required value={transDate} onChange={e => setTransDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600">시간 <span className="text-red-500">*</span></label>
-                                <input type="time" required value={transTime} onChange={e => setTransTime(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200" />
-                            </div>
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-xs font-semibold text-slate-600">탑승 인원 <span className="text-red-500">*</span></label>
-                                <input type="number" min="1" required value={transPassengers} onChange={e => setTransPassengers(Number(e.target.value))} className="w-full px-4 py-2.5 rounded-xl border border-slate-200" />
-                            </div>
-                        </div>
-                    )}
-                </section>
+      const response = await fetch('/api/proxy-bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validation.data),
+      });
 
-                {/* 결제 트랙 */}
-                <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-                    <h2 className="font-bold mb-4">결제 방식 선택</h2>
+      const result = await response.json();
+      if (!response.ok || result.success === false) {
+        throw new Error(result.error || '전화 예약 요청 생성에 실패했습니다.');
+      }
 
-                    <div className="flex flex-col gap-3 mb-6">
-                        <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${paymentChannel === 'NAVER' ? 'border-green-500 bg-green-50 ring-1 ring-green-500' : 'border-slate-200 hover:bg-slate-50'}`}>
-                            <input type="radio" value="NAVER" checked={paymentChannel === 'NAVER'} onChange={() => setPaymentChannel('NAVER')} className="w-4 h-4 text-green-600" />
-                            <div className="flex-1">
-                                <div className="font-semibold text-sm">네이버 스마트스토어 결제</div>
-                                <div className="text-xs text-slate-500">기존에 스마트스토어로 결제하신 고객님</div>
-                            </div>
-                        </label>
-                        <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${paymentChannel === 'LOCALLY' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}>
-                            <input type="radio" value="LOCALLY" checked={paymentChannel === 'LOCALLY'} onChange={() => setPaymentChannel('LOCALLY')} className="w-4 h-4 text-blue-600" />
-                            <div className="flex-1">
-                                <div className="font-semibold text-sm">로컬리 웹 자체 결제</div>
-                                <div className="text-xs text-slate-500">카드 결제 또는 무통장 입금으로 바로 접수할 수 있습니다.</div>
-                            </div>
-                        </label>
-                    </div>
+      const requestId = String(result.requestId || '').trim();
+      const locallyOrderId = String(result.locallyOrderId || '').trim();
+      const finalAmount = Number(result.finalAmount || currentServiceFee || PROXY_REQUEST_PRICE_KRW);
 
-                    {paymentChannel === 'NAVER' && (
-                        <div className="p-4 bg-green-50/50 rounded-xl border border-green-100 space-y-1.5">
-                            <label className="text-xs font-semibold text-green-800">스마트스토어 구매자명 <span className="text-red-500">*</span></label>
-                            <input type="text" value={naverBuyerName} onChange={e => setNaverBuyerName(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="결제 시 입력한 구매자 성함을 입력해주세요." />
-                            <p className="text-[11px] text-green-700 mt-1">이탈 방지를 위해 주문번호 14자리 대신 직관적인 구매자 성함으로 대조하고 있습니다.</p>
-                        </div>
-                    )}
+      if (!requestId) {
+        throw new Error('전화 예약 요청 생성에 실패했습니다.');
+      }
 
-                    {paymentChannel === 'LOCALLY' && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'card' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                    <input type="radio" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} className="w-4 h-4 text-blue-600" />
-                                    <div className="flex-1">
-                                        <div className="font-semibold text-sm">카드 즉시 결제</div>
-                                        <div className="text-xs text-slate-500">요청 제출 직후 바로 결제를 진행합니다.</div>
-                                    </div>
-                                </label>
-                                <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'bank' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                    <input type="radio" value="bank" checked={paymentMethod === 'bank'} onChange={() => setPaymentMethod('bank')} className="w-4 h-4 text-blue-600" />
-                                    <div className="flex-1">
-                                        <div className="font-semibold text-sm">무통장 입금</div>
-                                        <div className="text-xs text-slate-500">요청 접수 후 상세 페이지에서 입금 안내를 확인합니다.</div>
-                                    </div>
-                                </label>
-                            </div>
+      if (!requiresLocallyPayment || paymentMethod === 'bank') {
+        router.push(`/proxy-bookings/${requestId}`);
+        return;
+      }
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-slate-600">결제자 이름 <span className="text-red-500">*</span></label>
-                                    <input type="text" value={contactName} onChange={e => setContactName(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" placeholder="예: 홍길동" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-slate-600">연락처 <span className="text-red-500">*</span></label>
-                                    <input type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" placeholder="예: 01012345678" />
-                                </div>
-                            </div>
+      if (!locallyOrderId) {
+        router.push(`/proxy-bookings/${requestId}?payment=failed`);
+        return;
+      }
 
-                            <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-900">
-                                서비스 수수료는 <span className="font-bold">₩{PROXY_REQUEST_PRICE_KRW.toLocaleString()}</span> 입니다.
-                                {paymentMethod === 'card'
-                                    ? ' 제출 후 카드 결제가 이어집니다.'
-                                    : ' 제출 후 상세 페이지에서 입금 안내를 확인할 수 있습니다.'}
-                            </div>
-                        </div>
-                    )}
-                </section>
+      try {
+        const paymentSession = await launchCardPayment({
+          provider: readiness?.provider || 'portone',
+          merchantCode: portOneImpCode,
+          orderId: locallyOrderId,
+          productName: `Locally ${getProxyCategoryLabel(category)}`,
+          amount: finalAmount,
+          buyerEmail: user.email,
+          buyerName: contactName.trim(),
+          buyerTel: contactPhone.trim(),
+          redirectUrl: `${window.location.origin}/proxy-bookings/${requestId}`,
+        });
 
-                {/* 규정 동의 */}
-                <section className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                        <input type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} className="mt-1 w-4 h-4 shrink-0 rounded border-slate-300 text-black focus:ring-black" />
-                        <div className="text-sm text-slate-700 leading-relaxed">
-                            <span className="font-bold block mb-1">전화 대행 서비스 필수 유의사항에 동의합니다. (필수)</span>
-                            0120 번호 등 저희 환경에서 발신 시 수신자 부담 또는 별도 요금이 부과되는 특수 번호, 혹은 통화 연결 지연 및 과정이 복잡한 예약 건의 경우 3,000원의 추가 결제가 요구될 수 있음을 확인했습니다. 또한, 서비스 착수(진행 중 상태) 이후에는 어떠한 경우에도 환불이 불가함을 숙지했습니다.
-                        </div>
-                    </label>
-                </section>
+        const callbackRes = await fetch('/api/proxy-bookings/payment/nicepay-callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imp_uid: paymentSession.approvalId,
+            approvalId: paymentSession.approvalId,
+            merchant_uid: locallyOrderId,
+            orderId: locallyOrderId,
+          }),
+        });
 
-                <button disabled={loading || !agreedToTerms} type="submit" className="w-full bg-black text-white font-bold text-lg py-4 rounded-xl hover:bg-slate-800 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                    {loading && <Loader2 size={20} className="animate-spin" />}
-                    {paymentChannel === 'LOCALLY' && paymentMethod === 'card' ? '결제 후 요청 제출하기' : '요청 제출하기'}
-                </button>
-            </form>
+        const callbackResult = await callbackRes.json();
+        if (!callbackRes.ok || !callbackResult?.success) {
+          router.push(`/proxy-bookings/${requestId}?payment=failed`);
+          return;
+        }
+
+        router.push(`/proxy-bookings/${requestId}?payment=completed`);
+      } catch (paymentError) {
+        console.error('[proxy-bookings/new] card payment failed:', paymentError);
+        router.push(`/proxy-bookings/${requestId}?payment=failed`);
+      }
+    } catch (submitError: unknown) {
+      setError(submitError instanceof Error ? submitError.message : '전화 예약 요청 생성에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderCategoryFields = () => {
+    switch (category) {
+      case 'RESTAURANT':
+        return (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <SelectField
+              label="전화 유형"
+              className="md:col-span-2"
+              value={restaurantForm.restaurant_service_option}
+              onChange={(event) => updateRestaurantField('restaurant_service_option', event.target.value as RestaurantServiceOption)}
+            >
+              <option value="STANDARD">일반 식당 예약 · 문의 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.STANDARD.toLocaleString()})</option>
+              <option value="ZERO_ONE_TWO_ZERO">0120 / 0570 번호 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.ZERO_ONE_TWO_ZERO.toLocaleString()})</option>
+              <option value="KUITEI">쿠이테이 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.KUITEI.toLocaleString()})</option>
+            </SelectField>
+            <InputField
+              label="식당 이름"
+              required
+              placeholder="예: 스시 지로"
+              value={restaurantForm.restaurant_name}
+              onChange={(event) => updateRestaurantField('restaurant_name', event.target.value)}
+              className="md:col-span-2"
+            />
+            <InputField
+              label="구글맵 링크"
+              placeholder="https://maps.google.com/..."
+              value={restaurantForm.google_map_url || ''}
+              onChange={(event) => updateRestaurantField('google_map_url', event.target.value)}
+            />
+            <InputField
+              label="식당 전화번호"
+              placeholder="예: 03-1234-5678"
+              value={restaurantForm.restaurant_phone || ''}
+              onChange={(event) => updateRestaurantField('restaurant_phone', event.target.value)}
+            />
+            <InputField
+              label="예약 희망 날짜"
+              required
+              type="date"
+              value={restaurantForm.target_date}
+              onChange={(event) => updateRestaurantField('target_date', event.target.value)}
+            />
+            <InputField
+              label="예약 희망 시간 1지망"
+              required
+              type="time"
+              value={restaurantForm.preferred_time_primary}
+              onChange={(event) => updateRestaurantField('preferred_time_primary', event.target.value)}
+            />
+            <InputField
+              label="예약 희망 시간 2지망"
+              type="time"
+              value={restaurantForm.preferred_time_secondary || ''}
+              onChange={(event) => updateRestaurantField('preferred_time_secondary', event.target.value)}
+            />
+            <InputField
+              label="예약자 성함"
+              required
+              placeholder="예: 홍길동"
+              value={restaurantForm.reservation_name}
+              onChange={(event) => updateRestaurantField('reservation_name', event.target.value)}
+            />
+            <InputField
+              label="인원수"
+              required
+              type="number"
+              min={1}
+              value={restaurantForm.guest_number}
+              onChange={(event) => updateRestaurantField('guest_number', Number(event.target.value))}
+            />
+            <InputField
+              label="한국 연락처"
+              required
+              type="tel"
+              placeholder="예: 01012345678"
+              value={restaurantForm.korean_contact}
+              onChange={(event) => updateRestaurantField('korean_contact', event.target.value)}
+            />
+            <InputField
+              label="현지 호텔 이름 / 전화번호"
+              placeholder="예: 호텔명 / 전화번호"
+              value={restaurantForm.local_hotel_contact || ''}
+              onChange={(event) => updateRestaurantField('local_hotel_contact', event.target.value)}
+            />
+            <TextareaField
+              label="요청사항"
+              rows={4}
+              className="md:col-span-2"
+              placeholder="메모가 필요하면 카카오톡 아이디, 알레르기, 좌석 요청 등을 적어주세요."
+              value={restaurantForm.request_notes || ''}
+              onChange={(event) => updateRestaurantField('request_notes', event.target.value)}
+            />
+            <SelectField
+              label="예약금 · 취소료 여부 확인"
+              className="md:col-span-2"
+              value={restaurantForm.deposit_fee_checked}
+              onChange={(event) => updateRestaurantField('deposit_fee_checked', event.target.value as RestaurantFormData['deposit_fee_checked'])}
+            >
+              <option value="YES">예</option>
+              <option value="NO">아니요</option>
+              <option value="UNKNOWN">확인불가</option>
+            </SelectField>
+            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={restaurantForm.notice_acknowledged}
+                onChange={(event) => updateRestaurantField('notice_acknowledged', event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-black focus:ring-black"
+              />
+              <span>유의사항을 확인했고, 예약 가능 여부와 업장 사정에 따라 진행이 제한될 수 있음을 이해했습니다.</span>
+            </label>
+          </div>
+        );
+      case 'HOTEL':
+        return (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InputField
+              label="숙소 이름"
+              required
+              className="md:col-span-2"
+              placeholder="예: 하얏트 리젠시 도쿄"
+              value={hotelForm.property_name}
+              onChange={(event) => updateHotelField('property_name', event.target.value)}
+            />
+            <InputField
+              label="숙소 전화번호"
+              value={hotelForm.property_phone || ''}
+              onChange={(event) => updateHotelField('property_phone', event.target.value)}
+            />
+            <InputField
+              label="예약 번호"
+              value={hotelForm.reservation_number || ''}
+              onChange={(event) => updateHotelField('reservation_number', event.target.value)}
+            />
+            <InputField
+              label="예약자 성함"
+              required
+              value={hotelForm.reservation_name}
+              onChange={(event) => updateHotelField('reservation_name', event.target.value)}
+            />
+            <SelectField
+              label="문의 유형"
+              required
+              value={hotelForm.hotel_inquiry_type}
+              onChange={(event) => updateHotelField('hotel_inquiry_type', event.target.value as HotelFormData['hotel_inquiry_type'])}
+            >
+              <option value="CHANGE">변경</option>
+              <option value="CANCEL">취소</option>
+              <option value="GENERAL">일반 문의</option>
+            </SelectField>
+            <InputField
+              label="체크인 날짜"
+              required
+              type="date"
+              value={hotelForm.checkin_date}
+              onChange={(event) => updateHotelField('checkin_date', event.target.value)}
+            />
+            <InputField
+              label="체크아웃 날짜"
+              required
+              type="date"
+              value={hotelForm.checkout_date}
+              onChange={(event) => updateHotelField('checkout_date', event.target.value)}
+            />
+            <InputField
+              label="한국 연락처"
+              required
+              type="tel"
+              value={hotelForm.korean_contact}
+              onChange={(event) => updateHotelField('korean_contact', event.target.value)}
+            />
+            <TextareaField
+              label="요청 내용"
+              required
+              rows={4}
+              className="md:col-span-2"
+              value={hotelForm.request_content}
+              onChange={(event) => updateHotelField('request_content', event.target.value)}
+            />
+            <TextareaField
+              label="변경 희망 내용"
+              rows={3}
+              className="md:col-span-2"
+              value={hotelForm.desired_change || ''}
+              onChange={(event) => updateHotelField('desired_change', event.target.value)}
+            />
+            <TextareaField
+              label="기타 요청사항"
+              rows={3}
+              className="md:col-span-2"
+              value={hotelForm.additional_notes || ''}
+              onChange={(event) => updateHotelField('additional_notes', event.target.value)}
+            />
+            <SelectField
+              label="취소료 · 변경 수수료 여부 확인"
+              className="md:col-span-2"
+              value={hotelForm.fee_policy_checked}
+              onChange={(event) => updateHotelField('fee_policy_checked', event.target.value as HotelFormData['fee_policy_checked'])}
+            >
+              <option value="YES">예</option>
+              <option value="NO">아니요</option>
+              <option value="UNKNOWN">확인불가</option>
+            </SelectField>
+            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={hotelForm.notice_acknowledged}
+                onChange={(event) => updateHotelField('notice_acknowledged', event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-black focus:ring-black"
+              />
+              <span>유의사항을 확인했고, 숙소 정책과 수수료 규정에 따라 결과가 달라질 수 있음을 이해했습니다.</span>
+            </label>
+          </div>
+        );
+      case 'TRANSPORT':
+        return (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <SelectField
+              label="예약 유형"
+              required
+              value={transportForm.reservation_type}
+              onChange={(event) => updateTransportField('reservation_type', event.target.value as TransportFormData['reservation_type'])}
+              className="md:col-span-2"
+            >
+              <option value="TAXI">택시</option>
+              <option value="HOTEL_TAXI">호텔 택시</option>
+              <option value="SHUTTLE_BUS">셔틀버스</option>
+              <option value="OTHER">기타 교통</option>
+            </SelectField>
+            <InputField
+              label="이용 지역"
+              required
+              value={transportForm.service_area}
+              onChange={(event) => updateTransportField('service_area', event.target.value)}
+            />
+            <InputField
+              label="예약자 성함"
+              required
+              value={transportForm.reservation_name}
+              onChange={(event) => updateTransportField('reservation_name', event.target.value)}
+            />
+            <InputField
+              label="한국 연락처"
+              required
+              type="tel"
+              value={transportForm.korean_contact}
+              onChange={(event) => updateTransportField('korean_contact', event.target.value)}
+            />
+            <InputField
+              label="이용 날짜"
+              required
+              type="date"
+              value={transportForm.use_date}
+              onChange={(event) => updateTransportField('use_date', event.target.value)}
+            />
+            <InputField
+              label="이용 시간"
+              required
+              type="time"
+              value={transportForm.use_time}
+              onChange={(event) => updateTransportField('use_time', event.target.value)}
+            />
+            <InputField
+              label="출발 장소"
+              required
+              value={transportForm.departure_location}
+              onChange={(event) => updateTransportField('departure_location', event.target.value)}
+            />
+            <InputField
+              label="도착 장소"
+              required
+              value={transportForm.arrival_location}
+              onChange={(event) => updateTransportField('arrival_location', event.target.value)}
+            />
+            <InputField
+              label="인원수"
+              required
+              type="number"
+              min={1}
+              value={transportForm.passenger_number}
+              onChange={(event) => updateTransportField('passenger_number', Number(event.target.value))}
+            />
+            <InputField
+              label="짐 개수"
+              type="number"
+              min={0}
+              value={transportForm.baggage_count || 0}
+              onChange={(event) => updateTransportField('baggage_count', Number(event.target.value))}
+            />
+            <InputField
+              label="숙소 이름 / 예약 번호"
+              className="md:col-span-2"
+              value={transportForm.accommodation_reference || ''}
+              onChange={(event) => updateTransportField('accommodation_reference', event.target.value)}
+            />
+            <InputField
+              label="항공편명"
+              value={transportForm.flight_number || ''}
+              onChange={(event) => updateTransportField('flight_number', event.target.value)}
+            />
+            <TextareaField
+              label="기타 요청사항"
+              rows={4}
+              className="md:col-span-2"
+              value={transportForm.additional_notes || ''}
+              onChange={(event) => updateTransportField('additional_notes', event.target.value)}
+            />
+            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={transportForm.notice_acknowledged}
+                onChange={(event) => updateTransportField('notice_acknowledged', event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-black focus:ring-black"
+              />
+              <span>유의사항을 확인했고, 교통사 및 현지 운영 상황에 따라 예약 가능 여부가 달라질 수 있음을 이해했습니다.</span>
+            </label>
+          </div>
+        );
+      case 'GENERAL':
+        return (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InputField
+              label="업장명"
+              required
+              className="md:col-span-2"
+              value={generalForm.business_name}
+              onChange={(event) => updateGeneralField('business_name', event.target.value)}
+            />
+            <InputField
+              label="업장 전화번호"
+              value={generalForm.business_phone || ''}
+              onChange={(event) => updateGeneralField('business_phone', event.target.value)}
+            />
+            <InputField
+              label="업장 정보 링크"
+              value={generalForm.business_link || ''}
+              onChange={(event) => updateGeneralField('business_link', event.target.value)}
+            />
+            <SelectField
+              label="문의 유형"
+              required
+              value={generalForm.general_inquiry_type}
+              onChange={(event) => updateGeneralField('general_inquiry_type', event.target.value as GeneralInquiryFormData['general_inquiry_type'])}
+            >
+              <option value="STOCK_CHECK">재고 확인</option>
+              <option value="BUSINESS_HOURS">영업 여부 확인</option>
+              <option value="RESERVATION_AVAILABILITY">예약 가능 여부</option>
+              <option value="OTHER">기타 문의</option>
+            </SelectField>
+            <InputField
+              label="희망 확인 날짜 또는 시간"
+              value={generalForm.preferred_check_time || ''}
+              onChange={(event) => updateGeneralField('preferred_check_time', event.target.value)}
+            />
+            <InputField
+              label="한국 연락처"
+              required
+              type="tel"
+              className="md:col-span-2"
+              value={generalForm.korean_contact}
+              onChange={(event) => updateGeneralField('korean_contact', event.target.value)}
+            />
+            <TextareaField
+              label="문의 내용"
+              required
+              rows={4}
+              className="md:col-span-2"
+              value={generalForm.inquiry_content}
+              onChange={(event) => updateGeneralField('inquiry_content', event.target.value)}
+            />
+            <TextareaField
+              label="기타 요청사항"
+              rows={3}
+              className="md:col-span-2"
+              value={generalForm.additional_notes || ''}
+              onChange={(event) => updateGeneralField('additional_notes', event.target.value)}
+            />
+            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={generalForm.notice_acknowledged}
+                onChange={(event) => updateGeneralField('notice_acknowledged', event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-black focus:ring-black"
+              />
+              <span>유의사항을 확인했고, 업체 상황에 따라 확인 결과가 달라질 수 있음을 이해했습니다.</span>
+            </label>
+          </div>
+        );
+      case 'LOST_AND_FOUND':
+      default:
+        return (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InputField
+              label="분실 장소(업장명)"
+              required
+              className="md:col-span-2"
+              value={lostForm.location_name}
+              onChange={(event) => updateLostField('location_name', event.target.value)}
+            />
+            <InputField
+              label="업장 전화번호"
+              value={lostForm.location_phone || ''}
+              onChange={(event) => updateLostField('location_phone', event.target.value)}
+            />
+            <InputField
+              label="예약자 성함"
+              required
+              value={lostForm.reservation_name}
+              onChange={(event) => updateLostField('reservation_name', event.target.value)}
+            />
+            <InputField
+              label="분실 날짜"
+              required
+              type="date"
+              value={lostForm.lost_date}
+              onChange={(event) => updateLostField('lost_date', event.target.value)}
+            />
+            <InputField
+              label="분실 시간대"
+              required
+              placeholder="예: 18:00~19:00"
+              value={lostForm.lost_time_window}
+              onChange={(event) => updateLostField('lost_time_window', event.target.value)}
+            />
+            <InputField
+              label="분실물 종류"
+              required
+              value={lostForm.item_type}
+              onChange={(event) => updateLostField('item_type', event.target.value)}
+            />
+            <InputField
+              label="한국 연락처"
+              required
+              type="tel"
+              value={lostForm.korean_contact}
+              onChange={(event) => updateLostField('korean_contact', event.target.value)}
+            />
+            <InputField
+              label="현지 체류 숙소명"
+              className="md:col-span-2"
+              value={lostForm.local_stay_name || ''}
+              onChange={(event) => updateLostField('local_stay_name', event.target.value)}
+            />
+            <TextareaField
+              label="분실물 특징"
+              required
+              rows={3}
+              className="md:col-span-2"
+              value={lostForm.item_description}
+              onChange={(event) => updateLostField('item_description', event.target.value)}
+            />
+            <TextareaField
+              label="마지막으로 확인한 장소 또는 상황"
+              required
+              rows={4}
+              className="md:col-span-2"
+              value={lostForm.last_seen_context}
+              onChange={(event) => updateLostField('last_seen_context', event.target.value)}
+            />
+            <TextareaField
+              label="기타 요청사항"
+              rows={3}
+              className="md:col-span-2"
+              value={lostForm.additional_notes || ''}
+              onChange={(event) => updateLostField('additional_notes', event.target.value)}
+            />
+            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={lostForm.notice_acknowledged}
+                onChange={(event) => updateLostField('notice_acknowledged', event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-black focus:ring-black"
+              />
+              <span>유의사항을 확인했고, 회수 가능 여부는 업장 응답과 현지 상황에 따라 달라질 수 있음을 이해했습니다.</span>
+            </label>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="afterInteractive" />
+
+      <button
+        onClick={() => router.back()}
+        className="mb-6 flex items-center gap-2 text-sm text-slate-500 transition-colors hover:text-slate-900"
+      >
+        <ArrowLeft size={16} /> 돌아가기
+      </button>
+
+      <div className="mb-8 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-white shadow-sm md:p-8">
+        <div className="flex items-start gap-3">
+          <div className="mt-1 rounded-full bg-white/10 p-2">
+            <PhoneCall size={18} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight md:text-3xl">일본 전화 예약 · 문의 대행</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200 md:text-base">
+              일본 현지 업체에 직접 전화를 걸어 예약, 변경, 취소, 재고 확인, 분실물 문의를 대신 도와드립니다.
+              일본어 전화 응대가 필요한 상황을 로컬리 운영팀이 접수 후 순차적으로 처리합니다.
+            </p>
+          </div>
         </div>
-    );
+
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          {SERVICE_HIGHLIGHTS.map((item) => (
+            <div key={item} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100">
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-8 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionTitle>서비스 안내</SectionTitle>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-slate-900">서비스 내용</h3>
+              <ul className="space-y-2 text-sm leading-6 text-slate-600">
+                {SERVICE_SCOPE.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-1 text-slate-400">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-slate-900">서비스 기준</h3>
+              <ul className="space-y-2 text-sm leading-6 text-slate-600">
+                {SERVICE_RULES.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-1 text-slate-400">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-slate-900">진행 불가 또는 별도 문의</h3>
+              <ul className="space-y-2 text-sm leading-6 text-slate-600">
+                {SERVICE_EXCLUSIONS.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-1 text-slate-400">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-slate-900">유의 사항</h3>
+              <ul className="space-y-2 text-sm leading-6 text-slate-600">
+                {SERVICE_NOTES.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-1 text-slate-400">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionTitle>수수료 안내</SectionTitle>
+          <div className="space-y-3">
+            {SERVICE_FEES.map((item) => (
+              <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                  <span className="text-sm font-black text-slate-900">{item.value}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{item.note}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionTitle>서비스 카테고리 선택</SectionTitle>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {CATEGORY_OPTIONS.map((item) => (
+              <label
+                key={item.id}
+                className={`cursor-pointer rounded-2xl border p-4 transition-colors ${
+                  category === item.id
+                    ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  className="sr-only"
+                  checked={category === item.id}
+                  onChange={() => setCategory(item.id)}
+                />
+                <p className="text-sm font-bold text-slate-900">{item.label}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">{item.description}</p>
+                <p className="mt-3 text-xs font-black text-slate-700">{item.priceLabel}</p>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionTitle>{getProxyCategoryLabel(category)} 양식</SectionTitle>
+          {renderCategoryFields()}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionTitle>결제 방식 선택</SectionTitle>
+          <div className="mb-6 flex flex-col gap-3">
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
+                paymentChannel === 'NAVER'
+                  ? 'border-green-500 bg-green-50 ring-1 ring-green-500'
+                  : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="radio"
+                value="NAVER"
+                checked={paymentChannel === 'NAVER'}
+                onChange={() => setPaymentChannel('NAVER')}
+                className="h-4 w-4 text-green-600"
+              />
+              <div className="flex-1">
+                <div className="font-semibold text-sm">네이버 스마트스토어 결제 고객</div>
+                <div className="text-xs text-slate-500">이미 네이버로 결제하신 분은 구매자명 확인 후 바로 폼을 접수합니다.</div>
+              </div>
+            </label>
+
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
+                paymentChannel === 'LOCALLY'
+                  ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
+                  : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="radio"
+                value="LOCALLY"
+                checked={paymentChannel === 'LOCALLY'}
+                onChange={() => setPaymentChannel('LOCALLY')}
+                className="h-4 w-4 text-blue-600"
+              />
+              <div className="flex-1">
+                <div className="font-semibold text-sm">로컬리 자체 결제</div>
+                <div className="text-xs text-slate-500">카드 즉시 결제 또는 무통장 입금으로 접수 후 바로 요청을 생성합니다.</div>
+              </div>
+            </label>
+          </div>
+
+          {paymentChannel === 'NAVER' ? (
+            <div className="rounded-2xl border border-green-100 bg-green-50/70 p-4">
+              <InputField
+                label="스마트스토어 구매자명"
+                required
+                placeholder="결제 시 입력한 구매자 성함을 입력해주세요."
+                value={naverBuyerName}
+                onChange={(event) => setNaverBuyerName(event.target.value)}
+              />
+              <p className="mt-2 text-[11px] text-green-700">
+                기존 네이버 결제 고객은 구매자명 기준으로 주문을 대조합니다.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label
+                  className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
+                    paymentMethod === 'card'
+                      ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value="card"
+                    checked={paymentMethod === 'card'}
+                    onChange={() => setPaymentMethod('card')}
+                    className="h-4 w-4 text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm">카드 즉시 결제</div>
+                    <div className="text-xs text-slate-500">요청 생성 후 바로 카드 결제를 진행합니다.</div>
+                  </div>
+                </label>
+                <label
+                  className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
+                    paymentMethod === 'bank'
+                      ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value="bank"
+                    checked={paymentMethod === 'bank'}
+                    onChange={() => setPaymentMethod('bank')}
+                    className="h-4 w-4 text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm">무통장 입금</div>
+                    <div className="text-xs text-slate-500">요청 생성 후 상세 페이지에서 입금 안내를 확인합니다.</div>
+                  </div>
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <InputField
+                  label="결제자 이름"
+                  required
+                  value={contactName}
+                  onChange={(event) => setContactName(event.target.value)}
+                />
+                <InputField
+                  label="결제 연락처"
+                  required
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(event) => setContactPhone(event.target.value)}
+                />
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-900">
+                예상 수수료는 <span className="font-bold">₩{currentServiceFee.toLocaleString()}</span> 입니다.
+                {paymentMethod === 'card'
+                  ? ' 요청 제출 후 바로 카드 결제로 이어집니다.'
+                  : ' 요청 제출 후 상세 페이지에서 입금 안내를 확인할 수 있습니다.'}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+          <label className="flex items-start gap-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(event) => setAgreedToTerms(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-black focus:ring-black"
+            />
+            <span>
+              <span className="mb-1 block font-bold text-slate-900">서비스 기준 및 환불 규정을 확인했고 동의합니다. (필수)</span>
+              연결 완료, 만석, 업장 사정, 통화 착수 이후 환불 제한, 특수 번호/추가 통화의 별도 비용 가능성을 이해했습니다.
+            </span>
+          </label>
+        </section>
+
+        <button
+          disabled={loading || !agreedToTerms}
+          type="submit"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black py-4 text-lg font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          {loading ? <Loader2 size={20} className="animate-spin" /> : null}
+          {paymentChannel === 'LOCALLY' && paymentMethod === 'card' ? '결제 후 요청 제출하기' : '요청 제출하기'}
+        </button>
+      </form>
+
+      <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <p>
+            운영팀 답글과 안내는 전화 예약 상세 페이지에서 이어집니다. 카드 결제 완료 후에도 운영 확인이 필요할 수 있으며,
+            추가 문의가 있으면 상세 페이지 댓글로 남겨주세요.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }

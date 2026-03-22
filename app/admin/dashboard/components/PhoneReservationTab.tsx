@@ -7,10 +7,12 @@ import { AlertCircle, CheckCircle, Clock, Phone, Send, XCircle } from 'lucide-re
 
 import type { PaymentStatus, ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
 import {
+  getProxyCategoryLabel,
+  getProxyFormDisplayEntries,
   getProxyPaymentMethod,
+  getProxyRequestFeeKrw,
   getProxyRequestTitle,
   getProxyRequesterDisplayName,
-  PROXY_REQUEST_PRICE_KRW,
 } from '@/app/utils/proxyBooking';
 
 type ProxyRequestDetail = ProxyRequest & {
@@ -279,6 +281,13 @@ export default function PhoneReservationTab() {
     }
   }, [reply, selectedId, showToast, submittingReply]);
 
+  const selectedServiceFee = selectedRequest
+    ? getProxyRequestFeeKrw(selectedRequest.category, selectedRequest.form_data)
+    : null;
+  const selectedFormEntries = selectedRequest
+    ? getProxyFormDisplayEntries(selectedRequest.form_data)
+    : [];
+
   if (loadingList) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 md:gap-6 h-full">
@@ -323,7 +332,7 @@ export default function PhoneReservationTab() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{item.category}</p>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{getProxyCategoryLabel(item.category)}</p>
                       <p className="text-sm font-bold text-slate-900 truncate">{getProxyRequestTitle(item)}</p>
                       <p className="text-xs text-slate-500 mt-1">{getProxyRequesterDisplayName(item.profiles)}</p>
                     </div>
@@ -350,7 +359,7 @@ export default function PhoneReservationTab() {
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/70">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{selectedRequest.category}</p>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{getProxyCategoryLabel(selectedRequest.category)}</p>
                   <h3 className="text-lg font-bold text-slate-900">{getProxyRequestTitle(selectedRequest)}</h3>
                   <p className="text-sm text-slate-500 mt-1">
                     고객: {getProxyRequesterDisplayName(selectedRequest.profiles)}
@@ -370,7 +379,7 @@ export default function PhoneReservationTab() {
                   <h4 className="font-bold text-slate-900">결제 정보</h4>
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 채널</span><span className="font-semibold">{selectedRequest.payment_channel}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 수단</span><span className="font-semibold">{getProxyPaymentMethod(selectedRequest.form_data) === 'card' ? '카드' : getProxyPaymentMethod(selectedRequest.form_data) === 'bank' ? '무통장' : '미지정'}</span></div>
-                  <div className="flex justify-between gap-3"><span className="text-slate-500">서비스 수수료</span><span className="font-semibold">₩{PROXY_REQUEST_PRICE_KRW.toLocaleString()}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-500">서비스 수수료</span><span className="font-semibold">₩{selectedServiceFee?.toLocaleString()}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-slate-500">결제 상태</span><span className="font-semibold">{getPaymentStatusLabel(selectedRequest.payment_status)}</span></div>
                   {selectedRequest.locally_order_id && (
                     <div className="flex justify-between gap-3"><span className="text-slate-500">주문번호</span><span className="font-mono text-xs">{selectedRequest.locally_order_id}</span></div>
@@ -399,13 +408,11 @@ export default function PhoneReservationTab() {
               <div className="rounded-2xl border border-slate-100 p-4">
                 <h4 className="font-bold text-slate-900 mb-3">폼 작성 내용</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {Object.entries(selectedRequest.form_data || {}).map(([key, value]) => (
-                    value ? (
-                      <div key={key} className="rounded-xl bg-slate-50 px-3 py-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{key.replace(/_/g, ' ')}</p>
-                        <p className="text-slate-800 mt-1 break-words">{String(value)}</p>
-                      </div>
-                    ) : null
+                  {selectedFormEntries.map((entry) => (
+                    <div key={entry.key} className="rounded-xl bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{entry.label}</p>
+                      <p className="text-slate-800 mt-1 break-words whitespace-pre-wrap">{entry.value}</p>
+                    </div>
                   ))}
                 </div>
               </div>

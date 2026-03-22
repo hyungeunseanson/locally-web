@@ -167,15 +167,19 @@ test.describe.serial('Proxy booking team workspace flow', () => {
 
       await customerPage.goto('/', { waitUntil: 'networkidle' });
       await customerPage.getByRole('button', { name: '서비스' }).first().click();
-      await customerPage.getByRole('link', { name: /일본 식당 전화 예약 대행/ }).click();
+      await customerPage.getByRole('link', { name: /일본 전화 예약 · 문의 대행/ }).click();
       await customerPage.waitForURL(/\/proxy-bookings\/new/, { timeout: 15000 });
+      await expect(customerPage.getByRole('heading', { name: '일본 전화 예약 · 문의 대행' })).toBeVisible({ timeout: 15000 });
 
       await customerPage.getByPlaceholder('예: 스시 지로').fill(restaurantName);
       await customerPage.locator('input[type="date"]').first().fill('2026-04-02');
       await customerPage.locator('input[type="time"]').first().fill('19:00');
+      await customerPage.getByPlaceholder('예: 홍길동').first().fill(customerUser.fullName);
       await customerPage.locator('input[type="number"]').first().fill('2');
+      await customerPage.getByPlaceholder('예: 01012345678').first().fill(customerUser.phone);
       await customerPage.getByPlaceholder('결제 시 입력한 구매자 성함을 입력해주세요.').fill(customerUser.fullName);
-      await customerPage.getByRole('checkbox').check();
+      await customerPage.locator('input[type="checkbox"]').nth(0).check();
+      await customerPage.locator('input[type="checkbox"]').nth(1).check();
       await customerPage.getByRole('button', { name: '요청 제출하기' }).click();
 
       await customerPage.waitForURL(/\/proxy-bookings\/.+/, { timeout: 15000 });

@@ -7,7 +7,14 @@ import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { ArrowLeft, Send, CheckCircle, Clock, XCircle, AlertCircle, Phone } from 'lucide-react';
 import type { PaymentStatus, ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
-import { getProxyPaymentMethod, getProxyRequestTitle, getProxyRequesterDisplayName, PROXY_REQUEST_PRICE_KRW } from '@/app/utils/proxyBooking';
+import {
+    getProxyCategoryLabel,
+    getProxyFormDisplayEntries,
+    getProxyPaymentMethod,
+    getProxyRequestFeeKrw,
+    getProxyRequestTitle,
+    getProxyRequesterDisplayName,
+} from '@/app/utils/proxyBooking';
 
 type ProxyRequestDetail = ProxyRequest & {
     comments?: ProxyComment[];
@@ -139,6 +146,8 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
 
     const paymentState = searchParams.get('payment');
     const paymentMethod = getProxyPaymentMethod(request.form_data);
+    const serviceFee = getProxyRequestFeeKrw(request.category, request.form_data);
+    const formEntries = getProxyFormDisplayEntries(request.form_data);
     const paymentStatusLabel = request.payment_status === 'COMPLETED'
         ? '결제 완료'
         : request.payment_status === 'FAILED'
@@ -160,7 +169,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
 
                     <div className="flex justify-between items-start">
                         <div>
-                            <span className="text-xs font-bold text-slate-400 tracking-wider mb-2 block">{request.category}</span>
+                            <span className="text-xs font-bold text-slate-400 tracking-wider mb-2 block">{getProxyCategoryLabel(request.category)}</span>
                             <h1 className="text-2xl font-bold text-slate-900 break-words">
                                 {getProxyRequestTitle(request)}
                             </h1>
@@ -272,7 +281,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-slate-500">서비스 수수료</span>
-                                    <span className="font-semibold">₩{PROXY_REQUEST_PRICE_KRW.toLocaleString()}</span>
+                                    <span className="font-semibold">₩{serviceFee.toLocaleString()}</span>
                                 </div>
                             </>
                         )}
@@ -290,7 +299,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                                 <div className="text-sm font-bold text-slate-800 mb-2">무통장 입금 안내</div>
                                 <div className="text-xs text-slate-600 mb-3 leading-relaxed">
-                                    서비스 수수료 <span className="font-bold text-blue-600">₩{PROXY_REQUEST_PRICE_KRW.toLocaleString()}</span>을 아래 계좌로 입금해 주시면, 확인 후 담당자가 전화를 진행합니다.
+                                    서비스 수수료 <span className="font-bold text-blue-600">₩{serviceFee.toLocaleString()}</span>을 아래 계좌로 입금해 주시면, 확인 후 담당자가 전화를 진행합니다.
                                 </div>
                                 <div className="bg-white p-3 rounded text-sm font-mono text-center font-bold border border-slate-200 cursor-text select-all">
                                     {process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'} {process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-01-1234567'}
@@ -304,13 +313,11 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
                     <h3 className="font-bold border-b border-slate-100 pb-3 text-sm">상세 입력 정보</h3>
                     <div className="space-y-4 text-sm">
-                        {Object.entries(request.form_data).map(([key, val]) => (
-                            val ? (
-                                <div key={key}>
-                                    <div className="text-xs text-slate-400 font-semibold uppercase mb-1">{key.replace(/_/g, ' ')}</div>
-                                    <div className="font-medium text-slate-800 break-words">{String(val)}</div>
-                                </div>
-                            ) : null
+                        {formEntries.map((entry) => (
+                            <div key={entry.key}>
+                                <div className="text-xs text-slate-400 font-semibold uppercase mb-1">{entry.label}</div>
+                                <div className="font-medium text-slate-800 break-words whitespace-pre-wrap">{entry.value}</div>
+                            </div>
                         ))}
                     </div>
                 </div>

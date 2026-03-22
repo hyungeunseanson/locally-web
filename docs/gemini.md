@@ -158,6 +158,8 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - 전화 예약 서비스는 별도 admin 시스템으로 복제하지 않고 `proxy_requests / proxy_comments`를 단일 source로 유지한다. 홈 `서비스` 카드의 전화 예약은 `/proxy-bookings/new`로 바로 진입하고, admin 운영은 `TEAM` 탭 내부 `전화 예약` 서브탭(`PhoneReservationTab`)에서 기존 proxy API(`GET/POST/PATCH /api/proxy-bookings`, `POST /api/proxy-bookings/[id]/comments`)를 그대로 사용한다.
 - 전화 예약 `LOCALLY` 결제는 `proxy_requests.locally_order_id`와 `/api/proxy-bookings/payment/nicepay-callback`을 사용해 카드결제 검증을 수행한다. `NAVER`는 구매자명 기반 수동 확인 흐름을 유지하고, `LOCALLY`는 `card | bank`만 허용한다.
 - 전화 예약 운영 답글의 source of truth는 `/api/proxy-bookings/[id]/comments`다. admin 답글이 생성되면 고객에게 `notifications(type='new_message', link=/proxy-bookings/[id])` 인앱 알림과 즉시 이메일을 함께 보낸다.
+- 전화 예약 입력 화면 `/proxy-bookings/new`는 서비스 안내 섹션과 5개 카테고리(식당, 숙소, 교통, 일반 문의, 분실물) JSON form을 단일 페이지에서 처리한다. DB 스키마는 늘리지 않고 `proxy_requests.form_data`를 계속 source of truth로 사용하며, category별 상세 양식과 `service_fee_krw`는 서버 생성 시점에 함께 저장한다.
+- 전화 예약 수수료는 helper `getProxyRequestFeeKrw()`를 단일 source로 유지한다. 기본 요금은 식당 4,500원, 숙소/교통/일반 문의 6,000원, 분실물 9,000원이며, 식당 카테고리만 `restaurant_service_option`으로 `0120/0570=8,000원`, `쿠이테이=9,000원` 특수 요금을 선택할 수 있다. 고객 상세와 admin `PhoneReservationTab`은 저장된 `service_fee_krw`를 우선 표시한다.
 - `TEAM`/`Audit Logs` 읽기 경로는 admin-only SELECT 정책 위에서 client Supabase 목록/realtime을 유지한다. server-only로 전면 전환하지 않고, write 봉쇄와 read 회귀 방지를 동시에 맞춘다.
 - `TEAM` 탭 진입 시 `last_viewed_team`을 현재 시각으로 갱신하고 `team-viewed` 이벤트를 발생시켜, 사이드바 `Team Workspace` 배지가 같은 탭 세션에서도 즉시 0으로 돌아가게 유지한다.
 - 공개 호스트 projection은 당분간 `public_host_applications` safe-view를 유지하고 `security_invoker=off`로 운영한다. 홈/검색/체험상세/공개 프로필이 이 public projection에 의존하므로, `host_applications` RLS 기준 공개 렌더링이 깨지지 않도록 한다.

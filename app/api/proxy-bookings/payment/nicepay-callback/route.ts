@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
-import { PROXY_REQUEST_PRICE_KRW } from '@/app/utils/proxyBooking';
+import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
+import type { ProxyCategory } from '@/app/types/proxy';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
     const supabaseAdmin = createAdminClient();
     const { data: originalRequest, error: requestError } = await supabaseAdmin
       .from('proxy_requests')
-      .select('id, user_id, payment_channel, payment_status, locally_order_id, form_data')
+      .select('id, user_id, category, payment_channel, payment_status, locally_order_id, form_data')
       .eq('locally_order_id', orderId)
       .maybeSingle();
 
@@ -73,11 +74,16 @@ export async function POST(request: Request) {
     }
 
     try {
+      const expectedAmount = getProxyRequestFeeKrw(
+        String(originalRequest.category || 'RESTAURANT') as ProxyCategory,
+        (originalRequest.form_data as Record<string, unknown> | null | undefined) ?? undefined
+      );
+
       await verifyApprovedCardPayment({
         provider: getCurrentCardPaymentProvider(),
         approvalId,
         orderId,
-        expectedAmount: PROXY_REQUEST_PRICE_KRW,
+        expectedAmount,
       });
     } catch (verificationError) {
       const message =

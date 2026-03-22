@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
-import { PROXY_REQUEST_PRICE_KRW } from '@/app/utils/proxyBooking';
+import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
 
 type ProxyRequestRow = {
     id: string;
@@ -50,10 +50,15 @@ export async function POST(request: Request) {
         const data = validationResult.data;
         const isNaver = data.payment_channel === 'NAVER';
         const baseFormData = data.category_data.form_data;
+        const finalAmount = getProxyRequestFeeKrw(data.category_data.category, baseFormData);
         const formData = isNaver
-          ? baseFormData
+          ? {
+              ...baseFormData,
+              service_fee_krw: finalAmount,
+            }
           : {
               ...baseFormData,
+              service_fee_krw: finalAmount,
               payment_method: data.payment_method,
               contact_name: data.contact_name,
               contact_phone: data.contact_phone,
@@ -89,7 +94,7 @@ export async function POST(request: Request) {
             success: true,
             requestId: newRequest.id,
             locallyOrderId: newRequest.locally_order_id,
-            finalAmount: PROXY_REQUEST_PRICE_KRW,
+            finalAmount,
         });
     } catch (error: unknown) {
         console.error('API Proxy Request POST Error:', error);
