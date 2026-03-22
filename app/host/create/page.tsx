@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { X, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
@@ -30,7 +30,7 @@ const asProcessedImageFile = (file: File): ProcessedImageFile => file as Process
 export default function CreateExperiencePage() {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { showToast, showHeicUnsupportedToast } = useToast(); // 🟢 토스트 훅 가져오기
 
