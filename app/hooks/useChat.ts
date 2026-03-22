@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
@@ -109,7 +109,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { showToast, showHeicUnsupportedToast } = useToast();
 
   // 실시간 이벤트 중복 수신 방지 (메시지 id 단위)
