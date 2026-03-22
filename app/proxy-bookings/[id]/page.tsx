@@ -1,16 +1,20 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useMemo, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { ArrowLeft, Send, CheckCircle, Clock, XCircle, AlertCircle, Phone } from 'lucide-react';
-import type { ProxyRequest, ProxyComment } from '@/app/types/proxy';
+import type { PaymentStatus, ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
+
+type ProxyRequestDetail = ProxyRequest & {
+    comments?: ProxyComment[];
+};
 
 export default function ProxyBookingDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const { id } = use(params);
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
     const [request, setRequest] = useState<ProxyRequest | null>(null);
     const [comments, setComments] = useState<ProxyComment[]>([]);
@@ -44,11 +48,11 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                 setIsAdmin(profile?.role === 'admin');
 
                 const res = await fetch(`/api/proxy-bookings/${id}`);
-                const data = await res.json();
+                const data = await res.json() as { success?: boolean; data?: ProxyRequestDetail };
 
-                if (data.success) {
-                    setRequest(data.data as ProxyRequest);
-                    setComments((data.data as any).comments as ProxyComment[]);
+                if (data.success && data.data) {
+                    setRequest(data.data);
+                    setComments(data.data.comments ?? []);
                 } else {
                     router.push('/proxy-bookings');
                 }
@@ -60,9 +64,9 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
         };
 
         fetchDetail();
-    }, [id, supabase, router]);
+    }, [id, router, supabase]);
 
-    const handleUpdateStatus = async (newStatus: string) => {
+    const handleUpdateStatus = async (newStatus: ProxyStatus) => {
         if (!isAdmin) return;
         setUpdating(true);
         try {
@@ -72,7 +76,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                 body: JSON.stringify({ status: newStatus }),
             });
             if (res.ok) {
-                setRequest(prev => prev ? { ...prev, status: newStatus as any } : null);
+                setRequest(prev => prev ? { ...prev, status: newStatus } : null);
             }
         } catch (err) {
             console.error(err);
@@ -81,7 +85,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
         }
     };
 
-    const handleUpdatePayment = async (newStatus: string) => {
+    const handleUpdatePayment = async (newStatus: PaymentStatus) => {
         if (!isAdmin) return;
         setUpdating(true);
         try {
@@ -91,7 +95,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                 body: JSON.stringify({ payment_status: newStatus }),
             });
             if (res.ok) {
-                setRequest(prev => prev ? { ...prev, payment_status: newStatus as any } : null);
+                setRequest(prev => prev ? { ...prev, payment_status: newStatus } : null);
             }
         } catch (err) {
             console.error(err);
