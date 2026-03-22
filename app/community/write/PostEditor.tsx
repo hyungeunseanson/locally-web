@@ -56,6 +56,12 @@ type UploadedImage = {
     publicUrl: string;
 };
 
+type ProcessedImageFile = File & {
+    readonly __processedImage: true;
+};
+
+const asProcessedImageFile = (file: File): ProcessedImageFile => file as ProcessedImageFile;
+
 interface PostEditorProps {
     initialCategory: CommunityCategory;
     initialFormat: CommunityPostFormat;
@@ -208,27 +214,30 @@ export default function PostEditor({
         setDragOverIdx(null);
     };
 
+    const uploadProcessedImage = async (filePath: string, file: ProcessedImageFile) => {
+        const { error: uploadError } = await supabase.storage
+            .from('images')
+            .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+        if (uploadError) {
+            console.error('Image upload failed:', uploadError);
+            throw new Error('이미지 업로드에 실패했습니다.');
+        }
+
+        const { data } = supabase.storage.from('images').getPublicUrl(filePath);
+        return data.publicUrl;
+    };
+
     const uploadImages = async (): Promise<UploadedImage[]> => {
         const uploadedImages: UploadedImage[] = [];
 
         for (const file of imageFiles) {
-            const compressed = await compressImage(file);
+            const compressed = asProcessedImageFile(await compressImage(file));
             const fileName = sanitizeFileName(compressed.name);
             const filePath = `community/${Date.now()}-${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('images')
-                .upload(filePath, compressed, { cacheControl: '3600', upsert: false });
-
-            if (uploadError) {
-                console.error('Image upload failed:', uploadError);
-                throw new Error('이미지 업로드에 실패했습니다.');
-            }
-
-            const { data } = supabase.storage.from('images').getPublicUrl(filePath);
             uploadedImages.push({
                 path: filePath,
-                publicUrl: data.publicUrl,
+                publicUrl: await uploadProcessedImage(filePath, compressed),
             });
         }
 
