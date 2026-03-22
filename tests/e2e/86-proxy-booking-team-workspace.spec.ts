@@ -17,6 +17,7 @@ let adminClient: SupabaseClient | null = null;
 const createdAuthUserIds: string[] = [];
 const createdWhitelistEmails: string[] = [];
 const createdProxyRequestIds: string[] = [];
+const createdInquiryIds: string[] = [];
 
 function loadEnv(): EnvMap {
   return readFileSync('.env.local', 'utf8')
@@ -134,6 +135,11 @@ test.afterAll(async () => {
     await supabase.from('proxy_requests').delete().in('id', createdProxyRequestIds);
   }
 
+  if (createdInquiryIds.length > 0) {
+    await supabase.from('inquiry_messages').delete().in('inquiry_id', createdInquiryIds);
+    await supabase.from('inquiries').delete().in('id', createdInquiryIds);
+  }
+
   if (createdAuthUserIds.length > 0) {
     await supabase.from('notifications').delete().in('user_id', createdAuthUserIds);
   }
@@ -157,7 +163,7 @@ test.describe.serial('Proxy booking team workspace flow', () => {
     const customerUser = createTestUser('proxy.customer');
 
     await createAuthUser(adminUser, { whitelistAdmin: true });
-    await createAuthUser(customerUser);
+    const customerUserId = await createAuthUser(customerUser);
 
     try {
       const customerSession = await createIsolatedPage(browser, customerUser);
@@ -200,10 +206,22 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await customerPage.locator('input[type="checkbox"]').nth(1).check();
       await customerPage.getByRole('button', { name: '요청 제출하기' }).click();
 
-      await customerPage.waitForURL(/\/proxy-bookings\/.+/, { timeout: 15000 });
-      const requestId = customerPage.url().split('/proxy-bookings/')[1]?.split('?')[0];
-      expect(requestId).toBeTruthy();
-      createdProxyRequestIds.push(requestId!);
+      await customerPage.waitForURL(/\/guest\/inbox\?inquiryId=/, { timeout: 15000 });
+      const inboxUrl = new URL(customerPage.url());
+      const inquiryId = inboxUrl.searchParams.get('inquiryId');
+      expect(inquiryId).toBeTruthy();
+      createdInquiryIds.push(inquiryId!);
+
+      const { data: createdRequest } = await getAdminClient()
+        .from('proxy_requests')
+        .select('id')
+        .eq('user_id', customerUserId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      expect(createdRequest?.id).toBeTruthy();
+      createdProxyRequestIds.push(String(createdRequest!.id));
 
       const adminSession = await createIsolatedPage(browser, adminUser);
       const adminPage = adminSession.page;
@@ -218,6 +236,7 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await replyInput.fill(replyText);
       await adminPage.locator('form').filter({ has: replyInput }).getByRole('button').click();
       await expect(adminPage.getByText(replyText)).toBeVisible({ timeout: 15000 });
+      await expect(customerPage.getByText(replyText)).toBeVisible({ timeout: 15000 });
 
     } finally {
     }

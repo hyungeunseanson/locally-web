@@ -741,6 +741,7 @@ export default function NewProxyBooking() {
       }
 
       const requestId = String(result.requestId || '').trim();
+      const inquiryRedirectUrl = String(result.redirectUrl || '').trim();
       const locallyOrderId = String(result.locallyOrderId || '').trim();
       const finalAmount = Number(result.finalAmount || currentServiceFee || PROXY_REQUEST_PRICE_KRW);
 
@@ -749,12 +750,12 @@ export default function NewProxyBooking() {
       }
 
       if (!requiresLocallyPayment || paymentMethod === 'bank') {
-        router.push(`/proxy-bookings/${requestId}`);
+        router.push(inquiryRedirectUrl || `/guest/inbox`);
         return;
       }
 
       if (!locallyOrderId) {
-        router.push(`/proxy-bookings/${requestId}?payment=failed`);
+        router.push(inquiryRedirectUrl || `/guest/inbox`);
         return;
       }
 
@@ -768,7 +769,7 @@ export default function NewProxyBooking() {
           buyerEmail: user.email,
           buyerName: contactName.trim(),
           buyerTel: contactPhone.trim(),
-          redirectUrl: `${window.location.origin}/proxy-bookings/${requestId}`,
+          redirectUrl: inquiryRedirectUrl ? `${window.location.origin}${inquiryRedirectUrl}` : `${window.location.origin}/guest/inbox`,
         });
 
         const callbackRes = await fetch('/api/proxy-bookings/payment/nicepay-callback', {
@@ -784,14 +785,14 @@ export default function NewProxyBooking() {
 
         const callbackResult = await callbackRes.json();
         if (!callbackRes.ok || !callbackResult?.success) {
-          router.push(`/proxy-bookings/${requestId}?payment=failed`);
+          router.push(inquiryRedirectUrl || `/guest/inbox`);
           return;
         }
 
-        router.push(`/proxy-bookings/${requestId}?payment=completed`);
+        router.push(inquiryRedirectUrl || `/guest/inbox`);
       } catch (paymentError) {
         console.error('[proxy-bookings/new] card payment failed:', paymentError);
-        router.push(`/proxy-bookings/${requestId}?payment=failed`);
+        router.push(inquiryRedirectUrl || `/guest/inbox`);
       }
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : '전화 예약 요청 생성에 실패했습니다.');

@@ -18,6 +18,7 @@ import {
 
 type ProxyRequestDetail = ProxyRequest & {
     comments?: ProxyComment[];
+    linked_inquiry_id?: string | null;
 };
 
 export default function ProxyBookingDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +54,13 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                 const data = await res.json() as { success?: boolean; data?: ProxyRequestDetail; viewerIsAdmin?: boolean };
 
                 if (data.success && data.data) {
+                    const linkedInquiryId = typeof data.data.linked_inquiry_id === 'string' ? data.data.linked_inquiry_id : null;
+
+                    if (!data.viewerIsAdmin && linkedInquiryId) {
+                        router.replace(`/guest/inbox?inquiryId=${encodeURIComponent(linkedInquiryId)}`);
+                        return;
+                    }
+
                     setRequest(data.data);
                     setComments(data.data.comments ?? []);
                     setIsAdmin(Boolean(data.viewerIsAdmin));

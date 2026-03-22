@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { upsertInquiryThread } from '@/app/api/inquiries/thread/shared';
 import { ProxyRequestValidationSchema } from '@/app/schemas/proxyRequestSchema';
-import { getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
+import { buildProxyInquiryInitialMessage, getProxyRequestFeeKrw } from '@/app/utils/proxyBooking';
 
 type ProxyRequestRow = {
     id: string;
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
         const isNaver = data.payment_channel === 'NAVER';
         const baseFormData = data.category_data.form_data;
         const finalAmount = getProxyRequestFeeKrw(data.category_data.category, baseFormData);
-        const formData = isNaver
+        const intakeFormData = isNaver
           ? {
               ...baseFormData,
               service_fee_krw: finalAmount,
@@ -63,6 +65,30 @@ export async function POST(request: Request) {
               contact_name: data.contact_name,
               contact_phone: data.contact_phone,
             };
+
+        const inquiryMessage = buildProxyInquiryInitialMessage({
+            category: data.category_data.category,
+            formData: intakeFormData,
+            paymentChannel: data.payment_channel,
+            finalAmount,
+            naverBuyerName: isNaver ? data.naver_buyer_name : null,
+        });
+
+        const inquiryResult = await upsertInquiryThread({
+            actor: {
+                id: user.id,
+                email: user.email,
+            },
+            body: {
+                contextType: 'admin_support',
+                message: inquiryMessage,
+            },
+        });
+
+        const formData = {
+            ...intakeFormData,
+            linked_inquiry_id: inquiryResult.inquiryId,
+        };
 
         // Insert into proxy_requests
         const { data: newRequest, error: insertError } = await supabase
@@ -83,6 +109,11 @@ export async function POST(request: Request) {
 
         if (insertError || !newRequest) {
             console.error('Proxy Request Create Error:', insertError);
+            if (inquiryResult.inquiryId) {
+                const supabaseAdmin = createAdminClient();
+                await supabaseAdmin.from('inquiry_messages').delete().eq('inquiry_id', inquiryResult.inquiryId);
+                await supabaseAdmin.from('inquiries').delete().eq('id', inquiryResult.inquiryId);
+            }
             // [Fix] 23505 = unique_violation — 중복 order ID 시 500 대신 409 반환
             if (insertError?.code === '23505') {
                 return NextResponse.json({ success: false, error: 'Duplicate request' }, { status: 409 });
@@ -93,6 +124,8 @@ export async function POST(request: Request) {
         return NextResponse.json({
             success: true,
             requestId: newRequest.id,
+            inquiryId: inquiryResult.inquiryId,
+            redirectUrl: inquiryResult.redirectUrl,
             locallyOrderId: newRequest.locally_order_id,
             finalAmount,
         });

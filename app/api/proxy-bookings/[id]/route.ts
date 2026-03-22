@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
+import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
 
 type ProxyRequestRow = {
     id: string;
@@ -33,6 +34,15 @@ type ProxyCommentRow = {
     is_admin: boolean;
     created_at: string;
     updated_at: string;
+};
+
+type InquiryMessageRow = {
+    id: number | string;
+    inquiry_id: number | string;
+    sender_id: string;
+    content: string;
+    type?: string | null;
+    created_at: string;
 };
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -81,18 +91,44 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
             profile = (profileData as ProfileRow | null) ?? null;
         }
 
-        // Fetch comments
-        const { data: comments, error: commentsError } = await supabase
-            .from('proxy_comments')
-            .select('id, request_id, author_id, content, is_admin, created_at, updated_at')
-            .eq('request_id', id)
-            .order('created_at', { ascending: true });
+        const linkedInquiryId = getProxyLinkedInquiryId(requestRow.form_data);
+        let commentRows: ProxyCommentRow[] = [];
 
-        if (commentsError) {
-            console.error('Proxy Comments Fetch Error:', commentsError);
+        if (linkedInquiryId) {
+            const { data: inquiryMessages, error: inquiryMessagesError } = await supabase
+                .from('inquiry_messages')
+                .select('id, inquiry_id, sender_id, content, type, created_at')
+                .eq('inquiry_id', linkedInquiryId)
+                .order('created_at', { ascending: true });
+
+            if (inquiryMessagesError) {
+                console.error('Proxy Linked Inquiry Messages Fetch Error:', inquiryMessagesError);
+                return NextResponse.json({ success: false, error: 'Failed to fetch request detail' }, { status: 500 });
+            }
+
+            commentRows = ((inquiryMessages ?? []) as InquiryMessageRow[]).map((message) => ({
+                id: String(message.id),
+                request_id: id,
+                author_id: message.sender_id,
+                content: message.content,
+                is_admin: String(message.sender_id) !== String(requestRow.user_id),
+                created_at: message.created_at,
+                updated_at: message.created_at,
+            }));
+        } else {
+            const { data: comments, error: commentsError } = await supabase
+                .from('proxy_comments')
+                .select('id, request_id, author_id, content, is_admin, created_at, updated_at')
+                .eq('request_id', id)
+                .order('created_at', { ascending: true });
+
+            if (commentsError) {
+                console.error('Proxy Comments Fetch Error:', commentsError);
+            }
+
+            commentRows = (comments ?? []) as ProxyCommentRow[];
         }
 
-        const commentRows = (comments ?? []) as ProxyCommentRow[];
         const commentAuthorIds = [...new Set(commentRows.map((comment) => comment.author_id).filter(Boolean))];
         const commentProfilesById = new Map<string, Pick<ProfileRow, 'id' | 'full_name' | 'avatar_url'>>();
 
@@ -116,6 +152,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
             success: true,
             data: {
                 ...requestRow,
+                linked_inquiry_id: linkedInquiryId,
                 profiles: profile
                     ? {
                         full_name: profile.full_name,

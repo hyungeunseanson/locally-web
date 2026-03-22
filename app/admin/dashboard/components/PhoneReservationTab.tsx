@@ -3,12 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import { AlertCircle, CheckCircle, Clock, Phone, Send, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, ExternalLink, Phone, Send, XCircle } from 'lucide-react';
 
 import type { PaymentStatus, ProxyComment, ProxyRequest, ProxyStatus } from '@/app/types/proxy';
 import {
   getProxyCategoryLabel,
   getProxyFormDisplayEntries,
+  getProxyLinkedInquiryId,
   getProxyPaymentMethod,
   getProxyRequestFeeKrw,
   getProxyRequestTitle,
@@ -62,6 +63,8 @@ export default function PhoneReservationTab() {
   const { showToast } = useToast();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  const selectedRequestRef = useRef<ProxyRequestDetail | null>(null);
 
   const [requests, setRequests] = useState<ProxyRequest[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -100,6 +103,14 @@ export default function PhoneReservationTab() {
       setLoadingDetail(false);
     }
   }, []);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
+    selectedRequestRef.current = selectedRequest;
+  }, [selectedRequest]);
 
   const scheduleRefresh = useCallback((requestId?: string | null) => {
     if (refreshTimerRef.current) {
@@ -162,6 +173,13 @@ export default function PhoneReservationTab() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'proxy_comments' }, (payload) => {
           const requestId = typeof payload.new?.request_id === 'string' ? payload.new.request_id : null;
           scheduleRefresh(requestId);
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiry_messages' }, (payload) => {
+          const linkedInquiryId = getProxyLinkedInquiryId(selectedRequestRef.current?.form_data);
+          const payloadInquiryId = payload.new?.inquiry_id != null ? String(payload.new.inquiry_id) : null;
+          if (linkedInquiryId && payloadInquiryId && linkedInquiryId === payloadInquiryId) {
+            scheduleRefresh(selectedIdRef.current);
+          }
         })
         .subscribe();
     };
@@ -283,6 +301,9 @@ export default function PhoneReservationTab() {
 
   const selectedServiceFee = selectedRequest
     ? getProxyRequestFeeKrw(selectedRequest.category, selectedRequest.form_data)
+    : null;
+  const linkedInquiryId = selectedRequest
+    ? getProxyLinkedInquiryId(selectedRequest.form_data)
     : null;
   const selectedFormEntries = selectedRequest
     ? getProxyFormDisplayEntries(selectedRequest.form_data)
@@ -420,8 +441,21 @@ export default function PhoneReservationTab() {
               <div className="rounded-2xl border border-slate-100 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <AlertCircle size={16} className="text-slate-500" />
-                  <h4 className="font-bold text-slate-900">고객 소통</h4>
+                  <div>
+                    <h4 className="font-bold text-slate-900">전화 예약 (담당자 소통 스레드)</h4>
+                    <p className="text-xs text-slate-500 mt-1">문의 사항이나 예약 진행 상황에 대해 소통하세요.</p>
+                  </div>
                 </div>
+
+                {linkedInquiryId ? (
+                  <a
+                    href={`/admin/dashboard?tab=CHATS&inquiryId=${encodeURIComponent(linkedInquiryId)}`}
+                    className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <ExternalLink size={14} />
+                    1:1 문의함에서 열기
+                  </a>
+                ) : null}
 
                 <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
                   {(selectedRequest.comments || []).length === 0 ? (

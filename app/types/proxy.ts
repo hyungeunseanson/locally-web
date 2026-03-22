@@ -11,6 +11,7 @@ export type ProxyFormData = Record<string, unknown> & {
     contact_phone?: string | null;
     service_fee_krw?: number | null;
     restaurant_service_option?: RestaurantServiceOption | null;
+    linked_inquiry_id?: string | number | null;
 };
 
 export interface ProxyRequest {
@@ -26,6 +27,7 @@ export interface ProxyRequest {
     agreed_to_terms: boolean;
     created_at: string;
     updated_at: string;
+    linked_inquiry_id?: string | null;
 
     // Relations
     profiles?: {

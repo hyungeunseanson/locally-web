@@ -23,7 +23,7 @@ export const PROXY_RESTAURANT_SERVICE_OPTION_PRICES: Record<RestaurantServiceOpt
   KUITEI: 9000,
 };
 
-const INTERNAL_PROXY_FORM_FIELDS = new Set(['payment_method', 'contact_name', 'contact_phone', 'service_fee_krw']);
+const INTERNAL_PROXY_FORM_FIELDS = new Set(['payment_method', 'contact_name', 'contact_phone', 'service_fee_krw', 'linked_inquiry_id']);
 
 const PROXY_FORM_LABELS: Record<string, string> = {
   restaurant_name: '식당 이름',
@@ -163,6 +163,22 @@ export function getProxyPaymentMethod(
   return null;
 }
 
+export function getProxyLinkedInquiryId(
+  formData: Record<string, unknown> | null | undefined
+): string | null {
+  const inquiryId = formData?.linked_inquiry_id;
+
+  if (typeof inquiryId === 'string' && inquiryId.trim()) {
+    return inquiryId.trim();
+  }
+
+  if (typeof inquiryId === 'number' && Number.isFinite(inquiryId)) {
+    return String(inquiryId);
+  }
+
+  return null;
+}
+
 export function getProxyRestaurantServiceOption(
   formData: Record<string, unknown> | null | undefined
 ): RestaurantServiceOption {
@@ -253,6 +269,37 @@ export function getProxyFormDisplayEntries(formData: ProxyFormData | null | unde
 
     return [{ key, label, value }];
   });
+}
+
+export function buildProxyInquiryInitialMessage(request: {
+  category: ProxyCategory;
+  formData: ProxyFormData;
+  paymentChannel: string;
+  finalAmount: number;
+  naverBuyerName?: string | null;
+}) {
+  const { category, formData, paymentChannel, finalAmount, naverBuyerName } = request;
+  const title = getProxyRequestTitle({ category, form_data: formData } as Pick<ProxyRequest, 'category' | 'form_data'>);
+  const entries = getProxyFormDisplayEntries(formData)
+    .map((entry) => `- ${entry.label}: ${entry.value}`)
+    .join('\n');
+
+  const paymentSummary = paymentChannel === 'NAVER'
+    ? `결제 채널: NAVER${naverBuyerName ? `\n- 네이버 구매자명: ${naverBuyerName}` : ''}`
+    : `결제 채널: LOCALLY\n- 결제 수단: ${getProxyPaymentMethod(formData) === 'card' ? '카드' : '무통장 입금'}\n- 서비스 수수료: ₩${finalAmount.toLocaleString()}`;
+
+  return [
+    '전화 예약 요청이 접수되었습니다.',
+    '',
+    `카테고리: ${getProxyCategoryLabel(category)}`,
+    `제목: ${title}`,
+    paymentSummary,
+    '',
+    '[고객 입력 내용]',
+    entries || '- 입력 내용 없음',
+    '',
+    '담당자 소통 스레드에서 추가 문의나 진행 상황을 이어서 안내드립니다.',
+  ].join('\n');
 }
 
 export function getProxyRequesterDisplayName(

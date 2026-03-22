@@ -16,6 +16,7 @@
 | 🟡 회귀 테스트 보강 | `tests/e2e/86-proxy-booking-team-workspace.spec.ts`, `tests/e2e/87-proxy-booking-fee-util.spec.ts` — 홈 서비스 카드 진입 후 확장된 식당 양식 제출, admin `TEAM > 전화 예약` 답글 플로우, category별 수수료 helper 계약을 직접 검증 |
 | 🟡 식당/숙소 폼 보정 | `app/proxy-bookings/new/page.tsx`, `app/schemas/proxyRequestSchema.ts`, `app/utils/proxyBooking.ts` — 상단 수수료 박스를 제거하고 일본 현지인 강조 안내 섹션으로 교체, 식당 예약은 `datetime-local` 3지망 필수 입력과 `대체 식당 진행` 필드를 추가, 숙소 문의는 `예약한 사이트` 필드를 추가 |
 | 🟡 전화 예약 입력 UI 톤 정리 | `app/proxy-bookings/new/page.tsx`, `tests/e2e/86-proxy-booking-team-workspace.spec.ts` — 상단 소개/서비스 안내를 좌우 분할 대신 상하 카드 레이아웃으로 정리하고, 식당 예약 1/2/3지망은 브라우저 기본 `datetime-local` 대신 카드형 커스텀 날짜·시간 선택 UI로 변경 |
+| 🟡 문의함 연결 시작 | `app/api/proxy-bookings/route.ts`, `app/api/proxy-bookings/[id]/route.ts`, `app/api/proxy-bookings/[id]/comments/route.ts`, `app/proxy-bookings/new/page.tsx`, `app/proxy-bookings/[id]/page.tsx`, `app/admin/dashboard/components/PhoneReservationTab.tsx` — 전화 예약 생성 시 linked inquiry를 함께 만들고 고객은 바로 문의함으로 이동하도록 변경. Team Workspace 전화 예약 탭도 linked inquiry가 있는 요청은 기존 문의 메시지 엔진을 재사용해 답글/표시를 이어가도록 정리 |
 
 ## v3.39.36 — [Phone Reservation] 홈 진입 복구 · Team Workspace 통합 · 운영 답글 알림
 

@@ -3,6 +3,8 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
+import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
 
 type RequestOwnerProfile = { email?: string | null } | Array<{ email?: string | null }> | null;
 type CommentAuthorProfile = { full_name?: string | null; avatar_url?: string | null } | null;
@@ -24,7 +26,7 @@ export async function POST(
         // Validate request existence and access
         const { data: proxyReq, error: reqError } = await supabase
             .from('proxy_requests')
-            .select('id, user_id')
+            .select('id, user_id, form_data')
             .eq('id', requestId)
             .maybeSingle();
 
@@ -48,6 +50,42 @@ export async function POST(
         // [Fix] 5000→2000 (프로젝트 컨텐츠 길이 제한 정책 준수)
         if (content.trim().length > 2000) {
             return NextResponse.json({ success: false, error: 'Comment too long (max 2000 chars)' }, { status: 400 });
+        }
+
+        const linkedInquiryId = getProxyLinkedInquiryId(proxyReq.form_data as Record<string, unknown> | null | undefined);
+
+        if (linkedInquiryId) {
+            const inquiryResult = await createInquiryMessage({
+                actor: {
+                    id: user.id,
+                    email: user.email,
+                },
+                body: {
+                    inquiryId: linkedInquiryId,
+                    content: content.trim(),
+                    type: 'text',
+                },
+            });
+
+            const { data: authorProfile } = await supabase
+                .from('profiles')
+                .select('full_name, avatar_url')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            return NextResponse.json({
+                success: true,
+                data: {
+                    id: String(inquiryResult.messageId),
+                    request_id: requestId,
+                    author_id: user.id,
+                    content: inquiryResult.displayContent,
+                    is_admin: isAdmin,
+                    created_at: inquiryResult.updatedAt,
+                    updated_at: inquiryResult.updatedAt,
+                    profiles: (authorProfile ?? null) as CommentAuthorProfile | undefined,
+                },
+            });
         }
 
         const { data: newComment, error: insertError } = await supabase
