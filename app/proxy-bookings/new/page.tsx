@@ -73,9 +73,9 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
 ];
 
 const SERVICE_HIGHLIGHTS = [
-  '일본 현지 업체에 일본어로 직접 전화해 예약 가능 여부와 문의 내용을 대신 확인합니다.',
+  '일본 현지인 팀원이 직접 일본어로 전화해 예약 가능 여부와 문의 내용을 대신 확인합니다.',
+  '한국어 대응이 어려운 일본 업체에도 실제 일본 현지인 이름으로 연락해 신뢰도와 연결 성공률을 높입니다.',
   '식당, 숙소, 교통, 재고 확인, 분실물 문의까지 일본 전국 기준으로 접수할 수 있습니다.',
-  '진행 결과는 전화 예약 상세 페이지 답글과 알림으로 안내드립니다.',
 ];
 
 const SERVICE_SCOPE = [
@@ -105,28 +105,20 @@ const SERVICE_NOTES = [
   '요청사항에 카카오톡 아이디 등 추가 연락 수단을 적어주시면 운영팀 확인 시 참고합니다.',
 ];
 
-const SERVICE_FEES = [
-  { label: '식당 예약', value: '₩4,500', note: '기본 식당 예약/문의' },
-  { label: '호텔 · 료칸 · 숙소 문의', value: '₩6,000', note: '변경 / 취소 / 일반 문의' },
-  { label: '택시 · 버스 · 교통 예약', value: '₩6,000', note: '택시, 셔틀버스, 기타 교통' },
-  { label: '재고 확인 · 업체 일반 문의', value: '₩6,000', note: '재고/영업 여부/예약 가능 여부' },
-  { label: '0120 / 0570 번호', value: '₩8,000', note: '식당 카테고리에서 선택' },
-  { label: '분실물 문의', value: '₩9,000', note: '분실 장소 확인 및 문의' },
-  { label: '쿠이테이', value: '₩9,000', note: '식당 카테고리 특수 옵션' },
-];
-
 const DEFAULT_RESTAURANT_FORM: RestaurantFormData = {
   restaurant_name: '',
   google_map_url: '',
   restaurant_phone: '',
-  target_date: '',
-  preferred_time_primary: '',
-  preferred_time_secondary: '',
+  preferred_slot_primary: '',
+  preferred_slot_secondary: '',
+  preferred_slot_tertiary: '',
   reservation_name: '',
   guest_number: 2,
   korean_contact: '',
   local_hotel_contact: '',
   request_notes: '',
+  alternative_restaurant_mode: 'NONE',
+  alternative_restaurant_notes: '',
   notice_acknowledged: false,
   deposit_fee_checked: 'UNKNOWN',
   restaurant_service_option: 'STANDARD',
@@ -135,6 +127,7 @@ const DEFAULT_RESTAURANT_FORM: RestaurantFormData = {
 const DEFAULT_HOTEL_FORM: HotelFormData = {
   property_name: '',
   property_phone: '',
+  booking_platform: '',
   reservation_number: '',
   reservation_name: '',
   checkin_date: '',
@@ -218,6 +211,33 @@ function InputField({
         required={required}
         className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
       />
+    </div>
+  );
+}
+
+function DateTimeChoiceField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+      <label className="text-xs font-semibold text-slate-600">
+        {label}
+        <span className="text-red-500"> *</span>
+      </label>
+      <input
+        type="datetime-local"
+        required
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2.5 w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+      />
+      <p className="mt-2 text-[11px] text-slate-500">월/일/시간을 한 번에 선택해주세요.</p>
     </div>
   );
 }
@@ -325,14 +345,16 @@ export default function NewProxyBooking() {
             restaurant_name: restaurantForm.restaurant_name.trim(),
             google_map_url: normalizeOptionalText(restaurantForm.google_map_url || ''),
             restaurant_phone: normalizeOptionalText(restaurantForm.restaurant_phone || ''),
-            target_date: restaurantForm.target_date,
-            preferred_time_primary: restaurantForm.preferred_time_primary,
-            preferred_time_secondary: normalizeOptionalText(restaurantForm.preferred_time_secondary || ''),
+            preferred_slot_primary: restaurantForm.preferred_slot_primary,
+            preferred_slot_secondary: restaurantForm.preferred_slot_secondary,
+            preferred_slot_tertiary: restaurantForm.preferred_slot_tertiary,
             reservation_name: restaurantForm.reservation_name.trim(),
             guest_number: Number(restaurantForm.guest_number),
             korean_contact: restaurantForm.korean_contact.trim(),
             local_hotel_contact: normalizeOptionalText(restaurantForm.local_hotel_contact || ''),
             request_notes: normalizeOptionalText(restaurantForm.request_notes || ''),
+            alternative_restaurant_mode: restaurantForm.alternative_restaurant_mode,
+            alternative_restaurant_notes: normalizeOptionalText(restaurantForm.alternative_restaurant_notes || ''),
             notice_acknowledged: restaurantForm.notice_acknowledged,
             deposit_fee_checked: restaurantForm.deposit_fee_checked,
             restaurant_service_option: restaurantForm.restaurant_service_option,
@@ -344,6 +366,7 @@ export default function NewProxyBooking() {
           form_data: {
             property_name: hotelForm.property_name.trim(),
             property_phone: normalizeOptionalText(hotelForm.property_phone || ''),
+            booking_platform: normalizeOptionalText(hotelForm.booking_platform || ''),
             reservation_number: normalizeOptionalText(hotelForm.reservation_number || ''),
             reservation_name: hotelForm.reservation_name.trim(),
             checkin_date: hotelForm.checkin_date,
@@ -546,16 +569,23 @@ export default function NewProxyBooking() {
       case 'RESTAURANT':
         return (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <SelectField
-              label="전화 유형"
-              className="md:col-span-2"
-              value={restaurantForm.restaurant_service_option}
-              onChange={(event) => updateRestaurantField('restaurant_service_option', event.target.value as RestaurantServiceOption)}
-            >
-              <option value="STANDARD">일반 식당 예약 · 문의 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.STANDARD.toLocaleString()})</option>
-              <option value="ZERO_ONE_TWO_ZERO">0120 / 0570 번호 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.ZERO_ONE_TWO_ZERO.toLocaleString()})</option>
-              <option value="KUITEI">쿠이테이 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.KUITEI.toLocaleString()})</option>
-            </SelectField>
+            <div className="md:col-span-2">
+              <label className="text-xs font-semibold text-slate-600">
+                전화 유형
+                <span className="ml-2 text-[11px] font-medium text-slate-400">
+                  0120 / 0570 번호는 ₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.ZERO_ONE_TWO_ZERO.toLocaleString()}, 쿠이테이는 ₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.KUITEI.toLocaleString()}
+                </span>
+              </label>
+              <select
+                value={restaurantForm.restaurant_service_option}
+                onChange={(event) => updateRestaurantField('restaurant_service_option', event.target.value as RestaurantServiceOption)}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              >
+                <option value="STANDARD">일반 식당 예약 · 문의 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.STANDARD.toLocaleString()})</option>
+                <option value="ZERO_ONE_TWO_ZERO">0120 / 0570 번호 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.ZERO_ONE_TWO_ZERO.toLocaleString()})</option>
+                <option value="KUITEI">쿠이테이 (₩{PROXY_RESTAURANT_SERVICE_OPTION_PRICES.KUITEI.toLocaleString()})</option>
+              </select>
+            </div>
             <InputField
               label="식당 이름"
               required
@@ -576,26 +606,23 @@ export default function NewProxyBooking() {
               value={restaurantForm.restaurant_phone || ''}
               onChange={(event) => updateRestaurantField('restaurant_phone', event.target.value)}
             />
-            <InputField
-              label="예약 희망 날짜"
-              required
-              type="date"
-              value={restaurantForm.target_date}
-              onChange={(event) => updateRestaurantField('target_date', event.target.value)}
-            />
-            <InputField
-              label="예약 희망 시간 1지망"
-              required
-              type="time"
-              value={restaurantForm.preferred_time_primary}
-              onChange={(event) => updateRestaurantField('preferred_time_primary', event.target.value)}
-            />
-            <InputField
-              label="예약 희망 시간 2지망"
-              type="time"
-              value={restaurantForm.preferred_time_secondary || ''}
-              onChange={(event) => updateRestaurantField('preferred_time_secondary', event.target.value)}
-            />
+            <div className="md:col-span-2 grid gap-3 md:grid-cols-3">
+              <DateTimeChoiceField
+                label="예약 희망 일시 1지망"
+                value={restaurantForm.preferred_slot_primary}
+                onChange={(value) => updateRestaurantField('preferred_slot_primary', value)}
+              />
+              <DateTimeChoiceField
+                label="예약 희망 일시 2지망"
+                value={restaurantForm.preferred_slot_secondary}
+                onChange={(value) => updateRestaurantField('preferred_slot_secondary', value)}
+              />
+              <DateTimeChoiceField
+                label="예약 희망 일시 3지망"
+                value={restaurantForm.preferred_slot_tertiary}
+                onChange={(value) => updateRestaurantField('preferred_slot_tertiary', value)}
+              />
+            </div>
             <InputField
               label="예약자 성함"
               required
@@ -634,6 +661,30 @@ export default function NewProxyBooking() {
               onChange={(event) => updateRestaurantField('request_notes', event.target.value)}
             />
             <SelectField
+              label="대체 식당 진행"
+              className="md:col-span-2"
+              value={restaurantForm.alternative_restaurant_mode}
+              onChange={(event) =>
+                updateRestaurantField(
+                  'alternative_restaurant_mode',
+                  event.target.value as RestaurantFormData['alternative_restaurant_mode']
+                )
+              }
+            >
+              <option value="NONE">원하지 않음</option>
+              <option value="ALLOW_ONE_REPLACEMENT">1회 대체 식당 진행 동의</option>
+            </SelectField>
+            {restaurantForm.alternative_restaurant_mode === 'ALLOW_ONE_REPLACEMENT' ? (
+              <TextareaField
+                label="대체 식당 요청 메모"
+                rows={3}
+                className="md:col-span-2"
+                placeholder="예: 같은 지역, 비슷한 가격대, 스시 우선 등 대체 식당 조건을 적어주세요."
+                value={restaurantForm.alternative_restaurant_notes || ''}
+                onChange={(event) => updateRestaurantField('alternative_restaurant_notes', event.target.value)}
+              />
+            ) : null}
+            <SelectField
               label="예약금 · 취소료 여부 확인"
               className="md:col-span-2"
               value={restaurantForm.deposit_fee_checked}
@@ -669,6 +720,12 @@ export default function NewProxyBooking() {
               label="숙소 전화번호"
               value={hotelForm.property_phone || ''}
               onChange={(event) => updateHotelField('property_phone', event.target.value)}
+            />
+            <InputField
+              label="예약한 사이트"
+              placeholder="예: Agoda, Booking.com"
+              value={hotelForm.booking_platform || ''}
+              onChange={(event) => updateHotelField('booking_platform', event.target.value)}
             />
             <InputField
               label="예약 번호"
@@ -1032,33 +1089,52 @@ export default function NewProxyBooking() {
         <ArrowLeft size={16} /> 돌아가기
       </button>
 
-      <div className="mb-8 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-white shadow-sm md:p-8">
-        <div className="flex items-start gap-3">
-          <div className="mt-1 rounded-full bg-white/10 p-2">
-            <PhoneCall size={18} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight md:text-3xl">일본 전화 예약 · 문의 대행</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200 md:text-base">
-              일본 현지 업체에 직접 전화를 걸어 예약, 변경, 취소, 재고 확인, 분실물 문의를 대신 도와드립니다.
-              일본어 전화 응대가 필요한 상황을 로컬리 운영팀이 접수 후 순차적으로 처리합니다.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
-          {SERVICE_HIGHLIGHTS.map((item) => (
-            <div key={item} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100">
-              {item}
+      <div className="mb-8 overflow-hidden rounded-[2rem] border border-stone-200 bg-[linear-gradient(135deg,#f7f2eb_0%,#ffffff_45%,#f5f7fb_100%)] shadow-sm">
+        <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="p-6 md:p-8">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 rounded-full bg-stone-900 p-2 text-white shadow-sm">
+                <PhoneCall size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-bold tracking-wide text-stone-500">PHONE RESERVATION SUPPORT</p>
+                <h1 className="mt-2 text-2xl font-black tracking-tight text-stone-950 md:text-4xl">
+                  일본인이 대신 전화 예약을 도와드립니다
+                </h1>
+                <p className="mt-4 max-w-3xl text-sm leading-7 text-stone-700 md:text-base">
+                  일본의 일부 식당과 업체는 전화로만 예약이나 문의를 받습니다. 로컬리에서는 일본 현지인 팀원이 직접 일본어로 전화를 걸어
+                  예약, 변경, 취소, 재고 확인, 분실물 문의까지 대신 진행합니다. 예약이 확정되거나 확인이 끝나면 상세 페이지 답글과 알림으로 안내드립니다.
+                </p>
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      <div className="mb-8 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <SectionTitle>서비스 안내</SectionTitle>
-          <div className="grid gap-5 md:grid-cols-2">
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              {SERVICE_HIGHLIGHTS.map((item) => (
+                <div key={item} className="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm leading-6 text-stone-700 shadow-sm">
+                  {item}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm">
+              <p className="text-sm font-bold text-stone-500">리뷰 확인은</p>
+              <p className="mt-2 text-xl font-black tracking-tight text-stone-950">🔖 locally-travel.com</p>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl bg-stone-100 px-4 py-4 text-center">
+                  <p className="text-lg font-black text-stone-900">한국인 ❌</p>
+                  <p className="mt-2 text-sm leading-6 text-stone-600">한국어만 가능한 대행이 아니라, 일본 현지 업체가 신뢰할 수 있는 방식으로 연락합니다.</p>
+                </div>
+                <div className="rounded-2xl bg-emerald-50 px-4 py-4 text-center">
+                  <p className="text-lg font-black text-emerald-700">일본 현지인 ✅</p>
+                  <p className="mt-2 text-sm leading-6 text-emerald-800">실제 일본인 이름으로 직접 통화하여 일본 식당과 업체에서도 신뢰도와 응답률을 높입니다.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-stone-200 bg-white/70 p-6 md:p-8 lg:border-l lg:border-t-0">
+            <SectionTitle>서비스 안내</SectionTitle>
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-1">
             <div>
               <h3 className="mb-2 text-sm font-bold text-slate-900">서비스 내용</h3>
               <ul className="space-y-2 text-sm leading-6 text-slate-600">
@@ -1104,20 +1180,6 @@ export default function NewProxyBooking() {
               </ul>
             </div>
           </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <SectionTitle>수수료 안내</SectionTitle>
-          <div className="space-y-3">
-            {SERVICE_FEES.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                  <span className="text-sm font-black text-slate-900">{item.value}</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">{item.note}</p>
-              </div>
-            ))}
           </div>
         </div>
       </div>

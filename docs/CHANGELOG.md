@@ -14,6 +14,7 @@
 | 🟠 동적 수수료 단일 source 정리 | `app/utils/proxyBooking.ts`, `app/api/proxy-bookings/route.ts`, `app/api/proxy-bookings/payment/nicepay-callback/route.ts` — 전화 예약 수수료를 helper 한 곳에서 계산하고 생성 시 `service_fee_krw`를 저장, 카드 결제 검증도 동일 helper 기준 금액으로 확인하도록 정리 |
 | 🟠 고객/운영 상세 표시 개선 | `app/proxy-bookings/[id]/page.tsx`, `app/admin/dashboard/components/PhoneReservationTab.tsx` — 고객 상세와 Team Workspace 전화 예약 탭이 더 이상 고정 5,000원을 보여주지 않고, 카테고리별 실제 수수료와 한글화된 form entry를 표시하도록 보강 |
 | 🟡 회귀 테스트 보강 | `tests/e2e/86-proxy-booking-team-workspace.spec.ts`, `tests/e2e/87-proxy-booking-fee-util.spec.ts` — 홈 서비스 카드 진입 후 확장된 식당 양식 제출, admin `TEAM > 전화 예약` 답글 플로우, category별 수수료 helper 계약을 직접 검증 |
+| 🟡 식당/숙소 폼 보정 | `app/proxy-bookings/new/page.tsx`, `app/schemas/proxyRequestSchema.ts`, `app/utils/proxyBooking.ts` — 상단 수수료 박스를 제거하고 일본 현지인 강조 안내 섹션으로 교체, 식당 예약은 `datetime-local` 3지망 필수 입력과 `대체 식당 진행` 필드를 추가, 숙소 문의는 `예약한 사이트` 필드를 추가 |
 
 ## v3.39.36 — [Phone Reservation] 홈 진입 복구 · Team Workspace 통합 · 운영 답글 알림
 

@@ -169,11 +169,12 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       await customerPage.getByRole('button', { name: '서비스' }).first().click();
       await customerPage.getByRole('link', { name: /일본 전화 예약 · 문의 대행/ }).click();
       await customerPage.waitForURL(/\/proxy-bookings\/new/, { timeout: 15000 });
-      await expect(customerPage.getByRole('heading', { name: '일본 전화 예약 · 문의 대행' })).toBeVisible({ timeout: 15000 });
+      await expect(customerPage.getByRole('heading', { name: '일본인이 대신 전화 예약을 도와드립니다' })).toBeVisible({ timeout: 15000 });
 
       await customerPage.getByPlaceholder('예: 스시 지로').fill(restaurantName);
-      await customerPage.locator('input[type="date"]').first().fill('2026-04-02');
-      await customerPage.locator('input[type="time"]').first().fill('19:00');
+      await customerPage.locator('input[type="datetime-local"]').nth(0).fill('2026-04-02T19:00');
+      await customerPage.locator('input[type="datetime-local"]').nth(1).fill('2026-04-02T19:30');
+      await customerPage.locator('input[type="datetime-local"]').nth(2).fill('2026-04-02T20:00');
       await customerPage.getByPlaceholder('예: 홍길동').first().fill(customerUser.fullName);
       await customerPage.locator('input[type="number"]').first().fill('2');
       await customerPage.getByPlaceholder('예: 01012345678').first().fill(customerUser.phone);
