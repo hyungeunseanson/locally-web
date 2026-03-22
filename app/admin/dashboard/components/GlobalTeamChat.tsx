@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
@@ -53,8 +53,9 @@ export default function GlobalTeamChat() {
     // isOpen 최신값을 closure 안에서 안전하게 읽기 위한 ref (Chrome 재구독 버그 방지)
     const isOpenRef = useRef(false);
     const currentUserRef = useRef<CurrentAdminUser | null>(null);
+    const messagesRef = useRef<ChatMessage[]>([]);
 
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const activeTab = searchParams.get('tab')?.toUpperCase();
@@ -64,6 +65,7 @@ export default function GlobalTeamChat() {
     // ─── ref 동기화 ──────────────────────────────────────────────────────────
     useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
     useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+    useEffect(() => { messagesRef.current = messages; }, [messages]);
 
     // ─── 스크롤 헬퍼 ─────────────────────────────────────────────────────────
     const scrollToBottom = useCallback((delay = 0) => {
@@ -145,7 +147,7 @@ export default function GlobalTeamChat() {
         };
 
         initChat();
-    }, [isTeamWorkspace]);
+    }, [isTeamWorkspace, supabase]);
 
     // ─── 메시지 fetch + 실시간 구독 ──────────────────────────────────────────
     // 핵심 수정: isOpen을 deps에서 제거 → 채팅창 토글마다 채널 재구독 방지 (Chrome 성능 버그)
@@ -222,7 +224,7 @@ export default function GlobalTeamChat() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [currentUser, isTeamWorkspace, scrollToBottom]); // isOpen 제거됨
+    }, [currentUser, isTeamWorkspace, markMessagesRead, scrollToBottom, supabase]); // isOpen 제거됨
 
     // ─── 채팅창 오픈/클로즈 사이드이펙트 ────────────────────────────────────
     useEffect(() => {
@@ -241,8 +243,8 @@ export default function GlobalTeamChat() {
             scrollToBottom(220);
 
             // Phase 3: 채팅 오픈 시 안 읽은 메시지 읽음 처리
-            if (currentUser && messages.length > 0) {
-                markMessagesRead(messages, currentUser.id);
+            if (currentUserRef.current && messagesRef.current.length > 0) {
+                markMessagesRead(messagesRef.current, currentUserRef.current.id);
             }
 
             if (window.innerWidth < 768) {
@@ -253,7 +255,7 @@ export default function GlobalTeamChat() {
         }
 
         return () => { document.body.style.overflow = ''; };
-    }, [isOpen, isTeamWorkspace]); // 열릴 때 읽음 반영
+    }, [isOpen, isTeamWorkspace, markMessagesRead, scrollToBottom]); // 열릴 때 읽음 반영
 
     // ─── 파일 처리 ────────────────────────────────────────────────────────────
     const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -485,6 +487,7 @@ export default function GlobalTeamChat() {
                                     onClick={() => setZoomImage(msg.metadata!.image_url!)}
                                     className={`p-1 bg-white border border-slate-200 ${maxW} cursor-pointer hover:opacity-90 transition-opacity rounded-2xl ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'}`}
                                 >
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- team chat attachments render arbitrary public URLs and keep native zoom behavior */}
                                     <img src={msg.metadata.image_url} alt="attached" className="rounded-xl w-full object-cover max-h-48" loading="lazy" />
                                 </div>
                             )}
@@ -549,6 +552,7 @@ export default function GlobalTeamChat() {
             {selectedImage && (
                 <div className="mb-2 relative inline-block">
                     <div className="p-1 border border-slate-200 rounded-xl bg-slate-50 relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- blob preview URL must render before upload completes */}
                         <img src={selectedImage.url} alt="preview" className="h-16 w-auto rounded-lg object-cover" />
                         <button onClick={clearSelectedImage} className="absolute -top-1.5 -right-1.5 bg-slate-800 text-white p-0.5 rounded-full shadow-md hover:bg-slate-900">
                             <X size={10} />
@@ -683,6 +687,7 @@ export default function GlobalTeamChat() {
                     >
                         <X size={24} />
                     </button>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- zoom modal renders arbitrary uploaded URLs and keeps native contain sizing */}
                     <img
                         src={zoomImage}
                         alt="Zoomed"
