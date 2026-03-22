@@ -176,6 +176,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
         <div className="p-5 md:p-8 overflow-y-auto">
           <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
             <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-slate-200 overflow-hidden shrink-0 border border-slate-100">
+              {/* eslint-disable-next-line @next/next/no-img-element -- review modal cover renders arbitrary public trip image URLs */}
               {trip.image ? <img src={trip.image} alt={trip.title} className="w-full h-full object-cover" /> : <div className="bg-slate-200 w-full h-full" />}
             </div>
             <div>
@@ -221,6 +222,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             {/* 기존 사진 (수정 모드) */}
             {existingPhotoUrls.map((url, idx) => (
               <div key={`existing-${idx}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 group">
+                {/* eslint-disable-next-line @next/next/no-img-element -- existing review photos render already-uploaded public URLs */}
                 <img src={url} alt="review" className="w-full h-full object-cover" />
                 <button
                   onClick={() => removeExistingPhoto(idx)}
@@ -233,6 +235,7 @@ export default function ReviewModal({ trip, onClose, onReviewSubmitted }: Review
             {/* 새로 추가된 사진 */}
             {newImagePreviews.map((url, idx) => (
               <div key={`new-${idx}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-blue-200 group">
+                {/* eslint-disable-next-line @next/next/no-img-element -- new review previews use blob URLs before upload */}
                 <img src={url} alt="new review" className="w-full h-full object-cover" />
                 <button
                   onClick={() => removeNewImage(idx)}
