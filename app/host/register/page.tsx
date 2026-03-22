@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
@@ -70,7 +70,7 @@ function getFallbackLevel(value: unknown): LanguageLevel {
 export default function HostRegisterPage() {
   const { lang } = useLanguage();
   const copy = getHostRegisterCopy(lang);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { refreshAuth } = useAuth();
   const { showToast, showHeicUnsupportedToast } = useToast();
@@ -127,7 +127,7 @@ export default function HostRegisterPage() {
     };
 
     fetchExistingData();
-  }, []);
+  }, [supabase]);
 
   const updateData = (key: keyof HostRegisterFormData, value: HostRegisterFormData[keyof HostRegisterFormData]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
