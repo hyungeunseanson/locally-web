@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.43 — [Host Dashboard] 예약 카드 수입 예정 정산액 기준 정렬
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 예약 카드 수입 예정 정산 기준 반영 | `app/host/dashboard/components/ReservationCard.tsx` — 호스트 예약 카드의 `수입 예정`이 총 결제액이 아니라 `getBookingHostPayout()` 기준 정산 예정액을 표시하도록 정렬. 게스트 수수료 포함 총액이 그대로 노출되던 문제 수정 |
+| 🟡 회귀 테스트 보강 | `tests/e2e/40-host-reservations-inquiries-ui.spec.ts` — 호스트 대시보드 예약 카드가 정산액(`₩24,000`)을 노출하는지 확인하는 assertion 추가 |
+
 ## v3.39.42 — [Guest Trips] 프로그램명 로컬라이즈 · 환불 문구 정렬
 
 | 항목 | 내용 |

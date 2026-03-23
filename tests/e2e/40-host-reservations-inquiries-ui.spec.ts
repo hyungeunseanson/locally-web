@@ -368,6 +368,7 @@ test.describe.serial('Host dashboard reservations and inquiries UI coverage', ()
     await page.goto('/host/dashboard?tab=reservations', { waitUntil: 'networkidle' });
 
     await expect(page.getByRole('heading', { name: `#${paidBookingId}` })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('₩24,000').last()).toBeVisible();
     await expect(page.getByRole('button', { name: /취소\/환불|Cancelled/ })).toBeVisible();
 
     await page.getByRole('button', { name: /취소\/환불|Cancelled/ }).click();
