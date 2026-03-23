@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 
-import { resolveTeamAdminContext, teamError } from '@/app/api/admin/team/_shared';
+import { createTeamRequestId, resolveTeamAdminContext, teamError } from '@/app/api/admin/team/_shared';
 
 export async function GET() {
+  const requestId = createTeamRequestId('bootstrap');
+
   try {
-    const context = await resolveTeamAdminContext();
+    const context = await resolveTeamAdminContext('bootstrap', requestId);
     if ('response' in context) {
       return context.response;
     }
@@ -16,8 +18,8 @@ export async function GET() {
       .limit(100);
 
     if (tasksError) {
-      console.error('[admin/team/bootstrap] tasks fetch error:', tasksError);
-      return teamError('팀 작업을 불러오지 못했습니다.', 500);
+      console.error(`[admin/team/bootstrap][${requestId}] tasks fetch error:`, tasksError);
+      return teamError('팀 작업을 불러오지 못했습니다.', 500, requestId);
     }
 
     const taskIds = (tasks ?? []).map((task) => task.id);
@@ -37,13 +39,13 @@ export async function GET() {
     ]);
 
     if (commentsResult.error) {
-      console.error('[admin/team/bootstrap] comments fetch error:', commentsResult.error);
-      return teamError('팀 댓글을 불러오지 못했습니다.', 500);
+      console.error(`[admin/team/bootstrap][${requestId}] comments fetch error:`, commentsResult.error);
+      return teamError('팀 댓글을 불러오지 못했습니다.', 500, requestId);
     }
 
     if (whitelistResult.error) {
-      console.error('[admin/team/bootstrap] whitelist fetch error:', whitelistResult.error);
-      return teamError('관리자 화이트리스트를 불러오지 못했습니다.', 500);
+      console.error(`[admin/team/bootstrap][${requestId}] whitelist fetch error:`, whitelistResult.error);
+      return teamError('관리자 화이트리스트를 불러오지 못했습니다.', 500, requestId);
     }
 
     return NextResponse.json({
@@ -57,7 +59,7 @@ export async function GET() {
       whitelist: whitelistResult.data ?? [],
     });
   } catch (error) {
-    console.error('[admin/team/bootstrap] unexpected error:', error);
-    return teamError('Server error', 500);
+    console.error(`[admin/team/bootstrap][${requestId}] unexpected error:`, error);
+    return teamError('Server error', 500, requestId);
   }
 }

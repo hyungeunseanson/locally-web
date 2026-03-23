@@ -5,11 +5,19 @@ import { resolveAdminAccess } from '@/app/utils/adminAccess';
 
 export const TEAM_CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 
-export function teamError(message: string, status: number) {
-  return NextResponse.json({ success: false, error: message }, { status });
+export function createTeamRequestId(scope: string) {
+  const nonce = Math.random().toString(36).slice(2, 8);
+  return `team-${scope}-${Date.now().toString(36)}-${nonce}`;
 }
 
-export async function resolveTeamAdminContext() {
+export function teamError(message: string, status: number, requestId?: string) {
+  return NextResponse.json({ success: false, error: message, requestId: requestId ?? null }, { status });
+}
+
+export async function resolveTeamAdminContext(
+  routeName = 'shared',
+  requestId = createTeamRequestId('shared')
+) {
   const supabaseServer = await createServerClient();
   const {
     data: { user },
@@ -17,7 +25,8 @@ export async function resolveTeamAdminContext() {
   } = await supabaseServer.auth.getUser();
 
   if (authError || !user) {
-    return { response: teamError('Unauthorized', 401) } as const;
+    console.error(`[admin/team/${routeName}][${requestId}] auth failed:`, authError);
+    return { response: teamError('Unauthorized', 401, requestId) } as const;
   }
 
   const supabaseAdmin = createAdminClient();
@@ -27,7 +36,8 @@ export async function resolveTeamAdminContext() {
   });
 
   if (!isAdmin) {
-    return { response: teamError('Forbidden', 403) } as const;
+    console.error(`[admin/team/${routeName}][${requestId}] forbidden for user ${user.id}`);
+    return { response: teamError('Forbidden', 403, requestId) } as const;
   }
 
   const { data: profile, error: profileError } = await supabaseAdmin
@@ -37,7 +47,7 @@ export async function resolveTeamAdminContext() {
     .maybeSingle();
 
   if (profileError) {
-    console.error('[admin/team] profile fetch error:', profileError);
+    console.error(`[admin/team/${routeName}][${requestId}] profile fetch error:`, profileError);
   }
 
   return {

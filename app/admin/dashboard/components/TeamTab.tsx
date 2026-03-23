@@ -33,6 +33,7 @@ type TeamWorkspaceBootstrapResponse = {
   tasks?: AdminTask[];
   comments?: AdminComment[];
   whitelist?: Array<{ id: string; email: string; created_at?: string }>;
+  requestId?: string | null;
   error?: string;
 };
 
@@ -145,6 +146,12 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     const payload = (await response.json().catch(() => null)) as TeamWorkspaceBootstrapResponse | null;
     if (!response.ok || !payload?.success) {
       const nextError = payload?.error || '관리자 데이터를 불러오지 못했습니다.';
+      const requestId = typeof payload?.requestId === 'string' ? payload.requestId : null;
+      console.error('[TeamTab] Team Workspace bootstrap request failed:', {
+        status: response.status,
+        requestId,
+        error: nextError,
+      });
       if (response.status === 401 || response.status === 403) {
         setIsWorkspaceUnauthorized(true);
       }

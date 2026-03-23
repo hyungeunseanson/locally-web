@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 
-import { resolveTeamAdminContext, teamError, TEAM_CHAT_ROOM_ID } from '@/app/api/admin/team/_shared';
+import { createTeamRequestId, resolveTeamAdminContext, teamError, TEAM_CHAT_ROOM_ID } from '@/app/api/admin/team/_shared';
 
 export async function GET() {
+  const requestId = createTeamRequestId('chat');
+
   try {
-    const context = await resolveTeamAdminContext();
+    const context = await resolveTeamAdminContext('chat', requestId);
     if ('response' in context) {
       return context.response;
     }
@@ -17,8 +19,8 @@ export async function GET() {
       .limit(100);
 
     if (error) {
-      console.error('[admin/team/chat] fetch error:', error);
-      return teamError('팀 채팅을 불러오지 못했습니다.', 500);
+      console.error(`[admin/team/chat][${requestId}] fetch error:`, error);
+      return teamError('팀 채팅을 불러오지 못했습니다.', 500, requestId);
     }
 
     return NextResponse.json({
@@ -30,7 +32,7 @@ export async function GET() {
       messages: data ?? [],
     });
   } catch (error) {
-    console.error('[admin/team/chat] unexpected error:', error);
-    return teamError('Server error', 500);
+    console.error(`[admin/team/chat][${requestId}] unexpected error:`, error);
+    return teamError('Server error', 500, requestId);
   }
 }

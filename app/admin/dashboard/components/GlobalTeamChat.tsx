@@ -38,6 +38,7 @@ type TeamChatResponse = {
     success: boolean;
     currentUser?: CurrentAdminUser;
     messages?: ChatMessage[];
+    requestId?: string | null;
     error?: string;
 };
 
@@ -145,6 +146,12 @@ export default function GlobalTeamChat() {
         const payload = (await response.json().catch(() => null)) as TeamChatResponse | null;
         if (!response.ok || !payload?.success) {
             const nextError = payload?.error || '팀 채팅을 불러오지 못했습니다.';
+            const requestId = typeof payload?.requestId === 'string' ? payload.requestId : null;
+            console.error('[GlobalTeamChat] team chat bootstrap request failed:', {
+                status: response.status,
+                requestId,
+                error: nextError,
+            });
             if (response.status === 401 || response.status === 403) {
                 setServerCurrentUser(null);
                 setMessages([]);
