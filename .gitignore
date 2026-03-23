@@ -42,3 +42,6 @@ next-env.d.ts
 
 # reference images
 /docs/homeref/
+
+# allow shipped service thumbnails even when global gitignore excludes jpg
+!public/images/services/phone-reservation-fr2.jpg
