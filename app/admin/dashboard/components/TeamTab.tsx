@@ -115,15 +115,21 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   };
 
   const getCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
-      setCurrentUser({ id: user.id, name: profile?.full_name || user.email?.split('@')[0] });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) console.error('[TeamTab] auth.getUser error:', authError);
+    if (!user) {
+      console.warn('[TeamTab] user is null — session may be expired or invalid');
+      return null;
     }
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+    const resolved = { id: user.id, name: profile?.full_name || user.email?.split('@')[0] };
+    setCurrentUser(resolved);
+    return resolved;
   };
 
   const fetchTasks = async () => {
-    const { data } = await supabase.from('admin_tasks').select('*').order('created_at', { ascending: false }).limit(100);
+    const { data, error } = await supabase.from('admin_tasks').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) console.error('[TeamTab] fetchTasks error:', error);
     if (data) {
       setTasks(data);
       tasksRef.current = data; // ⭐ 추가: ref도 함께 업데이트
@@ -195,7 +201,10 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     const initData = async () => {
       setIsLoading(true);
       // tasks를 먼저 가져온 뒤 그 ID 목록으로 댓글 필터링
-      const [taskData] = await Promise.all([fetchTasks(), fetchWhitelist(), getCurrentUser()]);
+      const [taskData, , resolvedUser] = await Promise.all([fetchTasks(), fetchWhitelist(), getCurrentUser()]);
+      if (!resolvedUser) {
+        showToast('세션이 만료되었습니다. 페이지를 새로고침해주세요.', 'error');
+      }
       await fetchComments(taskData ?? []);
       setIsLoading(false);
     };
