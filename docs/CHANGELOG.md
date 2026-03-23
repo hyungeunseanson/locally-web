@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.40 — [Booking Cancellation] 호스트 진행 불가 검토 가시성 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 guest 검토 안내 보강 | `app/guest/trips/components/TripCard.tsx`, `app/context/LanguageContext.tsx` — `호스트 진행 불가` 취소 검토가 접수된 예약 카드에 운영팀 검토 대기 안내 박스를 추가해, 고객이 추가 취소 요청 없이 기다려야 하는 상태를 명확히 표시 |
+| 🟠 Master Ledger 검토 배지/필터 추가 | `app/admin/dashboard/components/MasterLedgerTab.tsx` — host-unavailable review marker가 있는 예약은 목록 상태 컬럼과 상세 헤더에 오렌지 배지를 함께 노출하고, `검토 요청` 토글 필터로 해당 예약만 빠르게 모아볼 수 있게 보강 |
+
 ## v3.39.39 — [Booking Cancellation] 호스트 진행 불가 검토 요청 분기
 
 | 항목 | 내용 |

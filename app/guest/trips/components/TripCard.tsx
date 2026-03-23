@@ -298,6 +298,15 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 <span className="font-semibold text-slate-900">{trip.time}</span>
               </div>
             </div>
+
+            {isHostUnavailablePending && (
+              <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50 px-3 py-2.5 text-[11px] leading-5 text-orange-700">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500" />
+                  <p>{t('trip_review_pending_notice')}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 하단 3버튼 */}

@@ -131,6 +131,7 @@ export default function MasterLedgerTab({
   }]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'PENDING' | 'CANCELLED'>('ALL');
+  const [reviewOnly, setReviewOnly] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<AdminMasterLedgerEntry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [allBookings, setAllBookings] = useState<AdminMasterLedgerEntry[]>([]);
@@ -257,6 +258,10 @@ export default function MasterLedgerTab({
     ].filter(Boolean).join(' ').toLowerCase();
     const searchMatch = searchString.includes(searchTerm.toLowerCase());
 
+    if (reviewOnly && !isHostUnavailableReviewPending(b.cancel_reason)) {
+      return false;
+    }
+
     // 상태 필터링
     const status = (b.status || '').toUpperCase();
     let statusMatch = false;
@@ -274,6 +279,10 @@ export default function MasterLedgerTab({
 
     return startMatch && endMatch && searchMatch && statusMatch;
   });
+
+  const pendingHostUnavailableReviewCount = allBookings.filter(
+    (booking) => isHostUnavailableReviewPending(booking.cancel_reason)
+  ).length;
 
   // 2. 통합 합계 계산 (KPI) - 취소된 건은 제외
   const totals = ledgerData.reduce((acc, curr) => {
@@ -623,6 +632,22 @@ export default function MasterLedgerTab({
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => setReviewOnly((current) => !current)}
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[10px] font-bold transition-all md:text-xs ${
+                reviewOnly
+                  ? 'border-orange-200 bg-orange-50 text-orange-700'
+                  : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <AlertTriangle size={12} />
+              <span>검토 요청</span>
+              {pendingHostUnavailableReviewCount > 0 && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black ${reviewOnly ? 'bg-orange-200 text-orange-800' : 'bg-slate-100 text-slate-600'}`}>
+                  {pendingHostUnavailableReviewCount}
+                </span>
+              )}
+            </button>
           </div>
           <div className="flex gap-2 w-full md:w-auto mt-0 md:mt-0">
             <div className="relative flex-1 md:w-64">
@@ -673,7 +698,18 @@ export default function MasterLedgerTab({
                       onClick={() => handleSelectBooking(b)}
                       className={`hover:bg-slate-50 transition-colors cursor-pointer group ${selectedBooking?.id === b.id ? 'bg-blue-50/50' : ''}`}
                     >
-                      <td className="px-1.5 md:px-4 py-2 md:py-4">{renderStatusBadge(b.status)}</td>
+                      <td className="px-1.5 md:px-4 py-2 md:py-4">
+                        <div className="flex flex-col items-start gap-1">
+                          {renderStatusBadge(b.status)}
+                          {isHostUnavailableReviewPending(b.cancel_reason) && (
+                            <span className="inline-flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-700 md:px-2 md:text-[10px]">
+                              <AlertTriangle size={10} />
+                              <span className="md:hidden">검토</span>
+                              <span className="hidden md:inline">호스트 진행 불가 검토</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="hidden md:table-cell px-2 md:px-4 py-2.5 md:py-4">
                         {b._type === 'service'
                           ? <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700">서비스의뢰</span>
@@ -729,6 +765,12 @@ export default function MasterLedgerTab({
                   }`}>
                   {selectedBooking.status}
                 </div>
+                {isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
+                  <div className="inline-flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-orange-700 md:px-2 md:text-[10px]">
+                    <AlertTriangle size={10} />
+                    <span>REVIEW</span>
+                  </div>
+                )}
                 <span className="text-[8px] md:text-[10px] text-slate-400 font-bold">#{String(selectedBooking.id).slice(0, 8)}</span>
               </div>
               <h3 className="text-[12px] md:text-base font-black text-slate-900 leading-tight mb-1 md:mb-2 line-clamp-2">{selectedBooking.experiences?.title}</h3>
