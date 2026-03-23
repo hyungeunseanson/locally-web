@@ -34,10 +34,21 @@ interface CurrentAdminUser {
     name: string;
 }
 
+type TeamChatResponse = {
+    success: boolean;
+    currentUser?: CurrentAdminUser;
+    messages?: ChatMessage[];
+    error?: string;
+};
+
+type ChatBootstrapStatus = 'loading' | 'ready' | 'unauthorized' | 'error';
+
 export default function GlobalTeamChat() {
     const sessionState = useTeamWorkspaceAdminSession();
     const { currentUser, status: sessionStatus } = sessionState;
-    const sessionReason = sessionStatus === 'unauthorized' ? sessionState.reason : null;
+    const [serverCurrentUser, setServerCurrentUser] = useState<CurrentAdminUser | null>(null);
+    const [chatBootstrapStatus, setChatBootstrapStatus] = useState<ChatBootstrapStatus>('loading');
+    const [chatBootstrapError, setChatBootstrapError] = useState<string | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -63,10 +74,12 @@ export default function GlobalTeamChat() {
     const activeTab = searchParams.get('tab')?.toUpperCase();
     const isTeamWorkspace = pathname?.startsWith('/admin/dashboard') && activeTab === 'TEAM';
     const CHAT_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+    const effectiveCurrentUser = currentUser ?? serverCurrentUser;
+    const canUseRealtime = isTeamWorkspace && sessionStatus === 'ready' && Boolean(currentUser);
 
     // ─── ref 동기화 ──────────────────────────────────────────────────────────
     useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
-    useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+    useEffect(() => { currentUserRef.current = effectiveCurrentUser; }, [effectiveCurrentUser]);
     useEffect(() => { messagesRef.current = messages; }, [messages]);
 
     // ─── 스크롤 헬퍼 ─────────────────────────────────────────────────────────
@@ -124,46 +137,74 @@ export default function GlobalTeamChat() {
         }
     }, [supabase, CHAT_ROOM_ID]);
 
-    // ─── 초기화: Auth & Admin check ──────────────────────────────────────────
+    const fetchTeamChatState = useCallback(async () => {
+        const response = await fetch('/api/admin/team/chat', {
+            cache: 'no-store',
+        });
+
+        const payload = (await response.json().catch(() => null)) as TeamChatResponse | null;
+        if (!response.ok || !payload?.success) {
+            const nextError = payload?.error || '팀 채팅을 불러오지 못했습니다.';
+            if (response.status === 401 || response.status === 403) {
+                setServerCurrentUser(null);
+                setMessages([]);
+                setChatBootstrapError(nextError);
+                setChatBootstrapStatus('unauthorized');
+                return;
+            }
+
+            throw new Error(nextError);
+        }
+
+        setServerCurrentUser(payload.currentUser ?? null);
+        setMessages(payload.messages ?? []);
+        setChatBootstrapError(null);
+        setChatBootstrapStatus('ready');
+    }, []);
+
+    // ─── 초기화: Team Workspace bootstrap ────────────────────────────────────
     useEffect(() => {
         setIsClient(true);
         if (!isTeamWorkspace) {
             setIsOpen(false);
             setHasUnread(false);
+            setChatBootstrapStatus('loading');
+            setChatBootstrapError(null);
         }
     }, [isTeamWorkspace]);
 
-    // ─── 메시지 fetch + 실시간 구독 ──────────────────────────────────────────
-    // 핵심 수정: isOpen을 deps에서 제거 → 채팅창 토글마다 채널 재구독 방지 (Chrome 성능 버그)
     useEffect(() => {
-        if (!isTeamWorkspace || sessionStatus !== 'ready' || !currentUser) return;
+        let isActive = true;
 
-        const fetchMessages = async () => {
-            const { data } = await supabase
-                .from('admin_task_comments')
-                .select('*')
-                .eq('task_id', CHAT_ROOM_ID)
-                .order('created_at', { ascending: true })
-                .limit(100);
+        if (!isTeamWorkspace) return;
 
-            if (data) {
-                setMessages(data);
-                if (isOpenRef.current) {
-                    scrollToBottom(120);
-                } else if (data.length > 0) {
-                    const lastMsg = data[data.length - 1];
-                    const lastViewed = localStorage.getItem('global_chat_last_viewed');
-                    if (
-                        lastMsg.author_id !== currentUser.id &&
-                        (!lastViewed || new Date(lastMsg.created_at) > new Date(lastViewed))
-                    ) {
-                        setHasUnread(true);
-                    }
-                }
+        setChatBootstrapStatus('loading');
+        setChatBootstrapError(null);
+
+        const bootstrap = async () => {
+            try {
+                await fetchTeamChatState();
+            } catch (error) {
+                console.error('[GlobalTeamChat] bootstrap failed:', error);
+                if (!isActive) return;
+                setChatBootstrapError(
+                    error instanceof Error ? error.message : '팀 채팅을 불러오지 못했습니다.'
+                );
+                setChatBootstrapStatus('error');
             }
         };
 
-        fetchMessages();
+        void bootstrap();
+
+        return () => {
+            isActive = false;
+        };
+    }, [fetchTeamChatState, isTeamWorkspace]);
+
+    // ─── 메시지 실시간 구독 ─────────────────────────────────────────────────
+    // 핵심 수정: isOpen을 deps에서 제거 → 채팅창 토글마다 채널 재구독 방지 (Chrome 성능 버그)
+    useEffect(() => {
+        if (!canUseRealtime || !currentUser) return;
 
         const channel = supabase.channel('global_admin_chat_v2')
             .on('postgres_changes', {
@@ -190,7 +231,11 @@ export default function GlobalTeamChat() {
                 } else if (isOpenRef.current) {
                     scrollToBottom(120);
                     // 새 메시지 자동 읽음 처리
-                    if (currentUserRef.current && newMsg.author_id !== currentUserRef.current.id) {
+                    if (
+                        sessionStatus === 'ready' &&
+                        currentUserRef.current &&
+                        newMsg.author_id !== currentUserRef.current.id
+                    ) {
                         markMessagesRead([newMsg], currentUserRef.current.id);
                     }
                 }
@@ -208,14 +253,14 @@ export default function GlobalTeamChat() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [currentUser, isTeamWorkspace, markMessagesRead, scrollToBottom, sessionStatus, supabase]); // isOpen 제거됨
+    }, [canUseRealtime, currentUser, markMessagesRead, scrollToBottom, sessionStatus, supabase]); // isOpen 제거됨
 
     useEffect(() => {
-        if (sessionStatus === 'unauthorized') {
+        if (chatBootstrapStatus === 'unauthorized') {
             setIsOpen(false);
             setHasUnread(false);
         }
-    }, [sessionStatus]);
+    }, [chatBootstrapStatus]);
 
     // ─── 채팅창 오픈/클로즈 사이드이펙트 ────────────────────────────────────
     useEffect(() => {
@@ -234,7 +279,7 @@ export default function GlobalTeamChat() {
             scrollToBottom(220);
 
             // Phase 3: 채팅 오픈 시 안 읽은 메시지 읽음 처리
-            if (currentUserRef.current && messagesRef.current.length > 0) {
+            if (sessionStatus === 'ready' && currentUserRef.current && messagesRef.current.length > 0) {
                 markMessagesRead(messagesRef.current, currentUserRef.current.id);
             }
 
@@ -246,7 +291,7 @@ export default function GlobalTeamChat() {
         }
 
         return () => { document.body.style.overflow = ''; };
-    }, [isOpen, isTeamWorkspace, markMessagesRead, scrollToBottom]); // 열릴 때 읽음 반영
+    }, [isOpen, isTeamWorkspace, markMessagesRead, scrollToBottom, sessionStatus]); // 열릴 때 읽음 반영
 
     // ─── 파일 처리 ────────────────────────────────────────────────────────────
     const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -289,7 +334,7 @@ export default function GlobalTeamChat() {
     // ─── 메시지 전송 ──────────────────────────────────────────────────────────
     const sendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
-        if ((!newMessage.trim() && !selectedImage) || !currentUser || isUploading) return;
+        if ((!newMessage.trim() && !selectedImage) || !effectiveCurrentUser || isUploading) return;
 
         let imageUrl: string | undefined;
         const messageText = newMessage;
@@ -299,12 +344,12 @@ export default function GlobalTeamChat() {
             id: tempId,
             task_id: CHAT_ROOM_ID,
             content: messageText || '사진 전송 중...',
-            author_id: currentUser.id,
-            author_name: currentUser.name,
+            author_id: effectiveCurrentUser.id,
+            author_name: effectiveCurrentUser.name,
             created_at: new Date().toISOString(),
             metadata: selectedImage ? { image_url: selectedImage.url } : undefined,
             reactions: {},
-            read_by: [currentUser.id]
+            read_by: [effectiveCurrentUser.id]
         };
 
         setMessages(prev => [...prev, opMessage]);
@@ -327,7 +372,7 @@ export default function GlobalTeamChat() {
                     content: messageText || '사진을 1장 보냈습니다.',
                     metadata: imageUrl ? { image_url: imageUrl } : null,
                     reactions: {},
-                    readBy: [currentUser.id],
+                    readBy: [effectiveCurrentUser.id],
                 }),
             });
 
@@ -337,7 +382,7 @@ export default function GlobalTeamChat() {
                 body: JSON.stringify({
                     eventType: 'team_chat',
                     title: `Team Chat에 새로운 메시지가 도착했습니다.`,
-                    message: `${currentUser.name}: ${messageText || '(사진)'}`,
+                    message: `${effectiveCurrentUser.name}: ${messageText || '(사진)'}`,
                     link: '/admin/dashboard?tab=TEAM'
                 })
             }).catch(e => console.error('Notify error:', e));
@@ -353,15 +398,15 @@ export default function GlobalTeamChat() {
 
     // ─── Phase 2: 리액션 토글 ────────────────────────────────────────────────
     const handleReaction = async (msgId: string, emoji: ReactionEmoji) => {
-        if (!currentUser) return;
+        if (!effectiveCurrentUser) return;
         setReactionPickerFor(null);
 
         setMessages(prev => prev.map(m => {
             if (m.id !== msgId) return m;
             const reactions = { ...(m.reactions || {}) };
             const users = reactions[emoji] ? [...reactions[emoji]] : [];
-            const idx = users.indexOf(currentUser.id);
-            if (idx === -1) users.push(currentUser.id);
+            const idx = users.indexOf(effectiveCurrentUser.id);
+            if (idx === -1) users.push(effectiveCurrentUser.id);
             else users.splice(idx, 1);
             reactions[emoji] = users;
             return { ...m, reactions };
@@ -372,8 +417,8 @@ export default function GlobalTeamChat() {
 
         const reactions = { ...(msg.reactions || {}) };
         const users = reactions[emoji] ? [...reactions[emoji]] : [];
-        const idx = users.indexOf(currentUser.id);
-        if (idx === -1) users.push(currentUser.id);
+        const idx = users.indexOf(effectiveCurrentUser.id);
+        if (idx === -1) users.push(effectiveCurrentUser.id);
         else users.splice(idx, 1);
         reactions[emoji] = users;
 
@@ -397,7 +442,7 @@ export default function GlobalTeamChat() {
             <div className={`flex gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {activeEmojis.map(emoji => {
                     const users = reactions[emoji] || [];
-                    const iMine = currentUser ? users.includes(currentUser.id) : false;
+                    const iMine = effectiveCurrentUser ? users.includes(effectiveCurrentUser.id) : false;
                     return (
                         <button
                             key={emoji}
@@ -418,8 +463,8 @@ export default function GlobalTeamChat() {
 
     // ─── 렌더: 읽음 표시 ─────────────────────────────────────────────────────
     const renderReadBy = (msg: ChatMessage, isLastFromMe: boolean) => {
-        if (!isLastFromMe || !currentUser) return null;
-        const readBy = (msg.read_by || []).filter(id => id !== currentUser.id);
+        if (!isLastFromMe || !effectiveCurrentUser) return null;
+        const readBy = (msg.read_by || []).filter(id => id !== effectiveCurrentUser.id);
         if (readBy.length === 0) return null;
         return (
             <div className="text-[9px] text-slate-400 mt-0.5 text-right">
@@ -430,8 +475,8 @@ export default function GlobalTeamChat() {
 
     // ─── 렌더: 메시지 목록 ───────────────────────────────────────────────────
     const renderMessages = (isMobile = false) => {
-        const meId = currentUser?.id;
-        if (sessionStatus === 'loading') {
+        const meId = effectiveCurrentUser?.id;
+        if (chatBootstrapStatus === 'loading') {
             return (
                 <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
                     <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
@@ -443,7 +488,7 @@ export default function GlobalTeamChat() {
             );
         }
 
-        if (sessionStatus === 'unauthorized') {
+        if (chatBootstrapStatus === 'unauthorized') {
             return (
                 <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
                     <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
@@ -451,9 +496,21 @@ export default function GlobalTeamChat() {
                     </div>
                     <p className="text-sm font-bold text-slate-700">관리자 세션 확인이 필요합니다.</p>
                     <p className="text-xs text-slate-500 mt-1.5 text-center leading-relaxed">
-                        {sessionReason === 'forbidden'
-                            ? '관리자 권한을 확인하지 못했습니다.'
-                            : '새로고침 후 다시 시도해주세요.'}
+                        새로고침 후 다시 시도해주세요.
+                    </p>
+                </div>
+            );
+        }
+
+        if (chatBootstrapStatus === 'error') {
+            return (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
+                    <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
+                        <MessageSquare size={22} className="text-slate-400" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">팀 채팅을 불러오지 못했습니다.</p>
+                    <p className="text-xs text-slate-500 mt-1.5 text-center leading-relaxed">
+                        {chatBootstrapError || '잠시 후 다시 시도해주세요.'}
                     </p>
                 </div>
             );
@@ -568,11 +625,13 @@ export default function GlobalTeamChat() {
     // ─── 렌더: 입력 영역 ─────────────────────────────────────────────────────
     const renderInput = (isMobile = false) => (
         <div className={`border-t border-slate-200 bg-white z-10 ${isMobile ? 'p-2.5' : 'p-3'}`}>
-            {sessionStatus !== 'ready' ? (
+            {chatBootstrapStatus === 'loading' ? (
                 <div className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-[11px] text-slate-500">
-                    {sessionStatus === 'loading'
-                        ? '세션 확인 중입니다...'
-                        : '관리자 세션을 확인하지 못했습니다. 새로고침 후 다시 시도해주세요.'}
+                    세션 확인 중입니다...
+                </div>
+            ) : chatBootstrapStatus === 'unauthorized' || chatBootstrapStatus === 'error' || !effectiveCurrentUser ? (
+                <div className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-[11px] text-slate-500">
+                    관리자 세션을 확인하지 못했습니다. 새로고침 후 다시 시도해주세요.
                 </div>
             ) : (
                 <>
@@ -592,6 +651,7 @@ export default function GlobalTeamChat() {
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
+                    disabled={sessionStatus !== 'ready'}
                     className={`text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors shrink-0 ${isMobile ? 'p-2' : 'p-2.5'}`}
                 >
                     <Paperclip size={isMobile ? 17 : 19} />
