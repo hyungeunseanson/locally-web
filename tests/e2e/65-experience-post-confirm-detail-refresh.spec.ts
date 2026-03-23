@@ -73,8 +73,6 @@ test.describe.serial('Experience detail refresh after booking confirmation', () 
     await selectReservationDate(page, experience.date);
     await selectReservationTime(page, experience.time);
     await expect(page.getByTestId('reservation-solo-option')).toHaveCount(0);
-    await expect(
-      page.getByTestId('reservation-guest-select').locator('option:not([value=\"private\"])')
-    ).toHaveCount(1);
+    await expect(page.getByTestId('reservation-guest-select').locator('option')).toHaveCount(1);
   });
 });

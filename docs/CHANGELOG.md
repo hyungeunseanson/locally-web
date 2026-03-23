@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.41 — [Experience Booking] 프라이빗 투어 인원 선택 분리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 예약 유형/인원 선택 분리 | `app/experiences/[id]/components/ReservationCard.tsx`, `app/context/experienceUiDictionary.ts` — 기존 `인원 선택 + 프라이빗` 단일 select를 `일반/프라이빗 예약 유형` 토글과 별도 인원 select로 분리해, 프라이빗 투어도 실제 참가 인원을 직접 선택할 수 있게 조정. 프라이빗 가격은 인원 수와 무관하게 고정 유지 |
+| 🟠 상세 예약 회귀 보강 | `tests/e2e/64-experience-availability-detail.spec.ts`, `tests/e2e/65-experience-post-confirm-detail-refresh.spec.ts`, `tests/e2e/91-private-tour-guest-count.spec.ts` — availability summary, 뒤로가기 복귀, 프라이빗 다인 선택 후 payment 쿼리/표시/고정 요금 유지까지 계약 테스트로 검증 |
+
 ## v3.39.40 — [Booking Cancellation] 호스트 진행 불가 검토 가시성 보강
 
 | 항목 | 내용 |

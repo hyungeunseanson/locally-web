@@ -70,7 +70,7 @@ test.describe.serial('Experience detail availability summary', () => {
 
     const guestOptions = page
       .getByTestId('reservation-guest-select')
-      .locator('option:not([value="private"])');
+      .locator('option');
 
     await expect(guestOptions).toHaveCount(Math.min(expectedRemainingSeats, 6));
   });
@@ -115,8 +115,12 @@ test.describe.serial('Experience detail availability summary', () => {
     const privateTimeSlot = page.getByTestId(`reservation-time-${experience.time}`);
     await expect(privateTimeSlot).toBeVisible();
     await expect(privateTimeSlot).toBeDisabled();
-    await expect(privateTimeSlot).toContainText('프라이빗 예약 마감');
-    await expect(page.getByText('선택한 날짜는 현재 예약이 마감되었습니다. 다른 날짜를 선택해 주세요.')).toBeVisible();
+    await expect(privateTimeSlot).toContainText(/프라이빗 예약 마감|Private booking sold out|貸切予約締切|私人团已售罄/);
+    await expect(
+      page.getByText(
+        /선택한 날짜는 현재 예약이 마감되었습니다\. 다른 날짜를 선택해 주세요\.|This date is fully booked\. Please select another date\.|選択した日は満席です。別の日付を選択してください。|该日期已满，请选择其他日期。/
+      )
+    ).toBeVisible();
   });
 
   test('keeps a capacity-full date visible and marks the time as sold out', async ({ page }) => {
