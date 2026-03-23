@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { Edit3 } from 'lucide-react';
 
 import { createClient } from '@/app/utils/supabase/server';
+import { getCurrentLocale } from '@/app/utils/locale';
 import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import SiteHeader from '@/app/components/SiteHeader';
-import type { CommunityCategory, CommunityHubFilter, CommunityPostFormatFilter } from '@/app/types/community';
+import type { CommunityCategory, CommunityHubFilter } from '@/app/types/community';
 import CommunityCategoryTabs from './components/CommunityCategoryTabs';
 import CommunityFeed from './CommunityFeed';
 import RightSidebar from './components/RightSidebar';
@@ -60,6 +61,7 @@ function normalizeHighlightPost(post: {
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<SearchParamMap> }): Promise<Metadata> {
     const params = await searchParams;
+    const locale = await getCurrentLocale();
     const currentHub = resolveCommunityHub(params?.hub as string);
     const currentFormat = resolveCommunityFormat(params?.format as string, params?.category as string);
 
@@ -74,7 +76,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
         ? `${hubTitle} 여행자들이 묻고 답하는 Locally 도시 허브 커뮤니티`
         : '여행자들이 도시별 질문, 동행, 여행 꿀팁을 이어보는 Locally 커뮤니티';
     const canonicalPath = '/community';
-    const canonicalUrl = buildLocalizedAbsoluteUrl('ko', canonicalPath);
+    const canonicalUrl = buildLocalizedAbsoluteUrl(locale, canonicalPath);
 
     return {
         title,

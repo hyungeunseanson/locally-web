@@ -54,7 +54,7 @@ export async function generateMetadata(
       title: title,
       description: description?.slice(0, 150),
       images: [imageUrl],
-      url: buildLocalizedAbsoluteUrl('ko', `/experiences/${id}`),
+      url: buildLocalizedAbsoluteUrl(locale, `/experiences/${id}`),
       locale: locale,
       siteName: 'Locally',
     },
@@ -65,7 +65,7 @@ export async function generateMetadata(
       images: [imageUrl],
     },
     alternates: {
-      canonical: buildLocalizedAbsoluteUrl('ko', `/experiences/${id}`),
+      canonical: buildLocalizedAbsoluteUrl(locale, `/experiences/${id}`),
       languages: {
         'ko': buildLocalizedAbsoluteUrl('ko', `/experiences/${id}`),
         'en': buildLocalizedAbsoluteUrl('en', `/experiences/${id}`),

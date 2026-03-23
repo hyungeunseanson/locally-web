@@ -12,7 +12,7 @@ import ShareButton from '../components/ShareButton';
 import SiteHeader from '@/app/components/SiteHeader';
 import CommunityAuthorTrigger from '../components/CommunityAuthorTrigger';
 import JsonLd from '@/app/components/seo/JsonLd';
-import { getProfileDisplayName } from '@/app/utils/profile';
+import { getCurrentLocale } from '@/app/utils/locale';
 import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/structuredData';
 import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
@@ -24,6 +24,7 @@ import { resolveCommunityCategory, resolveCommunityFormat, resolveCommunityHub, 
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
     const { id } = await params;
+    const locale = await getCurrentLocale();
     const supabase = await createClient();
     const { data: post } = await supabase.from('community_posts').select('title, content, images, category').eq('id', id).maybeSingle();
 
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const snippet = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
     const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
     const pagePath = `/community/${id}`;
-    const canonicalUrl = buildLocalizedAbsoluteUrl('ko', pagePath);
+    const canonicalUrl = buildLocalizedAbsoluteUrl(locale, pagePath);
 
     let prefix = '';
     if (post.category === 'qna') prefix = '[Q&A] ';

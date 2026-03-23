@@ -10,10 +10,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getCurrentLocale();
 
   const titles: Record<string, string> = {
-    ko: 'Locally - 현지인과 함께하는 진짜 로컬 여행',
-    en: 'Locally - Real Local Experiences with Locals',
-    ja: 'Locally - 現地の人と楽しむリアルなローカル旅行',
-    zh: 'Locally - 与当地人一起体验真正的在地旅行'
+    ko: '현지인과 함께하는 진짜 로컬 여행',
+    en: 'Real Local Experiences with Locals',
+    ja: '現地の人と楽しむリアルなローカル旅行',
+    zh: '与当地人一起体验真正的在地旅行'
   };
 
   const descriptions: Record<string, string> = {

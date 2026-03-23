@@ -100,7 +100,7 @@ export async function generateMetadata(): Promise<Metadata> {
     keywords: ['여행', '현지인 가이드', '로컬 체험', '한국 여행', '서울 투어', '일본 동행', '일본 현지 가이드', '맞춤 의뢰', 'Locally'],
     alternates: {
       languages: {
-        'ko': buildAbsoluteUrl('/ko'),
+        'ko': buildAbsoluteUrl('/'),
         'en': buildLocalizedAbsoluteUrl('en'),
         'ja': buildLocalizedAbsoluteUrl('ja'),
         'zh': buildLocalizedAbsoluteUrl('zh'),

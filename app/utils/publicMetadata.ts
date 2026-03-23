@@ -21,7 +21,7 @@ export function buildPublicMetadata({
   descriptionMap,
   openGraphType = 'website',
 }: BuildPublicMetadataOptions): Metadata {
-  const pageUrl = buildLocalizedAbsoluteUrl('ko', pathname);
+  const pageUrl = buildLocalizedAbsoluteUrl(locale, pathname);
   const title = titleMap[locale];
   const description = descriptionMap[locale];
 

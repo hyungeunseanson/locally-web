@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/app/utils/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
@@ -22,13 +22,15 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-locally-locale', localeMatch[1]);
   }
 
-  // 3. 조작된 헤더를 지닌 request 껍데기를 만들어 하위 로직(updateSession)으로 패스
-  const modifiedRequest = new NextRequest(request, {
-    headers: requestHeaders,
+  // 3. 수정한 request headers를 downstream 렌더링까지 전달
+  const forwardedResponse = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
   });
 
   // Supabase 세션 처리 및 헤더 병합
-  const finalResponse = await updateSession(modifiedRequest);
+  const finalResponse = await updateSession(request, forwardedResponse);
 
   if (localeMatch) {
     finalResponse.cookies.set('app_lang', localeMatch[1], {
