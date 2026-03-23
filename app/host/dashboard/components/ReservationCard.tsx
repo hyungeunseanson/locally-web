@@ -14,6 +14,11 @@ import {
   isConfirmedBookingStatus,
   isPendingBookingStatus,
 } from '@/app/constants/bookingStatus';
+import { getBookingHostPayout } from '@/app/utils/bookingFinance';
+import {
+  getHostUnavailableReviewDetail,
+  isHostUnavailableReviewPending,
+} from '@/app/utils/hostUnavailableReview';
 
 interface ReservationCardProps {
   res: {
@@ -24,6 +29,8 @@ interface ReservationCardProps {
     time?: string | null;
     guests?: number | null;
     amount?: number | null;
+    total_price?: number | null;
+    total_experience_price?: number | null;
     created_at?: string | null;
     cancel_reason?: string | null;
     refund_amount?: number | null;
@@ -113,7 +120,9 @@ export default function ReservationCard({
   const showDesktopReviewButton = !isCancelledBookingStatus(res.status);
   const orderDisplay = String(res.order_id || res.id);
   const guestCount = res.guests ?? 0;
-  const amountDisplay = res.amount != null ? `₩${res.amount.toLocaleString()}` : '-';
+  const expectedIncomeDisplay = `₩${getBookingHostPayout(res).toLocaleString()}`;
+  const hasHostUnavailableReview = isHostUnavailableReviewPending(res.cancel_reason);
+  const hostUnavailableDetail = getHostUnavailableReviewDetail(res.cancel_reason);
 
   // 🟢 결제 시간 다국어 포맷팅
   const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
@@ -213,7 +222,7 @@ export default function ReservationCard({
                 <div className="shrink-0 text-right">
                   <p className="text-[10px] font-semibold text-slate-400">{t('res_expected_income')}</p>
                   <p className="mt-1 text-[15px] font-black text-slate-900">
-                    {amountDisplay}
+                    {expectedIncomeDisplay}
                   </p>
                 </div>
               </div>
@@ -302,7 +311,7 @@ export default function ReservationCard({
 
             <div className="text-right flex-shrink-0">
               <p className="text-xs text-slate-400 font-bold mb-1">{t('res_expected_income')}</p>
-              <p className="text-xl font-black text-slate-900">{amountDisplay}</p>
+              <p className="text-xl font-black text-slate-900">{expectedIncomeDisplay}</p>
             </div>
           </div>
 
@@ -364,7 +373,20 @@ export default function ReservationCard({
       </div>
 
       {/* 호스트 취소 안내 문구 (확정된 예약) */}
-      {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && (
+      {hasHostUnavailableReview && !isCancelledBookingStatus(res.status) && (
+        <div className="mx-4 md:mx-6 mb-4 bg-orange-50 border border-orange-100 rounded-lg p-2.5 flex items-start gap-2">
+          <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={14} />
+          <div className="text-[11px] leading-snug text-orange-700">
+            <p className="font-bold text-orange-900">고객이 &apos;호스트 진행 불가&apos; 사유로 운영 검토를 요청했습니다.</p>
+            <p className="mt-0.5">운영팀 확인 후 전액 환불 취소 또는 반려로 처리됩니다.</p>
+            {hostUnavailableDetail && (
+              <p className="mt-1 text-orange-800">고객 메모: {hostUnavailableDetail}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && !hasHostUnavailableReview && (
         <div className="mx-4 md:mx-6 mb-4 bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
           <AlertTriangle className="text-slate-400 shrink-0 mt-0.5" size={14} />
           <p className="text-[11px] text-slate-500 leading-snug">

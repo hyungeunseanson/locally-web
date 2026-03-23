@@ -4,7 +4,14 @@ import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
-import { fetchGuestTrips, cancelGuestTrip, syncCompletedGuestTrips, type GuestTripsResponse } from '@/app/utils/api/trips';
+import {
+  fetchGuestTrips,
+  cancelGuestTrip,
+  syncCompletedGuestTrips,
+  type CancelGuestTripResponse,
+  type GuestTripCancelReasonCode,
+  type GuestTripsResponse,
+} from '@/app/utils/api/trips';
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 
 export function useGuestTrips() {
@@ -27,10 +34,10 @@ export function useGuestTrips() {
   const syncCompletedNeeded = data?.syncCompletedNeeded || false;
 
   // 🟢 2. React Query Mutation을 이용한 취소 로직 처리
-  const cancelMutation = useMutation<unknown, Error, { bookingId: number; reason: string }>({
+  const cancelMutation = useMutation<CancelGuestTripResponse, Error, { bookingId: number; reasonCode: GuestTripCancelReasonCode; reason?: string }>({
     mutationFn: cancelGuestTrip,
-    onSuccess: () => {
-      showToast(t('msg_cancel_success'), 'success');
+    onSuccess: (result) => {
+      showToast(result.reviewPending ? t('msg_cancel_review_pending') : t('msg_cancel_success'), 'success');
       // 취소 성공 시 캐시를 무효화하여 목록을 즉시(자동으로) 새로고침
       queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
     },
@@ -64,11 +71,14 @@ export function useGuestTrips() {
   }, [syncCompletedMutation, syncCompletedNeeded]);
 
   // 🟢 3. 기존 UI 컴포넌트와 연결되는 함수 (기존 구조 100% 유지)
-  const requestCancel = async (bookingId: number, reason: string) => {
-    if (!confirm(t('msg_cancel_confirm'))) return false;
+  const requestCancel = async (bookingId: number, reasonCode: GuestTripCancelReasonCode, reason?: string) => {
+    const confirmMessage = reasonCode === 'host_unavailable'
+      ? t('msg_cancel_review_confirm')
+      : t('msg_cancel_confirm');
+    if (!confirm(confirmMessage)) return false;
     
     try {
-      await cancelMutation.mutateAsync({ bookingId, reason });
+      await cancelMutation.mutateAsync({ bookingId, reasonCode, reason });
       return true;
     } catch {
       return false; // 에러 토스트는 onError에서 처리됨

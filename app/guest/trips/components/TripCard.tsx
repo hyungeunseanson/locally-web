@@ -9,6 +9,10 @@ import CancellationModal from './CancellationModal';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
+import { getContent } from '@/app/utils/contentHelper';
+import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
+import { isHostUnavailableReviewPending } from '@/app/utils/hostUnavailableReview';
+import type { GuestTripCancelReasonCode } from '@/app/utils/api/trips';
 
 export interface GuestTrip {
   id: number;
@@ -16,6 +20,10 @@ export interface GuestTrip {
   expId: string | number;
   hostId: string;
   title: string;
+  title_ko?: string | null;
+  title_en?: string | null;
+  title_ja?: string | null;
+  title_zh?: string | null;
   date: string;
   time: string;
   location?: string;
@@ -26,6 +34,7 @@ export interface GuestTrip {
   photos?: string[];
   isPrivate?: boolean;
   status?: string;
+  cancelReason?: string | null;
   guests?: number;
   paymentDate?: string;
   created_at?: string;
@@ -39,7 +48,7 @@ export interface GuestTrip {
 
 interface TripCardProps {
   trip: GuestTrip;
-  onRequestCancel: (id: number, reason: string, hostId: string) => Promise<boolean>;
+  onRequestCancel: (id: number, reasonCode: GuestTripCancelReasonCode, reason: string) => Promise<boolean>;
   onOpenReceipt: (trip: GuestTrip) => void;
   isProcessing: boolean;
 }
@@ -49,6 +58,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const router = useRouter();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const localizedTitle = getContent(trip, 'title', lang) || trip.title;
 
   // 🟢 [추가] 환불 예상 정보 상태
   const [refundInfo, setRefundInfo] = useState({ percent: 0, amount: 0, reason: '' });
@@ -61,6 +71,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
       'meeting_point',
       lang
     ) || trip.location || 'SEOUL';
+  const isHostUnavailablePending = isHostUnavailableReviewPending(trip.cancelReason);
 
   const openExternalLink = (url: string) => {
     window.location.href = url;
@@ -68,7 +79,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 
   const shareTrip = async () => {
     const tripUrl = `${window.location.origin}/experiences/${trip.expId}`;
-    const shareText = `[Locally] ${trip.title}\n${trip.date} ${trip.time}\n${tripUrl}`;
+    const shareText = `[Locally] ${localizedTitle}\n${trip.date} ${trip.time}\n${tripUrl}`;
 
     try {
       if (navigator.share) {
@@ -112,40 +123,23 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
     });
   };
 
-  // 🟢 [환불 계산기] 프론트엔드용 (API 로직과 동일하게 유지)
-  // TripCard.tsx 내부 calculateRefundFront 함수 교체
-
   const calculateRefundFront = () => {
-    const now = new Date();
-    // 날짜 형식이 안맞을 경우를 대비한 방어 코드
     const dateString = trip.date || new Date().toISOString().split('T')[0];
     const timeString = trip.time || '00:00';
-    const tourDate = new Date(`${dateString}T${timeString}:00`);
-
-    // paymentDate가 없으면 created_at 사용
     const payDateString = trip.paymentDate || trip.created_at || new Date().toISOString();
-    const paymentDate = new Date(payDateString);
-
-    const diffTime = tourDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const hoursSincePayment = (now.getTime() - paymentDate.getTime()) / (1000 * 60 * 60);
-
-    // 🟢 [핵심 수정] 금액 변수명 전부 체크 (문자열일 경우 숫자로 변환)
     const rawPrice = trip.amount || trip.totalPrice || trip.total_price || trip.price || 0;
     const totalAmount = Number(rawPrice);
+    const { rate, reason } = calculateGuestCancellationRefundRate({
+      tourDate: dateString,
+      tourTime: timeString,
+      paymentDate: payDateString,
+    });
 
-    // 1. 결제 후 24시간 이내 철회 (단, 투어일 2일 전까지만 - 규정 재확인)
-    if (hoursSincePayment <= 24 && diffDays > 1) {
-      return { percent: 100, amount: totalAmount, reason: '결제 후 24시간 이내 철회 (전액 환불)' };
-    }
-
-    // 2. 날짜별 규정
-    if (diffDays <= 0) return { percent: 0, amount: 0, reason: '투어 당일/경과 (환불 불가)' };
-    if (diffDays === 1) return { percent: 40, amount: Math.floor(totalAmount * 0.4), reason: '1일 전 취소 (40% 환불)' };
-    if (diffDays >= 2 && diffDays <= 7) return { percent: 70, amount: Math.floor(totalAmount * 0.7), reason: '2~7일 전 취소 (70% 환불)' };
-    if (diffDays >= 8 && diffDays <= 19) return { percent: 80, amount: Math.floor(totalAmount * 0.8), reason: '8~19일 전 취소 (80% 환불)' };
-
-    return { percent: 100, amount: totalAmount, reason: '20일 전 취소 (전액 환불)' };
+    return {
+      percent: rate,
+      amount: Math.floor(totalAmount * (rate / 100)),
+      reason,
+    };
   };
 
   // 취소 버튼 클릭 시 계산 수행
@@ -159,6 +153,10 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   // 상태 뱃지 로직
   const getStatusInfo = () => {
     const normalizedStatus = (trip.status || '').toLowerCase();
+
+    if (isHostUnavailablePending) {
+      return { label: t('trip_status_review_pending'), color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12} /> };
+    }
 
     // 🟢 [추가] 입금 대기 상태
     if (normalizedStatus === 'pending') {
@@ -183,9 +181,9 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const { label, color, icon } = getStatusInfo();
 
   const addToCalendar = () => {
-    const text = encodeURIComponent(`[Locally] ${trip.title}`);
+    const text = encodeURIComponent(`[Locally] ${localizedTitle}`);
     const safeLocation = trip.location || '';
-    const details = encodeURIComponent(`예약번호: ${trip.orderId}\n장소: ${safeLocation}`);
+    const details = encodeURIComponent(`예약번호: ${trip.orderId}\n프로그램: ${localizedTitle}\n장소: ${safeLocation}`);
     const location = encodeURIComponent(safeLocation);
     const dateStr = trip.date.replace(/-/g, "");
     const dates = `${dateStr}/${dateStr}`;
@@ -203,7 +201,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
             {photos.length > 0 ? (
               <Image
                 src={photos[currentPhotoIndex]}
-                alt={trip.title}
+                alt={localizedTitle}
                 fill
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -264,7 +262,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                       <button onClick={shareTrip} className="hidden md:flex w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium items-center gap-2"><Share2 className="w-3.5 h-3.5" />{t('trip_share')}</button>
                       <div className="h-px bg-slate-100 my-1"></div>
 
-                      {!isCancelledBookingStatus(trip.status || '') ? (
+                      {!isCancelledBookingStatus(trip.status || '') && !isHostUnavailablePending ? (
                         <button
                           onClick={handleCancelClick} // 🟢 클릭 시 환불 계산 후 모달 오픈
                           className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-red-50 text-red-500 font-medium"
@@ -273,7 +271,11 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                         </button>
                       ) : (
                         <button disabled className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed">
-                          {(trip.status || '').toLowerCase() === 'cancellation_requested' ? t('status_cancel_requesting') : t('trip_status_cancelled')}
+                          {isHostUnavailablePending
+                            ? t('trip_status_review_pending')
+                            : (trip.status || '').toLowerCase() === 'cancellation_requested'
+                              ? t('status_cancel_requesting')
+                              : t('trip_status_cancelled')}
                         </button>
                       )}
                     </div>
@@ -283,7 +285,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
             </div>
 
             <Link href={`/experiences/${trip.expId}`} className="block group-hover:text-rose-500 transition-colors mt-1.5 md:mt-2">
-              <h3 className="text-[15px] md:text-xl font-bold text-slate-900 mb-1.5 md:mb-2 leading-tight line-clamp-2">{trip.title}</h3>
+              <h3 className="text-[15px] md:text-xl font-bold text-slate-900 mb-1.5 md:mb-2 leading-tight line-clamp-2">{localizedTitle}</h3>
             </Link>
 
             <div className="flex flex-wrap gap-2 md:gap-3 text-[12px] md:text-sm text-slate-600 mt-1.5 md:mt-2">
@@ -305,7 +307,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 const messageParams = new URLSearchParams({
                   hostId: String(trip.hostId),
                   expId: String(trip.expId),
-                  expTitle: trip.title,
+                  expTitle: localizedTitle,
                 });
 
                 if (trip.hostName) {
@@ -338,13 +340,15 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
       </div>
 
       <CancellationModal
+        key={`${trip.id}-${showCancelModal ? 'open' : 'closed'}`}
         isOpen={showCancelModal}
         onClose={() => setShowCancelModal(false)}
         isProcessing={isProcessing}
         // 🟢 [추가] 환불 정보 전달
         refundInfo={refundInfo}
-        onConfirm={async (reason) => {
-          const success = await onRequestCancel(trip.id, reason, trip.hostId);
+        fullRefundAmount={Number(trip.amount || trip.totalPrice || trip.total_price || trip.price || 0)}
+        onConfirm={async ({ reasonCode, reason }) => {
+          const success = await onRequestCancel(trip.id, reasonCode, reason);
           if (success) setShowCancelModal(false);
         }}
       />

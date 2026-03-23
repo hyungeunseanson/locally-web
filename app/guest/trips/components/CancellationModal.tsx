@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, Info } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
+import type { GuestTripCancelReasonCode } from '@/app/utils/api/trips';
 
 interface RefundInfo {
   percent: number;
@@ -13,16 +14,29 @@ interface RefundInfo {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (reason: string) => void;
+  onConfirm: (payload: { reasonCode: GuestTripCancelReasonCode; reason: string }) => void;
   isProcessing: boolean;
   refundInfo: RefundInfo; // 🟢 추가됨
+  fullRefundAmount: number;
 }
 
-export default function CancellationModal({ isOpen, onClose, onConfirm, isProcessing, refundInfo }: Props) {
+export default function CancellationModal({ isOpen, onClose, onConfirm, isProcessing, refundInfo, fullRefundAmount }: Props) {
   const { t } = useLanguage();
+  const [reasonCode, setReasonCode] = useState<GuestTripCancelReasonCode>('personal_change');
   const [reason, setReason] = useState('');
 
   if (!isOpen) return null;
+
+  const isHostUnavailable = reasonCode === 'host_unavailable';
+  const isOtherReason = reasonCode === 'other';
+  const resolvedRefundInfo = isHostUnavailable
+    ? {
+      percent: 100,
+      amount: fullRefundAmount,
+      reason: t('modal_cancel_host_unavailable_refund'),
+    }
+    : refundInfo;
+  const reasonRequired = isOtherReason;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4">
@@ -40,16 +54,16 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
         <div className="p-4 md:p-6 space-y-5 md:space-y-6">
           
           {/* 🟢 [핵심] 예상 환불 금액 카드 */}
-          <div className={`border rounded-lg md:rounded-xl p-4 md:p-5 text-center ${refundInfo.amount > 0 ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'}`}>
+          <div className={`border rounded-lg md:rounded-xl p-4 md:p-5 text-center ${resolvedRefundInfo.amount > 0 ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'}`}>
             <div className="text-[11px] md:text-xs font-bold text-slate-500 uppercase mb-1">{t('modal_cancel_expected_refund')}</div>
-            <div className={`text-[26px] md:text-3xl font-black mb-2 ${refundInfo.amount > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
-              ₩{refundInfo.amount.toLocaleString()}
+            <div className={`text-[26px] md:text-3xl font-black mb-2 ${resolvedRefundInfo.amount > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
+              ₩{resolvedRefundInfo.amount.toLocaleString()}
             </div>
             <div className="inline-block px-2.5 md:px-3 py-1 bg-white rounded-full text-[11px] md:text-xs font-bold shadow-sm border border-slate-100">
-              {t('modal_cancel_refund_rate')} <span className={refundInfo.percent === 100 ? 'text-green-600' : 'text-red-500'}>{refundInfo.percent}%</span>
+              {t('modal_cancel_refund_rate')} <span className={resolvedRefundInfo.percent === 100 ? 'text-green-600' : 'text-red-500'}>{resolvedRefundInfo.percent}%</span>
             </div>
             <p className="text-[10px] md:text-[11px] text-slate-500 mt-2.5 md:mt-3 flex items-center justify-center gap-1">
-              <Info className="w-[11px] h-[11px] md:w-3 md:h-3"/> {refundInfo.reason}
+              <Info className="w-[11px] h-[11px] md:w-3 md:h-3"/> {resolvedRefundInfo.reason}
             </p>
           </div>
 
@@ -62,9 +76,30 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
              <p>{t('modal_cancel_policy_4')}</p>
           </div>
 
+          <div className="space-y-1.5 md:space-y-2">
+            <label className="text-[13px] md:text-sm font-bold text-slate-700">{t('modal_cancel_reason_type_label')}</label>
+            <select
+              className="w-full border border-slate-300 rounded-lg md:rounded-xl p-2.5 md:p-3 text-[13px] md:text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all bg-white"
+              value={reasonCode}
+              onChange={(e) => setReasonCode(e.target.value as GuestTripCancelReasonCode)}
+            >
+              <option value="personal_change">{t('modal_cancel_reason_option_personal_change')}</option>
+              <option value="schedule_issue">{t('modal_cancel_reason_option_schedule_issue')}</option>
+              <option value="host_unavailable">{t('modal_cancel_reason_option_host_unavailable')}</option>
+              <option value="other">{t('modal_cancel_reason_option_other')}</option>
+            </select>
+            {isHostUnavailable && (
+              <p className="text-[11px] text-orange-600 leading-5">
+                {t('modal_cancel_host_unavailable_hint')}
+              </p>
+            )}
+          </div>
+
           {/* 취소 사유 입력 */}
           <div className="space-y-1.5 md:space-y-2">
-            <label className="text-[13px] md:text-sm font-bold text-slate-700">{t('modal_cancel_reason_label')}</label>
+            <label className="text-[13px] md:text-sm font-bold text-slate-700">
+              {t('modal_cancel_reason_detail_label')} {reasonRequired ? '' : <span className="text-slate-400 font-medium">({t('modal_cancel_reason_detail_optional')})</span>}
+            </label>
             <textarea 
               className="w-full border border-slate-300 rounded-lg md:rounded-xl p-2.5 md:p-3 text-[13px] md:text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all resize-none"
               rows={3}
@@ -84,9 +119,9 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
             {t('button_close')}
           </button>
           <button 
-            onClick={() => onConfirm(reason)}
-            disabled={!reason.trim() || isProcessing}
-            className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm text-white transition-all ${!reason.trim() ? 'bg-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-200'}`}
+            onClick={() => onConfirm({ reasonCode, reason: reason.trim() })}
+            disabled={(reasonRequired && !reason.trim()) || isProcessing}
+            className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl font-bold text-[13px] md:text-sm text-white transition-all ${(reasonRequired && !reason.trim()) ? 'bg-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-200'}`}
           >
             {isProcessing ? t('status_processing') : t('button_confirm_cancel')}
           </button>

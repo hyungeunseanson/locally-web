@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.39 — [Booking Cancellation] 호스트 진행 불가 검토 요청 분기
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 고객 취소 사유 구조화 | `app/guest/trips/components/CancellationModal.tsx`, `app/guest/trips/components/TripCard.tsx`, `app/guest/trips/hooks/useGuestTrips.ts`, `app/utils/api/trips.ts`, `app/context/LanguageContext.tsx` — 게스트 취소 모달에 `개인 사정 / 일정 변경 / 호스트 진행 불가 / 기타` reason code를 추가하고, `호스트 진행 불가` 선택 시 예상 환불을 전액 기준으로 안내하면서 운영 검토 요청 confirm으로 분기 |
+| 🔴 host_unavailable review marker 추가 | `app/utils/hostUnavailableReview.ts`, `app/api/payment/cancel/route.ts`, `app/api/guest/trips/route.ts` — `호스트 진행 불가` 사유는 즉시 취소하지 않고 `bookings.cancel_reason`에 review marker를 저장해 guest trip/host dashboard에서 `운영 검토 중` 상태로 읽도록 변경 |
+| 🔴 호스트 직접 취소 차단 유지 | `app/api/payment/cancel/route.ts`, `tests/e2e/75-experience-cancel-error-safe.spec.ts` — 호스트가 legacy `isHostCancel` payload로 직접 취소/환불을 실행하지 못하도록 서버에서 403으로 차단하고, 운영팀 검토 요청 구조를 기본 경로로 고정 |
+| 🟠 운영 승인/반려 경로 보강 | `app/admin/dashboard/components/MasterLedgerTab.tsx`, `app/api/admin/bookings/force-cancel/route.ts`, `app/api/admin/bookings/reject-host-unavailable/route.ts` — Master Ledger 상세에서 host-unavailable review를 감지해 `전액 환불 취소` 또는 `검토 반려`를 수행하도록 추가하고, 승인 시 기존 admin force-cancel 100% 환불 경로를 재사용 |
+| 🟡 알림 정책 정렬 | `docs/email_notification_policy.md` — host-unavailable review request는 고객/호스트 인앱 + 관리자 alert만 보내고, 실제 이메일은 운영 승인 후 취소 완료 시점에만 발송하도록 정책을 문서화 |
+
 ## v3.39.38 — [Phone Reservation] 관리자 알림 · 전용 결제 액션 · 결제 게이트
 
 | 항목 | 내용 |

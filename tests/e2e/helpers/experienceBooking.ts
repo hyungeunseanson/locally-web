@@ -24,6 +24,9 @@ export type BookableExperience = {
   date: string;
   time: string;
   maxGuests: number;
+  price: number;
+  privatePrice: number;
+  isPrivateEnabled: boolean;
 };
 
 type PrepareBookableExperienceOptions = {
@@ -31,6 +34,9 @@ type PrepareBookableExperienceOptions = {
   time?: string;
   daysFromNowStart?: number;
   daysFromNowEnd?: number;
+  requirePrivateEnabled?: boolean;
+  minimumMaxGuests?: number;
+  searchAnyHost?: boolean;
 };
 
 type InsertTestBookingInput = {
@@ -179,6 +185,12 @@ export async function cleanupBookings(bookingIds: string[]) {
 }
 
 export async function login(page: Page, user: TestUser) {
+  await page.context().clearCookies();
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
 
   await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
@@ -224,21 +236,55 @@ export async function selectReservationTime(page: Page, time: string) {
 }
 
 export async function getLatestHostExperience(hostUserId = HOST_USER_ID) {
+  return getLatestHostExperienceWithOptions({ hostUserId });
+}
+
+export async function getLatestHostExperienceWithOptions({
+  hostUserId = HOST_USER_ID,
+  requirePrivateEnabled = false,
+  minimumMaxGuests = 1,
+  searchAnyHost = false,
+}: {
+  hostUserId?: string;
+  requirePrivateEnabled?: boolean;
+  minimumMaxGuests?: number;
+  searchAnyHost?: boolean;
+}) {
   const supabase = getAdminClient();
-  const { data: experience, error } = await supabase
+  let query = supabase
     .from('experiences')
-    .select('id, title, status, host_id, max_guests')
-    .eq('host_id', hostUserId)
+    .select('id, title, status, host_id, max_guests, price, private_price, is_private_enabled')
+    .gte('max_guests', minimumMaxGuests);
+
+  if (!searchAnyHost) {
+    query = query.eq('host_id', hostUserId);
+  } else {
+    query = query.in('status', ['approved', 'active']);
+  }
+
+  if (requirePrivateEnabled) {
+    query = query.eq('is_private_enabled', true).gt('private_price', 0);
+  }
+
+  const { data: experience, error } = await query
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) throw error;
   if (!experience) {
-    throw new Error('No host experience found for the approved test host.');
+    throw new Error(
+      requirePrivateEnabled
+        ? searchAnyHost
+          ? 'No private-enabled public experience found for the test suite.'
+          : 'No private-enabled host experience found for the approved test host.'
+        : searchAnyHost
+          ? 'No public experience found for the test suite.'
+          : 'No host experience found for the approved test host.'
+    );
   }
 
-  if (experience.status !== 'approved' && experience.status !== 'active') {
+  if (!searchAnyHost && experience.status !== 'approved' && experience.status !== 'active') {
     const { error: updateError } = await supabase
       .from('experiences')
       .update({ status: 'approved' })
@@ -251,6 +297,9 @@ export async function getLatestHostExperience(hostUserId = HOST_USER_ID) {
     experienceId: Number(experience.id),
     title: String(experience.title || 'Locally 체험'),
     maxGuests: Number(experience.max_guests || 10),
+    price: Number(experience.price || 0),
+    privatePrice: Number(experience.private_price || 0),
+    isPrivateEnabled: Boolean(experience.is_private_enabled),
   };
 }
 
@@ -319,8 +368,21 @@ export async function prepareBookableExperience(
   createdAvailabilityKeys: AvailabilityKey[],
   options: PrepareBookableExperienceOptions = {}
 ): Promise<BookableExperience> {
-  const { hostUserId = HOST_USER_ID, time = '10:00', daysFromNowStart = 14, daysFromNowEnd = 45 } = options;
-  const experience = await getLatestHostExperience(hostUserId);
+  const {
+    hostUserId = HOST_USER_ID,
+    time = '10:00',
+    daysFromNowStart = 14,
+    daysFromNowEnd = 45,
+    requirePrivateEnabled = false,
+    minimumMaxGuests = 1,
+    searchAnyHost = false,
+  } = options;
+  const experience = await getLatestHostExperienceWithOptions({
+    hostUserId,
+    requirePrivateEnabled,
+    minimumMaxGuests,
+    searchAnyHost,
+  });
   const date = await findEmptyFutureDate(experience.experienceId, time, daysFromNowStart, daysFromNowEnd);
 
   await ensureAvailabilitySlot(
@@ -338,6 +400,9 @@ export async function prepareBookableExperience(
     date,
     time,
     maxGuests: experience.maxGuests,
+    price: experience.price,
+    privatePrice: experience.privatePrice,
+    isPrivateEnabled: experience.isPrivateEnabled,
   };
 }
 

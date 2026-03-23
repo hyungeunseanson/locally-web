@@ -1,7 +1,6 @@
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient } from '@/app/utils/supabase/server';
 import { NextResponse } from 'next/server';
-import { toZonedTime } from 'date-fns-tz';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/app/utils/bookingFinance';
@@ -10,28 +9,18 @@ import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
 import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
+import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
+import {
+  formatHostUnavailableReviewMarker,
+  isHostUnavailableReviewPending,
+} from '@/app/utils/hostUnavailableReview';
 
-const TIMEZONE = 'Asia/Seoul';
-
-// 환불률 계산기 (Timezone Fixed)
-function calculateRefundRate(tourDateStr: string, tourTimeStr: string, paymentDateStr: string) {
-  const now = toZonedTime(new Date(), TIMEZONE);
-  // Better: Parse tourDate as KST if it's stored as local string
-  const tourDateKST = toZonedTime(new Date(`${tourDateStr}T${tourTimeStr}:00`), TIMEZONE);
-  const paymentDate = new Date(paymentDateStr); // UTC usually from DB
-  const paymentDateKST = toZonedTime(paymentDate, TIMEZONE);
-
-  const diffTime = tourDateKST.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  const hoursSincePayment = (now.getTime() - paymentDateKST.getTime()) / (1000 * 60 * 60);
-
-  if (hoursSincePayment <= 24 && diffDays > 1) return { rate: 100, reason: '24시간 이내 철회' };
-  if (diffDays <= 0) return { rate: 0, reason: '당일/지난 일정' };
-  if (diffDays === 1) return { rate: 40, reason: '1일 전 취소' };
-  if (diffDays >= 2 && diffDays <= 7) return { rate: 70, reason: '2~7일 전 취소' };
-  if (diffDays >= 8 && diffDays <= 19) return { rate: 80, reason: '8~19일 전 취소' };
-  return { rate: 100, reason: '20일 전 취소' };
-}
+const GUEST_CANCELLATION_REASON_LABELS = {
+  personal_change: '개인 사정',
+  schedule_issue: '일정 변경',
+  host_unavailable: '호스트 진행 불가',
+  other: '기타',
+} as const;
 
 export async function POST(request: Request) {
   let bookingId: string | number | null = null;
@@ -44,7 +33,13 @@ export async function POST(request: Request) {
     bookingId = typeof body?.bookingId === 'string' || typeof body?.bookingId === 'number'
       ? body.bookingId
       : null;
-    const { reason: userReason, isHostCancel } = body;
+    const { reason: rawUserReason, isHostCancel } = body;
+    const reasonCode = typeof body?.reasonCode === 'string'
+      ? body.reasonCode
+      : null;
+    const userReason = typeof rawUserReason === 'string'
+      ? rawUserReason.trim()
+      : '';
 
     // [C-3] Auth Check
     const supabaseAuth = await createClient();
@@ -81,9 +76,91 @@ export async function POST(request: Request) {
     // [CRITICAL Fix] 모든 terminal 상태(cancelled/declined/cancellation_requested) 차단 — 기존 isCancelledOnlyBookingStatus('cancelled' 단독)는 declined/cancellation_requested를 통과시킴
     if (isCancelledBookingStatus(booking.status)) return NextResponse.json({ error: '이미 취소됨' }, { status: 400 });
 
-    // [HIGH Fix] isHostCancel 권한 검증을 lock 획득 전에 수행 — 기존 위치(lock 후)는 403 반환 시 booking이 'cancellation_requested'에 영구 잠김
-    if (isHostCancel && !isAdmin && booking.experiences?.host_id !== user.id) {
-      return NextResponse.json({ error: 'Only host can perform host cancellation' }, { status: 403 });
+    // 호스트 직접 취소는 더 이상 허용하지 않는다.
+    // 운영팀이 검토 후 관리자 취소 경로를 사용해야 하므로 guest reason review flow로 유도한다.
+    if (isHostCancel && !isAdmin) {
+      return NextResponse.json({ error: '호스트 직접 취소는 지원하지 않습니다. 운영팀 검토 요청 경로를 이용해주세요.' }, { status: 403 });
+    }
+
+    if (!isHostCancel && isHostUnavailableReviewPending(booking.cancel_reason)) {
+      return NextResponse.json({ error: '이미 운영팀 검토가 진행 중입니다.' }, { status: 409 });
+    }
+
+    if (!isHostCancel && reasonCode === 'host_unavailable') {
+      const [year, month, day] = String(booking.date || '').split('-').map(Number);
+      const bookingDate = new Date(year, (month || 1) - 1, day || 1);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (bookingDate <= today) {
+        return NextResponse.json({ error: '미래 예약에 대해서만 운영 검토를 요청할 수 있습니다.' }, { status: 409 });
+      }
+
+      const reviewMarker = formatHostUnavailableReviewMarker(userReason);
+      const { data: reviewUpdatedRow, error: reviewUpdateError } = await supabaseAdmin
+        .from('bookings')
+        .update({ cancel_reason: reviewMarker })
+        .eq('id', bookingId)
+        .is('cancel_reason', null)
+        .select('id')
+        .maybeSingle();
+
+      if (reviewUpdateError) {
+        throw new Error(`host unavailable review update failed: ${reviewUpdateError.message}`);
+      }
+      if (!reviewUpdatedRow) {
+        return NextResponse.json({ error: '이미 운영팀 검토가 진행 중입니다.' }, { status: 409 });
+      }
+
+      const expTitle = booking.experiences?.title || 'Locally 체험';
+      const hostId = booking.experiences?.host_id || null;
+
+      try {
+        const notifications = [];
+
+        if (booking.user_id) {
+          notifications.push({
+            user_id: booking.user_id,
+            type: 'cancellation',
+            title: '취소 요청이 접수되었습니다.',
+            message: `'${expTitle}' 예약이 운영팀 검토 대기 상태로 접수되었습니다.`,
+            link: '/guest/trips',
+            is_read: false,
+          });
+        }
+
+        if (hostId) {
+          notifications.push({
+            user_id: hostId,
+            type: 'cancellation',
+            title: '호스트 진행 불가 취소 검토 요청',
+            message: `'${expTitle}' 예약에 대해 고객이 운영팀 검토를 요청했습니다.`,
+            link: '/host/dashboard',
+            is_read: false,
+          });
+        }
+
+        if (notifications.length > 0) {
+          const { error: notificationError } = await supabaseAdmin.from('notifications').insert(notifications);
+          if (notificationError) {
+            console.error('Host unavailable review notification insert error:', notificationError);
+          }
+        }
+      } catch (notificationError) {
+        console.error('Host unavailable review notification side effect error:', notificationError);
+      }
+
+      await insertAdminAlerts({
+        title: '호스트 진행 불가 취소 검토 요청',
+        message: `[${String(booking.order_id || booking.id).slice(0, 8)}] ${expTitle} 예약에 고객이 호스트 진행 불가 사유로 취소 검토를 요청했습니다.`,
+        link: '/admin/dashboard?tab=LEDGER',
+      });
+
+      return NextResponse.json({
+        success: true,
+        reviewPending: true,
+        message: '운영팀 검토 요청이 접수되었습니다.',
+      });
     }
 
     // [Race Guard] Atomic lock: PG 환불 전에 DB 상태를 먼저 점유 — 동시 요청 이중 환불 방지
@@ -104,12 +181,20 @@ export async function POST(request: Request) {
     // 2. 환불액 및 정산액 계산
     let refundRate = 0;
     let reasonText = '';
+    const fallbackGuestReason = reasonCode && reasonCode in GUEST_CANCELLATION_REASON_LABELS
+      ? GUEST_CANCELLATION_REASON_LABELS[reasonCode as keyof typeof GUEST_CANCELLATION_REASON_LABELS]
+      : '사용자 요청';
+    const normalizedUserReason = userReason || fallbackGuestReason;
 
     if (isHostCancel) {
       refundRate = 100;
       reasonText = '호스트 사유 취소';
     } else {
-      const calc = calculateRefundRate(booking.date, booking.time || '00:00', booking.created_at);
+      const calc = calculateGuestCancellationRefundRate({
+        tourDate: booking.date,
+        tourTime: booking.time || '00:00',
+        paymentDate: booking.created_at,
+      });
       refundRate = calc.rate;
       reasonText = calc.reason;
     }
@@ -129,7 +214,7 @@ export async function POST(request: Request) {
           providerTransactionId: booking.tid,
           orderId: booking.order_id,
           cancelAmount: refundAmount,
-          cancelReason: userReason || reasonText,
+          cancelReason: normalizedUserReason || reasonText,
           totalAmount,
           acceptedResultCodes: ['2001', '2211'],
         });
@@ -139,7 +224,7 @@ export async function POST(request: Request) {
     // 4. DB 업데이트 (lock 상태에서만 진행 보장)
     const { error: updateError } = await supabaseAdmin.from('bookings').update({
       status: 'cancelled',
-      cancel_reason: `${userReason} (${reasonText})`,
+      cancel_reason: `${normalizedUserReason} (${reasonText})`,
       refund_amount: refundAmount,
       host_payout_amount: hostPayout,
       platform_revenue: platformRevenue
@@ -203,7 +288,7 @@ export async function POST(request: Request) {
           recipientUserId: hostId,
           subject: '[Locally] 예약 취소 안내 (호스트)',
           title: '예약이 취소되었습니다',
-          message: `[${expTitle}] 예약이 취소되었습니다. 취소 사유: ${userReason || '미제공'}. 환불액: ₩${refundAmount.toLocaleString()}`,
+          message: `[${expTitle}] 예약이 취소되었습니다. 취소 사유: ${normalizedUserReason || '미제공'}. 환불액: ₩${refundAmount.toLocaleString()}`,
           link: '/host/dashboard',
           ctaLabel: '대시보드 보기',
         }).catch(e => console.error('Host booking cancellation email failed:', e));

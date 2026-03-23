@@ -171,7 +171,7 @@ test.describe.serial('Experience cancel error-safe flow', () => {
     expect(booking?.status).toBe('PENDING');
   });
 
-  test('allows the host to cancel their own experience booking', async ({ page }) => {
+  test('rejects direct host cancellation and keeps the booking unchanged', async ({ page }) => {
     const host = createTestUser('exp.cancel.host-owner');
     const guest = createTestUser('exp.cancel.host-guest');
     const hostId = await createAuthUser(host, createdAuthUserIds);
@@ -196,9 +196,9 @@ test.describe.serial('Experience cancel error-safe flow', () => {
       },
     });
 
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
-      success: true,
+      error: expect.any(String),
     });
 
     const { data: booking, error } = await getAdminClient()
@@ -208,7 +208,7 @@ test.describe.serial('Experience cancel error-safe flow', () => {
       .maybeSingle();
 
     if (error) throw error;
-    expect(booking?.status).toBe('cancelled');
+    expect(booking?.status).toBe('PENDING');
   });
 
   test('allows admins to cancel another guest booking', async ({ page }) => {
@@ -251,6 +251,154 @@ test.describe.serial('Experience cancel error-safe flow', () => {
 
     if (error) throw error;
     expect(booking?.status).toBe('cancelled');
+  });
+
+  test('routes host-unavailable guest cancellation into admin review without cancelling immediately', async ({ page }) => {
+    const host = createTestUser('exp.cancel.review-host');
+    const guest = createTestUser('exp.cancel.review-guest');
+    const hostId = await createAuthUser(host, createdAuthUserIds);
+    const guestId = await createAuthUser(guest, createdAuthUserIds);
+
+    const experienceId = await createHostOwnedExperience(hostId, host);
+    const bookingId = await createBookingForExperience({
+      guestId,
+      guest,
+      experienceId,
+      status: 'confirmed',
+      paymentMethod: 'bank',
+    });
+
+    await login(page, guest);
+
+    const response = await page.request.post('/api/payment/cancel', {
+      data: {
+        bookingId,
+        reasonCode: 'host_unavailable',
+        reason: '호스트가 진행 불가하다고 안내함',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      reviewPending: true,
+    });
+
+    const { data: booking, error } = await getAdminClient()
+      .from('bookings')
+      .select('status, cancel_reason, refund_amount')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(booking?.status).toBe('confirmed');
+    expect(booking?.cancel_reason).toContain('[HOST_UNAVAILABLE_REVIEW_PENDING]');
+    expect([null, 0]).toContain(booking?.refund_amount ?? null);
+  });
+
+  test('allows admins to approve a host-unavailable review with full cancel flow', async ({ page }) => {
+    const host = createTestUser('exp.cancel.review-approve-host');
+    const guest = createTestUser('exp.cancel.review-approve-guest');
+    const admin = createTestUser('exp.cancel.review-approve-admin');
+    const hostId = await createAuthUser(host, createdAuthUserIds);
+    const guestId = await createAuthUser(guest, createdAuthUserIds);
+    const adminId = await createAuthUser(admin, createdAuthUserIds);
+    await makeUserAdmin(adminId, admin.email);
+
+    const experienceId = await createHostOwnedExperience(hostId, host);
+    const bookingId = await createBookingForExperience({
+      guestId,
+      guest,
+      experienceId,
+      status: 'confirmed',
+      paymentMethod: 'bank',
+      amount: 30000,
+    });
+
+    await login(page, guest);
+    const reviewResponse = await page.request.post('/api/payment/cancel', {
+      data: {
+        bookingId,
+        reasonCode: 'host_unavailable',
+        reason: '호스트 진행 불가',
+      },
+    });
+    expect(reviewResponse.status()).toBe(200);
+
+    await login(page, admin);
+    const response = await page.request.post('/api/admin/bookings/force-cancel', {
+      data: {
+        bookingId,
+        source: 'host_fault_request',
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const { data: booking, error } = await getAdminClient()
+      .from('bookings')
+      .select('status, cancel_reason, refund_amount')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(booking?.status).toBe('cancelled');
+    expect(booking?.cancel_reason).toContain('호스트 진행 불가 확인 취소');
+    expect(booking?.refund_amount).toBeGreaterThan(0);
+  });
+
+  test('allows admins to reject a host-unavailable review request and keep the booking', async ({ page }) => {
+    const host = createTestUser('exp.cancel.review-reject-host');
+    const guest = createTestUser('exp.cancel.review-reject-guest');
+    const admin = createTestUser('exp.cancel.review-reject-admin');
+    const hostId = await createAuthUser(host, createdAuthUserIds);
+    const guestId = await createAuthUser(guest, createdAuthUserIds);
+    const adminId = await createAuthUser(admin, createdAuthUserIds);
+    await makeUserAdmin(adminId, admin.email);
+
+    const experienceId = await createHostOwnedExperience(hostId, host);
+    const bookingId = await createBookingForExperience({
+      guestId,
+      guest,
+      experienceId,
+      status: 'confirmed',
+      paymentMethod: 'bank',
+    });
+
+    await login(page, guest);
+    const reviewResponse = await page.request.post('/api/payment/cancel', {
+      data: {
+        bookingId,
+        reasonCode: 'host_unavailable',
+        reason: '호스트 진행 불가',
+      },
+    });
+    expect(reviewResponse.status()).toBe(200);
+
+    await login(page, admin);
+    const response = await page.request.post('/api/admin/bookings/reject-host-unavailable', {
+      data: {
+        bookingId,
+      },
+    });
+
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+    });
+
+    const { data: booking, error } = await getAdminClient()
+      .from('bookings')
+      .select('status, cancel_reason')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (error) throw error;
+    expect(booking?.status).toBe('confirmed');
+    expect(booking?.cancel_reason).toBeNull();
   });
 
   test('keeps a paid card booking unchanged when PG cancellation cannot start', async ({ page }) => {

@@ -40,6 +40,10 @@ import {
 } from '@/app/utils/bookingFinance';
 import { markBookingViewed } from '@/app/utils/adminViewedBookings';
 import { AdminMasterLedgerEntry } from '@/app/types/admin';
+import {
+  getHostUnavailableReviewDetail,
+  isHostUnavailableReviewPending,
+} from '@/app/utils/hostUnavailableReview';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
 const DateRange = dynamic(() => import('react-date-range').then(mod => mod.DateRange), { ssr: false });
@@ -101,7 +105,7 @@ const STATUS_TABS = [
 
 type ConfirmDialogState =
   | {
-      kind: 'confirm-payment' | 'force-cancel';
+      kind: 'confirm-payment' | 'force-cancel' | 'approve-host-unavailable' | 'reject-host-unavailable';
       bookingId: string;
       title: string;
       description: string;
@@ -324,6 +328,20 @@ export default function MasterLedgerTab({
       return;
     }
 
+    if (confirmDialog.kind === 'approve-host-unavailable') {
+      await performForceCancel(confirmDialog.bookingId, {
+        source: 'host_fault_request',
+        reason: '호스트 진행 불가 확인 취소',
+        successMessage: '호스트 진행 불가 전액 환불 취소가 처리되었습니다.',
+      });
+      return;
+    }
+
+    if (confirmDialog.kind === 'reject-host-unavailable') {
+      await performRejectHostUnavailable(confirmDialog.bookingId);
+      return;
+    }
+
     await performForceCancel(confirmDialog.bookingId);
   };
 
@@ -372,23 +390,55 @@ export default function MasterLedgerTab({
     await performConfirmPayment(bookingId);
   };
 
-  const performForceCancel = async (bookingId: string) => {
+  const performForceCancel = async (
+    bookingId: string,
+    options?: {
+      source?: 'admin_force' | 'host_fault_request';
+      reason?: string;
+      successMessage?: string;
+    }
+  ) => {
     setIsProcessing(true);
     try {
       const res = await fetch('/api/admin/bookings/force-cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, reason: '관리자 직권 취소' }),
+        body: JSON.stringify({
+          bookingId,
+          reason: options?.reason || '관리자 직권 취소',
+          source: options?.source || 'admin_force',
+        }),
       });
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || '취소 실패');
-      showToast('취소 처리되었습니다.', 'success');
+      showToast(options?.successMessage || '취소 처리되었습니다.', 'success');
       await refreshAfterMutation();
       setSelectedBooking(null);
       setConfirmDialog(null);
     } catch (error: unknown) {
       showToast(getErrorMessage(error, '취소 실패'), 'error');
     } finally { setIsProcessing(false); }
+  };
+
+  const performRejectHostUnavailable = async (bookingId: string) => {
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/admin/bookings/reject-host-unavailable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || '반려 실패');
+      showToast('호스트 진행 불가 검토 요청을 반려했습니다.', 'success');
+      await refreshAfterMutation();
+      setSelectedBooking(null);
+      setConfirmDialog(null);
+    } catch (error: unknown) {
+      showToast(getErrorMessage(error, '반려 실패'), 'error');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleForceCancel = async (bookingId: string) => {
@@ -408,6 +458,48 @@ export default function MasterLedgerTab({
 
     if (!confirm('⚠️ 정말로 강제 취소(전액 환불)하시겠습니까?')) return;
     await performForceCancel(bookingId);
+  };
+
+  const handleApproveHostUnavailable = async (bookingId: string) => {
+    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+
+    if (isMobileScreen) {
+      setConfirmDialog({
+        kind: 'approve-host-unavailable',
+        bookingId,
+        title: '호스트 진행 불가 승인',
+        description: '호스트 진행 불가 사유를 확인하고 전액 환불 취소하시겠습니까?',
+        confirmLabel: '전액 환불 취소',
+        tone: 'red',
+      });
+      return;
+    }
+
+    if (!confirm('호스트 진행 불가 사유를 확인하고 전액 환불 취소하시겠습니까?')) return;
+    await performForceCancel(bookingId, {
+      source: 'host_fault_request',
+      reason: '호스트 진행 불가 확인 취소',
+      successMessage: '호스트 진행 불가 전액 환불 취소가 처리되었습니다.',
+    });
+  };
+
+  const handleRejectHostUnavailable = async (bookingId: string) => {
+    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+
+    if (isMobileScreen) {
+      setConfirmDialog({
+        kind: 'reject-host-unavailable',
+        bookingId,
+        title: '검토 반려',
+        description: '호스트 진행 불가 검토 요청을 반려하시겠습니까?',
+        confirmLabel: '검토 반려',
+        tone: 'blue',
+      });
+      return;
+    }
+
+    if (!confirm('호스트 진행 불가 검토 요청을 반려하시겠습니까?')) return;
+    await performRejectHostUnavailable(bookingId);
   };
 
   const handleCopy = (text?: string | null) => {
@@ -650,6 +742,24 @@ export default function MasterLedgerTab({
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-6 scrollbar-hide bg-white pb-6 md:pb-10">
+            {isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
+              <div className="rounded-xl border border-orange-100 bg-orange-50 p-3 md:p-4">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0 text-orange-500" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] md:text-xs font-black text-orange-900">호스트 진행 불가 취소 검토 요청</p>
+                    <p className="mt-1 text-[11px] leading-5 text-orange-700">
+                      고객이 호스트 진행 불가 사유로 취소 검토를 요청했습니다. 승인 시 전액 환불 취소됩니다.
+                    </p>
+                    {getHostUnavailableReviewDetail(selectedBooking.cancel_reason) && (
+                      <p className="mt-2 text-[11px] leading-5 text-orange-800">
+                        고객 메모: {getHostUnavailableReviewDetail(selectedBooking.cancel_reason)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* 예약/결제 시점 */}
             <div className="flex items-center gap-1.5 md:gap-2 text-[9px] md:text-[11px] text-slate-500 bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100">
               <Clock size={12} className="text-slate-400 md:w-3.5 md:h-3.5" />
@@ -731,7 +841,26 @@ export default function MasterLedgerTab({
                   </button>
                 )}
 
-                {isConfirmedBookingStatus(selectedBooking.status) && (
+                {isConfirmedBookingStatus(selectedBooking.status) && isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleRejectHostUnavailable(selectedBooking.id)}
+                      disabled={isProcessing}
+                      className="w-full py-2.5 md:py-3 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] md:text-xs font-bold transition-all border border-slate-200 flex items-center justify-center gap-2"
+                    >
+                      {isProcessing ? '처리 중...' : '검토 반려'}
+                    </button>
+                    <button
+                      onClick={() => handleApproveHostUnavailable(selectedBooking.id)}
+                      disabled={isProcessing}
+                      className="w-full py-2.5 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] md:text-xs font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center gap-2"
+                    >
+                      {isProcessing ? '처리 중...' : '전액 환불 취소'}
+                    </button>
+                  </div>
+                )}
+
+                {isConfirmedBookingStatus(selectedBooking.status) && !isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
                   <button
                     onClick={() => handleForceCancel(selectedBooking.id)}
                     disabled={isProcessing}

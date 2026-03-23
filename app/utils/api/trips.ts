@@ -7,6 +7,19 @@ export type GuestTripsResponse = {
   syncCompletedNeeded: boolean;
 };
 
+export type GuestTripCancelReasonCode =
+  | 'personal_change'
+  | 'schedule_issue'
+  | 'host_unavailable'
+  | 'other';
+
+export type CancelGuestTripResponse = {
+  success: boolean;
+  reviewPending?: boolean;
+  message?: string;
+  refundAmount?: number;
+};
+
 // 1. 게스트 예약 내역 불러오기
 export const fetchGuestTrips = async (): Promise<GuestTripsResponse> => {
     const res = await fetch('/api/guest/trips');
@@ -31,11 +44,19 @@ export const syncCompletedGuestTrips = async () => {
 };
   
   // 2. 예약 취소 요청
-  export const cancelGuestTrip = async ({ bookingId, reason }: { bookingId: number; reason: string }) => {
+  export const cancelGuestTrip = async ({
+    bookingId,
+    reasonCode,
+    reason,
+  }: {
+    bookingId: number;
+    reasonCode: GuestTripCancelReasonCode;
+    reason?: string;
+  }): Promise<CancelGuestTripResponse> => {
     const res = await fetch('/api/payment/cancel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId, reason, isHostCancel: false }),
+      body: JSON.stringify({ bookingId, reasonCode, reason, isHostCancel: false }),
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || '취소 요청에 실패했습니다.');

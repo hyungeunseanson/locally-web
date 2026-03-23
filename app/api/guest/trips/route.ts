@@ -32,7 +32,20 @@ export async function GET() {
       .from('bookings')
       .select(`
         *,
-        experiences (id, host_id, title, image_url, photos, location, meeting_point, meeting_point_i18n),
+        experiences (
+          id,
+          host_id,
+          title,
+          title_ko,
+          title_en,
+          title_ja,
+          title_zh,
+          image_url,
+          photos,
+          location,
+          meeting_point,
+          meeting_point_i18n
+        ),
         reviews (id, rating, content, photos, created_at)
       `)
       .eq('user_id', user.id)
@@ -100,6 +113,10 @@ export async function GET() {
         orderId: booking.order_id || booking.id.slice(0, 8),
         expId: booking.experiences?.id,
         title: booking.experiences?.title,
+        title_ko: booking.experiences?.title_ko || null,
+        title_en: booking.experiences?.title_en || null,
+        title_ja: booking.experiences?.title_ja || null,
+        title_zh: booking.experiences?.title_zh || null,
         image: booking.experiences?.image_url,
         photos: booking.experiences?.photos, // 🟢 누락되었던 체험 사진 배열 추가 매핑
         location: booking.experiences?.location,
@@ -110,6 +127,7 @@ export async function GET() {
         guests: booking.guests,
         price: booking.amount,
         status: status, // 업데이트된 상태 사용
+        cancelReason: booking.cancel_reason || null,
         paymentDate: booking.created_at,
         hostId: booking.experiences?.host_id, // 메시지 보내기용
         hostName: hostPublicProfile?.name || 'Host',

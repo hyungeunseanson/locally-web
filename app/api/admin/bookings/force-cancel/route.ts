@@ -8,10 +8,12 @@ import { calculateBookingCancellationSettlement, getBookingPaidAmount } from '@/
 import { isCancelledBookingStatus, isPendingBookingStatus } from '@/app/constants/bookingStatus';
 import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import { refundPayPalCapture } from '@/app/utils/paypal/server';
+import { isHostUnavailableReviewPending } from '@/app/utils/hostUnavailableReview';
 
 type ForceCancelBody = {
   bookingId?: string;
   reason?: string;
+  source?: 'admin_force' | 'host_fault_request';
 };
 
 export async function POST(request: Request) {
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    const { bookingId, reason } = (await request.json()) as ForceCancelBody;
+    const { bookingId, reason, source } = (await request.json()) as ForceCancelBody;
     if (!bookingId) {
       return NextResponse.json({ success: false, error: 'bookingId is required' }, { status: 400 });
     }
@@ -67,7 +69,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '이미 취소 또는 거절된 예약입니다.' }, { status: 409 });
     }
 
-    const cancelReason = (reason || '관리자 직권 취소').trim();
+    const isHostFaultRequest = source === 'host_fault_request';
+
+    if (isHostFaultRequest && !isHostUnavailableReviewPending(booking.cancel_reason)) {
+      return NextResponse.json({ success: false, error: '호스트 진행 불가 검토 요청이 아닙니다.' }, { status: 409 });
+    }
+
+    const cancelReason = (reason || (isHostFaultRequest ? '호스트 진행 불가 확인 취소' : '관리자 직권 취소')).trim();
     const totalAmount = getBookingPaidAmount(booking);
     const settlement = isPendingBookingStatus(booking.status)
       ? { refundAmount: 0, hostPayout: 0, platformRevenue: 0 }
@@ -114,7 +122,9 @@ export async function POST(request: Request) {
       .update({
         status: 'cancelled',
         // 마커 제거 후 최종 취소 사유로 교체
-        cancel_reason: `${cancelReason} (관리자 강제 취소)`,
+        cancel_reason: isHostFaultRequest
+          ? `${cancelReason} (호스트 진행 불가 확인 취소)`
+          : `${cancelReason} (관리자 강제 취소)`,
         refund_amount: settlement.refundAmount,
         host_payout_amount: settlement.hostPayout,
         platform_revenue: settlement.platformRevenue,
@@ -153,7 +163,9 @@ export async function POST(request: Request) {
           user_id: hostId,
           type: 'cancellation',
           title: '😢 예약이 취소되었습니다.',
-          message: `[${expTitle}] 예약이 취소되었습니다. ${refundText}`,
+          message: isHostFaultRequest
+            ? `[${expTitle}] 예약이 호스트 진행 불가 사유로 취소 처리되었습니다. ${refundText}`
+            : `[${expTitle}] 예약이 취소되었습니다. ${refundText}`,
           link: '/host/dashboard',
           is_read: false,
         });
@@ -163,8 +175,10 @@ export async function POST(request: Request) {
         notifications.push({
           user_id: guestId,
           type: 'cancellation',
-          title: '예약이 취소되었습니다.',
-          message: `[${expTitle}] 예약이 관리자에 의해 취소되었습니다. ${refundText}`,
+          title: isHostFaultRequest ? '호스트 진행 불가로 예약이 취소되었습니다.' : '예약이 취소되었습니다.',
+          message: isHostFaultRequest
+            ? `[${expTitle}] 예약이 호스트 진행 불가 사유로 취소되었습니다. ${refundText}`
+            : `[${expTitle}] 예약이 관리자에 의해 취소되었습니다. ${refundText}`,
           link: '/guest/trips',
           is_read: false,
         });
@@ -202,9 +216,11 @@ export async function POST(request: Request) {
       if (guestId) {
         await sendImmediateGenericEmail({
           recipientUserId: guestId,
-          subject: '[Locally] 예약 취소 안내',
-          title: '예약이 취소되었습니다',
-          message: `'${expTitle}' 예약이 관리자에 의해 취소되었습니다.\n${refundText}`,
+          subject: isHostFaultRequest ? '[Locally] 호스트 진행 불가 취소 안내' : '[Locally] 예약 취소 안내',
+          title: isHostFaultRequest ? '호스트 진행 불가로 예약이 취소되었습니다' : '예약이 취소되었습니다',
+          message: isHostFaultRequest
+            ? `'${expTitle}' 예약이 호스트 진행 불가 사유로 취소되었습니다.\n${refundText}`
+            : `'${expTitle}' 예약이 관리자에 의해 취소되었습니다.\n${refundText}`,
           link: '/guest/trips',
           ctaLabel: '내 여행 보기',
         });
@@ -222,13 +238,14 @@ export async function POST(request: Request) {
     await recordAuditLog({
       admin_id: user.id,
       admin_email: user.email,
-      action_type: 'ADMIN_FORCE_CANCEL_BOOKING',
+      action_type: isHostFaultRequest ? 'ADMIN_APPROVE_HOST_UNAVAILABLE_CANCEL' : 'ADMIN_FORCE_CANCEL_BOOKING',
       target_type: 'booking',
       target_id: String(bookingId),
       details: {
         experience_title: expTitle,
         refund_amount: settlement.refundAmount,
         booking_status: booking.status,
+        source: source || 'admin_force',
       },
     });
 
