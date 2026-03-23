@@ -58,6 +58,12 @@ const STATIC_ROUTE_CONFIGS: StaticRouteConfig[] = [
     sourcePaths: ['app/services/intro/page.tsx'],
   },
   {
+    pathname: '/proxy-bookings/new',
+    changeFrequency: 'weekly',
+    priority: 0.7,
+    sourcePaths: ['app/proxy-bookings/new/layout.tsx', 'app/proxy-bookings/new/page.tsx'],
+  },
+  {
     pathname: '/site-map',
     changeFrequency: 'monthly',
     priority: 0.5,
@@ -131,21 +137,54 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const supabase = createAdminClient();
 
-    const { data: experiences } = await supabase
-      .from('experiences')
-      .select('id, updated_at, is_active')
-      .eq('status', 'active');
+    const [{ data: experiences }, { data: communityPosts }, { data: publicHosts }] = await Promise.all([
+      supabase
+        .from('experiences')
+        .select('id, updated_at, is_active')
+        .eq('status', 'active'),
+      supabase
+        .from('community_posts')
+        .select('id, created_at')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('public_host_applications')
+        .select('user_id, status, created_at')
+        .in('status', ['approved', 'active'])
+        .order('created_at', { ascending: false }),
+    ]);
 
     const experienceUrls: MetadataRoute.Sitemap = (experiences || [])
       .filter((exp) => exp.is_active !== false)
       .map((exp) => ({
-      url: buildAbsoluteUrl(`/experiences/${exp.id}`),
-      lastModified: exp.updated_at ? new Date(exp.updated_at) : new Date(),
+        url: buildAbsoluteUrl(`/experiences/${exp.id}`),
+        lastModified: exp.updated_at ? new Date(exp.updated_at) : new Date(),
+        changeFrequency: 'weekly',
+        priority: 0.9,
+      }));
+
+    const communityUrls: MetadataRoute.Sitemap = (communityPosts || []).map((post) => ({
+      url: buildAbsoluteUrl(`/community/${post.id}`),
+      lastModified: post.created_at ? new Date(post.created_at) : new Date(),
       changeFrequency: 'weekly',
-      priority: 0.9,
+      priority: 0.7,
     }));
 
-    return [...staticUrls, ...experienceUrls];
+    const latestPublicHostByUser = new Map<string, { created_at: string | null }>();
+    for (const host of publicHosts || []) {
+      if (!host.user_id || latestPublicHostByUser.has(host.user_id)) {
+        continue;
+      }
+      latestPublicHostByUser.set(host.user_id, { created_at: host.created_at ?? null });
+    }
+
+    const publicHostUrls: MetadataRoute.Sitemap = Array.from(latestPublicHostByUser.entries()).map(([userId, host]) => ({
+      url: buildAbsoluteUrl(`/users/${userId}`),
+      lastModified: host.created_at ? new Date(host.created_at) : new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    }));
+
+    return [...staticUrls, ...experienceUrls, ...communityUrls, ...publicHostUrls];
   } catch {
     // Supabase 조회 실패 시 정적 URL만 반환 (graceful fallback)
     return staticUrls;
