@@ -5,12 +5,12 @@ import ExperienceClient from './ExperienceClient';
 import JsonLd from '@/app/components/seo/JsonLd';
 import { notFound } from 'next/navigation';
 import { getCurrentLocale } from '@/app/utils/locale';
-import { buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
+import { buildAbsoluteUrl, buildLocalizedAbsoluteUrl } from '@/app/utils/siteUrl';
 import { getContent } from '@/app/utils/contentHelper';
 import { getHostPublicProfile } from '@/app/utils/profile';
 import { ExperienceDetail, HostProfileDetail } from './types';
 import { PRIVATE_NOINDEX_METADATA } from '@/app/utils/seo';
-import { buildExperienceProductJsonLd } from '@/app/utils/structuredData';
+import { buildBreadcrumbJsonLd, buildExperienceProductJsonLd } from '@/app/utils/structuredData';
 import { fetchExperienceAvailabilitySummary } from '@/app/utils/experienceAvailability';
 
 type Props = {
@@ -163,10 +163,28 @@ export default async function Page({ params }: Props) {
           providerName: hostProfile?.name || null,
         })
       : null;
+  const breadcrumbNameMap: Record<'ko' | 'en' | 'ja' | 'zh', string> = {
+    ko: '홈',
+    en: 'Home',
+    ja: 'ホーム',
+    zh: '首页',
+  };
+  const experiencePageUrl = buildLocalizedAbsoluteUrl(locale, `/experiences/${id}`);
+  const experienceBreadcrumbJsonLd =
+    isPublicExperience
+      ? buildBreadcrumbJsonLd([
+          { name: breadcrumbNameMap[locale], item: buildAbsoluteUrl('/') },
+          { name: getContent(experience, 'title', locale), item: experiencePageUrl },
+        ])
+      : null;
 
   return (
     <>
-      {experienceJsonLd ? <JsonLd data={experienceJsonLd} /> : null}
+      {experienceJsonLd && experienceBreadcrumbJsonLd ? (
+        <JsonLd data={[experienceJsonLd, experienceBreadcrumbJsonLd]} />
+      ) : experienceJsonLd ? (
+        <JsonLd data={experienceJsonLd} />
+      ) : null}
       <ExperienceClient
         initialUser={userResult.data.user}
         initialExperience={experience}

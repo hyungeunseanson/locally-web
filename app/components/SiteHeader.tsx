@@ -174,7 +174,7 @@ function SiteHeaderContent() {
               alt="Locally Logo"
               className="w-[52px] h-[52px] object-contain mix-blend-multiply grayscale contrast-200 group-hover:scale-105 transition-transform duration-300"
             />
-            <h1 className="text-[18px] font-bold tracking-tight cursor-pointer text-[#111827] leading-none mb-[1.5px]">Locally</h1>
+            <span className="text-[18px] font-bold tracking-tight cursor-pointer text-[#111827] leading-none mb-[1.5px]">Locally</span>
           </Link>
 
           <div className="flex items-center justify-end gap-2 z-[101]">
