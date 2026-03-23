@@ -143,20 +143,26 @@ export async function POST(
             } else {
                 // Notify the admin that the user has replied
                 // Assuming admin emails are predetermined or send to a generic support email
-                fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications/send-email`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-                    },
-                    body: JSON.stringify({
-                        type: 'proxy_comment_notify',
-                        targetEmail: process.env.ADMIN_SUPPORT_EMAIL || process.env.GMAIL_USER,
-                        targetRole: 'admin',
-                        requestId,
-                        content: content.trim()
-                    })
-                }).catch(err => console.error('Failed to trigger admin email notification:', err));
+                const internalApiSecret = process.env.INTERNAL_API_SECRET;
+
+                if (!internalApiSecret) {
+                    console.error('INTERNAL_API_SECRET is missing. Skipping proxy comment admin email dispatch.');
+                } else {
+                    fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications/send-email`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-internal-secret': internalApiSecret,
+                        },
+                        body: JSON.stringify({
+                            type: 'proxy_comment_notify',
+                            targetEmail: process.env.ADMIN_SUPPORT_EMAIL || process.env.GMAIL_USER,
+                            targetRole: 'admin',
+                            requestId,
+                            content: content.trim()
+                        })
+                    }).catch(err => console.error('Failed to trigger admin email notification:', err));
+                }
             }
         } catch {
             console.warn('Silent email fail on comment creation');

@@ -175,22 +175,28 @@ export async function POST(request: Request) {
       }
 
       if (hostId) {
-        fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-secret': process.env.INTERNAL_API_SECRET || '',
-          },
-          body: JSON.stringify({
-            type: 'booking_cancellation',
-            hostId,
-            experienceTitle: expTitle,
-            cancelReason,
-            refundAmount: settlement.refundAmount,
-          }),
-        }).catch((emailError) => {
-          console.error('[ADMIN] booking cancel email error:', emailError);
-        });
+        const internalApiSecret = process.env.INTERNAL_API_SECRET;
+
+        if (!internalApiSecret) {
+          console.error('[ADMIN] INTERNAL_API_SECRET is missing. Skipping booking cancellation email dispatch.');
+        } else {
+          fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notifications/send-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-internal-secret': internalApiSecret,
+            },
+            body: JSON.stringify({
+              type: 'booking_cancellation',
+              hostId,
+              experienceTitle: expTitle,
+              cancelReason,
+              refundAmount: settlement.refundAmount,
+            }),
+          }).catch((emailError) => {
+            console.error('[ADMIN] booking cancel email error:', emailError);
+          });
+        }
       }
 
       if (guestId) {

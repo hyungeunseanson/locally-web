@@ -6,6 +6,23 @@ import { render } from '@react-email/render';
 import BookingConfirmationEmail from '@/app/emails/templates/BookingConfirmationEmail';
 import BookingCancellationEmail from '@/app/emails/templates/BookingCancellationEmail';
 
+type SendEmailBody = {
+    type?: string;
+    hostId?: string;
+    guestName?: string;
+    experienceTitle?: string;
+    guestsCount?: number;
+    bookingDate?: string;
+    bookingTime?: string;
+    cancelReason?: string;
+    refundAmount?: number;
+    totalAmount?: number;
+    targetEmail?: string;
+    targetRole?: string;
+    requestId?: string;
+    content?: string;
+};
+
 function escapeHtml(value: string) {
     return value
         .replace(/&/g, '&amp;')
@@ -18,11 +35,18 @@ function escapeHtml(value: string) {
 export async function POST(request: Request) {
     // [Security] 내부 서버-to-서버 전용 라우트 — 외부 호출 차단
     const internalSecret = request.headers.get('x-internal-secret');
-    if (!internalSecret || internalSecret !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const expectedInternalSecret = process.env.INTERNAL_API_SECRET;
+
+    if (!expectedInternalSecret) {
+        console.error('[Email API] INTERNAL_API_SECRET is not configured.');
+        return NextResponse.json({ error: 'Internal secret is not configured' }, { status: 500 });
+    }
+
+    if (!internalSecret || internalSecret !== expectedInternalSecret) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    let body: any = {};
+    let body: SendEmailBody = {};
     try {
         body = await request.json();
         const { type, hostId, guestName, experienceTitle, guestsCount, bookingDate, bookingTime, cancelReason, refundAmount, totalAmount, targetEmail, targetRole, requestId, content } = body;
@@ -35,12 +59,21 @@ export async function POST(request: Request) {
 
         // Fetch host's email
         let hostEmail = '';
-        // [Fix] profiles.name → profiles.full_name (profiles 테이블에 name 컬럼 없음 — 42703 방지)
-        const { data: hostProfile } = await supabase.from('profiles').select('email, full_name').eq('id', hostId).maybeSingle();
+        let hostProfile: { email?: string | null; full_name?: string | null } | null = null;
+
+        if (hostId) {
+            // [Fix] profiles.name → profiles.full_name (profiles 테이블에 name 컬럼 없음 — 42703 방지)
+            const { data } = await supabase
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', hostId)
+                .maybeSingle();
+            hostProfile = data;
+        }
 
         if (hostProfile?.email) {
             hostEmail = hostProfile.email;
-        } else {
+        } else if (hostId) {
             const { data: authData } = await supabase.auth.admin.getUserById(hostId);
             if (authData?.user?.email) hostEmail = authData.user.email;
         }
@@ -110,10 +143,11 @@ export async function POST(request: Request) {
             html: emailHtml,
         });
 
-        console.log(`✅ [Email API] Successfully sent ${type} email to ${finalEmail}`);
+        console.log(`✅ [Email API] Successfully sent ${type} email`);
         return NextResponse.json({ success: true });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown Error';
         console.error('🔥 [Email API] Email Sending Failed:', error);
 
         // Phase 3: 명확한 DB 에러 로그 기록 (notifications 테이블에 system_error 로 저장)
@@ -131,14 +165,14 @@ export async function POST(request: Request) {
 
             if (!errorHostId) {
                 console.warn('🔥 [Email API] Could not resolve user_id for system_error notification. Skipping DB log to prevent Null Constraint violation.');
-                return NextResponse.json({ error: error.message }, { status: 500 });
+                return NextResponse.json({ error: errorMessage }, { status: 500 });
             }
 
             await supabase.from('notifications').insert({
                 user_id: errorHostId,
                 type: 'system_error',
                 title: '🚨 이메일 발송 시스템 장애',
-                message: `이메일 렌더링 또는 전송이 실패했습니다: ${error?.message || 'Unknown Error'}`,
+                message: `이메일 렌더링 또는 전송이 실패했습니다: ${errorMessage}`,
                 link: '',
                 is_read: false
             });
@@ -147,6 +181,6 @@ export async function POST(request: Request) {
             console.error('🔥 [Email API] Failed to log error to DB:', logError);
         }
 
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }

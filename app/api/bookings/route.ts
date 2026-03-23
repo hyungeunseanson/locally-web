@@ -23,6 +23,8 @@ type AtomicBookingResult = {
     experience_title: string | null;
 };
 
+const FALLBACK_MAX_GUESTS = 10;
+
 export async function POST(request: Request) {
     try {
         // 1. 세션 확인 (호출자 인증)
@@ -70,6 +72,24 @@ export async function POST(request: Request) {
 
         // 2. 관리자 권한 클라이언트 생성 (DB 제어용)
         const supabaseAdmin = createAdminClient();
+
+        const { data: experienceMeta, error: experienceLookupError } = await supabaseAdmin
+            .from('experiences')
+            .select('max_guests')
+            .eq('id', normalizedExperienceId)
+            .maybeSingle();
+
+        if (experienceLookupError) {
+            console.warn('[api/bookings] experience max_guests precheck skipped:', experienceLookupError.message);
+        } else if (experienceMeta) {
+            const effectiveMaxGuests = Math.max(1, Number(experienceMeta.max_guests || FALLBACK_MAX_GUESTS));
+            if (guestCount > effectiveMaxGuests) {
+                return NextResponse.json(
+                    { success: false, error: `최대 예약 가능 인원은 ${effectiveMaxGuests}명입니다.` },
+                    { status: 400 }
+                );
+            }
+        }
 
         // 3. 예약 원자화 RPC 호출 (슬롯 잠금 + 검증 + 삽입)
         // [Note] solo-guarantee 사전 DB 조회(TOCTOU 취약)는 제거. RPC가 atomic하게 동일 조건 검증함.

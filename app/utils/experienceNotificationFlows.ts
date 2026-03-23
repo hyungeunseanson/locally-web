@@ -81,25 +81,31 @@ export async function notifyExperiencePaymentConfirmed(
   }
 
   if (hostId) {
-    void fetch(`${getSiteUrl()}/api/notifications/send-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      },
-      body: JSON.stringify({
-        type: 'booking_confirmation',
-        hostId,
-        guestName: displayName,
-        experienceTitle,
-        guestsCount,
-        bookingDate,
-        bookingTime,
-        totalAmount,
-      }),
-    }).catch((mailError) => {
-      console.error('[ExperienceNotificationFlows] host booking email dispatch failed:', mailError);
-    });
+    const internalApiSecret = process.env.INTERNAL_API_SECRET;
+
+    if (!internalApiSecret) {
+      console.error('[ExperienceNotificationFlows] INTERNAL_API_SECRET is missing. Skipping host booking email dispatch.');
+    } else {
+      void fetch(`${getSiteUrl()}/api/notifications/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': internalApiSecret,
+        },
+        body: JSON.stringify({
+          type: 'booking_confirmation',
+          hostId,
+          guestName: displayName,
+          experienceTitle,
+          guestsCount,
+          bookingDate,
+          bookingTime,
+          totalAmount,
+        }),
+      }).catch((mailError) => {
+        console.error('[ExperienceNotificationFlows] host booking email dispatch failed:', mailError);
+      });
+    }
   }
 
   if (guestId) {
