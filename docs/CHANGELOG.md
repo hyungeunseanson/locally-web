@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.42 — [Guest Trips] 프로그램명 로컬라이즈 · 환불 문구 정렬
+
+| 항목 | 내용 |
+| --- | --- |
+| 🔴 게스트 화면 localized title 적용 | `app/experiences/[id]/payment/complete/page.tsx`, `app/guest/trips/components/PastTripCard.tsx`, `app/guest/trips/components/ReceiptModal.tsx`, `tests/e2e/57-guest-trips-sync-completed.spec.ts` — 예약확정 화면, 지난 여행 카드, 영수증 모달에서 현재 언어 기준 `title_ko/en/ja/zh`를 우선 사용하도록 정리해, 한국어 페이지에서 일본어 원문 프로그램명이 그대로 보이지 않도록 수정 |
+| 🟠 환불 정책 고정 문구 정렬 | `app/host/create/localization.ts`, `tests/e2e/90-booking-cancel-policy.spec.ts` — 체험 상세의 고정 환불 정책 요약 문구를 실제 게스트 취소 계산 helper 기준과 맞추고, 결제 당일 취소/1일 전/2~7일 전/8~19일 전/20일 전 이상 경계값 계약 테스트를 추가 |
+
 ## v3.39.41 — [Experience Booking] 프라이빗 투어 인원 선택 분리
 
 | 항목 | 내용 |

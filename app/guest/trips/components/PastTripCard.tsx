@@ -6,6 +6,7 @@ import { ChevronRight, CheckCircle, Mountain } from 'lucide-react'; // 🟢 아�
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가
 import { useRouter } from 'next/navigation';
 import type { GuestTrip } from './TripCard';
+import { getContent } from '@/app/utils/contentHelper';
 
 type PastGuestTrip = GuestTrip & {
   hasReview?: boolean;
@@ -18,9 +19,10 @@ interface PastTripCardProps {
 }
 
 export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) {
-  const { t } = useLanguage(); // 🟢 추가
+  const { t, lang } = useLanguage(); // 🟢 추가
   const router = useRouter();
   const thumbnailSrc = trip.photos && trip.photos.length > 0 ? trip.photos[0] : trip.image || null;
+  const localizedTitle = getContent(trip, 'title', lang) || trip.title;
 
   const handleCardClick = () => {
     if (trip.expId) {
@@ -42,7 +44,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
         {thumbnailSrc ? (
           <Image
             src={thumbnailSrc}
-            alt={trip.title}
+            alt={localizedTitle}
             width={56}
             height={56}
             className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
@@ -53,7 +55,7 @@ export default function PastTripCard({ trip, onOpenReview }: PastTripCardProps) 
       </div>
 
       <div className="flex-1 min-w-0">
-        <h4 className="font-bold text-[13px] md:text-sm text-slate-900 truncate">{trip.title}</h4>
+        <h4 className="font-bold text-[13px] md:text-sm text-slate-900 truncate">{localizedTitle}</h4>
         <div className="text-[11px] md:text-xs text-slate-500 mt-0.5">{trip.date}</div>
 
         {trip.status !== 'cancelled' ? (

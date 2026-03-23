@@ -130,13 +130,13 @@ export const ACTIVITY_LEVEL_OPTIONS: Array<
   },
 ];
 
-export const FIXED_REFUND_POLICY = '표준 정책 (20일 전 무료 취소)';
+export const FIXED_REFUND_POLICY = '결제 당일 취소 100%, 20일 전 100%, 8~19일 전 80%, 2~7일 전 70%, 1일 전 40%, 당일 환불 불가';
 
 export const FIXED_REFUND_POLICY_LABELS: LocalizedText = {
-  ko: '표준 정책 (20일 전 무료 취소)',
-  en: 'Standard policy (free cancellation up to 20 days before)',
-  ja: '標準ポリシー（20日前まで無料キャンセル）',
-  zh: '标准政策（20天前可免费取消）',
+  ko: '결제 당일 취소 100%, 20일 전 100%, 8~19일 전 80%, 2~7일 전 70%, 1일 전 40%, 당일 환불 불가',
+  en: '100% on the payment day, 100% 20 days before, 80% 8–19 days before, 70% 2–7 days before, 40% 1 day before, no refund on the day.',
+  ja: '決済当日のキャンセル100%、20日前100%、8〜19日前80%、2〜7日前70%、1日前40%、当日返金不可',
+  zh: '付款当日取消100%，20天前100%，8~19天前80%，2~7天前70%，1天前40%，当天不可退款',
 };
 
 export const MAX_EXPERIENCE_PHOTOS = 5;

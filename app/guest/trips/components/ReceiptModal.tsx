@@ -3,11 +3,16 @@
 import React from 'react';
 import { X, Download, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { getContent } from '@/app/utils/contentHelper';
 
 interface ReceiptTrip {
   id: number;
   orderId?: string | number;
   title: string;
+  title_ko?: string | null;
+  title_en?: string | null;
+  title_ja?: string | null;
+  title_zh?: string | null;
   date: string;
   time: string;
   guests?: number;
@@ -19,8 +24,9 @@ interface ReceiptTrip {
 }
 
 export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onClose: () => void }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   if (!trip) return null;
+  const localizedTitle = getContent(trip, 'title', lang) || trip.title;
 
   // 🟢 [안전 장치] 데이터가 없으면 빈 문자열 처리 (substring 에러 방지)
   const paymentDate = trip.paymentDate || trip.created_at || new Date().toISOString();
@@ -54,7 +60,7 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
             </div>
             <div className="flex justify-between text-[12px] md:text-sm">
               <span className="text-slate-500">{t('receipt_product_name')}</span>
-              <span className="font-bold text-right w-36 md:w-40 truncate">{trip.title}</span>
+              <span className="font-bold text-right w-36 md:w-40 truncate">{localizedTitle}</span>
             </div>
             <div className="flex justify-between text-[12px] md:text-sm">
               <span className="text-slate-500">{t('receipt_schedule')}</span>

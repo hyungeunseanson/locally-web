@@ -156,6 +156,68 @@ async function createHostExperience(hostId: string) {
   return Number(data.id);
 }
 
+async function createLocalizedHostExperience(hostId: string) {
+  const supabase = getAdminClient();
+  const timestamp = Date.now();
+
+  const { data, error } = await supabase
+    .from('experiences')
+    .insert({
+      host_id: hostId,
+      country: '일본',
+      city: '도쿄',
+      title: `東京でキッズ向けグルメツアー ${timestamp}`,
+      title_ko: `도쿄 어린이 맛집 투어 ${timestamp}`,
+      title_ja: `東京でキッズ向けグルメツアー ${timestamp}`,
+      category: '맛집 탐방',
+      languages: ['일본어', '한국어'],
+      language_levels: [{ language: '일본어', level: 5 }, { language: '한국어', level: 4 }],
+      duration: 2,
+      max_guests: 4,
+      description: 'localized title verification',
+      itinerary: [{ title: '시부야역', description: 'localized title stop' }],
+      spots: '시부야',
+      meeting_point: 'Shibuya Station',
+      meeting_point_i18n: {
+        ko: '시부야역',
+        ja: '渋谷駅',
+      },
+      location: 'Shibuya Station',
+      photos: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200'],
+      price: 40000,
+      inclusions: ['가이드'],
+      exclusions: ['개인 경비'],
+      supplies: '편한 복장',
+      rules: {
+        age_limit: '만 19세 이상',
+        activity_level: '보통',
+      },
+      status: 'approved',
+      is_active: true,
+      is_private_enabled: false,
+      private_price: 0,
+      source_locale: 'ja',
+      manual_locales: ['ko', 'ja'],
+      translation_version: 1,
+      translation_meta: {
+        ko: { mode: 'manual', status: 'ready', version: 1 },
+        ja: { mode: 'manual', status: 'ready', version: 1 },
+      },
+    })
+    .select('id,title_ko')
+    .single();
+
+  if (error || !data?.id) {
+    throw error || new Error('Failed to create localized experience fixture.');
+  }
+
+  createdExperienceIds.push(Number(data.id));
+  return {
+    id: Number(data.id),
+    titleKo: String(data.title_ko),
+  };
+}
+
 async function createApprovedHostApplication(userId: string, user: TestUser) {
   const supabase = getAdminClient();
   const { data, error } = await supabase
@@ -230,6 +292,51 @@ async function createPastPaidBooking(params: {
 
   if (error) {
     throw error || new Error('Failed to create past paid booking.');
+  }
+
+  createdBookingIds.push(bookingId);
+  return bookingId;
+}
+
+async function createFuturePaidBooking(params: {
+  guestId: string;
+  guest: TestUser;
+  experienceId: number;
+}) {
+  const supabase = getAdminClient();
+  const futureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+  const date = futureDate.toISOString().slice(0, 10);
+  const bookingId = `GUEST-TRIPS-LOCALIZED-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  const { error } = await supabase
+    .from('bookings')
+    .insert({
+      id: bookingId,
+      user_id: params.guestId,
+      experience_id: params.experienceId,
+      order_id: bookingId,
+      date,
+      time: '18:00',
+      guests: 2,
+      amount: 88000,
+      total_price: 80000,
+      total_experience_price: 80000,
+      host_payout_amount: 64000,
+      platform_revenue: 24000,
+      status: 'PAID',
+      payment_method: 'card',
+      type: 'group',
+      contact_name: params.guest.fullName,
+      contact_phone: params.guest.phone,
+      message: '',
+      created_at: new Date().toISOString(),
+      payout_status: 'pending',
+      is_solo_guarantee: false,
+      solo_guarantee_price: 0,
+    });
+
+  if (error) {
+    throw error || new Error('Failed to create future paid booking.');
   }
 
   createdBookingIds.push(bookingId);
@@ -338,5 +445,44 @@ test.describe.serial('guest trips completed sync route', () => {
 
     if (afterSyncError) throw afterSyncError;
     expect(afterSync?.status).toBe('completed');
+  });
+
+  test('renders localized Korean titles on guest trips and payment complete', async ({ page }) => {
+    const host = createUser('host.localized');
+    const guest = createUser('guest.localized');
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+        languages: ['일본어', '한국어'],
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experience = await createLocalizedHostExperience(hostId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId: experience.id,
+    });
+
+    await login(page, guest);
+
+    await page.goto('/guest/trips', { waitUntil: 'networkidle' });
+    await expect(page.getByRole('heading', { name: experience.titleKo })).toBeVisible();
+
+    await page.goto(`/experiences/${experience.id}/payment/complete?orderId=${bookingId}`, { waitUntil: 'networkidle' });
+    await expect(page.getByText(experience.titleKo)).toBeVisible();
   });
 });

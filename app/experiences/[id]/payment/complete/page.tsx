@@ -8,16 +8,22 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { CheckCircle, Calendar, MapPin, Share2, Copy, Home, ArrowRight, MessageCircle, Clock, AlertCircle } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import Spinner from '@/app/components/ui/Spinner';
 import confetti from 'canvas-confetti'; // 🎉 폭죽 효과
 import { isPendingBookingStatus, isConfirmedBookingStatus, isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
+import { getContent } from '@/app/utils/contentHelper';
 
 type BookingExperience = {
   id?: string | number;
   host_id?: string | null;
   title?: string;
+  title_ko?: string | null;
+  title_en?: string | null;
+  title_ja?: string | null;
+  title_zh?: string | null;
   location?: string;
   duration?: number;
   photos?: string[] | null;
@@ -38,6 +44,7 @@ function PaymentCompleteContent() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
+  const { lang } = useLanguage();
 
   const orderId = searchParams.get('orderId');
   const [booking, setBooking] = useState<BookingData | null>(null);
@@ -109,7 +116,7 @@ function PaymentCompleteContent() {
   const handleAddToCalendar = () => {
     if (!booking) return;
     const { date, time, experiences } = booking;
-    const title = experiences?.title || 'Locally 체험';
+    const title = getContent(experiences, 'title', lang) || experiences?.title || 'Locally 체험';
     const location = experiences?.location || '';
     const durationHours = experiences?.duration || 2;
 
@@ -133,6 +140,7 @@ function PaymentCompleteContent() {
 
   if (loading) return <Spinner fullScreen />;
   if (!booking) return <div className="min-h-screen bg-white flex items-center justify-center">예약 정보를 불러올 수 없습니다.</div>;
+  const localizedExperienceTitle = getContent(booking.experiences, 'title', lang) || booking.experiences?.title || 'Locally 체험';
   const bookingImage = booking.experiences?.photos?.[0] || booking.experiences?.image_url || '/images/logo.png';
   const messageParams = new URLSearchParams();
   if (booking.experiences?.host_id) {
@@ -141,8 +149,8 @@ function PaymentCompleteContent() {
   if (booking.experiences?.id) {
     messageParams.set('expId', String(booking.experiences.id));
   }
-  if (booking.experiences?.title) {
-    messageParams.set('expTitle', booking.experiences.title);
+  if (localizedExperienceTitle) {
+    messageParams.set('expTitle', localizedExperienceTitle);
   }
   const messageQuery = messageParams.toString();
   const messageHref = messageQuery
@@ -199,12 +207,12 @@ function PaymentCompleteContent() {
           <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
             {/* 이미지 */}
             <div className="w-full md:w-32 h-28 md:h-32 bg-slate-200 rounded-xl md:rounded-2xl relative overflow-hidden shrink-0 shadow-inner">
-              <Image src={bookingImage} alt={booking.experiences?.title || '체험 이미지'} fill className="object-cover" />
+              <Image src={bookingImage} alt={localizedExperienceTitle || '체험 이미지'} fill className="object-cover" />
             </div>
 
             {/* 텍스트 정보 */}
             <div className="flex-1 space-y-3 md:space-y-4 w-full">
-              <h3 className="font-bold text-[17px] md:text-xl text-slate-900 leading-snug">{booking.experiences?.title}</h3>
+              <h3 className="font-bold text-[17px] md:text-xl text-slate-900 leading-snug">{localizedExperienceTitle}</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-[12px] md:text-sm">
                 <div className="flex items-center gap-2 md:gap-3 text-slate-600 bg-white p-2.5 md:p-3 rounded-lg md:rounded-xl border border-slate-100">
