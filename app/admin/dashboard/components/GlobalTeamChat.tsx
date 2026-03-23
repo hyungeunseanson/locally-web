@@ -3,12 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/app/utils/supabase/client';
-import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { compressImage } from '@/app/utils/image';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Paperclip, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useTeamWorkspaceAdminSession } from '@/app/admin/dashboard/hooks/useTeamWorkspaceAdminSession';
 
 // ─── 리액션 이모지 목록 ───────────────────────────────────────────────────────
 const REACTION_EMOJIS = ['❤️', '✅', '🙏'] as const;
@@ -35,7 +35,9 @@ interface CurrentAdminUser {
 }
 
 export default function GlobalTeamChat() {
-    const [currentUser, setCurrentUser] = useState<CurrentAdminUser | null>(null);
+    const sessionState = useTeamWorkspaceAdminSession();
+    const { currentUser, status: sessionStatus } = sessionState;
+    const sessionReason = sessionStatus === 'unauthorized' ? sessionState.reason : null;
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -126,33 +128,15 @@ export default function GlobalTeamChat() {
     useEffect(() => {
         setIsClient(true);
         if (!isTeamWorkspace) {
-            setCurrentUser(null);
-            return;
+            setIsOpen(false);
+            setHasUnread(false);
         }
-
-        const initChat = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { isAdmin } = await resolveAdminAccess(supabase, {
-                userId: user.id,
-                email: user.email,
-            });
-            if (isAdmin) {
-                setCurrentUser({
-                    id: user.id,
-                    name: user.email?.split('@')[0] || 'Admin'
-                });
-            }
-        };
-
-        initChat();
-    }, [isTeamWorkspace, supabase]);
+    }, [isTeamWorkspace]);
 
     // ─── 메시지 fetch + 실시간 구독 ──────────────────────────────────────────
     // 핵심 수정: isOpen을 deps에서 제거 → 채팅창 토글마다 채널 재구독 방지 (Chrome 성능 버그)
     useEffect(() => {
-        if (!isTeamWorkspace || !currentUser) return;
+        if (!isTeamWorkspace || sessionStatus !== 'ready' || !currentUser) return;
 
         const fetchMessages = async () => {
             const { data } = await supabase
@@ -224,7 +208,14 @@ export default function GlobalTeamChat() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [currentUser, isTeamWorkspace, markMessagesRead, scrollToBottom, supabase]); // isOpen 제거됨
+    }, [currentUser, isTeamWorkspace, markMessagesRead, scrollToBottom, sessionStatus, supabase]); // isOpen 제거됨
+
+    useEffect(() => {
+        if (sessionStatus === 'unauthorized') {
+            setIsOpen(false);
+            setHasUnread(false);
+        }
+    }, [sessionStatus]);
 
     // ─── 채팅창 오픈/클로즈 사이드이펙트 ────────────────────────────────────
     useEffect(() => {
@@ -440,6 +431,34 @@ export default function GlobalTeamChat() {
     // ─── 렌더: 메시지 목록 ───────────────────────────────────────────────────
     const renderMessages = (isMobile = false) => {
         const meId = currentUser?.id;
+        if (sessionStatus === 'loading') {
+            return (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
+                    <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
+                        <MessageSquare size={22} className="text-slate-400 animate-pulse" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">세션 확인 중...</p>
+                    <p className="text-xs text-slate-500 mt-1.5 text-center leading-relaxed">관리자 세션이 확인되면 팀 채팅을 불러옵니다.</p>
+                </div>
+            );
+        }
+
+        if (sessionStatus === 'unauthorized') {
+            return (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
+                    <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
+                        <MessageSquare size={22} className="text-slate-400" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">관리자 세션 확인이 필요합니다.</p>
+                    <p className="text-xs text-slate-500 mt-1.5 text-center leading-relaxed">
+                        {sessionReason === 'forbidden'
+                            ? '관리자 권한을 확인하지 못했습니다.'
+                            : '새로고침 후 다시 시도해주세요.'}
+                    </p>
+                </div>
+            );
+        }
+
         if (messages.length === 0) {
             return (
                 <div className="h-full flex flex-col items-center justify-center text-slate-500 py-16">
@@ -549,6 +568,14 @@ export default function GlobalTeamChat() {
     // ─── 렌더: 입력 영역 ─────────────────────────────────────────────────────
     const renderInput = (isMobile = false) => (
         <div className={`border-t border-slate-200 bg-white z-10 ${isMobile ? 'p-2.5' : 'p-3'}`}>
+            {sessionStatus !== 'ready' ? (
+                <div className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-[11px] text-slate-500">
+                    {sessionStatus === 'loading'
+                        ? '세션 확인 중입니다...'
+                        : '관리자 세션을 확인하지 못했습니다. 새로고침 후 다시 시도해주세요.'}
+                </div>
+            ) : (
+                <>
             {selectedImage && (
                 <div className="mb-2 relative inline-block">
                     <div className="p-1 border border-slate-200 rounded-xl bg-slate-50 relative">
@@ -594,10 +621,12 @@ export default function GlobalTeamChat() {
                     <Send size={isMobile ? 14 : 16} className={isUploading ? 'animate-pulse' : ''} />
                 </button>
             </form>
+                </>
+            )}
         </div>
     );
 
-    if (!isClient || !currentUser || !isTeamWorkspace) return null;
+    if (!isClient || !isTeamWorkspace) return null;
 
     return (
         <>

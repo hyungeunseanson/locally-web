@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AdminTask, AdminComment } from '@/app/types/admin';
 import { useToast } from '@/app/context/ToastContext';
+import { useTeamWorkspaceAdminSession } from '@/app/admin/dashboard/hooks/useTeamWorkspaceAdminSession';
 
 type TeamTabProps = {
   initialInnerTab?: 'todo' | 'memo' | 'proxy';
@@ -23,6 +24,9 @@ type TeamTabProps = {
 
 export default function TeamTab({ initialInnerTab, initialProxyRequestId }: TeamTabProps) {
   const { showToast } = useToast();
+  const sessionState = useTeamWorkspaceAdminSession();
+  const { currentUser, status: sessionStatus } = sessionState;
+  const sessionReason = sessionStatus === 'unauthorized' ? sessionState.reason : null;
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
   const [whitelist, setWhitelist] = useState<any[]>([]);
@@ -37,12 +41,15 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const [memoCommentInputs, setMemoCommentInputs] = useState<Record<string, string>>({}); // ⭐ 메모별 댓글 입력 상태
   const [expandedTodo, setExpandedTodo] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
   const [lastViewed, setLastViewed] = useState<string>(new Date(0).toISOString());
   const [expandedMemos, setExpandedMemos] = useState<Set<string>>(new Set());
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [workspaceErrorMessage, setWorkspaceErrorMessage] = useState<string | null>(null);
+  const [hasLoadedTasks, setHasLoadedTasks] = useState(false);
+  const [hasLoadedComments, setHasLoadedComments] = useState(false);
+  const [hasLoadedWhitelist, setHasLoadedWhitelist] = useState(false);
   const [isSubmittingCommentByTaskId, setIsSubmittingCommentByTaskId] = useState<Record<string, boolean>>({});
 
   const threadRef = useRef<HTMLDivElement>(null);
@@ -50,7 +57,9 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const newTodoTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const todoCommentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const memoCommentTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
-  const supabase = createClient();
+  const sessionErrorToastShownRef = useRef(false);
+  const workspaceErrorToastShownRef = useRef(false);
+  const supabase = useMemo(() => createClient(), []);
 
   const autoResizeTextarea = useCallback((element: HTMLTextAreaElement | null, maxHeight: number) => {
     if (!element) return;
@@ -114,55 +123,59 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     setExpandedMemos(newSet);
   };
 
-  const getCurrentUser = async () => {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError) console.error('[TeamTab] auth.getUser error:', authError);
-    if (!user) {
-      console.warn('[TeamTab] user is null — session may be expired or invalid');
-      return null;
-    }
-    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
-    const resolved = { id: user.id, name: profile?.full_name || user.email?.split('@')[0] };
-    setCurrentUser(resolved);
-    return resolved;
-  };
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     const { data, error } = await supabase.from('admin_tasks').select('*').order('created_at', { ascending: false }).limit(100);
-    if (error) console.error('[TeamTab] fetchTasks error:', error);
-    if (data) {
-      setTasks(data);
-      tasksRef.current = data; // ⭐ 추가: ref도 함께 업데이트
+    if (error) {
+      console.error('[TeamTab] fetchTasks error:', error);
+      throw error;
     }
-    return data;
-  };
+
+    const nextTasks = data ?? [];
+    setTasks(nextTasks);
+    tasksRef.current = nextTasks;
+    setHasLoadedTasks(true);
+    return nextTasks;
+  }, [supabase]);
 
   const fetchComments = useCallback(async (taskList?: { id: string }[]) => {
     // 🔧 [구조적 수정] task_id를 실제 admin_tasks ID 목록으로 필터링.
     // MiniChatBar가 아무리 채팅을 쌓아도 영향 없고, limit도 불필요.
     // ⭐ 수정: tasks대신 tasksRef.current 사용
     const ids = (taskList ?? tasksRef.current).map(t => t.id);
-    if (ids.length === 0) { setComments([]); return; }
-    const { data } = await supabase
+    if (ids.length === 0) {
+      setComments([]);
+      setHasLoadedComments(true);
+      return [];
+    }
+    const { data, error } = await supabase
       .from('admin_task_comments')
       .select('*')
       .in('task_id', ids)
       .order('created_at', { ascending: true });
-    if (data) setComments(data);
+
+    if (error) {
+      console.error('[TeamTab] fetchComments error:', error);
+      throw error;
+    }
+
+    const nextComments = data ?? [];
+    setComments(nextComments);
+    setHasLoadedComments(true);
+    return nextComments;
   }, [supabase]);
 
   const refreshTasksAndComments = useCallback(async () => {
     const nextTasks = await fetchTasks();
-    await fetchComments(nextTasks ?? []);
+    await fetchComments(nextTasks);
     return nextTasks;
-  }, [fetchComments]);
+  }, [fetchComments, fetchTasks]);
 
   const scheduleFetchComments = useCallback((taskList?: { id: string }[]) => {
     if (commentsFetchTimerRef.current) {
       clearTimeout(commentsFetchTimerRef.current);
     }
     commentsFetchTimerRef.current = setTimeout(() => {
-      fetchComments(taskList).catch((error: any) => {
+      fetchComments(taskList).catch((error: unknown) => {
         console.error('Failed to fetch comments:', error);
       });
     }, 200);
@@ -186,10 +199,17 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     });
   };
 
-  const fetchWhitelist = async () => {
-    const { data } = await supabase.from('admin_whitelist').select('*').order('created_at', { ascending: false });
-    if (data) setWhitelist(data);
-  };
+  const fetchWhitelist = useCallback(async () => {
+    const { data, error } = await supabase.from('admin_whitelist').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('[TeamTab] fetchWhitelist error:', error);
+      throw error;
+    }
+
+    setWhitelist(data ?? []);
+    setHasLoadedWhitelist(true);
+    return data ?? [];
+  }, [supabase]);
 
   useEffect(() => {
     setIsClient(true);
@@ -198,22 +218,87 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     localStorage.setItem('last_viewed_team', new Date().toISOString());
     window.dispatchEvent(new Event('team-viewed'));
 
-    const initData = async () => {
-      setIsLoading(true);
-      // tasks를 먼저 가져온 뒤 그 ID 목록으로 댓글 필터링
-      const [taskData, , resolvedUser] = await Promise.all([fetchTasks(), fetchWhitelist(), getCurrentUser()]);
-      if (!resolvedUser) {
-        showToast('세션이 만료되었습니다. 페이지를 새로고침해주세요.', 'error');
+    const handleClickOutside = (event: MouseEvent) => {
+      if (threadRef.current && !threadRef.current.contains(event.target as Node)) {
+        setExpandedTodo(null);
       }
-      await fetchComments(taskData ?? []);
-      setIsLoading(false);
     };
-    initData();
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (commentsFetchTimerRef.current) {
+        clearTimeout(commentsFetchTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (sessionStatus === 'unauthorized' && !sessionErrorToastShownRef.current) {
+      sessionErrorToastShownRef.current = true;
+      showToast('관리자 세션을 확인하지 못했습니다. 새로고침 후 다시 시도해주세요.', 'error');
+      return;
+    }
+
+    if (sessionStatus === 'ready') {
+      sessionErrorToastShownRef.current = false;
+    }
+  }, [sessionStatus, sessionReason, showToast]);
+
+  useEffect(() => {
+    if (sessionStatus !== 'ready') {
+      setIsLoading(sessionStatus === 'loading');
+      setWorkspaceErrorMessage(null);
+      return;
+    }
+
+    let isActive = true;
+
+    const initWorkspace = async () => {
+      setIsLoading(true);
+      setWorkspaceErrorMessage(null);
+      setHasLoadedTasks(false);
+      setHasLoadedComments(false);
+      setHasLoadedWhitelist(false);
+
+      try {
+        const taskData = await fetchTasks();
+        await fetchWhitelist();
+        await fetchComments(taskData);
+
+        if (!isActive) return;
+        workspaceErrorToastShownRef.current = false;
+        setIsLoading(false);
+      } catch (error) {
+        console.error('[TeamTab] Team Workspace bootstrap failed:', error);
+        if (!isActive) return;
+        setWorkspaceErrorMessage('관리자 데이터를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.');
+        setIsLoading(false);
+        if (!workspaceErrorToastShownRef.current) {
+          workspaceErrorToastShownRef.current = true;
+          showToast('관리자 데이터를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.', 'error');
+        }
+      }
+    };
+
+    void initWorkspace();
+
+    return () => {
+      isActive = false;
+    };
+  }, [fetchComments, fetchTasks, fetchWhitelist, sessionStatus, showToast]);
+
+  useEffect(() => {
+    if (sessionStatus !== 'ready') return;
 
     const channel = supabase.channel('team_workspace_realtime_final')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, async () => {
-        const nextTasks = await fetchTasks();
-        scheduleFetchComments(nextTasks ?? []);
+        try {
+          const nextTasks = await fetchTasks();
+          scheduleFetchComments(nextTasks);
+        } catch (error) {
+          console.error('[TeamTab] realtime admin_tasks refresh failed:', error);
+        }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_task_comments' }, (payload) => {
         const taskId = payload.new?.task_id as string | undefined;
@@ -229,24 +314,17 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
         if (!currentTaskIds.has(taskId)) return;
         scheduleFetchComments();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_whitelist' }, () => { fetchWhitelist(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_whitelist' }, () => {
+        fetchWhitelist().catch((error) => {
+          console.error('[TeamTab] realtime admin_whitelist refresh failed:', error);
+        });
+      })
       .subscribe();
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (threadRef.current && !threadRef.current.contains(event.target as Node)) {
-        setExpandedTodo(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
       supabase.removeChannel(channel);
-      document.removeEventListener('mousedown', handleClickOutside);
-      if (commentsFetchTimerRef.current) {
-        clearTimeout(commentsFetchTimerRef.current);
-      }
     };
-  }, []);
+  }, [fetchTasks, fetchWhitelist, scheduleFetchComments, sessionStatus, supabase]);
 
   useEffect(() => {
     if (initialInnerTab === 'proxy') {
@@ -528,9 +606,15 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     return comments.some(comment => memoTaskIds.has(comment.task_id) && new Date(comment.created_at) > viewedAt);
   }, [comments, memos, memoTaskIds, viewedAt]);
 
+  const hasLoadedWorkspace = hasLoadedTasks && hasLoadedComments && hasLoadedWhitelist;
+  const sessionErrorMessage =
+    sessionReason === 'forbidden'
+      ? '관리자 권한을 확인하지 못했습니다. 관리자 계정으로 다시 로그인해주세요.'
+      : '관리자 세션을 확인하지 못했습니다. 새로고침 후 다시 시도해주세요.';
+
   if (!isClient) return null;
 
-  if (isLoading) {
+  if (sessionStatus === 'loading' || isLoading) {
     return (
       <div className="flex flex-col h-full gap-6 animate-pulse">
         <div className="h-10 bg-slate-100 rounded-xl w-1/3"></div>
@@ -545,6 +629,28 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
             <div className="h-12 bg-slate-200 rounded"></div>
             <div className="h-64 bg-slate-200 rounded"></div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionStatus === 'unauthorized') {
+    return (
+      <div className="flex h-full items-center justify-center rounded-2xl border border-rose-100 bg-white px-6 py-16 text-center shadow-sm">
+        <div className="max-w-md space-y-3">
+          <p className="text-sm font-bold text-slate-900">관리자 세션 확인이 필요합니다.</p>
+          <p className="text-sm leading-relaxed text-slate-500">{sessionErrorMessage}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (workspaceErrorMessage && !hasLoadedWorkspace) {
+    return (
+      <div className="flex h-full items-center justify-center rounded-2xl border border-amber-100 bg-white px-6 py-16 text-center shadow-sm">
+        <div className="max-w-md space-y-3">
+          <p className="text-sm font-bold text-slate-900">Team Workspace를 불러오지 못했습니다.</p>
+          <p className="text-sm leading-relaxed text-slate-500">{workspaceErrorMessage}</p>
         </div>
       </div>
     );

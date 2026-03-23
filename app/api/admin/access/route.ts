@@ -17,14 +17,28 @@ export async function GET() {
     }
 
     const supabaseAdmin = createAdminClient();
-    const access = await resolveAdminAccess(supabaseAdmin, {
-      userId: user.id,
-      email: user.email,
-    });
+    const [access, profileResult] = await Promise.all([
+      resolveAdminAccess(supabaseAdmin, {
+        userId: user.id,
+        email: user.email,
+      }),
+      supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle(),
+    ]);
+
+    const displayName =
+      typeof profileResult.data?.full_name === 'string' && profileResult.data.full_name.trim().length > 0
+        ? profileResult.data.full_name.trim()
+        : (user.email?.split('@')[0] ?? null);
 
     return NextResponse.json({
       success: true,
       ...access,
+      userId: user.id,
+      displayName,
     });
   } catch (error) {
     console.error('[admin/access] GET failed:', error);
