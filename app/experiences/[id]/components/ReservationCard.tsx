@@ -33,8 +33,7 @@ export default function ReservationCard({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
-  const [bookingType, setBookingType] = useState<'group' | 'private'>('group');
-  const [guestCountSelection, setGuestCountSelection] = useState<number>(1);
+  const [guestSelection, setGuestSelection] = useState<string>('1');
   const [isSoloGuaranteed, setIsSoloGuaranteed] = useState(false);
 
   const cleanTime = selectedTime.substring(0, 5);
@@ -122,8 +121,12 @@ export default function ReservationCard({
     return days;
   };
 
-  const isPrivate = bookingType === 'private';
-  const guestCount = guestCountSelection;
+  const isPrivate = guestSelection === 'private';
+  const resolvedGuestSelection =
+    !isPrivate && Number(guestSelection) > maxSelectable
+      ? String(maxSelectable)
+      : guestSelection;
+  const guestCount = isPrivate ? 1 : Number(resolvedGuestSelection);
   const isSoloEligible =
     !isPrivate &&
     guestCount === 1 &&
@@ -149,12 +152,6 @@ export default function ReservationCard({
       setIsSoloGuaranteed(false);
     }
   }, [dateToTimeMap, selectedDate, selectedTime]);
-
-  useEffect(() => {
-    if (guestCountSelection > maxSelectable) {
-      setGuestCountSelection(maxSelectable);
-    }
-  }, [guestCountSelection, maxSelectable]);
 
   useEffect(() => {
     if (isSoloGuaranteed && !isSoloEligible) {
@@ -217,44 +214,6 @@ export default function ReservationCard({
 
         <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
           <div className="flex flex-col w-full gap-3">
-            {isPrivateEnabled && (
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold uppercase text-slate-800">{t('exp_reservation_booking_type')}</span>
-                  {isPrivate && (
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      {t('exp_reservation_private_fixed_note')}
-                    </span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    data-testid="reservation-booking-type-group"
-                    onClick={() => setBookingType('group')}
-                    className={`rounded-lg border px-3 py-2 text-[11px] font-semibold transition-all ${
-                      !isPrivate
-                        ? 'border-black bg-black text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    {t('exp_reservation_regular_booking')}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="reservation-booking-type-private"
-                    onClick={() => setBookingType('private')}
-                    className={`rounded-lg border px-3 py-2 text-[11px] font-semibold transition-all ${
-                      isPrivate
-                        ? 'border-black bg-black text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    {t('exp_reservation_private_option')}
-                  </button>
-                </div>
-              </div>
-            )}
             <div className="flex justify-between items-center mb-1">
               <span className="text-[10px] font-bold uppercase text-slate-800">{t('exp_reservation_guest_count')}</span>
               {selectedTime && (
@@ -266,20 +225,34 @@ export default function ReservationCard({
             
             <select
               data-testid="reservation-guest-select"
-              value={String(guestCountSelection)}
+              value={resolvedGuestSelection}
               onChange={(e) => {
-                const nextSelection = Number(e.target.value);
-                setGuestCountSelection(nextSelection);
-                if (nextSelection !== 1 && isSoloGuaranteed) {
+                const nextSelection = e.target.value;
+                setGuestSelection(nextSelection);
+                if (nextSelection !== '1' && isSoloGuaranteed) {
                   setIsSoloGuaranteed(false);
                 }
               }}
               className="text-[13px] md:text-sm outline-none bg-transparent font-semibold w-full cursor-pointer py-1"
             >
-              {Array.from({ length: Math.min(maxSelectable, 6) }, (_, i) => i + 1).map(n => (
-                <option key={n} value={String(n)}>{t('exp_reservation_guest_option', { count: n })}</option>
-              ))}
+              <optgroup label={t('exp_reservation_regular_booking')}>
+                {Array.from({ length: Math.min(maxSelectable, 6) }, (_, i) => i + 1).map(n => (
+                  <option key={n} value={String(n)}>{t('exp_reservation_guest_option', { count: n })}</option>
+                ))}
+              </optgroup>
+              {isPrivateEnabled && (
+                <optgroup label={t('exp_reservation_private_option')}>
+                  <option value="private">
+                    {t('exp_reservation_private_option_label_with_limit', { count: maxGuests })}
+                  </option>
+                </optgroup>
+              )}
             </select>
+            {isPrivate && (
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                {t('exp_reservation_private_followup_note')}
+              </p>
+            )}
           </div>
         </div>
       </div>

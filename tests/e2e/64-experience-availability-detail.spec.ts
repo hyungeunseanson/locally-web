@@ -70,7 +70,7 @@ test.describe.serial('Experience detail availability summary', () => {
 
     const guestOptions = page
       .getByTestId('reservation-guest-select')
-      .locator('option');
+      .locator('option:not([value="private"])');
 
     await expect(guestOptions).toHaveCount(Math.min(expectedRemainingSeats, 6));
   });

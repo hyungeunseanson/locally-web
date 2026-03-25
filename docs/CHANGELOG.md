@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.45 — [Experience Booking] 프라이빗 옵션 UI 원복
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 예약 카드 compact UI 원복 | `app/experiences/[id]/components/ReservationCard.tsx`, `app/context/experienceUiDictionary.ts` — `예약 유형` 분리 토글을 제거하고 예전 single select 구조로 복귀. 프라이빗 옵션은 다시 동일 셀렉트 안에 배치하고, `최대 n명` 안내와 `실제 인원은 예약 후 호스트와 조율` 보조 문구만 추가 |
+| 🟡 회귀 테스트 정리 | `tests/e2e/64-experience-availability-detail.spec.ts`, `tests/e2e/65-experience-post-confirm-detail-refresh.spec.ts`, `tests/e2e/91-private-tour-guest-count.spec.ts` — availability summary/뒤로가기 refresh 테스트를 예전 single select 계약으로 되돌리고, private option은 `type=private`, `guests=1`, 고정가 유지와 조율 안내 노출만 검증하도록 정리 |
+
 ## v3.39.44 — [Host Create] 대표 언어 카피 정리
 
 | 항목 | 내용 |

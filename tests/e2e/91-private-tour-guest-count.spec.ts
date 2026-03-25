@@ -20,8 +20,8 @@ test.afterAll(async () => {
   await cleanupAuthUsers(createdAuthUserIds);
 });
 
-test.describe.serial('Private tour guest count selection', () => {
-  test('allows selecting multiple guests for private tours while keeping the private rate fixed', async ({ page }) => {
+test.describe.serial('Private tour selector rollback', () => {
+  test('keeps the compact private option while navigating with guests=1 and the fixed rate', async ({ page }) => {
     const viewer = createTestUser('exp.private.multiguest.viewer');
     await createAuthUser(viewer, createdAuthUserIds);
 
@@ -30,7 +30,6 @@ test.describe.serial('Private tour guest count selection', () => {
       minimumMaxGuests: 2,
       searchAnyHost: true,
     });
-    const selectedGuests = Math.min(3, experience.maxGuests);
     const expectedFinalAmount = experience.privatePrice + Math.floor(experience.privatePrice * 0.1);
 
     await login(page, viewer);
@@ -39,8 +38,10 @@ test.describe.serial('Private tour guest count selection', () => {
     await selectReservationDate(page, experience.date);
     await selectReservationTime(page, experience.time);
 
-    await page.getByTestId('reservation-booking-type-private').click();
-    await page.getByTestId('reservation-guest-select').selectOption(String(selectedGuests));
+    await page.getByTestId('reservation-guest-select').selectOption('private');
+    await expect(
+      page.getByText(/실제 인원은 예약 후 호스트와 조율됩니다\.|The final guest count will be coordinated with the host after booking\.|実際の参加人数は予約後にホストと調整されます。|实际参加人数将在预订后与主办方协调。/)
+    ).toBeVisible();
 
     await page.getByTestId('reservation-submit').click();
     await expect
@@ -58,12 +59,11 @@ test.describe.serial('Private tour guest count selection', () => {
         pathname: `/experiences/${experience.experienceId}/payment`,
         date: experience.date,
         time: experience.time,
-        guests: String(selectedGuests),
+        guests: '1',
         type: 'private',
       });
 
     await expect(page.getByText(/프라이빗 투어|Private tour|貸切ツアー|私人团/)).toBeVisible();
-    await expect(page.getByText(`${selectedGuests}명`)).toBeVisible();
     await expect(page.getByText(`₩${expectedFinalAmount.toLocaleString()}`)).toBeVisible();
   });
 });
