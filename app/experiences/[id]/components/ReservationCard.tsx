@@ -214,8 +214,15 @@ export default function ReservationCard({
 
         <div className="p-3 bg-white flex justify-between items-center border-t border-slate-200">
           <div className="flex flex-col w-full gap-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-bold uppercase text-slate-800">{t('exp_reservation_guest_count')}</span>
+            <div className="flex justify-between items-start gap-2 mb-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
+                <span className="text-[10px] font-bold uppercase text-slate-800">{t('exp_reservation_guest_count')}</span>
+                {isPrivate && (
+                  <span className="text-[10px] leading-relaxed text-slate-500">
+                    ({t('exp_reservation_private_followup_note')})
+                  </span>
+                )}
+              </div>
               {selectedTime && (
                 <span className="text-[10px] text-rose-500 font-bold">
                   {remainingSeats <= 0 ? t('exp_reservation_sold_out') : remainingSeats <= 3 ? t('exp_reservation_seats_left', { count: remainingSeats }) : ''}
@@ -248,11 +255,6 @@ export default function ReservationCard({
                 </optgroup>
               )}
             </select>
-            {isPrivate && (
-              <p className="text-[11px] leading-relaxed text-slate-500">
-                {t('exp_reservation_private_followup_note')}
-              </p>
-            )}
           </div>
         </div>
       </div>

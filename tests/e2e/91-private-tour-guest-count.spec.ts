@@ -40,7 +40,7 @@ test.describe.serial('Private tour selector rollback', () => {
 
     await page.getByTestId('reservation-guest-select').selectOption('private');
     await expect(
-      page.getByText(/실제 인원은 예약 후 호스트와 조율됩니다\.|The final guest count will be coordinated with the host after booking\.|実際の参加人数は予約後にホストと調整されます。|实际参加人数将在预订后与主办方协调。/)
+      page.getByText(/실제 참여 인원은 예약 후 호스트에게 알려주세요\.|Please let the host know the final guest count after booking\.|実際の参加人数は予約後にホストへお知らせください。|实际参加人数请在预订后告知主办方。/)
     ).toBeVisible();
 
     await page.getByTestId('reservation-submit').click();

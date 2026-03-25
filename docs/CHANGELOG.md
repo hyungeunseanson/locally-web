@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.46 — [Experience Booking] 프라이빗 참여 인원 안내 카피 위치 조정
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 private 참여 인원 안내 문구 정리 | `app/experiences/[id]/components/ReservationCard.tsx`, `app/context/experienceUiDictionary.ts` — `실제 인원은 예약 후 호스트와 조율` 문구를 `실제 참여 인원은 예약 후 호스트에게 알려주세요`로 더 직접적으로 바꾸고, 하단 문단이 아니라 `인원` 라벨 옆 괄호형 보조 문구로 이동해 UI 밀도를 유지하면서 의미를 바로 이해할 수 있게 정리 |
+| 🟡 private option 계약 테스트 문구 반영 | `tests/e2e/91-private-tour-guest-count.spec.ts` — private option 선택 시 새 보조 문구가 노출되는지 검증 정리 |
+
 ## v3.39.45 — [Experience Booking] 프라이빗 옵션 UI 원복
 
 | 항목 | 내용 |
