@@ -107,7 +107,7 @@ export default function GuestTripsPage() {
 
   // ─── 맞춤 의뢰 섹션 (공통, 모바일+데스크탑) ───────────────────────────
   const ServiceRequestsSection = () => (
-    <section className="mt-8 md:mt-12">
+    <section data-testid="guest-trips-service-section" className="mt-8 md:mt-12">
       <div className="flex items-center justify-between mb-3 md:mb-4">
         <h2 className="text-[15px] md:text-xl font-bold flex items-center gap-2">
           <Briefcase size={18} className="text-slate-600" />
@@ -126,14 +126,18 @@ export default function GuestTripsPage() {
           {[1, 2].map((i) => <div key={i} className="animate-pulse h-16 bg-slate-100 rounded-xl" />)}
         </div>
       ) : serviceRequests.length === 0 ? (
-        <div className="border border-dashed border-slate-200 rounded-2xl py-8 text-center bg-slate-50/60">
-          <Briefcase size={22} className="text-slate-300 mx-auto mb-2" />
-          <p className="text-[12px] md:text-sm text-slate-500 mb-3">{t('trip_no_custom_requests')}</p>
-          <Link href="/services/intro">
-            <button className="inline-flex items-center gap-1.5 bg-slate-900 text-white px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold hover:bg-slate-800 transition-colors">
-              <Plus size={12} /> {t('trip_register_first')}
-            </button>
-          </Link>
+        <div data-testid="guest-trips-service-empty" className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 md:px-5 md:py-4 [box-shadow:0_1px_4px_rgba(0,0,0,0.04)]">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-[13px] md:text-sm font-bold text-slate-900">{t('trip_service_empty_title')}</p>
+              <p className="mt-1 text-[11px] md:text-xs text-slate-500">{t('trip_service_empty_desc')}</p>
+            </div>
+            <Link href="/services/intro" className="shrink-0">
+              <button className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-[11px] font-bold text-white transition-colors hover:bg-slate-800 md:text-xs">
+                <Plus size={12} /> {t('trip_service_empty_cta')}
+              </button>
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -192,18 +196,8 @@ export default function GuestTripsPage() {
 
         {/* 📱 모바일 전용: 스크롤 레이아웃 */}
         <div className="md:hidden">
-          {/* ── 맞춤 의뢰 섹션 (최상단) ── */}
-          <ServiceRequestsSection />
-
-          {/* ── 구분선 ── */}
-          <div className="flex items-center gap-2 my-6">
-            <div className="h-px flex-1 bg-slate-100" />
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t('trip_tab_regular')}</span>
-            <div className="h-px flex-1 bg-slate-100" />
-          </div>
-
           {/* ── 예정된 여행 ── */}
-          <div className="flex flex-col gap-3 mb-6">
+          <div data-testid="guest-trips-upcoming-section" className="flex flex-col gap-3 mb-6">
             {upcomingTrips.length > 0 ? (
               upcomingTrips.map((trip: GuestTrip) => (
                 <TripCard key={trip.id} trip={trip} onRequestCancel={requestCancel} isProcessing={isProcessing} onOpenReceipt={openReceipt} />
@@ -232,23 +226,16 @@ export default function GuestTripsPage() {
               </div>
             </>
           )}
+
+          {/* ── 맞춤 의뢰 섹션 (하단 보조 영역) ── */}
+          <ServiceRequestsSection />
         </div>
 
         {/* 🖥️ 데스크탑 전용: 기존 2컬럼 레이아웃 */}
         <div className="hidden md:grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
 
-          {/* 1. 왼쪽 메인: 맞춤 의뢰 (최상단) + 예정된 여행 */}
-          <section className="lg:col-span-7">
-            {/* 맞춤 의뢰 섹션 (데스크탑 최상단) */}
-            <ServiceRequestsSection />
-
-            {/* 구분선 */}
-            <div className="flex items-center gap-3 my-8">
-              <div className="h-px flex-1 bg-slate-100" />
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('trip_tab_regular')}</span>
-              <div className="h-px flex-1 bg-slate-100" />
-            </div>
-
+          {/* 1. 왼쪽 메인: 예정된 여행 + 맞춤 의뢰 */}
+          <section data-testid="guest-trips-desktop-main" className="lg:col-span-7">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               {t('trip_upcoming')} <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full">{upcomingTrips.length}</span>
             </h2>
@@ -274,6 +261,8 @@ export default function GuestTripsPage() {
                 </div>
               )}
             </div>
+
+            <ServiceRequestsSection />
           </section>
 
           {/* 2. 오른쪽 사이드: 지난 여행 */}

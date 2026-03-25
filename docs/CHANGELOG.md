@@ -5,6 +5,15 @@
 
 ---
 
+## v3.39.51 — [Guest UX] Trips · Inbox · Payment Complete 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 모바일 Trips 로그인 가드 | `app/components/mobile/BottomTabNavigation.tsx` — 비로그인 상태에서 중앙 `여행` 탭을 눌렀을 때 빈 상태로 진입하지 않고 기존 `LoginModal` 인터셉트가 뜨도록 정리. 동시에 message-type unread notification이 있을 때 메시지 탭에도 별도 dot를 노출하도록 보강 |
+| 🟠 Trips 우선순위/empty state 정리 | `app/guest/trips/page.tsx`, `app/guest/trips/components/TripCard.tsx`, `app/context/LanguageContext.tsx` — `예정된 일정`을 맞춤 의뢰보다 먼저 배치하고, 맞춤 의뢰가 0건일 때는 큰 dashed empty card 대신 얇은 보조 카드로 축소. 예약 카드에는 `호스트 / 예약 인원 / 프라이빗` 메타를 추가하고, `호스트 진행 불가` 검토 대기 상태에는 ETA와 고객센터 링크를 함께 노출 |
+| 🟠 취소/메시지/결제 완료 안심 카피 보강 | `app/guest/trips/components/CancellationModal.tsx`, `app/guest/inbox/page.tsx`, `app/experiences/[id]/payment/complete/page.tsx`, `app/context/LanguageContext.tsx` — 취소 모달에 `먼저 호스트에게 문의하기` CTA를 추가하고, Inbox empty state를 CTA 2개가 있는 action card로 재구성. 결제 완료 화면은 하드코딩 한국어를 모두 `ko/en/ja/zh` i18n 키로 옮겨 post-booking reassurance가 언어별로 일관되게 보이도록 정리 |
+| 🟡 게스트 UX 회귀 테스트 보강 | `tests/e2e/54-mobile-notification-badges.spec.ts`, `tests/e2e/57-guest-trips-sync-completed.spec.ts`, `tests/e2e/94-guest-trips-priority.spec.ts`, `tests/e2e/95-guest-inbox-empty-state.spec.ts` — 메시지 탭 unread dot, Trips 섹션 우선순위, 취소 모달 `호스트에게 문의하기`, host-unavailable review 안내, payment complete locale copy, inbox empty state CTA까지 Playwright 계약 테스트로 보강 |
+
 ## v3.39.50 — [UX] 핵심 3대 플로우 UX 핀셋 개선
 
 | 항목 | 내용 |

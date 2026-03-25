@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useChat } from '@/app/hooks/useChat';
 import Spinner from '@/app/components/ui/Spinner';
 import UserProfileModal from '@/app/components/UserProfileModal'; // 🟢 모달 임포트
-import { Send, User, Loader2, ImagePlus, ArrowLeft } from 'lucide-react';
+import { Send, User, Loader2, ImagePlus, ArrowLeft, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 추가 (import 맨 아래)
 import { detectChatPolicySignals } from '@/app/utils/chatPolicySignals';
@@ -341,7 +342,29 @@ function InboxContent() {
           {/* 목록 스크롤 */}
           <div className="flex-1 overflow-y-auto">
             {inquiries.length === 0 && (
-              <div className="p-10 text-center text-slate-400 text-sm">{t('msg_empty')}</div>
+              <div className="flex h-full min-h-[280px] items-center justify-center p-6 md:p-8">
+                <div data-testid="guest-inbox-empty-state" className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+                  <h2 className="mt-4 text-[16px] font-bold text-slate-900">{t('guest_inbox_empty_title')}</h2>
+                  <p className="mt-2 text-[13px] leading-6 text-slate-500">{t('guest_inbox_empty_desc')}</p>
+                  <div className="mt-5 flex flex-col gap-2.5">
+                    <Link
+                      href="/guest/trips"
+                      className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-[13px] font-bold text-white transition-colors hover:bg-slate-800"
+                    >
+                      {t('guest_inbox_empty_primary_cta')}
+                    </Link>
+                    <Link
+                      href="/help"
+                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      {t('guest_inbox_empty_secondary_cta')}
+                    </Link>
+                  </div>
+                </div>
+              </div>
             )}
             {inquiries.map((inq) => {
               const display = getDisplayHost(inq);

@@ -72,6 +72,24 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
       lang
     ) || trip.location || 'SEOUL';
   const isHostUnavailablePending = isHostUnavailableReviewPending(trip.cancelReason);
+  const guestCount = Number(trip.guests || 1);
+
+  const buildMessageHref = () => {
+    const messageParams = new URLSearchParams({
+      hostId: String(trip.hostId),
+      expId: String(trip.expId),
+      expTitle: localizedTitle,
+    });
+
+    if (trip.hostName) {
+      messageParams.set('hostName', trip.hostName);
+    }
+    if (trip.hostAvatarUrl) {
+      messageParams.set('hostAvatar', trip.hostAvatarUrl);
+    }
+
+    return `/guest/inbox?${messageParams.toString()}`;
+  };
 
   const openExternalLink = (url: string) => {
     window.location.href = url;
@@ -193,7 +211,10 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 
   return (
     <>
-      <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64 relative">
+      <div
+        data-testid={`guest-trip-card-${trip.id}`}
+        className="bg-white rounded-2xl md:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col md:flex-row h-auto md:h-64 relative"
+      >
 
         {/* 왼쪽: 이미지 섹션 */}
         <div className="w-full md:w-72 h-48 md:h-full relative bg-slate-200 shrink-0 cursor-pointer overflow-hidden group/slide flex items-center justify-center">
@@ -240,6 +261,22 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                   <span>{t('paid_label')} {formatPaymentDate(trip.paymentDate || trip.created_at || '')}</span>
                 </div>
 
+                <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-[10px] md:text-[11px] text-slate-500">
+                  {trip.hostName && (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                      {t('trip_meta_host')} {trip.hostName}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                    {t('trip_meta_guests', { count: String(guestCount) })}
+                  </span>
+                  {trip.isPrivate && (
+                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-700">
+                      {t('trip_meta_private')}
+                    </span>
+                  )}
+                </div>
+
                 <div className="text-[11px] md:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 md:gap-2 mt-0.5 md:mt-1">
                   <MapPin className="w-[11px] h-[11px] md:w-3 md:h-3" /> {localizedMeetingPoint}
                 </div>
@@ -248,6 +285,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
               {/* 🟢 더보기 메뉴 */}
               <div className="relative">
                 <button
+                  data-testid={`guest-trip-menu-button-${trip.id}`}
                   onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }}
                   className="p-1.5 md:p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors"
                 >
@@ -303,7 +341,17 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
               <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50 px-3 py-2.5 text-[11px] leading-5 text-orange-700">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500" />
-                  <p>{t('trip_review_pending_notice')}</p>
+                  <div className="space-y-2">
+                    <p>{t('trip_review_pending_notice')}</p>
+                    <p className="text-[10px] md:text-[11px] text-orange-700/90">{t('trip_review_pending_eta')}</p>
+                    <Link
+                      href="/help"
+                      data-testid="guest-trip-review-support-link"
+                      className="inline-flex items-center text-[10px] md:text-[11px] font-bold text-orange-700 underline underline-offset-2 transition-colors hover:text-orange-800"
+                    >
+                      {t('trip_review_pending_support_cta')}
+                    </Link>
+                  </div>
                 </div>
               </div>
             )}
@@ -313,20 +361,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
           <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 grid grid-cols-3 gap-1.5 md:gap-2">
             <button
               onClick={() => {
-                const messageParams = new URLSearchParams({
-                  hostId: String(trip.hostId),
-                  expId: String(trip.expId),
-                  expTitle: localizedTitle,
-                });
-
-                if (trip.hostName) {
-                  messageParams.set('hostName', trip.hostName);
-                }
-                if (trip.hostAvatarUrl) {
-                  messageParams.set('hostAvatar', trip.hostAvatarUrl);
-                }
-
-                router.push(`/guest/inbox?${messageParams.toString()}`);
+                router.push(buildMessageHref());
               }}
               className="py-2 rounded-lg md:rounded-xl border border-slate-200 font-bold text-[11px] md:text-xs text-slate-600 hover:border-black hover:text-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1"
             >
@@ -356,6 +391,10 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
         // 🟢 [추가] 환불 정보 전달
         refundInfo={refundInfo}
         fullRefundAmount={Number(trip.amount || trip.totalPrice || trip.total_price || trip.price || 0)}
+        onContactHost={() => {
+          setShowCancelModal(false);
+          router.push(buildMessageHref());
+        }}
         onConfirm={async ({ reasonCode, reason }) => {
           const success = await onRequestCancel(trip.id, reasonCode, reason);
           if (success) setShowCancelModal(false);

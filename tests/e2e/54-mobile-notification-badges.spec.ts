@@ -136,15 +136,19 @@ async function createApprovedHostApplication(userId: string, user: TestUser) {
   createdApplicationIds.push(String(data.id));
 }
 
-async function insertUnreadNotification(userId: string, link: string) {
+async function insertUnreadNotification(
+  userId: string,
+  link: string,
+  overrides?: Partial<{ type: string; title: string; message: string }>
+) {
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from('notifications')
     .insert({
       user_id: userId,
-      type: 'booking_confirmed',
-      title: '모바일 배지 테스트',
-      message: '읽지 않은 알림이 있습니다.',
+      type: overrides?.type || 'booking_confirmed',
+      title: overrides?.title || '모바일 배지 테스트',
+      message: overrides?.message || '읽지 않은 알림이 있습니다.',
       link,
       is_read: false,
     })
@@ -204,9 +208,26 @@ test.describe.serial('mobile unread badges', () => {
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('guest-mobile-profile-unread-dot')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('guest-mobile-messages-unread-dot')).toHaveCount(0);
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('guest-account-unread-dot')).toBeVisible({ timeout: 15000 });
+  });
+
+  test('guest mobile messages tab shows unread badge for message notifications', async ({ page }) => {
+    const guest = createUser('guest-message');
+    const guestId = await createAuthUser(guest);
+    await insertUnreadNotification(guestId, '/guest/inbox', {
+      type: 'new_message',
+      title: '새 메시지 테스트',
+      message: '호스트가 메시지를 보냈습니다.',
+    });
+
+    await login(page, guest);
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('guest-mobile-messages-unread-dot')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('guest-mobile-profile-unread-dot')).toBeVisible({ timeout: 15000 });
   });
 
   test('host mobile menu entry points show unread badge', async ({ page }) => {

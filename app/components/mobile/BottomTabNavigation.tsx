@@ -24,7 +24,7 @@ export default function BottomTabNavigation() {
         pathname?.startsWith('/host/experiences/');
     const activeHostTab = searchParams?.get('tab') || 'reservations';
     const { user } = useAuth();
-    const { unreadCount } = useNotification();
+    const { unreadCount, notifications } = useNotification();
     const avatarUrl = user?.user_metadata?.avatar_url;
     const [showLogin, setShowLogin] = useState(false);
     const { pendingHref, isNavigating, navigate } = usePendingNavigation();
@@ -55,6 +55,11 @@ export default function BottomTabNavigation() {
         navigate(href);
     };
 
+    const getMobileTabTestId = (href: string) => {
+        if (href === '/') return 'mobile-tab-home';
+        return `mobile-tab-${href.split('?')[0].replace(/\//g, '-').replace(/^-+/, '')}`;
+    };
+
     const guestTabs = [
         {
             name: t('nav_search'),
@@ -71,7 +76,7 @@ export default function BottomTabNavigation() {
         {
             name: t('nav_trips'),
             href: '/guest/trips',
-            requireAuth: false,
+            requireAuth: true,
             icon: (isActive: boolean) => (
                 <div className={`relative w-6 h-6 flex items-center justify-center overflow-hidden ${isActive ? '' : 'opacity-50'}`}>
                     <Image
@@ -89,7 +94,23 @@ export default function BottomTabNavigation() {
             name: t('nav_messages'),
             href: '/guest/inbox',
             requireAuth: true,
-            icon: (isActive: boolean) => <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
+            icon: (isActive: boolean) => {
+                const hasUnreadMessageNotification = notifications.some(
+                    (notification) => !notification.is_read && notification.type.includes('message')
+                );
+
+                return (
+                    <div className="relative">
+                        <MessageSquare size={22} className={isActive ? 'text-[#FF385C]' : 'text-gray-400'} strokeWidth={2} />
+                        {hasUnreadMessageNotification && (
+                            <span data-testid="guest-mobile-messages-unread-dot" className="absolute -right-1 -top-1">
+                                <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 opacity-75 animate-ping" />
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-rose-500" />
+                            </span>
+                        )}
+                    </div>
+                );
+            }
         },
         {
             name: t('nav_profile'),
@@ -206,6 +227,7 @@ export default function BottomTabNavigation() {
                             <button
                                 key={idx}
                                 type="button"
+                                data-testid={getMobileTabTestId(tab.href)}
                                 onClick={() => handleTabPress(tab.href, tab.requireAuth)}
                                 className="flex min-w-[50px] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 transition-all duration-150 active:scale-[0.96] active:bg-slate-50"
                             >
@@ -223,6 +245,7 @@ export default function BottomTabNavigation() {
                         <button
                             key={idx}
                             type="button"
+                            data-testid={getMobileTabTestId(tab.href)}
                             onClick={() => handleTabPress(tab.href, tab.requireAuth)}
                             disabled={isNavigating}
                             aria-busy={isPending}

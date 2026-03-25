@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
+import { formatHostUnavailableReviewMarker } from '@/app/utils/hostUnavailableReview';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -484,5 +485,140 @@ test.describe.serial('guest trips completed sync route', () => {
 
     await page.goto(`/experiences/${experience.id}/payment/complete?orderId=${bookingId}`, { waitUntil: 'networkidle' });
     await expect(page.getByText(experience.titleKo)).toBeVisible();
+  });
+
+  test('shows trip context meta and contact-host CTA in the cancellation modal', async ({ page }) => {
+    const host = createUser('host.trip.meta');
+    const guest = createUser('guest.trip.meta');
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    await supabase
+      .from('experiences')
+      .update({ meeting_point: '서울역 1번 출구', meeting_point_i18n: { ko: '서울역 1번 출구' } })
+      .eq('id', experienceId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'networkidle' });
+    await expect(page.getByText(`호스트 ${host.fullName}`).last()).toBeVisible();
+    await expect(page.getByText('예약 2명').last()).toBeVisible();
+
+    await page.getByTestId(`guest-trip-menu-button-${bookingId}`).last().click();
+    await page.getByRole('button', { name: /취소 요청/ }).click();
+
+    const cancelModal = page.locator('div.fixed.inset-0.z-50').filter({
+      hasText: /예약 취소 요청|취소 규정 요약/,
+    });
+    await expect(cancelModal).toBeVisible({ timeout: 10000 });
+    await expect(cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' })).toBeVisible();
+
+    await cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' }).click();
+    await page.waitForURL((url) => url.pathname === '/guest/inbox' && url.searchParams.get('expId') === String(experienceId), { timeout: 15000 });
+    await expect(page).toHaveURL(new RegExp(`hostId=${hostId}`));
+  });
+
+  test('shows review pending guidance and support CTA for host-unavailable review requests', async ({ page }) => {
+    const host = createUser('host.review.pending');
+    const guest = createUser('guest.review.pending');
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    const { error: reviewMarkerError } = await supabase
+      .from('bookings')
+      .update({
+        cancel_reason: formatHostUnavailableReviewMarker('host cannot proceed'),
+      })
+      .eq('id', bookingId);
+
+    if (reviewMarkerError) throw reviewMarkerError;
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'networkidle' });
+    await expect(page.getByText('호스트 진행 불가 사유를 운영팀이 검토 중입니다.').last()).toBeVisible();
+    await expect(page.getByText('보통 영업일 기준 검토 후 알림으로 안내됩니다. 급한 경우 고객센터로 문의해주세요.').last()).toBeVisible();
+    await expect(page.getByTestId('guest-trip-review-support-link').last()).toHaveAttribute('href', '/help');
+  });
+
+  test('renders payment complete copy in the selected locale', async ({ page }) => {
+    const host = createUser('host.payment.locale');
+    const guest = createUser('guest.payment.locale');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const experience = await createLocalizedHostExperience(hostId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId: experience.id,
+    });
+
+    await login(page, guest);
+
+    const localeExpectations = [
+      { locale: 'en', title: 'Your booking is confirmed!', cta: 'Go to Messages' },
+      { locale: 'ja', title: '予約が確定しました！', cta: 'メッセージへ移動' },
+      { locale: 'zh', title: '预订已确认！', cta: '前往消息' },
+    ] as const;
+
+    for (const expectation of localeExpectations) {
+      await page.evaluate(({ locale }) => {
+        window.localStorage.setItem('app_lang', locale);
+        document.cookie = `app_lang=${locale}; path=/`;
+      }, expectation);
+
+      await page.goto(`/experiences/${experience.id}/payment/complete?orderId=${bookingId}`, { waitUntil: 'networkidle' });
+      await expect(page.getByText(expectation.title)).toBeVisible();
+      await expect(page.getByRole('link', { name: new RegExp(expectation.cta) })).toBeVisible();
+    }
   });
 });

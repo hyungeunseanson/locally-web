@@ -18,9 +18,10 @@ interface Props {
   isProcessing: boolean;
   refundInfo: RefundInfo; // 🟢 추가됨
   fullRefundAmount: number;
+  onContactHost: () => void;
 }
 
-export default function CancellationModal({ isOpen, onClose, onConfirm, isProcessing, refundInfo, fullRefundAmount }: Props) {
+export default function CancellationModal({ isOpen, onClose, onConfirm, isProcessing, refundInfo, fullRefundAmount, onContactHost }: Props) {
   const { t } = useLanguage();
   const [reasonCode, setReasonCode] = useState<GuestTripCancelReasonCode>('personal_change');
   const [reason, setReason] = useState('');
@@ -108,6 +109,14 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
               onChange={(e) => setReason(e.target.value)}
             />
           </div>
+
+          <button
+            type="button"
+            onClick={onContactHost}
+            className="text-[12px] md:text-sm font-semibold text-slate-600 underline underline-offset-4 transition-colors hover:text-slate-900"
+          >
+            {t('modal_cancel_contact_host_cta')}
+          </button>
         </div>
 
         {/* 하단 버튼 */}

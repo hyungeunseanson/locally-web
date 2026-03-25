@@ -44,7 +44,7 @@ function PaymentCompleteContent() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
 
   const orderId = searchParams.get('orderId');
   const [booking, setBooking] = useState<BookingData | null>(null);
@@ -94,7 +94,7 @@ function PaymentCompleteContent() {
 
       if (error || !data) {
         console.error('Booking fetch error:', error);
-        showToast('예약 정보를 불러오지 못했어요. 주문 번호를 확인해주세요.', 'error');
+        showToast(t('pay_complete_fetch_error'), 'error');
       } else {
         setBooking(data);
         // 🎉 결제 완료(PAID/confirmed) 상태일 때만 폭죽 + analytics 발사
@@ -110,13 +110,13 @@ function PaymentCompleteContent() {
       setLoading(false);
     };
     fetchBooking();
-  }, [orderId, supabase, showToast]);
+  }, [orderId, supabase, showToast, t]);
 
   // 📅 구글 캘린더 링크 생성
   const handleAddToCalendar = () => {
     if (!booking) return;
     const { date, time, experiences } = booking;
-    const title = getContent(experiences, 'title', lang) || experiences?.title || 'Locally 체험';
+    const title = getContent(experiences, 'title', lang) || experiences?.title || t('pay_complete_fallback_title');
     const location = experiences?.location || '';
     const durationHours = experiences?.duration || 2;
 
@@ -125,7 +125,7 @@ function PaymentCompleteContent() {
     const endDate = new Date(new Date(`${date}T${time}`).getTime() + durationHours * 60 * 60 * 1000);
     const endTime = endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'; // 대략적인 종료 시간 (2시간 후로 가정)
 
-    const details = `Locally 체험 예약: ${title}${location ? `\n위치: ${location}` : ''}`;
+    const details = `${t('pay_complete_fallback_title')}: ${title}${location ? `\n${location}` : ''}`;
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
 
     window.location.href = url;
@@ -135,12 +135,12 @@ function PaymentCompleteContent() {
   const handleShare = () => {
     const url = `${window.location.origin}/experiences/${params.id}`;
     navigator.clipboard.writeText(url);
-    showToast('체험 링크가 복사되었습니다! 친구에게 알려주세요.', 'success');
+    showToast(t('pay_complete_share_copied'), 'success');
   };
 
   if (loading) return <Spinner fullScreen />;
-  if (!booking) return <div className="min-h-screen bg-white flex items-center justify-center">예약 정보를 불러올 수 없습니다.</div>;
-  const localizedExperienceTitle = getContent(booking.experiences, 'title', lang) || booking.experiences?.title || 'Locally 체험';
+  if (!booking) return <div className="min-h-screen bg-white flex items-center justify-center">{t('pay_complete_missing_booking')}</div>;
+  const localizedExperienceTitle = getContent(booking.experiences, 'title', lang) || booking.experiences?.title || t('pay_complete_fallback_title');
   const bookingImage = booking.experiences?.photos?.[0] || booking.experiences?.image_url || '/images/logo.png';
   const messageParams = new URLSearchParams();
   if (booking.experiences?.host_id) {
@@ -170,17 +170,17 @@ function PaymentCompleteContent() {
               <div className="w-16 h-16 md:w-20 md:h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-yellow-600 shadow-sm animate-pulse">
                 <AlertCircle className="w-7 h-7 md:w-10 md:h-10" strokeWidth={3} />
               </div>
-              <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">입금을 대기 중입니다!</h1>
-              <p className="text-slate-500 text-[14px] md:text-lg mb-4 md:mb-6">아래 계좌로 입금해주시면 예약이 확정됩니다.</p>
+              <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">{t('pay_complete_pending_title')}</h1>
+              <p className="text-slate-500 text-[14px] md:text-lg mb-4 md:mb-6">{t('pay_complete_pending_desc')}</p>
 
               <div className="bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl p-4 md:p-6 max-w-xs md:max-w-sm mx-auto">
-                <p className="text-[11px] md:text-xs font-bold text-slate-400 mb-2 uppercase">입금 계좌 정보</p>
+                <p className="text-[11px] md:text-xs font-bold text-slate-400 mb-2 uppercase">{t('pay_complete_bank_info_label')}</p>
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <span className="font-black text-[20px] md:text-2xl text-slate-900">{bankInfo.account}</span>
-                  <Copy className="w-4 h-4 text-slate-400 cursor-pointer hover:text-black" onClick={() => { navigator.clipboard.writeText(bankInfo.accountDigits); showToast('계좌번호 복사 완료!', 'success'); }} />
+                  <Copy className="w-4 h-4 text-slate-400 cursor-pointer hover:text-black" onClick={() => { navigator.clipboard.writeText(bankInfo.accountDigits); showToast(t('pay_complete_bank_copied'), 'success'); }} />
                 </div>
-                <p className="font-bold text-slate-700 text-[13px] md:text-base">{bankInfo.bankName} (예금주: {bankInfo.accountHolder})</p>
-                <p className="text-[11px] md:text-xs text-rose-500 mt-1.5 md:mt-2 font-bold">* 1시간 내 미입금 시 자동 취소</p>
+                <p className="font-bold text-slate-700 text-[13px] md:text-base">{bankInfo.bankName} ({t('pay_complete_bank_account_holder_label')}: {bankInfo.accountHolder})</p>
+                <p className="text-[11px] md:text-xs text-rose-500 mt-1.5 md:mt-2 font-bold">{t('pay_complete_bank_timeout_hint')}</p>
               </div>
             </>
           ) : isCancelledBookingStatus(booking.status || '') ? (
@@ -188,16 +188,16 @@ function PaymentCompleteContent() {
               <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-slate-400 shadow-sm">
                 <AlertCircle className="w-7 h-7 md:w-10 md:h-10" strokeWidth={3} />
               </div>
-              <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">예약이 취소되었습니다</h1>
-              <p className="text-slate-500 text-[14px] md:text-lg">예약이 취소 또는 거절된 상태입니다. 궁금한 점은 고객센터에 문의해주세요.</p>
+              <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">{t('pay_complete_cancelled_title')}</h1>
+              <p className="text-slate-500 text-[14px] md:text-lg">{t('pay_complete_cancelled_desc')}</p>
             </>
           ) : (
             <>
               <div className="w-16 h-16 md:w-20 md:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-green-600 shadow-sm">
                 <CheckCircle className="w-7 h-7 md:w-10 md:h-10" strokeWidth={3} />
               </div>
-              <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">예약이 확정되었습니다!</h1>
-              <p className="text-slate-500 text-[14px] md:text-lg">설레는 여행 준비를 시작해보세요.</p>
+              <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">{t('pay_complete_confirmed_title')}</h1>
+              <p className="text-slate-500 text-[14px] md:text-lg">{t('pay_complete_confirmed_desc')}</p>
             </>
           )}
         </div>
@@ -207,7 +207,7 @@ function PaymentCompleteContent() {
           <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
             {/* 이미지 */}
             <div className="w-full md:w-32 h-28 md:h-32 bg-slate-200 rounded-xl md:rounded-2xl relative overflow-hidden shrink-0 shadow-inner">
-              <Image src={bookingImage} alt={localizedExperienceTitle || '체험 이미지'} fill className="object-cover" />
+              <Image src={bookingImage} alt={t('pay_complete_image_alt')} fill className="object-cover" />
             </div>
 
             {/* 텍스트 정보 */}
@@ -233,10 +233,10 @@ function PaymentCompleteContent() {
 
           <div className="mt-5 md:mt-8 pt-5 md:pt-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-2 md:gap-4">
             <div className="text-[12px] md:text-sm text-slate-500">
-              예약번호 <span className="font-mono font-bold text-slate-900 ml-2">{orderId}</span>
+              {t('pay_complete_booking_number_label')} <span className="font-mono font-bold text-slate-900 ml-2">{orderId}</span>
             </div>
             <Link href={`/guest/trips`} className="text-[12px] md:text-sm font-bold text-rose-500 hover:underline flex items-center gap-1">
-              예약 상세 내역 보기 <ArrowRight className="w-3.5 h-3.5" />
+              {t('pay_complete_view_detail')} <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
@@ -244,13 +244,13 @@ function PaymentCompleteContent() {
         {/* 3. 액션 버튼들 (캘린더, 공유, 홈) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 max-w-2xl mx-auto mb-10 md:mb-16">
           <button onClick={handleAddToCalendar} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-white border border-slate-200 hover:border-black hover:shadow-md rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base text-slate-700">
-            <Calendar className="w-4 h-4 md:w-[18px] md:h-[18px]" /> 캘린더에 추가
+            <Calendar className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_action_add_calendar')}
           </button>
           <button onClick={handleShare} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-white border border-slate-200 hover:border-black hover:shadow-md rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base text-slate-700">
-            <Share2 className="w-4 h-4 md:w-[18px] md:h-[18px]" /> 친구에게 공유
+            <Share2 className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_action_share')}
           </button>
           <Link href="/" className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-slate-900 text-white hover:bg-black hover:shadow-lg rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
-            <Home className="w-4 h-4 md:w-[18px] md:h-[18px]" /> 홈으로 가기
+            <Home className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_action_home')}
           </Link>
         </div>
 
@@ -258,10 +258,10 @@ function PaymentCompleteContent() {
         <div className="bg-blue-50 text-blue-800 p-4 md:p-6 rounded-xl md:rounded-2xl text-[12px] md:text-sm max-w-2xl mx-auto flex items-start gap-2.5 md:gap-3">
           <MessageCircle className="shrink-0 mt-0.5 w-4 h-4 md:w-[18px] md:h-[18px]" />
           <div className="text-left">
-            <p className="font-bold text-[13px] md:text-base mb-1">호스트에게 메시지를 보내보세요!</p>
-            <p className="text-blue-600/80">궁금한 점이 있거나, 미리 알리고 싶은 내용이 있다면 메시지함에서 호스트와 대화할 수 있습니다.</p>
+            <p className="font-bold text-[13px] md:text-base mb-1">{t('pay_complete_message_title')}</p>
+            <p className="text-blue-600/80">{t('pay_complete_message_desc')}</p>
             <Link href={messageHref} className="inline-block mt-2.5 md:mt-3 text-[11px] md:text-xs font-bold bg-blue-100 hover:bg-blue-200 text-blue-700 px-2.5 md:px-3 py-1.5 rounded-lg transition-colors">
-              메시지 보내러 가기 →
+              {t('pay_complete_message_cta')} →
             </Link>
           </div>
         </div>
