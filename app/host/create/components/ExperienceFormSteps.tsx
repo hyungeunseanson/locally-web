@@ -519,6 +519,9 @@ export default function ExperienceFormSteps({
                     onChange={(e) => updateData('manual_content', setManualFieldValue(formData.manual_content, option.code, 'description', e.target.value))}
                     className="w-full p-4 h-32 md:h-36 bg-slate-50 rounded-2xl outline-none resize-none text-sm md:text-base border border-slate-200 focus:border-black"
                   />
+                  <p className={`text-[11px] mt-1 ml-1 ${(inputValue?.length || 0) >= 30 ? 'text-green-500' : 'text-slate-400'}`}>
+                    {inputValue?.length || 0}/30자 이상
+                  </p>
                 </div>
               );
             })}
@@ -715,6 +718,7 @@ export default function ExperienceFormSteps({
                 placeholder="0"
               />
             </div>
+            <p className="text-[11px] md:text-xs text-slate-400 text-center mt-2">참고: 4시간 투어 기준 평균 3~5만원</p>
           </div>
 
           <div className="w-full bg-slate-50 p-6 rounded-2xl border border-slate-200">

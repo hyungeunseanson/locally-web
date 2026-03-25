@@ -267,6 +267,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
               />
 
               {mode === 'SIGNUP' && (
+                <p className="px-4 py-1.5 text-[11px] md:text-xs text-gray-400 border-t border-gray-300 bg-gray-50">6자 이상 입력해주세요</p>
+              )}
+
+              {mode === 'SIGNUP' && (
                 <>
                   <div className="flex border-t border-gray-300">
                     <div className="w-1/2 border-r border-gray-300">

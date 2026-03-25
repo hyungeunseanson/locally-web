@@ -121,6 +121,13 @@ function LanguageLevelSelector({
                 </button>
               ))}
             </div>
+            <div className="mt-2 flex justify-between px-0.5 text-[9px] md:text-[10px] text-slate-400">
+              <span>기초</span>
+              <span>초급</span>
+              <span>중급</span>
+              <span>고급</span>
+              <span>원어민</span>
+            </div>
           </div>
         );
       })}
@@ -285,6 +292,9 @@ export default function HostRegisterForm({
               <div className="w-full text-left">
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.selfIntroLabel}</label>
                 <textarea placeholder={copy.selfIntroPlaceholder} value={formData.selfIntro} onChange={(e) => updateData('selfIntro', e.target.value)} className="w-full p-3.5 h-32 bg-slate-50 rounded-xl outline-none text-sm resize-none border border-transparent focus:border-black focus:bg-white transition-all" />
+                <p className={`text-[11px] mt-1.5 ml-1 ${(formData.selfIntro?.length || 0) >= 50 ? 'text-green-500' : 'text-slate-400'}`}>
+                  {formData.selfIntro?.length || 0}/50자
+                </p>
               </div>
             </div>
           </div>

@@ -5,6 +5,19 @@
 
 ---
 
+## v3.39.50 — [UX] 핵심 3대 플로우 UX 핀셋 개선
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 비밀번호 힌트 | `app/components/LoginModal.tsx` — 회원가입 모드에서 비밀번호 필드 아래 "6자 이상 입력해주세요" 힌트 추가 |
+| 🟢 생년월일 placeholder | `app/components/loginModalLocalization.ts` — "8자리" → "예: 19900115" 예시로 변경 (4개 언어) |
+| 🟢 auth-code-error 문구 | `app/auth/auth-code-error/page.tsx` — "소셜 로그인 처리 중" → "인증 처리 중"으로 수정 (이메일 인증 실패에도 적용) |
+| 🟢 가입 환영 메시지 | `app/components/loginModalLocalization.ts` — 가입 완료/인증 메일 문구를 환영+다음 행동 유도 문구로 개선 (4개 언어) |
+| 🟢 자기소개 글자 수 카운터 | `app/host/register/components/HostRegisterForm.tsx` — Step 4 자기소개 textarea 아래 "{n}/50자" 카운터 (50자 달성 시 녹색) |
+| 🟢 언어 레벨 기준 | `app/host/register/components/HostRegisterForm.tsx` — Lv.1~5 버튼 아래 "기초/초급/중급/고급/원어민" 레이블 추가 |
+| 🟢 체험 설명 글자 수 카운터 | `app/host/create/components/ExperienceFormSteps.tsx` — Step 5 설명 textarea 아래 "{n}/30자 이상" 카운터 (30자 달성 시 녹색) |
+| 🟢 가격 힌트 | `app/host/create/components/ExperienceFormSteps.tsx` — Step 7 가격 입력 아래 "참고: 4시간 투어 기준 평균 3~5만원" 텍스트 |
+
 ## v3.39.49 — [Host Create] 대표 언어 안내 강조 · 환불 정책 칩 정리
 
 | 항목 | 내용 |

@@ -21,7 +21,7 @@ export default function AuthCodeErrorPage() {
             로그인에 실패했어요
           </h1>
           <p className="text-slate-600 mb-2">
-            소셜 로그인 처리 중 문제가 발생했거나, 요청이 만료되었을 수 있어요.
+            인증 처리 중 문제가 발생했거나, 요청이 만료되었을 수 있어요.
           </p>
           <p className="text-slate-500 text-sm mb-10">
             다시 시도하거나 이메일 로그인을 이용해 주세요.
