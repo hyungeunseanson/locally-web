@@ -238,6 +238,7 @@ type ExperienceFormCopy = {
   step7Desc: string;
   priceLabel: string;
   privateOptionLabel: string;
+  privateOptionDesc: string;
   privatePricePlaceholder: string;
   step8Title: string;
   step8DescLine1: string;
@@ -348,6 +349,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Desc: '가격을 설정하세요.',
     priceLabel: '기본 1인당 가격',
     privateOptionLabel: '단독 투어 옵션',
+    privateOptionDesc: '다른 게스트 없이 우리 그룹만 참여하는 프라이빗 투어 가격을 설정합니다.',
     privatePricePlaceholder: '단독 투어 고정 가격',
     step8Title: '체험 등록 완료! 🎉',
     step8DescLine1: '관리자 검토 후 공개됩니다.',
@@ -456,6 +458,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Desc: 'Set your price.',
     priceLabel: 'Base price per guest',
     privateOptionLabel: 'Private tour option',
+    privateOptionDesc: 'Set a fixed price for a private tour where only the booking group participates.',
     privatePricePlaceholder: 'Fixed private tour price',
     step8Title: 'Experience submitted! 🎉',
     step8DescLine1: 'It will be published after admin review.',
@@ -564,6 +567,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Desc: '価格を設定してください。',
     priceLabel: '基本の1人あたり価格',
     privateOptionLabel: 'プライベートツアーオプション',
+    privateOptionDesc: '他のゲストなしで、グループだけが参加するプライベートツアーの価格を設定します。',
     privatePricePlaceholder: 'プライベートツアー固定価格',
     step8Title: '体験登録が完了しました！ 🎉',
     step8DescLine1: '管理者の確認後に公開されます。',
@@ -672,6 +676,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Desc: '请设置价格。',
     priceLabel: '基础单价（每人）',
     privateOptionLabel: '私人团选项',
+    privateOptionDesc: '设置仅预订团体参加、无其他游客的私人团价格。',
     privatePricePlaceholder: '私人团固定价格',
     step8Title: '体验提交完成！ 🎉',
     step8DescLine1: '管理员审核后将会公开。',

@@ -519,8 +519,8 @@ export default function ExperienceFormSteps({
                     onChange={(e) => updateData('manual_content', setManualFieldValue(formData.manual_content, option.code, 'description', e.target.value))}
                     className="w-full p-4 h-32 md:h-36 bg-slate-50 rounded-2xl outline-none resize-none text-sm md:text-base border border-slate-200 focus:border-black"
                   />
-                  <p className={`text-[11px] mt-1 ml-1 ${(inputValue?.length || 0) >= 30 ? 'text-green-500' : 'text-slate-400'}`}>
-                    {inputValue?.length || 0}/30자 이상
+                  <p className={`text-[11px] mt-1 ml-1 ${(inputValue?.length || 0) >= 50 ? 'text-green-500' : 'text-slate-400'}`}>
+                    {inputValue?.length || 0}/50자 이상
                   </p>
                 </div>
               );
@@ -671,26 +671,26 @@ export default function ExperienceFormSteps({
           </div>
 
           <div data-testid="host-create-refund-policy-card" className="rounded-2xl border border-slate-200 bg-white px-4 py-4 md:px-5 md:py-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">{copy.refundPolicyLabel}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">{copy.refundPolicyLabel}</p>
+            <div className="space-y-0 divide-y divide-slate-100">
               {copy.refundPolicyItems.map((item, index) => {
                 const isNoRefundRule = index === copy.refundPolicyItems.length - 1;
                 return (
-                  <span
+                  <div
                     key={item}
                     data-testid={`host-create-refund-policy-chip-${index}`}
-                    className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold md:text-sm ${
+                    className={`py-2 px-1 text-[12px] md:text-sm ${
                       isNoRefundRule
-                        ? 'border-rose-200 bg-rose-50 text-rose-600'
-                        : 'border-slate-200 bg-white text-slate-700'
+                        ? 'font-bold text-rose-500'
+                        : 'text-slate-600'
                     }`}
                   >
                     {item}
-                  </span>
+                  </div>
                 );
               })}
             </div>
-            <p className="text-xs text-slate-500 mt-2">{copy.refundPolicyHelp}</p>
+            <p className="text-[11px] md:text-xs text-slate-400 mt-3">{copy.refundPolicyHelp}</p>
           </div>
         </div>
       </div>
@@ -711,9 +711,13 @@ export default function ExperienceFormSteps({
             <div className="relative w-full max-w-xs mx-auto">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl md:text-4xl font-bold text-slate-300">₩</span>
               <input
-                type="number"
-                value={formData.price}
-                onChange={(e) => updateData('price', Number(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                value={formData.price || ''}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, '');
+                  updateData('price', v ? Number(v) : 0);
+                }}
                 className="w-full pl-12 pr-4 py-3 md:py-4 text-3xl md:text-5xl font-black text-center border-b-2 border-slate-200 focus:border-black outline-none bg-transparent"
                 placeholder="0"
               />
@@ -722,7 +726,7 @@ export default function ExperienceFormSteps({
           </div>
 
           <div className="w-full bg-slate-50 p-6 rounded-2xl border border-slate-200">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
                 <Lock size={18} className="text-slate-900" />
                 <span className="font-bold text-slate-900">{copy.privateOptionLabel}</span>
@@ -737,15 +741,20 @@ export default function ExperienceFormSteps({
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
               </label>
             </div>
+            <p className="text-[11px] md:text-xs text-slate-400 mb-3">{copy.privateOptionDesc}</p>
 
             {formData.is_private_enabled && (
-              <div className="animate-in fade-in slide-in-from-top-2 pt-2 border-t border-slate-200 mt-2">
+              <div className="animate-in fade-in slide-in-from-top-2 pt-2 border-t border-slate-200">
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">₩</span>
                   <input
-                    type="number"
-                    value={formData.private_price || 0}
-                    onChange={(e) => updateData('private_price', Number(e.target.value))}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.private_price || ''}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9]/g, '');
+                      updateData('private_price', v ? Number(v) : 0);
+                    }}
                     className="w-full pl-10 pr-4 py-3 text-xl font-bold bg-white border border-slate-300 rounded-xl focus:border-black outline-none"
                     placeholder={copy.privatePricePlaceholder}
                   />
