@@ -3,7 +3,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { COMMUNITY_FORMAT_FILTER_OPTIONS } from '../categoryMeta';
+import { COMMUNITY_FORMAT_FILTER_OPTIONS, COMMUNITY_OPEN } from '../categoryMeta';
 import { buildCommunityListHref, resolveCommunityFormat, resolveCommunityHub, resolveCommunitySort } from '../queryParams';
 import { usePendingNavigation } from '../hooks/usePendingNavigation';
 
@@ -24,9 +24,15 @@ export default function CommunityCategoryTabs() {
         }));
     };
 
+    const visibleTabs = COMMUNITY_OPEN
+        ? COMMUNITY_FORMAT_FILTER_OPTIONS
+        : COMMUNITY_FORMAT_FILTER_OPTIONS.filter((tab) => tab.id === 'locally_pick');
+
+    if (visibleTabs.length <= 1) return null;
+
     return (
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-            {COMMUNITY_FORMAT_FILTER_OPTIONS.map((tab) => {
+            {visibleTabs.map((tab) => {
                 const href = buildCommunityListHref({
                     hub: currentHub,
                     format: tab.id as typeof currentFormat,

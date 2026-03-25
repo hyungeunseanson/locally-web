@@ -5,6 +5,9 @@ import type {
   CommunityPostFormatFilter,
 } from '@/app/types/community';
 
+/** 커뮤니티(질문/동행/꿀팁) 임시 비활성화 플래그. true → 전체 공개, false → 로컬리 콘텐츠만 */
+export const COMMUNITY_OPEN = false;
+
 export type CommunityCategoryMeta = {
   label: string;
   shortLabel: string;

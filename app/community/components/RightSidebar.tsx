@@ -5,7 +5,7 @@ import type { CommunityCategory, CommunityHubFilter, CommunityPostFormatFilter }
 import type { CommunityHighlightPost } from '../highlights';
 import { getCommunityHubMeta } from '../hubMeta';
 import { buildCommunityDetailHref, buildCommunityListHref } from '../queryParams';
-import { isLocallyContentCategory } from '../categoryMeta';
+import { COMMUNITY_OPEN, isLocallyContentCategory } from '../categoryMeta';
 
 interface RightSidebarProps {
     category: CommunityCategory;
@@ -80,7 +80,9 @@ export default function RightSidebar({
     companionPulse,
     locallyPicks,
 }: RightSidebarProps) {
-    const showWriteButton = !isLocallyContentCategory(category) || canWriteLocallyContent;
+    const showWriteButton = COMMUNITY_OPEN
+        ? (!isLocallyContentCategory(category) || canWriteLocallyContent)
+        : canWriteLocallyContent;
     const writeParams = new URLSearchParams();
     writeParams.set('category', category);
     if (hub !== 'all') writeParams.set('hub', hub);
@@ -99,16 +101,20 @@ export default function RightSidebar({
                 </Link>
             )}
 
-            <SidebarList
-                title="이번 주 인기 질문"
-                items={weeklyQuestions}
-                moreHref={buildCommunityListHref({ hub, format: 'question' })}
-            />
-            <SidebarList
-                title="지금 올라오는 동행"
-                items={companionPulse}
-                moreHref={buildCommunityListHref({ hub, format: 'companion' })}
-            />
+            {COMMUNITY_OPEN && (
+                <SidebarList
+                    title="이번 주 인기 질문"
+                    items={weeklyQuestions}
+                    moreHref={buildCommunityListHref({ hub, format: 'question' })}
+                />
+            )}
+            {COMMUNITY_OPEN && (
+                <SidebarList
+                    title="지금 올라오는 동행"
+                    items={companionPulse}
+                    moreHref={buildCommunityListHref({ hub, format: 'companion' })}
+                />
+            )}
             <SidebarList
                 title="로컬리 콘텐츠"
                 items={locallyPicks}

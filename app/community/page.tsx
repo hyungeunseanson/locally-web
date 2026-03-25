@@ -1,7 +1,7 @@
 import React from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { Edit3 } from 'lucide-react';
+import { Edit3, MessageCircle } from 'lucide-react';
 
 import { createClient } from '@/app/utils/supabase/server';
 import { getCurrentLocale } from '@/app/utils/locale';
@@ -16,7 +16,7 @@ import MobileWidgetStrip from './components/MobileWidgetStrip';
 import MobileSortBar from './components/MobileSortBar';
 import CommunitySearchControls from './components/CommunitySearchControls';
 import CommunityHubTabs from './components/CommunityHubTabs';
-import { getCommunityCategoryFromFormat, getCommunityFormatFromCategory, getCommunityFormatMeta } from './categoryMeta';
+import { COMMUNITY_OPEN, getCommunityCategoryFromFormat, getCommunityFormatFromCategory, getCommunityFormatMeta } from './categoryMeta';
 import { getCommunityHubMeta } from './hubMeta';
 import {
     buildCommunityFeedPosts,
@@ -66,15 +66,28 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
     const currentFormat = resolveCommunityFormat(params?.format as string, params?.category as string);
 
     const hubTitle = currentHub !== 'all' ? getCommunityHubMeta(currentHub).label : '';
-    const formatTitle = currentFormat !== 'all' ? getCommunityFormatMeta(currentFormat).label : '커뮤니티';
-    const title = hubTitle
-        ? `${hubTitle} ${formatTitle} - 커뮤니티`
-        : currentFormat === 'all'
-            ? '커뮤니티'
-            : `${formatTitle} - 커뮤니티`;
-    const description = hubTitle
-        ? `${hubTitle} 여행자들이 묻고 답하는 Locally 도시 허브 커뮤니티`
-        : '여행자들이 도시별 질문, 동행, 여행 꿀팁을 이어보는 Locally 커뮤니티';
+
+    let title: string;
+    let description: string;
+
+    if (!COMMUNITY_OPEN) {
+        title = hubTitle
+            ? `${hubTitle} 로컬리 콘텐츠`
+            : '로컬리 콘텐츠';
+        description = hubTitle
+            ? `${hubTitle} 여행에 대한 Locally 오리지널 콘텐츠 — 루트, 맛집, 현지 추천 정보를 확인하세요.`
+            : '로컬이 직접 정리한 여행 콘텐츠 — 루트, 맛집, 현지 추천 정보를 확인하세요.';
+    } else {
+        const formatTitle = currentFormat !== 'all' ? getCommunityFormatMeta(currentFormat).label : '커뮤니티';
+        title = hubTitle
+            ? `${hubTitle} ${formatTitle} - 커뮤니티`
+            : currentFormat === 'all'
+                ? '커뮤니티'
+                : `${formatTitle} - 커뮤니티`;
+        description = hubTitle
+            ? `${hubTitle} 여행자들이 묻고 답하는 Locally 도시 허브 커뮤니티`
+            : '여행자들이 도시별 질문, 동행, 여행 꿀팁을 이어보는 Locally 커뮤니티';
+    }
     const canonicalPath = '/community';
     const canonicalUrl = buildLocalizedAbsoluteUrl(locale, canonicalPath);
 
@@ -111,8 +124,12 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
 
     const currentHub = resolveCommunityHub(params?.hub as string);
     const requestedCategory = resolveCommunityCategory(params?.category as string);
-    const currentFormat = resolveCommunityFormat(params?.format as string, requestedCategory);
-    const currentCategory = currentFormat === 'all' ? requestedCategory : getCommunityCategoryFromFormat(currentFormat);
+    let currentFormat = resolveCommunityFormat(params?.format as string, requestedCategory);
+    if (!COMMUNITY_OPEN && currentFormat !== 'locally_pick') {
+        currentFormat = 'locally_pick';
+    }
+    const currentCategory = !COMMUNITY_OPEN ? 'locally_content' as CommunityCategory
+        : currentFormat === 'all' ? requestedCategory : getCommunityCategoryFromFormat(currentFormat);
     const queryText = ((params?.q as string) || '').trim().replace(/,/g, ' ');
     const sort = resolveCommunitySort(params?.sort as string);
     const limit = 15;
@@ -273,13 +290,20 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
         }>).map((post) => normalizeHighlightPost(post));
     };
 
-    const [weeklyQuestions, companionPulse, locallyPicks] = queryText
-        ? [[], [], []] as [CommunityHighlightPost[], CommunityHighlightPost[], CommunityHighlightPost[]]
-        : await Promise.all([
-            fetchHighlightPosts({ category: 'qna', sortMode: 'popular' }),
-            fetchHighlightPosts({ category: 'companion', sortMode: 'latest' }),
-            fetchHighlightPosts({ category: 'locally_content', sortMode: 'latest' }),
-        ]);
+    let weeklyQuestions: CommunityHighlightPost[] = [];
+    let companionPulse: CommunityHighlightPost[] = [];
+    let locallyPicks: CommunityHighlightPost[] = [];
+    if (!queryText) {
+        if (COMMUNITY_OPEN) {
+            [weeklyQuestions, companionPulse, locallyPicks] = await Promise.all([
+                fetchHighlightPosts({ category: 'qna', sortMode: 'popular' }),
+                fetchHighlightPosts({ category: 'companion', sortMode: 'latest' }),
+                fetchHighlightPosts({ category: 'locally_content', sortMode: 'latest' }),
+            ]);
+        } else {
+            locallyPicks = await fetchHighlightPosts({ category: 'locally_content', sortMode: 'latest' });
+        }
+    }
 
     let canWriteLocallyContent = false;
     if (user) {
@@ -293,7 +317,9 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     const writeCategory = currentFormat === 'all'
         ? (currentCategory === 'all' ? 'qna' : currentCategory)
         : getCommunityCategoryFromFormat(currentFormat);
-    const showFloatingWriteCta = writeCategory !== 'locally_content' || canWriteLocallyContent;
+    const showFloatingWriteCta = COMMUNITY_OPEN
+        ? (writeCategory !== 'locally_content' || canWriteLocallyContent)
+        : canWriteLocallyContent;
     const writeParams = new URLSearchParams();
     writeParams.set('category', writeCategory);
     if (currentHub !== 'all') writeParams.set('hub', currentHub);
@@ -310,6 +336,18 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
                             <div className="mb-4">
                                 <CommunityHubTabs />
                             </div>
+
+                            {!COMMUNITY_OPEN && (
+                                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 md:px-5 md:py-4 shadow-sm">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 md:h-10 md:w-10">
+                                        <MessageCircle size={18} className="text-slate-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[12px] font-semibold text-slate-800 md:text-[14px]">커뮤니티 기능 오픈 준비 중</p>
+                                        <p className="text-[11px] text-slate-500 md:text-[13px]">질문 · 동행 · 여행 꿀팁 탭이 곧 열립니다</p>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="mb-4">
                                 <CommunityCategoryTabs />

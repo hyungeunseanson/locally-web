@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { buildCommunityDetailHref } from '../queryParams';
 import { getCommunityHubMeta } from '../hubMeta';
+import { COMMUNITY_OPEN } from '../categoryMeta';
 import type { CommunityHighlightPost } from '../highlights';
 
 interface MobileWidgetStripProps {
@@ -66,8 +67,8 @@ export default function MobileWidgetStrip({
     return (
         <div className="lg:hidden mb-4 -mx-4 px-4">
             <div className="flex items-start gap-2 overflow-x-auto no-scrollbar pb-1">
-                <HighlightCard title="이번 주 인기 질문" items={weeklyQuestions} />
-                <HighlightCard title="지금 올라오는 동행" items={companionPulse} />
+                {COMMUNITY_OPEN && <HighlightCard title="이번 주 인기 질문" items={weeklyQuestions} />}
+                {COMMUNITY_OPEN && <HighlightCard title="지금 올라오는 동행" items={companionPulse} />}
                 <HighlightCard title="로컬리 콘텐츠" items={locallyPicks} />
             </div>
         </div>
