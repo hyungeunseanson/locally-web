@@ -144,7 +144,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .eq('status', 'active'),
       supabase
         .from('community_posts')
-        .select('id, created_at')
+        .select('id, created_at, updated_at')
         .order('created_at', { ascending: false }),
       supabase
         .from('public_host_applications')
@@ -164,7 +164,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const communityUrls: MetadataRoute.Sitemap = (communityPosts || []).map((post) => ({
       url: buildAbsoluteUrl(`/community/${post.id}`),
-      lastModified: post.created_at ? new Date(post.created_at) : new Date(),
+      lastModified: new Date(post.updated_at || post.created_at || new Date()),
       changeFrequency: 'weekly',
       priority: 0.7,
     }));

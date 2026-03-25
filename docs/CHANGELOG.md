@@ -5,6 +5,25 @@
 
 ---
 
+## v3.39.48 — [Community SEO] 로컬리 콘텐츠 검색 노출 1차 개선
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 meta description 줄바꿈 정리 | `app/community/[id]/page.tsx` — `post.content.substring(0,160)`에 줄바꿈/다중공백이 그대로 포함되던 문제 수정. `\n→공백`, 연속공백 압축 후 160자 절단으로 Google 스니펫 가독성 개선 |
+| 🟠 이미지 alt 텍스트 개선 | `PostImages.tsx`, `InstagramSlider.tsx` — 기존 "첨부 이미지" 일괄 alt를 게시물 제목 기반으로 변경. `title` prop 추가, alt="{title}" / "{title} - 이미지 N" 패턴 적용. Google Images 색인 및 접근성 향상 |
+| 🟡 PostListCard alt 통일 | `PostListCard.tsx` — `alt="썸네일"` → `alt={post.title}` 변경. PostGridCard와 패턴 통일 |
+| 🟡 sitemap lastModified 개선 | `app/sitemap.ts` — community posts의 lastModified를 `created_at` → `updated_at ?? created_at`로 변경. 수정된 게시물의 재크롤 우선순위 향상 |
+
+## v3.39.47 — [Community] 커뮤니티 임시 비활성화 + 로컬리 콘텐츠 전용 노출
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 COMMUNITY_OPEN 플래그 | `categoryMeta.ts` — `COMMUNITY_OPEN = false` 상수 추가. 질문/동행/꿀팁 탭 임시 숨김, 로컬리 콘텐츠만 노출 |
+| 🟠 Coming Soon 배너 | `app/community/page.tsx` — 카테고리 탭 영역에 "커뮤니티 기능 오픈 준비 중" 인라인 배너 추가 |
+| 🟡 포맷 강제 + highlight 스킵 | `page.tsx` — COMMUNITY_OPEN=false 시 format→locally_pick 강제, Q&A/동행 highlight fetch 스킵 |
+| 🟡 사이드바/위젯 조건부 숨김 | `RightSidebar.tsx`, `MobileWidgetStrip.tsx` — 커뮤니티 섹션 조건부 렌더 |
+| 🟡 SEO metadata 조정 | `page.tsx generateMetadata` — COMMUNITY_OPEN=false 시 "로컬리 콘텐츠" 타이틀/설명 적용 |
+
 ## v3.39.46 — [Experience Booking] 프라이빗 참여 인원 안내 카피 위치 조정
 
 | 항목 | 내용 |

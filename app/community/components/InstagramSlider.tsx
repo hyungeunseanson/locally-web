@@ -7,6 +7,8 @@ interface InstagramSliderProps {
     images: string[];
     /** 슬라이드 컨테이너에 추가 className */
     className?: string;
+    /** 이미지 alt 텍스트에 사용할 게시물 제목 */
+    title?: string;
 }
 
 /**
@@ -15,7 +17,7 @@ interface InstagramSliderProps {
  * - 터치 스와이프 + 화살표 버튼(데스크탑 hover)
  * - 하단 닷 인디케이터 + 상단 우측 N/Total 카운터
  */
-export default function InstagramSlider({ images, className = '' }: InstagramSliderProps) {
+export default function InstagramSlider({ images, className = '', title }: InstagramSliderProps) {
     const [current, setCurrent] = useState(0);
     const touchStartX = useRef<number>(0);
     const touchEndX = useRef<number>(0);
@@ -50,7 +52,7 @@ export default function InstagramSlider({ images, className = '' }: InstagramSli
             <div className={`w-full aspect-[4/5] overflow-hidden rounded-[28px] bg-gray-100 ${className}`}>
                 <img
                     src={images[0]}
-                    alt="첨부 이미지 1"
+                    alt={title || '첨부 이미지'}
                     className="h-full w-full object-cover"
                     loading="eager"
                 />
@@ -71,7 +73,7 @@ export default function InstagramSlider({ images, className = '' }: InstagramSli
                     <div key={idx} className="h-full w-full flex-shrink-0">
                         <img
                             src={src}
-                            alt={`첨부 이미지 ${idx + 1}`}
+                            alt={title ? `${title} - 이미지 ${idx + 1}` : `첨부 이미지 ${idx + 1}`}
                             className="h-full w-full object-cover"
                             loading={idx === 0 ? 'eager' : 'lazy'}
                             draggable={false}

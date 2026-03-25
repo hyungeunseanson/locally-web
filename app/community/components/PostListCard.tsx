@@ -72,7 +72,7 @@ export default function PostListCard({ post, hub, format, query, sort }: PostLis
                     <div className="h-[72px] w-[72px] overflow-hidden rounded-2xl border border-gray-100 bg-gray-100 flex-shrink-0">
                         <img
                             src={thumbnail}
-                            alt="썸네일"
+                            alt={post.title}
                             className="h-full w-full object-cover"
                             loading="lazy"
                         />

@@ -9,6 +9,8 @@ interface PostImagesProps {
     detail?: boolean;
     /** 상세 hero 이미지에서는 true */
     hero?: boolean;
+    /** 이미지 alt 텍스트에 사용할 게시물 제목 */
+    title?: string;
 }
 
 /**
@@ -23,7 +25,7 @@ interface PostImagesProps {
  *  - 이전: aspect-square + w-full + max-h → 세 클래스가 충돌해 이상한 비율
  *  - 현재: max-w로 너비를 먼저 제한 → aspect로 높이 결정 (충돌 없음)
  */
-export default function PostImages({ images, detail = false, hero = false }: PostImagesProps) {
+export default function PostImages({ images, detail = false, hero = false, title }: PostImagesProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     const handleSingleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -44,7 +46,7 @@ export default function PostImages({ images, detail = false, hero = false }: Pos
         return (
             <div className="flex justify-center">
                 <div className="w-full md:w-1/2">
-                    <InstagramSlider images={images} />
+                    <InstagramSlider images={images} title={title} />
                 </div>
             </div>
         );
@@ -66,7 +68,7 @@ export default function PostImages({ images, detail = false, hero = false }: Pos
             >
                 <img
                     src={images[0]}
-                    alt="첨부 이미지"
+                    alt={title || '첨부 이미지'}
                     className="w-full h-full object-cover"
                     loading="lazy"
                     onLoad={handleSingleImageLoad}
@@ -84,7 +86,7 @@ export default function PostImages({ images, detail = false, hero = false }: Pos
                 <div key={idx} className="aspect-square bg-gray-100 overflow-hidden">
                     <img
                         src={img}
-                        alt={`첨부 이미지 ${idx + 1}`}
+                        alt={title ? `${title} - 이미지 ${idx + 1}` : `첨부 이미지 ${idx + 1}`}
                         className="w-full h-full object-cover"
                         loading="lazy"
                     />

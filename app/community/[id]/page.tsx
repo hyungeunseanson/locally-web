@@ -32,7 +32,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         return { title: '게시글을 찾을 수 없습니다' };
     }
 
-    const snippet = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
+    const cleaned = post.content.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    const snippet = cleaned.substring(0, 160) + (cleaned.length > 160 ? '…' : '');
     const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
     const pagePath = `/community/${id}`;
     const canonicalUrl = buildLocalizedAbsoluteUrl(locale, pagePath);
@@ -234,7 +235,7 @@ export default async function CommunityPostDetail({
                             <article className="px-5 py-6">
                                 {isLocallyContent && post.images && post.images.length > 0 && (
                                     <div className="mb-6">
-                                        <PostImages images={post.images} detail hero />
+                                        <PostImages images={post.images} detail hero title={post.title} />
                                     </div>
                                 )}
 
@@ -302,7 +303,7 @@ export default async function CommunityPostDetail({
 
                                 {!isLocallyContent && post.images && post.images.length > 0 && (
                                     <div className="mb-8">
-                                        <PostImages images={post.images} detail />
+                                        <PostImages images={post.images} detail title={post.title} />
                                     </div>
                                 )}
 
