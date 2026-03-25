@@ -31,7 +31,6 @@ import {
   COUNTRY_OPTIONS,
   EXPERIENCE_LANGUAGE_OPTIONS,
   MAX_EXPERIENCE_PHOTOS,
-  FIXED_REFUND_POLICY_LABELS,
   getExperienceFormCopy,
   getItineraryStepLabel,
   getLocalizedText,
@@ -258,10 +257,14 @@ export default function ExperienceFormSteps({
           <p className="text-[13px] md:text-base text-slate-500">{copy.step2Desc}</p>
         </div>
         <LanguageLevelSelector entries={formData.language_levels || []} updateData={updateData} />
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5">
-          <div className="space-y-1">
+        <div data-testid="host-create-source-locale-card" className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+          <div className="space-y-3">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">{copy.sourceLocaleLabel}</label>
-            <p className="text-sm text-slate-500">{copy.sourceLocaleHelp}</p>
+            <div className="space-y-1.5">
+              <p className="text-sm text-slate-600">{copy.sourceLocaleHelpPrimary}</p>
+              <p className="text-sm text-slate-500">{copy.sourceLocaleHelpExample}</p>
+              <p className="text-sm font-semibold text-slate-700">{copy.sourceLocaleHelpAi}</p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2.5">
             {selectedLanguageOptions.map((option) => {
@@ -664,9 +667,26 @@ export default function ExperienceFormSteps({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 md:px-5 md:py-5">
+          <div data-testid="host-create-refund-policy-card" className="rounded-2xl border border-slate-200 bg-white px-4 py-4 md:px-5 md:py-5">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">{copy.refundPolicyLabel}</p>
-            <p className="text-sm md:text-base font-semibold text-slate-800">{getLocalizedText(FIXED_REFUND_POLICY_LABELS, lang)}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {copy.refundPolicyItems.map((item, index) => {
+                const isNoRefundRule = index === copy.refundPolicyItems.length - 1;
+                return (
+                  <span
+                    key={item}
+                    data-testid={`host-create-refund-policy-chip-${index}`}
+                    className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold md:text-sm ${
+                      isNoRefundRule
+                        ? 'border-rose-200 bg-rose-50 text-rose-600'
+                        : 'border-slate-200 bg-white text-slate-700'
+                    }`}
+                  >
+                    {item}
+                  </span>
+                );
+              })}
+            </div>
             <p className="text-xs text-slate-500 mt-2">{copy.refundPolicyHelp}</p>
           </div>
         </div>

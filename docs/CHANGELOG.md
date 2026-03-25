@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.49 — [Host Create] 대표 언어 안내 강조 · 환불 정책 칩 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 대표 언어 안내 카드 재정리 | `app/host/create/components/ExperienceFormSteps.tsx`, `app/host/create/localization.ts` — Step 2의 `대표 언어` 안내를 단일 회색 문단에서 `대표 소개 문구 / 예시 문구 / AI 자동 번역 안내` 3단 구조 카드로 재정리해, 대표 언어가 AI 자동 번역 기준 언어라는 점이 더 분명하게 보이도록 정리 |
+| 🟠 환불 정책 칩 리스트화 | `app/host/create/components/ExperienceFormSteps.tsx`, `app/host/create/localization.ts` — Step 6의 고정 환불 정책을 한 줄 문장 대신 6개 규칙 칩 리스트로 분리해 모바일에서도 가독성이 유지되도록 조정. `당일 환불 불가`는 별도 강조 스타일 적용 |
+| 🟡 host create UI 계약 테스트 추가 | `tests/e2e/93-host-create-copy-layout.spec.ts` — `/host/create` Step 2/Step 6에서 대표 언어 안내 3단 구조와 환불 정책 칩 노출을 직접 검증하는 좁은 Playwright 스펙 추가 |
+
 ## v3.39.48 — [Community SEO] 로컬리 콘텐츠 검색 노출 1차 개선
 
 | 항목 | 내용 |

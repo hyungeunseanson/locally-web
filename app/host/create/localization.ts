@@ -188,6 +188,9 @@ type ExperienceFormCopy = {
   step2Desc: string;
   sourceLocaleLabel: string;
   sourceLocaleHelp: string;
+  sourceLocaleHelpPrimary: string;
+  sourceLocaleHelpExample: string;
+  sourceLocaleHelpAi: string;
   sourceLocaleBadge: string;
   step3Title: string;
   step3Desc: (maxPhotos: number) => string;
@@ -230,6 +233,7 @@ type ExperienceFormCopy = {
   activityLevelLabel: string;
   refundPolicyLabel: string;
   refundPolicyHelp: string;
+  refundPolicyItems: string[];
   step7Title: string;
   step7Desc: string;
   priceLabel: string;
@@ -287,6 +291,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step2Desc: '이 체험을 어떤 언어로 진행할 수 있나요?',
     sourceLocaleLabel: '대표 언어',
     sourceLocaleHelp: '주로 받고 싶은 게스트의 언어로 대표 소개를 작성해주세요. 예: 한국인 게스트를 주로 받는다면 한국어를 선택해 작성하면 됩니다. 다른 언어는 이 대표 언어를 기준으로 AI 자동 번역 및 보정이 진행됩니다.',
+    sourceLocaleHelpPrimary: '주로 받고 싶은 게스트의 언어로 대표 소개를 작성해주세요.',
+    sourceLocaleHelpExample: '예: 한국인 게스트를 주로 받는다면 한국어를 선택해 작성하면 됩니다.',
+    sourceLocaleHelpAi: '다른 언어는 이 대표 언어를 기준으로 AI 자동 번역 및 보정이 진행됩니다.',
     sourceLocaleBadge: '대표',
     step3Title: '체험의 첫인상',
     step3Desc: (maxPhotos) => `선택한 언어별 제목을 입력하고 대표사진을 올려주세요. (최대 ${maxPhotos}장)`,
@@ -329,6 +336,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     activityLevelLabel: '활동 강도',
     refundPolicyLabel: '환불 정책',
     refundPolicyHelp: '환불 정책은 고정으로 자동 적용됩니다.',
+    refundPolicyItems: [
+      '결제 당일 취소 100%',
+      '20일 전 100%',
+      '8~19일 전 80%',
+      '2~7일 전 70%',
+      '1일 전 40%',
+      '당일 환불 불가',
+    ],
     step7Title: '요금 설정',
     step7Desc: '가격을 설정하세요.',
     priceLabel: '기본 1인당 가격',
@@ -384,6 +399,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step2Desc: 'Which languages can you host this experience in?',
     sourceLocaleLabel: 'Primary language',
     sourceLocaleHelp: 'Write the main introduction in the language of the guests you want to attract most. Example: if you mainly want to host Korean guests, choose Korean. Other languages will be AI-translated and refined from this primary language.',
+    sourceLocaleHelpPrimary: 'Write the main introduction in the language of the guests you want to attract most.',
+    sourceLocaleHelpExample: 'Example: if you mainly want to host Korean guests, choose Korean.',
+    sourceLocaleHelpAi: 'Other languages will be AI-translated and refined from this primary language.',
     sourceLocaleBadge: 'Primary',
     step3Title: 'First impression of your experience',
     step3Desc: (maxPhotos) => `Add titles for each selected language and upload hero photos. (Up to ${maxPhotos})`,
@@ -426,6 +444,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     activityLevelLabel: 'Activity level',
     refundPolicyLabel: 'Refund policy',
     refundPolicyHelp: 'The refund policy is fixed and applied automatically.',
+    refundPolicyItems: [
+      '100% on the payment day',
+      '100% 20 days before',
+      '80% 8–19 days before',
+      '70% 2–7 days before',
+      '40% 1 day before',
+      'No refund on the day',
+    ],
     step7Title: 'Pricing',
     step7Desc: 'Set your price.',
     priceLabel: 'Base price per guest',
@@ -481,6 +507,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step2Desc: 'この体験はどの言語で進行できますか？',
     sourceLocaleLabel: '代表言語',
     sourceLocaleHelp: '主に受け入れたいゲストの言語で代表紹介文を作成してください。例：韓国人ゲストを主に受け入れたい場合は韓国語を選択してください。ほかの言語はこの代表言語を基準にAI自動翻訳と補正が行われます。',
+    sourceLocaleHelpPrimary: '主に受け入れたいゲストの言語で代表紹介文を作成してください。',
+    sourceLocaleHelpExample: '例：韓国人ゲストを主に受け入れたい場合は韓国語を選択してください。',
+    sourceLocaleHelpAi: 'ほかの言語はこの代表言語を基準にAI自動翻訳と補正が行われます。',
     sourceLocaleBadge: '代表',
     step3Title: '体験の第一印象',
     step3Desc: (maxPhotos) => `選択した各言語のタイトルを入力し、代表写真をアップロードしてください。（最大${maxPhotos}枚）`,
@@ -523,6 +552,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     activityLevelLabel: '活動強度',
     refundPolicyLabel: '返金ポリシー',
     refundPolicyHelp: '返金ポリシーは固定で自動適用されます。',
+    refundPolicyItems: [
+      '決済当日のキャンセル100%',
+      '20日前100%',
+      '8〜19日前80%',
+      '2〜7日前70%',
+      '1日前40%',
+      '当日返金不可',
+    ],
     step7Title: '料金設定',
     step7Desc: '価格を設定してください。',
     priceLabel: '基本の1人あたり価格',
@@ -578,6 +615,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step2Desc: '这个体验可以用哪些语言进行？',
     sourceLocaleLabel: '代表语言',
     sourceLocaleHelp: '请使用你主要想接待的游客语言来撰写主介绍。例：如果你主要想接待韩国游客，就选择韩语。其他语言将基于该代表语言进行 AI 自动翻译和润色。',
+    sourceLocaleHelpPrimary: '请使用你主要想接待的游客语言来撰写主介绍。',
+    sourceLocaleHelpExample: '例：如果你主要想接待韩国游客，就选择韩语。',
+    sourceLocaleHelpAi: '其他语言将基于该代表语言进行 AI 自动翻译和润色。',
     sourceLocaleBadge: '代表',
     step3Title: '体验的第一印象',
     step3Desc: (maxPhotos) => `请填写所选语言的标题并上传代表照片。（最多${maxPhotos}张）`,
@@ -620,6 +660,14 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     activityLevelLabel: '活动强度',
     refundPolicyLabel: '退款政策',
     refundPolicyHelp: '退款政策为固定并自动应用。',
+    refundPolicyItems: [
+      '付款当日取消100%',
+      '20天前100%',
+      '8~19天前80%',
+      '2~7天前70%',
+      '1天前40%',
+      '当天不可退款',
+    ],
     step7Title: '价格设置',
     step7Desc: '请设置价格。',
     priceLabel: '基础单价（每人）',
