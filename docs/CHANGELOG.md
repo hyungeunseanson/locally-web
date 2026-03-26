@@ -5,6 +5,12 @@
 
 ---
 
+## v3.39.62 — [Runtime Ops] codex 테스트 데이터 cleanup dry-run 스크립트 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 codex cleanup 스크립트 추가 | `scripts/cleanup-codex-runtime-data.mjs`, `package.json`, `docs/runtime_verification.md` — `codex.*@example.com` 계정과 연결된 `auth.users`, `profiles`, `users`, `admin_whitelist`, `admin_audit_logs`, `host_applications`, `notifications`, `admin_tasks`, `admin_task_comments`, `bookings` 잔여 row를 dry-run으로 먼저 집계하고, `--execute`를 붙였을 때만 삭제하도록 runtime cleanup 배치를 분리 |
+
 ## v3.39.61 — [Service Payment UX] 결제수단 unavailable 안내 톤 정리
 
 | 항목 | 내용 |

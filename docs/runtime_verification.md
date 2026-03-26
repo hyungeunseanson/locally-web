@@ -69,9 +69,43 @@ npm run test:e2e:live:noisy -- --ack-noisy
 1. 배포가 `Ready`인지 확인한다.
 2. `gate-safe` 실행.
 3. 실패 시 즉시 중단하고 drift/regression/data issue로 분류한다.
-4. 성공 시 아래 Supabase 쿼리로 최근 적재와 cleanup 상태를 본다.
+4. 성공 시 아래 cleanup dry-run과 Supabase 쿼리로 최근 적재와 cleanup 상태를 본다.
 5. 필요할 때만 `shared-surface` 실행.
 6. 운영 노이즈가 허용된 상황에서만 `noisy` 실행.
+
+## Cleanup
+
+### Codex test data dry-run
+
+```bash
+npm run cleanup:codex:dry
+```
+
+- 목적:
+  - `codex.*@example.com` 계정과 연결된 테스트 잔여 row 수를 한 번에 본다.
+  - 실제 삭제 없이 현재 삭제 대상만 요약한다.
+- 포함 대상:
+  - `auth.users`
+  - `profiles`
+  - `users`
+  - `admin_whitelist`
+  - `admin_audit_logs`
+  - `host_applications`
+  - `notifications`
+  - `admin_tasks`
+  - `admin_task_comments`
+  - `bookings`
+
+### Codex test data execute
+
+```bash
+npm run cleanup:codex:execute
+```
+
+- 규칙:
+  - dry-run 결과를 확인한 뒤에만 실행한다.
+  - 운영 데이터와 섞일 여지가 있으면 실행하지 않는다.
+  - 실행 결과는 배포 보고에 남긴다.
 
 ## Supabase Queries
 
