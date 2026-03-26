@@ -44,6 +44,7 @@ type HostRegisterCopy = {
   step4Badge: string;
   step4Title: string;
   selfIntroLabel: string;
+  selfIntroHelp: string;
   selfIntroPlaceholder: string;
   step5Badge: string;
   step5Title: string;
@@ -142,6 +143,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Badge: 'Step 4. 프로필 설정',
     step4Title: '게스트에게 보여질\n모습을 꾸며보세요',
     selfIntroLabel: '자기소개',
+    selfIntroHelp: '보여주고 싶은 게스트의 언어로 작성해주세요. 예: 한국인 게스트에게 보여주고 싶다면 한국어로 작성하면 됩니다.',
     selfIntroPlaceholder: '안녕하세요! 저는 여행과 사진을 좋아하는 호스트입니다. (최소 50자 이상)',
     step5Badge: 'Step 5. 신뢰 인증',
     step5Title: '인증된 호스트\n배지를 받아보세요',
@@ -248,6 +250,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Badge: 'Step 4. Profile Setup',
     step4Title: 'Shape the profile\nguests will see',
     selfIntroLabel: 'Self introduction',
+    selfIntroHelp: 'Write this in the language of the guests you want to show it to. Example: if you want Korean guests to read it, write it in Korean.',
     selfIntroPlaceholder: 'Hi! I am a host who loves travel and photography. (At least 50 characters)',
     step5Badge: 'Step 5. Verification',
     step5Title: 'Earn a verified host\nbadge',
@@ -354,6 +357,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Badge: 'Step 4. プロフィール設定',
     step4Title: 'ゲストに見える\nプロフィールを整えましょう',
     selfIntroLabel: '自己紹介',
+    selfIntroHelp: '見せたいゲストの言語で作成してください。例：韓国人ゲストに見せたい場合は韓国語で作成してください。',
     selfIntroPlaceholder: 'こんにちは！旅行と写真が好きなホストです。（50文字以上推奨）',
     step5Badge: 'Step 5. 信頼認証',
     step5Title: '認証済みホスト\nバッジを獲得しましょう',
@@ -460,6 +464,7 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step4Badge: 'Step 4. 个人资料设置',
     step4Title: '完善房客将看到的\n个人形象',
     selfIntroLabel: '自我介绍',
+    selfIntroHelp: '请使用你想展示给游客看的语言来填写。例：如果你想给韩国游客看，就用韩语来写。',
     selfIntroPlaceholder: '你好！我是喜欢旅行和摄影的房东。（建议至少50字）',
     step5Badge: 'Step 5. 信任认证',
     step5Title: '获得认证房东\n徽章',

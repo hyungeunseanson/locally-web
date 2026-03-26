@@ -24,8 +24,10 @@ import type { HostProfile } from './components/ProfileEditor';
 import GuidelinesTab from './components/GuidelinesTab'; // 🟢 필수 교육 및 가이드라인 탭
 import ServiceJobsTab from './components/ServiceJobsTab';
 import { getHostPublicProfile, getProfileCompletion } from '@/app/utils/profile';
+import HostApprovalWelcomeOverlay from './components/HostApprovalWelcomeOverlay';
 
 interface HostStatusSummary {
+  id?: string | number | null;
   status?: string | null;
   admin_comment?: string | null;
 }
@@ -33,7 +35,7 @@ interface HostStatusSummary {
 // 실제 대시보드 로직
 function DashboardContent() {
   const { t } = useLanguage();
-  const { notifications } = useNotification();
+  const { notifications, markAsRead } = useNotification();
   // 서비스 관련 안 읽은 알림 여부 (N 배지용)
   const serviceUnread = notifications.some(
     (n) => !n.is_read && [
@@ -45,6 +47,9 @@ function DashboardContent() {
   const [activeTab, setActiveTab] = useState('reservations');
   const [hostStatus, setHostStatus] = useState<HostStatusSummary | null>(null);
   const [profile, setProfile] = useState<HostProfile | null>(null);
+  const [experienceCount, setExperienceCount] = useState<number | null>(null);
+  const [hasConsumedApprovalWelcome, setHasConsumedApprovalWelcome] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const supabase = useMemo(() => createClient(), []);
@@ -78,6 +83,26 @@ function DashboardContent() {
         .maybeSingle();
 
       if (!error) setHostStatus(hostData);
+
+      const { count: hostExperienceCount, error: experienceCountError } = await supabase
+        .from('experiences')
+        .select('id', { count: 'exact', head: true })
+        .eq('host_id', user.id);
+
+      if (!experienceCountError) {
+        setExperienceCount(hostExperienceCount ?? 0);
+      }
+
+      const { count: consumedApprovalCount, error: consumedApprovalError } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('type', 'host_application_approved')
+        .eq('is_read', true);
+
+      if (!consumedApprovalError) {
+        setHasConsumedApprovalWelcome((consumedApprovalCount ?? 0) > 0);
+      }
 
       const { data: profileData } = await supabase
         .from('profiles')
@@ -123,6 +148,44 @@ function DashboardContent() {
     void fetchData();
   }, [fetchData, searchParams]);
 
+  const status = hostStatus?.status?.toLowerCase().trim();
+  const approvalNotification = notifications.find(
+    (notification) =>
+      notification.type === 'host_application_approved' &&
+      notification.link === '/host/dashboard' &&
+      !notification.is_read
+  );
+  const shouldShowApprovalWelcome = Boolean(
+    !welcomeDismissed &&
+      approvalNotification &&
+      !hasConsumedApprovalWelcome &&
+      experienceCount === 0 &&
+      status &&
+      ['approved', 'active'].includes(status)
+  );
+
+  const consumeApprovalNotification = useCallback(async () => {
+    if (!approvalNotification) return;
+
+    setWelcomeDismissed(true);
+    setHasConsumedApprovalWelcome(true);
+
+    try {
+      await markAsRead(approvalNotification.id);
+    } catch (error) {
+      console.error('[HostDashboard] failed to mark host approval notification as read:', error);
+    }
+  }, [approvalNotification, markAsRead]);
+
+  const handleApprovalWelcomeDismiss = useCallback(async () => {
+    await consumeApprovalNotification();
+  }, [consumeApprovalNotification]);
+
+  const handleApprovalWelcomePrimaryAction = useCallback(async () => {
+    await consumeApprovalNotification();
+    router.push('/host/create');
+  }, [consumeApprovalNotification, router]);
+
   if (loading) {
     return (
       <div className="min-h-[60vh] bg-white flex items-center justify-center">
@@ -145,8 +208,6 @@ function DashboardContent() {
       </div>
     );
   }
-
-  const status = hostStatus.status?.toLowerCase().trim();
 
   // 2. 심사 중 / 보완 요청 / 거절 (단, 가이드라인 탭은 모두 접근 가능)
   if (status && ['pending', 'revision', 'rejected'].includes(status) && activeTab !== 'guidelines') {
@@ -204,7 +265,14 @@ function DashboardContent() {
 
   // 3. 승인된 호스트 대시보드
   return (
-    <div className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-8 flex flex-col md:flex-row gap-0 md:gap-8">
+    <>
+      {shouldShowApprovalWelcome && (
+        <HostApprovalWelcomeOverlay
+          onDismiss={handleApprovalWelcomeDismiss}
+          onPrimaryAction={handleApprovalWelcomePrimaryAction}
+        />
+      )}
+      <div className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-8 flex flex-col md:flex-row gap-0 md:gap-8">
 
       {/* 데스크탑 사이드바 */}
       <aside className="w-64 hidden md:block shrink-0">
@@ -308,7 +376,8 @@ function DashboardContent() {
         {activeTab === 'profile' && <ProfileEditor profile={profile} onUpdate={fetchData} />}
         {activeTab === 'guidelines' && <GuidelinesTab />}
       </main>
-    </div>
+      </div>
+    </>
   );
 }
 

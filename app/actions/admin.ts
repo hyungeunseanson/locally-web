@@ -43,6 +43,7 @@ function buildHostApplicationStatusNotification(status: string, comment?: string
 
   if (status === 'approved') {
     return {
+      type: 'host_application_approved',
       title: '🎉 호스트 승인이 완료되었습니다',
       message: '호스트 신청이 승인되었습니다. 이제 호스트 대시보드와 기능을 이용할 수 있습니다.',
       link: '/host/dashboard',
@@ -51,6 +52,7 @@ function buildHostApplicationStatusNotification(status: string, comment?: string
 
   if (status === 'revision') {
     return {
+      type: 'application_status_changed',
       title: '🛠️ 호스트 지원서 보완이 필요합니다',
       message: trimmedComment
         ? `관리자 코멘트를 확인하고 지원서를 보완해 주세요.\n\n보완 사유: ${trimmedComment}`
@@ -61,6 +63,7 @@ function buildHostApplicationStatusNotification(status: string, comment?: string
 
   if (status === 'rejected') {
     return {
+      type: 'application_status_changed',
       title: '📌 호스트 지원 결과를 확인해 주세요',
       message: trimmedComment
         ? `이번 호스트 신청은 승인되지 않았습니다.\n\n사유: ${trimmedComment}`
@@ -119,7 +122,7 @@ export async function updateAdminStatus(table: 'host_applications' | 'experience
       if (notification) {
         const { error: notificationError } = await supabaseAdmin.from('notifications').insert({
           user_id: app.user_id,
-          type: 'application_status_changed',
+          type: notification.type,
           title: notification.title,
           message: notification.message,
           link: notification.link,

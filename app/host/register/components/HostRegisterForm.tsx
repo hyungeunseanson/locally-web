@@ -291,6 +291,7 @@ export default function HostRegisterForm({
               </label>
               <div className="w-full text-left">
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.selfIntroLabel}</label>
+                <p className="mt-1 ml-1 text-xs leading-5 text-slate-500">{copy.selfIntroHelp}</p>
                 <textarea placeholder={copy.selfIntroPlaceholder} value={formData.selfIntro} onChange={(e) => updateData('selfIntro', e.target.value)} className="w-full p-3.5 h-32 bg-slate-50 rounded-xl outline-none text-sm resize-none border border-transparent focus:border-black focus:bg-white transition-all" />
                 <p className={`text-[11px] mt-1.5 ml-1 ${(formData.selfIntro?.length || 0) >= 50 ? 'text-green-500' : 'text-slate-400'}`}>
                   {formData.selfIntro?.length || 0}/50자
@@ -425,7 +426,18 @@ export default function HostRegisterForm({
       </main>
 
       <footer className="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between">
-        <button onClick={prevStep} disabled={step === 1} className={`px-4 py-2 rounded-full font-bold text-xs transition-all ${step === 1 ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-100 underline decoration-2'}`}>{copy.prevButton}</button>
+        <button
+          onClick={prevStep}
+          disabled={step === 1}
+          data-testid="host-register-prev-button"
+          className={`min-h-[44px] rounded-full border px-5 py-2.5 text-sm font-semibold transition-all ${
+            step === 1
+              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300'
+              : 'border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50'
+          }`}
+        >
+          {copy.prevButton}
+        </button>
         {step === totalSteps ? (
           <button onClick={handleSubmit} disabled={loading} className="bg-black text-white px-6 py-3 rounded-full font-bold text-sm hover:scale-105 transition-transform shadow-xl shadow-slate-300 disabled:opacity-50 flex items-center gap-2">
             {loading ? copy.submittingButton : copy.submitButton}

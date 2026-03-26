@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.53 — [Host UX] 등록 폼 가시성 + 승인 축하 온보딩
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 등록 폼 `이전` 버튼 가시성 강화 | `app/host/register/components/HostRegisterForm.tsx` — Step footer의 `이전` 버튼을 텍스트 링크형에서 보이는 보조 액션 버튼으로 정리하고 `data-testid="host-register-prev-button"`를 추가해 모바일에서도 이전 동작이 더 명확하게 보이도록 개선 |
+| 🟢 자기소개 언어 안내 추가 | `app/host/register/localization.ts`, `app/host/register/components/HostRegisterForm.tsx` — Step 4 `자기소개` 아래에 "보여주고 싶은 게스트의 언어로 작성" helper text를 `ko/en/ja/zh`로 추가해, 호스트가 어느 언어로 소개를 써야 하는지 바로 이해할 수 있게 정리 |
+| 🟢 승인 축하 오버레이 추가 | `app/host/dashboard/page.tsx`, `app/host/dashboard/components/HostApprovalWelcomeOverlay.tsx`, `app/context/LanguageContext.tsx` — 승인된 호스트가 체험 0개 상태로 대시보드에 처음 들어오면 confetti와 함께 "승인 완료 + 첫 체험 등록" 오버레이를 1회 노출 |
+| 🟡 승인 알림 token 분리 | `app/actions/admin.ts` — 호스트 승인 시 인앱 알림 type을 `host_application_approved`로 분리해, 대시보드 welcome overlay가 기존 승인 알림을 계정 단위 1회성 토큰처럼 재사용할 수 있게 보강 |
+| 🟡 회귀 테스트 추가 | `tests/e2e/97-host-register-visibility.spec.ts`, `tests/e2e/98-host-approved-welcome-overlay.spec.ts` — 등록 폼 이전 버튼/자기소개 helper text와 승인 축하 오버레이 노출/읽음 처리 동작을 Playwright 계약 테스트로 보강 |
+
 ## v3.39.52 — [Host Dashboard] i18n 정합성 + 체험 등록 완료 UX 개선
 
 | 항목 | 내용 |
