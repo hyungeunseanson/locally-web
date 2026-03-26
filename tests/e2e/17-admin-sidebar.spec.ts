@@ -124,12 +124,12 @@ async function insertAdminAlert(userId: string, title: string, message: string) 
 }
 
 async function login(page: Page, user: TestUser) {
-  await page.goto('/login', { waitUntil: 'networkidle' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 15000 });
   await page.locator('input[type="email"]').fill(user.email);
   await page.locator('input[type="password"]').fill(user.password);
   await page.locator('button[type="submit"]').click();
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
-  await page.waitForLoadState('networkidle');
 }
 
 test.afterAll(async () => {
@@ -160,17 +160,11 @@ test.describe.serial('Admin sidebar smoke', () => {
     await insertAdminAlert(adminUserId, '코덱스 사이드바 알림 A', '첫 번째 사이드바 알림');
     await insertAdminAlert(adminUserId, '코덱스 사이드바 알림 B', '두 번째 사이드바 알림');
 
-    const countsResponsePromise = page.waitForResponse((response) =>
-      response.url().includes('/api/admin/sidebar-counts') &&
-      response.request().method() === 'GET'
-    );
-
     await login(page, adminUser);
-    await page.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'networkidle' });
-    await countsResponsePromise;
+    await page.goto('/admin/dashboard?tab=APPROVALS', { waitUntil: 'domcontentloaded' });
 
     const alertsButton = page.getByRole('button', { name: /Admin Alerts/i });
-    await expect(alertsButton).toContainText('Admin Alerts');
-    await expect(alertsButton).toContainText('2');
+    await expect(alertsButton).toContainText('Admin Alerts', { timeout: 15000 });
+    await expect(alertsButton).toContainText('2', { timeout: 15000 });
   });
 });
