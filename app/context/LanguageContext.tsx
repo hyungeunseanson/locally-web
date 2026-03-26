@@ -1056,8 +1056,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_btn_bank: "무통장 입금 신청하기",
     sp_btn_card: "{price} 결제하기",
     sp_bank_locked_notice: "이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.",
-    sp_card_unavailable_config: "카드 결제 설정이 아직 완료되지 않아 무통장 또는 PayPal만 사용할 수 있습니다.",
-    sp_card_unavailable_fallback: "카드 결제 준비가 완료되지 않아 무통장 또는 PayPal만 사용할 수 있습니다.",
+    sp_card_unavailable_config: "지금은 카드 결제를 준비 중이라 무통장 입금이나 PayPal로 먼저 결제할 수 있어요.",
+    sp_card_unavailable_fallback: "지금은 카드 결제를 사용할 수 없어 무통장 입금이나 PayPal로 결제할 수 있어요.",
     sp_paypal_desc: "PayPal 승인 후 결제가 완료되며, 기존 카드/무통장 결제 흐름에는 영향을 주지 않습니다.",
     sp_paypal_loading: "PayPal 버튼을 불러오는 중입니다.",
     sp_paypal_hint: "위 PayPal 버튼에서 승인하면 결제가 완료됩니다.",
@@ -1076,7 +1076,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_err_paypal_processing: "PayPal 결제 처리 중 오류가 발생했습니다.",
     sp_err_paypal_button: "PayPal 버튼 처리 중 오류가 발생했습니다.",
     sp_err_paypal_load: "PayPal 버튼을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
-    sp_err_card_unavailable: "지금은 카드 결제를 사용할 수 없습니다. 무통장 또는 PayPal을 이용해주세요.",
+    sp_err_card_unavailable: "지금은 카드 결제를 사용할 수 없어요. 무통장 입금이나 PayPal을 선택해주세요.",
 
     // [Service Payment Complete]
     spc_bank_title: "입금 대기 중",
@@ -2283,8 +2283,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_btn_bank: "Request Bank Transfer",
     sp_btn_card: "Pay {price}",
     sp_bank_locked_notice: "This request is already waiting for a bank transfer. You cannot change the payment method now.",
-    sp_card_unavailable_config: "Card payment setup is not complete yet, so only bank transfer or PayPal is available.",
-    sp_card_unavailable_fallback: "Card payment is not ready yet, so only bank transfer or PayPal is available.",
+    sp_card_unavailable_config: "Card payment is still being prepared, so you can check out with bank transfer or PayPal for now.",
+    sp_card_unavailable_fallback: "Card payment isn't available right now, so you can check out with bank transfer or PayPal.",
     sp_paypal_desc: "Payment is completed after PayPal approval and does not affect the existing card or bank transfer flow.",
     sp_paypal_loading: "Loading the PayPal button.",
     sp_paypal_hint: "Payment will be completed when you approve in the PayPal button above.",
@@ -2303,7 +2303,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_err_paypal_processing: "An error occurred while processing the PayPal payment.",
     sp_err_paypal_button: "An error occurred while handling the PayPal button.",
     sp_err_paypal_load: "Failed to load the PayPal button. Please try again shortly.",
-    sp_err_card_unavailable: "Card payment is currently unavailable. Please use bank transfer or PayPal.",
+    sp_err_card_unavailable: "Card payment isn't available right now. Please choose bank transfer or PayPal.",
 
     // [Service Payment Complete]
     spc_bank_title: "Awaiting Deposit",
@@ -3511,8 +3511,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_btn_bank: "銀行振込を申し込む",
     sp_btn_card: "{price} 決済する",
     sp_bank_locked_notice: "すでに銀行振込待ち状態に切り替わった依頼です。決済方法は変更できません。",
-    sp_card_unavailable_config: "カード決済設定がまだ完了していないため、銀行振込またはPayPalのみご利用いただけます。",
-    sp_card_unavailable_fallback: "カード決済の準備が整っていないため、銀行振込またはPayPalのみご利用いただけます。",
+    sp_card_unavailable_config: "現在カード決済を準備中のため、今は銀行振込またはPayPalで決済できます。",
+    sp_card_unavailable_fallback: "現在カード決済は利用できないため、銀行振込またはPayPalで決済できます。",
     sp_paypal_desc: "PayPalで承認すると決済が完了し、既存のカード/振込フローには影響しません。",
     sp_paypal_loading: "PayPalボタンを読み込み中です。",
     sp_paypal_hint: "上のPayPalボタンで承認すると決済が完了します。",
@@ -3531,7 +3531,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_err_paypal_processing: "PayPal決済処理中にエラーが発生しました。",
     sp_err_paypal_button: "PayPalボタン処理中にエラーが発生しました。",
     sp_err_paypal_load: "PayPalボタンを読み込めませんでした。しばらくしてからもう一度お試しください。",
-    sp_err_card_unavailable: "現在カード決済はご利用いただけません。銀行振込またはPayPalをご利用ください。",
+    sp_err_card_unavailable: "現在カード決済は利用できません。銀行振込またはPayPalを選択してください。",
 
     // [Service Payment Complete]
     spc_bank_title: "入金待ち",
@@ -4738,8 +4738,8 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_btn_bank: "申请银行转账",
     sp_btn_card: "支付 {price}",
     sp_bank_locked_notice: "该需求已切换为等待银行转账状态，当前无法再修改支付方式。",
-    sp_card_unavailable_config: "银行卡支付设置尚未完成，目前仅支持银行转账或 PayPal。",
-    sp_card_unavailable_fallback: "银行卡支付尚未准备完成，目前仅支持银行转账或 PayPal。",
+    sp_card_unavailable_config: "目前银行卡支付还在准备中，现在可以先用银行转账或 PayPal 完成支付。",
+    sp_card_unavailable_fallback: "目前暂时无法使用银行卡支付，现在可以用银行转账或 PayPal 完成支付。",
     sp_paypal_desc: "在 PayPal 完成授权后即会完成支付，不会影响现有银行卡或转账流程。",
     sp_paypal_loading: "正在加载 PayPal 按钮。",
     sp_paypal_hint: "在上方 PayPal 按钮完成授权后即会完成支付。",
@@ -4758,7 +4758,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     sp_err_paypal_processing: "处理 PayPal 支付时发生错误。",
     sp_err_paypal_button: "处理 PayPal 按钮时发生错误。",
     sp_err_paypal_load: "无法加载 PayPal 按钮，请稍后重试。",
-    sp_err_card_unavailable: "当前无法使用银行卡支付，请改用银行转账或 PayPal。",
+    sp_err_card_unavailable: "当前无法使用银行卡支付，请选择银行转账或 PayPal。",
 
     // [Service Payment Complete]
     spc_bank_title: "等待存款",

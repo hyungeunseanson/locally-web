@@ -5,6 +5,12 @@
 
 ---
 
+## v3.39.61 — [Service Payment UX] 결제수단 unavailable 안내 톤 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 서비스 결제수단 안내 문구 정리 | `app/context/LanguageContext.tsx` — 서비스 결제 화면에서 카드 결제가 불가할 때 `설정 미완료` 중심으로 보이던 문구를, `지금은 무통장 입금이나 PayPal로 결제할 수 있다`는 사용자 행동 중심 안내로 `ko/en/ja/zh` 모두 정리 |
+
 ## v3.39.60 — [Messaging UX] 기본 아바타 fallback 정리
 
 | 항목 | 내용 |
