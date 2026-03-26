@@ -238,7 +238,7 @@ export default function Earnings() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-base md:text-lg text-slate-800">{t('hp_earn_details')}</h3>
               <span className="text-[10px] font-bold bg-white border px-2 py-1 rounded text-slate-400 uppercase tracking-wide">
-                Year to Date
+                {t('hp_earn_ytd')}
               </span>
             </div>
 

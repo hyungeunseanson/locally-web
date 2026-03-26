@@ -245,15 +245,15 @@ export default function MyExperiences() {
                     }`}
                 >
                   <Edit size={15} />
-                  <span>{exp.status === 'revision' ? t('btn_edit_app') : t('exp_edit')}</span>
+                  <span>{t('exp_edit')}</span>
                 </Link>
                 <button
                   onClick={() => handleDelete(exp.id)}
                   className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 text-[12px] md:text-sm font-semibold text-red-600 transition-colors hover:border-red-200 hover:bg-red-100"
-                  title="삭제"
+                  title={t('exp_delete')}
                 >
                   <Trash2 size={15} />
-                  <span>삭제</span>
+                  <span>{t('exp_delete')}</span>
                 </button>
               </div>
             </div>
@@ -308,12 +308,12 @@ export default function MyExperiences() {
                     }`}
                 >
                   <Edit size={16} />
-                  <span>{exp.status === 'revision' ? t('btn_edit_app') : t('exp_edit')}</span>
+                  <span>{t('exp_edit')}</span>
                 </Link>
                 <button
                   onClick={() => handleDelete(exp.id)}
                   className="inline-flex items-center justify-center rounded-xl border border-slate-200 p-2.5 text-slate-400 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                  title="삭제"
+                  title={t('exp_delete')}
                 >
                   <Trash2 size={18} />
                 </button>

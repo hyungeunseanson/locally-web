@@ -151,7 +151,7 @@ export default function ProfileEditor({ profile, onUpdate }: ProfileEditorProps)
       setAvatarUrl(data.publicUrl);
       showToast(t('profile_photo_change_done'), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '알 수 없는 오류';
+      const message = err instanceof Error ? err.message : t('hp_unknown_error');
       showToast(`${t('profile_photo_fail')} ${message}`, 'error');
     } finally {
       setUploading(false);

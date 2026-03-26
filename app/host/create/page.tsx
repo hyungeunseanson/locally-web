@@ -36,6 +36,7 @@ export default function CreateExperiencePage() {
 
   // --- 상태 관리 ---
   const [step, setStep] = useState(1);
+  const [createdExperienceId, setCreatedExperienceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<ExperienceFormState>({
     ...INITIAL_FORM_DATA,
@@ -443,9 +444,10 @@ export default function CreateExperiencePage() {
         throw new Error(result?.error || copy.unknownError);
       }
 
-      // 🟢 [수정됨] 등록 성공 시 알림 띄우고 대시보드로 이동
+      // 🟢 [수정됨] 등록 성공 시 알림 띄우고 완료 화면(Step 8) 표시
       showToast(copy.submitSuccess, 'success');
-      router.push('/host/dashboard?tab=experiences'); // 내 체험 관리 탭으로 이동
+      setCreatedExperienceId(result.id);
+      setStep(TOTAL_STEPS);
 
     } catch (error) {
       const message = error instanceof Error ? error.message : copy.unknownError;
@@ -517,6 +519,7 @@ export default function CreateExperiencePage() {
           setTempInclusion={setTempInclusion}
           tempExclusion={tempExclusion}
           setTempExclusion={setTempExclusion}
+          createdExperienceId={createdExperienceId}
         />
       </main>
 

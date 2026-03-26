@@ -245,7 +245,7 @@ guest:profiles!bookings_user_id_fkey (
       const res = await fetch('/api/payment/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId: booking.id, reason: '호스트 승인' }),
+        body: JSON.stringify({ bookingId: booking.id, reason: t('res_reason_host_approved') }),
       });
       if (!res.ok) throw new Error(t('res_error_refund'));
 
@@ -316,7 +316,7 @@ guest:profiles!bookings_user_id_fkey (
             <button
               onClick={() => fetchReservations()}
               className="p-1 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
-              title="새로고침"
+              title={t('hp_refresh')}
             >
               <RefreshCw size={13} className={loading ? "animate-spin text-blue-500" : ""} />
             </button>

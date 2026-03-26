@@ -78,7 +78,7 @@ export default function HostReviews() {
 
     } catch (error) {
       console.error(error);
-      showToast('리뷰를 불러오지 못했습니다.', 'error');
+      showToast(t('hp_review_load_fail'), 'error');
     } finally {
       setLoading(false);
     }

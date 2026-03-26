@@ -244,6 +244,7 @@ type ExperienceFormCopy = {
   step8DescLine1: string;
   step8DescLine2: string;
   step8Button: string;
+  step8ScheduleButton: string;
   prevButton: string;
   nextButton: string;
   submitButton: string;
@@ -355,6 +356,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step8DescLine1: '관리자 검토 후 공개됩니다.',
     step8DescLine2: '이제 일정을 열어 예약을 받아보세요.',
     step8Button: '내 체험 보러가기',
+    step8ScheduleButton: '일정 관리하기',
     prevButton: '이전',
     nextButton: '다음',
     submitButton: '체험 등록하기',
@@ -464,6 +466,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step8DescLine1: 'It will be published after admin review.',
     step8DescLine2: 'Open your schedule and start receiving bookings.',
     step8Button: 'View my experiences',
+    step8ScheduleButton: 'Manage schedule',
     prevButton: 'Back',
     nextButton: 'Next',
     submitButton: 'Submit experience',
@@ -573,6 +576,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step8DescLine1: '管理者の確認後に公開されます。',
     step8DescLine2: '次は日程を開けて予約を受け付けましょう。',
     step8Button: '自分の体験を見る',
+    step8ScheduleButton: '日程を管理する',
     prevButton: '戻る',
     nextButton: '次へ',
     submitButton: '体験を登録する',
@@ -682,6 +686,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step8DescLine1: '管理员审核后将会公开。',
     step8DescLine2: '现在可以开放日程并开始接收预订。',
     step8Button: '查看我的体验',
+    step8ScheduleButton: '管理日程',
     prevButton: '上一步',
     nextButton: '下一步',
     submitButton: '提交体验',

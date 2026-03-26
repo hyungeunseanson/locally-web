@@ -61,6 +61,7 @@ interface ExperienceFormStepsProps {
   setTempExclusion: React.Dispatch<React.SetStateAction<string>>;
   handleRemoveImage?: (index: number) => void;
   onPhotoTap?: (index: number) => void;
+  createdExperienceId?: string | null;
 }
 
 const LEVELS: LanguageLevel[] = [1, 2, 3, 4, 5];
@@ -156,6 +157,7 @@ export default function ExperienceFormSteps({
   setTempExclusion,
   handleRemoveImage,
   onPhotoTap,
+  createdExperienceId,
 }: ExperienceFormStepsProps) {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
@@ -781,9 +783,19 @@ export default function ExperienceFormSteps({
             {copy.step8DescLine2}
           </p>
         </div>
-        <div className="pt-8">
+        <div className="pt-8 flex flex-col items-center gap-3">
+          {createdExperienceId && (
+            <Link href={`/host/experiences/${createdExperienceId}/dates`}>
+              <button className="bg-black text-white px-12 py-5 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl hover:shadow-2xl">
+                {copy.step8ScheduleButton}
+              </button>
+            </Link>
+          )}
           <Link href="/host/dashboard?tab=experiences">
-            <button className="bg-black text-white px-12 py-5 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl hover:shadow-2xl">
+            <button className={createdExperienceId
+              ? "text-slate-500 underline text-sm font-medium hover:text-slate-700 transition-colors"
+              : "bg-black text-white px-12 py-5 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl hover:shadow-2xl"
+            }>
               {copy.step8Button}
             </button>
           </Link>
