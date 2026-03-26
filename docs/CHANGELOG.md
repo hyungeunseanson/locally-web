@@ -9,7 +9,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 🟡 codex cleanup 스크립트 추가 | `scripts/cleanup-codex-runtime-data.mjs`, `package.json`, `docs/runtime_verification.md` — `codex.*@example.com` 계정과 연결된 `auth.users`, `profiles`, `users`, `admin_whitelist`, `admin_audit_logs`, `host_applications`, `notifications`, `admin_tasks`, `admin_task_comments`, `bookings` 잔여 row를 dry-run으로 먼저 집계하고, `--execute`를 붙였을 때만 삭제하도록 runtime cleanup 배치를 분리 |
+| 🟡 codex cleanup 스크립트 추가 | `scripts/cleanup-codex-runtime-data.mjs`, `package.json`, `docs/runtime_verification.md` — `codex.*@example.com` 계정과 연결된 `auth.users`, `profiles`, `users`, `admin_whitelist`, `admin_audit_logs`, `host_applications`, `admin_tasks`, `admin_task_comments`, `bookings` 잔여 row를 dry-run으로 먼저 집계하고, `--execute`를 붙였을 때만 삭제하도록 runtime cleanup 배치를 분리 |
+| 🟡 notification 삭제 범위 안전선 분리 | `scripts/cleanup-codex-runtime-data.mjs`, `package.json`, `docs/runtime_verification.md` — `notifications`는 `codex user_id`에 직접 연결된 row만 기본 `cleanup:codex:execute`에서 삭제하고, 실제 호스트/어드민 계정으로 간 codex 내용 알림은 `notifications_review`로 별도 집계만 하도록 분리. review 알림까지 지우는 경우만 `cleanup:codex:execute:full`을 명시적으로 사용하도록 정리 |
 
 ## v3.39.61 — [Service Payment UX] 결제수단 unavailable 안내 톤 정리
 

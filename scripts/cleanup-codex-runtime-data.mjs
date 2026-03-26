@@ -18,6 +18,7 @@ function loadEnvFile(path) {
 
 const argv = process.argv.slice(2);
 const shouldExecute = argv.includes('--execute');
+const shouldIncludeContentNotifications = argv.includes('--include-content-notifications');
 
 const envFromFile = loadEnvFile(resolve('.env.local'));
 const env = { ...process.env, ...envFromFile };
@@ -116,7 +117,8 @@ async function collectCleanupTargets() {
     ]
   );
 
-  const notificationRows = [...(notificationContentRes.data || [])];
+  const notificationRowsByContent = [...(notificationContentRes.data || [])];
+  const notificationRowsByUserId = [];
   if (codexUserIds.length > 0) {
     for (const userIdChunk of chunk(codexUserIds, 25)) {
       const { data: userNotificationRows } = await runQuery('notifications by codex user ids', () =>
@@ -125,12 +127,20 @@ async function collectCleanupTargets() {
           .select('id,user_id,title,message')
           .in('user_id', userIdChunk)
       );
-      notificationRows.push(...(userNotificationRows || []));
+      notificationRowsByUserId.push(...(userNotificationRows || []));
     }
   }
 
-  const uniqueNotifications = Array.from(
-    new Map(notificationRows.map((row) => [row.id, row])).values()
+  const executeNotifications = Array.from(
+    new Map(notificationRowsByUserId.map((row) => [row.id, row])).values()
+  );
+  const executeNotificationIds = new Set(executeNotifications.map((row) => row.id));
+  const reviewNotifications = Array.from(
+    new Map(
+      notificationRowsByContent
+        .filter((row) => !executeNotificationIds.has(row.id))
+        .map((row) => [row.id, row])
+    ).values()
   );
 
   return {
@@ -146,7 +156,8 @@ async function collectCleanupTargets() {
     adminTasks: adminTasksRes.data || [],
     adminTaskComments: adminTaskCommentsRes.data || [],
     bookings: bookingsRes.data || [],
-    notifications: uniqueNotifications,
+    notificationsExecute: executeNotifications,
+    notificationsReview: reviewNotifications,
     profiles: (profileEmailRes.data || []).map((row) => ({ id: row.id, email: row.email })),
     publicUsers: codexUserIds.map((id) => ({ id })),
   };
@@ -160,7 +171,8 @@ function printSummary(targets) {
     ['admin_whitelist', targets.adminWhitelist.length],
     ['admin_audit_logs', targets.adminAuditLogs.length],
     ['host_applications', targets.hostApplications.length],
-    ['notifications', targets.notifications.length],
+    ['notifications_execute', targets.notificationsExecute.length],
+    ['notifications_review', targets.notificationsReview.length],
     ['admin_tasks', targets.adminTasks.length],
     ['admin_task_comments', targets.adminTaskComments.length],
     ['bookings', targets.bookings.length],
@@ -185,7 +197,13 @@ async function deleteByIds(table, ids) {
 async function executeCleanup(targets) {
   const deleted = {};
 
-  deleted.notifications = await deleteByIds('notifications', targets.notifications.map((row) => row.id));
+  deleted.notifications = await deleteByIds(
+    'notifications',
+    [
+      ...targets.notificationsExecute.map((row) => row.id),
+      ...(shouldIncludeContentNotifications ? targets.notificationsReview.map((row) => row.id) : []),
+    ]
+  );
   deleted.adminTaskComments = await deleteByIds('admin_task_comments', targets.adminTaskComments.map((row) => row.id));
   deleted.adminTasks = await deleteByIds('admin_tasks', targets.adminTasks.map((row) => row.id));
   deleted.bookings = await deleteByIds('bookings', targets.bookings.map((row) => row.id));
@@ -224,6 +242,11 @@ async function main() {
   const targets = await collectCleanupTargets();
 
   console.log(shouldExecute ? '[codex-cleanup] execute mode' : '[codex-cleanup] dry-run mode');
+  if (shouldIncludeContentNotifications) {
+    console.log('[codex-cleanup] content-matched notifications will also be deleted.');
+  } else {
+    console.log('[codex-cleanup] content-matched notifications are review-only and excluded from default execute.');
+  }
   printSummary(targets);
 
   if (!shouldExecute) {

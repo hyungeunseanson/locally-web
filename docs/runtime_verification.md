@@ -91,7 +91,8 @@ npm run cleanup:codex:dry
   - `admin_whitelist`
   - `admin_audit_logs`
   - `host_applications`
-  - `notifications`
+  - `notifications_execute`
+  - `notifications_review`
   - `admin_tasks`
   - `admin_task_comments`
   - `bookings`
@@ -104,8 +105,20 @@ npm run cleanup:codex:execute
 
 - 규칙:
   - dry-run 결과를 확인한 뒤에만 실행한다.
+  - 기본값은 `codex` 계정에 직접 연결된 데이터만 삭제한다.
+  - `notifications`는 `codex user_id`에 직접 연결된 row만 지우고, 내용에만 `codex/코덱스`가 들어간 알림은 기본값에서 제외한다.
   - 운영 데이터와 섞일 여지가 있으면 실행하지 않는다.
   - 실행 결과는 배포 보고에 남긴다.
+
+### Codex test data full execute
+
+```bash
+npm run cleanup:codex:execute:full
+```
+
+- 규칙:
+  - `notifications_review`까지 같이 삭제한다.
+  - 실제 호스트/어드민 계정으로 간 테스트 알림 이력까지 지울 수 있으므로, 기본값으로는 쓰지 않는다.
 
 ## Supabase Queries
 
