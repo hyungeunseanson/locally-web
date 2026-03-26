@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/app/utils/supabase/admin';
-import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
 
 type AdminAlertRecipient = {
   userId: string | null;
@@ -139,8 +139,8 @@ export async function sendAdminAlertEmails(params: {
 
   await Promise.all(recipients.map(async (recipient) => {
     try {
-      const result = await sendImmediateGenericEmail({
-        recipientEmail: recipient.email,
+      const result = await sendImmediateAdminEmail({
+        to: recipient.email,
         subject: params.subject,
         title: params.title,
         message: params.message,

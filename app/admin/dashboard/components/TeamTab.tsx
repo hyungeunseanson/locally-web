@@ -775,6 +775,8 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
                           <div className="flex items-center gap-1.5 mt-0.5">
                             {/* author_name — 수정 불필요 (유지) */}
                             <span className="text-[10px] text-slate-400 font-medium">{todo.author_name}</span>
+                            <span className="text-[10px] text-slate-300">·</span>
+                            <span className="text-[10px] text-slate-400 font-medium">{format(new Date(todo.created_at), 'MM.dd HH:mm')}</span>
                             {(isTodoNew || hasNewComment) && <span className="w-3 h-3 bg-rose-500 text-[7px] font-bold text-white rounded-full flex items-center justify-center shrink-0">N</span>}
                             <div className="flex items-center gap-0.5 text-[8px] text-blue-500 font-bold">
                               <MessageCircle size={9} /> {taskComments.length}

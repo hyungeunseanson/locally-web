@@ -111,6 +111,7 @@ Locally는 현지인 호스트(Local Host)와 여행자(Guest)를 연결하는 C
 - **[권한 Source 결정]** 관리자 권한 판정 source는 `users.role + admin_whitelist`다. `profiles`는 표시/프로필 데이터용이며, `profiles.role`을 권한 판정에 사용하지 않는다.
 - **[관리자 읽기 경계 결정]** `admin_tasks`, `admin_task_comments`, `admin_whitelist`, `admin_audit_logs`는 쓰기(write)가 아니라 읽기(select)만 admin-only client 경로를 허용한다. TEAM/감사 로그의 목록·realtime 읽기는 유지하되, mutation은 서버 경계 또는 service-role 정책으로만 처리한다.
 - **[관리자 알림센터 결정]** 운영 알림센터는 신규 테이블을 만들지 않고 기존 `notifications`를 재사용한다. 관리자 전용 누적 알림은 `type='admin_alert'`로 저장하고, Admin Dashboard `ALERTS` 탭에서 소비한다.
+- **[관리자 메일 provider 결정]** 관리자 대상 운영 메일은 `app/utils/adminEmailProvider.ts`를 단일 source로 사용하고, `RESEND_API_KEY` + `RESEND_FROM_EMAIL`가 있으면 Resend, 없으면 Gmail fallback을 사용한다. guest/host 일반 메일은 기존 `emailNotificationJobs` 경계를 유지한다.
 - **[알림 API 보안 결정]** `/api/notifications/email`의 단일 수신자 경로는 범용 발송 API로 사용하지 않는다. self 알림이나 서버 검증 가능한 소유권 컨텍스트(`review_reply`, `cancellation_approved` 등)만 허용하고, 그 외는 각 도메인 서버 라우트에서 직접 발송한다.
 - **[알림 mutation 경계 결정]** 일반 `notifications`의 읽음 처리와 삭제는 `/api/notifications/read`, `DELETE /api/notifications/[id]`만 사용한다. 브라우저에서 `notifications`를 direct `update/delete`하지 않는다. 인앱 알림 생성 역시 서버 route/service-role 경계에서만 수행한다.
 
@@ -468,7 +469,7 @@ service_bookings: PENDING → (결제) → PAID → cancelled / cancellation_req
 - locale prefix URL(`/en`, `/ja`, `/zh`)로 진입한 요청은 middleware가 `app_lang` cookie도 같은 locale로 동기화해야 한다. 그래야 내부 RSC/메타 요청이 이전 cookie locale 때문에 canonical/JSON-LD를 잘못 만들지 않는다.
 - JSON-LD는 `app/components/seo/JsonLd.tsx`와 `app/utils/structuredData.ts`를 통해 주입한다. 현재 범위는 홈(`Organization`, `WebSite` + `sameAs`), 공개 체험 상세(`Product` + `TouristTrip` 힌트), 커뮤니티 상세(`Article` + `BreadcrumbList`)까지이며, 실제 화면/DB에 존재하는 사실만 구조화 데이터에 넣는다.
 - `robots.txt`는 private UI를 차단하는 용도가 아니라, 크롤 불필요한 `/api/`만 `Disallow`한다. private UI 차단은 route-level `noindex`가 단일 source다.
-- `/api/admin/notify-team`의 팀 메모/메모 답글 이메일은 `admin_whitelist` 수신자 외에 작성자 본인에게도 즉시 1부를 보낸다. 반면 인앱 알림과 팀채팅 메일은 계속 작성자를 제외한다.
+- `/api/admin/notify-team`의 팀 할 일/메모/메모 답글 이메일은 `admin_whitelist` 수신자에게만 즉시 보낸다. 작성자 본인은 제외한다. `team_task_comment`는 계속 인앱 only이고, `team_chat` 메일은 unread 배치 첫 1회만 작성자 제외로 보낸다.
 - Playwright E2E는 시작 시 `tests/e2e/global.setup.ts`에서 `admin_whitelist`의 `codex.%@example.com` 찌꺼기를 자동 삭제해, 중단된 테스트가 남긴 가짜 관리자 이메일이 운영 팀 탭에 쌓이지 않게 유지한다.
 
 ---

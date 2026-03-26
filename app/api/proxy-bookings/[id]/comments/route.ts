@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
 import { createInquiryMessage } from '@/app/api/inquiries/thread/shared';
 import { getProxyLinkedInquiryId } from '@/app/utils/proxyBooking';
 
@@ -141,27 +142,18 @@ export async function POST(
                     ctaLabel: '답변 확인하기',
                 }).catch((err) => console.error('Failed to send proxy reply email:', err));
             } else {
-                // Notify the admin that the user has replied
-                // Assuming admin emails are predetermined or send to a generic support email
-                const internalApiSecret = process.env.INTERNAL_API_SECRET;
-
-                if (!internalApiSecret) {
-                    console.error('INTERNAL_API_SECRET is missing. Skipping proxy comment admin email dispatch.');
+                const adminEmail = process.env.ADMIN_SUPPORT_EMAIL || process.env.GMAIL_USER || null;
+                if (!adminEmail) {
+                    console.error('ADMIN_SUPPORT_EMAIL/GMAIL_USER is missing. Skipping proxy comment admin email dispatch.');
                 } else {
-                    fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications/send-email`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-internal-secret': internalApiSecret,
-                        },
-                        body: JSON.stringify({
-                            type: 'proxy_comment_notify',
-                            targetEmail: process.env.ADMIN_SUPPORT_EMAIL || process.env.GMAIL_USER,
-                            targetRole: 'admin',
-                            requestId,
-                            content: content.trim()
-                        })
-                    }).catch(err => console.error('Failed to trigger admin email notification:', err));
+                    await sendImmediateAdminEmail({
+                        to: adminEmail,
+                        subject: '[Locally Admin] 전화 예약 요청에 새 답변이 등록되었습니다',
+                        title: '전화 예약 요청에 새 답변이 등록되었습니다',
+                        message: content.trim(),
+                        link: `/proxy-bookings/${requestId}`,
+                        ctaLabel: '전화 예약 요청 보기',
+                    }).catch(err => console.error('Failed to send proxy comment admin email:', err));
                 }
             }
         } catch {

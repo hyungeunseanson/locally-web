@@ -27,6 +27,20 @@
 - `app/admin/dashboard/hooks/useAdminChatQuery.ts`
 - `app/admin/dashboard/components/Sidebar.tsx`
 - `app/host/dashboard/components/ReservationManager.tsx`
+- `app/admin/dashboard/components/TeamTab.tsx`
+- `app/admin/dashboard/components/GlobalTeamChat.tsx`
+
+#### Current Team Workspace Risks
+- `app/api/admin/team/bootstrap/route.ts`
+  - `admin_tasks` 100건, `admin_task_comments`는 가져온 task ids 기준으로만 묶여 오래된 TODO/메모/댓글이 조용히 누락될 수 있음
+- `app/api/admin/team/chat/route.ts`
+  - 팀 채팅도 최근 100건만 내려 오래된 운영 대화가 화면에서 사라질 수 있음
+- `app/admin/dashboard/components/TeamTab.tsx`
+  - TODO/메모/댓글 생성 후 `/api/admin/notify-team`을 client fire-and-forget으로 호출해, DB write는 성공했는데 메일/인앱 적재만 누락될 수 있음
+- `app/admin/dashboard/components/GlobalTeamChat.tsx`
+  - 팀채팅도 동일한 client notify 경계를 사용해 네트워크 단절 시 메일/알림 누락 가능성이 남아 있음
+- `app/admin/dashboard/components/TeamTab.tsx`
+  - `admin_tasks`, `admin_whitelist` realtime 이벤트가 bootstrap 전체 refetch로 이어져 작업 수 증가 시 broad refetch 비용이 커짐
 
 ### Upload / Storage
 - chat image uploads

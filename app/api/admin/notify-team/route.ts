@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
-import { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJobs';
+import { sendImmediateAdminEmail } from '@/app/utils/adminEmailProvider';
 import {
     buildTeamEmailRecipients,
     shouldSendTeamEmail,
@@ -183,15 +183,19 @@ export async function POST(request: Request) {
         await Promise.all(emailTargetEmails.map(async (recipientEmail) => {
             try {
                 if (isImmediateTeamEmail(eventType)) {
-                    await sendImmediateGenericEmail({
-                        recipientEmail,
+                    const result = await sendImmediateAdminEmail({
+                        to: recipientEmail,
                         subject: `[Locally Admin] ${title}`,
                         title,
                         message,
                         link: notificationLink,
                         ctaLabel: '대시보드에서 확인하기',
                     });
-                    sentCount += 1;
+                    if (result.sent) {
+                        sentCount += 1;
+                    } else {
+                        skippedCount += 1;
+                    }
                     return;
                 }
 
@@ -208,15 +212,19 @@ export async function POST(request: Request) {
                         return;
                     }
 
-                    await sendImmediateGenericEmail({
-                        recipientEmail,
+                    const result = await sendImmediateAdminEmail({
+                        to: recipientEmail,
                         subject: `[Locally Admin] ${title}`,
                         title,
                         message,
                         link: notificationLink,
                         ctaLabel: '대시보드에서 확인하기',
                     });
-                    sentCount += 1;
+                    if (result.sent) {
+                        sentCount += 1;
+                    } else {
+                        skippedCount += 1;
+                    }
                     return;
                 }
             } catch (emailError) {

@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.54 — [Admin Mail / Team Workspace] TODO 메일 + 관리자 메일 provider 분리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 Team TODO 작성 시각 노출 | `app/admin/dashboard/components/TeamTab.tsx` — Team Workspace TODO 카드 collapsed 메타 줄에 `MM.dd HH:mm` 작성 시각을 추가해, 언제 생성된 업무인지 바로 판단할 수 있게 정리 |
+| 🟢 Team TODO 메일 즉시 발송 | `app/utils/teamNotificationPolicy.ts`, `app/api/admin/notify-team/route.ts` — `team_todo`를 즉시 메일 대상으로 추가하고, `admin_whitelist` 기반 수신자에게 작성자 제외 원칙으로 발송하도록 보강. `team_task_comment`는 계속 인앱 only 유지 |
+| 🟢 관리자 메일 provider 분리 | `app/utils/adminEmailProvider.ts`, `app/utils/adminAlertCenter.ts`, `app/api/admin/notify-team/route.ts`, `app/api/proxy-bookings/[id]/comments/route.ts` — 관리자 대상 운영 메일을 별도 helper로 분리하고, `RESEND_API_KEY` + `RESEND_FROM_EMAIL`가 있으면 Resend, 없으면 Gmail fallback을 쓰도록 정리 |
+| 🟡 팀 메일 정책 문서/테스트 정렬 | `tests/e2e/45-team-notify-policy.spec.ts`, `docs/email_notification_policy.md`, `docs/gemini.md` — 팀 메모/메모 답글/할 일 메일은 작성자 제외, 팀 할 일 댓글은 메일 미발송 기준으로 정책과 테스트를 실제 동작에 맞게 통일 |
+| 🟡 Team Workspace 운영 리스크 문서화 | `docs/performance/optimization-baseline.md` — bootstrap 100건 제한, client fire-and-forget notify, broad realtime refetch를 Team Workspace의 현재 주요 누락/성능 리스크로 명시 |
+
 ## v3.39.53 — [Host UX] 등록 폼 가시성 + 승인 축하 온보딩
 
 | 항목 | 내용 |

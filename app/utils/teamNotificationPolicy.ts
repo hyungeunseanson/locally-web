@@ -10,11 +10,11 @@ function normalizeEmail(email: string) {
 }
 
 export function shouldSendTeamEmail(eventType?: TeamEventType | null) {
-  return eventType === 'team_chat' || eventType === 'team_memo' || eventType === 'team_memo_comment';
+  return eventType === 'team_chat' || eventType === 'team_todo' || eventType === 'team_memo' || eventType === 'team_memo_comment';
 }
 
 export function isImmediateTeamEmail(eventType?: TeamEventType | null) {
-  return eventType === 'team_memo' || eventType === 'team_memo_comment';
+  return eventType === 'team_todo' || eventType === 'team_memo' || eventType === 'team_memo_comment';
 }
 
 export function buildTeamEmailRecipients(params: {
