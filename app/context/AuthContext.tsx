@@ -28,9 +28,7 @@ const AUTH_LOCAL_STORAGE_KEYS = [
   'global_chat_last_viewed',
   'host_checked_reservations',
   'last_active_update',
-  'last_viewed_team',
   'locally_recent_searches',
-  'viewed_booking_ids',
 ] as const;
 
 export function AuthProvider({

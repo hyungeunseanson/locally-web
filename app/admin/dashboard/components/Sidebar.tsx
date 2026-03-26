@@ -5,7 +5,10 @@ import Link from 'next/link';
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
-import { getUnviewedPendingBookingCount } from '@/app/utils/adminViewedBookings';
+import {
+  ensureAdminTeamLastViewed,
+  getAdminUnviewedPendingBookingCount,
+} from '@/app/utils/adminBadgeState';
 import { isAdminAlertNotification } from '@/app/utils/adminNotifications';
 import {
   Users, CheckCircle2, MessageSquare,
@@ -95,7 +98,9 @@ export default function Sidebar() {
       const { data, success } = await res.json();
       if (!success || !data) throw new Error('Invalid backend response');
 
-      const unviewedPendingBookings = getUnviewedPendingBookingCount(data.pendingBookingIds || []);
+      const unviewedPendingBookings = currentUser?.id
+        ? getAdminUnviewedPendingBookingCount(currentUser.id, data.pendingBookingIds || [])
+        : 0;
 
       setCounts(prev => ({
         ...prev,
@@ -109,11 +114,16 @@ export default function Sidebar() {
     } catch (e) {
       console.error('Sidebar counts fetch error:', e);
     }
-  }, []);
+  }, [currentUser?.id]);
 
   const fetchTeamCounts = useCallback(async () => {
     try {
-      const lastViewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
+      if (!currentUser?.id) {
+        setCounts(prev => ({ ...prev, teamNewCount: 0 }));
+        return;
+      }
+
+      const lastViewed = ensureAdminTeamLastViewed(currentUser.id);
       const res = await fetch(`/api/admin/team-counts?lastViewed=${encodeURIComponent(lastViewed)}`);
 
       if (!res.ok) throw new Error('Failed to fetch team counts');
@@ -128,7 +138,7 @@ export default function Sidebar() {
     } catch (e) {
       console.error('Sidebar team counts fetch error:', e);
     }
-  }, []);
+  }, [currentUser?.id]);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -162,13 +172,18 @@ export default function Sidebar() {
   }, [fetchTeamCounts]);
 
   useEffect(() => {
+    fetchCurrentUser();
+  }, [fetchCurrentUser]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
     fetchCounts();
     fetchTeamCounts();
-    fetchCurrentUser();
 
     window.addEventListener('booking-viewed', scheduleFetchCounts);
     window.addEventListener('team-viewed', scheduleFetchTeamCounts);
-    const intervalId = window.setInterval(fetchCounts, 300000); // 45초 -> 5분으로 완화
+    const intervalId = window.setInterval(fetchCounts, 300000);
 
     return () => {
       if (countsRefreshTimeoutRef.current) {
@@ -183,7 +198,7 @@ export default function Sidebar() {
       window.removeEventListener('team-viewed', scheduleFetchTeamCounts);
       window.clearInterval(intervalId);
     };
-  }, [fetchCounts, fetchCurrentUser, fetchTeamCounts, scheduleFetchCounts, scheduleFetchTeamCounts]);
+  }, [currentUser?.id, fetchCounts, fetchTeamCounts, scheduleFetchCounts, scheduleFetchTeamCounts]);
 
   useEffect(() => {
     const channel = supabase.channel('online_users_sidebar')

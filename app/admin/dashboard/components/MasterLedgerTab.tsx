@@ -38,7 +38,7 @@ import {
   getBookingPaidAmount,
   getBookingPlatformRevenue,
 } from '@/app/utils/bookingFinance';
-import { markBookingViewed } from '@/app/utils/adminViewedBookings';
+import { markAdminBookingViewed } from '@/app/utils/adminBadgeState';
 import { AdminMasterLedgerEntry } from '@/app/types/admin';
 import {
   getHostUnavailableReviewDetail,
@@ -137,6 +137,7 @@ export default function MasterLedgerTab({
   const [allBookings, setAllBookings] = useState<AdminMasterLedgerEntry[]>([]);
   const [isLoadingLedger, setIsLoadingLedger] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
   const lastRefreshSignalRef = useRef<string | null>(null);
   // 🔧 Issue #4 Phase A: Realtime 연속 이벤트 벑합 (300ms 디바운스)
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -173,6 +174,22 @@ export default function MasterLedgerTab({
   useEffect(() => {
     fetchLedger();
   }, [fetchLedger]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadCurrentAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isActive) return;
+      setCurrentAdminId(user?.id || null);
+    };
+
+    void loadCurrentAdmin();
+
+    return () => {
+      isActive = false;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     if (!refreshSignal) {
@@ -213,10 +230,19 @@ export default function MasterLedgerTab({
   }, [fetchLedger, supabase]);
 
   // 0. 예약 클릭 시 열람 처리
-  const handleSelectBooking = (b: AdminMasterLedgerEntry) => {
+  const handleSelectBooking = async (b: AdminMasterLedgerEntry) => {
     setSelectedBooking(b);
 
-    if (markBookingViewed(b.id)) {
+    let adminId = currentAdminId;
+    if (!adminId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      adminId = user?.id || null;
+      if (adminId) {
+        setCurrentAdminId(adminId);
+      }
+    }
+
+    if (adminId && markAdminBookingViewed(adminId, b.id)) {
       // 사이드바에 알림 (이벤트 발생)
       window.dispatchEvent(new Event('booking-viewed'));
     }

@@ -163,9 +163,13 @@ async function syncTeamWorkspaceCount(page: Page, lastViewed?: string) {
   const serverCount = await page.evaluate(async (value) => {
     if (value) {
       localStorage.setItem('last_viewed_team', value);
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('last_viewed_team:'))
+        .forEach((key) => localStorage.setItem(key, value));
     }
 
-    const current = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
+    const scopedKey = Object.keys(localStorage).find((key) => key.startsWith('last_viewed_team:'));
+    const current = (scopedKey && localStorage.getItem(scopedKey)) || localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
     const response = await fetch(`/api/admin/team-counts?lastViewed=${encodeURIComponent(current)}`);
     const result = await response.json();
 

@@ -5,6 +5,15 @@
 
 ---
 
+## v3.39.55 — [Admin UX] 채팅 모니터링 레이아웃 · 사이드바 badge 안정화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 메시지 모니터링 데스크탑 리스트 확장 | `app/admin/dashboard/components/ChatMonitor.tsx` — 데스크탑 좌측 채팅방 리스트 폭을 확대하고, 이름/체험명/최신 메시지/시간이 덜 잘리도록 spacing과 시간 표기를 정리해 채팅이 많아질 때도 목록 스캔이 쉬워지도록 개선 |
+| 🔴 Team Workspace / Master Ledger badge 안정화 | `app/utils/adminBadgeState.ts`, `app/admin/dashboard/components/Sidebar.tsx`, `app/admin/dashboard/components/TeamTab.tsx`, `app/admin/dashboard/components/MasterLedgerTab.tsx` — `last_viewed_team`, `viewed_booking_ids`를 admin user id 기준 scoped key로 관리하고, legacy key를 1회 흡수하도록 정리. Team tab은 bootstrap 성공 후에만 viewed 처리하도록 바꿔 숫자가 갑자기 튀거나 너무 빨리 사라지는 문제를 완화 |
+| 🟡 로그아웃 후 badge 재등장 완화 | `app/context/AuthContext.tsx` — sign out 시 팀/예약 viewed 상태를 지우지 않도록 조정해, 같은 관리자 계정이 다시 로그인했을 때 `새 항목` 숫자가 과하게 초기화되는 문제를 줄임 |
+| 🟡 Team Workspace 현재 한계 가시화 | `app/admin/dashboard/components/TeamTab.tsx` — 헤더에 `최근 100개 기준으로 동기화` 안내를 추가해, 현재 bootstrap 제한 범위를 운영자가 즉시 이해할 수 있게 보강 |
+
 ## v3.39.54 — [Admin Mail / Team Workspace] TODO 메일 + 관리자 메일 provider 분리
 
 | 항목 | 내용 |

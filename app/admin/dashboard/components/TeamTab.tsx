@@ -16,6 +16,7 @@ import { ko } from 'date-fns/locale';
 import { AdminTask, AdminComment } from '@/app/types/admin';
 import { useToast } from '@/app/context/ToastContext';
 import { useTeamWorkspaceAdminSession } from '@/app/admin/dashboard/hooks/useTeamWorkspaceAdminSession';
+import { ensureAdminTeamLastViewed, markAdminTeamViewed } from '@/app/utils/adminBadgeState';
 
 type TeamTabProps = {
   initialInnerTab?: 'todo' | 'memo' | 'proxy';
@@ -74,6 +75,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   const todoCommentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const memoCommentTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const workspaceErrorToastShownRef = useRef(false);
+  const viewedStateSyncedUserIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
   const autoResizeTextarea = useCallback((element: HTMLTextAreaElement | null, maxHeight: number) => {
@@ -206,10 +208,6 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
 
   useEffect(() => {
     setIsClient(true);
-    const viewed = localStorage.getItem('last_viewed_team') || new Date(0).toISOString();
-    setLastViewed(viewed);
-    localStorage.setItem('last_viewed_team', new Date().toISOString());
-    window.dispatchEvent(new Event('team-viewed'));
 
     const handleClickOutside = (event: MouseEvent) => {
       if (threadRef.current && !threadRef.current.contains(event.target as Node)) {
@@ -225,6 +223,28 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?.id) {
+      viewedStateSyncedUserIdRef.current = null;
+      return;
+    }
+
+    const viewed = ensureAdminTeamLastViewed(currentUser.id);
+    setLastViewed(viewed);
+    viewedStateSyncedUserIdRef.current = null;
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    const isWorkspaceReady = hasLoadedTasks && hasLoadedComments && hasLoadedWhitelist;
+    if (!currentUser?.id || !isWorkspaceReady) return;
+    if (viewedStateSyncedUserIdRef.current === currentUser.id) return;
+
+    const nextViewedAt = markAdminTeamViewed(currentUser.id);
+    setLastViewed(nextViewedAt);
+    viewedStateSyncedUserIdRef.current = currentUser.id;
+    window.dispatchEvent(new Event('team-viewed'));
+  }, [currentUser?.id, hasLoadedComments, hasLoadedTasks, hasLoadedWhitelist]);
 
   useEffect(() => {
     let isActive = true;
@@ -624,9 +644,14 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
   return (
     <div className="flex flex-col h-full gap-3 md:gap-6 relative pt-2 md:pt-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-2.5 md:pb-4 gap-2">
-        <h2 className="text-[10px] md:text-xl font-bold text-slate-900 flex items-center gap-1.5">
-          <ClipboardList size={12} className="text-rose-500" /> Team Sync HQ
-        </h2>
+        <div>
+          <h2 className="text-[10px] md:text-xl font-bold text-slate-900 flex items-center gap-1.5">
+            <ClipboardList size={12} className="text-rose-500" /> Team Sync HQ
+          </h2>
+          <p className="mt-1 text-[9px] md:text-xs text-slate-400">
+            최근 100개 기준으로 동기화됩니다.
+          </p>
+        </div>
 
         {/* 🟢 구조 개편: Inner Tab Navigation */}
         <div className="flex bg-slate-100 p-0.5 rounded-lg w-full md:w-auto">
