@@ -269,21 +269,34 @@ export default function ServiceRequestDetailPage() {
 
         {/* ── [고객 뷰] pending_payment: 결제 대기 배너 ── */}
         {isOwner && isPendingPaymentServiceRequest(request.status) && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-4 flex flex-col items-center gap-3 text-center">
-            <CreditCard size={32} className="text-amber-500" />
-            <div>
-              <p className="font-black text-[15px] md:text-base text-amber-900 mb-1">{t('sr_need_pay')}</p>
-              <p className="text-[12px] md:text-[13px] text-amber-700">{t('sr_need_pay_desc')}</p>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-4 flex flex-col gap-4 text-left">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-white border border-amber-100 flex items-center justify-center shrink-0">
+                <CreditCard size={22} className="text-amber-500" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="font-black text-[15px] md:text-base text-amber-900">{t('sr_need_pay')}</p>
+                <p className="text-[12px] md:text-[13px] text-amber-700">{t('sr_need_pay_desc')}</p>
+                <p className="text-[11px] md:text-[12px] text-amber-700/90 leading-relaxed">{t('sr_need_pay_followup')}</p>
+              </div>
             </div>
-            <button
-              onClick={() => router.push(`/services/${requestId}/payment`)}
-              className="w-full py-3.5 rounded-xl font-black text-[14px] md:text-sm text-white"
-              style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', boxShadow: '0 4px 15px rgba(217,119,6,0.35)' }}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <CreditCard size={16} /> {t('btn_pay_now')}
-              </span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                onClick={() => router.push(`/services/${requestId}/payment`)}
+                className="w-full py-3.5 rounded-xl font-black text-[14px] md:text-sm text-white"
+                style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', boxShadow: '0 4px 15px rgba(217,119,6,0.35)' }}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <CreditCard size={16} /> {t('btn_pay_now')}
+                </span>
+              </button>
+              <Link
+                href="/help"
+                className="flex items-center justify-center rounded-xl border border-amber-200 bg-white px-4 py-3.5 text-[13px] md:text-sm font-bold text-amber-800 transition-colors hover:bg-amber-100"
+              >
+                {t('spc_support')}
+              </Link>
+            </div>
           </div>
         )}
 

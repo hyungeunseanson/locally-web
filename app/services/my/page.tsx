@@ -10,6 +10,7 @@ import {
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { isPendingPaymentServiceRequest } from '@/app/constants/serviceStatus';
 import { getServiceRequestStatusLabel } from '@/app/constants/serviceStatus';
 import type { ServiceRequestCard } from '@/app/types/service';
 
@@ -94,49 +95,65 @@ export default function MyServiceRequestsPage() {
           <div className="space-y-3">
             {requests.map((req) => {
               const cfg = STATUS_CONFIG[req.status] ?? { cls: 'bg-slate-50 text-slate-400 border-slate-200', dot: 'bg-slate-300' };
+              const isPendingPayment = isPendingPaymentServiceRequest(req.status);
               return (
-                <Link key={req.id} href={`/services/${req.id}`}>
-                  <div className="group bg-white rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer">
-                    {/* 상단 */}
-                    <div className="px-4 pt-4 pb-3 flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                        <Briefcase size={16} className="text-slate-400" />
+                <div key={req.id} className="space-y-2">
+                  <Link href={`/services/${req.id}`}>
+                    <div className="group bg-white rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer">
+                      {/* 상단 */}
+                      <div className="px-4 pt-4 pb-3 flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                          <Briefcase size={16} className="text-slate-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h2 className="font-bold text-[13px] md:text-[15px] text-slate-900 leading-snug line-clamp-2 group-hover:text-slate-700 transition-colors">
+                            {req.title}
+                          </h2>
+                          <div className="flex flex-wrap gap-x-2.5 gap-y-1 mt-1.5 text-[10px] md:text-[11px] text-slate-400">
+                            <span className="flex items-center gap-1"><MapPin size={9} />{req.city}</span>
+                            <span className="flex items-center gap-1"><Calendar size={9} />{req.service_date}</span>
+                            <span className="flex items-center gap-1"><Clock size={9} />{req.duration_hours}시간</span>
+                            <span className="flex items-center gap-1"><Users size={9} />{req.guest_count}명</span>
+                            {req.languages?.length > 0 && (
+                              <span className="flex items-center gap-1"><Globe2 size={9} />{req.languages.slice(0, 2).join(' · ')}</span>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronRight size={16} className="text-slate-200 shrink-0 mt-1 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h2 className="font-bold text-[13px] md:text-[15px] text-slate-900 leading-snug line-clamp-2 group-hover:text-slate-700 transition-colors">
-                          {req.title}
-                        </h2>
-                        <div className="flex flex-wrap gap-x-2.5 gap-y-1 mt-1.5 text-[10px] md:text-[11px] text-slate-400">
-                          <span className="flex items-center gap-1"><MapPin size={9} />{req.city}</span>
-                          <span className="flex items-center gap-1"><Calendar size={9} />{req.service_date}</span>
-                          <span className="flex items-center gap-1"><Clock size={9} />{req.duration_hours}시간</span>
-                          <span className="flex items-center gap-1"><Users size={9} />{req.guest_count}명</span>
-                          {req.languages?.length > 0 && (
-                            <span className="flex items-center gap-1"><Globe2 size={9} />{req.languages.slice(0, 2).join(' · ')}</span>
-                          )}
+
+                      {/* 구분선 */}
+                      <div className="mx-4 border-t border-slate-50" />
+
+                      {/* 하단: 상태 + 금액 */}
+                      <div className="px-4 pb-4 pt-3 flex items-center justify-between">
+                        <span className={`inline-flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold px-2.5 py-1 rounded-full border ${cfg.cls}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                          {getServiceRequestStatusLabel(req.status)}
+                        </span>
+                        <div className="text-right">
+                          <p className="text-[9px] text-slate-400 mb-0.5">{t('req_total_paid')}</p>
+                          <p className="font-black text-[15px] md:text-[17px] text-slate-900">
+                            ₩{req.total_customer_price.toLocaleString()}
+                          </p>
                         </div>
                       </div>
-                      <ChevronRight size={16} className="text-slate-200 shrink-0 mt-1 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
                     </div>
+                  </Link>
 
-                    {/* 구분선 */}
-                    <div className="mx-4 border-t border-slate-50" />
-
-                    {/* 하단: 상태 + 금액 */}
-                    <div className="px-4 pb-4 pt-3 flex items-center justify-between">
-                      <span className={`inline-flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold px-2.5 py-1 rounded-full border ${cfg.cls}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                        {getServiceRequestStatusLabel(req.status)}
-                      </span>
-                      <div className="text-right">
-                        <p className="text-[9px] text-slate-400 mb-0.5">{t('req_total_paid')}</p>
-                        <p className="font-black text-[15px] md:text-[17px] text-slate-900">
-                          ₩{req.total_customer_price.toLocaleString()}
-                        </p>
+                  {isPendingPayment && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-[12px] md:text-[13px] font-black text-amber-900">{t('sr_need_pay')}</p>
+                        <p className="mt-1 text-[11px] md:text-[12px] leading-5 text-amber-700">{t('sr_need_pay_desc')}</p>
+                        <p className="mt-1 text-[10px] md:text-[11px] leading-5 text-amber-700/90">{t('sr_need_pay_followup')}</p>
                       </div>
+                      <Link href={`/services/${req.id}/payment`} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-[12px] md:text-[13px] font-black text-white shadow-sm transition-colors hover:bg-amber-600">
+                        <Zap size={14} /> {t('btn_pay_now')}
+                      </Link>
                     </div>
-                  </div>
-                </Link>
+                  )}
+                </div>
               );
             })}
           </div>

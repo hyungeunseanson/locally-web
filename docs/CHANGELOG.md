@@ -5,6 +5,12 @@
 
 ---
 
+## v3.39.58 — [Service UX] pending_payment 후속 안내 강화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 서비스 pending_payment 후속 행동 보강 | `app/services/[requestId]/ServiceRequestClient.tsx`, `app/services/my/page.tsx`, `app/context/LanguageContext.tsx` — 서비스 상세와 내 의뢰 목록의 `결제 대기` 안내에 "결제 후에는 이 화면에서 진행 상태와 호스트 지원 현황을 확인할 수 있다"는 follow-up 문구를 추가하고, 상세에서는 고객센터 링크까지 함께 노출해 결제 전후 다음 행동을 더 명확하게 정리 |
+
 ## v3.39.57 — [Guest Booking UX] 예약·결제 후속 안내 및 서비스 결제 신뢰감 보강
 
 | 항목 | 내용 |
