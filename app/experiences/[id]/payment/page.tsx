@@ -802,11 +802,11 @@ function PaymentContent() {
             <h2 className="text-[16px] md:text-xl font-bold">{t('exp_payment_booker_title')}</h2>
             <div>
               <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">{t('exp_payment_name_label')}</label>
-              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_name_placeholder') as string} />
+              <input data-testid="exp-payment-booker-name" type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_name_placeholder') as string} />
             </div>
             <div>
               <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">{t('exp_payment_phone_label')}</label>
-              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_phone_placeholder') as string} />
+              <input data-testid="exp-payment-booker-phone" type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_phone_placeholder') as string} />
             </div>
           </div>
 
@@ -814,6 +814,7 @@ function PaymentContent() {
             <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">{t('exp_payment_method_title')}</h2>
           <div className={`grid gap-2 md:gap-3 mb-3 md:mb-4 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <button
+                data-testid="exp-payment-method-card"
                 type="button"
                 onClick={() => {
                   if (isCardReadyResolved && isCardReady) {
@@ -827,6 +828,7 @@ function PaymentContent() {
                 <span className="font-bold text-[12px] md:text-sm">{t('exp_payment_method_card')}</span>
               </button>
               <button
+                data-testid="exp-payment-method-bank"
                 onClick={() => setPaymentMethod('bank')}
                 className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'bank' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
@@ -835,6 +837,7 @@ function PaymentContent() {
               </button>
               {isPayPalEnabled && (
                 <button
+                  data-testid="exp-payment-method-paypal"
                   onClick={() => setPaymentMethod('paypal')}
                   className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'paypal' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
                 >
@@ -934,7 +937,7 @@ function PaymentContent() {
           <div className="mb-5 md:mb-6 space-y-2.5 md:space-y-3 bg-red-50/50 p-4 md:p-5 rounded-xl md:rounded-2xl border border-red-100">
             <h3 className="text-[13px] md:text-sm font-bold text-red-600 mb-2.5 md:mb-3 flex items-center gap-1 md:gap-1.5"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_safety_title')}</h3>
 
-            <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
+            <label data-testid="exp-payment-agree-off-platform" className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
               <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeNoOffPlatform ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
               <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
@@ -942,7 +945,7 @@ function PaymentContent() {
               </div>
             </label>
 
-            <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
+            <label data-testid="exp-payment-agree-safety" className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
               <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeSafety ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeSafety} onChange={() => setAgreeSafety(!agreeSafety)} />
               <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
@@ -950,7 +953,7 @@ function PaymentContent() {
               </div>
             </label>
 
-            <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
+            <label data-testid="exp-payment-agree-terms" className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
               <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeTerms ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeTerms} onChange={() => setAgreeTerms(!agreeTerms)} />
               <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
@@ -967,6 +970,7 @@ function PaymentContent() {
 
           {paymentMethod !== 'paypal' ? (
             <button
+              data-testid="exp-payment-submit"
               onClick={handlePayment}
               disabled={
                 isProcessing ||

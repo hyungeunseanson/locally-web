@@ -280,13 +280,14 @@ test.describe.serial('Live guest post-booking experience flow', () => {
     await test.step('Create a pending bank-transfer booking', async () => {
       await page.goto(
         `/experiences/${bookableExperience.experienceId}/payment?date=${bookableExperience.date}&time=${bookableExperience.time}&guests=1`,
-        { waitUntil: 'networkidle' }
+        { waitUntil: 'domcontentloaded' }
       );
+      await expect(page.getByTestId('exp-payment-booker-name')).toBeVisible({ timeout: 30000 });
 
-      await page.locator('input[placeholder="예약자 성함"]').fill(guest.fullName);
-      await page.locator('input[placeholder="010-0000-0000"]').fill(guest.phone);
+      await page.getByTestId('exp-payment-booker-name').fill(guest.fullName);
+      await page.getByTestId('exp-payment-booker-phone').fill(guest.phone);
 
-      await page.getByRole('button', { name: /무통장 입금/ }).click();
+      await page.getByTestId('exp-payment-method-bank').click();
 
       const bankCard = page.locator('div').filter({ hasText: /입금하실 계좌/ }).last();
       paymentBankAccount = (await bankCard.locator('span.font-black').textContent())?.trim() || '';
@@ -294,9 +295,9 @@ test.describe.serial('Live guest post-booking experience flow', () => {
       expect(paymentBankAccount).not.toBe('');
       expect(paymentBankName).not.toBe('');
 
-      const noOffPlatformAgreement = page.getByText(/호스트와의 직접 연락.*플랫폼 외부 결제/).first();
-      const safetyAgreement = page.getByText(/게스트 안전 가이드라인/).first();
-      const termsAgreement = page.getByText(/구매 조건, 취소\/환불 규정/).first();
+      const noOffPlatformAgreement = page.getByTestId('exp-payment-agree-off-platform');
+      const safetyAgreement = page.getByTestId('exp-payment-agree-safety');
+      const termsAgreement = page.getByTestId('exp-payment-agree-terms');
 
       await expect(noOffPlatformAgreement).toBeVisible({ timeout: 15000 });
       await expect(safetyAgreement).toBeVisible({ timeout: 15000 });
@@ -306,7 +307,7 @@ test.describe.serial('Live guest post-booking experience flow', () => {
       await safetyAgreement.click();
       await termsAgreement.click();
 
-      await page.getByRole('button', { name: /결제하기/ }).click();
+      await page.getByTestId('exp-payment-submit').click();
       await page.waitForURL(/\/payment\/complete\?orderId=/, { timeout: 30000 });
 
       const url = new URL(page.url());
