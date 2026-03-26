@@ -117,6 +117,23 @@ function ServiceRequestForm() {
         </div>
 
         <div className="space-y-5 md:space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 md:px-5 md:py-5">
+            <p className="text-[11px] md:text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{t('srf_flow_title')}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              {[
+                t('srf_flow_step_request'),
+                t('srf_flow_step_payment'),
+                t('srf_flow_step_recruit'),
+                t('srf_flow_step_select'),
+              ].map((label, index) => (
+                <div key={String(label)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <p className="text-[10px] font-black text-slate-400">STEP {index + 1}</p>
+                  <p className="mt-1 text-[11px] md:text-xs font-semibold leading-5 text-slate-700">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* 의뢰 제목 */}
           <div>
             <label className="block text-[12px] md:text-sm font-bold text-slate-700 mb-1.5">

@@ -73,6 +73,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
     ) || trip.location || 'SEOUL';
   const isHostUnavailablePending = isHostUnavailableReviewPending(trip.cancelReason);
   const guestCount = Number(trip.guests || 1);
+  const isPendingDeposit = (trip.status || '').toLowerCase() === 'pending';
 
   const buildMessageHref = () => {
     const messageParams = new URLSearchParams({
@@ -336,6 +337,25 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 <span className="font-semibold text-slate-900">{trip.time}</span>
               </div>
             </div>
+
+            {isPendingDeposit && (
+              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+                <div className="flex items-start gap-2">
+                  <Receipt className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <div className="space-y-2">
+                    <p>{t('trip_pending_notice')}</p>
+                    <button
+                      type="button"
+                      data-testid="guest-trip-pending-receipt-button"
+                      onClick={() => onOpenReceipt(trip)}
+                      className="inline-flex items-center text-[10px] md:text-[11px] font-bold text-amber-800 underline underline-offset-2 transition-colors hover:text-amber-900"
+                    >
+                      {t('trip_pending_receipt_cta')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {isHostUnavailablePending && (
               <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50 px-3 py-2.5 text-[11px] leading-5 text-orange-700">

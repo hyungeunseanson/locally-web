@@ -466,7 +466,7 @@ test.describe.serial('Service payment method lock', () => {
     await page.goto(`/services/${fixture.requestId}/payment`, { waitUntil: 'networkidle' });
 
     await expect(
-      page.getByText('이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.')
+      page.getByText(/입금하실 계좌|Bank Account for Deposit|お振込先口座|存款账户/)
     ).toBeVisible();
 
     const markBankResponse = await page.request.post('/api/services/payment/mark-bank', {

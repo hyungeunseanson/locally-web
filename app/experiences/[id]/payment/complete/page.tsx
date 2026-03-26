@@ -241,17 +241,25 @@ function PaymentCompleteContent() {
           </div>
         </div>
 
-        {/* 3. 액션 버튼들 (캘린더, 공유, 홈) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 max-w-2xl mx-auto mb-10 md:mb-16">
+        {/* 3. 액션 버튼들 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 max-w-2xl mx-auto mb-3 md:mb-4">
+          <Link href="/guest/trips" className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-slate-900 text-white hover:bg-black hover:shadow-lg rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
+            <ArrowRight className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_view_detail')}
+          </Link>
+          <Link href={messageHref} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
+            <MessageCircle className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_message_cta')}
+          </Link>
           <button onClick={handleAddToCalendar} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-white border border-slate-200 hover:border-black hover:shadow-md rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base text-slate-700">
             <Calendar className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_action_add_calendar')}
           </button>
-          <button onClick={handleShare} className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-white border border-slate-200 hover:border-black hover:shadow-md rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base text-slate-700">
-            <Share2 className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_action_share')}
-          </button>
-          <Link href="/" className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-slate-900 text-white hover:bg-black hover:shadow-lg rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
+          <Link href="/" className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-white border border-slate-200 hover:border-black hover:shadow-md rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base text-slate-700">
             <Home className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_action_home')}
           </Link>
+        </div>
+        <div className="mb-10 md:mb-16 text-center">
+          <button onClick={handleShare} className="inline-flex items-center gap-2 text-[12px] md:text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900">
+            <Share2 className="w-4 h-4" /> {t('pay_complete_action_share')}
+          </button>
         </div>
 
         {/* 4. 하단 안내 */}
@@ -260,9 +268,9 @@ function PaymentCompleteContent() {
           <div className="text-left">
             <p className="font-bold text-[13px] md:text-base mb-1">{t('pay_complete_message_title')}</p>
             <p className="text-blue-600/80">{t('pay_complete_message_desc')}</p>
-            <Link href={messageHref} className="inline-block mt-2.5 md:mt-3 text-[11px] md:text-xs font-bold bg-blue-100 hover:bg-blue-200 text-blue-700 px-2.5 md:px-3 py-1.5 rounded-lg transition-colors">
-              {t('pay_complete_message_cta')} →
-            </Link>
+            <p className="mt-2.5 md:mt-3 text-[11px] md:text-xs font-semibold text-blue-700/90">
+              {t('pay_complete_message_followup')}
+            </p>
           </div>
         </div>
 

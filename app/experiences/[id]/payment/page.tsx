@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { createClient } from '@/app/utils/supabase/client';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import { useToast } from '@/app/context/ToastContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { BOOKING_ACTIVE_STATUS_FOR_CAPACITY } from '@/app/constants/bookingStatus';
 import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
@@ -115,6 +116,7 @@ function PaymentContent() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [experience, setExperience] = useState<PaymentExperience | null>(null);
@@ -149,8 +151,8 @@ function PaymentContent() {
   });
 
   const experienceId = params?.id as string;
-  const date = searchParams?.get('date') || '날짜 미정';
-  const time = searchParams?.get('time') || '시간 미정';
+  const date = searchParams?.get('date') || (t('exp_payment_date_tbd') as string);
+  const time = searchParams?.get('time') || (t('exp_payment_time_tbd') as string);
   const guests = Number(searchParams?.get('guests')) || 1;
   const isPrivate = searchParams?.get('type') === 'private';
   const requestedSoloGuarantee = searchParams?.get('solo') === '1' && guests === 1 && !isPrivate;
@@ -184,15 +186,15 @@ function PaymentContent() {
 
   const getCheckoutValidationError = useCallback((context: PayPalCheckoutContext) => {
     if (!context.customerName || !context.customerPhone) {
-      return '예약자 정보를 입력해주세요.';
+      return t('exp_payment_validation_customer') as string;
     }
 
     if (!context.agreeTerms || !context.agreeSafety || !context.agreeNoOffPlatform) {
-      return '모든 필수 안전 및 이용 규정에 동의해주세요.';
+      return t('exp_payment_validation_agreements') as string;
     }
 
     return null;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -216,7 +218,7 @@ function PaymentContent() {
   }, [agreeNoOffPlatform, agreeSafety, agreeTerms, customerName, customerPhone]);
 
   const refreshSlotSummary = useCallback(async () => {
-    if (!experienceId || !date || !time || date === '날짜 미정' || time === '시간 미정') {
+    if (!experienceId || !date || !time || date === t('exp_payment_date_tbd') || time === t('exp_payment_time_tbd')) {
       setSlotSummary(null);
       setHasSlotSummaryLoaded(false);
       setIsSlotSummaryResolved(true);
@@ -304,7 +306,7 @@ function PaymentContent() {
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
 
     if (!soloOptionNoticeShownRef.current) {
-      showToast('이미 확정된 예약이 있어 1인 출발 확정 옵션이 제거되었습니다.', 'error');
+      showToast(t('exp_payment_solo_removed') as string, 'error');
       soloOptionNoticeShownRef.current = true;
     }
   }, [
@@ -399,7 +401,7 @@ function PaymentContent() {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      const message = '로그인이 필요합니다.';
+      const message = t('login_required') as string;
       setPaymentError(message);
       showToast(message, 'error');
       router.push('/login');
@@ -415,8 +417,8 @@ function PaymentContent() {
     const isAvailable = await checkAvailability();
     if (!isAvailable) {
       const message = isPrivate
-        ? '해당 시간대에 이미 다른 예약이 있어 단독 투어 진행이 어렵습니다.'
-        : '죄송합니다. 잔여석이 부족하여 예약할 수 없습니다.';
+        ? (t('exp_payment_private_conflict') as string)
+        : (t('exp_payment_capacity_conflict') as string);
       setPaymentError(message);
       showToast(message, 'error');
       throw new Error(message);
@@ -441,7 +443,7 @@ function PaymentContent() {
     const result = (await res.json()) as BookingApiResponse;
 
     if (!res.ok || !result.success || !result.newOrderId) {
-      const message = result.error || '예약 처리 중 오류가 발생했습니다.';
+      const message = result.error || (t('exp_payment_booking_error') as string);
       setPaymentError(message);
       showToast(message, 'error');
       throw new Error(message);
@@ -484,7 +486,7 @@ function PaymentContent() {
 
       const result = (await response.json()) as PayPalCreateOrderResponse;
       if (!response.ok || !result.success || !result.paypalOrderId) {
-        const message = result.error || 'PayPal 주문 생성에 실패했습니다.';
+        const message = result.error || (t('exp_payment_paypal_create_error') as string);
         setPaymentError(message);
         showToast(message, 'error');
         throw new Error(message);
@@ -504,7 +506,7 @@ function PaymentContent() {
       try {
         const session = paypalSessionRef.current;
         if (!session) {
-          throw new Error('PayPal 결제 세션을 찾을 수 없습니다. 다시 시도해주세요.');
+          throw new Error(t('exp_payment_paypal_session_missing') as string);
         }
 
         const response = await fetch('/api/payment/paypal/capture-order', {
@@ -518,7 +520,7 @@ function PaymentContent() {
 
         const result = (await response.json()) as PayPalCaptureResponse;
         if (!response.ok || !result.success) {
-          const message = result.error || 'PayPal 결제 승인 처리에 실패했습니다.';
+          const message = result.error || (t('exp_payment_paypal_capture_error') as string);
           setPaymentError(message);
           showToast(message, 'error');
           return;
@@ -526,7 +528,7 @@ function PaymentContent() {
 
         router.push(`/experiences/${experienceId}/payment/complete?orderId=${session.orderId}`);
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'PayPal 결제 승인 처리 중 오류가 발생했습니다.';
+        const message = error instanceof Error ? error.message : (t('exp_payment_paypal_capture_processing_error') as string);
         setPaymentError(message);
         showToast(message, 'error');
       } finally {
@@ -570,10 +572,10 @@ function PaymentContent() {
         onApprove: async (data) => handlePayPalApprove(data),
         onCancel: () => {
           setIsProcessing(false);
-          showToast('PayPal 결제가 취소되었습니다.', 'error');
+          showToast(t('exp_payment_paypal_cancelled') as string, 'error');
         },
         onError: (error) => {
-          const message = error instanceof Error ? error.message : 'PayPal 버튼 처리 중 오류가 발생했습니다.';
+          const message = error instanceof Error ? error.message : (t('exp_payment_paypal_button_error') as string);
           console.error('[PAYPAL] client button error:', error);
           setPaymentError(message);
           setIsProcessing(false);
@@ -582,7 +584,7 @@ function PaymentContent() {
       })
       .render(container)
       .catch((error) => {
-        const message = error instanceof Error ? error.message : 'PayPal 버튼을 불러오지 못했습니다.';
+        const message = error instanceof Error ? error.message : (t('exp_payment_paypal_load_error') as string);
         console.error('[PAYPAL] button render error:', error);
         setPaypalSdkError(message);
         setPaymentError(message);
@@ -618,7 +620,7 @@ function PaymentContent() {
     }
 
     if (!isSlotSummaryResolved) {
-      const message = '예약 가능 정보를 확인하는 중입니다. 잠시 후 다시 시도해주세요.';
+      const message = t('exp_payment_missing_availability') as string;
       setPaymentError(message);
       return showToast(message, 'error');
     }
@@ -628,7 +630,7 @@ function PaymentContent() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        const message = '로그인이 필요합니다.';
+        const message = t('login_required') as string;
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
@@ -639,8 +641,8 @@ function PaymentContent() {
       const isAvailable = await checkAvailability();
       if (!isAvailable) {
         const message = isPrivate
-          ? '해당 시간대에 이미 다른 예약이 있어 단독 투어 진행이 어렵습니다.'
-          : '죄송합니다. 잔여석이 부족하여 예약할 수 없습니다.';
+          ? (t('exp_payment_private_conflict') as string)
+          : (t('exp_payment_capacity_conflict') as string);
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
@@ -666,7 +668,7 @@ function PaymentContent() {
       const result = (await res.json()) as BookingApiResponse;
 
       if (!res.ok || !result.success || !result.newOrderId || result.finalAmount == null) {
-        const message = result.error || '예약 처리 중 오류가 발생했습니다.';
+        const message = result.error || (t('exp_payment_booking_error') as string);
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
@@ -681,7 +683,7 @@ function PaymentContent() {
       }
 
       if (!isCardReady || !portOneImpCode) {
-        const message = '카드 결제를 지금 사용할 수 없습니다. 무통장 또는 PayPal을 이용해주세요.';
+        const message = t('exp_payment_card_unavailable') as string;
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
@@ -693,7 +695,7 @@ function PaymentContent() {
           provider: cardProvider,
           merchantCode: portOneImpCode,
           orderId: newOrderId,
-          productName: experience?.title || 'Locally 체험 예약',
+          productName: experience?.title || (t('exp_payment_fallback_product_name') as string),
           amount: Number(secureFinalAmount),
           buyerEmail: user.email,
           buyerName: customerName,
@@ -714,7 +716,9 @@ function PaymentContent() {
         const callbackResult = (await response.json()) as { success?: boolean; error?: string };
 
         if (!response.ok || !callbackResult.success) {
-          const message = `결제 검증 중 오류가 발생했습니다. ${callbackResult.error || ''}`.trim();
+          const message = [t('exp_payment_card_verify_error'), callbackResult.error]
+            .filter(Boolean)
+            .join(' ');
           setPaymentError(message);
           showToast(message, 'error');
           setIsProcessing(false);
@@ -724,7 +728,7 @@ function PaymentContent() {
         router.push(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`);
       } catch (err: unknown) {
         const message =
-          err instanceof Error ? err.message : '카드 결제 처리 중 오류가 발생했습니다.';
+          err instanceof Error ? err.message : (t('exp_payment_card_process_error') as string);
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
@@ -732,7 +736,7 @@ function PaymentContent() {
 
     } catch (error: unknown) {
       console.error(error);
-      const message = '시스템 오류가 발생했습니다.';
+      const message = t('server_error') as string;
       setPaymentError(message);
       showToast(message, 'error');
       setIsProcessing(false);
@@ -755,7 +759,7 @@ function PaymentContent() {
             setIsPayPalSdkReady(true);
           }}
           onError={() => {
-            const message = 'PayPal 결제 모듈을 불러오지 못했습니다.';
+            const message = t('exp_payment_paypal_load_error') as string;
             setPaypalSdkError(message);
             setIsPayPalSdkReady(false);
           }}
@@ -765,7 +769,7 @@ function PaymentContent() {
       <div className="bg-white w-full max-w-md rounded-2xl md:rounded-3xl shadow-lg md:shadow-xl overflow-hidden border border-slate-100">
         <div className="h-12 md:h-16 border-b border-slate-100 flex items-center px-3 md:px-4 gap-2.5 md:gap-4 bg-white sticky top-0 z-10">
           <button onClick={() => router.back()} className="p-1.5 md:p-2 hover:bg-slate-50 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 md:w-6 md:h-6" /></button>
-          <span className="font-black text-[15px] md:text-lg">결제하기</span>
+          <span className="font-black text-[15px] md:text-lg">{t('exp_payment_title')}</span>
         </div>
 
         <div className="p-4 md:p-6">
@@ -781,33 +785,33 @@ function PaymentContent() {
             </div>
           </div>
 
-          <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">예약 정보 확인</h2>
+          <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">{t('exp_payment_summary_title')}</h2>
           <div className="bg-slate-50 p-4 md:p-6 rounded-xl md:rounded-2xl space-y-3 md:space-y-4 mb-5 md:mb-6 text-[12px] md:text-sm text-slate-700 border border-slate-100">
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" /> 날짜</span><span className="font-bold">{date}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Clock className="w-3.5 h-3.5 md:w-4 md:h-4" /> 시간</span><span className="font-bold">{time}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Users className="w-3.5 h-3.5 md:w-4 md:h-4" /> 인원</span><span className="font-bold">{guests}명</span></div>
-            {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> 타입</span><span className="font-bold text-rose-500">프라이빗 투어</span></div>}
+            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_date')}</span><span className="font-bold">{date}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Clock className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_time')}</span><span className="font-bold">{time}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><Users className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_guests')}</span><span className="font-bold">{t('trip_meta_guests', { count: String(guests) })}</span></div>
+            {isPrivate && <div className="flex justify-between items-center"><span className="text-slate-500 flex items-center gap-1.5 md:gap-2"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_label_type')}</span><span className="font-bold text-rose-500">{t('exp_payment_private_type')}</span></div>}
             {effectiveIsSoloGuarantee && (
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] md:text-xs text-slate-500 leading-relaxed">
-                <span className="font-semibold text-slate-700">1인 출발 확정 옵션이 적용되었습니다.</span>
+                <span className="font-semibold text-slate-700">{t('exp_payment_solo_note')}</span>
               </div>
             )}
           </div>
 
           <div className="mb-6 md:mb-8 space-y-3 md:space-y-4">
-            <h2 className="text-[16px] md:text-xl font-bold">예약자 정보</h2>
+            <h2 className="text-[16px] md:text-xl font-bold">{t('exp_payment_booker_title')}</h2>
             <div>
-              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">이름</label>
-              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder="예약자 성함" />
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">{t('exp_payment_name_label')}</label>
+              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_name_placeholder') as string} />
             </div>
             <div>
-              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">연락처</label>
-              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder="010-0000-0000" />
+              <label className="block text-[11px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">{t('exp_payment_phone_label')}</label>
+              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-3 py-2.5 md:p-3 text-[13px] md:text-sm bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl outline-none focus:border-black transition-colors" placeholder={t('exp_payment_phone_placeholder') as string} />
             </div>
           </div>
 
           <div className="mb-6 md:mb-8">
-            <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">결제 수단</h2>
+            <h2 className="text-[16px] md:text-xl font-bold mb-3 md:mb-4">{t('exp_payment_method_title')}</h2>
           <div className={`grid gap-2 md:gap-3 mb-3 md:mb-4 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <button
                 type="button"
@@ -820,14 +824,14 @@ function PaymentContent() {
                 className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'card' ? 'border-black bg-slate-50 text-black' : !isCardReadyResolved || !isCardReady ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
                 <CreditCard className="w-5 h-5 md:w-6 md:h-6" />
-                <span className="font-bold text-[12px] md:text-sm">카드 결제</span>
+                <span className="font-bold text-[12px] md:text-sm">{t('exp_payment_method_card')}</span>
               </button>
               <button
                 onClick={() => setPaymentMethod('bank')}
                 className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'bank' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
-                <div className="flex items-center gap-1"><Users className="w-5 h-5 md:w-6 md:h-6" /><span className="text-[9px] md:text-[10px] font-bold bg-rose-100 text-rose-600 px-1 rounded">추천</span></div>
-                <span className="font-bold text-[12px] md:text-sm">무통장 입금</span>
+                <div className="flex items-center gap-1"><Users className="w-5 h-5 md:w-6 md:h-6" /><span className="text-[9px] md:text-[10px] font-bold bg-rose-100 text-rose-600 px-1 rounded">{t('exp_payment_method_recommended')}</span></div>
+                <span className="font-bold text-[12px] md:text-sm">{t('exp_payment_method_bank')}</span>
               </button>
               {isPayPalEnabled && (
                 <button
@@ -835,26 +839,28 @@ function PaymentContent() {
                   className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 flex flex-col items-center gap-1.5 md:gap-2 transition-all ${paymentMethod === 'paypal' ? 'border-black bg-slate-50 text-black' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
                 >
                   <div className="rounded bg-[#0070ba] px-2 py-0.5 text-[10px] font-black text-white">PayPal</div>
-                  <span className="font-bold text-[12px] md:text-sm">PayPal</span>
+                  <span className="font-bold text-[12px] md:text-sm">{t('exp_payment_method_paypal')}</span>
                 </button>
               )}
             </div>
 
             {isCardReadyResolved && !isCardReady && (
               <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] md:text-xs text-amber-700">
-                카드 결제를 지금 사용할 수 없습니다. {cardReadyReason === 'missing_imp_code' ? '결제 설정이 아직 완료되지 않았습니다.' : '무통장 또는 PayPal을 이용해주세요.'}
+                {cardReadyReason === 'missing_imp_code'
+                  ? t('exp_payment_card_unavailable_config')
+                  : t('exp_payment_card_unavailable_alternative')}
               </div>
             )}
 
             {paymentMethod === 'bank' && (
               <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 animate-in fade-in zoom-in-95">
-                <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">입금하실 계좌</p>
+                <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">{t('exp_payment_bank_label')}</p>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-black text-[16px] md:text-lg text-slate-900">{bankInfo.account}</span>
                   <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{bankInfo.bankName}</span>
                 </div>
                 <p className="text-[11px] md:text-xs text-slate-400">
-                  * 예약 후 <span className="text-rose-500 font-bold">1시간 이내</span>에 미입금 시 자동 취소됩니다.
+                  {t('exp_payment_bank_timeout_prefix')} <span className="text-rose-500 font-bold">{t('exp_payment_bank_timeout_highlight')}</span>{t('exp_payment_bank_timeout_suffix')}
                 </p>
               </div>
             )}
@@ -862,12 +868,12 @@ function PaymentContent() {
             {paymentMethod === 'paypal' && (
               <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:rounded-xl md:p-4 animate-in fade-in zoom-in-95">
                 <div className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
-                  PayPal 승인 후 결제가 완료되며, 기존 카드/무통장 결제 흐름에는 영향을 주지 않습니다.
+                  {t('exp_payment_paypal_desc')}
                 </div>
                 {!isSlotSummaryResolved && (
                   <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
                     <Spinner size={16} className="mr-2" />
-                    예약 가능 정보를 확인하는 중입니다.
+                    {t('exp_payment_slot_loading')}
                   </div>
                 )}
                 {paypalSdkError && (
@@ -878,7 +884,7 @@ function PaymentContent() {
                 {isSlotSummaryResolved && !isPayPalSdkReady && !paypalSdkError && (
                   <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
                     <Spinner size={16} className="mr-2" />
-                    PayPal 버튼을 불러오는 중입니다.
+                    {t('exp_payment_paypal_loading')}
                   </div>
                 )}
                 <div
@@ -890,13 +896,13 @@ function PaymentContent() {
           </div>
 
           <div className="px-1 md:px-2 space-y-1.5 md:space-y-2 mb-6 md:mb-8 text-[12px] md:text-sm">
-            <div className="flex justify-between items-center text-slate-600"><span>체험 금액</span><span>₩{baseHostPrice.toLocaleString()}</span></div>
+            <div className="flex justify-between items-center text-slate-600"><span>{t('exp_payment_host_price')}</span><span>₩{baseHostPrice.toLocaleString()}</span></div>
             {effectiveIsSoloGuarantee && (
-              <div className="flex justify-between items-center text-slate-600"><span>1인 출발 확정비</span><span>+ ₩{soloGuaranteePrice.toLocaleString()}</span></div>
+              <div className="flex justify-between items-center text-slate-600"><span>{t('exp_payment_solo_price')}</span><span>+ ₩{soloGuaranteePrice.toLocaleString()}</span></div>
             )}
             <div className="flex justify-between items-center text-blue-600">
               <span className="flex items-center gap-1">
-                서비스 수수료 (10%)
+                {t('exp_payment_platform_fee')}
                 <span
                   ref={feeInfoRef}
                   className="relative inline-flex"
@@ -905,7 +911,7 @@ function PaymentContent() {
                 >
                   <button
                     type="button"
-                    aria-label="서비스 수수료 안내"
+                    aria-label={t('exp_payment_platform_fee_aria') as string}
                     aria-expanded={isFeeInfoOpen}
                     onClick={() => setIsFeeInfoOpen((prev) => !prev)}
                     onFocus={() => setIsFeeInfoOpen(true)}
@@ -915,24 +921,24 @@ function PaymentContent() {
                   </button>
                   {isFeeInfoOpen && (
                     <div className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl md:w-64 md:text-xs">
-                      서비스 수수료는 결제 처리, 고객 지원, 플랫폼 운영에 사용됩니다.
+                      {t('exp_payment_platform_fee_tooltip')}
                     </div>
                   )}
                 </span>
               </span>
               <span>+ ₩{guestFee.toLocaleString()}</span>
             </div>
-            <div className="border-t border-slate-100 pt-3 md:pt-4 mt-1.5 md:mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">총 결제금액</span><span className="text-[24px] md:text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
+            <div className="border-t border-slate-100 pt-3 md:pt-4 mt-1.5 md:mt-2 flex justify-between items-center"><span className="font-bold text-slate-900">{t('exp_payment_total')}</span><span className="text-[24px] md:text-3xl font-black text-slate-900">₩{finalAmount.toLocaleString()}</span></div>
           </div>
 
           <div className="mb-5 md:mb-6 space-y-2.5 md:space-y-3 bg-red-50/50 p-4 md:p-5 rounded-xl md:rounded-2xl border border-red-100">
-            <h3 className="text-[13px] md:text-sm font-bold text-red-600 mb-2.5 md:mb-3 flex items-center gap-1 md:gap-1.5"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> 게스트 안전 필수 동의</h3>
+            <h3 className="text-[13px] md:text-sm font-bold text-red-600 mb-2.5 md:mb-3 flex items-center gap-1 md:gap-1.5"><ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t('exp_payment_safety_title')}</h3>
 
             <label className="flex items-start gap-2.5 md:gap-3 cursor-pointer hover:bg-white/50 p-1.5 md:p-2 -ml-1 md:-ml-2 rounded-lg md:rounded-xl transition-colors">
               <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeNoOffPlatform ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeNoOffPlatform} onChange={() => setAgreeNoOffPlatform(!agreeNoOffPlatform)} />
               <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
-                <span className="text-red-600 font-bold">[필수]</span> 호스트와의 직접 연락 및 플랫폼 외부 결제는 금지되며, 적발 시 계정 영구 정지 처분에 동의합니다.
+                {t('exp_payment_agree_off_platform')}
               </div>
             </label>
 
@@ -940,7 +946,7 @@ function PaymentContent() {
               <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeSafety ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeSafety} onChange={() => setAgreeSafety(!agreeSafety)} />
               <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
-                <span className="text-red-600 font-bold">[필수]</span> 플랫폼 내 게스트 안전 가이드라인을 숙지하였으며, 상호 존중하는 올바른 호스팅 문화에 기여하겠습니다.
+                {t('exp_payment_agree_safety')}
               </div>
             </label>
 
@@ -948,7 +954,7 @@ function PaymentContent() {
               <div className={`mt-0.5 min-w-[18px] h-[18px] md:min-w-[20px] md:h-5 rounded border flex items-center justify-center transition-colors ${agreeTerms ? 'bg-black border-black text-white' : 'border-slate-300 bg-white text-transparent'}`}><CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></div>
               <input type="checkbox" className="hidden" checked={agreeTerms} onChange={() => setAgreeTerms(!agreeTerms)} />
               <div className="text-[12px] md:text-sm font-medium text-slate-700 leading-[1.45] md:leading-snug">
-                <span className="text-slate-900 font-bold">[필수]</span> 구매 조건, 취소/환불 규정을 모두 확인하였으며 본 플랫폼 서비스 이용 약관에 동의합니다.
+                {t('exp_payment_agree_terms')}
               </div>
             </label>
           </div>
@@ -973,13 +979,13 @@ function PaymentContent() {
                 <Spinner size={20} className="w-[18px] h-[18px] md:w-5 md:h-5 text-white" />
               ) : (
                 <>
-                  <CreditCard className="w-[18px] h-[18px] md:w-5 md:h-5" /> ₩{finalAmount.toLocaleString()} 결제하기
+                  <CreditCard className="w-[18px] h-[18px] md:w-5 md:h-5" /> {t('exp_payment_pay_button', { amount: `₩${finalAmount.toLocaleString()}` })}
                 </>
               )}
             </button>
           ) : (
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-[12px] text-slate-500 md:rounded-2xl md:text-sm">
-              위 PayPal 버튼에서 승인하면 결제가 완료됩니다.
+              {t('exp_payment_paypal_button_hint')}
             </div>
           )}
         </div>

@@ -10,6 +10,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
 import type { CardPaymentProvider, CardPaymentReadiness } from '@/app/utils/payments/card/types';
 import type { ServiceRequest } from '@/app/types/service';
+import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
 declare global {
   interface Window {
@@ -103,6 +104,7 @@ function ServicePaymentContent() {
   const isPayPalEnabled = Boolean(paypalClientId);
   const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
   const isBankLockedBooking = (pendingBooking?.payment_method || '').toLowerCase() === 'bank';
+  const bankInfo = getPublicBankInfo();
 
   const getCheckoutValidationError = useCallback(() => {
     if (!contactName.trim() || !contactPhone.trim()) {
@@ -249,7 +251,7 @@ function ServicePaymentContent() {
       }
 
       if ((pendingBooking.payment_method || '').toLowerCase() === 'bank') {
-        const message = '이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.';
+        const message = t('sp_err_bank_locked') as string;
         setPaymentError(message);
         showToast(message, 'error');
         throw new Error(message);
@@ -263,7 +265,7 @@ function ServicePaymentContent() {
 
       const result = (await response.json()) as PayPalCreateOrderResponse;
       if (!response.ok || !result.success || !result.paypalOrderId) {
-        const message = result.error || 'PayPal 주문 생성에 실패했습니다.';
+        const message = result.error || (t('sp_err_paypal_create') as string);
         setPaymentError(message);
         showToast(message, 'error');
         throw new Error(message);
@@ -281,7 +283,7 @@ function ServicePaymentContent() {
 
     try {
       if (!pendingBooking) {
-        throw new Error('PayPal 결제 세션을 찾을 수 없습니다. 다시 시도해주세요.');
+        throw new Error(t('sp_err_paypal_session_missing') as string);
       }
 
       const response = await fetch('/api/services/payment/paypal/capture-order', {
@@ -295,7 +297,7 @@ function ServicePaymentContent() {
 
       const result = (await response.json()) as PayPalCaptureResponse;
       if (!response.ok || !result.success) {
-        const message = result.error || 'PayPal 결제 승인 처리에 실패했습니다.';
+        const message = result.error || (t('sp_err_paypal_capture') as string);
         setPaymentError(message);
         showToast(message, 'error');
         return;
@@ -303,7 +305,7 @@ function ServicePaymentContent() {
 
       router.push(`/services/${requestId}/payment/complete?orderId=${pendingBooking.order_id}&method=paypal`);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'PayPal 결제 승인 처리 중 오류가 발생했습니다.';
+      const message = error instanceof Error ? error.message : (t('sp_err_paypal_processing') as string);
       setPaymentError(message);
       showToast(message, 'error');
     } finally {
@@ -351,10 +353,10 @@ function ServicePaymentContent() {
         onApprove: async (data) => handlePayPalApprove(data),
         onCancel: () => {
           setIsProcessing(false);
-          showToast('PayPal 결제가 취소되었습니다.', 'error');
+          showToast(t('sp_err_cancel') as string, 'error');
         },
         onError: (error) => {
-          const message = error instanceof Error ? error.message : 'PayPal 버튼 처리 중 오류가 발생했습니다.';
+          const message = error instanceof Error ? error.message : (t('sp_err_paypal_button') as string);
           console.error('[PAYPAL][SERVICE] client button error:', error);
           setPaymentError(message);
           setIsProcessing(false);
@@ -363,7 +365,7 @@ function ServicePaymentContent() {
       })
       .render(container)
       .catch((error) => {
-        const message = error instanceof Error ? error.message : 'PayPal 버튼을 불러오지 못했습니다.';
+        const message = error instanceof Error ? error.message : (t('sp_err_paypal_load') as string);
         console.error('[PAYPAL][SERVICE] button render error:', error);
         setPaypalSdkError(message);
         setPaymentError(message);
@@ -413,7 +415,7 @@ function ServicePaymentContent() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if ((currentBooking.payment_method || '').toLowerCase() === 'bank') {
-        const message = '이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.';
+        const message = t('sp_err_bank_locked') as string;
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
@@ -421,7 +423,7 @@ function ServicePaymentContent() {
       }
 
       if (!isCardReady || !portOneImpCode) {
-        const message = '카드 결제를 지금 사용할 수 없습니다. 무통장 또는 PayPal을 이용해주세요.';
+        const message = t('sp_err_card_unavailable') as string;
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);
@@ -518,7 +520,7 @@ function ServicePaymentContent() {
             setIsPayPalSdkReady(true);
           }}
           onError={() => {
-            const message = 'PayPal 결제 모듈을 불러오지 못했습니다.';
+            const message = t('sp_err_paypal_load') as string;
             setPaypalSdkError(message);
             setIsPayPalSdkReady(false);
           }}
@@ -583,13 +585,13 @@ function ServicePaymentContent() {
           {isCardReadyResolved && !isCardReady && (
             <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 md:text-[12px]">
               {cardReadyReason === 'missing_imp_code'
-                ? '카드 결제 설정이 아직 완료되지 않아 무통장 또는 PayPal만 사용할 수 있습니다.'
-                : '카드 결제 검증 준비가 완료되지 않아 무통장 또는 PayPal만 사용할 수 있습니다.'}
+                ? t('sp_card_unavailable_config')
+                : t('sp_card_unavailable_fallback')}
             </p>
           )}
           {isBankLockedBooking && (
             <p className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-700 md:text-[12px]">
-              이미 무통장 입금 대기 상태로 전환된 의뢰입니다. 결제수단을 변경할 수 없습니다.
+              {t('sp_bank_locked_notice')}
             </p>
           )}
           <div className={`grid gap-3 ${isPayPalEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -650,9 +652,12 @@ function ServicePaymentContent() {
           <div className="bg-slate-50 p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-200 mb-5 animate-in fade-in zoom-in-95">
             <p className="text-[11px] md:text-xs font-bold text-slate-500 mb-1">{t('sp_bank_account')}</p>
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-black text-[16px] md:text-lg text-slate-900">{process.env.NEXT_PUBLIC_BANK_ACCOUNT || '3333-14-0254739'}</span>
-              <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{process.env.NEXT_PUBLIC_BANK_NAME || '카카오뱅크'}</span>
+              <span className="font-black text-[16px] md:text-lg text-slate-900">{bankInfo.account}</span>
+              <span className="text-[10px] md:text-xs font-bold bg-yellow-300 px-1 md:px-1.5 py-0.5 rounded text-black">{bankInfo.bankName}</span>
             </div>
+            <p className="mb-1 text-[11px] md:text-xs text-slate-500">
+              {t('pay_complete_bank_account_holder_label')}: {bankInfo.accountHolder}
+            </p>
             <p className="text-[11px] md:text-xs text-slate-400">
               {t('sp_bank_notice_1')}<span className="text-rose-500 font-bold">{t('sp_bank_notice_hl')}</span>{t('sp_bank_notice_2')}
             </p>
@@ -662,7 +667,7 @@ function ServicePaymentContent() {
         {paymentMethod === 'paypal' && (
           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:rounded-xl md:p-4 mb-5 animate-in fade-in zoom-in-95">
             <div className="text-[11px] md:text-xs text-slate-500 leading-relaxed">
-              PayPal 승인 후 결제가 완료되며, 기존 카드/무통장 결제 흐름에는 영향을 주지 않습니다.
+              {t('sp_paypal_desc')}
             </div>
             {paypalSdkError && (
               <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] md:text-xs text-rose-600">
@@ -672,7 +677,7 @@ function ServicePaymentContent() {
             {!isPayPalSdkReady && !paypalSdkError && (
               <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-[12px] text-slate-500">
                 <Loader2 size={16} className="mr-2 animate-spin" />
-                PayPal 버튼을 불러오는 중입니다.
+                {t('sp_paypal_loading')}
               </div>
             )}
             <div ref={paypalButtonRef} className={isPayPalSdkReady ? 'min-h-[48px]' : 'hidden'} />
@@ -717,7 +722,7 @@ function ServicePaymentContent() {
           </button>
         ) : (
           <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-[12px] text-slate-500">
-            위 PayPal 버튼에서 승인하면 결제가 완료됩니다.
+            {t('sp_paypal_hint')}
           </div>
         )}
       </div>

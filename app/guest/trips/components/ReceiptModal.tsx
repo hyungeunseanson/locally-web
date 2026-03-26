@@ -1,9 +1,11 @@
 'use client';
 
 import React from 'react';
-import { X, Download, CheckCircle2 } from 'lucide-react';
+import { X, Download, CheckCircle2, Clock } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
+import { isPendingBookingStatus } from '@/app/constants/bookingStatus';
+import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
 
 interface ReceiptTrip {
   id: number;
@@ -21,12 +23,15 @@ interface ReceiptTrip {
   created_at?: string;
   price?: number;
   amount?: number;
+  status?: string;
 }
 
 export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onClose: () => void }) {
   const { t, lang } = useLanguage();
   if (!trip) return null;
   const localizedTitle = getContent(trip, 'title', lang) || trip.title;
+  const bankInfo = getPublicBankInfo();
+  const isPending = isPendingBookingStatus(trip.status || '');
 
   // 🟢 [안전 장치] 데이터가 없으면 빈 문자열 처리 (substring 에러 방지)
   const paymentDate = trip.paymentDate || trip.created_at || new Date().toISOString();
@@ -39,14 +44,19 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
   };
 
   const orderDisplay = trip.orderId || String(trip.id || '-').slice(0, 15);
+  const guestCount = Number(trip.guests || 1);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white w-full max-w-sm rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative">
         <div className="bg-slate-900 p-4 md:p-6 text-white text-center relative">
           <button onClick={onClose} className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-2 bg-white/10 rounded-full hover:bg-white/20"><X className="w-4 h-4 md:w-[18px] md:h-[18px]"/></button>
-          <div className="w-10 h-10 md:w-12 md:h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2.5 md:mb-3 shadow-lg">
-            <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-white"/>
+          <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center mx-auto mb-2.5 md:mb-3 shadow-lg ${isPending ? 'bg-amber-400' : 'bg-green-500'}`}>
+            {isPending ? (
+              <Clock className="w-5 h-5 md:w-6 md:h-6 text-white" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-white"/>
+            )}
           </div>
           <h2 className="text-[16px] md:text-lg font-bold">{t('receipt_title')}</h2>
           <p className="text-slate-400 text-[11px] md:text-xs mt-1">{safeDate(paymentDate)}</p>
@@ -68,11 +78,29 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
             </div>
             <div className="flex justify-between text-[12px] md:text-sm">
               <span className="text-slate-500">{t('receipt_guests')}</span>
-              <span className="font-bold">{trip.guests}{t('res_gcal_details_persons')}</span>
+              <span className="font-bold">{guestCount}{t('res_gcal_details_persons')}</span>
             </div>
           </div>
 
           <div className="border-t border-dashed border-slate-200 my-3 md:my-4"></div>
+
+          {isPending && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left space-y-2">
+              <div>
+                <p className="text-[11px] md:text-xs font-bold text-amber-800">{t('receipt_pending_title')}</p>
+                <p className="mt-1 text-[11px] md:text-xs text-amber-700 leading-relaxed">{t('receipt_pending_desc')}</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-2.5 border border-amber-100">
+                <p className="text-[10px] md:text-[11px] font-bold text-slate-500 mb-1">{t('pay_complete_bank_info_label')}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-black text-[15px] md:text-base text-slate-900">{bankInfo.account}</span>
+                  <span className="text-[10px] font-bold bg-yellow-300 px-1.5 py-0.5 rounded text-black">{bankInfo.bankName}</span>
+                </div>
+                <p className="text-[10px] md:text-[11px] text-slate-600">{t('pay_complete_bank_account_holder_label')}: {bankInfo.accountHolder}</p>
+                <p className="mt-1 text-[10px] md:text-[11px] font-semibold text-rose-500">{t('pay_complete_bank_timeout_hint')}</p>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-between items-end">
             <span className="text-[13px] md:text-sm font-bold text-slate-900">{t('receipt_amount')}</span>

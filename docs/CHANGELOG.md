@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.57 — [Guest Booking UX] 예약·결제 후속 안내 및 서비스 결제 신뢰감 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 체험 무통장 후속 안내 보강 | `app/guest/trips/components/TripCard.tsx`, `app/guest/trips/components/ReceiptModal.tsx`, `app/experiences/[id]/payment/complete/page.tsx` — `입금 대기` 예약 카드에 영수증 진입 CTA를 추가하고, 영수증/완료 페이지에서 계좌·예금주·입금 마감 시간을 다시 확인할 수 있도록 정리. 완료 페이지 CTA도 `예약 상세 → 메시지 → 캘린더/홈` 우선순위로 재배치 |
+| 🟢 체험 결제 페이지 다국어/신뢰 문구 정리 | `app/experiences/[id]/payment/page.tsx`, `app/context/LanguageContext.tsx` — 예약자 정보, 결제수단, PayPal/카드 fallback, 필수 동의, 검증 에러 등 visible copy를 `ko/en/ja/zh`로 정리해 결제 단계의 설명 일관성을 높임 |
+| 🟢 서비스 요청·결제 흐름 설명 보강 | `app/services/request/page.tsx`, `app/services/[requestId]/payment/page.tsx`, `app/services/[requestId]/payment/complete/page.tsx`, `app/context/LanguageContext.tsx` — 서비스 요청 상단에 `의뢰 작성 → 결제 → 호스트 모집 → 호스트 선택` 단계 안내를 추가하고, 서비스 결제/완료 페이지의 하드코딩 copy를 다국어로 정리. 무통장 완료 시에도 계좌/예금주/다음 단계/문의 경로를 반복 안내하도록 강화 |
+
 ## v3.39.56 — [Admin UX] 채팅 모니터링 리스트 row 가독성 보강
 
 | 항목 | 내용 |

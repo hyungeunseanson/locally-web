@@ -339,12 +339,12 @@ test.describe.serial('Experience card payment UI smoke', () => {
 
     await page.locator('input[type="text"]').fill(customerUser.fullName);
     await page.locator('input[type="tel"]').fill(customerUser.phone);
-    await page.getByText('호스트와의 직접 연락 및 플랫폼 외부 결제는 금지').click();
-    await page.getByText('플랫폼 내 게스트 안전 가이드라인을 숙지하였으며').click();
-    await page.getByText('구매 조건, 취소/환불 규정을 모두 확인하였으며').click();
+    await page.getByText(/오프플랫폼 직거래|off-platform direct transactions|プラットフォーム外での直接取引|平台外私下交易/).click();
+    await page.getByText(/허위 예약, 무단 불참|risky behavior such as fake bookings|虚偽予約、無断欠席|虚假预订、无故缺席/).click();
+    await page.getByText(/취소\/환불 규정|cancellation\/refund policy|キャンセル\/返金規定|取消\/退款规则/).click();
 
-    await expect(page.getByRole('button', { name: /카드 결제/ }).first()).toBeEnabled({ timeout: 15000 });
-    await page.getByRole('button', { name: /₩.*결제하기/ }).click();
+    await expect(page.getByRole('button', { name: /카드|Card|カード|银行卡/ }).first()).toBeEnabled({ timeout: 15000 });
+    await page.getByRole('button', { name: /결제하기|Pay|決済する|支付/ }).last().click();
 
     await expect
       .poll(async () => {
@@ -371,7 +371,9 @@ test.describe.serial('Experience card payment UI smoke', () => {
     );
 
     expect(callbackSeen).toBe(true);
-    await expect(page.getByRole('heading', { name: /예약이 확정되었습니다!|Payment Complete!/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /예약이 확정되었습니다!|Your booking is confirmed!|予約が確定しました！|预订已确认！/ })
+    ).toBeVisible();
     await expect(page.getByText(observedOrderId)).toBeVisible();
     await expect(page.getByText(experience.title)).toBeVisible();
 
