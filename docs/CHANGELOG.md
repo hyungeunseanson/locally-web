@@ -5,6 +5,12 @@
 
 ---
 
+## v3.39.60 — [Messaging UX] 기본 아바타 fallback 정리
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 채팅/메시지 기본 아바타 404 제거 | `app/guest/inbox/page.tsx`, `app/hooks/useChat.ts` — 존재하지 않던 `/default-avatar.png` fallback 대신 실제 배포 자산인 `/images/logo.png`를 기본 아바타로 사용하도록 정리해, 메시지함/채팅 관련 404 noise를 제거 |
+
 ## v3.39.59 — [Service UX] 요청 폼 구조 정리 및 데스크탑 요약 보강
 
 | 항목 | 내용 |

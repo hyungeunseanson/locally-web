@@ -84,7 +84,7 @@ function InboxContent() {
 
   // 🟢 [헬퍼] 보안 이미지 및 시간 포맷
   const secureUrl = (url: string | null | undefined) => {
-    if (!url) return "/default-avatar.png";
+    if (!url) return "/images/logo.png";
     if (url.startsWith('http://')) return url.replace('http://', 'https://');
     return url;
   };

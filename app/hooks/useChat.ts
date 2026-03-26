@@ -426,7 +426,7 @@ export function useChat(role: 'guest' | 'host' | 'admin' = 'guest') {
       if (updatedSelectedInquiry) {
         // DB 재조립 시 host.avatar_url이 placeholder/null로 내려오면 기존 정상 avatar를 보존
         const isPlaceholder = (url: string | null | undefined) =>
-          !url || url === '/default-avatar.png';
+          !url || url === '/images/logo.png';
         const prevHost = selectedInquiryRef.current?.host;
         const mergedHost = updatedSelectedInquiry.host
           ? {
