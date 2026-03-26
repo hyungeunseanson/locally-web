@@ -323,10 +323,10 @@ export default function ChatMonitor() {
               <div
                 key={inq.id}
                 onClick={() => loadMessages(inq.id)}
-                className={`p-3 md:p-4 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
+                className={`p-3 md:px-4 md:py-4 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[118px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
               >
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <span className="font-bold text-xs md:text-sm text-slate-800 flex items-center gap-1.5 min-w-0">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className="font-bold text-xs md:text-sm text-slate-800 flex items-center gap-1.5 min-w-0 leading-5">
                     {activeTab === 'monitor' ? (
                       <span className="text-[8px] md:text-[10px] bg-slate-100 text-slate-500 px-1 md:px-1.5 py-0.5 rounded whitespace-nowrap">유저↔호스트</span>
                     ) : (
@@ -338,11 +338,11 @@ export default function ChatMonitor() {
                   </span>
                   <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium">{formatInquiryListTimestamp(inq.updated_at)}</span>
                 </div>
-                <div className="text-[10px] md:text-xs text-slate-500 mb-1 truncate">
+                <div className="text-[10px] md:text-xs text-slate-500 mb-1.5 line-clamp-2 leading-5 min-h-[2.5rem] md:min-h-[2.75rem]">
                   {inq.experiences?.title ? `🏠 ${inq.experiences.title}` : '📄 문의 내용'}
                 </div>
                 <div className="flex items-start gap-1.5">
-                  <p className="text-xs md:text-sm text-slate-600 line-clamp-2 leading-5 flex-1">{inq.content || '(내용 없음)'}</p>
+                  <p className="text-xs md:text-sm text-slate-600 line-clamp-2 leading-5 flex-1 min-h-[2.5rem] md:min-h-[2.75rem]">{inq.content || '(내용 없음)'}</p>
                   {inq.has_policy_signal && (
                     <span className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200">
                       <AlertTriangle size={10} />
