@@ -75,6 +75,12 @@ npm run test:e2e:live:noisy -- --ack-noisy
 
 ## Cleanup
 
+### 운영 기본 원칙
+
+- 평시에는 `safe cleanup`만 사용한다.
+- 배포 직전에는 `full cleanup`까지 포함한 전체 정리를 실행한다.
+- `full cleanup` 후에는 반드시 dry-run을 다시 돌려 잔여 row를 확인한다.
+
 ### Codex test data dry-run
 
 ```bash
@@ -100,12 +106,19 @@ npm run cleanup:codex:dry
 ### Codex test data execute
 
 ```bash
+npm run cleanup:codex:execute:safe
+```
+
+또는
+
+```bash
 npm run cleanup:codex:execute
 ```
 
 - 규칙:
+  - 평시 기본 정리용이다.
   - dry-run 결과를 확인한 뒤에만 실행한다.
-  - 기본값은 `codex` 계정에 직접 연결된 데이터만 삭제한다.
+  - `codex` 계정에 직접 연결된 데이터만 삭제한다.
   - `notifications`는 `codex user_id`에 직접 연결된 row만 지우고, 내용에만 `codex/코덱스`가 들어간 알림은 기본값에서 제외한다.
   - 운영 데이터와 섞일 여지가 있으면 실행하지 않는다.
   - 실행 결과는 배포 보고에 남긴다.
@@ -117,8 +130,17 @@ npm run cleanup:codex:execute:full
 ```
 
 - 규칙:
+  - 배포 직전 전체 정리용이다.
   - `notifications_review`까지 같이 삭제한다.
   - 실제 호스트/어드민 계정으로 간 테스트 알림 이력까지 지울 수 있으므로, 기본값으로는 쓰지 않는다.
+
+### 배포 직전 권장 순서
+
+1. `npm run cleanup:codex:dry`
+2. `npm run cleanup:codex:execute:full`
+3. `npm run cleanup:codex:dry`
+4. `npm run test:e2e:live:gate`
+5. 필요 시 `shared-surface`
 
 ## Supabase Queries
 
