@@ -48,8 +48,25 @@ function hasTextValue(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function hasMinLength(value: unknown, minLength: number): boolean {
+  return typeof value === 'string' && value.trim().length >= minLength;
+}
+
 function hasLanguageValues(value: unknown): boolean {
   return Array.isArray(value) && value.some((item) => String(item).trim().length > 0);
+}
+
+function isLikelyEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isLikelyDob(value: string): boolean {
+  return /^\d{4}[-./]\d{2}[-./]\d{2}$/.test(value);
+}
+
+function isLikelyPhone(value: string): boolean {
+  const digits = value.replace(/\D/g, '');
+  return digits.length >= 8 && digits.length <= 15;
 }
 
 function shouldNotifyAdmin(existingApplicationStatus: string | null, hasExistingApplication: boolean) {
@@ -72,12 +89,6 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as HostRegisterSubmitBody;
-    const languageLevels = normalizeLanguageLevels(body.languageLevels, [], 3);
-
-    if (languageLevels.length < 1) {
-      return NextResponse.json({ success: false, error: 'At least one language is required.' }, { status: 400 });
-    }
-
     const supabaseAdmin = createAdminClient();
 
     const { data: latestApplication, error: latestApplicationError } = await supabaseAdmin
@@ -97,28 +108,101 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, applicationId: latestApplication.id, status: 'approved', notifyAdmin: false });
     }
 
+    const languageLevels = normalizeLanguageLevels(body.languageLevels, [], 3);
+    const trimmedHostNationality = asTrimmedString(body.hostNationality);
+    const trimmedName = asTrimmedString(body.name);
+    const trimmedDob = asTrimmedString(body.dob);
+    const trimmedPhone = asTrimmedString(body.phone);
+    const trimmedEmail = asTrimmedString(body.email);
+    const trimmedSelfIntro = asTrimmedString(body.selfIntro);
+    const trimmedIdCardFile = asTrimmedString(body.idCardFile);
+    const trimmedBankName = asTrimmedString(body.bankName);
+    const trimmedAccountNumber = asTrimmedString(body.accountNumber);
+    const trimmedAccountHolder = asTrimmedString(body.accountHolder);
+    const trimmedMotivation = asTrimmedString(body.motivation);
+
+    if (!trimmedHostNationality) {
+      return NextResponse.json({ success: false, error: 'Nationality is required.' }, { status: 400 });
+    }
+
+    if (languageLevels.length < 1) {
+      return NextResponse.json({ success: false, error: 'At least one language is required.' }, { status: 400 });
+    }
+
+    if (!trimmedName) {
+      return NextResponse.json({ success: false, error: 'Name is required.' }, { status: 400 });
+    }
+
+    if (!trimmedDob) {
+      return NextResponse.json({ success: false, error: 'Date of birth is required.' }, { status: 400 });
+    }
+
+    if (!isLikelyDob(trimmedDob)) {
+      return NextResponse.json({ success: false, error: 'Date of birth must use YYYY.MM.DD format.' }, { status: 400 });
+    }
+
+    if (!trimmedPhone) {
+      return NextResponse.json({ success: false, error: 'Phone number is required.' }, { status: 400 });
+    }
+
+    if (!isLikelyPhone(trimmedPhone)) {
+      return NextResponse.json({ success: false, error: 'Phone number format is invalid.' }, { status: 400 });
+    }
+
+    if (!trimmedEmail) {
+      return NextResponse.json({ success: false, error: 'Email is required.' }, { status: 400 });
+    }
+
+    if (!isLikelyEmail(trimmedEmail)) {
+      return NextResponse.json({ success: false, error: 'Email format is invalid.' }, { status: 400 });
+    }
+
+    if (!hasMinLength(body.selfIntro, 50)) {
+      return NextResponse.json({ success: false, error: 'Self introduction must be at least 50 characters.' }, { status: 400 });
+    }
+
+    if (!trimmedIdCardFile) {
+      return NextResponse.json({ success: false, error: 'ID card image is required.' }, { status: 400 });
+    }
+
+    if (!trimmedBankName) {
+      return NextResponse.json({ success: false, error: 'Bank name is required.' }, { status: 400 });
+    }
+
+    if (!trimmedAccountNumber) {
+      return NextResponse.json({ success: false, error: 'Account number is required.' }, { status: 400 });
+    }
+
+    if (!trimmedAccountHolder) {
+      return NextResponse.json({ success: false, error: 'Account holder is required.' }, { status: 400 });
+    }
+
+    if (!trimmedMotivation) {
+      return NextResponse.json({ success: false, error: 'Motivation is required.' }, { status: 400 });
+    }
+
     const languageNames = getLanguageNames(languageLevels);
     const nextStatus = 'pending';
 
     const payload = {
       user_id: user.id,
-      host_nationality: asTrimmedString(body.hostNationality),
+      host_nationality: trimmedHostNationality,
       languages: languageNames,
       language_levels: languageLevels satisfies LanguageLevelEntry[],
-      name: asTrimmedString(body.name),
-      phone: asTrimmedString(body.phone),
-      dob: asTrimmedString(body.dob),
-      email: asTrimmedString(body.email),
+      name: trimmedName,
+      phone: trimmedPhone,
+      dob: trimmedDob,
+      email: trimmedEmail,
       instagram: asTrimmedString(body.instagram),
       source: asTrimmedString(body.source),
       language_cert: asTrimmedString(body.languageCert),
       profile_photo: asNullableTrimmedString(body.profilePhoto),
-      self_intro: asTrimmedString(body.selfIntro),
-      id_card_file: asNullableTrimmedString(body.idCardFile),
-      bank_name: asTrimmedString(body.bankName),
-      account_number: asTrimmedString(body.accountNumber),
-      account_holder: asTrimmedString(body.accountHolder),
-      motivation: asTrimmedString(body.motivation),
+      self_intro: trimmedSelfIntro,
+      id_card_file: trimmedIdCardFile,
+      bank_name: trimmedBankName,
+      account_number: trimmedAccountNumber,
+      account_holder: trimmedAccountHolder,
+      motivation: trimmedMotivation,
       status: nextStatus,
     };
 

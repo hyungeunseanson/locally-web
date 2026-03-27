@@ -116,12 +116,14 @@ test('host register keeps previous button visible and shows self-intro language 
   await login(page, user);
 
   await page.goto('/host/register', { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { name: /국적은|nationality|国籍|国籍/ })).toBeVisible();
 
   const prevButton = page.getByTestId('host-register-prev-button').last();
   await expect(prevButton).toBeVisible();
   await expect(prevButton).toBeDisabled();
 
-  await page.getByRole('button', { name: /한국인|Korean|日本人|Japanese/ }).first().click();
+  await page.getByRole('button', { name: /Korean|한국인|Japanese|日本人/ }).first().click();
   await page.locator('footer').getByRole('button', { name: /다음|Next|次へ|下一步/ }).click();
   await expect(page.getByRole('heading', { name: /어떤 언어로 소통이|Which languages can|どの言語でコミュニケーション|可以使用哪些语言沟通/ })).toBeVisible();
 
@@ -134,6 +136,9 @@ test('host register keeps previous button visible and shows self-intro language 
       /정산과 신원 확인에 사용되는 이름입니다\.|This name is used for identity review and payouts\.|本人確認と精算に使われる名前です。|该姓名会用于身份审核和结算/
     )
   ).toBeVisible();
+
+  await page.locator('footer').getByRole('button', { name: /다음|Next|次へ|下一步/ }).click();
+  await expect(page.getByRole('heading', { name: /호스트님의\s*연락처를 알려주세요|Tell us how to\s*reach you|連絡先を\s*教えてください|请告诉我们\s*您的联系方式/ })).toBeVisible();
 
   await page.locator('input[placeholder="홍길동"], input[placeholder="John Doe"]').fill(user.fullName);
   await page.locator('input[placeholder="YYYY.MM.DD"]').fill('1990.01.01');

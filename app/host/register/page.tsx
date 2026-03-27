@@ -59,6 +59,27 @@ const INITIAL_FORM_DATA: HostRegisterFormData = {
   agreeSafetyPolicy: false,
 };
 
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
+function hasMinLength(value: string | null | undefined, minLength: number) {
+  return (value?.trim().length || 0) >= minLength;
+}
+
+function isLikelyEmail(value: string | null | undefined) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value?.trim() || '');
+}
+
+function isLikelyDob(value: string | null | undefined) {
+  return /^\d{4}[-./]\d{2}[-./]\d{2}$/.test(value?.trim() || '');
+}
+
+function isLikelyPhone(value: string | null | undefined) {
+  const digits = (value || '').replace(/\D/g, '');
+  return digits.length >= 8 && digits.length <= 15;
+}
+
 function getFallbackLevel(value: unknown): LanguageLevel {
   const parsed = Number(value);
   if (parsed >= 1 && parsed <= 5) {
@@ -154,22 +175,94 @@ export default function HostRegisterPage() {
     }));
   };
 
-  const validateNextStep = () => {
-    if (step !== 2) return true;
-    if (formData.languageLevels.length < 1) {
-      showToast(copy.validationLanguages, 'error');
-      return false;
+  const validateStep = (stepToValidate: number) => {
+    switch (stepToValidate) {
+      case 1:
+        if (!hasText(formData.hostNationality)) {
+          showToast(copy.validationNationality, 'error');
+          return false;
+        }
+        return true;
+      case 2:
+        if (formData.languageLevels.length < 1) {
+          showToast(copy.validationLanguages, 'error');
+          return false;
+        }
+        if (formData.languageLevels.some((entry) => entry.level < 1 || entry.level > 5)) {
+          showToast(copy.validationLanguageLevels, 'error');
+          return false;
+        }
+        return true;
+      case 3:
+        if (!hasText(formData.name)) {
+          showToast(copy.validationName, 'error');
+          return false;
+        }
+        if (!hasText(formData.dob)) {
+          showToast(copy.validationDob, 'error');
+          return false;
+        }
+        if (!isLikelyDob(formData.dob)) {
+          showToast(copy.validationDobFormat, 'error');
+          return false;
+        }
+        if (!hasText(formData.phone)) {
+          showToast(copy.validationPhone, 'error');
+          return false;
+        }
+        if (!isLikelyPhone(formData.phone)) {
+          showToast(copy.validationPhoneFormat, 'error');
+          return false;
+        }
+        if (!hasText(formData.email)) {
+          showToast(copy.validationEmail, 'error');
+          return false;
+        }
+        if (!isLikelyEmail(formData.email)) {
+          showToast(copy.validationEmailFormat, 'error');
+          return false;
+        }
+        return true;
+      case 4:
+        if (!hasMinLength(formData.selfIntro, 50)) {
+          showToast(copy.validationSelfIntro, 'error');
+          return false;
+        }
+        return true;
+      case 5:
+        if (!hasText(formData.idCardFile)) {
+          showToast(copy.validationIdCard, 'error');
+          return false;
+        }
+        return true;
+      case 6:
+        if (!hasText(formData.bankName)) {
+          showToast(copy.validationBankName, 'error');
+          return false;
+        }
+        if (!hasText(formData.accountNumber)) {
+          showToast(copy.validationAccountNumber, 'error');
+          return false;
+        }
+        if (!hasText(formData.accountHolder)) {
+          showToast(copy.validationAccountHolder, 'error');
+          return false;
+        }
+        return true;
+      case 7:
+        if (!hasText(formData.motivation)) {
+          showToast(copy.validationMotivation, 'error');
+          return false;
+        }
+        return true;
+      default:
+        return true;
     }
-    if (formData.languageLevels.some((entry) => entry.level < 1 || entry.level > 5)) {
-      showToast(copy.validationLanguageLevels, 'error');
-      return false;
-    }
-    return true;
   };
 
   const nextStep = () => {
     if (step >= totalSteps) return;
-    if (!validateNextStep()) return;
+    if (!validateStep(step)) return;
     setStep((prev) => prev + 1);
   };
 
@@ -198,6 +291,13 @@ export default function HostRegisterPage() {
   };
 
   const handleSubmit = async () => {
+    for (let stepIndex = 1; stepIndex < totalSteps; stepIndex += 1) {
+      if (!validateStep(stepIndex)) {
+        setStep(stepIndex);
+        return;
+      }
+    }
+
     if (!formData.agreeTerms || !formData.educationCompleted || !formData.agreeSafetyPolicy) {
       showToast(copy.validationAgreements, 'error');
       return;

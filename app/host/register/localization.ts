@@ -101,6 +101,20 @@ type HostRegisterCopy = {
   submittingButton: string;
   validationLanguages: string;
   validationLanguageLevels: string;
+  validationNationality: string;
+  validationName: string;
+  validationDob: string;
+  validationDobFormat: string;
+  validationPhone: string;
+  validationPhoneFormat: string;
+  validationEmail: string;
+  validationEmailFormat: string;
+  validationSelfIntro: string;
+  validationIdCard: string;
+  validationBankName: string;
+  validationAccountNumber: string;
+  validationAccountHolder: string;
+  validationMotivation: string;
   validationAgreements: string;
   loginRequired: string;
   submitSuccess: string;
@@ -222,6 +236,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     submittingButton: '신청 중...',
     validationLanguages: '구사 가능한 언어를 1개 이상 선택해주세요.',
     validationLanguageLevels: '선택한 각 언어의 레벨을 설정해주세요.',
+    validationNationality: '국적을 선택해주세요.',
+    validationName: '실명을 입력해주세요.',
+    validationDob: '생년월일을 입력해주세요.',
+    validationDobFormat: '생년월일은 YYYY.MM.DD 형식으로 입력해주세요.',
+    validationPhone: '연락 가능한 휴대전화 번호를 입력해주세요.',
+    validationPhoneFormat: '휴대전화 번호 형식을 다시 확인해주세요.',
+    validationEmail: '이메일 주소를 입력해주세요.',
+    validationEmailFormat: '올바른 이메일 주소를 입력해주세요.',
+    validationSelfIntro: '자기소개는 50자 이상 작성해주세요.',
+    validationIdCard: '신분증 이미지를 업로드해주세요.',
+    validationBankName: '은행명을 입력해주세요.',
+    validationAccountNumber: '계좌번호를 입력해주세요.',
+    validationAccountHolder: '예금주명을 입력해주세요.',
+    validationMotivation: '호스트 지원 동기를 작성해주세요.',
     validationAgreements: '모든 필수 교육 시청 및 서약에 동의해주세요.',
     loginRequired: '로그인이 필요합니다.',
     submitSuccess: '신청이 완료되었습니다! 관리자 승인을 기다려주세요.',
@@ -351,6 +379,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     submittingButton: 'Submitting...',
     validationLanguages: 'Please select at least one language you can speak.',
     validationLanguageLevels: 'Please set a level for each selected language.',
+    validationNationality: 'Please select your nationality.',
+    validationName: 'Please enter your legal name.',
+    validationDob: 'Please enter your date of birth.',
+    validationDobFormat: 'Enter your date of birth in YYYY.MM.DD format.',
+    validationPhone: 'Please enter a phone number we can reach.',
+    validationPhoneFormat: 'Please check your phone number format.',
+    validationEmail: 'Please enter your email address.',
+    validationEmailFormat: 'Please enter a valid email address.',
+    validationSelfIntro: 'Please write at least 50 characters for your self-introduction.',
+    validationIdCard: 'Please upload your ID image.',
+    validationBankName: 'Please enter your bank name.',
+    validationAccountNumber: 'Please enter your account number.',
+    validationAccountHolder: 'Please enter the account holder name.',
+    validationMotivation: 'Please tell us why you want to host with Locally.',
     validationAgreements: 'Please agree to all required training and pledges.',
     loginRequired: 'Login is required.',
     submitSuccess: 'Your application has been submitted! Please wait for admin approval.',
@@ -480,6 +522,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     submittingButton: '申請中...',
     validationLanguages: '対応可能な言語を1つ以上選択してください。',
     validationLanguageLevels: '選択した各言語のレベルを設定してください。',
+    validationNationality: '国籍を選択してください。',
+    validationName: '実名を入力してください。',
+    validationDob: '生年月日を入力してください。',
+    validationDobFormat: '生年月日は YYYY.MM.DD 形式で入力してください。',
+    validationPhone: '連絡可能な電話番号を入力してください。',
+    validationPhoneFormat: '電話番号の形式をもう一度ご確認ください。',
+    validationEmail: 'メールアドレスを入力してください。',
+    validationEmailFormat: '正しいメールアドレスを入力してください。',
+    validationSelfIntro: '自己紹介は50文字以上で入力してください。',
+    validationIdCard: '本人確認書類の画像をアップロードしてください。',
+    validationBankName: '銀行名を入力してください。',
+    validationAccountNumber: '口座番号を入力してください。',
+    validationAccountHolder: '口座名義を入力してください。',
+    validationMotivation: 'ホスト応募の理由を入力してください。',
     validationAgreements: 'すべての必須教育および誓約に同意してください。',
     loginRequired: 'ログインが必要です。',
     submitSuccess: '申請が完了しました！管理者の承認をお待ちください。',
@@ -609,6 +665,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     submittingButton: '提交中...',
     validationLanguages: '请至少选择一种可使用语言。',
     validationLanguageLevels: '请为每种已选语言设置等级。',
+    validationNationality: '请选择国籍。',
+    validationName: '请输入真实姓名。',
+    validationDob: '请输入出生日期。',
+    validationDobFormat: '出生日期请按 YYYY.MM.DD 格式填写。',
+    validationPhone: '请输入可联系的手机号。',
+    validationPhoneFormat: '请重新检查手机号格式。',
+    validationEmail: '请输入邮箱地址。',
+    validationEmailFormat: '请输入有效的邮箱地址。',
+    validationSelfIntro: '自我介绍请至少填写 50 个字符。',
+    validationIdCard: '请上传身份证明图片。',
+    validationBankName: '请输入银行名称。',
+    validationAccountNumber: '请输入账号。',
+    validationAccountHolder: '请输入账户姓名。',
+    validationMotivation: '请填写申请成为房东的原因。',
     validationAgreements: '请同意所有必修培训和承诺。',
     loginRequired: '需要登录。',
     submitSuccess: '申请已提交完成！请等待管理员审核。',
