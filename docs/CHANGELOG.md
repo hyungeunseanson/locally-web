@@ -5,6 +5,15 @@
 
 ---
 
+## v3.39.81 — [Home Landing] 검색 시작/서비스 요청 진입 가이드 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 홈 체험 진입 안내 strip 추가 | `app/components/HomePageClient.tsx`, `app/context/LanguageContext.tsx` — 홈 체험 탭 상단에 `저장 → 전체 검색 결과 → 상세 확인` 흐름을 알려주는 안내 strip와 `검색 결과 전체 보기` CTA를 추가하고, 현재 홈 필터 상태를 `/search`로 이어받을 수 있게 정리 |
+| 🟠 홈 서비스 진입 안내 strip 추가 | `app/components/HomePageClient.tsx`, `app/context/LanguageContext.tsx` — 홈 서비스 탭 상단에 `요청서 작성 → 결제 → 호스트 지원` 흐름을 짧게 설명하는 안내 strip와 `맞춤 요청서 작성` CTA를 추가 |
+| 🟡 홈 빈 상태 CTA 보강 | `app/components/HomePageClient.tsx`, `app/context/LanguageContext.tsx` — 홈 체험 결과가 없을 때 `필터 다시 보기`, `전체 체험 보기` CTA를 함께 보여줘 탐색이 끊기지 않도록 정리 |
+| 🟡 홈 진입 스모크 추가 | `app/components/HomeHero.tsx`, `tests/e2e/107-home-landing-ingress.spec.ts` — 홈 탭 버튼에 안정적인 selector를 붙이고, 체험/서비스 진입 안내 strip가 실제로 보이는지 얇은 Playwright 회귀 체크를 추가 |
+
 ## v3.39.80 — [Interaction Polish] 모달/토스트/탭/필터 인터랙션 촉감 개선
 
 | 항목 | 내용 |

@@ -255,7 +255,7 @@ export default function HomeHero({
         <div className={`flex items-center justify-center gap-[52px] transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-0 opacity-0 pt-0 pb-0' : 'max-h-[94px] opacity-100 pt-2 pb-[3px]'
           }`}>
           {/* 체험 탭 */}
-          <button onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
+          <button data-testid="home-tab-experience" onClick={() => setActiveTab('experience')} className="flex flex-col items-center relative">
             <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[-4px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/e47ab655-027b-4679-b2e6-df1c99a5c33d.png?im_w=240"
@@ -272,7 +272,7 @@ export default function HomeHero({
           </button>
 
           {/* 서비스 탭 */}
-          <button onClick={() => setActiveTab('service')} className="flex flex-col items-center relative">
+          <button data-testid="home-tab-service" onClick={() => setActiveTab('service')} className="flex flex-col items-center relative">
             <div className="w-[68px] h-[68px] flex items-center justify-center relative mb-[-4px]">
               <img
                 src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-search-bar-icons/original/3d67e9a9-520a-49ee-b439-7b3a75ea814d.png?im_w=240"
@@ -294,6 +294,7 @@ export default function HomeHero({
         <div className={`flex items-center justify-center gap-12 transition-all duration-300 overflow-hidden ${isScrolled ? 'max-h-[34px] opacity-100 pb-1' : 'max-h-0 opacity-0'
           }`}>
           <button
+            data-testid="home-tab-experience"
             onClick={() => setActiveTab('experience')}
             className={`relative py-[6px] text-[12px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'experience' ? 'text-[#222222] font-extrabold' : 'text-[#7E7E7E] font-medium'
               }`}
@@ -302,6 +303,7 @@ export default function HomeHero({
             {activeTab === 'experience' && <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-[20px] h-[2px] bg-[#222222] rounded-full" />}
           </button>
           <button
+            data-testid="home-tab-service"
             onClick={() => setActiveTab('service')}
             className={`relative py-[6px] text-[12px] tracking-[0.01em] transition-colors active:scale-[0.95] ${activeTab === 'service' ? 'text-[#222222] font-extrabold' : 'text-[#7E7E7E] font-medium'
               }`}
@@ -339,6 +341,7 @@ export default function HomeHero({
           >
             {/* 🎈 체험 탭 */}
             <button
+              data-testid="home-tab-experience"
               onClick={() => setActiveTab('experience')}
               className={`group flex items-center gap-1 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${activeTab === 'experience' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
                 }`}
@@ -366,6 +369,7 @@ export default function HomeHero({
 
             {/* 🛎️ 서비스 탭 */}
             <button
+              data-testid="home-tab-service"
               onClick={() => setActiveTab('service')}
               className={`group flex items-center gap-1 pl-1 pr-6 py-2 rounded-full transition-all duration-200 outline-none hover:bg-slate-50/80 ${activeTab === 'service' ? 'opacity-100' : 'opacity-50 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
                 }`}

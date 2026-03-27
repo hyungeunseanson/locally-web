@@ -49,6 +49,17 @@ export default function HomePageClient() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const searchHref = React.useMemo(() => {
+    const params = new URLSearchParams();
+    if (locationInput.trim()) params.set('location', locationInput.trim());
+    if (selectedLanguage && selectedLanguage !== 'all') params.set('language', selectedLanguage);
+    if (dateRange.start) params.set('startDate', dateRange.start.toISOString().slice(0, 10));
+    if (dateRange.end) params.set('endDate', dateRange.end.toISOString().slice(0, 10));
+
+    const query = params.toString();
+    return query ? `/search?${query}` : '/search';
+  }, [dateRange.end, dateRange.start, locationInput, selectedLanguage]);
+
   return (
     <>
     <div className="min-h-screen bg-[#F3F3F3] md:bg-white text-slate-900 font-sans relative">
@@ -107,6 +118,50 @@ export default function HomePageClient() {
           </div>
         </div>
 
+        <div className="px-5 pb-3 pt-3 md:px-0 md:pb-6 md:pt-0">
+          {activeTab === 'experience' ? (
+            <div
+              data-testid="home-experience-ingress-hint"
+              className="rounded-[18px] border border-slate-200 bg-white/90 px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.05)] md:flex md:items-center md:justify-between md:gap-5 md:rounded-[20px] md:px-5"
+            >
+              <div>
+                <p className="text-[12px] font-semibold tracking-[-0.01em] md:text-[14px]">
+                  {t('home_exp_ingress_title')}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-slate-500 md:text-[13px]">
+                  {t('home_exp_ingress_desc')}
+                </p>
+              </div>
+              <Link
+                href={searchHref}
+                className="mt-3 inline-flex h-10 items-center justify-center rounded-full border border-slate-300 px-4 text-[12px] font-semibold text-slate-900 transition-colors hover:bg-slate-50 md:mt-0 md:shrink-0"
+              >
+                {t('home_exp_ingress_cta')}
+              </Link>
+            </div>
+          ) : (
+            <div
+              data-testid="home-service-ingress-hint"
+              className="rounded-[18px] border border-[#E8D7BD] bg-[#FFF8EE] px-4 py-3 text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.04)] md:flex md:items-center md:justify-between md:gap-5 md:rounded-[20px] md:px-5"
+            >
+              <div>
+                <p className="text-[12px] font-semibold tracking-[-0.01em] md:text-[14px]">
+                  {t('home_service_ingress_title')}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-slate-600 md:text-[13px]">
+                  {t('home_service_ingress_desc')}
+                </p>
+              </div>
+              <Link
+                href="/services/request"
+                className="mt-3 inline-flex h-10 items-center justify-center rounded-full border border-[#D9B77E] bg-white px-4 text-[12px] font-semibold text-slate-900 transition-colors hover:bg-[#FFF4E3] md:mt-0 md:shrink-0"
+              >
+                {t('home_service_ingress_cta')}
+              </Link>
+            </div>
+          )}
+        </div>
+
         {activeTab === 'experience' && (
           loading ? (
             <>
@@ -130,20 +185,28 @@ export default function HomePageClient() {
           ) : filteredExperiences.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-40 text-center px-5">
               <Ghost size={48} className="text-slate-300 mb-4" />
-              <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
-              <p className="text-slate-500 text-sm mb-2">날짜나 지역을 바꿔보거나, 아래 버튼으로 전체 목록을 둘러보세요.</p>
-              <button
-                onClick={() => {
-                  setLocationInput('');
-                  setSelectedLanguage('all');
-                  setDateRange({ start: null, end: null });
-                  setSelectedCategory('all');
-                  setFilteredExperiences(allExperiences);
-                }}
-                className="mt-6 px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors"
-              >
-                전체 목록 보기
-              </button>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">{t('home_empty_title')}</h3>
+              <p className="text-slate-500 text-sm mb-2">{t('home_empty_desc')}</p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={() => {
+                    setLocationInput('');
+                    setSelectedLanguage('all');
+                    setDateRange({ start: null, end: null });
+                    setSelectedCategory('all');
+                    setFilteredExperiences(allExperiences);
+                  }}
+                  className="px-6 py-3 bg-slate-100 text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                >
+                  {t('home_empty_reset')}
+                </button>
+                <Link
+                  href="/search"
+                  className="px-6 py-3 rounded-xl border border-slate-300 text-slate-900 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  {t('home_empty_browse')}
+                </Link>
+              </div>
             </div>
           ) : (
             <>
