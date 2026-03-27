@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.75 — [Proxy Booking] self-service 안내 강화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 전화대행 생성/목록/상세의 다음 행동 안내 보강 | `app/proxy-bookings/new/page.tsx`, `app/proxy-bookings/page.tsx`, `app/proxy-bookings/[id]/page.tsx` — 생성 화면에 `요청 접수 → 결제 확인 → 메시지함 안내` 진행 순서를 추가하고, 목록 카드에 결제/처리 상태별 다음 행동 문구를 노출했다. 상세 화면은 게스트를 곧바로 메시지함으로만 보내지 않고, 상태와 무통장 입금 안내를 다시 확인할 수 있게 유지하면서 `메시지함 열기` CTA를 함께 제공하도록 정리 |
+| 🟡 식당 예약 카드 일정 표시 수정 | `app/proxy-bookings/page.tsx` — 기존에 존재하지 않는 `target_date/target_time`를 읽던 목록 카드의 일정 표시를 실제 `preferred_slot_primary` 값 기준으로 바꿔, 식당 예약 요청의 희망 일시가 정상적으로 보이도록 수정 |
+| 🟡 self-service 검증 추가 | `tests/e2e/105-proxy-booking-self-service.spec.ts` — 게스트가 전화대행 목록에서 다음 행동 문구를 보고, 상세 페이지에서 메시지함 CTA와 무통장 입금 안내를 다시 확인할 수 있는지 검증하는 얇은 스펙을 추가 |
+
 ## v3.39.74 — [Self-Service] 계정·알림·도움말 안내 강화 + 공개 호스트 프로필 신뢰 보강
 
 | 항목 | 내용 |

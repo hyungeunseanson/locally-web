@@ -105,6 +105,24 @@ const SERVICE_NOTES = [
   '요청사항에 카카오톡 아이디 등 추가 연락 수단을 적어주시면 운영팀 확인 시 참고합니다.',
 ];
 
+const REQUEST_FLOW_STEPS = [
+  {
+    step: '1',
+    title: '요청 접수',
+    description: '필요한 정보와 연락처를 남기면 전화 예약 요청이 먼저 접수됩니다.',
+  },
+  {
+    step: '2',
+    title: '결제 확인',
+    description: '카드는 바로 결제하고, 무통장은 상세 페이지에서 입금 안내를 확인합니다.',
+  },
+  {
+    step: '3',
+    title: '메시지함 안내',
+    description: '운영팀 답변과 전화 진행 결과는 메시지함 스레드에서 계속 확인할 수 있습니다.',
+  },
+];
+
 const DEFAULT_RESTAURANT_FORM: RestaurantFormData = {
   restaurant_name: '',
   google_map_url: '',
@@ -1446,6 +1464,21 @@ export default function NewProxyBooking() {
                 ))}
               </ul>
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-blue-100 bg-blue-50/70 p-4 shadow-sm sm:p-6">
+          <SectionTitle>진행 순서</SectionTitle>
+          <div className="grid gap-3 md:grid-cols-3">
+            {REQUEST_FLOW_STEPS.map((step) => (
+              <div key={step.step} className="rounded-2xl border border-blue-100 bg-white px-4 py-4">
+                <div className="mb-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">
+                  {step.step}
+                </div>
+                <p className="text-sm font-bold text-slate-900">{step.title}</p>
+                <p className="mt-2 text-[13px] leading-6 text-slate-600">{step.description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

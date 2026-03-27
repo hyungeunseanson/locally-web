@@ -54,13 +54,6 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                 const data = await res.json() as { success?: boolean; data?: ProxyRequestDetail; viewerIsAdmin?: boolean };
 
                 if (data.success && data.data) {
-                    const linkedInquiryId = typeof data.data.linked_inquiry_id === 'string' ? data.data.linked_inquiry_id : null;
-
-                    if (!data.viewerIsAdmin && linkedInquiryId) {
-                        router.replace(`/guest/inbox?inquiryId=${encodeURIComponent(linkedInquiryId)}`);
-                        return;
-                    }
-
                     setRequest(data.data);
                     setComments(data.data.comments ?? []);
                     setIsAdmin(Boolean(data.viewerIsAdmin));
@@ -163,6 +156,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
     const paymentMethod = getProxyPaymentMethod(request.form_data);
     const serviceFee = getProxyRequestFeeKrw(request.category, request.form_data);
     const formEntries = getProxyFormDisplayEntries(request.form_data);
+    const linkedInquiryId = typeof request.linked_inquiry_id === 'string' ? request.linked_inquiry_id : null;
     const canStartProcessing = request.payment_status === 'COMPLETED';
     const paymentStatusLabel = request.payment_status === 'COMPLETED'
         ? '결제 완료'
@@ -171,6 +165,30 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
             : request.payment_status === 'REFUNDED'
                 ? '환불 완료'
                 : '결제 대기';
+
+    const nextActionMessage = (() => {
+        if (request.payment_status === 'WAITING' && paymentMethod === 'bank') {
+            return '아직 입금 대기 상태입니다. 아래 계좌 안내를 확인하고 입금이 완료되면 운영팀이 메시지함 스레드에서 다음 답변을 남깁니다.';
+        }
+
+        if (request.payment_status === 'WAITING') {
+            return '결제 확인이 완료되면 운영팀이 메시지함 스레드에서 진행 여부와 통화 결과를 안내합니다.';
+        }
+
+        if (request.status === 'IN_PROGRESS') {
+            return '현재 운영팀이 실제 전화를 진행 중입니다. 추가 확인이 필요하면 이 스레드나 메시지함에 이어서 답변이 남습니다.';
+        }
+
+        if (request.status === 'COMPLETED') {
+            return '전화 진행이 완료된 요청입니다. 마지막 답변과 후속 안내를 메시지함 또는 아래 스레드에서 다시 확인해주세요.';
+        }
+
+        if (request.status === 'CANCELLED') {
+            return '취소 또는 반려된 요청입니다. 필요하면 내용을 수정해 새 요청으로 다시 접수할 수 있습니다.';
+        }
+
+        return '운영팀이 요청을 확인 중입니다. 진행 결과와 추가 질문 답변은 메시지함과 아래 스레드로 이어집니다.';
+    })();
 
     return (
         <div className="max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -206,6 +224,27 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                     </div>
                 )}
 
+                {!isAdmin && (
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/80 px-5 py-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <p className="text-sm font-bold text-blue-900">다음 안내는 메시지함과 이 화면에서 함께 확인할 수 있어요.</p>
+                                <p className="mt-1 text-sm leading-6 text-blue-800">
+                                    {nextActionMessage}
+                                </p>
+                            </div>
+                            {linkedInquiryId ? (
+                                <Link
+                                    href={`/guest/inbox?inquiryId=${encodeURIComponent(linkedInquiryId)}`}
+                                    className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100/40"
+                                >
+                                    메시지함 열기
+                                </Link>
+                            ) : null}
+                        </div>
+                    </div>
+                )}
+
                 {/* 1:1 Message Thread (Scrollable) */}
                 <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col overflow-hidden">
                     <div className="p-4 border-b border-slate-200 bg-white">
@@ -213,7 +252,7 @@ export default function ProxyBookingDetail({ params }: { params: Promise<{ id: s
                             <Phone size={18} className="text-slate-500" />
                             담당자 소통 스레드
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">문의 사항이나 예약 진행 상황에 대해 소통하세요.</p>
+                        <p className="text-xs text-slate-500 mt-1">문의 사항이나 예약 진행 상황에 대해 소통하세요. 메시지함에서도 같은 답변을 확인할 수 있습니다.</p>
                     </div>
 
                     <div className="flex-1 p-6 overflow-y-auto space-y-6">

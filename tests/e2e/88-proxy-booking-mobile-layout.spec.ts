@@ -1,10 +1,19 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 } });
+
+async function dismissAnnouncementIfVisible(page: Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click();
+    await expect(announcement).toHaveCount(0);
+  }
+}
 
 test.describe('Proxy booking mobile layout', () => {
   test('keeps the restaurant slot picker actionable on mobile', async ({ page }) => {
     await page.goto('/proxy-bookings/new', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
 
     await expect(page.getByRole('heading', { name: '일본인이 대신 전화 예약을 도와드립니다' })).toBeVisible();
 

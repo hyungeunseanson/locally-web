@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/app/utils/supabase/client';
 import { Plus, Phone, Clock, CheckCircle, XCircle } from 'lucide-react';
 import type { ProxyRequest } from '@/app/types/proxy';
-import { getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
+import { getProxyPaymentMethod, getProxyRequestTitle, getProxyRequesterDisplayName } from '@/app/utils/proxyBooking';
 
 export default function ProxyBookingsBoard() {
     const supabase = useMemo(() => createClient(), []);
@@ -51,6 +51,61 @@ export default function ProxyBookingsBoard() {
         }
     };
 
+    const getPaymentStatusLabel = (request: ProxyRequest) => {
+        switch (request.payment_status) {
+            case 'COMPLETED':
+                return '결제 완료';
+            case 'FAILED':
+                return '결제 취소';
+            case 'REFUNDED':
+                return '환불 완료';
+            default:
+                return getProxyPaymentMethod(request.form_data) === 'bank' ? '입금 대기' : '결제 대기';
+        }
+    };
+
+    const getRequestDateSummary = (request: ProxyRequest) => {
+        if (request.category === 'RESTAURANT') {
+            const slot = typeof request.form_data?.preferred_slot_primary === 'string'
+                ? request.form_data.preferred_slot_primary
+                : '';
+            if (slot.includes('T')) {
+                const [date, time] = slot.split('T');
+                if (date && time) {
+                    return `${date} ${time.slice(0, 5)}`;
+                }
+            }
+        }
+
+        return new Date(request.created_at).toLocaleDateString();
+    };
+
+    const getNextStepCopy = (request: ProxyRequest) => {
+        const paymentMethod = getProxyPaymentMethod(request.form_data);
+
+        if (request.payment_status === 'WAITING' && paymentMethod === 'bank') {
+            return '입금 전이라면 상세에서 계좌를 확인하고, 입금 후에는 메시지함 답변을 기다려주세요.';
+        }
+
+        if (request.payment_status === 'WAITING') {
+            return '결제 확인이 끝나면 운영팀이 메시지함 스레드에서 진행 상황을 안내합니다.';
+        }
+
+        if (request.status === 'IN_PROGRESS') {
+            return '현재 전화 진행 중입니다. 추가 답변은 메시지함과 상세 스레드에서 확인할 수 있습니다.';
+        }
+
+        if (request.status === 'COMPLETED') {
+            return '통화 결과와 다음 안내는 메시지함에 남겨둔 답변을 확인해주세요.';
+        }
+
+        if (request.status === 'CANCELLED') {
+            return '취소 또는 반려된 요청입니다. 필요한 경우 새 요청을 다시 접수해주세요.';
+        }
+
+        return '운영팀이 요청을 확인 중이며, 다음 안내는 메시지함과 상세 스레드로 이어집니다.';
+    };
+
     return (
         <div className="max-w-4xl mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-6">
@@ -67,6 +122,12 @@ export default function ProxyBookingsBoard() {
                     </Link>
                 )}
             </div>
+
+            {!isAdmin && (
+                <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-blue-900">
+                    요청 접수 후 운영팀 답변은 메시지함과 상세 스레드에서 함께 확인할 수 있습니다. 무통장 입금 요청은 상세에서 계좌 안내를 다시 볼 수 있습니다.
+                </div>
+            )}
 
             {loading ? (
                 <div className="space-y-4 animate-pulse">
@@ -101,7 +162,7 @@ export default function ProxyBookingsBoard() {
                                 <div className="flex items-center justify-between text-xs text-slate-500">
                                     <span className="flex items-center gap-1">
                                         {req.category === 'RESTAURANT' && <Clock size={12} />}
-                                        {req.category === 'RESTAURANT' ? `${req.form_data?.target_date} ${req.form_data?.target_time}` : new Date(req.created_at).toLocaleDateString()}
+                                        {getRequestDateSummary(req)}
                                     </span>
 
                                     {isAdmin && (
@@ -109,6 +170,16 @@ export default function ProxyBookingsBoard() {
                                             요청자: {getProxyRequesterDisplayName(req.profiles)}
                                         </span>
                                     )}
+                                </div>
+
+                                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                                    <div className="flex items-center justify-between gap-2 text-[11px] font-bold">
+                                        <span className="text-slate-500">결제/처리 상태</span>
+                                        <span className="text-slate-700">{getPaymentStatusLabel(req)}</span>
+                                    </div>
+                                    <p className="mt-2 text-[12px] leading-5 text-slate-600">
+                                        {getNextStepCopy(req)}
+                                    </p>
                                 </div>
                             </div>
                         </Link>

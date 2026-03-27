@@ -159,6 +159,14 @@ async function login(page: Page, user: TestUser) {
   await page.waitForLoadState('networkidle');
 }
 
+async function dismissAnnouncementIfVisible(page: Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click();
+    await expect(announcement).toHaveCount(0);
+  }
+}
+
 async function createIsolatedPage(browser: Browser, user: TestUser) {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -214,9 +222,11 @@ test.describe.serial('Proxy booking team workspace flow', () => {
       const targetDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
 
       await customerPage.goto('/', { waitUntil: 'networkidle' });
+      await dismissAnnouncementIfVisible(customerPage);
       await customerPage.getByRole('button', { name: '서비스' }).first().click();
       await customerPage.getByRole('link', { name: /일본 전화 예약 · 문의 대행/ }).click();
       await customerPage.waitForURL(/\/proxy-bookings\/new/, { timeout: 15000 });
+      await dismissAnnouncementIfVisible(customerPage);
       await expect(customerPage.getByRole('heading', { name: '일본인이 대신 전화 예약을 도와드립니다' })).toBeVisible({ timeout: 15000 });
 
       await customerPage.getByPlaceholder('예: 스시 지로').fill(restaurantName);
