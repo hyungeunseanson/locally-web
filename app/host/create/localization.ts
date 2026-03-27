@@ -291,6 +291,10 @@ type ExperienceFormCopy = {
   validationItineraryTitles: string;
   validationDescription: string;
   validationInclusions: string;
+  validationInclusionItemQuality: string;
+  validationExclusionItemQuality: string;
+  validationDuplicateListItem: string;
+  validationSuppliesQuality: string;
   validationAgeLimit: string;
   validationPrice: string;
   validationPrivatePrice: string;
@@ -448,6 +452,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationItineraryTitles: '이동 동선의 장소 이름을 모두 입력해주세요.',
     validationDescription: '상세 설명을 30자 이상 입력해주세요.',
     validationInclusions: '포함 사항을 1개 이상 입력해주세요.',
+    validationInclusionItemQuality: '포함 사항은 두 글자 이상으로 구체적으로 입력해주세요.',
+    validationExclusionItemQuality: '불포함 사항은 두 글자 이상으로 구체적으로 입력해주세요.',
+    validationDuplicateListItem: '같은 항목은 한 번만 추가해주세요.',
+    validationSuppliesQuality: '준비물은 네 글자 이상으로 구체적으로 적어주세요.',
     validationAgeLimit: '참가 연령 기준을 입력해주세요.',
     validationPrice: '기본 가격을 올바르게 입력해주세요.',
     validationPrivatePrice: '단독 투어 가격을 입력해주세요.',
@@ -603,6 +611,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationItineraryTitles: 'Enter a place name for every itinerary stop.',
     validationDescription: 'Enter at least 30 characters for the description.',
     validationInclusions: 'Add at least one inclusion.',
+    validationInclusionItemQuality: 'Make each inclusion specific and at least 2 characters long.',
+    validationExclusionItemQuality: 'Make each exclusion specific and at least 2 characters long.',
+    validationDuplicateListItem: 'Add each item only once.',
+    validationSuppliesQuality: 'If you add supplies, describe them in at least 4 characters.',
     validationAgeLimit: 'Enter the age requirement.',
     validationPrice: 'Enter a valid base price.',
     validationPrivatePrice: 'Enter the private tour price.',
@@ -758,6 +770,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationItineraryTitles: '移動ルートの場所名をすべて入力してください。',
     validationDescription: '詳細説明を30文字以上入力してください。',
     validationInclusions: '含まれるものを1つ以上入力してください。',
+    validationInclusionItemQuality: '含まれるものは2文字以上で具体的に入力してください。',
+    validationExclusionItemQuality: '含まれないものは2文字以上で具体的に入力してください。',
+    validationDuplicateListItem: '同じ項目は1回だけ追加してください。',
+    validationSuppliesQuality: '持ち物を書く場合は4文字以上で具体的に入力してください。',
     validationAgeLimit: '参加年齢条件を入力してください。',
     validationPrice: '基本価格を正しく入力してください。',
     validationPrivatePrice: 'プライベートツアー価格を入力してください。',
@@ -913,6 +929,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     validationItineraryTitles: '请填写所有路线地点名称。',
     validationDescription: '请输入至少30个字的详细说明。',
     validationInclusions: '请至少填写一项包含内容。',
+    validationInclusionItemQuality: '包含内容请至少填写2个字并尽量具体。',
+    validationExclusionItemQuality: '不包含内容请至少填写2个字并尽量具体。',
+    validationDuplicateListItem: '相同项目只需添加一次。',
+    validationSuppliesQuality: '如果填写需准备物品，请至少写4个字并尽量具体。',
     validationAgeLimit: '请输入参加年龄条件。',
     validationPrice: '请输入正确的基础价格。',
     validationPrivatePrice: '请输入私人团价格。',

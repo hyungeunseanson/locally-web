@@ -27,6 +27,15 @@ type ProcessedImageFile = File & {
 
 const asProcessedImageFile = (file: File): ProcessedImageFile => file as ProcessedImageFile;
 
+function normalizeListItem(value: string) {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function hasDuplicateItems(items: string[]) {
+  const normalized = items.map((item) => normalizeListItem(item).toLocaleLowerCase());
+  return new Set(normalized).size !== normalized.length;
+}
+
 export default function CreateExperiencePage() {
   const { lang } = useLanguage();
   const copy = getExperienceFormCopy(lang);
@@ -132,8 +141,32 @@ export default function CreateExperiencePage() {
         showToast(copy.validationDescription, 'error');
         return false;
       }
-      if (!formData.inclusions || formData.inclusions.length === 0) {
+      const cleanedInclusions = (formData.inclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
+      const cleanedExclusions = (formData.exclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
+      const cleanedSupplies = (formData.supplies || '').trim();
+
+      if (cleanedInclusions.length === 0) {
         showToast(copy.validationInclusions, 'error');
+        return false;
+      }
+      if (cleanedInclusions.some((item: string) => item.length < 2)) {
+        showToast(copy.validationInclusionItemQuality, 'error');
+        return false;
+      }
+      if (hasDuplicateItems(cleanedInclusions)) {
+        showToast(copy.validationDuplicateListItem, 'error');
+        return false;
+      }
+      if (cleanedExclusions.some((item: string) => item.length < 2)) {
+        showToast(copy.validationExclusionItemQuality, 'error');
+        return false;
+      }
+      if (cleanedExclusions.length > 0 && hasDuplicateItems(cleanedExclusions)) {
+        showToast(copy.validationDuplicateListItem, 'error');
+        return false;
+      }
+      if (cleanedSupplies && cleanedSupplies.length < 4) {
+        showToast(copy.validationSuppliesQuality, 'error');
         return false;
       }
       return true;
@@ -218,8 +251,21 @@ export default function CreateExperiencePage() {
     value: string,
     setter: React.Dispatch<React.SetStateAction<string>>
   ) => {
-    if (!value.trim()) return;
-    updateData(field, [...formData[field], value]);
+    const normalizedValue = normalizeListItem(value);
+    if (!normalizedValue) return;
+
+    if (normalizedValue.length < 2) {
+      showToast(field === 'inclusions' ? copy.validationInclusionItemQuality : copy.validationExclusionItemQuality, 'error');
+      return;
+    }
+
+    const existingItems = (formData[field] || []).map((item) => normalizeListItem(item).toLocaleLowerCase());
+    if (existingItems.includes(normalizedValue.toLocaleLowerCase())) {
+      showToast(copy.validationDuplicateListItem, 'error');
+      return;
+    }
+
+    updateData(field, [...formData[field], normalizedValue]);
     setter('');
   };
 
@@ -418,11 +464,15 @@ export default function CreateExperiencePage() {
         })
       );
 
-      const cleanedExclusions = (formData.exclusions || []).map((item: string) => item.trim()).filter(Boolean);
+      const cleanedInclusions = (formData.inclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
+      const cleanedExclusions = (formData.exclusions || []).map((item: string) => normalizeListItem(item)).filter(Boolean);
+      const cleanedSupplies = (formData.supplies || '').trim();
       const payload = buildExperienceWritePayload({
         ...formData,
         photos: photoUrls,
+        inclusions: cleanedInclusions,
         exclusions: cleanedExclusions,
+        supplies: cleanedSupplies,
         itinerary: itineraryWithPhotos,
         meeting_point: formData.meeting_point || itineraryWithPhotos[0]?.title || '',
         rules: {

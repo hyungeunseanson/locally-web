@@ -69,6 +69,10 @@ function isLikelyPhone(value: string): boolean {
   return digits.length >= 8 && digits.length <= 15;
 }
 
+function normalizeAccountNumber(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
 function shouldNotifyAdmin(existingApplicationStatus: string | null, hasExistingApplication: boolean) {
   return (
     (!hasExistingApplication || existingApplicationStatus === 'revision' || existingApplicationStatus === 'rejected') &&
@@ -117,7 +121,7 @@ export async function POST(request: NextRequest) {
     const trimmedSelfIntro = asTrimmedString(body.selfIntro);
     const trimmedIdCardFile = asTrimmedString(body.idCardFile);
     const trimmedBankName = asTrimmedString(body.bankName);
-    const trimmedAccountNumber = asTrimmedString(body.accountNumber);
+    const trimmedAccountNumber = normalizeAccountNumber(asTrimmedString(body.accountNumber));
     const trimmedAccountHolder = asTrimmedString(body.accountHolder);
     const trimmedMotivation = asTrimmedString(body.motivation);
 
@@ -131,6 +135,10 @@ export async function POST(request: NextRequest) {
 
     if (!trimmedName) {
       return NextResponse.json({ success: false, error: 'Name is required.' }, { status: 400 });
+    }
+
+    if (trimmedName.length < 2) {
+      return NextResponse.json({ success: false, error: 'Name must be at least 2 characters.' }, { status: 400 });
     }
 
     if (!trimmedDob) {
@@ -169,16 +177,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Bank name is required.' }, { status: 400 });
     }
 
+    if (trimmedBankName.length < 2) {
+      return NextResponse.json({ success: false, error: 'Bank name must be at least 2 characters.' }, { status: 400 });
+    }
+
     if (!trimmedAccountNumber) {
       return NextResponse.json({ success: false, error: 'Account number is required.' }, { status: 400 });
+    }
+
+    if (trimmedAccountNumber.length < 8) {
+      return NextResponse.json({ success: false, error: 'Account number format is invalid.' }, { status: 400 });
     }
 
     if (!trimmedAccountHolder) {
       return NextResponse.json({ success: false, error: 'Account holder is required.' }, { status: 400 });
     }
 
+    if (trimmedAccountHolder.length < 2) {
+      return NextResponse.json({ success: false, error: 'Account holder name must be at least 2 characters.' }, { status: 400 });
+    }
+
     if (!trimmedMotivation) {
       return NextResponse.json({ success: false, error: 'Motivation is required.' }, { status: 400 });
+    }
+
+    if (trimmedMotivation.length < 20) {
+      return NextResponse.json({ success: false, error: 'Motivation must be at least 20 characters.' }, { status: 400 });
     }
 
     const languageNames = getLanguageNames(languageLevels);
