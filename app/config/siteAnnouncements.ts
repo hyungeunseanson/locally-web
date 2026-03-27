@@ -44,7 +44,7 @@ export const SITE_ANNOUNCEMENTS: SiteAnnouncement[] = [
     id: 'bank-only-template-2026-04-01',
 
     // true 로 바꾸면 팝업이 실제로 뜹니다.
-    enabled: false,
+    enabled: true,
 
     // 숫자가 클수록 더 먼저 뜹니다.
     priority: 100,
