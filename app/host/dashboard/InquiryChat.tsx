@@ -119,6 +119,32 @@ export default function InquiryChat() {
   const formatTime = (dateString: string) =>
     new Date(dateString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
+  const formatInquiryTimestamp = (dateString?: string | null) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString('ko-KR', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getWaitingHours = (dateString?: string | null) => {
+    if (!dateString) return 0;
+    return Math.floor((Date.now() - new Date(dateString).getTime()) / (1000 * 60 * 60));
+  };
+
+  const replyNeededInquiries = useMemo(
+    () => inquiries.filter((inquiry) => inquiry.unread_count > 0),
+    [inquiries]
+  );
+  const oldestReplyNeededInquiry = useMemo(() => {
+    if (replyNeededInquiries.length === 0) return null;
+    return [...replyNeededInquiries]
+      .filter((inquiry) => inquiry.updated_at)
+      .sort((a, b) => new Date(a.updated_at || '').getTime() - new Date(b.updated_at || '').getTime())[0] || null;
+  }, [replyNeededInquiries]);
+
   const handleSend = async (file?: File) => {
     if (!selectedInquiry || isSending) return;
     if (!replyText.trim() && !file) return;
@@ -169,6 +195,26 @@ export default function InquiryChat() {
           <span className="font-bold text-[16px] text-slate-800">{t('hd_inbox_title')}</span>
         </div>
 
+        {replyNeededInquiries.length > 0 && (
+          <div className="border-b border-amber-100 bg-white px-4 py-3 md:px-5">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+              <p className="text-[12px] font-semibold leading-5 text-amber-900">
+                {t('host_inquiry_warning_strip')}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-amber-800">
+                <span className="rounded-full border border-amber-200 bg-white/70 px-2.5 py-1 font-semibold">
+                  {t('host_inquiry_waiting_count')} {replyNeededInquiries.length}
+                </span>
+                {oldestReplyNeededInquiry?.updated_at && (
+                  <span className="rounded-full border border-amber-200 bg-white/70 px-2.5 py-1 font-semibold">
+                    {t('host_inquiry_oldest_waiting')} {formatInquiryTimestamp(oldestReplyNeededInquiry.updated_at)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 목록 스크롤 */}
         <div className="flex-1 overflow-y-auto">
           {isLoading && (
@@ -181,6 +227,7 @@ export default function InquiryChat() {
             const lastTime = inq.updated_at
               ? new Date(inq.updated_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
               : '';
+            const waitingHours = getWaitingHours(inq.updated_at);
             return (
               <div
                 key={inq.id}
@@ -198,9 +245,21 @@ export default function InquiryChat() {
                 {/* 텍스트 */}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-0.5">
-                    <span className={`text-[14px] md:text-[15px] truncate pr-2 ${inq.unread_count > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
-                      {inq.guest?.name || '게스트'}
-                    </span>
+                    <div className="flex min-w-0 items-center gap-1.5 pr-2">
+                      <span className={`text-[14px] md:text-[15px] truncate ${inq.unread_count > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-800'}`}>
+                        {inq.guest?.name || '게스트'}
+                      </span>
+                      {inq.unread_count > 0 && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                          {t('host_inquiry_reply_needed_badge')}
+                        </span>
+                      )}
+                      {inq.unread_count > 0 && waitingHours >= 12 && (
+                        <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">
+                          {t('host_inquiry_priority_badge')}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] md:text-[11px] text-gray-400 shrink-0">{lastTime}</span>
                   </div>
                   <div className="flex items-center justify-between gap-1">

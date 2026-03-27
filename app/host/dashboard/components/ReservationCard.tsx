@@ -387,12 +387,10 @@ export default function ReservationCard({
       )}
 
       {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && !hasHostUnavailableReview && (
-        <div className="mx-4 md:mx-6 mb-4 bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
-          <AlertTriangle className="text-slate-400 shrink-0 mt-0.5" size={14} />
-          <p className="text-[11px] text-slate-500 leading-snug">
-            {t('res_card_host_cancel_notice_1')}
-            <strong>{t('res_card_host_cancel_notice_2')}</strong>
-            {t('res_card_host_cancel_notice_3')}
+        <div className="mx-4 md:mx-6 mb-4 rounded-lg border border-amber-200 bg-amber-50 p-2.5 flex items-start gap-2">
+          <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={14} />
+          <p className="text-[11px] leading-snug text-amber-900 font-medium">
+            {t('res_card_host_cancel_warning')}
           </p>
         </div>
       )}

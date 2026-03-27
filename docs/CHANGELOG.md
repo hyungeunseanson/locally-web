@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.63 — [Host UX] 무응답·취소 책임 경고 카피 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 호스트 예약 탭 warning strip 추가 | `app/host/dashboard/components/ReservationManager.tsx`, `app/context/LanguageContext.tsx` — 호스트 예약 관리 상단에 `무응답·취소·노쇼는 정산과 활동 상태에 영향을 줄 수 있다`는 경고 strip과 함께, 지금 바로 확인해야 할 `다가오는 일정`/`취소 요청` 개수를 작은 상태 칩으로 노출 |
+| 🟠 호스트 취소 경고 문구 강화 | `app/host/dashboard/components/ReservationCard.tsx`, `app/context/LanguageContext.tsx` — 기존의 완곡한 취소 안내를 `고객 보상 발생 시 관련 비용이 정산에서 조정될 수 있다`는 더 직접적인 경고 카피로 교체해, 호스트 사유 취소의 무게를 더 분명하게 전달 |
+| 🟠 문의 목록 미응답 강조 보강 | `app/host/dashboard/InquiryChat.tsx`, `app/context/LanguageContext.tsx` — 문의 목록 상단에 `게스트가 답변을 기다리고 있다`는 경고 strip을 추가하고, 각 문의 row에 `답변 필요` 및 장시간 미응답 시 `우선 확인` 배지를 표시해 오래된 미응답 문의를 더 빨리 처리할 수 있게 정리 |
+
 ## v3.39.62 — [Runtime Ops] codex 테스트 데이터 cleanup dry-run 스크립트 추가
 
 | 항목 | 내용 |

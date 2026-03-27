@@ -301,6 +301,21 @@ guest:profiles!bookings_user_id_fkey (
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
+  const actionableReservationCount = reservations.filter((reservation) => {
+    const [year, month, day] = reservation.date.split('-').map(Number);
+    const tripDate = new Date(year, month - 1, day);
+    const baseToday = new Date();
+    baseToday.setHours(0, 0, 0, 0);
+    return (
+      !isCancelledBookingStatus(reservation.status) &&
+      !isCancellationRequestedBookingStatus(reservation.status) &&
+      (tripDate >= baseToday || isPendingBookingStatus(reservation.status))
+    );
+  }).length;
+  const cancellationRequestCount = reservations.filter((reservation) =>
+    isCancellationRequestedBookingStatus(reservation.status)
+  ).length;
+
   // ✅ [복구] 하이드레이션 방지 (Skeleton 표시)
   if (!isMounted) return <Skeleton className="w-full h-96 rounded-3xl" />;
 
@@ -360,6 +375,31 @@ guest:profiles!bookings_user_id_fkey (
       {errorMsg && (
         <div className="mx-6 mt-4 p-4 bg-red-50 text-red-600 text-sm font-bold flex items-center gap-2 border border-red-100 rounded-xl animate-in slide-in-from-top-2">
           <AlertCircle size={18} /> {errorMsg}
+        </div>
+      )}
+
+      {reservations.length > 0 && (
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+            <div className="min-w-0">
+              <p className="text-[12px] md:text-[13px] font-semibold leading-5">
+                {t('host_dashboard_warning_strip')}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-amber-800">
+                {actionableReservationCount > 0 && (
+                  <span className="rounded-full border border-amber-200 bg-white/70 px-2.5 py-1 font-semibold">
+                    {t('tab_upcoming')} {actionableReservationCount}
+                  </span>
+                )}
+                {cancellationRequestCount > 0 && (
+                  <span className="rounded-full border border-amber-200 bg-white/70 px-2.5 py-1 font-semibold">
+                    {t('res_cancel_req')} {cancellationRequestCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

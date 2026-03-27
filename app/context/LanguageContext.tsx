@@ -182,6 +182,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     // 예약 관리
     res_status: "예약 현황",
     res_desc: "게스트의 예약을 관리하고 준비하세요.",
+    host_dashboard_warning_strip: "게스트 여행을 망치는 무응답·취소·노쇼는 정산과 활동 상태에 바로 영향을 줄 수 있습니다. 지금 처리해야 할 예약과 문의를 먼저 확인해주세요.",
     tab_upcoming: "다가오는 일정",
     tab_past: "지난 일정",
     tab_cancel: "취소/환불",
@@ -616,6 +617,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     
     res_cancel_reason: "사유",
     res_reason_none: "사유 없음",
+    res_card_host_cancel_warning: "호스트 사유 취소는 게스트 여행 피해로 이어집니다. 고객 보상이 발생하면 관련 비용이 정산에서 조정될 수 있습니다.",
     res_card_host_cancel_notice_1: "호스트 사정으로 예약을 진행할 수 없는 경우, ",
     res_card_host_cancel_notice_2: "게스트에게 메시지로 상황을 설명하고 예약을 취소하도록 요청",
     res_card_host_cancel_notice_3: "해 주세요.",
@@ -1134,6 +1136,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     hd_inbox_title: "문의 목록",
     hd_inbox_select: "대화를 선택하세요.",
+    host_inquiry_warning_strip: "게스트가 답변을 기다리고 있습니다. 미응답이 길어지면 예약 이탈, 고객 불만, 운영 검토로 이어질 수 있습니다.",
+    host_inquiry_reply_needed_badge: "답변 필요",
+    host_inquiry_priority_badge: "우선 확인",
+    host_inquiry_waiting_count: "답변 대기",
+    host_inquiry_oldest_waiting: "가장 오래 기다린 문의",
 
     hd_match_selected: "선택됨",
     hd_match_cancelled: "취소됨",
@@ -1431,6 +1438,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     menu_profile: "Profile Settings",
     res_status: "Reservation Status",
     res_desc: "Manage and prepare for guest reservations.",
+    host_dashboard_warning_strip: "Unanswered messages, cancellations, and no-shows that disrupt a guest's trip can directly affect your payout and account status. Please check the bookings and inquiries that need action first.",
     tab_upcoming: "Upcoming",
     tab_past: "Completed",
     tab_cancel: "Cancelled",
@@ -1842,6 +1850,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     
     res_cancel_reason: "Reason",
     res_reason_none: "No reason provided",
+    res_card_host_cancel_warning: "Host-side cancellations disrupt a guest's trip. If customer compensation is required, related costs may be adjusted from your payout.",
     res_card_host_cancel_notice_1: "If you cannot proceed with the reservation, ",
     res_card_host_cancel_notice_2: "please explain the situation to the guest via message and ask them to cancel",
     res_card_host_cancel_notice_3: ".",
@@ -2361,6 +2370,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     hd_inbox_title: "Inbox",
     hd_inbox_select: "Select a conversation.",
+    host_inquiry_warning_strip: "Guests are waiting for a reply. Long response delays can lead to booking drop-off, guest complaints, and operational review.",
+    host_inquiry_reply_needed_badge: "Reply needed",
+    host_inquiry_priority_badge: "Priority",
+    host_inquiry_waiting_count: "Awaiting reply",
+    host_inquiry_oldest_waiting: "Oldest waiting inquiry",
 
     hd_match_selected: "Selected",
     hd_match_cancelled: "Cancelled",
@@ -2654,6 +2668,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     menu_profile: "設定",
     res_status: "予約状況",
     res_desc: "ゲストの予約を管理・準備しましょう。",
+    host_dashboard_warning_strip: "ゲスト旅行を損なう無応答・キャンセル・ノーショーは、精算やアカウント状態に直接影響する可能性があります。今すぐ対応が必要な予約と問い合わせを先に確認してください。",
     tab_upcoming: "予定",
     tab_past: "完了",
     tab_cancel: "キャンセル",
@@ -3071,6 +3086,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     
     res_cancel_reason: "理由",
     res_reason_none: "理由なし",
+    res_card_host_cancel_warning: "ホスト都合のキャンセルはゲストの旅行被害につながります。顧客補償が発生した場合、関連費用が精算金から調整されることがあります。",
     res_card_host_cancel_notice_1: "ホストの都合で予約を進行できない場合、",
     res_card_host_cancel_notice_2: "ゲストにメッセージで状況を説明し、予約をキャンセルするよう依頼",
     res_card_host_cancel_notice_3: "してください。",
@@ -3589,6 +3605,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     hd_inbox_title: "お問い合わせリスト",
     hd_inbox_select: "会話を選択してください。",
+    host_inquiry_warning_strip: "ゲストが返信を待っています。無応答が長引くと、予約離脱・顧客不満・運営審査につながることがあります。",
+    host_inquiry_reply_needed_badge: "返信必要",
+    host_inquiry_priority_badge: "優先確認",
+    host_inquiry_waiting_count: "返信待ち",
+    host_inquiry_oldest_waiting: "最も長く待っている問い合わせ",
 
     hd_match_selected: "選択済み",
     hd_match_cancelled: "キャンセル",
@@ -3881,6 +3902,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
     menu_profile: "个人资料设置",
     res_status: "预订状态",
     res_desc: "管理并准备客人的预订。",
+    host_dashboard_warning_strip: "会破坏客人行程的无回复、取消和爽约，可能会直接影响您的结算和账号状态。请先处理现在必须回应的预订和咨询。",
     tab_upcoming: "即将到来",
     tab_past: "历史记录",
     tab_cancel: "取消/退款",
@@ -4298,6 +4320,7 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     res_cancel_reason: "理由",
     res_reason_none: "无理由",
+    res_card_host_cancel_warning: "房东原因取消会直接损害客人的旅行体验。如产生客户补偿，相关费用可能会从您的结算中调整。",
     res_card_host_cancel_notice_1: "如果您因故无法继续预订，",
     res_card_host_cancel_notice_2: "请通过消息向客人解释情况并要求他们取消预订",
     res_card_host_cancel_notice_3: "。",
@@ -4816,6 +4839,11 @@ const dictionary: Record<Locale, Record<string, string>> = {
 
     hd_inbox_title: "消息列表",
     hd_inbox_select: "请选择一个对话。",
+    host_inquiry_warning_strip: "客人正在等待回复。长时间不回复可能会导致订单流失、客诉和运营审核。",
+    host_inquiry_reply_needed_badge: "需回复",
+    host_inquiry_priority_badge: "优先处理",
+    host_inquiry_waiting_count: "待回复",
+    host_inquiry_oldest_waiting: "等待最久的咨询",
 
     hd_match_selected: "已选择",
     hd_match_cancelled: "已取消",
