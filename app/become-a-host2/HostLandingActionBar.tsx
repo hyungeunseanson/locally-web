@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import LoginModal from '@/app/components/LoginModal';
 import { useAuth } from '@/app/context/AuthContext';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 type ApplicationStatus =
   | 'pending'
@@ -22,6 +23,7 @@ export default function HostLandingActionBar({
   compact = false,
 }: HostLandingActionBarProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const { user, isHost, applicationStatus, isLoading, refreshAuth } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
@@ -51,10 +53,34 @@ export default function HostLandingActionBar({
     isHost || normalizedStatus === 'approved' || normalizedStatus === 'active';
 
   const primaryLabel = shouldSwitchToHostMode
-    ? '호스트 모드로 전환'
+    ? t('host_landing_cta_dashboard')
     : hasApplication
-      ? '신청현황'
-      : '호스트 지원하기';
+      ? t('host_landing_cta_status')
+      : t('host_landing_cta_apply');
+
+  const helperTitle = !user
+    ? t('host_landing_helper_login_title')
+    : shouldSwitchToHostMode
+      ? t('host_landing_helper_dashboard_title')
+      : normalizedStatus === 'pending'
+        ? t('host_landing_helper_pending_title')
+        : normalizedStatus === 'revision'
+          ? t('host_landing_helper_revision_title')
+          : normalizedStatus === 'rejected'
+            ? t('host_landing_helper_rejected_title')
+            : t('host_landing_helper_apply_title');
+
+  const helperDesc = !user
+    ? t('host_landing_helper_login_desc')
+    : shouldSwitchToHostMode
+      ? t('host_landing_helper_dashboard_desc')
+      : normalizedStatus === 'pending'
+        ? t('host_landing_helper_pending_desc')
+        : normalizedStatus === 'revision'
+          ? t('host_landing_helper_revision_desc')
+          : normalizedStatus === 'rejected'
+            ? t('host_landing_helper_rejected_desc')
+            : t('host_landing_helper_apply_desc');
 
   const openLoginIfNeeded = () => {
     if (user) return false;
@@ -81,7 +107,11 @@ export default function HostLandingActionBar({
 
   return (
     <>
-      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        redirectPath="/become-a-host"
+      />
 
       <section className="bg-white">
         <div
@@ -95,6 +125,7 @@ export default function HostLandingActionBar({
             className="flex w-full max-w-[320px] flex-col items-center justify-center gap-2"
           >
             <button
+              data-testid="host-landing-primary-cta"
               type="button"
               onClick={handlePrimaryClick}
               disabled={isLoading}
@@ -102,6 +133,17 @@ export default function HostLandingActionBar({
             >
               {primaryLabel}
             </button>
+            <div
+              data-testid="host-landing-status-hint"
+              className="w-full rounded-2xl border border-[#E7E7E7] bg-[#FAFAFA] px-4 py-3 text-left"
+            >
+              <p className="text-[12px] font-semibold tracking-[-0.01em] text-[#2F2F2F]">
+                {helperTitle}
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-[#6B7280]">
+                {helperDesc}
+              </p>
+            </div>
           </div>
         </div>
       </section>

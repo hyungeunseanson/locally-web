@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.83 — [Host Landing] 지원 CTA와 상태 분기 안내 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 호스트 랜딩 CTA 상태별 안내 추가 | `app/become-a-host2/HostLandingActionBar.tsx`, `app/context/LanguageContext.tsx` — `비로그인 / 첫 지원 / 검토중 / 보완 요청 / 반려 / 승인 완료` 상태에 따라 CTA 아래 helper box를 다르게 보여주고, 지금 무엇을 해야 하는지 더 바로 읽히게 정리 |
+| 🟠 호스트 랜딩 로그인 복귀 경로 고정 | `app/become-a-host2/HostLandingActionBar.tsx` — 랜딩 CTA로 로그인 모달을 열었을 때, 로그인 후 다시 `/become-a-host`로 돌아와 지원을 이어서 시작할 수 있게 연결 |
+| 🟡 호스트 랜딩 진입 회귀 체크 추가 | `tests/e2e/109-host-landing-guidance.spec.ts` — 비로그인 랜딩에서 상태 힌트가 보이고, CTA 클릭 후 로그인 모달에 복귀 안내가 실제로 뜨는지 얇은 Playwright 체크를 추가 |
+
 ## v3.39.82 — [Login Flow] 소셜 복귀 경로 및 첫 진입 안내 보강
 
 | 항목 | 내용 |
