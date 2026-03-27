@@ -532,7 +532,7 @@ test.describe.serial('guest trips completed sync route', () => {
     await expect(page.getByText('예약 2명').last()).toBeVisible();
 
     await page.getByTestId(`guest-trip-menu-button-${bookingId}`).last().click();
-    await page.getByRole('button', { name: /취소 요청/ }).click();
+    await page.getByTestId(`guest-trip-cancel-button-${bookingId}`).click();
 
     const cancelModal = page.locator('div.fixed.inset-0.z-50').filter({
       hasText: /예약 취소 요청|취소 규정 요약/,

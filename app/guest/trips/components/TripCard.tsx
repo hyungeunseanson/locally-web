@@ -304,13 +304,18 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
 
                       {!isCancelledBookingStatus(trip.status || '') && !isReviewPending ? (
                         <button
+                          data-testid={`guest-trip-cancel-button-${trip.id}`}
                           onClick={handleCancelClick} // 🟢 클릭 시 환불 계산 후 모달 오픈
                           className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-red-50 text-red-500 font-medium"
                         >
                           {t('trip_cancel_req')} {/* 🟢 교체 */}
                         </button>
                       ) : (
-                        <button disabled className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed">
+                        <button
+                          data-testid={`guest-trip-cancel-disabled-${trip.id}`}
+                          disabled
+                          className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed"
+                        >
                           {isReviewPending
                             ? t('trip_status_review_pending')
                             : (trip.status || '').toLowerCase() === 'cancellation_requested'
