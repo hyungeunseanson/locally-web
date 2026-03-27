@@ -5,6 +5,15 @@
 
 ---
 
+## v3.39.84 — [Guest Messaging] 예약 후 메시지함/알림 연결 안내 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 예약 카드 메시지 후속 안내 추가 | `app/guest/trips/components/TripCard.tsx`, `app/context/LanguageContext.tsx` — 게스트 예약 카드에 `일정 조율이나 사전 문의는 메시지함에서 계속 이어진다`는 안내를 추가해, 예약 직후 호스트와 어디서 다시 대화하는지 더 분명하게 정리 |
+| 🟠 게스트 메시지함 안내 strip / 빈 상태 보강 | `app/guest/inbox/page.tsx`, `app/context/LanguageContext.tsx` — 목록 상단에 `호스트 답변과 고객센터 답변이 모두 이 메시지함으로 이어진다`는 strip를 추가하고, 빈 상태에는 고객센터 답변도 같은 메시지함으로 도착한다는 설명을 보강 |
+| 🟠 알림 센터에서 메시지함 연결 강화 | `app/notifications/page.tsx`, `app/context/LanguageContext.tsx` — 게스트 알림 센터 상단에 `자세한 대화는 메시지함에서 이어서 확인` 안내와 `메시지함 보기` CTA를 추가하고, 빈 상태에도 `메시지함 보기 / 도움말 보기` CTA를 함께 노출 |
+| 🟡 게스트 메시지 안내 회귀 체크 추가 | `tests/e2e/95-guest-inbox-empty-state.spec.ts`, `tests/e2e/110-guest-notifications-guidance.spec.ts` — 메시지함 상단 안내 strip, 고객센터 답변 설명, 알림 센터의 메시지함 CTA가 실제로 보이는지 얇은 Playwright 체크를 추가 |
+
 ## v3.39.83 — [Host Landing] 지원 CTA와 상태 분기 안내 보강
 
 | 항목 | 내용 |

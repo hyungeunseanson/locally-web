@@ -165,6 +165,25 @@ export default function NotificationsPage() {
           </div>
         </div>
 
+        {!isHostNotifications && (
+          <div
+            data-testid="notifications-guidance-strip"
+            className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between"
+          >
+            <div>
+              <p className="text-[11px] font-bold text-slate-800 md:text-[12px]">{t('noti_guest_inbox_notice_title')}</p>
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">{t('noti_guest_inbox_notice_desc')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/guest/inbox')}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-bold text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+            >
+              {t('noti_empty_cta_inbox')}
+            </button>
+          </div>
+        )}
+
         <div className="flex justify-end mb-3">
           <button
             onClick={markAllAsRead}
@@ -179,19 +198,30 @@ export default function NotificationsPage() {
           {isLoading ? (
             [1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)
           ) : filteredList.length === 0 ? (
-            <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50">
+            <div data-testid="notifications-empty-state" className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50">
               <Bell size={28} className="mx-auto text-slate-300 mb-2" />
               <h3 className="text-[13px] font-bold text-slate-400">{t('noti_empty_title')}</h3>
               <p className="text-slate-400 text-[11px] mt-0.5">
                 {filter === 'unread' ? t('noti_empty_unread') : t('noti_empty_all')}
               </p>
-              <button
-                type="button"
-                onClick={() => router.push('/help')}
-                className="mt-4 inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-bold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
-              >
-                {t('noti_empty_cta_help')}
-              </button>
+              <div className="mt-4 flex flex-col items-center justify-center gap-2 sm:flex-row">
+                {!isHostNotifications && (
+                  <button
+                    type="button"
+                    onClick={() => router.push('/guest/inbox')}
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-bold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                  >
+                    {t('noti_empty_cta_inbox')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => router.push('/help')}
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-bold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                >
+                  {t('noti_empty_cta_help')}
+                </button>
+              </div>
             </div>
           ) : (
             filteredList.map((noti, idx) => {

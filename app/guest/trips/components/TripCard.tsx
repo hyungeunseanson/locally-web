@@ -381,6 +381,11 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                 </div>
               </div>
             )}
+
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] md:text-[11px] leading-5 text-slate-600">
+              <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <p>{t('trip_message_hint')}</p>
+            </div>
           </div>
 
           {/* 하단 3버튼 */}

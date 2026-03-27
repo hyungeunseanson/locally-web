@@ -42,9 +42,9 @@ function getAdminClient() {
 function createUser(prefix: string): TestUser {
   const timestamp = Date.now();
   return {
-    email: `codex.guest.inbox.empty.${prefix}.${timestamp}@example.com`,
+    email: `codex.guest.notifications.${prefix}.${timestamp}@example.com`,
     password: TEST_PASSWORD,
-    fullName: `Guest Inbox Empty ${prefix} ${timestamp}`,
+    fullName: `Guest Notifications ${prefix} ${timestamp}`,
     phone: `010${String(timestamp).slice(-8)}`,
   };
 }
@@ -111,7 +111,7 @@ test.afterAll(async () => {
   }
 });
 
-test('guest inbox empty state shows helpful CTAs', async ({ page }) => {
+test('guest notifications explain inbox follow-up and show self-service CTAs', async ({ page }) => {
   const guest = createUser('guest');
   await createAuthUser(guest);
 
@@ -121,16 +121,14 @@ test('guest inbox empty state shows helpful CTAs', async ({ page }) => {
   });
 
   await login(page, guest);
-  await page.goto('/guest/inbox', { waitUntil: 'domcontentloaded' });
+  await page.goto('/notifications', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByTestId('guest-inbox-guidance-strip')).toContainText('예약 후 답변은 여기서 이어집니다');
-  await expect(page.getByTestId('guest-inbox-guidance-strip')).toContainText('호스트 답변과 고객센터 답변을 같은 메시지함에서 확인할 수 있어요.');
+  const strip = page.getByTestId('notifications-guidance-strip');
+  await expect(strip).toBeVisible();
+  await expect(strip.getByRole('button', { name: '메시지함 보기' })).toBeVisible();
 
-  const emptyState = page.getByTestId('guest-inbox-empty-state');
+  const emptyState = page.getByTestId('notifications-empty-state');
   await expect(emptyState).toBeVisible();
-  await expect(emptyState.getByText('아직 대화가 없습니다')).toBeVisible();
-  await expect(emptyState.getByText('예약 후 호스트와 메시지를 주고받거나 고객센터에 문의할 수 있습니다.')).toBeVisible();
-  await expect(emptyState.getByText('고객센터에 남긴 문의 답변도 이 메시지함으로 도착합니다.')).toBeVisible();
-  await expect(emptyState.getByRole('link', { name: '예약 내역 보러 가기' })).toHaveAttribute('href', '/guest/trips');
-  await expect(emptyState.getByRole('link', { name: '고객센터 문의하기' })).toHaveAttribute('href', '/help');
+  await expect(emptyState.getByRole('button', { name: '메시지함 보기' })).toBeVisible();
+  await expect(emptyState.getByRole('button', { name: '도움말 보기' })).toBeVisible();
 });

@@ -339,6 +339,14 @@ function InboxContent() {
             <span className="font-bold text-[16px] text-slate-800">{t('msg_list')}</span>
           </div>
 
+          <div
+            data-testid="guest-inbox-guidance-strip"
+            className="shrink-0 border-b border-slate-100 bg-slate-50 px-4 py-3 md:px-5"
+          >
+            <p className="text-[11px] font-bold text-slate-800 md:text-[12px]">{t('guest_inbox_notice_title')}</p>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">{t('guest_inbox_notice_desc')}</p>
+          </div>
+
           {/* 목록 스크롤 */}
           <div className="flex-1 overflow-y-auto">
             {inquiries.length === 0 && (
@@ -349,6 +357,7 @@ function InboxContent() {
                   </div>
                   <h2 className="mt-4 text-[16px] font-bold text-slate-900">{t('guest_inbox_empty_title')}</h2>
                   <p className="mt-2 text-[13px] leading-6 text-slate-500">{t('guest_inbox_empty_desc')}</p>
+                  <p className="mt-2 text-[12px] leading-6 text-slate-400">{t('guest_inbox_empty_followup')}</p>
                   <div className="mt-5 flex flex-col gap-2.5">
                     <Link
                       href="/guest/trips"
