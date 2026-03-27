@@ -150,6 +150,10 @@ function GuideExampleCard({ title, items }: { title: string; items: string[] }) 
   );
 }
 
+function normalizeListItem(value: string) {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
 export default function ExperienceFormSteps({
   step,
   formData,
@@ -177,6 +181,16 @@ export default function ExperienceFormSteps({
   const copy = getExperienceFormCopy(lang);
   const manualLocales = getManualLocalesFromLanguageLevels(formData.language_levels || []);
   const selectedLanguageOptions = EXPERIENCE_LANGUAGE_OPTIONS.filter((option) => manualLocales.includes(option.code));
+  const normalizedTempInclusion = normalizeListItem(tempInclusion);
+  const normalizedTempExclusion = normalizeListItem(tempExclusion);
+  const trimmedSupplies = formData.supplies.trim();
+  const inclusionLooksShort = normalizedTempInclusion.length > 0 && normalizedTempInclusion.length < 2;
+  const inclusionLooksDuplicate = normalizedTempInclusion.length >= 2 && formData.inclusions.some((item: string) => normalizeListItem(item).toLocaleLowerCase() === normalizedTempInclusion.toLocaleLowerCase());
+  const exclusionLooksShort = normalizedTempExclusion.length > 0 && normalizedTempExclusion.length < 2;
+  const exclusionLooksDuplicate = normalizedTempExclusion.length >= 2 && formData.exclusions.some((item: string) => normalizeListItem(item).toLocaleLowerCase() === normalizedTempExclusion.toLocaleLowerCase());
+  const suppliesLooksShort = trimmedSupplies.length > 0 && trimmedSupplies.length < 4;
+  const priceMissing = !Number(formData.price) || Number(formData.price) <= 0;
+  const privatePriceMissing = Boolean(formData.is_private_enabled) && (!Number(formData.private_price) || Number(formData.private_price) <= 0);
   const categoryIconMap: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
     utensils: Utensils,
     coffee: Coffee,
@@ -583,6 +597,8 @@ export default function ExperienceFormSteps({
                 <Plus size={20} />
               </button>
             </div>
+            {inclusionLooksShort && <FieldHint className="mb-3 ml-0 text-amber-600">{copy.validationInclusionItemQuality}</FieldHint>}
+            {!inclusionLooksShort && inclusionLooksDuplicate && <FieldHint className="mb-3 ml-0 text-amber-600">{copy.validationDuplicateListItem}</FieldHint>}
             <div className="flex flex-wrap gap-2">
               {formData.inclusions.map((item: string, i: number) => (
                 <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-100">
@@ -616,6 +632,8 @@ export default function ExperienceFormSteps({
                 <Plus size={20} />
               </button>
             </div>
+            {exclusionLooksShort && <FieldHint className="mb-3 ml-0 text-amber-600">{copy.validationExclusionItemQuality}</FieldHint>}
+            {!exclusionLooksShort && exclusionLooksDuplicate && <FieldHint className="mb-3 ml-0 text-amber-600">{copy.validationDuplicateListItem}</FieldHint>}
             <div className="flex flex-wrap gap-2">
               {formData.exclusions.map((item: string, i: number) => (
                 <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
@@ -637,6 +655,7 @@ export default function ExperienceFormSteps({
               onChange={(e) => updateData('supplies', e.target.value)}
               className="w-full p-4 h-24 bg-slate-50 rounded-2xl outline-none resize-none text-sm border border-slate-200 focus:border-black"
             />
+            {suppliesLooksShort && <FieldHint className="ml-0 text-amber-600">{copy.validationSuppliesQuality}</FieldHint>}
           </div>
         </div>
       </div>
@@ -762,6 +781,7 @@ export default function ExperienceFormSteps({
               />
             </div>
             <FieldHint className="text-center ml-0 mt-2">{copy.priceHelp}</FieldHint>
+            {priceMissing && <FieldHint className="text-center ml-0 text-amber-600">{copy.validationPrice}</FieldHint>}
             <HelpDisclosure title={copy.pricingGuideTitle} className="mt-4 text-left">
               <p>{copy.pricingGuideBody}</p>
               <GuideExampleCard title={copy.pricingGuideExamplesTitle} items={copy.pricingGuideExamples} />
@@ -803,6 +823,7 @@ export default function ExperienceFormSteps({
                     placeholder={copy.privatePricePlaceholder}
                   />
                 </div>
+                {privatePriceMissing && <FieldHint className="ml-0 mt-2 text-amber-600">{copy.validationPrivatePrice}</FieldHint>}
               </div>
             )}
           </div>

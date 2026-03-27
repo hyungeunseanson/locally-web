@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.68 — [Host Onboarding UX] 입력 중 품질 가이드 조기 노출
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 호스트 등록 계좌/지원 동기 inline 경고 추가 | `app/host/register/components/HostRegisterForm.tsx`, `app/host/register/localization.ts` — 정산 계좌 step에서 은행명/계좌번호/예금주가 너무 짧으면 입력칸 아래에서 바로 경고를 보여주고, 계좌번호는 숫자만 남기도록 정리. 지원 동기 step에서도 너무 짧은 경우와 충분히 구체적인 경우를 입력 중 바로 알려줘 마지막 제출 단계에서 한꺼번에 막히는 답답함을 줄임 |
+| 🟠 체험 등록 step 5/7 inline 품질 안내 보강 | `app/host/create/components/ExperienceFormSteps.tsx`, `tests/e2e/93-host-create-copy-layout.spec.ts` — 포함/불포함 임시 입력이 너무 짧거나 중복될 때, 준비물이 지나치게 짧을 때, 가격이 비어 있을 때를 입력칸 바로 아래에서 더 구체적으로 안내하도록 정리하고, 낮은 품질 입력에서 경고가 실제로 보이는지 얇은 회귀 체크를 추가 |
+
 ## v3.39.67 — [Host Create / Register] 입력 품질 최소 검증 보강
 
 | 항목 | 내용 |

@@ -167,6 +167,16 @@ export default function HostRegisterForm({
       </React.Fragment>
     ));
 
+  const trimmedBankName = formData.bankName.trim();
+  const normalizedAccountNumber = formData.accountNumber.replace(/\D/g, '');
+  const trimmedAccountHolder = formData.accountHolder.trim();
+  const trimmedMotivation = formData.motivation.trim();
+  const bankNameLooksShort = trimmedBankName.length > 0 && trimmedBankName.length < 2;
+  const accountNumberLooksShort = normalizedAccountNumber.length > 0 && normalizedAccountNumber.length < 8;
+  const accountHolderLooksShort = trimmedAccountHolder.length > 0 && trimmedAccountHolder.length < 2;
+  const motivationLooksShort = trimmedMotivation.length > 0 && trimmedMotivation.length < 20;
+  const motivationLooksReady = trimmedMotivation.length >= 20;
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col">
       {step < totalSteps + 1 && (
@@ -359,16 +369,19 @@ export default function HostRegisterForm({
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.bankNameLabel}</label>
                 <div className="relative"><Building size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder={copy.bankNamePlaceholder} value={formData.bankName} onChange={(e) => updateData('bankName', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
                 <FieldHint>{copy.bankNameHelp}</FieldHint>
+                {bankNameLooksShort && <FieldHint className="text-amber-600">{copy.bankNameInlineShort}</FieldHint>}
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.accountNumberLabel}</label>
-                <div className="relative"><CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="tel" placeholder={copy.accountNumberPlaceholder} value={formData.accountNumber} onChange={(e) => updateData('accountNumber', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
+                <div className="relative"><CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="tel" placeholder={copy.accountNumberPlaceholder} value={formData.accountNumber} onChange={(e) => updateData('accountNumber', e.target.value.replace(/\D/g, ''))} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
                 <FieldHint>{copy.accountNumberHelp}</FieldHint>
+                {accountNumberLooksShort && <FieldHint className="text-amber-600">{copy.accountNumberInlineShort}</FieldHint>}
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.accountHolderLabel}</label>
                 <div className="relative"><User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder={copy.accountHolderPlaceholder} value={formData.accountHolder} onChange={(e) => updateData('accountHolder', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
                 <FieldHint>{copy.accountHolderHelp}</FieldHint>
+                {accountHolderLooksShort && <FieldHint className="text-amber-600">{copy.accountHolderInlineShort}</FieldHint>}
               </div>
             </div>
           </div>
@@ -383,6 +396,8 @@ export default function HostRegisterForm({
             </div>
             <FieldHint className="text-center ml-0">{copy.motivationHelp}</FieldHint>
             <textarea placeholder={copy.motivationPlaceholder} value={formData.motivation} onChange={(e) => updateData('motivation', e.target.value)} className="w-full p-5 h-48 bg-slate-50 rounded-2xl outline-none text-sm resize-none border border-slate-200 focus:border-black transition-all" />
+            {motivationLooksShort && <FieldHint className="text-center ml-0 text-amber-600">{copy.motivationInlineShort}</FieldHint>}
+            {motivationLooksReady && <FieldHint className="text-center ml-0 text-green-600">{copy.motivationInlineReady}</FieldHint>}
             <HelpDisclosure title={copy.motivationGuideTitle}>
               <p>{copy.motivationGuideBody}</p>
             </HelpDisclosure>

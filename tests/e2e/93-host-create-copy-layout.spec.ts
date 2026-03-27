@@ -267,6 +267,12 @@ test('host create shows structured primary language guidance and refund policy c
   const inclusionInput = page.locator(
     'input[placeholder="예) 음료"], input[placeholder="e.g. Drink"], input[placeholder="例）ドリンク"], input[placeholder="例如：饮品"]'
   );
+  await inclusionInput.fill('a');
+  await expect(
+    page.getByText(
+      /포함 사항은 두 글자 이상으로 구체적으로 입력해주세요\.|Make each inclusion specific and at least 2 characters long\.|含まれるものは2文字以上で具体的に入力してください。|包含内容请至少填写2个字并尽量具体。/
+    )
+  ).toBeVisible();
   await inclusionInput.fill('Welcome drink');
   await inclusionInput.press('Enter');
 
@@ -305,4 +311,13 @@ test('host create shows structured primary language guidance and refund policy c
       /게스트가 경험의 가치를 이해할 수 있도록 포함 항목과 함께 생각해주세요\.|Think about price together with duration, inclusions, and the value guests will feel\.|所要時間、含まれる内容、ゲストが感じる価値を一緒に考えて価格を決めてください。|请结合时长、包含内容和游客能感受到的价值来考虑价格。/
     )
   ).toBeVisible();
+
+  const basePriceInput = page.locator('input[inputmode="numeric"]').first();
+  await basePriceInput.fill('');
+  await expect(
+    page.getByText(
+      /기본 가격을 올바르게 입력해주세요\.|Enter a valid base price\.|基本価格を正しく入力してください。|请输入正确的基础价格。/
+    )
+  ).toBeVisible();
+  await basePriceInput.fill('50000');
 });

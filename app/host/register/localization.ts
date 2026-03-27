@@ -70,18 +70,23 @@ type HostRegisterCopy = {
   bankNameLabel: string;
   bankNamePlaceholder: string;
   bankNameHelp: string;
+  bankNameInlineShort: string;
   accountNumberLabel: string;
   accountNumberPlaceholder: string;
   accountNumberHelp: string;
+  accountNumberInlineShort: string;
   accountHolderLabel: string;
   accountHolderPlaceholder: string;
   accountHolderHelp: string;
+  accountHolderInlineShort: string;
   payoutGuideTitle: string;
   payoutGuideBody: string;
   step7Badge: string;
   step7Title: string;
   step7Desc: string;
   motivationHelp: string;
+  motivationInlineShort: string;
+  motivationInlineReady: string;
   motivationGuideTitle: string;
   motivationGuideBody: string;
   motivationPlaceholder: string;
@@ -205,18 +210,23 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     bankNameLabel: '은행명',
     bankNamePlaceholder: '예) 카카오뱅크, 신한은행',
     bankNameHelp: '정산 지급에 사용됩니다. 오입력 시 정산이 지연될 수 있습니다.',
+    bankNameInlineShort: '은행명을 조금 더 정확하게 적어주세요.',
     accountNumberLabel: '계좌번호',
     accountNumberPlaceholder: '- 없이 숫자만 입력',
     accountNumberHelp: '숫자만 정확히 입력해주세요. 잘못 입력하면 재확인이 필요할 수 있습니다.',
+    accountNumberInlineShort: '계좌번호가 너무 짧아요. 숫자를 다시 확인해주세요.',
     accountHolderLabel: '예금주',
     accountHolderPlaceholder: '본인 실명',
     accountHolderHelp: '신분증과 동일한 본인 실명으로 입력해주세요.',
+    accountHolderInlineShort: '예금주명은 신분증과 같은 실명으로 입력해주세요.',
     payoutGuideTitle: '정산 계좌 입력 전 확인해주세요',
     payoutGuideBody: '계좌 정보는 수익 정산에 바로 연결됩니다. 은행명, 계좌번호, 예금주가 실제 정보와 다르면 지급이 지연될 수 있어요. 본인 명의 계좌를 정확히 입력하는 것이 가장 중요합니다.',
     step7Badge: 'Step 7. 신청 사유',
     step7Title: '마지막 질문입니다!',
     step7Desc: '로컬리 호스트가 되고 싶은 이유를 적어주세요.',
     motivationHelp: '어떤 게스트에게 어떤 경험을 주고 싶은지 구체적으로 적어주시면 검토에 도움이 됩니다.',
+    motivationInlineShort: '지원 동기가 아직 짧아요. 어떤 게스트에게 어떤 경험을 주고 싶은지 한두 문장 더 적어주세요.',
+    motivationInlineReady: '좋아요. 이 정도면 왜 호스트가 되고 싶은지 더 잘 전달됩니다.',
     motivationGuideTitle: '좋은 신청 사유 예시',
     motivationGuideBody: '단순히 “외국인을 만나보고 싶어서”보다, 내가 잘 안내할 수 있는 지역이나 주제, 어떤 게스트에게 어떤 시간을 만들어주고 싶은지까지 적어주시면 훨씬 설득력이 높아집니다.',
     motivationPlaceholder: '예) 외국인 친구들과 교류하는 것을 좋아해서 지원하게 되었습니다.',
@@ -348,18 +358,23 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     bankNameLabel: 'Bank name',
     bankNamePlaceholder: 'e.g. KakaoBank, Shinhan Bank',
     bankNameHelp: 'This is used for payouts. Incorrect details can delay your settlement.',
+    bankNameInlineShort: 'Please enter the bank name a little more clearly.',
     accountNumberLabel: 'Account number',
     accountNumberPlaceholder: 'Numbers only, no dashes',
     accountNumberHelp: 'Please enter the number exactly. Mistakes may require manual re-checking.',
+    accountNumberInlineShort: 'This account number looks too short. Please check the digits again.',
     accountHolderLabel: 'Account holder',
     accountHolderPlaceholder: 'Your legal name',
     accountHolderHelp: 'Please use the same legal name shown on your ID.',
+    accountHolderInlineShort: 'Please enter the account holder name exactly as shown on your ID.',
     payoutGuideTitle: 'Before you enter your payout account',
     payoutGuideBody: 'Your bank details are directly tied to settlement. If the bank name, account number, or account holder is incorrect, payouts can be delayed. An account in your own name is the safest option.',
     step7Badge: 'Step 7. Motivation',
     step7Title: 'One last question!',
     step7Desc: 'Tell us why you want to become a Locally host.',
     motivationHelp: 'Specific answers about the guests you want to host and the experience you want to create help with review.',
+    motivationInlineShort: 'Your reason is still a bit short. Add one or two more sentences about the guests you want to host and the experience you want to create.',
+    motivationInlineReady: 'Good. This already explains your hosting motivation much more clearly.',
     motivationGuideTitle: 'A stronger example',
     motivationGuideBody: 'Instead of only saying you want to meet travelers, explain what neighborhood or topic you can guide well, and what kind of time you want your guests to have. Specific motivations are much more convincing.',
     motivationPlaceholder: 'e.g. I love meeting international travelers and sharing local spots.',
@@ -491,18 +506,23 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     bankNameLabel: '銀行名',
     bankNamePlaceholder: '例）楽天銀行、三井住友銀行',
     bankNameHelp: '精算金の支払いに使われます。誤入力があると精算が遅れることがあります。',
+    bankNameInlineShort: '銀行名をもう少し正確に入力してください。',
     accountNumberLabel: '口座番号',
     accountNumberPlaceholder: 'ハイフンなしの数字のみ',
     accountNumberHelp: '数字のみ正確に入力してください。誤りがあると再確認が必要になる場合があります。',
+    accountNumberInlineShort: '口座番号が短すぎるようです。数字をもう一度確認してください。',
     accountHolderLabel: '口座名義',
     accountHolderPlaceholder: '本人の実名',
     accountHolderHelp: '身分証と同じ本人の実名を入力してください。',
+    accountHolderInlineShort: '口座名義は身分証と同じ実名で入力してください。',
     payoutGuideTitle: '口座入力の前にご確認ください',
     payoutGuideBody: '口座情報は収益精算に直接使われます。銀行名、口座番号、名義が実際の情報と異なると支払いが遅れることがあります。本人名義の口座を正確に入力することが重要です。',
     step7Badge: 'Step 7. 応募理由',
     step7Title: '最後の質問です！',
     step7Desc: 'Locally ホストになりたい理由を書いてください。',
     motivationHelp: 'どんなゲストにどんな体験を届けたいのかを具体的に書くと、審査に役立ちます。',
+    motivationInlineShort: '応募理由がまだ少し短いです。どんなゲストにどんな体験を届けたいのかをもう一、二文足してください。',
+    motivationInlineReady: '良い内容です。ホストになりたい理由がより伝わりやすくなっています。',
     motivationGuideTitle: '良い応募理由の例',
     motivationGuideBody: '単に「旅行者と交流したい」だけでなく、自分が案内しやすい地域やテーマ、どんな時間を作りたいかまで書くと、ずっと説得力が高まります。',
     motivationPlaceholder: '例）海外から来る旅行者と交流し、地元の魅力を紹介したいからです。',
@@ -634,18 +654,23 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     bankNameLabel: '银行名称',
     bankNamePlaceholder: '例如：KakaoBank、Shinhan Bank',
     bankNameHelp: '用于结算打款。若信息有误，结算可能会延迟。',
+    bankNameInlineShort: '请把银行名称写得更准确一些。',
     accountNumberLabel: '账号',
     accountNumberPlaceholder: '仅输入数字，不含连字符',
     accountNumberHelp: '请准确输入数字。若填写错误，可能需要人工再次确认。',
+    accountNumberInlineShort: '账号看起来有点短，请再确认一下数字。',
     accountHolderLabel: '账户持有人',
     accountHolderPlaceholder: '本人实名',
     accountHolderHelp: '请填写与证件一致的本人实名。',
+    accountHolderInlineShort: '账户姓名请填写与证件一致的实名。',
     payoutGuideTitle: '填写收款账户前请先确认',
     payoutGuideBody: '账户信息会直接用于收益结算。若银行名、账号或户名与实际不一致，打款可能延迟。最重要的是使用本人名义并准确填写。',
     step7Badge: 'Step 7. 申请理由',
     step7Title: '最后一个问题！',
     step7Desc: '请写下你想成为 Locally 房东的原因。',
     motivationHelp: '如果能具体写出你想接待什么样的游客、想带来什么样的体验，会更有助于审核。',
+    motivationInlineShort: '申请理由还有点短。请再补充一两句，说明你想接待什么样的游客、想带来什么样的体验。',
+    motivationInlineReady: '很好，这样已经能更清楚地表达你为什么想成为房东。',
     motivationGuideTitle: '更好的申请理由示例',
     motivationGuideBody: '不要只写“想认识外国游客”，也建议写出你擅长带领的地区或主题，以及你希望游客获得什么样的感受。越具体，越有说服力。',
     motivationPlaceholder: '例如：我喜欢与外国游客交流，并介绍本地独特的地方。',
