@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.85 — [Guest Cancellation] 취소/환불 self-service 안내 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 취소 모달 결과 확인 경로 보강 | `app/guest/trips/components/CancellationModal.tsx`, `app/context/LanguageContext.tsx` — 취소 사유 선택 아래에 `결과는 예약 내역과 알림에서 다시 확인` 안내 box를 추가하고, 운영 검토형 사유는 `검토 결과도 알림으로 안내`된다는 점을 분리해서 보여주도록 정리 |
+| 🟠 입금 안내 모달 후속 행동 보강 | `app/guest/trips/components/ReceiptModal.tsx`, `app/context/LanguageContext.tsx` — 입금 대기 영수증에 `입금 확인 후 예약 내역과 알림에서 상태가 바뀐다`는 설명과 `고객센터 문의하기` CTA를 추가해, 계속 pending일 때 self-service 경로를 더 가깝게 배치 |
+| 🟡 게스트 취소/입금 안내 회귀 체크 보강 | `tests/e2e/57-guest-trips-sync-completed.spec.ts` — 취소 모달의 새 follow-up 안내와 pending 영수증의 고객센터 CTA가 실제로 노출되는지 검증하는 로컬 Playwright 체크를 추가 |
+
 ## v3.39.84 — [Guest Messaging] 예약 후 메시지함/알림 연결 안내 보강
 
 | 항목 | 내용 |

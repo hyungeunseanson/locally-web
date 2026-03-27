@@ -42,6 +42,12 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
     }
     : refundInfo;
   const reasonRequired = isOtherReason;
+  const followupTitle = isReviewReason
+    ? t('modal_cancel_followup_review_title')
+    : t('modal_cancel_followup_title');
+  const followupDesc = isReviewReason
+    ? t('modal_cancel_followup_review_desc')
+    : t('modal_cancel_followup_desc');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-4">
@@ -118,6 +124,18 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
+          </div>
+
+          <div
+            data-testid="guest-trip-cancel-followup"
+            className={`rounded-lg border px-3.5 py-3 text-left ${isReviewReason ? 'border-orange-100 bg-orange-50' : 'border-slate-200 bg-slate-50'}`}
+          >
+            <p className={`text-[11px] md:text-xs font-bold ${isReviewReason ? 'text-orange-800' : 'text-slate-700'}`}>
+              {followupTitle}
+            </p>
+            <p className={`mt-1 text-[11px] leading-5 ${isReviewReason ? 'text-orange-700' : 'text-slate-500'}`}>
+              {followupDesc}
+            </p>
           </div>
 
           <button

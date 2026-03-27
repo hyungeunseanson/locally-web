@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { X, Download, CheckCircle2, Clock } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
@@ -48,7 +49,7 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-sm rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative">
+      <div className="bg-white w-full max-w-sm rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200">
         <div className="bg-slate-900 p-4 md:p-6 text-white text-center relative">
           <button onClick={onClose} className="absolute top-3 md:top-4 right-3 md:right-4 p-1.5 md:p-2 bg-white/10 rounded-full hover:bg-white/20"><X className="w-4 h-4 md:w-[18px] md:h-[18px]"/></button>
           <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center mx-auto mb-2.5 md:mb-3 shadow-lg ${isPending ? 'bg-amber-400' : 'bg-green-500'}`}>
@@ -98,6 +99,20 @@ export default function ReceiptModal({ trip, onClose }: { trip: ReceiptTrip, onC
                 </div>
                 <p className="text-[10px] md:text-[11px] text-slate-600">{t('pay_complete_bank_account_holder_label')}: {bankInfo.accountHolder}</p>
                 <p className="mt-1 text-[10px] md:text-[11px] font-semibold text-rose-500">{t('pay_complete_bank_timeout_hint')}</p>
+              </div>
+              <div
+                data-testid="guest-trip-receipt-pending-followup"
+                className="rounded-lg border border-amber-100 bg-white px-3 py-2.5"
+              >
+                <p className="text-[10px] md:text-[11px] leading-relaxed text-slate-600">
+                  {t('receipt_pending_followup')}
+                </p>
+                <Link
+                  href="/help"
+                  className="mt-2 inline-flex text-[10px] md:text-[11px] font-bold text-amber-800 underline underline-offset-2 transition-colors hover:text-amber-900"
+                >
+                  {t('receipt_pending_support_cta')}
+                </Link>
               </div>
             </div>
           )}

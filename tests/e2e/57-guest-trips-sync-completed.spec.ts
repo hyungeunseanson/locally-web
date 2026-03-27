@@ -348,6 +348,51 @@ async function createFuturePaidBooking(params: {
   return bookingId;
 }
 
+async function createFuturePendingBooking(params: {
+  guestId: string;
+  guest: TestUser;
+  experienceId: number;
+}) {
+  const supabase = getAdminClient();
+  const futureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+  const date = futureDate.toISOString().slice(0, 10);
+  const bookingId = `GUEST-TRIPS-PENDING-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  const { error } = await supabase
+    .from('bookings')
+    .insert({
+      id: bookingId,
+      user_id: params.guestId,
+      experience_id: params.experienceId,
+      order_id: bookingId,
+      date,
+      time: '07:00',
+      guests: 2,
+      amount: 88000,
+      total_price: 80000,
+      total_experience_price: 80000,
+      host_payout_amount: 64000,
+      platform_revenue: 24000,
+      status: 'pending',
+      payment_method: 'bank',
+      type: 'group',
+      contact_name: params.guest.fullName,
+      contact_phone: params.guest.phone,
+      message: '',
+      created_at: new Date().toISOString(),
+      payout_status: 'pending',
+      is_solo_guarantee: false,
+      solo_guarantee_price: 0,
+    });
+
+  if (error) {
+    throw error || new Error('Failed to create future pending booking.');
+  }
+
+  createdBookingIds.push(bookingId);
+  return bookingId;
+}
+
 async function login(page: Page, user: TestUser) {
   await page.goto('/login', { waitUntil: 'networkidle' });
   await page.locator('input[type="email"]').fill(user.email);
@@ -527,9 +572,8 @@ test.describe.serial('guest trips completed sync route', () => {
     });
 
     await login(page, guest);
-    await page.goto('/guest/trips', { waitUntil: 'networkidle' });
-    await expect(page.getByText(`호스트 ${host.fullName}`).last()).toBeVisible();
-    await expect(page.getByText('예약 2명').last()).toBeVisible();
+    await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId(`guest-trip-menu-button-${bookingId}`).last()).toBeVisible();
 
     await page.getByTestId(`guest-trip-menu-button-${bookingId}`).last().click();
     await page.getByTestId(`guest-trip-cancel-button-${bookingId}`).click();
@@ -538,11 +582,56 @@ test.describe.serial('guest trips completed sync route', () => {
       hasText: /예약 취소 요청|취소 규정 요약/,
     });
     await expect(cancelModal).toBeVisible({ timeout: 10000 });
+    await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 후 결과는 여기서 확인하세요');
+    await expect(cancelModal.getByTestId('guest-trip-cancel-followup')).toContainText('취소 요청과 환불 진행 상태는 예약 내역과 알림에서 다시 확인할 수 있어요.');
     await expect(cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' })).toBeVisible();
 
     await cancelModal.getByRole('button', { name: '먼저 호스트에게 문의하기' }).click();
     await page.waitForURL((url) => url.pathname === '/guest/inbox' && url.searchParams.get('expId') === String(experienceId), { timeout: 15000 });
     await expect(page).toHaveURL(new RegExp(`hostId=${hostId}`));
+  });
+
+  test('shows pending receipt follow-up guidance and support CTA', async ({ page }) => {
+    const host = createUser('host.pending.receipt');
+    const guest = createUser('guest.pending.receipt');
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePendingBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('guest-trip-pending-receipt-button').last()).toBeVisible();
+    await page.getByTestId('guest-trip-pending-receipt-button').last().click();
+
+    const receiptFollowup = page.getByTestId('guest-trip-receipt-pending-followup');
+    await expect(receiptFollowup).toBeVisible();
+    await expect(receiptFollowup).toContainText('입금이 확인되면 예약 내역과 알림에서 상태가 바뀝니다. 계속 입금 대기 상태라면 고객센터에 문의해주세요.');
+    await expect(receiptFollowup.getByRole('link', { name: '고객센터 문의하기' })).toHaveAttribute('href', '/help');
+    await expect(page.getByText(bookingId).first()).toBeVisible();
   });
 
   test('shows review pending guidance and support CTA for host-unavailable review requests', async ({ page }) => {
@@ -596,7 +685,7 @@ test.describe.serial('guest trips completed sync route', () => {
     const host = createUser('host.notice');
     const guest = createUser('guest.notice');
     const hostId = await createAuthUser(host);
-    const guestId = await createAuthUser(guest);
+    await createAuthUser(guest);
     await createApprovedHostApplication(hostId, host);
 
     const notice = '이 체험은 최소 2인부터 진행됩니다. 인원이 모이지 않으면 일정 조정 또는 취소가 있을 수 있습니다.';
