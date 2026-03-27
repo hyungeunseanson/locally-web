@@ -5,6 +5,25 @@
 
 ---
 
+## v3.39.80 — [Interaction Polish] 모달/토스트/탭/필터 인터랙션 촉감 개선
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 모달 진입 애니메이션 보강 | `GlobalAnnouncementModal.tsx`, `UserProfileModal.tsx`, `GuestProfileModal.tsx`, `CommunityAuthorModal.tsx`, `ReceiptModal.tsx`, `ChatParticipantProfileModal.tsx` — 애니메이션 없이 나타나던 6개 모달에 `fade-in + zoom-in-95 duration-200` 진입 효과 추가. 커뮤니티 작성자 모달은 모바일에서 `slide-in-from-bottom` 적용 |
+| 🟢 토스트 퇴장 애니메이션 | `ToastContext.tsx` — 토스트가 사라질 때 `opacity-0 + translate-y + scale-95` 300ms 퇴장 효과 추가. 기존에는 즉시 DOM 제거되어 부자연스럽던 부분 해소 |
+| 🟢 검색 필터 칩 터치 피드백 | `search/page.tsx` — 유형/시간대 필터 칩 + 시트 내 타입 필터에 `transition-all duration-150 active:scale-[0.95]` 추가. 결과 보기 버튼에도 `active:scale-[0.97]` 적용 |
+| 🟢 검색 필터 시트 slide-up | `search/page.tsx` — 모바일 하단 필터 시트에 `slide-in-from-bottom-8 duration-300` 진입 + 오버레이 `fade-in` 추가 |
+| 🟢 대시보드 탭 fade-in | `host/dashboard/page.tsx`, `admin/dashboard/page.tsx` — 탭 전환 시 콘텐츠에 `animate-in fade-in duration-200` 키 래퍼 추가. 기존 즉시 교체에서 부드러운 전환으로 |
+| 🟢 헤더 드롭다운 개선 | `SiteHeader.tsx` — 드롭다운 duration 100→150ms 조정 + 메뉴 아이템에 `transition-colors` 추가 |
+
+## v3.39.79 — [Search & Wishlist] 탐색 다음 행동 안내 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 검색 결과/빈 상태의 다음 행동 보강 | `app/search/page.tsx`, `app/context/LanguageContext.tsx` — 검색 결과가 있을 때는 `하트 저장 → 상세에서 날짜/호스트 안내 확인` 흐름을 짧게 안내하는 helper strip를 추가했고, 결과가 없을 때는 `필터 초기화`, `전체 체험 보기` CTA를 바로 노출해 탐색이 끊기지 않도록 정리 |
+| 🟠 위시리스트 상단 비교 가이드 추가 | `app/guest/wishlists/page.tsx`, `app/context/LanguageContext.tsx` — 위시리스트 상단에 `위치·언어·가격을 다시 비교하고 상세에서 날짜와 호스트 안내를 확인`하라는 helper strip와 `체험 더 찾아보기` CTA를 추가해 저장 후 재탐색 흐름을 더 자연스럽게 보강 |
+| 🟡 검색 ingress 스모크 보강 | `tests/e2e/43-guest-search-detail-ingress.spec.ts` — 검색 결과 helper strip와 검색 결과 없음 empty state CTA가 실제로 노출되는지 얇은 회귀 체크를 추가 |
+
 ## v3.39.78 — [Proxy Booking Admin] 운영 판단 가이드 보강
 
 | 항목 | 내용 |

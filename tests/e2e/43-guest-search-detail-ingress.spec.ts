@@ -47,6 +47,14 @@ function getDurationPattern(duration: number) {
   return new RegExp(`${hours}\\s?(hours?|시간|時間|小时)`);
 }
 
+async function dismissAnnouncementIfVisible(page: import('@playwright/test').Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click();
+    await expect(announcement).toHaveCount(0);
+  }
+}
+
 async function getPublicExperienceFixture(): Promise<PublicExperience> {
   const supabase = getAdminClient();
   const { data: approvedHosts, error: approvedHostsError } = await supabase
@@ -93,6 +101,7 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     const durationPattern = getDurationPattern(experience.duration);
 
     await page.goto('/', { waitUntil: 'networkidle' });
+    await dismissAnnouncementIfVisible(page);
 
     const homeSearchInput = page.locator('input[type="text"]').first();
     await expect(homeSearchInput).toBeVisible({ timeout: 15000 });
@@ -120,14 +129,27 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     await page.goto(`/search?location=${encodeURIComponent(experience.title)}`, {
       waitUntil: 'networkidle',
     });
+    await dismissAnnouncementIfVisible(page);
 
     const experienceLink = page.locator(`a[href="/experiences/${experience.id}"]:visible`).first();
     await expect(experienceLink).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('search-flow-hint')).toBeVisible({ timeout: 15000 });
 
     await experienceLink.click();
 
     await page.waitForURL(new RegExp(`/experiences/${experience.id}$`), { timeout: 15000 });
     await expect(page.locator('h1:visible').first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('experience-duration-meta-desktop')).toContainText(durationPattern);
+  });
+
+  test('shows actionable empty state when search has no results', async ({ page }) => {
+    await page.goto(`/search?location=${encodeURIComponent('codex-no-search-result-zzzz')}`, {
+      waitUntil: 'networkidle',
+    });
+    await dismissAnnouncementIfVisible(page);
+
+    await expect(page.getByRole('heading', { name: /이 조건에 맞는 체험이 없어요|No experiences match these filters|この条件に合う体験がありません|没有符合这些条件的体验/ })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /필터 초기화|Clear filters|フィルターを解除|清除筛选/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /전체 체험 보기|Browse all experiences|すべての体験を見る|查看全部体验/ })).toBeVisible();
   });
 });

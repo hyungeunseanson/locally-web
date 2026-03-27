@@ -177,6 +177,11 @@ function SearchResults() {
     }
   };
 
+  const clearAllSearchFilters = () => {
+    setSelectedTimes([]);
+    setSelectedTypes([]);
+  };
+
   const hasSheetSelection =
     activeSheet === 'time'
       ? selectedTimes.length > 0
@@ -257,7 +262,7 @@ function SearchResults() {
           <div className="mt-3 flex items-center justify-center gap-2">
             <button
               onClick={() => setActiveSheet('type')}
-              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap ${
+              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
                 selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >
@@ -266,7 +271,7 @@ function SearchResults() {
             </button>
             <button
               onClick={() => setActiveSheet('time')}
-              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap ${
+              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
                 selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >
@@ -295,7 +300,7 @@ function SearchResults() {
               ))}
             </div>
           ) : experiences.length === 0 ? (
-            <div className="min-h-[66vh] flex flex-col items-center justify-center text-center">
+            <div data-testid="search-empty-state" className="min-h-[66vh] flex flex-col items-center justify-center text-center">
               <div className="relative w-[154px] h-[112px] mb-5">
                 <img
                   src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=480&q=80"
@@ -313,11 +318,30 @@ function SearchResults() {
                   className="absolute top-[24px] left-[60px] w-[98px] h-[70px] object-cover rounded-[12px] rotate-[2deg]"
                 />
               </div>
-              <h3 className="text-[24px] font-bold text-[#212121] leading-tight">일치하는 결과 없음</h3>
-              <p className="mt-2 text-[13px] text-[#7A7A7A] leading-snug">날짜나 위치를 변경해 다시 검색해 보세요.</p>
+              <h3 className="text-[24px] font-bold text-[#212121] leading-tight">{t('search_empty_title')}</h3>
+              <p className="mt-2 text-[13px] text-[#7A7A7A] leading-snug">{t('search_empty_desc')}</p>
+              <div className="mt-5 flex flex-col gap-2 w-full max-w-[220px]">
+                <button
+                  type="button"
+                  onClick={clearAllSearchFilters}
+                  className="h-11 rounded-full border border-[#222] text-[13px] font-semibold text-[#222] bg-white"
+                >
+                  {t('search_empty_clear_filters')}
+                </button>
+                <Link
+                  href="/search"
+                  className="h-11 rounded-full bg-[#222429] text-white text-[13px] font-semibold flex items-center justify-center"
+                >
+                  {t('search_empty_browse_all')}
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-8 pb-6">
+              <div data-testid="search-flow-hint-mobile" className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <p className="text-[13px] font-bold text-[#202020]">{t('search_flow_hint_title')}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-[#6B6B6B]">{t('search_flow_hint_desc')}</p>
+              </div>
               {mobileSections.filter((section) => section.items.length > 0).map((section) => (
                 <section key={section.id}>
                   <h3 className="text-[17px] font-semibold text-[#202020] tracking-[-0.01em] leading-tight mb-3">{section.title}</h3>
@@ -367,16 +391,37 @@ function SearchResults() {
                 ))}
               </div>
             ) : experiences.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+              <div data-testid="search-empty-state" className="flex flex-col items-center justify-center h-full text-center py-20">
                 <Ghost size={48} className="text-slate-300 mb-4" />
-                <h3 className="text-lg font-bold text-slate-900 mb-2">이 조건에 맞는 체험이 없어요</h3>
-                <p className="text-slate-500 text-sm">다른 날짜나 키워드로 검색해보시거나, 메인에서 전체 체험을 둘러보세요.</p>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">{t('search_empty_title')}</h3>
+                <p className="text-slate-500 text-sm">{t('search_empty_desc')}</p>
+                <div className="mt-5 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={clearAllSearchFilters}
+                    className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    {t('search_empty_clear_filters')}
+                  </button>
+                  <Link
+                    href="/search"
+                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-black"
+                  >
+                    {t('search_empty_browse_all')}
+                  </Link>
+                </div>
               </div>
             ) : (
-              <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
-                {experiences.map((item) => (
-                  <ExperienceCard key={item.id} data={item} />
-                ))}
+              <div className="space-y-5">
+                <div data-testid="search-flow-hint" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                  <p className="text-sm font-black text-slate-900">{t('search_flow_hint_title')}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">{t('search_flow_hint_desc')}</p>
+                </div>
+                <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
+                  {experiences.map((item) => (
+                    <ExperienceCard key={item.id} data={item} />
+                  ))}
+                </div>
               </div>
             )}
             <div className="mt-12">
@@ -398,10 +443,10 @@ function SearchResults() {
 
       {activeSheet && (
         <div className="fixed inset-0 z-[190] md:hidden">
-          <button className="absolute inset-0 bg-black/35" onClick={() => setActiveSheet(null)} aria-label="close-overlay" />
+          <button className="absolute inset-0 bg-black/35 animate-in fade-in duration-200" onClick={() => setActiveSheet(null)} aria-label="close-overlay" />
 
           <div
-            className={`absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] shadow-[0_-12px_32px_rgba(0,0,0,0.16)] flex flex-col ${
+            className={`absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] shadow-[0_-12px_32px_rgba(0,0,0,0.16)] flex flex-col animate-in slide-in-from-bottom-8 duration-300 ${
               activeSheet === 'time' ? 'h-[42dvh]' : activeSheet === 'type' ? 'h-[54dvh]' : 'h-[84dvh]'
             }`}
           >
@@ -444,7 +489,7 @@ function SearchResults() {
                       <button
                         key={option.id}
                         onClick={() => toggleType(option.id)}
-                        className={`h-9 px-3 rounded-full border flex items-center gap-1.5 text-[12px] font-medium ${
+                        className={`h-9 px-3 rounded-full border flex items-center gap-1.5 text-[12px] font-medium transition-all duration-150 active:scale-[0.95] ${
                           selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
                         }`}
                       >
@@ -467,7 +512,7 @@ function SearchResults() {
                         <button
                           key={option.id}
                           onClick={() => toggleType(option.id)}
-                          className={`h-9 px-3 rounded-full border flex items-center gap-1.5 text-[12px] font-medium ${
+                          className={`h-9 px-3 rounded-full border flex items-center gap-1.5 text-[12px] font-medium transition-all duration-150 active:scale-[0.95] ${
                             selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
                           }`}
                         >
@@ -488,7 +533,7 @@ function SearchResults() {
                         <button
                           key={`filter-${option.id}`}
                           onClick={() => toggleTime(option.id)}
-                          className={`h-9 px-4 rounded-full border text-[12px] font-medium ${
+                          className={`h-9 px-4 rounded-full border text-[12px] font-medium transition-all duration-150 active:scale-[0.95] ${
                             selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
                           }`}
                         >
@@ -511,7 +556,7 @@ function SearchResults() {
               </button>
               <button
                 onClick={() => setActiveSheet(null)}
-                className="h-[44px] px-6 rounded-[10px] bg-[#222429] text-white text-[14px] font-semibold"
+                className="h-[44px] px-6 rounded-[10px] bg-[#222429] text-white text-[14px] font-semibold transition-all duration-150 active:scale-[0.97]"
               >
                 결과 보기
               </button>
