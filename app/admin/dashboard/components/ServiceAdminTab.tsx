@@ -32,6 +32,43 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
 
 const EDITABLE_REQUEST_STATUSES = new Set(['pending_payment', 'open']);
 
+function getRowActionCopy(booking: AdminServiceBooking) {
+  if (booking.status === 'PENDING' && booking.payment_method === 'bank') {
+    return {
+      text: '입금 확인 시 의뢰가 공개되고 호스트 모집이 바로 시작됩니다.',
+      cls: 'text-blue-600',
+    };
+  }
+  if (booking.status === 'cancellation_requested') {
+    return {
+      text: '환불 취소 여부를 먼저 확인해주세요. 결제 후 취소는 환불까지 함께 처리됩니다.',
+      cls: 'text-orange-600',
+    };
+  }
+  if (booking.status === 'cancelled') {
+    return {
+      text: '취소·환불 내역에서 환불액과 사유를 다시 확인할 수 있습니다.',
+      cls: 'text-slate-400',
+    };
+  }
+  if ((booking.status === 'PAID' || booking.status === 'confirmed') && !booking.host_id) {
+    return {
+      text: '결제가 완료되어 호스트 모집이 진행 중입니다.',
+      cls: 'text-indigo-600',
+    };
+  }
+  if ((booking.status === 'PAID' || booking.status === 'confirmed' || booking.status === 'completed') && booking.host_id && booking.payout_status === 'pending') {
+    return {
+      text: '서비스 완료 후에는 정산 대기 탭에서 이체 완료 처리가 필요합니다.',
+      cls: 'text-emerald-600',
+    };
+  }
+  return {
+    text: '현재 상태와 결제 상태를 함께 확인해주세요.',
+    cls: 'text-slate-400',
+  };
+}
+
 function statusBadge(status: string, map: Record<string, { label: string; cls: string }>) {
   const cfg = map[status] ?? { label: status, cls: 'bg-slate-50 text-slate-500' };
   return (
@@ -176,6 +213,16 @@ function ForceCancelModal({
           <p><span className="font-bold text-slate-700">결제 상태:</span> {booking.status}</p>
         </div>
 
+        <div className={`rounded-xl border px-4 py-3 mb-5 text-[11px] md:text-xs leading-relaxed ${
+          booking.status === 'PENDING'
+            ? 'bg-amber-50 border-amber-200 text-amber-700'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}>
+          {booking.status === 'PENDING'
+            ? '결제 전 상태입니다. 이 경우 PG 환불 없이 예약과 의뢰만 취소됩니다.'
+            : '이미 결제된 예약입니다. 이 경우 환불 후 취소되며, 환불 금액과 사유를 함께 다시 확인해야 합니다.'}
+        </div>
+
         <div className="space-y-4">
           <div>
             <label className="block text-[11px] md:text-xs font-bold text-slate-700 mb-1.5">환불 금액</label>
@@ -234,6 +281,10 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
   const [allFilter, setAllFilter] = useState<AllFilter>('ALL');
 
   const cancelReqCount = bookings.filter(b => b.status === 'cancellation_requested').length;
+  const pendingBankCount = bookings.filter(b => b.status === 'PENDING' && b.payment_method === 'bank').length;
+  const settlementPendingCount = bookings.filter(
+    b => ['PAID', 'confirmed', 'completed'].includes(b.status) && b.payout_status === 'pending' && b.host_id
+  ).length;
   const displayedBookings = allFilter === 'CANCEL_REQ'
     ? bookings.filter(b => b.status === 'cancellation_requested')
     : bookings;
@@ -280,6 +331,31 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
         />
       )}
 
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 md:px-5 md:py-4">
+        <div className="flex items-start gap-2.5">
+          <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+          <div className="space-y-2">
+            <div>
+              <p className="text-[12px] md:text-sm font-black text-slate-900">운영 빠른 안내</p>
+              <p className="text-[10px] md:text-xs text-slate-600 mt-0.5">
+                무통장 결제 대기는 입금 확인 후 의뢰가 공개됩니다. 결제 전 취소는 DB 취소만, 결제 후 취소는 환불까지 함께 처리됩니다.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] md:text-xs font-bold text-blue-700 border border-blue-100">
+                입금 확인 필요 {pendingBankCount}건
+              </span>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] md:text-xs font-bold text-orange-700 border border-orange-100">
+                취소 검토 {cancelReqCount}건
+              </span>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] md:text-xs font-bold text-emerald-700 border border-emerald-100">
+                정산 대기 {settlementPendingCount}건
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 필터 필 */}
       <div className="flex gap-2">
         <button
@@ -321,14 +397,20 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {displayedBookings.length > 0 ? displayedBookings.map(b => (
-                <tr key={b.id} className={`hover:bg-slate-50 transition-colors ${b.status === 'cancellation_requested' ? 'bg-orange-50/40' : ''}`}>
+              {displayedBookings.length > 0 ? displayedBookings.map(b => {
+                const actionCopy = getRowActionCopy(b);
+
+                return (
+                  <tr key={b.id} className={`hover:bg-slate-50 transition-colors ${b.status === 'cancellation_requested' ? 'bg-orange-50/40' : ''}`}>
                   <td className="px-4 py-3 font-mono text-slate-400 text-[10px] md:text-xs">
                     {b.order_id ? b.order_id.slice(-12) : b.id.slice(-8)}
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-bold text-[11px] md:text-sm text-slate-900 line-clamp-1">{b.service_request?.title || '-'}</p>
                     <p className="text-[10px] md:text-xs text-slate-400">{b.service_request?.city} · {b.service_request?.service_date} · {b.service_request?.duration_hours}h</p>
+                    <p className={`mt-1 text-[10px] md:text-xs font-medium ${actionCopy.cls}`}>
+                      {actionCopy.text}
+                    </p>
                   </td>
                   <td className="px-4 py-3 text-[10px] md:text-xs text-slate-600">
                     {b.customer_profile?.full_name || b.customer_profile?.email || b.customer_id.slice(-6)}
@@ -396,8 +478,9 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
                       )}
                     </div>
                   </td>
-                </tr>
-              )) : (
+                  </tr>
+                );
+              }) : (
                 <tr>
                   <td colSpan={12} className="px-4 py-10 text-center text-[11px] md:text-sm text-slate-400">
                     {allFilter === 'CANCEL_REQ' ? '취소 요청 건이 없습니다.' : '등록된 맞춤 의뢰가 없습니다.'}

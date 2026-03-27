@@ -382,8 +382,12 @@ test.describe.serial('Admin service requests smoke', () => {
     await expect(page.getByRole('button', { name: '전체 의뢰' })).toBeVisible();
     await expect(page.getByRole('button', { name: '정산 대기' })).toBeVisible();
     await expect(page.getByRole('button', { name: '취소·환불 내역' })).toBeVisible();
+    await expect(page.getByText('운영 빠른 안내')).toBeVisible();
+    await expect(page.getByText('입금 확인 필요 1건')).toBeVisible();
+    await expect(page.getByText('취소 검토 0건')).toBeVisible();
 
     await expect(page.getByText(fixtures.pendingRequestTitle)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('입금 확인 시 의뢰가 공개되고 호스트 모집이 바로 시작됩니다.')).toBeVisible();
     await expect(page.getByRole('button', { name: /💰 입금 확인/ })).toBeVisible();
 
     page.once('dialog', async (dialog) => {

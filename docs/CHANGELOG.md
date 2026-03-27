@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.77 — [Admin Service Ops] 운영 판단 가이드 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 맞춤 의뢰 운영 탭 빠른 안내 추가 | `app/admin/dashboard/components/ServiceAdminTab.tsx` — 서비스 관리자 탭 상단에 `운영 빠른 안내` strip를 추가해, 무통장 입금 확인 후 의뢰 공개, 결제 전 취소는 DB 취소만, 결제 후 취소는 환불 취소라는 운영 의미를 바로 읽을 수 있게 정리 |
+| 🟠 행별 다음 액션/취소 모달 설명 강화 | `app/admin/dashboard/components/ServiceAdminTab.tsx` — 각 서비스 의뢰 row 아래에 현재 상태별 `다음 액션` 문구를 추가하고, 강제 취소 모달에는 `결제 전은 PG 환불 없음`, `결제 후는 환불 후 취소`라는 설명을 넣어 운영자가 취소 성격을 더 분명히 이해하도록 보강 |
+| 🟡 관리자 서비스 운영 스모크 보강 | `tests/e2e/10-admin-service-requests.spec.ts` — 운영 빠른 안내 strip와 입금 확인 후 흐름 문구가 실제 탭에서 보이는지 얇게 검증하는 체크를 추가 |
+
 ## v3.39.76 — [Service Matching] 지원/선정 단계 안내 강화
 
 | 항목 | 내용 |
