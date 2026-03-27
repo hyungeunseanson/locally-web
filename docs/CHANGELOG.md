@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.78 — [Proxy Booking Admin] 운영 판단 가이드 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 전화 예약 관리자 탭 빠른 안내 추가 | `app/admin/dashboard/components/PhoneReservationTab.tsx` — 목록 상단에 `운영 빠른 안내` strip를 추가해, 무통장·네이버 결제 대기, 카드 결제 대기, 진행 중, 환불 가능 건수를 한 번에 보이게 하고 `입금 확인 → 진행 시작`, `카드 대기 → 자동 반영`, `결제 완료 후 댓글 안내` 흐름을 짧게 정리 |
+| 🟠 요청 row / 상세 패널 다음 액션 보강 | `app/admin/dashboard/components/PhoneReservationTab.tsx` — 각 요청 row 아래에 상태별 `다음 액션` 문구를 추가하고, 상세 패널에는 결제/진행 상태에 따른 운영 판단 메모와 `입금 확인은 결제 상태만 완료로 바꾸고 이후 진행은 별도`라는 설명을 넣어 운영자가 액션 의미를 덜 헷갈리게 정리 |
+| 🟡 관리자 전화 예약 스모크 보강 | `tests/e2e/86-proxy-booking-team-workspace.spec.ts` — 관리자 TEAM 전화 예약 탭에서 새 운영 안내 strip와 입금 확인 전/후 가이드 문구가 실제로 보이는지 얇게 검증하는 체크를 추가 |
+
 ## v3.39.77 — [Admin Service Ops] 운영 판단 가이드 보강
 
 | 항목 | 내용 |

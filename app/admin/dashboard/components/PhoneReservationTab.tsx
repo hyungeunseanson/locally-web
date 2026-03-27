@@ -62,6 +62,64 @@ function getPaymentStatusLabel(status: PaymentStatus) {
   }
 }
 
+function getProxyNextActionCopy(request: ProxyRequest) {
+  const paymentMethod = getProxyPaymentMethod(request.form_data);
+
+  if (request.payment_status === 'WAITING' && (request.payment_channel === 'NAVER' || paymentMethod === 'bank')) {
+    return {
+      text: '입금 확인 또는 결제 취소를 먼저 처리해야 실제 전화 진행을 시작할 수 있습니다.',
+      cls: 'text-amber-600',
+    };
+  }
+
+  if (request.payment_status === 'WAITING' && paymentMethod === 'card') {
+    return {
+      text: '카드 결제 완료를 기다리는 상태입니다. 완료 후 진행 중으로 바꿀 수 있습니다.',
+      cls: 'text-blue-600',
+    };
+  }
+
+  if (request.payment_status === 'COMPLETED' && request.status === 'PENDING') {
+    return {
+      text: '결제가 완료되었습니다. 전화 진행을 시작하거나 댓글로 진행 상황을 바로 안내해주세요.',
+      cls: 'text-emerald-600',
+    };
+  }
+
+  if (request.payment_status === 'COMPLETED' && request.status === 'IN_PROGRESS') {
+    return {
+      text: '고객에게 최신 진행 상황을 댓글로 남기고, 끝나면 완료 처리해주세요.',
+      cls: 'text-indigo-600',
+    };
+  }
+
+  if (request.payment_status === 'COMPLETED' && request.status === 'COMPLETED') {
+    return {
+      text: '전화 예약이 끝난 상태입니다. 필요하면 환불 처리 여부만 다시 확인해주세요.',
+      cls: 'text-slate-500',
+    };
+  }
+
+  if (request.payment_status === 'REFUNDED') {
+    return {
+      text: '환불이 끝났습니다. 고객 안내가 부족했다면 댓글이나 메시지함 기록도 함께 확인해주세요.',
+      cls: 'text-rose-600',
+    };
+  }
+
+  if (request.status === 'CANCELLED' || request.payment_status === 'FAILED') {
+    return {
+      text: '취소된 요청입니다. 필요하면 취소 사유와 댓글 기록을 다시 확인해주세요.',
+      cls: 'text-slate-400',
+    };
+  }
+
+  return {
+    text: '현재 결제 상태와 진행 상태를 함께 확인해주세요.',
+    cls: 'text-slate-400',
+  };
+}
+
 export default function PhoneReservationTab({ initialSelectedRequestId = null }: PhoneReservationTabProps) {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
@@ -374,6 +432,13 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
     selectedPaymentMethod === 'card'
   );
   const showRefundAction = Boolean(selectedRequest && selectedRequest.payment_status === 'COMPLETED');
+  const manualPaymentWaitingCount = requests.filter((item) => {
+    const paymentMethod = getProxyPaymentMethod(item.form_data);
+    return item.payment_status === 'WAITING' && (item.payment_channel === 'NAVER' || paymentMethod === 'bank');
+  }).length;
+  const cardWaitingCount = requests.filter((item) => getProxyPaymentMethod(item.form_data) === 'card' && item.payment_status === 'WAITING').length;
+  const inProgressCount = requests.filter((item) => item.status === 'IN_PROGRESS').length;
+  const refundableCount = requests.filter((item) => item.payment_status === 'COMPLETED').length;
 
   if (loadingList) {
     return (
@@ -402,13 +467,42 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
           <span className="text-xs font-semibold text-slate-500">{requests.length}건</span>
         </div>
 
+        <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle size={15} className="text-amber-600 mt-0.5 shrink-0" />
+            <div className="space-y-2">
+              <div>
+                <p className="text-[12px] font-black text-slate-900">운영 빠른 안내</p>
+                <p className="text-[11px] leading-relaxed text-slate-600 mt-0.5">
+                  무통장·네이버 결제 대기는 먼저 입금 확인을 해야 하고, 카드 결제 대기는 자동 반영을 기다리면 됩니다. 결제 완료 후에는 진행 상태와 댓글 안내를 함께 관리해주세요.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full border border-blue-100 bg-white px-2.5 py-1 text-[10px] font-bold text-blue-700">
+                  입금 확인 필요 {manualPaymentWaitingCount}건
+                </span>
+                <span className="rounded-full border border-indigo-100 bg-white px-2.5 py-1 text-[10px] font-bold text-indigo-700">
+                  카드 대기 {cardWaitingCount}건
+                </span>
+                <span className="rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+                  진행 중 {inProgressCount}건
+                </span>
+                <span className="rounded-full border border-amber-100 bg-white px-2.5 py-1 text-[10px] font-bold text-amber-700">
+                  환불 가능 {refundableCount}건
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {requests.length === 0 ? (
           <div className="px-4 py-10 text-sm text-slate-500 text-center">아직 접수된 전화 예약이 없습니다.</div>
         ) : (
-          <div className="max-h-[65vh] overflow-y-auto divide-y divide-slate-100">
+          <div className="mt-4 max-h-[65vh] overflow-y-auto divide-y divide-slate-100">
             {requests.map((item) => {
               const paymentMethod = getProxyPaymentMethod(item.form_data);
               const isSelected = selectedId === item.id;
+              const nextActionCopy = getProxyNextActionCopy(item);
 
               return (
                 <button
@@ -429,6 +523,9 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                     <span>{new Date(item.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                     <span>{item.payment_channel}{paymentMethod ? ` · ${paymentMethod === 'card' ? '카드' : '무통장'}` : ''}</span>
                   </div>
+                  <p className={`mt-2 text-[11px] font-medium leading-relaxed ${nextActionCopy.cls}`}>
+                    {nextActionCopy.text}
+                  </p>
                 </button>
               );
             })}
@@ -482,6 +579,21 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                <p className="font-bold text-slate-900">운영 판단 메모</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
+                  {selectedRequest.payment_status === 'WAITING' && (selectedRequest.payment_channel === 'NAVER' || selectedPaymentMethod === 'bank')
+                    ? '무통장·네이버 결제 대기입니다. 입금 확인 후에만 실제 전화 진행을 시작하고, 취소 시에는 결제 취소부터 처리해주세요.'
+                    : selectedRequest.payment_status === 'WAITING' && selectedPaymentMethod === 'card'
+                    ? '카드 결제 대기 상태입니다. 결제가 자동 반영되기 전에는 진행 중으로 바꾸지 않는 것이 안전합니다.'
+                    : selectedRequest.payment_status === 'COMPLETED'
+                    ? '결제는 끝난 상태입니다. 이제 진행 상태를 갱신하고, 댓글로 고객에게 예약 진행 상황을 남겨주는 것이 가장 중요합니다.'
+                    : selectedRequest.payment_status === 'REFUNDED'
+                    ? '환불이 완료된 상태입니다. 추가 문의가 생기면 댓글 기록과 메시지함 안내를 함께 확인해주세요.'
+                    : '현재 결제 상태와 진행 상태를 함께 보고 다음 행동을 결정해주세요.'}
+                </p>
+              </div>
+
               <div className="rounded-2xl border border-slate-100 bg-white p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -508,6 +620,12 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                     >
                       결제 취소
                     </button>
+                  </div>
+                )}
+
+                {showManualPaymentActions && (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    입금 확인은 결제 상태만 `완료`로 바꾸고, 이후 실제 전화 진행은 아래 `운영 액션`에서 시작해주세요.
                   </div>
                 )}
 
@@ -577,7 +695,7 @@ export default function PhoneReservationTab({ initialSelectedRequestId = null }:
                   <AlertCircle size={16} className="text-slate-500" />
                   <div>
                     <h4 className="font-bold text-slate-900">전화 예약 (담당자 소통 스레드)</h4>
-                    <p className="text-xs text-slate-500 mt-1">문의 사항이나 예약 진행 상황에 대해 소통하세요.</p>
+                    <p className="text-xs text-slate-500 mt-1">문의 사항이나 예약 진행 상황에 대해 소통하세요. 여기 답글은 고객이 보는 예약 스레드에도 함께 남습니다.</p>
                   </div>
                 </div>
 

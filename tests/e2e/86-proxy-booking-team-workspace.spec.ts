@@ -286,13 +286,17 @@ test.describe.serial('Proxy booking team workspace flow', () => {
 
       await adminPage.goto(`/admin/dashboard?tab=TEAM&teamTab=proxy&proxyRequestId=${createdRequest!.id}`, { waitUntil: 'networkidle' });
       await expect(adminPage.getByRole('heading', { name: '전화 예약', exact: true })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByText('운영 빠른 안내')).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByText(/입금 확인 필요 \d+건/)).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByRole('heading', { name: restaurantName })).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByText('입금 확인 또는 결제 취소를 먼저 처리해야 실제 전화 진행을 시작할 수 있습니다.').first()).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeDisabled();
       await expect(adminPage.getByRole('button', { name: '완료', exact: true })).toBeDisabled();
 
-      await adminPage.getByRole('button', { name: '입금 확인' }).click();
+      await adminPage.getByRole('button', { name: '입금 확인', exact: true }).click();
       await expect(adminPage.getByText('현재 결제 상태:')).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByText('결제 완료').first()).toBeVisible({ timeout: 15000 });
+      await expect(adminPage.getByText('결제는 끝난 상태입니다. 이제 진행 상태를 갱신하고, 댓글로 고객에게 예약 진행 상황을 남겨주는 것이 가장 중요합니다.')).toBeVisible({ timeout: 15000 });
       await expect(adminPage.getByRole('button', { name: '진행 중', exact: true })).toBeEnabled();
 
       await waitForNotification({
