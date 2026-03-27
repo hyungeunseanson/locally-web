@@ -250,6 +250,12 @@ test('host create shows structured primary language guidance and refund policy c
       /게스트가 실제로 처음 만날 장소를 쉽게 찾을 수 있게 적어주세요\.|Write it so guests can easily find the exact first meeting spot\.|ゲストが最初に迷わず見つけられるように書いてください。|请写成游客第一次见面时能轻松找到的地点说明。/
     )
   ).toBeVisible();
+  await page.getByText(/만나는 장소와 동선은 이렇게 생각해주세요|Think of meeting point and itinerary this way|集合場所と動線はこう考えると分かりやすいです|集合地点和流程可以这样理解/).click();
+  await expect(
+    page.getByText(
+      /동선 예: 홍대 골목 산책|Itinerary example: Walk through local alleys|動線の例：ローカル路地散策|流程示例：本地巷子散步/
+    )
+  ).toBeVisible();
 
   await clickFooterButton(page, /다음|Next|次へ|下一步/);
 

@@ -137,6 +137,19 @@ function LanguageLevelSelector({
   );
 }
 
+function GuideExampleCard({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{title}</p>
+      <ul className="mt-2 space-y-1.5 text-xs leading-5 text-slate-600">
+        {items.map((item) => (
+          <li key={item}>• {item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function ExperienceFormSteps({
   step,
   formData,
@@ -342,6 +355,7 @@ export default function ExperienceFormSteps({
           <FieldHint className="ml-0">{copy.photoHelp}</FieldHint>
           <HelpDisclosure title={copy.photoGuideTitle}>
             <p>{copy.photoGuideBody}</p>
+            <GuideExampleCard title={copy.photoGuideExamplesTitle} items={copy.photoGuideExamples} />
           </HelpDisclosure>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
@@ -427,6 +441,7 @@ export default function ExperienceFormSteps({
           <FieldHint className="ml-0">{copy.itineraryHelp}</FieldHint>
           <HelpDisclosure title={copy.step4GuideTitle}>
             <p>{copy.step4GuideBody}</p>
+            <GuideExampleCard title={copy.step4GuideExamplesTitle} items={copy.step4GuideExamples} />
           </HelpDisclosure>
           <div className="relative border-l-2 border-slate-100 ml-3 md:ml-4 pl-6 md:pl-8 space-y-5 md:space-y-8 py-2">
             {formData.itinerary.map((item: ItineraryItem, idx: number) => (
@@ -510,6 +525,7 @@ export default function ExperienceFormSteps({
         </div>
         <HelpDisclosure title={copy.step5GuideTitle}>
           <p>{copy.step5GuideBody}</p>
+          <GuideExampleCard title={copy.step5GuideExamplesTitle} items={copy.step5GuideExamples} />
         </HelpDisclosure>
 
         <div className="space-y-6">
@@ -748,6 +764,7 @@ export default function ExperienceFormSteps({
             <FieldHint className="text-center ml-0 mt-2">{copy.priceHelp}</FieldHint>
             <HelpDisclosure title={copy.pricingGuideTitle} className="mt-4 text-left">
               <p>{copy.pricingGuideBody}</p>
+              <GuideExampleCard title={copy.pricingGuideExamplesTitle} items={copy.pricingGuideExamples} />
             </HelpDisclosure>
           </div>
 

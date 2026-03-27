@@ -5,6 +5,13 @@
 
 ---
 
+## v3.39.66 — [Host Create UX] 체험 등록 좋은 예시 보기 구체화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 체험 등록 도움말 예시 블록 추가 | `app/host/create/components/ExperienceFormSteps.tsx`, `app/host/create/localization.ts` — 대표사진, 만나는 장소/동선, 상세 소개/포함 사항, 가격 설정의 `자세히 보기` 안에 구체적인 좋은 입력 예시와 피해야 할 예시를 추가해, 처음 등록하는 호스트가 바로 참고할 수 있도록 보강 |
+| 🟡 체험 등록 예시 노출 회귀 체크 보강 | `tests/e2e/93-host-create-copy-layout.spec.ts` — step 4 도움말을 열었을 때 동선 예시가 실제로 보이는지 검증하도록 얇은 체크를 추가 |
+
 ## v3.39.65 — [Host Register] 핵심 필드 최소 검증 강화
 
 | 항목 | 내용 |

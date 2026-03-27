@@ -203,6 +203,8 @@ type ExperienceFormCopy = {
   photoHelp: string;
   photoGuideTitle: string;
   photoGuideBody: string;
+  photoGuideExamplesTitle: string;
+  photoGuideExamples: string[];
   addHeroPhoto: string;
   mainPhotoBadge: string;
   step4Title: string;
@@ -216,6 +218,8 @@ type ExperienceFormCopy = {
   itineraryHelp: string;
   step4GuideTitle: string;
   step4GuideBody: string;
+  step4GuideExamplesTitle: string;
+  step4GuideExamples: string[];
   itineraryTitlePlaceholder: string;
   itineraryDescPlaceholder: string;
   itineraryPhotoLabel: string;
@@ -229,6 +233,8 @@ type ExperienceFormCopy = {
   descriptionHelp: string;
   step5GuideTitle: string;
   step5GuideBody: string;
+  step5GuideExamplesTitle: string;
+  step5GuideExamples: string[];
   inclusionsLabel: string;
   inclusionsHelp: string;
   inclusionsPlaceholder: string;
@@ -257,6 +263,8 @@ type ExperienceFormCopy = {
   priceHelp: string;
   pricingGuideTitle: string;
   pricingGuideBody: string;
+  pricingGuideExamplesTitle: string;
+  pricingGuideExamples: string[];
   privateOptionLabel: string;
   privateOptionDesc: string;
   privatePriceHelp: string;
@@ -329,6 +337,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     photoHelp: '첫 사진은 예약 전환에 가장 큰 영향을 주는 이미지예요.',
     photoGuideTitle: '좋은 대표사진이란?',
     photoGuideBody: '장소 분위기와 실제 경험이 잘 보이고, 과도한 보정보다 현장감을 주는 사진이 좋습니다. 게스트가 “이 체험을 바로 상상할 수 있는지”를 기준으로 골라주세요.',
+    photoGuideExamplesTitle: '이런 사진이 좋아요',
+    photoGuideExamples: [
+      '예: 호스트와 게스트가 실제로 걷거나 체험하는 장면이 보이는 사진',
+      '예: 장소 분위기와 시간대가 자연스럽게 드러나는 밝은 현장 사진',
+      '피해야 할 예: 장소가 잘 안 보이는 셀카, 과한 필터 사진, 텍스트가 많은 이미지',
+    ],
     addHeroPhoto: '대표사진 추가',
     mainPhotoBadge: '메인',
     step4Title: '어디서 만날까요?',
@@ -342,6 +356,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     itineraryHelp: '각 구간에서 무엇을 하는지 짧고 분명하게 적어주세요.',
     step4GuideTitle: '만나는 장소와 동선은 이렇게 생각해주세요',
     step4GuideBody: '만나는 장소는 게스트가 처음 찾는 기준점이고, 정확한 주소는 길찾기와 운영 검토에 사용됩니다. 동선은 게스트가 “이 체험이 어떻게 흘러가는지”를 상상할 수 있게 적는 것이 좋습니다.',
+    step4GuideExamplesTitle: '좋은 입력 예시',
+    step4GuideExamples: [
+      '만나는 장소 예: 스타벅스 홍대입구역 8번 출구점 앞',
+      '정확한 주소 예: 서울 마포구 양화로 165',
+      '동선 예: 홍대 골목 산책 → 로컬 디저트 카페 방문 → 포토 스팟에서 마무리',
+    ],
     itineraryTitlePlaceholder: '장소 이름',
     itineraryDescPlaceholder: '간단한 설명 (선택)',
     itineraryPhotoLabel: '장소 사진',
@@ -355,6 +375,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     descriptionHelp: '게스트가 왜 이 체험을 예약해야 하는지 자연스럽게 이해할 수 있게 적어주세요.',
     step5GuideTitle: '좋은 소개글은 무엇이 다른가요?',
     step5GuideBody: '무엇을 하는지, 어떤 분위기인지, 누구에게 잘 맞는지, 현장에서 어떤 포인트를 기대할 수 있는지를 포함하면 훨씬 설득력이 높아집니다.',
+    step5GuideExamplesTitle: '이런 식으로 쓰면 더 좋아요',
+    step5GuideExamples: [
+      '소개 예: 관광지 설명보다 “현지 친구와 동네를 걷는 느낌”처럼 실제 분위기가 떠오르게 적기',
+      '포함 사항 예: 로컬 디저트 1종, 호스트 가이드, 추천 사진 포인트 안내',
+      '불포함 사항 예: 개인 교통비, 추가 주문 음료, 개인 쇼핑 비용',
+    ],
     inclusionsLabel: '포함 사항',
     inclusionsHelp: '가격에 포함된 것을 명확히 써야 게스트가 안심합니다.',
     inclusionsPlaceholder: '예) 음료',
@@ -390,6 +416,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     priceHelp: '게스트가 경험의 가치를 이해할 수 있도록 포함 항목과 함께 생각해주세요.',
     pricingGuideTitle: '가격을 정할 때 이런 기준이 좋아요',
     pricingGuideBody: '소요 시간, 포함 항목, 이동 동선, 준비 난이도, 현장 케어 수준을 함께 생각하면 가격을 더 자신 있게 정할 수 있습니다. 너무 싸게 시작하기보다 경험의 가치를 설명할 수 있는 가격이 좋습니다.',
+    pricingGuideExamplesTitle: '가격을 생각할 때 체크할 점',
+    pricingGuideExamples: [
+      '기본 가격 예: 2시간 투어 + 간단한 간식 포함 + 사진 포인트 안내',
+      '단독 투어 가격 예: 우리 팀만 참여하고 이동 동선 조율이 포함되는 경우',
+      '너무 낮은 가격보다 “무엇이 포함되는지”가 설명되는 가격이 신뢰를 줍니다.',
+    ],
     privateOptionLabel: '단독 투어 옵션',
     privateOptionDesc: '다른 게스트 없이 우리 그룹만 참여하는 프라이빗 투어 가격을 설정합니다.',
     privatePriceHelp: '기본 가격과 별도로, 우리 그룹만 참여할 때의 고정 가격을 정하는 옵션입니다.',
@@ -460,6 +492,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     photoHelp: 'The first photo has the biggest impact on booking conversion.',
     photoGuideTitle: 'What makes a good hero photo?',
     photoGuideBody: 'Choose a photo that clearly shows the atmosphere and what guests will actually experience. Photos feel stronger when they help guests imagine the moment right away.',
+    photoGuideExamplesTitle: 'Good example photos',
+    photoGuideExamples: [
+      'Example: a photo showing the host and guests actually walking or doing the experience',
+      'Example: a bright on-site photo that naturally shows the mood and time of day',
+      'Avoid: selfies with no clear location, over-filtered images, or graphics with too much text',
+    ],
     addHeroPhoto: 'Add hero photo',
     mainPhotoBadge: 'Main',
     step4Title: 'Where will you meet?',
@@ -473,6 +511,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     itineraryHelp: 'Keep each stop short and clear so guests can picture the flow.',
     step4GuideTitle: 'Think of meeting point and itinerary this way',
     step4GuideBody: 'The meeting point is the guest’s first anchor. The exact address helps with navigation and review. The itinerary should help guests imagine how the experience unfolds from start to finish.',
+    step4GuideExamplesTitle: 'Examples that work well',
+    step4GuideExamples: [
+      'Meeting point example: In front of Starbucks Hongik Univ. Station Exit 8',
+      'Exact address example: 165 Yanghwa-ro, Mapo-gu, Seoul',
+      'Itinerary example: Walk through local alleys → visit a dessert cafe → finish at a photo spot',
+    ],
     itineraryTitlePlaceholder: 'Place name',
     itineraryDescPlaceholder: 'Short description (optional)',
     itineraryPhotoLabel: 'Place photo',
@@ -486,6 +530,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     descriptionHelp: 'Write this so guests naturally understand why this experience is worth booking.',
     step5GuideTitle: 'What makes a strong description?',
     step5GuideBody: 'A strong description covers what happens, what the mood is like, who it fits best, and what guests can look forward to on the day.',
+    step5GuideExamplesTitle: 'Examples that guide better writing',
+    step5GuideExamples: [
+      'Description example: write the real vibe, like “it feels like walking the neighborhood with a local friend”',
+      'Inclusions example: one local dessert, host guidance, photo spot recommendations',
+      'Exclusions example: personal transportation, extra drink orders, personal shopping costs',
+    ],
     inclusionsLabel: 'Inclusions',
     inclusionsHelp: 'Clear inclusions help guests feel confident about what they are paying for.',
     inclusionsPlaceholder: 'e.g. Drink',
@@ -521,6 +571,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     priceHelp: 'Think about price together with duration, inclusions, and the value guests will feel.',
     pricingGuideTitle: 'A simple way to think about pricing',
     pricingGuideBody: 'Consider time, inclusions, route complexity, preparation effort, and how much care you provide on the day. A confident price with a clear value story works better than pricing too low.',
+    pricingGuideExamplesTitle: 'What to check before setting your price',
+    pricingGuideExamples: [
+      'Base price example: a 2-hour walk with a light snack and photo spot guidance',
+      'Private price example: only one group joins and the route can be adjusted for them',
+      'A clear value story builds more trust than setting the price too low.',
+    ],
     privateOptionLabel: 'Private tour option',
     privateOptionDesc: 'Set a fixed price for a private tour where only the booking group participates.',
     privatePriceHelp: 'Use this when you want a separate fixed price for one booking group only.',
@@ -591,6 +647,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     photoHelp: '最初の写真は予約転換に最も影響しやすい画像です。',
     photoGuideTitle: '良い代表写真とは？',
     photoGuideBody: '現場の雰囲気と実際の体験内容がよく伝わり、ゲストがすぐにその場面を想像できる写真がおすすめです。',
+    photoGuideExamplesTitle: 'おすすめの写真例',
+    photoGuideExamples: [
+      '例：ホストとゲストが実際に歩いたり体験している様子が見える写真',
+      '例：場所の雰囲気や時間帯が自然に伝わる明るい現地写真',
+      '避けたい例：場所が分かりにくい自撮り、過度なフィルター写真、文字が多い画像',
+    ],
     addHeroPhoto: '代表写真を追加',
     mainPhotoBadge: 'メイン',
     step4Title: 'どこで会いますか？',
@@ -604,6 +666,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     itineraryHelp: '各区間で何をするのかを短く分かりやすく書いてください。',
     step4GuideTitle: '集合場所と動線はこう考えると分かりやすいです',
     step4GuideBody: '集合場所はゲストが最初に探す基準点です。正確な住所は道案内や審査確認に使われます。動線は、体験がどう進むかを想像できるように書くのがポイントです。',
+    step4GuideExamplesTitle: '良い入力例',
+    step4GuideExamples: [
+      '集合場所の例：弘大入口駅8番出口前のスターバックス',
+      '正確な住所の例：ソウル特別市 麻浦区 楊花路 165',
+      '動線の例：ローカル路地散策 → デザートカフェ訪問 → 写真スポットで終了',
+    ],
     itineraryTitlePlaceholder: '場所名',
     itineraryDescPlaceholder: '簡単な説明（任意）',
     itineraryPhotoLabel: '場所の写真',
@@ -617,6 +685,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     descriptionHelp: 'ゲストが「なぜこの体験を予約したいのか」を自然に理解できる説明が理想です。',
     step5GuideTitle: '良い紹介文のポイント',
     step5GuideBody: '何をするのか、どんな雰囲気なのか、どんな人に向いているのか、当日に何を期待できるのかまで入れると、ぐっと説得力が高まります。',
+    step5GuideExamplesTitle: 'こう書くと伝わりやすいです',
+    step5GuideExamples: [
+      '紹介文の例：「観光案内」よりも「ローカルの友人と街を歩くような雰囲気」と書く',
+      '含まれるものの例：ローカルスイーツ1品、ホスト案内、写真スポット紹介',
+      '含まれないものの例：個人の交通費、追加ドリンク、個人の買い物費用',
+    ],
     inclusionsLabel: '含まれるもの',
     inclusionsHelp: '料金に含まれる内容を明確にすると、ゲストが安心して予約できます。',
     inclusionsPlaceholder: '例）ドリンク',
@@ -652,6 +726,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     priceHelp: '所要時間、含まれる内容、ゲストが感じる価値を一緒に考えて価格を決めてください。',
     pricingGuideTitle: '価格を決めるときの考え方',
     pricingGuideBody: '時間、含まれる内容、移動動線、準備の手間、当日のケアの深さを合わせて考えると決めやすくなります。安くしすぎるより、価値を説明できる価格のほうが長く続けやすいです。',
+    pricingGuideExamplesTitle: '価格を考えるときのチェック例',
+    pricingGuideExamples: [
+      '基本価格の例：2時間の散策＋軽いおやつ＋写真スポット案内',
+      'プライベート価格の例：1組限定で参加し、動線調整まで含まれる場合',
+      '安すぎる価格より、何が含まれているかが伝わる価格のほうが信頼されやすいです。',
+    ],
     privateOptionLabel: 'プライベートツアーオプション',
     privateOptionDesc: '他のゲストなしで、グループだけが参加するプライベートツアーの価格を設定します。',
     privatePriceHelp: '1組だけで参加する場合の固定価格を別で設定したいときに使います。',
@@ -722,6 +802,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     photoHelp: '第一张照片对预订转化的影响最大。',
     photoGuideTitle: '什么样的代表照片更好？',
     photoGuideBody: '建议选择能清楚展示现场氛围和实际体验内容的照片，让游客一眼就能想象自己会经历什么。',
+    photoGuideExamplesTitle: '推荐的照片示例',
+    photoGuideExamples: [
+      '例如：能看到房东与游客真正一起行走或体验的照片',
+      '例如：自然展示现场氛围和时间感的明亮实景照片',
+      '应避免：看不出地点的自拍、滤镜过重的照片、文字很多的图片',
+    ],
     addHeroPhoto: '添加代表照片',
     mainPhotoBadge: '主图',
     step4Title: '在哪里见面？',
@@ -735,6 +821,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     itineraryHelp: '请简短而清楚地写出每一段会做什么。',
     step4GuideTitle: '集合地点和流程可以这样理解',
     step4GuideBody: '集合地点是游客最先寻找的基准点，准确地址用于导航和审核确认。流程说明则应该帮助游客想象整个体验如何展开。',
+    step4GuideExamplesTitle: '好的填写示例',
+    step4GuideExamples: [
+      '集合地点示例：弘大入口站8号出口前的星巴克',
+      '准确地址示例：首尔麻浦区杨花路165',
+      '流程示例：本地巷子散步 → 甜点咖啡馆停留 → 在拍照点结束',
+    ],
     itineraryTitlePlaceholder: '地点名称',
     itineraryDescPlaceholder: '简要说明（可选）',
     itineraryPhotoLabel: '地点照片',
@@ -748,6 +840,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     descriptionHelp: '请写成让游客自然理解“为什么值得预订”的介绍。',
     step5GuideTitle: '好的介绍文通常会包含什么？',
     step5GuideBody: '如果能说明会做什么、整体氛围、适合什么样的游客，以及当天最值得期待的部分，介绍会更有说服力。',
+    step5GuideExamplesTitle: '这样写会更容易理解',
+    step5GuideExamples: [
+      '介绍示例：不要只写观光介绍，可以写成“像和本地朋友一起逛街”的真实氛围',
+      '包含内容示例：1份本地甜点、房东带路、拍照点推荐',
+      '不包含内容示例：个人交通费、额外饮品、个人购物费用',
+    ],
     inclusionsLabel: '包含内容',
     inclusionsHelp: '明确写出价格中包含什么，游客会更安心。',
     inclusionsPlaceholder: '例如：饮品',
@@ -783,6 +881,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     priceHelp: '请结合时长、包含内容和游客能感受到的价值来考虑价格。',
     pricingGuideTitle: '设定价格时可以这样想',
     pricingGuideBody: '可以一起考虑时长、包含内容、路线复杂度、准备难度以及当天的陪同与照顾程度。比起一味压低价格，更重要的是设定一个能体现体验价值的价格。',
+    pricingGuideExamplesTitle: '定价前可以先看这几个点',
+    pricingGuideExamples: [
+      '基础价格示例：2小时步行体验 + 简单点心 + 拍照点推荐',
+      '私享价格示例：只有一个团队参加，并包含路线调整时',
+      '比起过低价格，能解释清楚价值的价格更容易建立信任。',
+    ],
     privateOptionLabel: '私人团选项',
     privateOptionDesc: '设置仅预订团体参加、无其他游客的私人团价格。',
     privatePriceHelp: '如果想为单独一组游客设置固定价格，可以开启这个选项。',
