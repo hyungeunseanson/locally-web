@@ -251,12 +251,12 @@ export default function ChatMonitor() {
   const hostProfile = buildHostProfile(selectedInquiry);
 
   return (
-    <div className="flex h-[calc(100dvh-190px)] md:h-[calc(100dvh-230px)] lg:h-[calc(100dvh-260px)] gap-4 md:gap-6 w-full relative">
+    <div className="flex h-[calc(100dvh-190px)] md:h-[calc(100dvh-185px)] lg:h-[calc(100dvh-195px)] gap-4 md:gap-6 w-full relative">
       {/* 왼쪽 목록 패널 */}
       <div className={`w-full md:w-[420px] md:min-w-[400px] xl:w-[460px] bg-white rounded-xl md:rounded-2xl border border-slate-200 flex flex-col shadow-sm transition-all duration-300 ${selectedInquiry ? 'hidden md:flex' : 'flex'} h-full`}>
-        <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex justify-between items-center mb-3 md:mb-4">
-            <h3 className="font-bold text-sm md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">
+        <div className="p-3 md:px-3.5 md:py-3 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex justify-between items-center mb-2.5 md:mb-3">
+            <h3 className="font-bold text-sm md:text-[15px] text-slate-800 flex items-center gap-1.5 md:gap-2">
               <MessageCircle size={14} className="md:w-[18px] md:h-[18px]" /> 채팅 관리
             </h3>
             <button onClick={() => refresh(true)} className="p-1.5 md:p-2 hover:bg-slate-200 rounded-full text-slate-500" title="새로고침">
@@ -267,13 +267,13 @@ export default function ChatMonitor() {
           <div className="flex bg-slate-200/50 p-1 rounded-lg md:rounded-xl">
             <button
               onClick={() => setActiveTab('admin')}
-              className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-2 text-[10px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'admin' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-1.5 text-[10px] md:text-[11px] font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'admin' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
             >
               <Shield size={12} className="md:w-3.5 md:h-3.5" /> 1:1 문의
             </button>
             <button
               onClick={() => setActiveTab('monitor')}
-              className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-2 text-[10px] md:text-xs font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'monitor' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1.5 md:py-1.5 text-[10px] md:text-[11px] font-bold rounded-md md:rounded-lg transition-all ${activeTab === 'monitor' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50'}`}
             >
               <Eye size={12} className="md:w-3.5 md:h-3.5" /> 실시간 모니터링
             </button>
@@ -286,7 +286,7 @@ export default function ChatMonitor() {
                 <button
                   key={s}
                   onClick={() => setCsStatusFilter(s)}
-                  className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${csStatusFilter === s
+                  className={`px-2 md:px-2 py-0.5 md:py-0.5 rounded-full text-[9px] md:text-[10px] font-bold border transition-colors ${csStatusFilter === s
                     ? 'bg-slate-800 text-white border-slate-800'
                     : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
                     }`}
@@ -323,10 +323,10 @@ export default function ChatMonitor() {
               <div
                 key={inq.id}
                 onClick={() => loadMessages(inq.id)}
-                className={`p-3 md:px-4 md:py-4 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[118px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
+                className={`p-3 md:px-3 md:py-2.5 border-b border-slate-100 cursor-pointer transition-colors hover:bg-slate-50 md:min-h-[76px] ${selectedInquiry?.id === inq.id ? 'bg-blue-50 border-l-[3px] md:border-l-4 border-l-blue-500' : 'border-l-[3px] md:border-l-4 border-l-transparent'}`}
               >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="font-bold text-xs md:text-sm text-slate-800 flex items-center gap-1.5 min-w-0 leading-5">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <span className="font-bold text-xs md:text-[12px] text-slate-800 flex items-center gap-1.5 min-w-0 leading-4">
                     {activeTab === 'monitor' ? (
                       <span className="text-[8px] md:text-[10px] bg-slate-100 text-slate-500 px-1 md:px-1.5 py-0.5 rounded whitespace-nowrap">유저↔호스트</span>
                     ) : (
@@ -336,16 +336,16 @@ export default function ChatMonitor() {
                     )}
                     <span className="truncate">{getGuestName(inq.guest)}</span>
                   </span>
-                  <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium">{formatInquiryListTimestamp(inq.updated_at)}</span>
+                  <span className="text-[9px] md:text-[10px] text-slate-400 shrink-0 font-medium leading-4">{formatInquiryListTimestamp(inq.updated_at)}</span>
                 </div>
-                <div className="text-[10px] md:text-xs text-slate-500 mb-1.5 line-clamp-2 leading-5 min-h-[2.5rem] md:min-h-[2.75rem]">
+                <div className="text-[10px] md:text-[11px] text-slate-500 mb-1 line-clamp-1 leading-4">
                   {inq.experiences?.title ? `🏠 ${inq.experiences.title}` : '📄 문의 내용'}
                 </div>
                 <div className="flex items-start gap-1.5">
-                  <p className="text-xs md:text-sm text-slate-600 line-clamp-2 leading-5 flex-1 min-h-[2.5rem] md:min-h-[2.75rem]">{inq.content || '(내용 없음)'}</p>
+                  <p className="text-[11px] md:text-[12px] text-slate-600 line-clamp-2 leading-4 flex-1">{inq.content || '(내용 없음)'}</p>
                   {inq.has_policy_signal && (
-                    <span className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] md:text-[10px] font-bold text-rose-700 border border-rose-200">
-                      <AlertTriangle size={10} />
+                    <span className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[8px] md:text-[9px] font-bold text-rose-700 border border-rose-200 leading-none">
+                      <AlertTriangle size={9} />
                       정책위반 의심
                     </span>
                   )}
