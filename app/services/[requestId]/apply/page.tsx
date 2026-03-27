@@ -23,6 +23,13 @@ export default function ServiceApplyPage() {
 
   // 호스트 수입 (고객 노출 금지 — UI에서만 사용, 단가 비율 노출 안 함)
   const hostEarning = request?.total_host_payout ?? 0;
+  const trimmedAppealLength = appealMessage.trim().length;
+  const appealQualityCopy =
+    trimmedAppealLength === 0
+      ? t('req_apply_message_help')
+      : trimmedAppealLength < 20
+        ? t('req_apply_message_quality_short')
+        : t('req_apply_message_quality_good');
 
   useEffect(() => {
     const load = async () => {
@@ -130,11 +137,27 @@ export default function ServiceApplyPage() {
           </div>
         </div>
 
+        <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
+          <p className="text-[13px] font-black text-slate-900 md:text-sm">{t('req_apply_guide_title')}</p>
+          <p className="mt-1 text-[11px] leading-5 text-slate-500 md:text-[12px]">{t('req_apply_guide_desc')}</p>
+          <div className="mt-3 space-y-2">
+            {[t('req_apply_tip_1'), t('req_apply_tip_2'), t('req_apply_tip_3')].map((tip) => (
+              <div key={tip} className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                <div className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-900" />
+                <p className="text-[11px] leading-5 text-slate-600 md:text-[12px]">{tip}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* 어필 메시지 */}
         <div className="mb-5">
           <label className="block text-[13px] md:text-sm font-bold text-slate-700 mb-1.5">
             {t('req_appeal_msg')} * <span className="font-normal text-slate-400 text-[11px]">(최소 20자)</span>
           </label>
+          <p className="mb-2 text-[11px] leading-5 text-slate-500 md:text-[12px]">
+            {t('req_apply_message_help')}
+          </p>
           <textarea
             value={appealMessage}
             onChange={(e) => setAppealMessage(e.target.value)}
@@ -142,7 +165,22 @@ export default function ServiceApplyPage() {
             placeholder="나의 강점, 경험, 이 의뢰에 적합한 이유를 작성해주세요.&#10;예: 도쿄 거주 7년 경력의 현지인으로, 병원 통역 경험이 풍부합니다..."
             className="w-full border border-slate-200 rounded-xl px-4 py-3 text-[13px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none placeholder:text-slate-400"
           />
-          <p className="text-[10px] md:text-xs text-slate-400 mt-1 text-right">{appealMessage.length}자</p>
+          <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+            <p className={`text-[11px] leading-5 md:text-[12px] ${
+              trimmedAppealLength < 20 ? 'text-amber-700' : 'text-emerald-700'
+            }`}>
+              {appealQualityCopy}
+            </p>
+          </div>
+          <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-700 md:text-[11px]">
+              {t('req_apply_example_title')}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-blue-900 md:text-[12px]">
+              {t('req_apply_example_body')}
+            </p>
+          </div>
+          <p className="text-[10px] md:text-xs text-slate-400 mt-2 text-right">{appealMessage.length}자</p>
         </div>
 
         <button

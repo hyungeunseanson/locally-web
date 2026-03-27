@@ -202,6 +202,14 @@ async function login(page: Page, user: TestUser) {
   await page.waitForLoadState('domcontentloaded');
 }
 
+async function dismissAnnouncementIfVisible(page: Page) {
+  const announcement = page.getByTestId('global-site-announcement-modal');
+  if (await announcement.count()) {
+    await page.getByTestId('global-site-announcement-primary').click();
+    await expect(announcement).toHaveCount(0);
+  }
+}
+
 test.afterAll(async () => {
   const supabase = getAdminClient();
 
@@ -381,7 +389,10 @@ test.describe.serial('Service request contract alignment', () => {
 
     await login(page, hostUser);
     await page.goto(`/services/${requestRow.id}/apply`, { waitUntil: 'domcontentloaded' });
+    await dismissAnnouncementIfVisible(page);
 
     await expect(page.getByText(`₩${Number(requestRow.total_host_payout).toLocaleString()}`)).toBeVisible();
+    await expect(page.getByText('A better way to frame your application')).toBeVisible();
+    await expect(page.getByText('Instead of only saying hello, include your availability, strengths, and relevant experience.').first()).toBeVisible();
   });
 });

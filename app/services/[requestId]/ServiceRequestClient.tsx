@@ -367,12 +367,29 @@ export default function ServiceRequestDetailPage() {
         {/* ── [고객 뷰] 지원자 목록 ── */}
         {isOwner && request.status !== 'pending_payment' && (
           <div className="mb-4">
+            {request.selected_host_id && isActiveServiceRequest(request.status) && (
+              <div className="mb-3 rounded-2xl border border-blue-200 bg-blue-50/85 p-4">
+                <p className="text-[13px] font-black text-blue-900 md:text-[14px]">{t('sr_owner_matched_title')}</p>
+                <p className="mt-1 text-[11px] leading-5 text-blue-800 md:text-[12px]">{t('sr_owner_matched_desc')}</p>
+                <button
+                  onClick={handleOpenMessage}
+                  disabled={sendingMessage}
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[12px] font-bold text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100/40 disabled:opacity-60 md:text-[13px]"
+                >
+                  <MessageCircle size={14} /> {t('msg_send_to_host')}
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-[14px] md:text-base font-black">
                 {t('sr_host_list')}
                 <span className="ml-2 text-[12px] text-slate-400 font-normal">({applications.length}{t('req_guest_count')})</span>
               </h2>
             </div>
+            <p className="mb-3 text-[11px] leading-5 text-slate-500 md:text-[12px]">
+              {applications.length === 0 ? t('sr_empty_host_followup') : t('sr_host_list_help')}
+            </p>
 
             {applications.length === 0 ? (
               <div className="bg-white rounded-2xl border border-dashed border-slate-200 py-12 text-center">
@@ -523,7 +540,10 @@ export default function ServiceRequestDetailPage() {
                       : t('sr_application_pending')}
                 </p>
                 {myApplication.status === 'pending' && (
-                  <p className="text-[11px] md:text-[12px] text-slate-400 mt-1">{t('sr_customer_reviewing')}</p>
+                  <>
+                    <p className="text-[11px] md:text-[12px] text-slate-400 mt-1">{t('sr_customer_reviewing')}</p>
+                    <p className="text-[11px] md:text-[12px] text-slate-400 mt-1">{t('sr_application_pending_followup')}</p>
+                  </>
                 )}
               </div>
             ) : isOpenServiceRequest(request.status) ? (

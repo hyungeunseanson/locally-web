@@ -5,6 +5,15 @@
 
 ---
 
+## v3.39.76 — [Service Matching] 지원/선정 단계 안내 강화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 서비스 잡보드 지원 전 안내 보강 | `app/services/ServiceJobBoardClient.tsx`, `app/context/LanguageContext.tsx` — 승인 호스트가 `/services` 잡보드에 들어왔을 때 `열린 의뢰만 노출`, `지원 메시지에 무엇을 써야 하는지`, `선택 후 메시지함으로 이어지는 흐름`을 먼저 이해할 수 있도록 상단 가이드 카드와 카드별 `지원 후 흐름` 안내를 추가 |
+| 🟠 서비스 지원 페이지 설득력 가이드 추가 | `app/services/[requestId]/apply/page.tsx`, `app/context/LanguageContext.tsx` — 지원 전에 정리해야 할 포인트, 좋은 지원 메시지 방향, inline 품질 안내, 예시 문구를 넣어 호스트가 더 구체적인 지원 메시지를 쓰도록 보강 |
+| 🟠 고객 의뢰 상세의 선택/조율 안내 보강 | `app/services/[requestId]/ServiceRequestClient.tsx`, `app/context/LanguageContext.tsx` — 고객이 지원자 목록을 비교할 때 무엇을 보고 선택해야 하는지 안내를 추가하고, 매칭 완료 후에는 선택한 호스트와 바로 메시지함에서 조율할 수 있다는 안내 배너를 노출 |
+| 🟡 서비스 호스트 안내 UI 검증 추가 | `tests/e2e/49-service-request-contract.spec.ts`, `tests/e2e/106-service-host-flow-guidance.spec.ts` — 지원 페이지 가이드 문구와 잡보드/고객 상세의 새 안내 카피가 실제로 노출되는지 검증하는 얇은 스펙을 추가/보강 |
+
 ## v3.39.75 — [Proxy Booking] self-service 안내 강화
 
 | 항목 | 내용 |

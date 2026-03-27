@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Clock, MapPin, Users, Calendar, ChevronRight,
-  Briefcase, SlidersHorizontal, Globe2
+  Briefcase, SlidersHorizontal, Globe2, CheckCircle2, MessageCircleMore, UserCheck2
 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
@@ -101,6 +101,27 @@ export default function ServiceJobBoardClient() {
           ))}
         </div>
 
+        <div className="mb-5 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+          <p className="text-[12px] font-black text-slate-900 md:text-[13px]">{t('sjb_guide_title')}</p>
+          <div className="mt-3 grid gap-2.5 md:grid-cols-3">
+            {[
+              { icon: CheckCircle2, copy: t('sjb_guide_point_1') },
+              { icon: MessageCircleMore, copy: t('sjb_guide_point_2') },
+              { icon: UserCheck2, copy: t('sjb_guide_point_3') },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.copy} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                  <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-100">
+                    <Icon size={15} />
+                  </div>
+                  <p className="text-[11px] leading-5 text-slate-600 md:text-[12px]">{item.copy}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
@@ -163,6 +184,17 @@ export default function ServiceJobBoardClient() {
                         <p className="text-[9px] md:text-[10px] text-slate-400 mb-0.5">{t('sjb_expected_income')}</p>
                         <p className="font-black text-[15px] md:text-[17px] text-emerald-600">{earnStr}</p>
                       </div>
+                    </div>
+
+                    <div className="mx-4 border-t border-slate-50" />
+
+                    <div className="px-4 pb-4 pt-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 md:text-[10px]">
+                        {t('sjb_next_step_label')}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-5 text-slate-600 md:text-[12px]">
+                        {t('sjb_next_step_desc')}
+                      </p>
                     </div>
                   </div>
                 </Link>
