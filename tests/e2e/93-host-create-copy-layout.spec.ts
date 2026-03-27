@@ -213,6 +213,12 @@ test('host create shows structured primary language guidance and refund policy c
   await page.getByRole('button', { name: 'Lv.5' }).first().click();
   await clickFooterButton(page, /다음|Next|次へ|下一步/);
 
+  await expect(
+    page.getByText(
+      /게스트가 한눈에 이해할 수 있게 장소, 분위기, 핵심 경험이 드러나면 좋아요\.|A strong title quickly shows the place, mood, and core experience\.|場所、雰囲気、体験の核がひと目で伝わるタイトルが理想です。|如果能一眼看出地点、氛围和核心体验，会更吸引游客。/
+    )
+  ).toBeVisible();
+
   await page
     .locator(
       'input[placeholder="체험 제목을 입력하세요"], input[placeholder="Enter experience title"], input[placeholder="体験タイトルを入力してください"], input[placeholder="请输入体验标题"]'
@@ -238,6 +244,13 @@ test('host create shows structured primary language guidance and refund policy c
     )
     .first()
     .fill('Host Create Copy Itinerary');
+
+  await expect(
+    page.getByText(
+      /게스트가 실제로 처음 만날 장소를 쉽게 찾을 수 있게 적어주세요\.|Write it so guests can easily find the exact first meeting spot\.|ゲストが最初に迷わず見つけられるように書いてください。|请写成游客第一次见面时能轻松找到的地点说明。/
+    )
+  ).toBeVisible();
+
   await clickFooterButton(page, /다음|Next|次へ|下一步/);
 
   await page
@@ -250,6 +263,13 @@ test('host create shows structured primary language guidance and refund policy c
   );
   await inclusionInput.fill('Welcome drink');
   await inclusionInput.press('Enter');
+
+  await expect(
+    page.getByText(
+      /가격에 포함된 것을 명확히 써야 게스트가 안심합니다\.|Clear inclusions help guests feel confident about what they are paying for\.|料金に含まれる内容を明確にすると、ゲストが安心して予約できます。|明确写出价格中包含什么，游客会更安心。/
+    )
+  ).toBeVisible();
+
   await clickFooterButton(page, /다음|Next|次へ|下一步/);
 
   const refundPolicyCard = page.getByTestId('host-create-refund-policy-card');
@@ -264,6 +284,19 @@ test('host create shows structured primary language guidance and refund policy c
   await expect(
     refundPolicyCard.getByText(
       /당일 환불 불가|No refund on the day|当日返金不可|当天不可退款/
+    )
+  ).toBeVisible();
+
+  await page
+    .locator(
+      'input[placeholder="예) 만 7세 이상"], input[placeholder="e.g. Ages 7 and up"], input[placeholder="例）満7歳以上"], input[placeholder="例如：满7岁以上"]'
+    )
+    .fill('Ages 10 and up');
+
+  await clickFooterButton(page, /다음|Next|次へ|下一步/);
+  await expect(
+    page.getByText(
+      /게스트가 경험의 가치를 이해할 수 있도록 포함 항목과 함께 생각해주세요\.|Think about price together with duration, inclusions, and the value guests will feel\.|所要時間、含まれる内容、ゲストが感じる価値を一緒に考えて価格を決めてください。|请结合时长、包含内容和游客能感受到的价值来考虑价格。/
     )
   ).toBeVisible();
 });

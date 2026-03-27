@@ -29,12 +29,16 @@ type HostRegisterCopy = {
   languageCertPlaceholder: string;
   step3Badge: string;
   step3Title: string;
+  step3Desc: string;
   nameLabel: string;
   namePlaceholder: string;
+  nameHelp: string;
   dobLabel: string;
   dobPlaceholder: string;
+  dobHelp: string;
   phoneLabel: string;
   phonePlaceholder: string;
+  phoneHelp: string;
   emailLabel: string;
   emailPlaceholder: string;
   instagramLabel: string;
@@ -43,14 +47,20 @@ type HostRegisterCopy = {
   sourcePlaceholder: string;
   step4Badge: string;
   step4Title: string;
+  step4Desc: string;
+  profilePhotoHelp: string;
   selfIntroLabel: string;
   selfIntroHelp: string;
+  selfIntroGuideTitle: string;
+  selfIntroGuideBody: string;
   selfIntroPlaceholder: string;
   step5Badge: string;
   step5Title: string;
   step5Desc: string;
   idUploadTitle: string;
   idUploadDesc: string;
+  idUploadHelpTitle: string;
+  idUploadHelpBody: string;
   chooseFileButton: string;
   uploadDone: string;
   idSecurityNote: string;
@@ -59,18 +69,30 @@ type HostRegisterCopy = {
   step6Desc: string;
   bankNameLabel: string;
   bankNamePlaceholder: string;
+  bankNameHelp: string;
   accountNumberLabel: string;
   accountNumberPlaceholder: string;
+  accountNumberHelp: string;
   accountHolderLabel: string;
   accountHolderPlaceholder: string;
+  accountHolderHelp: string;
+  payoutGuideTitle: string;
+  payoutGuideBody: string;
   step7Badge: string;
   step7Title: string;
   step7Desc: string;
+  motivationHelp: string;
+  motivationGuideTitle: string;
+  motivationGuideBody: string;
   motivationPlaceholder: string;
   pledgeText: string;
   step8Badge: string;
   step8Title: string;
   step8Desc: string;
+  step8Summary1: string;
+  step8Summary2: string;
+  step8Summary3: string;
+  step8DetailsToggle: string;
   policyReadCheckbox: string;
   policyAgreeCheckbox: string;
   prevButton: string;
@@ -128,12 +150,16 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     languageCertPlaceholder: '예) JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. 기본 정보',
     step3Title: '호스트님의\n연락처를 알려주세요',
+    step3Desc: '정확한 기본 정보는 승인 검토와 중요한 일정 안내에 사용됩니다.',
     nameLabel: '성함 (실명)',
     namePlaceholder: '홍길동',
+    nameHelp: '정산과 신원 확인에 사용되는 이름입니다. 신분증 정보와 일치하게 입력해주세요.',
     dobLabel: '생년월일',
     dobPlaceholder: 'YYYY.MM.DD',
+    dobHelp: '성인 확인과 기본 신원 검토에 사용됩니다.',
     phoneLabel: '휴대전화 번호',
     phonePlaceholder: '010-1234-5678',
+    phoneHelp: '운영팀과 게스트가 중요한 일정 변경 시 연락할 수 있는 번호예요.',
     emailLabel: '이메일 주소',
     emailPlaceholder: 'example@gmail.com',
     instagramLabel: 'Instagram ID',
@@ -142,14 +168,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     sourcePlaceholder: '예) 인스타, 지인 추천',
     step4Badge: 'Step 4. 프로필 설정',
     step4Title: '게스트에게 보여질\n모습을 꾸며보세요',
+    step4Desc: '게스트가 안심하고 예약할 수 있도록, 믿음 가는 첫인상을 만들어주세요.',
+    profilePhotoHelp: '게스트가 가장 먼저 보는 사진이에요. 얼굴이 잘 보이는 밝은 사진을 권장합니다.',
     selfIntroLabel: '자기소개',
     selfIntroHelp: '보여주고 싶은 게스트의 언어로 작성해주세요. 예: 한국인 게스트에게 보여주고 싶다면 한국어로 작성하면 됩니다.',
+    selfIntroGuideTitle: '어떤 소개가 좋은가요?',
+    selfIntroGuideBody: '내가 어떤 분위기의 호스트인지, 어떤 게스트와 잘 맞는지, 체험에서 어떤 시간을 만들어주고 싶은지를 짧고 자연스럽게 적어주세요. 너무 짧거나 추상적인 소개보다 실제로 함께할 장면이 떠오르는 소개가 더 좋습니다.',
     selfIntroPlaceholder: '안녕하세요! 저는 여행과 사진을 좋아하는 호스트입니다. (최소 50자 이상)',
     step5Badge: 'Step 5. 신뢰 인증',
     step5Title: '인증된 호스트\n배지를 받아보세요',
     step5Desc: '신분증을 제출하면 프로필에 인증 배지가 표시됩니다.',
     idUploadTitle: '신분증 업로드',
     idUploadDesc: '주민등록증, 운전면허증, 여권 중 택 1',
+    idUploadHelpTitle: '왜 신분증이 필요한가요?',
+    idUploadHelpBody: '신분증은 승인 검토와 본인 확인에만 사용되며 게스트에게 공개되지 않습니다. 이름과 사진이 잘 보이도록 올려주시면 검토가 더 빠르고 정확해집니다.',
     chooseFileButton: '파일 선택하기',
     uploadDone: '업로드 완료',
     idSecurityNote: '* 제출된 신분증 정보는 본인 확인 용도로만 사용되며, 확인 즉시 안전하게 파기됩니다.',
@@ -158,18 +190,30 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step6Desc: '본인 명의의 계좌만 등록 가능합니다.',
     bankNameLabel: '은행명',
     bankNamePlaceholder: '예) 카카오뱅크, 신한은행',
+    bankNameHelp: '정산 지급에 사용됩니다. 오입력 시 정산이 지연될 수 있습니다.',
     accountNumberLabel: '계좌번호',
     accountNumberPlaceholder: '- 없이 숫자만 입력',
+    accountNumberHelp: '숫자만 정확히 입력해주세요. 잘못 입력하면 재확인이 필요할 수 있습니다.',
     accountHolderLabel: '예금주',
     accountHolderPlaceholder: '본인 실명',
+    accountHolderHelp: '신분증과 동일한 본인 실명으로 입력해주세요.',
+    payoutGuideTitle: '정산 계좌 입력 전 확인해주세요',
+    payoutGuideBody: '계좌 정보는 수익 정산에 바로 연결됩니다. 은행명, 계좌번호, 예금주가 실제 정보와 다르면 지급이 지연될 수 있어요. 본인 명의 계좌를 정확히 입력하는 것이 가장 중요합니다.',
     step7Badge: 'Step 7. 신청 사유',
     step7Title: '마지막 질문입니다!',
     step7Desc: '로컬리 호스트가 되고 싶은 이유를 적어주세요.',
+    motivationHelp: '어떤 게스트에게 어떤 경험을 주고 싶은지 구체적으로 적어주시면 검토에 도움이 됩니다.',
+    motivationGuideTitle: '좋은 신청 사유 예시',
+    motivationGuideBody: '단순히 “외국인을 만나보고 싶어서”보다, 내가 잘 안내할 수 있는 지역이나 주제, 어떤 게스트에게 어떤 시간을 만들어주고 싶은지까지 적어주시면 훨씬 설득력이 높아집니다.',
     motivationPlaceholder: '예) 외국인 친구들과 교류하는 것을 좋아해서 지원하게 되었습니다.',
     pledgeText: '본인은 로컬리 호스트로서 투명하고 정직하게 활동할 것을 약속하며,\n위 기재된 정보가 사실과 다를 경우 승인이 취소될 수 있음을 확인합니다.',
     step8Badge: 'Step 8. 필수 교육 숙지',
     step8Title: '안전하고 올바른\n호스팅을 위한 서약',
     step8Desc: '제출하기 전 아래 안전 가이드라인을 반드시 정독해 주세요.',
+    step8Summary1: '예약 확정 후 무응답, 무단 취소, 노쇼는 게스트 여행에 직접적인 피해를 줍니다.',
+    step8Summary2: '플랫폼 외부 결제 유도, 개인정보 선교환, 허위 안내는 신뢰 위반으로 간주됩니다.',
+    step8Summary3: '등록 내용과 실제 진행 내용을 최대한 일치시켜야 게스트 신뢰와 승인 품질이 유지됩니다.',
+    step8DetailsToggle: '전체 안전 가이드라인 자세히 보기',
     policyReadCheckbox: '[필수] 위 호스트 안전 가이드라인 및 플랫폼 이용 수칙을 모두 정독하고 숙지하였습니다.',
     policyAgreeCheckbox: '[필수] 위반 시 계정 영구 정지 및 법적 책임이 따를 수 있음에 동의하며,\n로컬리의 정직한 파트너로 활동할 것을 서약합니다.',
     prevButton: '이전',
@@ -235,12 +279,16 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     languageCertPlaceholder: 'e.g. JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. Basic Information',
     step3Title: 'Tell us how to\nreach you',
+    step3Desc: 'Accurate basics are used for review and important scheduling updates.',
     nameLabel: 'Full name',
     namePlaceholder: 'John Doe',
+    nameHelp: 'This name is used for identity review and payouts. Please match your ID.',
     dobLabel: 'Date of birth',
     dobPlaceholder: 'YYYY.MM.DD',
+    dobHelp: 'This is used for adult verification and basic identity review.',
     phoneLabel: 'Phone number',
     phonePlaceholder: '010-1234-5678',
+    phoneHelp: 'We may use this number for urgent updates about schedules or guests.',
     emailLabel: 'Email address',
     emailPlaceholder: 'example@gmail.com',
     instagramLabel: 'Instagram ID',
@@ -249,14 +297,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     sourcePlaceholder: 'e.g. Instagram, friend referral',
     step4Badge: 'Step 4. Profile Setup',
     step4Title: 'Shape the profile\nguests will see',
+    step4Desc: 'Help guests feel comfortable booking with you by creating a warm first impression.',
+    profilePhotoHelp: 'This is often the first image guests notice. A bright photo with your face clearly visible works best.',
     selfIntroLabel: 'Self introduction',
     selfIntroHelp: 'Write this in the language of the guests you want to show it to. Example: if you want Korean guests to read it, write it in Korean.',
+    selfIntroGuideTitle: 'What makes a good introduction?',
+    selfIntroGuideBody: 'Briefly explain what kind of host you are, what kind of guests you enjoy meeting, and what kind of time you want to create. Concrete and natural introductions work better than vague one-liners.',
     selfIntroPlaceholder: 'Hi! I am a host who loves travel and photography. (At least 50 characters)',
     step5Badge: 'Step 5. Verification',
     step5Title: 'Earn a verified host\nbadge',
     step5Desc: 'Upload your ID to show a verified badge on your profile.',
     idUploadTitle: 'Upload your ID',
     idUploadDesc: 'Choose one: ID card, driver’s license, or passport',
+    idUploadHelpTitle: 'Why do we ask for an ID?',
+    idUploadHelpBody: 'Your ID is only used for review and identity verification, and it is never shown to guests. Clear photos with your name and image visible help us review your application more quickly.',
     chooseFileButton: 'Choose file',
     uploadDone: 'Uploaded',
     idSecurityNote: '* Submitted ID information is used only for identity verification and will be securely destroyed immediately after review.',
@@ -265,18 +319,30 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step6Desc: 'Only an account under your own name can be registered.',
     bankNameLabel: 'Bank name',
     bankNamePlaceholder: 'e.g. KakaoBank, Shinhan Bank',
+    bankNameHelp: 'This is used for payouts. Incorrect details can delay your settlement.',
     accountNumberLabel: 'Account number',
     accountNumberPlaceholder: 'Numbers only, no dashes',
+    accountNumberHelp: 'Please enter the number exactly. Mistakes may require manual re-checking.',
     accountHolderLabel: 'Account holder',
     accountHolderPlaceholder: 'Your legal name',
+    accountHolderHelp: 'Please use the same legal name shown on your ID.',
+    payoutGuideTitle: 'Before you enter your payout account',
+    payoutGuideBody: 'Your bank details are directly tied to settlement. If the bank name, account number, or account holder is incorrect, payouts can be delayed. An account in your own name is the safest option.',
     step7Badge: 'Step 7. Motivation',
     step7Title: 'One last question!',
     step7Desc: 'Tell us why you want to become a Locally host.',
+    motivationHelp: 'Specific answers about the guests you want to host and the experience you want to create help with review.',
+    motivationGuideTitle: 'A stronger example',
+    motivationGuideBody: 'Instead of only saying you want to meet travelers, explain what neighborhood or topic you can guide well, and what kind of time you want your guests to have. Specific motivations are much more convincing.',
     motivationPlaceholder: 'e.g. I love meeting international travelers and sharing local spots.',
     pledgeText: 'I promise to act as a transparent and honest Locally host,\nand I understand that approval may be revoked if any information above is false.',
     step8Badge: 'Step 8. Required Training',
     step8Title: 'Pledge for safe and\nresponsible hosting',
     step8Desc: 'Please read the safety guidelines below carefully before submitting.',
+    step8Summary1: 'No-shows, careless cancellations, and long silence after confirmation directly damage a guest’s trip.',
+    step8Summary2: 'Off-platform payments, early contact sharing, and misleading information are treated as trust violations.',
+    step8Summary3: 'Your actual hosting should match what you register so guests can book with confidence.',
+    step8DetailsToggle: 'Read the full safety guidelines',
     policyReadCheckbox: '[Required] I have read and understood all host safety guidelines and platform rules above.',
     policyAgreeCheckbox: '[Required] I agree that violations may lead to permanent account suspension and legal responsibility,\nand I pledge to act as an honest Locally partner.',
     prevButton: 'Back',
@@ -342,12 +408,16 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     languageCertPlaceholder: '例）JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. 基本情報',
     step3Title: '連絡先を\n教えてください',
+    step3Desc: '正確な基本情報は審査と重要なお知らせの案内に使われます。',
     nameLabel: '氏名（実名）',
     namePlaceholder: '山田 太郎',
+    nameHelp: '本人確認と精算に使われる名前です。身分証の情報と一致させてください。',
     dobLabel: '生年月日',
     dobPlaceholder: 'YYYY.MM.DD',
+    dobHelp: '成人確認と基本的な本人確認に使用されます。',
     phoneLabel: '携帯電話番号',
     phonePlaceholder: '010-1234-5678',
+    phoneHelp: '運営やゲストが重要な予定変更時に連絡できる番号です。',
     emailLabel: 'メールアドレス',
     emailPlaceholder: 'example@gmail.com',
     instagramLabel: 'Instagram ID',
@@ -356,14 +426,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     sourcePlaceholder: '例）Instagram、知人の紹介',
     step4Badge: 'Step 4. プロフィール設定',
     step4Title: 'ゲストに見える\nプロフィールを整えましょう',
+    step4Desc: 'ゲストが安心して予約できるよう、信頼できる第一印象を作ってください。',
+    profilePhotoHelp: 'ゲストが最初に目にしやすい写真です。顔がはっきり見える明るい写真がおすすめです。',
     selfIntroLabel: '自己紹介',
     selfIntroHelp: '見せたいゲストの言語で作成してください。例：韓国人ゲストに見せたい場合は韓国語で作成してください。',
+    selfIntroGuideTitle: '良い自己紹介のコツ',
+    selfIntroGuideBody: 'どんな雰囲気のホストなのか、どんなゲストと相性が良いのか、どんな時間を作りたいのかを自然に書いてください。短すぎる一文より、実際の体験が想像できる紹介のほうが伝わります。',
     selfIntroPlaceholder: 'こんにちは！旅行と写真が好きなホストです。（50文字以上推奨）',
     step5Badge: 'Step 5. 信頼認証',
     step5Title: '認証済みホスト\nバッジを獲得しましょう',
     step5Desc: '身分証を提出すると、プロフィールに認証バッジが表示されます。',
     idUploadTitle: '身分証アップロード',
     idUploadDesc: '住民登録証、運転免許証、パスポートのいずれか1つ',
+    idUploadHelpTitle: 'なぜ身分証が必要ですか？',
+    idUploadHelpBody: '身分証は審査と本人確認のためだけに使われ、ゲストには公開されません。氏名と写真がはっきり見える画像をアップロードしていただくと、審査がより早く正確になります。',
     chooseFileButton: 'ファイルを選択',
     uploadDone: 'アップロード完了',
     idSecurityNote: '* 提出された身分証情報は本人確認の目的にのみ使用され、確認後すぐに安全に破棄されます。',
@@ -372,18 +448,30 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step6Desc: 'ご本人名義の口座のみ登録できます。',
     bankNameLabel: '銀行名',
     bankNamePlaceholder: '例）楽天銀行、三井住友銀行',
+    bankNameHelp: '精算金の支払いに使われます。誤入力があると精算が遅れることがあります。',
     accountNumberLabel: '口座番号',
     accountNumberPlaceholder: 'ハイフンなしの数字のみ',
+    accountNumberHelp: '数字のみ正確に入力してください。誤りがあると再確認が必要になる場合があります。',
     accountHolderLabel: '口座名義',
     accountHolderPlaceholder: '本人の実名',
+    accountHolderHelp: '身分証と同じ本人の実名を入力してください。',
+    payoutGuideTitle: '口座入力の前にご確認ください',
+    payoutGuideBody: '口座情報は収益精算に直接使われます。銀行名、口座番号、名義が実際の情報と異なると支払いが遅れることがあります。本人名義の口座を正確に入力することが重要です。',
     step7Badge: 'Step 7. 応募理由',
     step7Title: '最後の質問です！',
     step7Desc: 'Locally ホストになりたい理由を書いてください。',
+    motivationHelp: 'どんなゲストにどんな体験を届けたいのかを具体的に書くと、審査に役立ちます。',
+    motivationGuideTitle: '良い応募理由の例',
+    motivationGuideBody: '単に「旅行者と交流したい」だけでなく、自分が案内しやすい地域やテーマ、どんな時間を作りたいかまで書くと、ずっと説得力が高まります。',
     motivationPlaceholder: '例）海外から来る旅行者と交流し、地元の魅力を紹介したいからです。',
     pledgeText: '私は Locally ホストとして透明かつ誠実に活動することを約束し、\n上記の情報が事実と異なる場合は承認が取り消されることを確認します。',
     step8Badge: 'Step 8. 必須教育の確認',
     step8Title: '安全で正しい\nホスティングのための誓約',
     step8Desc: '提出前に、以下の安全ガイドラインを必ず熟読してください。',
+    step8Summary1: '予約確定後の無応答、無断キャンセル、ノーショーはゲストの旅行に直接被害を与えます。',
+    step8Summary2: 'プラットフォーム外決済の誘導、早期の連絡先交換、誤解を招く案内は信頼違反とみなされます。',
+    step8Summary3: '登録内容と実際の運営内容をできるだけ一致させることが、ゲストの安心につながります。',
+    step8DetailsToggle: '安全ガイドライン全文を見る',
     policyReadCheckbox: '[必須] 上記のホスト安全ガイドラインおよびプラットフォーム利用規則をすべて読み、理解しました。',
     policyAgreeCheckbox: '[必須] 違反時にはアカウント永久停止および法的責任が生じる可能性があることに同意し、\nLocally の誠実なパートナーとして活動することを誓います。',
     prevButton: '戻る',
@@ -449,12 +537,16 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     languageCertPlaceholder: '例如：JLPT N1, TOEIC 900',
     step3Badge: 'Step 3. 基本信息',
     step3Title: '请告诉我们\n您的联系方式',
+    step3Desc: '准确的基本信息会用于审核和重要日程通知。',
     nameLabel: '姓名（实名）',
     namePlaceholder: '张三',
+    nameHelp: '该姓名会用于身份审核和结算，请与证件信息保持一致。',
     dobLabel: '出生日期',
     dobPlaceholder: 'YYYY.MM.DD',
+    dobHelp: '用于成年确认和基础身份审核。',
     phoneLabel: '手机号码',
     phonePlaceholder: '010-1234-5678',
+    phoneHelp: '运营团队或游客在重要日程变更时可能会联系您。',
     emailLabel: '电子邮箱',
     emailPlaceholder: 'example@gmail.com',
     instagramLabel: 'Instagram ID',
@@ -463,14 +555,20 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     sourcePlaceholder: '例如：Instagram、朋友推荐',
     step4Badge: 'Step 4. 个人资料设置',
     step4Title: '完善房客将看到的\n个人形象',
+    step4Desc: '请用能让游客安心预订的方式展示自己。',
+    profilePhotoHelp: '这通常是游客最先看到的照片。建议使用光线明亮、能清楚看到脸部的照片。',
     selfIntroLabel: '自我介绍',
     selfIntroHelp: '请使用你想展示给游客看的语言来填写。例：如果你想给韩国游客看，就用韩语来写。',
+    selfIntroGuideTitle: '怎样的介绍更好？',
+    selfIntroGuideBody: '可以简单说明你是什么样的房东、适合接待什么样的游客，以及你希望为游客创造什么样的体验。比起过于简短或抽象的介绍，更推荐能让人想象实际同行画面的介绍。',
     selfIntroPlaceholder: '你好！我是喜欢旅行和摄影的房东。（建议至少50字）',
     step5Badge: 'Step 5. 信任认证',
     step5Title: '获得认证房东\n徽章',
     step5Desc: '提交身份证件后，个人资料上会显示认证徽章。',
     idUploadTitle: '上传身份证件',
     idUploadDesc: '身份证、驾驶证、护照三选一',
+    idUploadHelpTitle: '为什么需要身份证件？',
+    idUploadHelpBody: '身份证件仅用于审核和身份确认，不会展示给游客。若照片中姓名和头像清晰可见，审核会更快也更准确。',
     chooseFileButton: '选择文件',
     uploadDone: '上传完成',
     idSecurityNote: '* 提交的身份证件信息仅用于身份验证，审核完成后将立即安全销毁。',
@@ -479,18 +577,30 @@ const COPY: Record<HostRegisterLocale, HostRegisterCopy> = {
     step6Desc: '仅可登记本人名下账户。',
     bankNameLabel: '银行名称',
     bankNamePlaceholder: '例如：KakaoBank、Shinhan Bank',
+    bankNameHelp: '用于结算打款。若信息有误，结算可能会延迟。',
     accountNumberLabel: '账号',
     accountNumberPlaceholder: '仅输入数字，不含连字符',
+    accountNumberHelp: '请准确输入数字。若填写错误，可能需要人工再次确认。',
     accountHolderLabel: '账户持有人',
     accountHolderPlaceholder: '本人实名',
+    accountHolderHelp: '请填写与证件一致的本人实名。',
+    payoutGuideTitle: '填写收款账户前请先确认',
+    payoutGuideBody: '账户信息会直接用于收益结算。若银行名、账号或户名与实际不一致，打款可能延迟。最重要的是使用本人名义并准确填写。',
     step7Badge: 'Step 7. 申请理由',
     step7Title: '最后一个问题！',
     step7Desc: '请写下你想成为 Locally 房东的原因。',
+    motivationHelp: '如果能具体写出你想接待什么样的游客、想带来什么样的体验，会更有助于审核。',
+    motivationGuideTitle: '更好的申请理由示例',
+    motivationGuideBody: '不要只写“想认识外国游客”，也建议写出你擅长带领的地区或主题，以及你希望游客获得什么样的感受。越具体，越有说服力。',
     motivationPlaceholder: '例如：我喜欢与外国游客交流，并介绍本地独特的地方。',
     pledgeText: '本人承诺将作为 Locally 房东以透明、诚实的方式活动，\n并确认如上述信息与事实不符，审批可能被取消。',
     step8Badge: 'Step 8. 必修培训确认',
     step8Title: '为了安全且正确的\n接待而做出的承诺',
     step8Desc: '提交前请务必仔细阅读以下安全指南。',
+    step8Summary1: '预约确认后的长期不回复、随意取消或爽约，会直接影响游客的旅行安排。',
+    step8Summary2: '引导站外付款、过早交换私人联系方式、误导性说明都会被视为信任违规。',
+    step8Summary3: '请尽量让注册内容与实际接待内容一致，这样游客才会更安心下单。',
+    step8DetailsToggle: '查看完整安全指南',
     policyReadCheckbox: '[必填] 我已完整阅读并理解上述房东安全指南及平台使用规则。',
     policyAgreeCheckbox: '[必填] 我同意如有违规，账号可能被永久停用并承担法律责任，\n并承诺作为 Locally 的诚信合作伙伴开展活动。',
     prevButton: '上一步',

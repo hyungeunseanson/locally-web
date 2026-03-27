@@ -22,6 +22,7 @@ import {
   getHostRegisterCopy,
   getLocalizedText,
 } from '../localization';
+import { FieldHint, HelpDisclosure } from '@/app/host/components/FormHelp';
 
 type HostRegisterFormData = {
   languageLevels: LanguageLevelEntry[];
@@ -244,21 +245,25 @@ export default function HostRegisterForm({
             <div className="text-center">
               <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full text-[10px]">{copy.step3Badge}</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">{renderMultilineText(copy.step3Title)}</h1>
+              <p className="text-sm text-slate-500">{copy.step3Desc}</p>
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.nameLabel}</label>
                   <input type="text" placeholder={copy.namePlaceholder} value={formData.name} onChange={(e) => updateData('name', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" />
+                  <FieldHint>{copy.nameHelp}</FieldHint>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.dobLabel}</label>
                   <input type="text" placeholder={copy.dobPlaceholder} value={formData.dob} onChange={(e) => updateData('dob', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" />
+                  <FieldHint>{copy.dobHelp}</FieldHint>
                 </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.phoneLabel}</label>
                 <input type="tel" placeholder={copy.phonePlaceholder} value={formData.phone} onChange={(e) => updateData('phone', e.target.value)} className="w-full p-3.5 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" />
+                <FieldHint>{copy.phoneHelp}</FieldHint>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.emailLabel}</label>
@@ -283,12 +288,14 @@ export default function HostRegisterForm({
             <div>
               <span className="bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-full text-[10px]">{copy.step4Badge}</span>
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">{renderMultilineText(copy.step4Title)}</h1>
+              <p className="text-sm text-slate-500">{copy.step4Desc}</p>
             </div>
             <div className="flex flex-col items-center gap-6">
               <label className="w-32 h-32 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-black overflow-hidden relative bg-slate-50">
                 {formData.profilePhoto ? <img src={formData.profilePhoto} className="w-full h-full object-cover" alt="프로필 미리보기" /> : <Camera size={24} className="text-slate-400" />}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(e, 'profile')} />
               </label>
+              <FieldHint className="text-center ml-0 -mt-2">{copy.profilePhotoHelp}</FieldHint>
               <div className="w-full text-left">
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.selfIntroLabel}</label>
                 <p className="mt-1 ml-1 text-xs leading-5 text-slate-500">{copy.selfIntroHelp}</p>
@@ -296,6 +303,9 @@ export default function HostRegisterForm({
                 <p className={`text-[11px] mt-1.5 ml-1 ${(formData.selfIntro?.length || 0) >= 50 ? 'text-green-500' : 'text-slate-400'}`}>
                   {formData.selfIntro?.length || 0}/50자
                 </p>
+                <HelpDisclosure title={copy.selfIntroGuideTitle} className="mt-3">
+                  <p>{copy.selfIntroGuideBody}</p>
+                </HelpDisclosure>
               </div>
             </div>
           </div>
@@ -308,6 +318,9 @@ export default function HostRegisterForm({
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">{renderMultilineText(copy.step5Title)}</h1>
               <p className="text-sm text-slate-500">{copy.step5Desc}</p>
             </div>
+            <HelpDisclosure title={copy.idUploadHelpTitle}>
+              <p>{copy.idUploadHelpBody}</p>
+            </HelpDisclosure>
             <div className="border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center hover:bg-slate-50 transition-all cursor-pointer group relative">
               <input type="file" accept="image/*" className="hidden" id="id-upload" onChange={(e) => handlePhotoUpload(e, 'idCard')} />
               {formData.idCardFile ? (
@@ -338,18 +351,24 @@ export default function HostRegisterForm({
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">{renderMultilineText(copy.step6Title)}</h1>
               <p className="text-sm text-slate-500">{copy.step6Desc}</p>
             </div>
+            <HelpDisclosure title={copy.payoutGuideTitle}>
+              <p>{copy.payoutGuideBody}</p>
+            </HelpDisclosure>
             <div className="space-y-4 text-left">
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.bankNameLabel}</label>
                 <div className="relative"><Building size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder={copy.bankNamePlaceholder} value={formData.bankName} onChange={(e) => updateData('bankName', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
+                <FieldHint>{copy.bankNameHelp}</FieldHint>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.accountNumberLabel}</label>
                 <div className="relative"><CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="tel" placeholder={copy.accountNumberPlaceholder} value={formData.accountNumber} onChange={(e) => updateData('accountNumber', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
+                <FieldHint>{copy.accountNumberHelp}</FieldHint>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 ml-1 mb-1 block">{copy.accountHolderLabel}</label>
                 <div className="relative"><User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder={copy.accountHolderPlaceholder} value={formData.accountHolder} onChange={(e) => updateData('accountHolder', e.target.value)} className="w-full p-3.5 pl-10 bg-slate-50 rounded-xl outline-none focus:ring-1 focus:ring-black border border-slate-200 text-sm" /></div>
+                <FieldHint>{copy.accountHolderHelp}</FieldHint>
               </div>
             </div>
           </div>
@@ -362,7 +381,11 @@ export default function HostRegisterForm({
               <h1 className="text-3xl font-black mt-4 mb-3 leading-tight">{copy.step7Title}</h1>
               <p className="text-sm text-slate-500">{copy.step7Desc}</p>
             </div>
+            <FieldHint className="text-center ml-0">{copy.motivationHelp}</FieldHint>
             <textarea placeholder={copy.motivationPlaceholder} value={formData.motivation} onChange={(e) => updateData('motivation', e.target.value)} className="w-full p-5 h-48 bg-slate-50 rounded-2xl outline-none text-sm resize-none border border-slate-200 focus:border-black transition-all" />
+            <HelpDisclosure title={copy.motivationGuideTitle}>
+              <p>{copy.motivationGuideBody}</p>
+            </HelpDisclosure>
             <div className="pt-2 text-left">
               <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">
                 <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${formData.agreeTerms ? 'bg-black border-black' : 'border-slate-300 bg-white'}`}>
@@ -385,20 +408,30 @@ export default function HostRegisterForm({
               <p className="text-sm text-slate-500">{copy.step8Desc}</p>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 h-64 w-full text-sm text-slate-700 space-y-6 shadow-inner relative overflow-y-auto">
-              {copy.safetyPolicies.map((policy, index) => {
-                const Icon = safetyIconMap[policy.icon];
-                return (
-                  <React.Fragment key={policy.title}>
-                    <div>
-                      <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><Icon size={16} className={policy.accentClass} /> {policy.title}</h3>
-                      <p className="leading-relaxed text-xs">{policy.description}</p>
-                    </div>
-                    {index < copy.safetyPolicies.length - 1 && <div className="h-px bg-slate-200 w-full"></div>}
-                  </React.Fragment>
-                );
-              })}
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <ul className="space-y-2 text-left">
+                <li>• {copy.step8Summary1}</li>
+                <li>• {copy.step8Summary2}</li>
+                <li>• {copy.step8Summary3}</li>
+              </ul>
             </div>
+
+            <HelpDisclosure title={copy.step8DetailsToggle}>
+              <div className="space-y-6">
+                {copy.safetyPolicies.map((policy, index) => {
+                  const Icon = safetyIconMap[policy.icon];
+                  return (
+                    <React.Fragment key={policy.title}>
+                      <div>
+                        <h3 className="font-bold text-slate-900 flex items-center gap-1.5 mb-2"><Icon size={16} className={policy.accentClass} /> {policy.title}</h3>
+                        <p className="leading-relaxed text-xs">{policy.description}</p>
+                      </div>
+                      {index < copy.safetyPolicies.length - 1 && <div className="h-px bg-slate-200 w-full"></div>}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </HelpDisclosure>
 
             <div className="space-y-3 pt-2">
               <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border transition-all hover:bg-slate-50 border-slate-200">

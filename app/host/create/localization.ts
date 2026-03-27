@@ -182,8 +182,10 @@ export const INITIAL_FORM_DATA = {
 type ExperienceFormCopy = {
   step1Title: string;
   step1Desc: string;
+  step1SelectionHelp: string;
   customCityPlaceholder: string;
   categoryLabel: string;
+  categoryHelp: string;
   step2Title: string;
   step2Desc: string;
   sourceLocaleLabel: string;
@@ -196,16 +198,24 @@ type ExperienceFormCopy = {
   step3Desc: (maxPhotos: number) => string;
   titlePlaceholder: string;
   titleSectionLabel: string;
+  titleHelp: string;
   firstPhotoNotice: string;
+  photoHelp: string;
+  photoGuideTitle: string;
+  photoGuideBody: string;
   addHeroPhoto: string;
   mainPhotoBadge: string;
   step4Title: string;
   step4Desc: string;
   meetingPointLabel: string;
   meetingPointPlaceholder: string;
+  meetingPointHelp: string;
   addressPlaceholder: string;
   addressHelp: string;
   itinerarySectionTitle: string;
+  itineraryHelp: string;
+  step4GuideTitle: string;
+  step4GuideBody: string;
   itineraryTitlePlaceholder: string;
   itineraryDescPlaceholder: string;
   itineraryPhotoLabel: string;
@@ -216,11 +226,17 @@ type ExperienceFormCopy = {
   step5Desc: string;
   descriptionPlaceholder: string;
   descriptionSectionLabel: string;
+  descriptionHelp: string;
+  step5GuideTitle: string;
+  step5GuideBody: string;
   inclusionsLabel: string;
+  inclusionsHelp: string;
   inclusionsPlaceholder: string;
   exclusionsLabel: string;
+  exclusionsHelp: string;
   exclusionsPlaceholder: string;
   suppliesLabel: string;
+  suppliesHelp: string;
   suppliesPlaceholder: string;
   step6Title: string;
   step6Desc: string;
@@ -230,6 +246,7 @@ type ExperienceFormCopy = {
   maxGuestsUnit: string;
   ageLimitLabel: string;
   ageLimitPlaceholder: string;
+  ageLimitHelp: string;
   activityLevelLabel: string;
   refundPolicyLabel: string;
   refundPolicyHelp: string;
@@ -237,8 +254,12 @@ type ExperienceFormCopy = {
   step7Title: string;
   step7Desc: string;
   priceLabel: string;
+  priceHelp: string;
+  pricingGuideTitle: string;
+  pricingGuideBody: string;
   privateOptionLabel: string;
   privateOptionDesc: string;
+  privatePriceHelp: string;
   privatePricePlaceholder: string;
   step8Title: string;
   step8DescLine1: string;
@@ -287,8 +308,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   ko: {
     step1Title: '어떤 체험을 준비하셨나요?',
     step1Desc: '지역과 카테고리를 먼저 선택해주세요.',
+    step1SelectionHelp: '검색과 추천 노출에 영향을 주는 기본 정보예요.',
     customCityPlaceholder: '도시 이름 입력 (예: 가마쿠라)',
     categoryLabel: '카테고리',
+    categoryHelp: '게스트가 체험을 찾을 때 가장 먼저 보는 분류입니다.',
     step2Title: '진행 가능한 언어',
     step2Desc: '이 체험을 어떤 언어로 진행할 수 있나요?',
     sourceLocaleLabel: '대표 언어',
@@ -301,16 +324,24 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step3Desc: (maxPhotos) => `선택한 언어별 제목을 입력하고 대표사진을 올려주세요. (최대 ${maxPhotos}장)`,
     titlePlaceholder: '체험 제목을 입력하세요',
     titleSectionLabel: '언어별 제목',
+    titleHelp: '게스트가 한눈에 이해할 수 있게 장소, 분위기, 핵심 경험이 드러나면 좋아요.',
     firstPhotoNotice: '첫 번째 대표사진이 체험 상세 페이지 상단에서 가장 먼저 보여집니다.',
+    photoHelp: '첫 사진은 예약 전환에 가장 큰 영향을 주는 이미지예요.',
+    photoGuideTitle: '좋은 대표사진이란?',
+    photoGuideBody: '장소 분위기와 실제 경험이 잘 보이고, 과도한 보정보다 현장감을 주는 사진이 좋습니다. 게스트가 “이 체험을 바로 상상할 수 있는지”를 기준으로 골라주세요.',
     addHeroPhoto: '대표사진 추가',
     mainPhotoBadge: '메인',
     step4Title: '어디서 만날까요?',
     step4Desc: '게스트가 바로 이해할 수 있게 만나는 장소와 체험 흐름을 적어주세요.',
     meetingPointLabel: '만나는 장소',
     meetingPointPlaceholder: '예) 스타벅스 홍대역점',
+    meetingPointHelp: '게스트가 실제로 처음 만날 장소를 쉽게 찾을 수 있게 적어주세요.',
     addressPlaceholder: '예) 서울특별시 마포구 양화로 165',
     addressHelp: '* 구글맵에서 검색 가능한 정확한 주소를 입력해주세요.',
     itinerarySectionTitle: '체험 상세 내용',
+    itineraryHelp: '각 구간에서 무엇을 하는지 짧고 분명하게 적어주세요.',
+    step4GuideTitle: '만나는 장소와 동선은 이렇게 생각해주세요',
+    step4GuideBody: '만나는 장소는 게스트가 처음 찾는 기준점이고, 정확한 주소는 길찾기와 운영 검토에 사용됩니다. 동선은 게스트가 “이 체험이 어떻게 흘러가는지”를 상상할 수 있게 적는 것이 좋습니다.',
     itineraryTitlePlaceholder: '장소 이름',
     itineraryDescPlaceholder: '간단한 설명 (선택)',
     itineraryPhotoLabel: '장소 사진',
@@ -321,11 +352,17 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Desc: '체험을 더 설득력 있게 설명하고, 게스트가 받는 혜택을 정리해주세요.',
     descriptionPlaceholder: '상세 소개글을 입력하세요. (최소 50자 이상)',
     descriptionSectionLabel: '언어별 소개글',
+    descriptionHelp: '게스트가 왜 이 체험을 예약해야 하는지 자연스럽게 이해할 수 있게 적어주세요.',
+    step5GuideTitle: '좋은 소개글은 무엇이 다른가요?',
+    step5GuideBody: '무엇을 하는지, 어떤 분위기인지, 누구에게 잘 맞는지, 현장에서 어떤 포인트를 기대할 수 있는지를 포함하면 훨씬 설득력이 높아집니다.',
     inclusionsLabel: '포함 사항',
+    inclusionsHelp: '가격에 포함된 것을 명확히 써야 게스트가 안심합니다.',
     inclusionsPlaceholder: '예) 음료',
     exclusionsLabel: '불포함 사항',
+    exclusionsHelp: '현장에서 추가 비용 오해가 없도록 꼭 구분해주세요.',
     exclusionsPlaceholder: '예) 개인 교통비',
     suppliesLabel: '준비물 (선택)',
+    suppliesHelp: '게스트가 미리 준비해야 할 것이 있다면 꼭 알려주세요.',
     suppliesPlaceholder: '예) 편한 운동화, 생수',
     step6Title: '기본 규칙 설정',
     step6Desc: '소요 시간과 참여 기준을 정리해주세요.',
@@ -335,6 +372,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     maxGuestsUnit: '명',
     ageLimitLabel: '참가 연령',
     ageLimitPlaceholder: '예) 만 7세 이상',
+    ageLimitHelp: '현장에서 바로 혼선이 생기지 않도록 참여 기준을 분명히 적어주세요.',
     activityLevelLabel: '활동 강도',
     refundPolicyLabel: '환불 정책',
     refundPolicyHelp: '환불 정책은 고정으로 자동 적용됩니다.',
@@ -349,8 +387,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: '요금 설정',
     step7Desc: '가격을 설정하세요.',
     priceLabel: '기본 1인당 가격',
+    priceHelp: '게스트가 경험의 가치를 이해할 수 있도록 포함 항목과 함께 생각해주세요.',
+    pricingGuideTitle: '가격을 정할 때 이런 기준이 좋아요',
+    pricingGuideBody: '소요 시간, 포함 항목, 이동 동선, 준비 난이도, 현장 케어 수준을 함께 생각하면 가격을 더 자신 있게 정할 수 있습니다. 너무 싸게 시작하기보다 경험의 가치를 설명할 수 있는 가격이 좋습니다.',
     privateOptionLabel: '단독 투어 옵션',
     privateOptionDesc: '다른 게스트 없이 우리 그룹만 참여하는 프라이빗 투어 가격을 설정합니다.',
+    privatePriceHelp: '기본 가격과 별도로, 우리 그룹만 참여할 때의 고정 가격을 정하는 옵션입니다.',
     privatePricePlaceholder: '단독 투어 고정 가격',
     step8Title: '체험 등록 완료! 🎉',
     step8DescLine1: '관리자 검토 후 공개됩니다.',
@@ -397,8 +439,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   en: {
     step1Title: 'What kind of experience are you preparing?',
     step1Desc: 'Choose the region and category first.',
+    step1SelectionHelp: 'This basic information affects search visibility and recommendations.',
     customCityPlaceholder: 'Enter city name (e.g. Kamakura)',
     categoryLabel: 'Category',
+    categoryHelp: 'This is one of the first filters guests use when browsing.',
     step2Title: 'Available languages',
     step2Desc: 'Which languages can you host this experience in?',
     sourceLocaleLabel: 'Primary language',
@@ -411,16 +455,24 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step3Desc: (maxPhotos) => `Add titles for each selected language and upload hero photos. (Up to ${maxPhotos})`,
     titlePlaceholder: 'Enter experience title',
     titleSectionLabel: 'Titles by language',
+    titleHelp: 'A strong title quickly shows the place, mood, and core experience.',
     firstPhotoNotice: 'The first hero photo appears at the top of the experience detail page.',
+    photoHelp: 'The first photo has the biggest impact on booking conversion.',
+    photoGuideTitle: 'What makes a good hero photo?',
+    photoGuideBody: 'Choose a photo that clearly shows the atmosphere and what guests will actually experience. Photos feel stronger when they help guests imagine the moment right away.',
     addHeroPhoto: 'Add hero photo',
     mainPhotoBadge: 'Main',
     step4Title: 'Where will you meet?',
     step4Desc: 'Describe the meeting point and flow so guests can understand it right away.',
     meetingPointLabel: 'Meeting point',
     meetingPointPlaceholder: 'e.g. Starbucks Hongdae Station',
+    meetingPointHelp: 'Write it so guests can easily find the exact first meeting spot.',
     addressPlaceholder: 'e.g. 165 Yanghwa-ro, Mapo-gu, Seoul',
     addressHelp: '* Enter an exact address searchable on Google Maps.',
     itinerarySectionTitle: 'Experience itinerary',
+    itineraryHelp: 'Keep each stop short and clear so guests can picture the flow.',
+    step4GuideTitle: 'Think of meeting point and itinerary this way',
+    step4GuideBody: 'The meeting point is the guest’s first anchor. The exact address helps with navigation and review. The itinerary should help guests imagine how the experience unfolds from start to finish.',
     itineraryTitlePlaceholder: 'Place name',
     itineraryDescPlaceholder: 'Short description (optional)',
     itineraryPhotoLabel: 'Place photo',
@@ -431,11 +483,17 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Desc: 'Explain the experience clearly and summarize what guests receive.',
     descriptionPlaceholder: 'Enter a detailed description. (At least 50 characters)',
     descriptionSectionLabel: 'Descriptions by language',
+    descriptionHelp: 'Write this so guests naturally understand why this experience is worth booking.',
+    step5GuideTitle: 'What makes a strong description?',
+    step5GuideBody: 'A strong description covers what happens, what the mood is like, who it fits best, and what guests can look forward to on the day.',
     inclusionsLabel: 'Inclusions',
+    inclusionsHelp: 'Clear inclusions help guests feel confident about what they are paying for.',
     inclusionsPlaceholder: 'e.g. Drink',
     exclusionsLabel: 'Exclusions',
+    exclusionsHelp: 'Separate these clearly so there is no surprise extra cost on site.',
     exclusionsPlaceholder: 'e.g. Personal transportation',
     suppliesLabel: 'What to bring (optional)',
+    suppliesHelp: 'If guests should prepare anything in advance, tell them here.',
     suppliesPlaceholder: 'e.g. Comfortable shoes, water',
     step6Title: 'Basic rules',
     step6Desc: 'Set the duration and participation guidelines.',
@@ -445,6 +503,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     maxGuestsUnit: 'guests',
     ageLimitLabel: 'Age requirement',
     ageLimitPlaceholder: 'e.g. Ages 7 and up',
+    ageLimitHelp: 'Clear participation rules help avoid confusion on the day.',
     activityLevelLabel: 'Activity level',
     refundPolicyLabel: 'Refund policy',
     refundPolicyHelp: 'The refund policy is fixed and applied automatically.',
@@ -459,8 +518,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: 'Pricing',
     step7Desc: 'Set your price.',
     priceLabel: 'Base price per guest',
+    priceHelp: 'Think about price together with duration, inclusions, and the value guests will feel.',
+    pricingGuideTitle: 'A simple way to think about pricing',
+    pricingGuideBody: 'Consider time, inclusions, route complexity, preparation effort, and how much care you provide on the day. A confident price with a clear value story works better than pricing too low.',
     privateOptionLabel: 'Private tour option',
     privateOptionDesc: 'Set a fixed price for a private tour where only the booking group participates.',
+    privatePriceHelp: 'Use this when you want a separate fixed price for one booking group only.',
     privatePricePlaceholder: 'Fixed private tour price',
     step8Title: 'Experience submitted! 🎉',
     step8DescLine1: 'It will be published after admin review.',
@@ -507,8 +570,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   ja: {
     step1Title: 'どんな体験を準備していますか？',
     step1Desc: 'まず地域とカテゴリを選択してください。',
+    step1SelectionHelp: '検索表示やおすすめ表示に影響する基本情報です。',
     customCityPlaceholder: '都市名を入力してください（例: 鎌倉）',
     categoryLabel: 'カテゴリ',
+    categoryHelp: 'ゲストが体験を探すときに最初に見る分類の一つです。',
     step2Title: '対応可能な言語',
     step2Desc: 'この体験はどの言語で進行できますか？',
     sourceLocaleLabel: '代表言語',
@@ -521,16 +586,24 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step3Desc: (maxPhotos) => `選択した各言語のタイトルを入力し、代表写真をアップロードしてください。（最大${maxPhotos}枚）`,
     titlePlaceholder: '体験タイトルを入力してください',
     titleSectionLabel: '言語別タイトル',
+    titleHelp: '場所、雰囲気、体験の核がひと目で伝わるタイトルが理想です。',
     firstPhotoNotice: '最初の代表写真が体験詳細ページ上部に最初に表示されます。',
+    photoHelp: '最初の写真は予約転換に最も影響しやすい画像です。',
+    photoGuideTitle: '良い代表写真とは？',
+    photoGuideBody: '現場の雰囲気と実際の体験内容がよく伝わり、ゲストがすぐにその場面を想像できる写真がおすすめです。',
     addHeroPhoto: '代表写真を追加',
     mainPhotoBadge: 'メイン',
     step4Title: 'どこで会いますか？',
     step4Desc: 'ゲストがすぐ理解できるように集合場所と体験の流れを書いてください。',
     meetingPointLabel: '集合場所',
     meetingPointPlaceholder: '例）スターバックス弘大駅店',
+    meetingPointHelp: 'ゲストが最初に迷わず見つけられるように書いてください。',
     addressPlaceholder: '例）ソウル特別市 麻浦区 楊花路 165',
     addressHelp: '* Google Maps で検索できる正確な住所を入力してください。',
     itinerarySectionTitle: '体験の詳細内容',
+    itineraryHelp: '各区間で何をするのかを短く分かりやすく書いてください。',
+    step4GuideTitle: '集合場所と動線はこう考えると分かりやすいです',
+    step4GuideBody: '集合場所はゲストが最初に探す基準点です。正確な住所は道案内や審査確認に使われます。動線は、体験がどう進むかを想像できるように書くのがポイントです。',
     itineraryTitlePlaceholder: '場所名',
     itineraryDescPlaceholder: '簡単な説明（任意）',
     itineraryPhotoLabel: '場所の写真',
@@ -541,11 +614,17 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Desc: '体験をより魅力的に説明し、ゲストが受け取る内容を整理してください。',
     descriptionPlaceholder: '詳細紹介文を入力してください。（50文字以上推奨）',
     descriptionSectionLabel: '言語別紹介文',
+    descriptionHelp: 'ゲストが「なぜこの体験を予約したいのか」を自然に理解できる説明が理想です。',
+    step5GuideTitle: '良い紹介文のポイント',
+    step5GuideBody: '何をするのか、どんな雰囲気なのか、どんな人に向いているのか、当日に何を期待できるのかまで入れると、ぐっと説得力が高まります。',
     inclusionsLabel: '含まれるもの',
+    inclusionsHelp: '料金に含まれる内容を明確にすると、ゲストが安心して予約できます。',
     inclusionsPlaceholder: '例）ドリンク',
     exclusionsLabel: '含まれないもの',
+    exclusionsHelp: '現地で追加費用の誤解が出ないように、必ず分けて書いてください。',
     exclusionsPlaceholder: '例）個人の交通費',
     suppliesLabel: '持ち物（任意）',
+    suppliesHelp: '事前に準備してほしいものがあればここで案内してください。',
     suppliesPlaceholder: '例）歩きやすい靴、水',
     step6Title: '基本ルール設定',
     step6Desc: '所要時間と参加条件を整理してください。',
@@ -555,6 +634,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     maxGuestsUnit: '名',
     ageLimitLabel: '参加年齢',
     ageLimitPlaceholder: '例）満7歳以上',
+    ageLimitHelp: '当日に混乱が起きないよう、参加基準ははっきり書いてください。',
     activityLevelLabel: '活動強度',
     refundPolicyLabel: '返金ポリシー',
     refundPolicyHelp: '返金ポリシーは固定で自動適用されます。',
@@ -569,8 +649,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: '料金設定',
     step7Desc: '価格を設定してください。',
     priceLabel: '基本の1人あたり価格',
+    priceHelp: '所要時間、含まれる内容、ゲストが感じる価値を一緒に考えて価格を決めてください。',
+    pricingGuideTitle: '価格を決めるときの考え方',
+    pricingGuideBody: '時間、含まれる内容、移動動線、準備の手間、当日のケアの深さを合わせて考えると決めやすくなります。安くしすぎるより、価値を説明できる価格のほうが長く続けやすいです。',
     privateOptionLabel: 'プライベートツアーオプション',
     privateOptionDesc: '他のゲストなしで、グループだけが参加するプライベートツアーの価格を設定します。',
+    privatePriceHelp: '1組だけで参加する場合の固定価格を別で設定したいときに使います。',
     privatePricePlaceholder: 'プライベートツアー固定価格',
     step8Title: '体験登録が完了しました！ 🎉',
     step8DescLine1: '管理者の確認後に公開されます。',
@@ -617,8 +701,10 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
   zh: {
     step1Title: '你准备了什么样的体验？',
     step1Desc: '请先选择地区和类别。',
+    step1SelectionHelp: '这是会影响搜索和推荐展示的基础信息。',
     customCityPlaceholder: '输入城市名称（例如：镰仓）',
     categoryLabel: '类别',
+    categoryHelp: '这是游客浏览时最先看到的分类之一。',
     step2Title: '可使用语言',
     step2Desc: '这个体验可以用哪些语言进行？',
     sourceLocaleLabel: '代表语言',
@@ -631,16 +717,24 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step3Desc: (maxPhotos) => `请填写所选语言的标题并上传代表照片。（最多${maxPhotos}张）`,
     titlePlaceholder: '请输入体验标题',
     titleSectionLabel: '按语言填写标题',
+    titleHelp: '如果能一眼看出地点、氛围和核心体验，会更吸引游客。',
     firstPhotoNotice: '第一张代表照片会显示在体验详情页顶部。',
+    photoHelp: '第一张照片对预订转化的影响最大。',
+    photoGuideTitle: '什么样的代表照片更好？',
+    photoGuideBody: '建议选择能清楚展示现场氛围和实际体验内容的照片，让游客一眼就能想象自己会经历什么。',
     addHeroPhoto: '添加代表照片',
     mainPhotoBadge: '主图',
     step4Title: '在哪里见面？',
     step4Desc: '请填写集合地点和体验流程，让房客一眼就能理解。',
     meetingPointLabel: '集合地点',
     meetingPointPlaceholder: '例如：弘大站星巴克',
+    meetingPointHelp: '请写成游客第一次见面时能轻松找到的地点说明。',
     addressPlaceholder: '例如：首尔特别市麻浦区杨花路165',
     addressHelp: '* 请输入可以在 Google Maps 搜索到的准确地址。',
     itinerarySectionTitle: '体验详细内容',
+    itineraryHelp: '请简短而清楚地写出每一段会做什么。',
+    step4GuideTitle: '集合地点和流程可以这样理解',
+    step4GuideBody: '集合地点是游客最先寻找的基准点，准确地址用于导航和审核确认。流程说明则应该帮助游客想象整个体验如何展开。',
     itineraryTitlePlaceholder: '地点名称',
     itineraryDescPlaceholder: '简要说明（可选）',
     itineraryPhotoLabel: '地点照片',
@@ -651,11 +745,17 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step5Desc: '更有说服力地介绍体验，并整理房客可获得的内容。',
     descriptionPlaceholder: '请输入详细介绍。（建议至少50字）',
     descriptionSectionLabel: '按语言填写介绍',
+    descriptionHelp: '请写成让游客自然理解“为什么值得预订”的介绍。',
+    step5GuideTitle: '好的介绍文通常会包含什么？',
+    step5GuideBody: '如果能说明会做什么、整体氛围、适合什么样的游客，以及当天最值得期待的部分，介绍会更有说服力。',
     inclusionsLabel: '包含内容',
+    inclusionsHelp: '明确写出价格中包含什么，游客会更安心。',
     inclusionsPlaceholder: '例如：饮品',
     exclusionsLabel: '不包含内容',
+    exclusionsHelp: '请明确区分不包含内容，避免现场产生额外费用误会。',
     exclusionsPlaceholder: '例如：个人交通费',
     suppliesLabel: '需准备物品（可选）',
+    suppliesHelp: '如果游客需要提前准备什么，请在这里提前说明。',
     suppliesPlaceholder: '例如：舒适的运动鞋、饮用水',
     step6Title: '基本规则设置',
     step6Desc: '请整理所需时间和参与条件。',
@@ -665,6 +765,7 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     maxGuestsUnit: '人',
     ageLimitLabel: '参加年龄',
     ageLimitPlaceholder: '例如：满7岁以上',
+    ageLimitHelp: '请明确填写参加条件，避免现场产生混乱。',
     activityLevelLabel: '活动强度',
     refundPolicyLabel: '退款政策',
     refundPolicyHelp: '退款政策为固定并自动应用。',
@@ -679,8 +780,12 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     step7Title: '价格设置',
     step7Desc: '请设置价格。',
     priceLabel: '基础单价（每人）',
+    priceHelp: '请结合时长、包含内容和游客能感受到的价值来考虑价格。',
+    pricingGuideTitle: '设定价格时可以这样想',
+    pricingGuideBody: '可以一起考虑时长、包含内容、路线复杂度、准备难度以及当天的陪同与照顾程度。比起一味压低价格，更重要的是设定一个能体现体验价值的价格。',
     privateOptionLabel: '私人团选项',
     privateOptionDesc: '设置仅预订团体参加、无其他游客的私人团价格。',
+    privatePriceHelp: '如果想为单独一组游客设置固定价格，可以开启这个选项。',
     privatePricePlaceholder: '私人团固定价格',
     step8Title: '体验提交完成！ 🎉',
     step8DescLine1: '管理员审核后将会公开。',

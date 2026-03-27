@@ -39,6 +39,7 @@ import { type LanguageLevel, type LanguageLevelEntry } from '@/app/utils/languag
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getManualFieldValue, setManualFieldValue, type ExperienceFormState, type ItineraryItem } from '../experienceFormState';
 import { getManualLocalesFromLanguageLevels } from '@/app/utils/experienceTranslation';
+import { FieldHint, HelpDisclosure } from '@/app/host/components/FormHelp';
 
 interface ExperienceFormStepsProps {
   step: number;
@@ -183,6 +184,7 @@ export default function ExperienceFormSteps({
         <div className="space-y-2">
           <h1 className="text-[22px] md:text-[30px] font-black text-slate-900 leading-tight">{copy.step1Title}</h1>
           <p className="text-[13px] md:text-base text-slate-500">{copy.step1Desc}</p>
+          <p className="text-xs md:text-sm text-slate-500">{copy.step1SelectionHelp}</p>
         </div>
 
         <div className="space-y-5 md:space-y-6">
@@ -227,6 +229,7 @@ export default function ExperienceFormSteps({
 
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">{copy.categoryLabel}</label>
+            <FieldHint className="mb-3 ml-0">{copy.categoryHelp}</FieldHint>
             <div className="flex flex-wrap gap-2.5 md:gap-3">
               {CATEGORY_OPTIONS.map((categoryOption) => {
                 const Icon = categoryIconMap[categoryOption.icon] || MapPin;
@@ -302,6 +305,7 @@ export default function ExperienceFormSteps({
         <div className="space-y-6 md:space-y-8">
           <div className="space-y-4">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{copy.titleSectionLabel}</label>
+            <FieldHint className="ml-0">{copy.titleHelp}</FieldHint>
             <div className="space-y-4">
               {selectedLanguageOptions.map((option) => {
                 const isSourceLocale = formData.source_locale === option.code;
@@ -335,6 +339,10 @@ export default function ExperienceFormSteps({
           <p className="text-[12px] md:text-sm text-slate-500 leading-relaxed">
             {copy.firstPhotoNotice}
           </p>
+          <FieldHint className="ml-0">{copy.photoHelp}</FieldHint>
+          <HelpDisclosure title={copy.photoGuideTitle}>
+            <p>{copy.photoGuideBody}</p>
+          </HelpDisclosure>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {formData.photos.length < MAX_EXPERIENCE_PHOTOS && (
@@ -403,6 +411,7 @@ export default function ExperienceFormSteps({
             onChange={(e) => updateData('meeting_point', e.target.value)}
             className="w-full p-3.5 md:p-4 bg-white rounded-xl border border-slate-200 focus:border-black outline-none font-bold text-sm md:text-base"
           />
+          <FieldHint className="ml-0">{copy.meetingPointHelp}</FieldHint>
           <input
             type="text"
             placeholder={copy.addressPlaceholder}
@@ -415,6 +424,10 @@ export default function ExperienceFormSteps({
 
         <div className="space-y-4">
           <h3 className="text-base md:text-lg font-bold">{copy.itinerarySectionTitle}</h3>
+          <FieldHint className="ml-0">{copy.itineraryHelp}</FieldHint>
+          <HelpDisclosure title={copy.step4GuideTitle}>
+            <p>{copy.step4GuideBody}</p>
+          </HelpDisclosure>
           <div className="relative border-l-2 border-slate-100 ml-3 md:ml-4 pl-6 md:pl-8 space-y-5 md:space-y-8 py-2">
             {formData.itinerary.map((item: ItineraryItem, idx: number) => (
               <div key={idx} className="relative group animate-in slide-in-from-left-4 fade-in duration-300">
@@ -495,10 +508,14 @@ export default function ExperienceFormSteps({
           <h1 className="text-[22px] md:text-[30px] font-black">{copy.step5Title}</h1>
           <p className="text-[13px] md:text-base text-slate-500">{copy.step5Desc}</p>
         </div>
+        <HelpDisclosure title={copy.step5GuideTitle}>
+          <p>{copy.step5GuideBody}</p>
+        </HelpDisclosure>
 
         <div className="space-y-6">
           <div className="space-y-4">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{copy.descriptionSectionLabel}</label>
+            <FieldHint className="ml-0">{copy.descriptionHelp}</FieldHint>
             {selectedLanguageOptions.map((option) => {
               const isSourceLocale = formData.source_locale === option.code;
               const inputValue = getManualFieldValue(formData.manual_content, option.code, 'description');
@@ -531,6 +548,7 @@ export default function ExperienceFormSteps({
 
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">{copy.inclusionsLabel}</label>
+            <FieldHint className="mb-2 ml-0">{copy.inclusionsHelp}</FieldHint>
             <div className="flex gap-2 mb-3">
               <input
                 type="text"
@@ -563,6 +581,7 @@ export default function ExperienceFormSteps({
 
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">{copy.exclusionsLabel}</label>
+            <FieldHint className="mb-2 ml-0">{copy.exclusionsHelp}</FieldHint>
             <div className="flex gap-2 mb-3">
               <input
                 type="text"
@@ -595,6 +614,7 @@ export default function ExperienceFormSteps({
 
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">{copy.suppliesLabel}</label>
+            <FieldHint className="mb-2 ml-0">{copy.suppliesHelp}</FieldHint>
             <textarea
               placeholder={copy.suppliesPlaceholder}
               value={formData.supplies}
@@ -653,6 +673,7 @@ export default function ExperienceFormSteps({
                   onChange={(e) => updateData('rules', { ...formData.rules, age_limit: e.target.value })}
                   className="w-full p-3 bg-white rounded-xl text-sm border border-slate-200 focus:border-black outline-none"
                 />
+                <FieldHint className="ml-0">{copy.ageLimitHelp}</FieldHint>
               </div>
 
               <div>
@@ -724,7 +745,10 @@ export default function ExperienceFormSteps({
                 placeholder="0"
               />
             </div>
-            <p className="text-[11px] md:text-xs text-slate-400 text-center mt-2">참고: 4시간 투어 기준 평균 3~5만원</p>
+            <FieldHint className="text-center ml-0 mt-2">{copy.priceHelp}</FieldHint>
+            <HelpDisclosure title={copy.pricingGuideTitle} className="mt-4 text-left">
+              <p>{copy.pricingGuideBody}</p>
+            </HelpDisclosure>
           </div>
 
           <div className="w-full bg-slate-50 p-6 rounded-2xl border border-slate-200">
@@ -743,7 +767,8 @@ export default function ExperienceFormSteps({
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
               </label>
             </div>
-            <p className="text-[11px] md:text-xs text-slate-400 mb-3">{copy.privateOptionDesc}</p>
+            <p className="text-[11px] md:text-xs text-slate-400 mb-2">{copy.privateOptionDesc}</p>
+            <FieldHint className="mb-3 ml-0">{copy.privatePriceHelp}</FieldHint>
 
             {formData.is_private_enabled && (
               <div className="animate-in fade-in slide-in-from-top-2 pt-2 border-t border-slate-200">

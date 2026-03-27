@@ -129,6 +129,12 @@ test('host register keeps previous button visible and shows self-intro language 
   await page.getByRole('button', { name: 'Lv.5' }).first().click();
   await page.locator('footer').getByRole('button', { name: /다음|Next|次へ|下一步/ }).click();
 
+  await expect(
+    page.getByText(
+      /정산과 신원 확인에 사용되는 이름입니다\.|This name is used for identity review and payouts\.|本人確認と精算に使われる名前です。|该姓名会用于身份审核和结算/
+    )
+  ).toBeVisible();
+
   await page.locator('input[placeholder="홍길동"], input[placeholder="John Doe"]').fill(user.fullName);
   await page.locator('input[placeholder="YYYY.MM.DD"]').fill('1990.01.01');
   await page.locator('input[placeholder="010-1234-5678"]').fill(user.phone);
@@ -136,6 +142,12 @@ test('host register keeps previous button visible and shows self-intro language 
   await page.locator('input[placeholder="@locally.host"]').fill('@host_visibility');
   await page.locator('input[placeholder*="인스타"], input[placeholder*="Instagram"], input[placeholder*="インスタ"], input[placeholder*="小红书"]').fill('playwright');
   await page.locator('footer').getByRole('button', { name: /다음|Next|次へ|下一步/ }).click();
+
+  await expect(
+    page.getByText(
+      /게스트가 가장 먼저 보는 사진이에요\.|This is often the first image guests notice\.|ゲストが最初に目にしやすい写真です。|这通常是游客最先看到的照片/
+    )
+  ).toBeVisible();
 
   await expect(
     page.getByText(

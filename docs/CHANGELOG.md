@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.64 — [Host Onboarding UX] 등록 폼 도움말·예시 안내 강화
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 호스트 등록 helper text / 펼침 도움말 추가 | `app/host/register/components/HostRegisterForm.tsx`, `app/host/register/localization.ts`, `app/host/components/FormHelp.tsx` — 기본 정보, 프로필 소개, 신분증, 정산 계좌, 지원 동기에 왜 필요한지와 좋은 입력 기준을 짧은 문구로 보강하고, 핵심 항목에는 `자세히 보기` 도움말을 추가. 마지막 안전 가이드라인 step은 핵심 요약 3줄을 먼저 보여주고 세부 정책은 펼쳐서 읽도록 재구성 |
+| 🟠 체험 등록 품질 유도 카피 보강 | `app/host/create/components/ExperienceFormSteps.tsx`, `app/host/create/localization.ts`, `app/host/components/FormHelp.tsx` — 도시/카테고리, 제목/대표사진, 미팅포인트/주소/동선, 상세 소개/포함 사항, 연령 기준, 가격/프라이빗 옵션에 helper text와 소규모 도움말을 추가해 “왜 이걸 입력하는지”와 “어떤 입력이 좋은지”를 더 쉽게 이해할 수 있도록 정리 |
+| 🟡 등록 UX 가시성 계약 테스트 보강 | `tests/e2e/97-host-register-visibility.spec.ts`, `tests/e2e/93-host-create-copy-layout.spec.ts` — 새 helper text가 실제 단계 화면에서 보이는지 검증하도록 얇은 회귀 체크를 추가 |
+
 ## v3.39.63 — [Host UX] 무응답·취소 책임 경고 카피 보강
 
 | 항목 | 내용 |
