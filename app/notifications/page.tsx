@@ -185,58 +185,74 @@ export default function NotificationsPage() {
               <p className="text-slate-400 text-[11px] mt-0.5">
                 {filter === 'unread' ? t('noti_empty_unread') : t('noti_empty_all')}
               </p>
+              <button
+                type="button"
+                onClick={() => router.push('/help')}
+                className="mt-4 inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-bold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+              >
+                {t('noti_empty_cta_help')}
+              </button>
             </div>
           ) : (
-            filteredList.map((noti, idx) => (
-              <div
-                key={noti.id}
-                className={`relative group rounded-xl px-4 md:px-5 py-3 md:py-3.5 border transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300 [animation-fill-mode:both] ${!noti.is_read
+            filteredList.map((noti, idx) => {
+              const isLinkedNavigation = Boolean(noti.link && !['/notifications', '/host/notifications'].includes(noti.link));
+
+              return (
+                <div
+                  key={noti.id}
+                  className={`relative group rounded-xl px-4 md:px-5 py-3 md:py-3.5 border transition-all cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300 [animation-fill-mode:both] ${!noti.is_read
                     ? `bg-blue-50/40 border-blue-100 border-l-4 ${getAccentBorder(noti.type)}`
                     : 'bg-white border-slate-100 hover:border-slate-200'
-                  }`}
-                style={{ animationDelay: `${Math.min(idx * 40, 400)}ms` }}
-                onClick={() => handleNotificationClick(noti)}
-              >
-                <div className="flex gap-3 items-start">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${!noti.is_read ? 'bg-white shadow-sm' : 'bg-slate-100'
-                    }`}>
-                    {getIcon(noti.type)}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h3 className={`font-semibold text-[12px] md:text-[14px] mb-0.5 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
-                        {noti.title}
-                        {!noti.is_read && <span className="ml-1.5 w-1.5 h-1.5 inline-block bg-rose-500 rounded-full align-middle"></span>}
-                      </h3>
-                      <span className="text-[10px] md:text-[11px] text-slate-400 shrink-0 ml-2">
-                        {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')}
-                      </span>
-                    </div>
-                    <p className={`text-[11px] md:text-[13px] leading-relaxed whitespace-pre-wrap transition-all duration-300 ${expandedIds.includes(noti.id) ? '' : 'line-clamp-2'
-                      } ${!noti.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
-                      {noti.message}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center text-slate-300 group-hover:text-slate-500 transition-all ml-1">
-                    {noti.link && !['/notifications', '/host/notifications'].includes(noti.link) ? (
-                      <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                    ) : (
-                      <ChevronRight size={14} className={`transition-transform duration-300 ${expandedIds.includes(noti.id) ? 'rotate-90' : ''}`} />
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteNotification(noti.id); }}
-                  className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                  title={t('noti_delete')}
+                    }`}
+                  style={{ animationDelay: `${Math.min(idx * 40, 400)}ms` }}
+                  onClick={() => handleNotificationClick(noti)}
                 >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))
+                  <div className="flex gap-3 items-start">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${!noti.is_read ? 'bg-white shadow-sm' : 'bg-slate-100'
+                      }`}>
+                      {getIcon(noti.type)}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0">
+                          <h3 className={`font-semibold text-[12px] md:text-[14px] mb-0.5 ${!noti.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
+                            {noti.title}
+                            {!noti.is_read && <span className="ml-1.5 w-1.5 h-1.5 inline-block bg-rose-500 rounded-full align-middle"></span>}
+                          </h3>
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${isLinkedNavigation ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {isLinkedNavigation ? t('noti_action_open') : t('noti_action_details')}
+                          </span>
+                        </div>
+                        <span className="text-[10px] md:text-[11px] text-slate-400 shrink-0 ml-2">
+                          {new Date(noti.created_at).toLocaleDateString(lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN')}
+                        </span>
+                      </div>
+                      <p className={`mt-1 text-[11px] md:text-[13px] leading-relaxed whitespace-pre-wrap transition-all duration-300 ${expandedIds.includes(noti.id) ? '' : 'line-clamp-2'
+                        } ${!noti.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
+                        {noti.message}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center text-slate-300 group-hover:text-slate-500 transition-all ml-1">
+                      {isLinkedNavigation ? (
+                        <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                      ) : (
+                        <ChevronRight size={14} className={`transition-transform duration-300 ${expandedIds.includes(noti.id) ? 'rotate-90' : ''}`} />
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteNotification(noti.id); }}
+                    className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                    title={t('noti_delete')}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       </main>

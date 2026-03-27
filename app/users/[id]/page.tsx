@@ -6,12 +6,14 @@ import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { User, CheckCircle2, Star } from 'lucide-react';
 import ExperienceCard from '@/app/components/ExperienceCard';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 type PublicHostProfile = {
   full_name: string | null;
   avatar_url: string | null;
   bio: string | null;
   introduction: string | null;
+  languages: string[];
 };
 
 type HostExperienceCardData = {
@@ -38,6 +40,7 @@ type HostExperienceCardData = {
 
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<PublicHostProfile | null>(null);
   const [hostExperiences, setHostExperiences] = useState<HostExperienceCardData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       // 공개 호스트 프로필은 safe projection view만 사용한다.
       const { data: hostApp } = await supabase
         .from('public_host_applications')
-        .select('status, name, profile_photo, self_intro')
+        .select('status, name, profile_photo, self_intro, languages')
         .eq('user_id', resolvedParams.id)
         .maybeSingle();
 
@@ -57,6 +60,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         avatar_url: hostApp.profile_photo,
         bio: hostApp.self_intro,
         introduction: hostApp.self_intro,
+        languages: Array.isArray(hostApp.languages)
+          ? hostApp.languages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+          : [],
       } : null);
 
       // 승인된 호스트의 경우에만 운영 중인 활성 체험 가져오기
@@ -76,6 +82,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   }, [resolvedParams.id, supabase]);
 
   if (loading) return <div className="min-h-screen bg-white" />;
+
+  const displayName = profile?.full_name || t('public_host_profile_name_fallback');
+  const activeExperienceCountLabel = t('public_host_profile_meta_active_count').replace('{count}', String(hostExperiences.length));
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">
@@ -103,21 +112,50 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={64} /></div>
                   )}
                 </div>
-                <h1 className="text-2xl md:text-3xl font-black mb-2">{profile?.full_name || '이름 없음'}</h1>
-                <div className="flex items-center gap-1 text-sm font-bold mb-6">
-                  <CheckCircle2 size={16} className="text-black" /> 본인 인증 완료
+                <h1 className="text-2xl md:text-3xl font-black mb-2">{displayName}</h1>
+                <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+                  <div className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
+                    <CheckCircle2 size={16} className="text-black" /> {t('verified_identity')}
+                  </div>
+                  <div className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
+                    {activeExperienceCountLabel}
+                  </div>
                 </div>
 
+                {profile?.languages && profile.languages.length > 0 && (
+                  <div data-testid="public-host-languages" className="mb-6 w-full text-left">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                      {t('field_label_languages')}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.languages.map((language) => (
+                        <span
+                          key={language}
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600"
+                        >
+                          {language}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <p className="mb-3 text-sm leading-relaxed text-slate-500">
+                  {t('public_host_profile_verification_desc')}
+                </p>
+
                 <div className="w-full border-t border-slate-100 py-4 md:py-6 text-left space-y-3 md:space-y-4">
-                  <h3 className="font-bold text-base md:text-lg">{profile?.full_name} 님 확인 정보</h3>
+                  <h3 className="font-bold text-base md:text-lg">
+                    {t('public_host_profile_verification_title').replace('{name}', displayName)}
+                  </h3>
                   <div className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 size={18} /> <span>신분증</span>
+                    <CheckCircle2 size={18} /> <span>{t('public_host_profile_verification_id')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 size={18} /> <span>이메일 주소</span>
+                    <CheckCircle2 size={18} /> <span>{t('public_host_profile_verification_email')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 size={18} /> <span>전화번호</span>
+                    <CheckCircle2 size={18} /> <span>{t('public_host_profile_verification_phone')}</span>
                   </div>
                 </div>
               </div>
@@ -129,34 +167,56 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
             {/* 소개글 */}
             <section>
-              <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">호스트 소개</h2>
+              <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-3">{t('public_host_profile_intro_title')}</h2>
+              <p className="mb-4 text-sm leading-relaxed text-slate-500 md:mb-6">
+                {t('public_host_profile_intro_desc')}
+              </p>
               <div className="prose prose-slate max-w-none">
                 <p className="text-base md:text-lg leading-relaxed text-slate-700">
-                  {profile?.introduction || profile?.bio || "아직 자기소개가 없습니다."}
+                  {profile?.introduction || profile?.bio || t('public_host_profile_intro_empty')}
                 </p>
-                {/* 여기에 아까 만든 HostProfileCard의 상세 정보(직업, 취미 등)를 다시 보여줄 수도 있습니다. */}
               </div>
             </section>
 
             {/* 운영 중인 체험 */}
-            {hostExperiences.length > 0 && (
-              <section className="pt-12 border-t border-slate-100">
-                <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">{profile?.full_name}님의 체험</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <section data-testid="public-host-experiences-section" className="pt-12 border-t border-slate-100">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold mb-2">
+                    {t('public_host_profile_experiences_title').replace('{name}', displayName)}
+                  </h2>
+                  <p className="text-sm leading-relaxed text-slate-500">
+                    {t('public_host_profile_experiences_desc')}
+                  </p>
+                </div>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
+                  {activeExperienceCountLabel}
+                </span>
+              </div>
+
+              {hostExperiences.length > 0 ? (
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {hostExperiences.map(exp => (
                     <ExperienceCard key={exp.id} data={exp} />
                   ))}
                 </div>
-              </section>
-            )}
+              ) : (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
+                  {t('public_host_profile_experiences_empty')}
+                </div>
+              )}
+            </section>
 
             {/* 후기 (추후 구현) */}
             <section className="pt-12 border-t border-slate-100">
-              <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 flex items-center gap-2">
-                <Star className="fill-black" size={24} /> 후기
+              <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-3 flex items-center gap-2">
+                <Star className="fill-black" size={24} /> {t('public_host_profile_reviews_title')}
               </h2>
+              <p className="mb-4 text-sm leading-relaxed text-slate-500 md:mb-6">
+                {t('public_host_profile_reviews_desc')}
+              </p>
               <div className="p-8 bg-slate-50 rounded-2xl text-center text-slate-500">
-                아직 작성된 후기가 없습니다.
+                {t('public_host_profile_reviews_empty')}
               </div>
             </section>
 

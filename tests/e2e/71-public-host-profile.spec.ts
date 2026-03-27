@@ -224,7 +224,9 @@ test.describe.serial('Public host profile', () => {
 
     await expect(page.getByRole('heading', { name: host.fullName, exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('공개 호스트 프로필 검증용 승인 호스트입니다.')).toBeVisible();
-    await expect(page.getByRole('heading', { name: `${host.fullName}님의 체험` })).toBeVisible();
+    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
+    await expect(page.getByTestId('public-host-languages')).toBeVisible();
+    await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
     await expect(page.getByText(experience.title)).toBeVisible();
   });
 });

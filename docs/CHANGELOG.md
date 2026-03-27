@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.74 — [Self-Service] 계정·알림·도움말 안내 강화 + 공개 호스트 프로필 신뢰 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 계정/알림/도움말 self-service quick-win | `app/account/page.tsx`, `app/notifications/page.tsx`, `app/help/page.tsx`, `app/context/LanguageContext.tsx` — 모바일 계정 탭에 unread 알림 안내 strip를 추가하고, 알림 센터에 `바로 이동 / 세부 보기` 행동 구분과 empty-state 도움말 CTA를 보강했다. 도움말 센터에는 `답변은 메시지함에서 확인` 안내, FAQ 검색 empty state, 문의 모달 후속 안내를 추가해 self-service 흐름을 더 분명하게 정리 |
+| 🟠 공개 호스트 프로필 trust copy 보강 | `app/users/[id]/page.tsx`, `app/context/LanguageContext.tsx` — 공개 호스트 프로필의 하드코딩 한국어를 정리하고, 구사 언어·운영 중 체험 수·검증 정보 설명·소개/후기 fallback copy를 보강해 예약 전 신뢰 형성을 돕도록 개선 |
+| 🟡 관련 UI 스모크 보강 | `tests/e2e/54-mobile-notification-badges.spec.ts`, `tests/e2e/71-public-host-profile.spec.ts`, `tests/e2e/104-help-self-service.spec.ts` — 모바일 account unread 안내 strip, 공개 호스트 프로필 언어 노출, 도움말 self-service empty state를 얇게 검증하는 체크를 추가 |
+
 ## v3.39.73 — [Ops Docs] 공지 설정 파일 내부 주석 보강
 
 | 항목 | 내용 |

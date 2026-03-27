@@ -290,45 +290,76 @@ export default function HelpCenterPage() {
           </div>
         </div>
 
+        <div
+          data-testid="help-inbox-reply-strip"
+          className="mx-auto mb-8 md:mb-12 max-w-3xl rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center"
+        >
+          <p className="text-[12px] font-medium text-slate-700 md:text-[14px]">
+            {t('help_inbox_reply_notice')}
+          </p>
+        </div>
+
         {/* FAQ 리스트 */}
-        <div className="space-y-9 md:space-y-20">
-          {filteredData.map((category, catIdx) => (
-            <div key={catIdx}>
-              {/* 카테고리 제목 */}
-              <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-8 border-b border-black pb-2.5 md:pb-4">
-                <span className="p-1.5 md:p-2 border border-black rounded-full">{category.icon}</span>
-                <h2 className="text-[16px] md:text-2xl font-bold tracking-tight">{category.category}</h2>
-              </div>
+        {filteredData.length === 0 ? (
+          <div
+            data-testid="help-search-empty-state"
+            className="mx-auto max-w-3xl rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center"
+          >
+            <h2 className="text-[18px] font-black tracking-tight text-slate-900 md:text-2xl">
+              {t('help_search_empty_title')}
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-[13px] leading-relaxed text-slate-500 md:text-[15px]">
+              {t('help_search_empty_desc')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setHelpModalOpen(true)}
+              data-testid="help-search-empty-cta"
+              className="mt-5 inline-flex items-center justify-center rounded-full bg-black px-5 py-3 text-[12px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-slate-800"
+            >
+              {t('help_search_empty_cta')}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-9 md:space-y-20">
+            {filteredData.map((category, catIdx) => (
+              <div key={catIdx}>
+                {/* 카테고리 제목 */}
+                <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-8 border-b border-black pb-2.5 md:pb-4">
+                  <span className="p-1.5 md:p-2 border border-black rounded-full">{category.icon}</span>
+                  <h2 className="text-[16px] md:text-2xl font-bold tracking-tight">{category.category}</h2>
+                </div>
 
-              {/* 질문 목록 */}
-              <div className="space-y-0">
-                {category.items.map((item, itemIdx) => {
-                  const isOpen = openItems[`${catIdx}-${itemIdx}`];
-                  return (
-                    <div key={itemIdx} className="border-b border-gray-200">
-                      <button
-                        onClick={() => toggleItem(catIdx, itemIdx)}
-                        className="w-full py-4 md:py-6 flex justify-between items-start text-left group hover:bg-gray-50 transition-colors px-4 -mx-4 rounded-lg"
-                      >
-                        <span className="text-[13px] md:text-lg font-medium text-[#222222] pr-6 md:pr-8 group-hover:underline decoration-2 underline-offset-4">{item.q}</span>
-                        <div className="pt-1 text-gray-400 group-hover:text-black transition-colors">
-                          {isOpen ? <ChevronUp size={20} strokeWidth={2.5} /> : <ChevronDown size={20} strokeWidth={2.5} />}
-                        </div>
-                      </button>
+                {/* 질문 목록 */}
+                <div className="space-y-0">
+                  {category.items.map((item, itemIdx) => {
+                    const isOpen = openItems[`${catIdx}-${itemIdx}`];
+                    return (
+                      <div key={itemIdx} className="border-b border-gray-200">
+                        <button
+                          onClick={() => toggleItem(catIdx, itemIdx)}
+                          className="w-full py-4 md:py-6 flex justify-between items-start text-left group hover:bg-gray-50 transition-colors px-4 -mx-4 rounded-lg"
+                        >
+                          <span className="text-[13px] md:text-lg font-medium text-[#222222] pr-6 md:pr-8 group-hover:underline decoration-2 underline-offset-4">{item.q}</span>
+                          <div className="pt-1 text-gray-400 group-hover:text-black transition-colors">
+                            {isOpen ? <ChevronUp size={20} strokeWidth={2.5} /> : <ChevronDown size={20} strokeWidth={2.5} />}
+                          </div>
+                        </button>
 
-                      {/* 답변 내용 */}
-                      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100 pb-6 md:pb-8' : 'max-h-0 opacity-0'}`}>
-                        <div className="px-4 text-[14px] md:text-base text-[#484848] leading-relaxed max-w-3xl font-light">
-                          {item.a}
+                        {/* 답변 내용 */}
+                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100 pb-6 md:pb-8' : 'max-h-0 opacity-0'}`}>
+                          <div className="px-4 text-[14px] md:text-base text-[#484848] leading-relaxed max-w-3xl font-light">
+                            {item.a}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* 하단 지원 섹션 */}
         <div className="mt-20 md:mt-32 bg-[#F7F7F7] p-7 md:p-16 text-center rounded-2xl">
@@ -350,6 +381,9 @@ export default function HelpCenterPage() {
               <Mail size={18} /> {t('btn_email_us')}
             </a>
           </div>
+          <p className="mt-4 text-[12px] font-medium text-slate-500">
+            {t('help_inbox_reply_notice')}
+          </p>
         </div>
       </main>
 
@@ -381,6 +415,9 @@ export default function HelpCenterPage() {
               placeholder={supportCopy.modalPlaceholder}
               className="w-full h-[122px] md:h-[170px] rounded-2xl border border-slate-300 bg-white px-4 py-3 md:px-5 md:py-4 text-[12px] md:text-[14px] font-normal text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:border-slate-500"
             />
+            <p className="mt-3 text-[11px] leading-relaxed text-slate-500 md:text-[12px]">
+              {t('help_modal_inbox_hint')}
+            </p>
             <div className="mt-auto md:mt-5">
               <button
                 onClick={handleHelpSubmit}

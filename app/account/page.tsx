@@ -461,6 +461,31 @@ export default function AccountPage() {
           </div>
         </div>
 
+        {unreadCount > 0 && (
+          <div
+            data-testid="guest-account-notification-helper"
+            className="mx-4 mb-4 rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[12px] font-bold text-sky-900">
+                  {t('account_unread_helper_title').replace('{count}', String(unreadCount))}
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-sky-700">
+                  {t('account_unread_helper_desc')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/notifications')}
+                className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-sky-700 shadow-sm ring-1 ring-sky-100"
+              >
+                {t('account_unread_helper_cta')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── 프로필 카드 (이미지 3) ── */}
         <button
           onClick={() => setShowProfileView(true)}

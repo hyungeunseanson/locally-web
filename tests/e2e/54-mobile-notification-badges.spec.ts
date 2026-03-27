@@ -212,6 +212,7 @@ test.describe.serial('mobile unread badges', () => {
 
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('guest-account-unread-dot')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('guest-account-notification-helper')).toBeVisible({ timeout: 15000 });
   });
 
   test('guest mobile messages tab shows unread badge for message notifications', async ({ page }) => {
