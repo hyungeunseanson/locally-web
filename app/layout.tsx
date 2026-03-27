@@ -23,6 +23,7 @@ import type { User } from '@supabase/supabase-js';
 import { Analytics } from "@vercel/analytics/react";
 import { SplashProvider } from '@/app/context/SplashContext';
 import GlobalSplash from '@/app/components/GlobalSplash';
+import GlobalAnnouncementModal from '@/app/components/GlobalAnnouncementModal';
 
 const inter = localFont({
   src: [
@@ -203,6 +204,7 @@ export default async function RootLayout({
                   <LanguageProvider>
                     <SplashProvider>
                       <GlobalSplash />
+                      <GlobalAnnouncementModal />
 
                       <Suspense fallback={null}>
                         <UserPresenceTracker />

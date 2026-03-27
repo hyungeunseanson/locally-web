@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.71 — [Global Notice] 코드 설정형 전역 공지 모달 기반 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 전역 공지 설정 파일 + 선택 유틸 추가 | `app/config/siteAnnouncements.ts`, `app/utils/siteAnnouncements.ts` — 운영자가 코드에서 on/off 할 수 있는 전역 공지 설정 파일을 추가하고, 활성 기간/우선순위/경로 제외(`/admin`) 기준으로 현재 공지 1개만 선택하는 유틸을 분리 |
+| 🟠 전역 공지 모달 인프라 추가 | `app/components/GlobalAnnouncementModal.tsx`, `app/layout.tsx` — 첫 접속 시 활성 공지가 있으면 차분한 안내형 모달을 전역으로 띄우고, 같은 브라우저에서는 공지 ID별로 한 번만 닫히도록 localStorage dismiss를 연결 |
+| 🟡 공지 선택 순수 유틸 검증 추가 | `tests/e2e/103-site-announcements.spec.ts` — 경로 정규화, 우선순위 선택, 비활성/만료/제외 경로 처리, locale copy fallback을 순수 유틸 수준에서 얇게 검증 |
+
 ## v3.39.70 — [Admin Chat Monitor] 리스트 밀도 조정
 
 | 항목 | 내용 |
