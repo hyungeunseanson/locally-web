@@ -5,6 +5,12 @@
 
 ---
 
+## v3.39.72 — [Ops Docs] 전역 공지 팝업 운영 가이드 추가
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟡 비개발자용 전역 팝업 설명서 추가 | `docs/site_announcement_quick_guide.md` — 운영팀이 `app/config/siteAnnouncements.ts`에서 `enabled`, `id`, `startAt`, `endAt`, `body.ko`만 바꿔도 전역 팝업을 켜고 끌 수 있도록, 다시 띄우는 방법과 자주 하는 실수까지 포함한 짧은 실무 가이드를 추가 |
+
 ## v3.39.71 — [Global Notice] 코드 설정형 전역 공지 모달 기반 추가
 
 | 항목 | 내용 |
