@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/app/utils/supabase/client';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { getLegalDocument } from '@/app/constants/legalDocuments';
@@ -38,9 +38,15 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess?: () => void;
+  redirectPath?: string;
 }
 
-export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginModalProps) {
+const normalizeRedirectPath = (value?: string | null) => {
+  if (!value) return '/';
+  return /^\/(?!\/)/.test(value) ? value : '/';
+};
+
+export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPath }: LoginModalProps) {
   const { t, lang } = useLanguage();
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
 
@@ -63,11 +69,24 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
   const [isFocused, setIsFocused] = useState<string | null>(null);
 
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
   const copy = getLoginModalCopy(lang);
   const nationalityOptions = getLoginModalNationalityOptions(lang);
   const legalDocument = showLegalText ? getLegalDocument(lang, showLegalText) : null;
+  const currentPath = useMemo(() => {
+    const query = searchParams.toString();
+    const basePath = pathname || '/';
+    return `${basePath}${query ? `?${query}` : ''}`;
+  }, [pathname, searchParams]);
+  const resolvedRedirectPath = useMemo(() => {
+    if (redirectPath) return normalizeRedirectPath(redirectPath);
+    if (pathname === '/login') return '/';
+    return normalizeRedirectPath(currentPath);
+  }, [currentPath, pathname, redirectPath]);
+  const shouldShowReturnHint = resolvedRedirectPath !== '/';
 
   const handleAuth = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -175,7 +194,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(resolvedRedirectPath)}`,
+      },
     });
 
     if (error) {
@@ -249,6 +270,16 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <p className="text-[12px] md:text-sm text-gray-500 font-medium">
               {mode === 'LOGIN' ? t('welcome_subtitle') : copy.signupSubtitle}
             </p>
+            <div data-testid="login-modal-flow-hint" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-left">
+              <p className="text-[11px] md:text-[12px] font-medium leading-5 text-slate-600">
+                {mode === 'LOGIN' ? copy.loginHelper : copy.signupHelper}
+              </p>
+              {shouldShowReturnHint && (
+                <p className="mt-1 text-[11px] md:text-[12px] font-semibold leading-5 text-slate-900">
+                  {copy.returnAfterLogin}
+                </p>
+              )}
+            </div>
           </div>
 
           <form onSubmit={handleAuth}>
@@ -425,6 +456,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
             <SocialButton provider="kakao" label={t('continue_kakao')} onClick={() => handleSocialLogin('kakao')} isLoading={socialLoadingProvider === 'kakao'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
             <SocialButton provider="google" label={t('continue_google')} onClick={() => handleSocialLogin('google')} isLoading={socialLoadingProvider === 'google'} disabled={loading || socialLoadingProvider !== null} /> {/* 🟢 번역 적용 */}
           </div>
+
+          {shouldShowReturnHint && (
+            <p data-testid="login-modal-social-return-hint" className="mt-3 text-[11px] md:text-[12px] text-center font-medium text-slate-500">
+              {copy.socialReturnHint}
+            </p>
+          )}
 
           <div className="mt-5 md:mt-6 text-center text-[13px] md:text-sm">
             <button

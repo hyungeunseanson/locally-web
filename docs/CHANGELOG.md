@@ -5,6 +5,14 @@
 
 ---
 
+## v3.39.82 — [Login Flow] 소셜 복귀 경로 및 첫 진입 안내 보강
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 소셜 로그인 복귀 경로 유지 | `app/components/LoginModal.tsx`, `app/auth/callback/route.ts` — 구글/카카오 로그인도 더 이상 홈으로만 떨어지지 않고, 로그인 시작 전 보던 상대 경로를 `next`로 실어 callback 이후 다시 돌아오게 정리 |
+| 🟠 로그인/가입 직전 안내 보강 | `app/login/page.tsx`, `app/components/LoginModal.tsx`, `app/components/loginModalLocalization.ts`, `app/context/LanguageContext.tsx` — 로그인 페이지와 모달에 `로그인 후 어디로 돌아가는지`, `가입 후 바로 무엇을 할 수 있는지`를 짧은 helper box로 추가해 첫 진입 불안을 줄임 |
+| 🟡 로그인 진입 회귀 체크 추가 | `tests/e2e/108-login-flow-guidance.spec.ts` — `returnUrl`이 있는 로그인 페이지에서 복귀 안내와 소셜 복귀 힌트가 실제로 보이는지 얇은 Playwright 체크를 추가 |
+
 ## v3.39.81 — [Home Landing] 검색 시작/서비스 요청 진입 가이드 보강
 
 | 항목 | 내용 |
