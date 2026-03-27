@@ -12,6 +12,7 @@ export type ExperienceRules = {
   activity_level?: string;
   preparation_level?: string;
   refund_policy?: string;
+  host_notice?: string;
 };
 
 export type ExperienceDetail = {

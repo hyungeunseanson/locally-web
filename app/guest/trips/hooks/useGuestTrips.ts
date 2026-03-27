@@ -37,7 +37,10 @@ export function useGuestTrips() {
   const cancelMutation = useMutation<CancelGuestTripResponse, Error, { bookingId: number; reasonCode: GuestTripCancelReasonCode; reason?: string }>({
     mutationFn: cancelGuestTrip,
     onSuccess: (result) => {
-      showToast(result.reviewPending ? t('msg_cancel_review_pending') : t('msg_cancel_success'), 'success');
+      showToast(
+        result.reviewPending ? ((result.message as string) || (t('msg_cancel_review_pending') as string)) : t('msg_cancel_success'),
+        'success'
+      );
       // 취소 성공 시 캐시를 무효화하여 목록을 즉시(자동으로) 새로고침
       queryClient.invalidateQueries({ queryKey: ['guestTrips'] });
     },
@@ -74,6 +77,8 @@ export function useGuestTrips() {
   const requestCancel = async (bookingId: number, reasonCode: GuestTripCancelReasonCode, reason?: string) => {
     const confirmMessage = reasonCode === 'host_unavailable'
       ? t('msg_cancel_review_confirm')
+      : reasonCode === 'minimum_participants_unmet'
+      ? t('msg_cancel_review_confirm_minimum_participants')
       : t('msg_cancel_confirm');
     if (!confirm(confirmMessage)) return false;
     

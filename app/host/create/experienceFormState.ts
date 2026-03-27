@@ -31,6 +31,7 @@ export type ExperienceFormState = {
     age_limit: string;
     activity_level: string;
     refund_policy: string;
+    host_notice?: string;
   };
   price: number;
   is_private_enabled?: boolean;
@@ -70,6 +71,8 @@ export function syncManualContentWithLocales(
 }
 
 export function buildExperienceWritePayload(formData: ExperienceFormState) {
+  const hostNotice = String(formData.rules.host_notice || '').trim();
+
   return {
     country: formData.country,
     city: formData.city,
@@ -86,7 +89,10 @@ export function buildExperienceWritePayload(formData: ExperienceFormState) {
     duration: formData.duration,
     maxGuests: formData.maxGuests,
     meeting_point: formData.meeting_point,
-    rules: formData.rules,
+    rules: {
+      ...formData.rules,
+      host_notice: hostNotice,
+    },
     price: formData.price,
     is_private_enabled: Boolean(formData.is_private_enabled),
     private_price: formData.private_price ?? 0,

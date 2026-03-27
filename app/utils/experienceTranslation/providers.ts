@@ -104,7 +104,8 @@ Output rules:
   "rules": {
     "age_limit": "translated age limit",
     "activity_level": "translated activity level",
-    "refund_policy": "translated refund policy"
+    "refund_policy": "translated refund policy",
+    "host_notice": "translated host notice"
   }
 }
 
@@ -201,6 +202,7 @@ function parseRules(
     age_limit: asTrimmedString(raw.age_limit) || source.age_limit,
     activity_level: asTrimmedString(raw.activity_level) || source.activity_level,
     refund_policy: asTrimmedString(raw.refund_policy) || source.refund_policy,
+    host_notice: asTrimmedString(raw.host_notice) || source.host_notice,
   };
 }
 

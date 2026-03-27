@@ -750,6 +750,17 @@ export default function ExperienceFormSteps({
             </div>
             <p className="text-[11px] md:text-xs text-slate-400 mt-3">{copy.refundPolicyHelp}</p>
           </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 md:px-5 md:py-5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 block">{copy.hostNoticeLabel}</label>
+            <FieldHint className="mb-2 ml-0">{copy.hostNoticeHelp}</FieldHint>
+            <textarea
+              value={formData.rules.host_notice || ''}
+              onChange={(e) => updateData('rules', { ...formData.rules, host_notice: e.target.value })}
+              placeholder={copy.hostNoticePlaceholder}
+              className="w-full min-h-[104px] rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 outline-none resize-none focus:border-black"
+            />
+          </div>
         </div>
       </div>
     );

@@ -174,6 +174,7 @@ export const INITIAL_FORM_DATA = {
     age_limit: '',
     activity_level: '보통',
     refund_policy: FIXED_REFUND_POLICY,
+    host_notice: '',
   },
 
   price: 50000,
@@ -254,6 +255,9 @@ type ExperienceFormCopy = {
   ageLimitPlaceholder: string;
   ageLimitHelp: string;
   activityLevelLabel: string;
+  hostNoticeLabel: string;
+  hostNoticeHelp: string;
+  hostNoticePlaceholder: string;
   refundPolicyLabel: string;
   refundPolicyHelp: string;
   refundPolicyItems: string[];
@@ -404,6 +408,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitPlaceholder: '예) 만 7세 이상',
     ageLimitHelp: '현장에서 바로 혼선이 생기지 않도록 참여 기준을 분명히 적어주세요.',
     activityLevelLabel: '활동 강도',
+    hostNoticeLabel: '호스트 주의사항',
+    hostNoticeHelp: '게스트가 예약 전에 꼭 알아야 할 점을 적어주세요. 예: 최소 2인부터 진행, 실내 진행, 계단 이동, 이른 아침 시작',
+    hostNoticePlaceholder: '예) 이 체험은 최소 2인부터 진행됩니다. 인원이 모이지 않으면 일정 조정 또는 취소가 있을 수 있습니다.',
     refundPolicyLabel: '환불 정책',
     refundPolicyHelp: '환불 정책은 고정으로 자동 적용됩니다.',
     refundPolicyItems: [
@@ -563,6 +570,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitPlaceholder: 'e.g. Ages 7 and up',
     ageLimitHelp: 'Clear participation rules help avoid confusion on the day.',
     activityLevelLabel: 'Activity level',
+    hostNoticeLabel: 'Host notice',
+    hostNoticeHelp: 'Add anything guests should know before booking. For example: runs from 2 guests, indoors, stairs involved, early-morning start.',
+    hostNoticePlaceholder: 'e.g. This experience runs from 2 guests. If the group is too small, the schedule may be adjusted or cancelled.',
     refundPolicyLabel: 'Refund policy',
     refundPolicyHelp: 'The refund policy is fixed and applied automatically.',
     refundPolicyItems: [
@@ -722,6 +732,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitPlaceholder: '例）満7歳以上',
     ageLimitHelp: '当日に混乱が起きないよう、参加基準ははっきり書いてください。',
     activityLevelLabel: '活動強度',
+    hostNoticeLabel: 'ホストからの案内',
+    hostNoticeHelp: '予約前に必ず知っておいてほしいことを書いてください。例：2名から開催、室内 진행、階段 이동あり、早朝開始。',
+    hostNoticePlaceholder: '例）この体験は2名から開催です。人数が集まらない場合は日程調整またはキャンセルとなることがあります。',
     refundPolicyLabel: '返金ポリシー',
     refundPolicyHelp: '返金ポリシーは固定で自動適用されます。',
     refundPolicyItems: [
@@ -881,6 +894,9 @@ const EXPERIENCE_FORM_COPY: Record<FormLocale, ExperienceFormCopy> = {
     ageLimitPlaceholder: '例如：满7岁以上',
     ageLimitHelp: '请明确填写参加条件，避免现场产生混乱。',
     activityLevelLabel: '活动强度',
+    hostNoticeLabel: '主办方提醒',
+    hostNoticeHelp: '请写下游客在预订前一定要知道的内容。例如：满2人出发、室内进行、有楼梯、清晨开始。',
+    hostNoticePlaceholder: '例如：本体验需满2人才能进行。若人数不足，可能会调整日程或取消。',
     refundPolicyLabel: '退款政策',
     refundPolicyHelp: '退款政策为固定并自动应用。',
     refundPolicyItems: [

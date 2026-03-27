@@ -15,6 +15,7 @@ import { SOLO_GUARANTEE_PRICE } from '@/app/constants/soloGuarantee';
 import { launchCardPayment } from '@/app/utils/payments/card/client';
 import type { CardPaymentProvider, CardPaymentReadiness } from '@/app/utils/payments/card/types';
 import { getPublicBankInfo } from '@/app/utils/publicBankInfo';
+import { getLocalizedExperienceRules } from '@/app/utils/experienceTranslation';
 import { ExperienceAvailabilitySummary, ExperienceSlotSummary } from '../types';
 
 type PaymentExperience = {
@@ -26,6 +27,8 @@ type PaymentExperience = {
   private_price?: number | null;
   max_guests?: number | null;
   host_id?: string | null;
+  rules?: Record<string, unknown> | null;
+  rules_i18n?: Record<string, unknown> | null;
 };
 
 type BookingCheckRow = {
@@ -116,7 +119,7 @@ function PaymentContent() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [experience, setExperience] = useState<PaymentExperience | null>(null);
@@ -170,6 +173,9 @@ function PaymentContent() {
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
   const isPayPalEnabled = Boolean(paypalClientId);
   const portOneImpCode = process.env.NEXT_PUBLIC_PORTONE_IMP_CODE || '';
+  const hostNotice = experience
+    ? (getLocalizedExperienceRules(experience as Record<string, unknown>, lang).host_notice || '').trim()
+    : '';
 
   const buildPayPalSessionKey = useCallback(
     () =>
@@ -344,7 +350,7 @@ function PaymentContent() {
 
       const { data: expData } = await supabase
         .from('experiences')
-        .select('title, image_url, photos, location, price, private_price, max_guests, host_id')
+        .select('title, image_url, photos, location, price, private_price, max_guests, host_id, rules, rules_i18n')
         .eq('id', experienceId)
         .maybeSingle();
       if (expData) setExperience(expData as PaymentExperience);
@@ -797,6 +803,13 @@ function PaymentContent() {
               </div>
             )}
           </div>
+
+          {hostNotice && (
+            <div className="mb-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] leading-6 text-amber-900 md:mb-6 md:rounded-2xl md:px-5 md:py-4 md:text-[13px]">
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-amber-700 md:text-xs">{t('exp_guest_notice_title')}</p>
+              <p className="whitespace-pre-wrap">{hostNotice}</p>
+            </div>
+          )}
 
           <div className="mb-6 md:mb-8 space-y-3 md:space-y-4">
             <h2 className="text-[16px] md:text-xl font-bold">{t('exp_payment_booker_title')}</h2>

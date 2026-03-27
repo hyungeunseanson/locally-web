@@ -41,8 +41,10 @@ import {
 import { markAdminBookingViewed } from '@/app/utils/adminBadgeState';
 import { AdminMasterLedgerEntry } from '@/app/types/admin';
 import {
-  getHostUnavailableReviewDetail,
-  isHostUnavailableReviewPending,
+  getBookingReviewDetail,
+  getBookingReviewType,
+  isBookingReviewPending,
+  type BookingReviewRequestType,
 } from '@/app/utils/hostUnavailableReview';
 
 // SSR 비활성화로 react-date-range import (window is not defined 에러 방지)
@@ -113,6 +115,30 @@ type ConfirmDialogState =
       tone: 'blue' | 'red';
     }
   | null;
+
+function getReviewTitle(reviewType: BookingReviewRequestType | null) {
+  if (reviewType === 'minimum_participants_unmet') {
+    return '최소 진행 인원 미달 취소 검토 요청';
+  }
+
+  return '호스트 진행 불가 취소 검토 요청';
+}
+
+function getReviewDescription(reviewType: BookingReviewRequestType | null) {
+  if (reviewType === 'minimum_participants_unmet') {
+    return '최소 진행 인원 미달 사유를 확인하고 전액 환불 취소하시겠습니까?';
+  }
+
+  return '호스트 진행 불가 사유를 확인하고 전액 환불 취소하시겠습니까?';
+}
+
+function getReviewApproveReason(reviewType: BookingReviewRequestType | null) {
+  if (reviewType === 'minimum_participants_unmet') {
+    return '최소 진행 인원 미달 확인 취소';
+  }
+
+  return '호스트 진행 불가 확인 취소';
+}
 
 export default function MasterLedgerTab({
   onRefresh,
@@ -284,7 +310,7 @@ export default function MasterLedgerTab({
     ].filter(Boolean).join(' ').toLowerCase();
     const searchMatch = searchString.includes(searchTerm.toLowerCase());
 
-    if (reviewOnly && !isHostUnavailableReviewPending(b.cancel_reason)) {
+    if (reviewOnly && !isBookingReviewPending(b.cancel_reason)) {
       return false;
     }
 
@@ -307,7 +333,7 @@ export default function MasterLedgerTab({
   });
 
   const pendingHostUnavailableReviewCount = allBookings.filter(
-    (booking) => isHostUnavailableReviewPending(booking.cancel_reason)
+    (booking) => isBookingReviewPending(booking.cancel_reason)
   ).length;
 
   // 2. 통합 합계 계산 (KPI) - 취소된 건은 제외
@@ -364,10 +390,13 @@ export default function MasterLedgerTab({
     }
 
     if (confirmDialog.kind === 'approve-host-unavailable') {
+      const reviewType = getBookingReviewType(selectedBooking?.cancel_reason);
       await performForceCancel(confirmDialog.bookingId, {
         source: 'host_fault_request',
-        reason: '호스트 진행 불가 확인 취소',
-        successMessage: '호스트 진행 불가 전액 환불 취소가 처리되었습니다.',
+        reason: getReviewApproveReason(reviewType),
+        successMessage: reviewType === 'minimum_participants_unmet'
+          ? '최소 진행 인원 미달 전액 환불 취소가 처리되었습니다.'
+          : '호스트 진행 불가 전액 환불 취소가 처리되었습니다.',
       });
       return;
     }
@@ -456,6 +485,7 @@ export default function MasterLedgerTab({
   };
 
   const performRejectHostUnavailable = async (bookingId: string) => {
+    const reviewType = getBookingReviewType(selectedBooking?.cancel_reason);
     setIsProcessing(true);
     try {
       const res = await fetch('/api/admin/bookings/reject-host-unavailable', {
@@ -465,7 +495,12 @@ export default function MasterLedgerTab({
       });
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || '반려 실패');
-      showToast('호스트 진행 불가 검토 요청을 반려했습니다.', 'success');
+      showToast(
+        reviewType === 'minimum_participants_unmet'
+          ? '최소 진행 인원 미달 검토 요청을 반려했습니다.'
+          : '호스트 진행 불가 검토 요청을 반려했습니다.',
+        'success'
+      );
       await refreshAfterMutation();
       setSelectedBooking(null);
       setConfirmDialog(null);
@@ -496,29 +531,33 @@ export default function MasterLedgerTab({
   };
 
   const handleApproveHostUnavailable = async (bookingId: string) => {
+    const reviewType = getBookingReviewType(selectedBooking?.cancel_reason);
     const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
 
     if (isMobileScreen) {
       setConfirmDialog({
         kind: 'approve-host-unavailable',
         bookingId,
-        title: '호스트 진행 불가 승인',
-        description: '호스트 진행 불가 사유를 확인하고 전액 환불 취소하시겠습니까?',
+        title: getReviewTitle(reviewType),
+        description: getReviewDescription(reviewType),
         confirmLabel: '전액 환불 취소',
         tone: 'red',
       });
       return;
     }
 
-    if (!confirm('호스트 진행 불가 사유를 확인하고 전액 환불 취소하시겠습니까?')) return;
+    if (!confirm(getReviewDescription(reviewType))) return;
     await performForceCancel(bookingId, {
       source: 'host_fault_request',
-      reason: '호스트 진행 불가 확인 취소',
-      successMessage: '호스트 진행 불가 전액 환불 취소가 처리되었습니다.',
+      reason: getReviewApproveReason(reviewType),
+      successMessage: reviewType === 'minimum_participants_unmet'
+        ? '최소 진행 인원 미달 전액 환불 취소가 처리되었습니다.'
+        : '호스트 진행 불가 전액 환불 취소가 처리되었습니다.',
     });
   };
 
   const handleRejectHostUnavailable = async (bookingId: string) => {
+    const reviewType = getBookingReviewType(selectedBooking?.cancel_reason);
     const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
 
     if (isMobileScreen) {
@@ -526,14 +565,16 @@ export default function MasterLedgerTab({
         kind: 'reject-host-unavailable',
         bookingId,
         title: '검토 반려',
-        description: '호스트 진행 불가 검토 요청을 반려하시겠습니까?',
+        description: reviewType === 'minimum_participants_unmet'
+          ? '최소 진행 인원 미달 검토 요청을 반려하시겠습니까?'
+          : '호스트 진행 불가 검토 요청을 반려하시겠습니까?',
         confirmLabel: '검토 반려',
         tone: 'blue',
       });
       return;
     }
 
-    if (!confirm('호스트 진행 불가 검토 요청을 반려하시겠습니까?')) return;
+    if (!confirm(reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달 검토 요청을 반려하시겠습니까?' : '호스트 진행 불가 검토 요청을 반려하시겠습니까?')) return;
     await performRejectHostUnavailable(bookingId);
   };
 
@@ -727,11 +768,11 @@ export default function MasterLedgerTab({
                       <td className="px-1.5 md:px-4 py-2 md:py-4">
                         <div className="flex flex-col items-start gap-1">
                           {renderStatusBadge(b.status)}
-                          {isHostUnavailableReviewPending(b.cancel_reason) && (
+                          {isBookingReviewPending(b.cancel_reason) && (
                             <span className="inline-flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-700 md:px-2 md:text-[10px]">
                               <AlertTriangle size={10} />
                               <span className="md:hidden">검토</span>
-                              <span className="hidden md:inline">호스트 진행 불가 검토</span>
+                              <span className="hidden md:inline">{getReviewTitle(getBookingReviewType(b.cancel_reason)).replace(' 취소 검토 요청', ' 검토')}</span>
                             </span>
                           )}
                         </div>
@@ -791,7 +832,7 @@ export default function MasterLedgerTab({
                   }`}>
                   {selectedBooking.status}
                 </div>
-                {isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
+                {isBookingReviewPending(selectedBooking.cancel_reason) && (
                   <div className="inline-flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-orange-700 md:px-2 md:text-[10px]">
                     <AlertTriangle size={10} />
                     <span>REVIEW</span>
@@ -810,18 +851,20 @@ export default function MasterLedgerTab({
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-6 scrollbar-hide bg-white pb-6 md:pb-10">
-            {isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
+            {isBookingReviewPending(selectedBooking.cancel_reason) && (
               <div className="rounded-xl border border-orange-100 bg-orange-50 p-3 md:p-4">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={15} className="mt-0.5 shrink-0 text-orange-500" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] md:text-xs font-black text-orange-900">호스트 진행 불가 취소 검토 요청</p>
+                    <p className="text-[11px] md:text-xs font-black text-orange-900">{getReviewTitle(getBookingReviewType(selectedBooking.cancel_reason))}</p>
                     <p className="mt-1 text-[11px] leading-5 text-orange-700">
-                      고객이 호스트 진행 불가 사유로 취소 검토를 요청했습니다. 승인 시 전액 환불 취소됩니다.
+                      {getBookingReviewType(selectedBooking.cancel_reason) === 'minimum_participants_unmet'
+                        ? '고객이 최소 진행 인원 미달 사유로 취소 검토를 요청했습니다. 승인 시 전액 환불 취소됩니다.'
+                        : '고객이 호스트 진행 불가 사유로 취소 검토를 요청했습니다. 승인 시 전액 환불 취소됩니다.'}
                     </p>
-                    {getHostUnavailableReviewDetail(selectedBooking.cancel_reason) && (
+                    {getBookingReviewDetail(selectedBooking.cancel_reason) && (
                       <p className="mt-2 text-[11px] leading-5 text-orange-800">
-                        고객 메모: {getHostUnavailableReviewDetail(selectedBooking.cancel_reason)}
+                        고객 메모: {getBookingReviewDetail(selectedBooking.cancel_reason)}
                       </p>
                     )}
                   </div>
@@ -909,7 +952,7 @@ export default function MasterLedgerTab({
                   </button>
                 )}
 
-                {isConfirmedBookingStatus(selectedBooking.status) && isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
+                {isConfirmedBookingStatus(selectedBooking.status) && isBookingReviewPending(selectedBooking.cancel_reason) && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleRejectHostUnavailable(selectedBooking.id)}
@@ -928,7 +971,7 @@ export default function MasterLedgerTab({
                   </div>
                 )}
 
-                {isConfirmedBookingStatus(selectedBooking.status) && !isHostUnavailableReviewPending(selectedBooking.cancel_reason) && (
+                {isConfirmedBookingStatus(selectedBooking.status) && !isBookingReviewPending(selectedBooking.cancel_reason) && (
                   <button
                     onClick={() => handleForceCancel(selectedBooking.id)}
                     disabled={isProcessing}

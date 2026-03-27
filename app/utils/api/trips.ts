@@ -11,6 +11,7 @@ export type GuestTripCancelReasonCode =
   | 'personal_change'
   | 'schedule_issue'
   | 'host_unavailable'
+  | 'minimum_participants_unmet'
   | 'other';
 
 export type CancelGuestTripResponse = {

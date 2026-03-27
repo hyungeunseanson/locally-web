@@ -2,7 +2,10 @@ import { readFileSync } from 'fs';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type Page } from '@playwright/test';
-import { formatHostUnavailableReviewMarker } from '@/app/utils/hostUnavailableReview';
+import {
+  formatBookingReviewMarker,
+  formatHostUnavailableReviewMarker,
+} from '@/app/utils/hostUnavailableReview';
 
 type EnvMap = Record<string, string>;
 type TestUser = {
@@ -103,7 +106,7 @@ async function createAuthUser(user: TestUser) {
   return data.user.id;
 }
 
-async function createHostExperience(hostId: string) {
+async function createHostExperience(hostId: string, options?: { hostNotice?: string }) {
   const supabase = getAdminClient();
   const title = `[Playwright] Guest Trips Sync ${Date.now()}`;
 
@@ -136,6 +139,7 @@ async function createHostExperience(hostId: string) {
       rules: {
         age_limit: '만 19세 이상',
         activity_level: '보통',
+        host_notice: options?.hostNotice || '',
       },
       status: 'approved',
       is_active: true,
@@ -584,6 +588,74 @@ test.describe.serial('guest trips completed sync route', () => {
     await login(page, guest);
     await page.goto('/guest/trips', { waitUntil: 'networkidle' });
     await expect(page.getByText('호스트 진행 불가 사유를 운영팀이 검토 중입니다.').last()).toBeVisible();
+    await expect(page.getByText('보통 영업일 기준 검토 후 알림으로 안내됩니다. 급한 경우 고객센터로 문의해주세요.').last()).toBeVisible();
+    await expect(page.getByTestId('guest-trip-review-support-link').last()).toHaveAttribute('href', '/help');
+  });
+
+  test('shows host notice on experience detail and payment summary', async ({ page }) => {
+    const host = createUser('host.notice');
+    const guest = createUser('guest.notice');
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const notice = '이 체험은 최소 2인부터 진행됩니다. 인원이 모이지 않으면 일정 조정 또는 취소가 있을 수 있습니다.';
+    const experienceId = await createHostExperience(hostId, { hostNotice: notice });
+
+    await login(page, guest);
+
+    await page.goto(`/experiences/${experienceId}`, { waitUntil: 'networkidle' });
+    await expect(page.getByText(/호스트 안내|Host note|ホストからの案内|主办方提醒/)).toBeVisible();
+    await expect(page.getByText(notice)).toBeVisible();
+
+    await page.goto(`/experiences/${experienceId}/payment?date=2099-12-31&time=18:00&guests=2`, { waitUntil: 'networkidle' });
+    await expect(page.getByText(/예약 전 확인해주세요|Please read before booking|予約前にご確認ください|请在预订前确认/)).toBeVisible();
+    await expect(page.getByText(notice)).toBeVisible();
+  });
+
+  test('shows review pending guidance for minimum-participants review requests', async ({ page }) => {
+    const host = createUser('host.minimum.participants');
+    const guest = createUser('guest.minimum.participants');
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('app_lang', 'ko');
+      document.cookie = 'app_lang=ko; path=/';
+    });
+
+    const hostId = await createAuthUser(host);
+    const guestId = await createAuthUser(guest);
+    await createApprovedHostApplication(hostId, host);
+
+    const supabase = getAdminClient();
+    const { error: hostProfileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: host.fullName,
+        avatar_url: '/images/logo.png',
+      })
+      .eq('id', hostId);
+
+    if (hostProfileError) throw hostProfileError;
+
+    const experienceId = await createHostExperience(hostId);
+    const bookingId = await createFuturePaidBooking({
+      guestId,
+      guest,
+      experienceId,
+    });
+
+    const { error: reviewMarkerError } = await supabase
+      .from('bookings')
+      .update({
+        cancel_reason: formatBookingReviewMarker('minimum_participants_unmet', 'minimum 2 guests required'),
+      })
+      .eq('id', bookingId);
+
+    if (reviewMarkerError) throw reviewMarkerError;
+
+    await login(page, guest);
+    await page.goto('/guest/trips', { waitUntil: 'networkidle' });
+    await expect(page.getByText('최소 진행 인원 미달 사유를 운영팀이 검토 중입니다.').last()).toBeVisible();
     await expect(page.getByText('보통 영업일 기준 검토 후 알림으로 안내됩니다. 급한 경우 고객센터로 문의해주세요.').last()).toBeVisible();
     await expect(page.getByTestId('guest-trip-review-support-link').last()).toHaveAttribute('href', '/help');
   });

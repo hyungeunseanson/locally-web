@@ -5,6 +5,15 @@
 
 ---
 
+## v3.39.69 — [Experience Booking] 최소 진행 인원 미달 검토형 취소 + 호스트 안내 노출
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟠 체험 등록 `호스트 주의사항` 필드 추가 | `app/host/create/components/ExperienceFormSteps.tsx`, `app/host/create/localization.ts`, `app/host/create/experienceFormState.ts`, `app/host/experiences/[id]/edit/page.tsx`, `app/api/host/experiences/shared.ts` — 체험 규칙 영역에 `호스트 주의사항`을 추가해, 호스트가 `최소 2인부터 진행` 같은 예약 전 필수 안내를 직접 적을 수 있게 정리 |
+| 🟠 체험 상세 + 결제 직전 요약에 호스트 안내 노출 | `app/experiences/[id]/components/ExpMainContent.tsx`, `app/experiences/[id]/payment/page.tsx`, `app/context/experienceUiDictionary.ts`, `app/utils/experienceTranslation/*` — `rules.host_notice`가 있을 때만 체험 상세와 결제 직전 요약 양쪽에 같은 안내를 노출하고, 번역본이 없으면 원문으로 fallback 되도록 보강 |
+| 🟠 `최소 진행 인원 미달` 취소 사유를 운영 검토형으로 추가 | `app/utils/api/trips.ts`, `app/guest/trips/components/CancellationModal.tsx`, `app/guest/trips/hooks/useGuestTrips.ts`, `app/api/payment/cancel/route.ts`, `app/utils/hostUnavailableReview.ts`, `app/guest/trips/components/TripCard.tsx`, `app/host/dashboard/components/ReservationCard.tsx`, `app/admin/dashboard/components/MasterLedgerTab.tsx`, `app/api/admin/bookings/force-cancel/route.ts`, `app/api/admin/bookings/reject-host-unavailable/route.ts` — 게스트가 `최소 진행 인원 미달`을 선택하면 즉시 취소되지 않고 운영 검토로 들어가며, 관리자 승인 시 기존 호스트 진행 불가와 같은 100% 환불 취소 경로를 재사용하도록 일반화 |
+| 🟡 다국어/회귀 체크 추가 | `app/context/LanguageContext.tsx`, `tests/e2e/57-guest-trips-sync-completed.spec.ts`, `tests/e2e/93-host-create-copy-layout.spec.ts` — 새 취소 사유와 review pending 문구를 `ko/en/ja/zh`에 추가하고, host notice 입력 가시성과 minimum-participants review pending 노출을 얇게 검증하도록 보강 |
+
 ## v3.39.68 — [Host Onboarding UX] 입력 중 품질 가이드 조기 노출
 
 | 항목 | 내용 |

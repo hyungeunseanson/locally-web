@@ -11,16 +11,23 @@ import { refundPayPalCapture } from '@/app/utils/paypal/server';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
 import {
-  formatHostUnavailableReviewMarker,
-  isHostUnavailableReviewPending,
+  formatBookingReviewMarker,
+  isBookingReviewPending,
+  type BookingReviewRequestType,
 } from '@/app/utils/hostUnavailableReview';
 
 const GUEST_CANCELLATION_REASON_LABELS = {
   personal_change: '개인 사정',
   schedule_issue: '일정 변경',
   host_unavailable: '호스트 진행 불가',
+  minimum_participants_unmet: '최소 진행 인원 미달',
   other: '기타',
 } as const;
+
+const REVIEW_PENDING_REASON_CODES: Record<string, BookingReviewRequestType> = {
+  host_unavailable: 'host_unavailable',
+  minimum_participants_unmet: 'minimum_participants_unmet',
+};
 
 export async function POST(request: Request) {
   let bookingId: string | number | null = null;
@@ -82,11 +89,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '호스트 직접 취소는 지원하지 않습니다. 운영팀 검토 요청 경로를 이용해주세요.' }, { status: 403 });
     }
 
-    if (!isHostCancel && isHostUnavailableReviewPending(booking.cancel_reason)) {
+    if (!isHostCancel && isBookingReviewPending(booking.cancel_reason)) {
       return NextResponse.json({ error: '이미 운영팀 검토가 진행 중입니다.' }, { status: 409 });
     }
 
-    if (!isHostCancel && reasonCode === 'host_unavailable') {
+    const reviewType = reasonCode && reasonCode in REVIEW_PENDING_REASON_CODES
+      ? REVIEW_PENDING_REASON_CODES[reasonCode]
+      : null;
+
+    if (!isHostCancel && reviewType) {
       const [year, month, day] = String(booking.date || '').split('-').map(Number);
       const bookingDate = new Date(year, (month || 1) - 1, day || 1);
       const today = new Date();
@@ -96,7 +107,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: '미래 예약에 대해서만 운영 검토를 요청할 수 있습니다.' }, { status: 409 });
       }
 
-      const reviewMarker = formatHostUnavailableReviewMarker(userReason);
+      const reviewMarker = formatBookingReviewMarker(reviewType, userReason);
       const { data: reviewUpdatedRow, error: reviewUpdateError } = await supabaseAdmin
         .from('bookings')
         .update({ cancel_reason: reviewMarker })
@@ -122,8 +133,12 @@ export async function POST(request: Request) {
           notifications.push({
             user_id: booking.user_id,
             type: 'cancellation',
-            title: '취소 요청이 접수되었습니다.',
-            message: `'${expTitle}' 예약이 운영팀 검토 대기 상태로 접수되었습니다.`,
+            title: reviewType === 'minimum_participants_unmet'
+              ? '최소 진행 인원 미달 취소 요청이 접수되었습니다.'
+              : '취소 요청이 접수되었습니다.',
+            message: reviewType === 'minimum_participants_unmet'
+              ? `'${expTitle}' 예약의 최소 진행 인원 미달 취소 요청이 운영팀 검토 대기 상태로 접수되었습니다.`
+              : `'${expTitle}' 예약이 운영팀 검토 대기 상태로 접수되었습니다.`,
             link: '/guest/trips',
             is_read: false,
           });
@@ -133,8 +148,12 @@ export async function POST(request: Request) {
           notifications.push({
             user_id: hostId,
             type: 'cancellation',
-            title: '호스트 진행 불가 취소 검토 요청',
-            message: `'${expTitle}' 예약에 대해 고객이 운영팀 검토를 요청했습니다.`,
+            title: reviewType === 'minimum_participants_unmet'
+              ? '최소 진행 인원 미달 취소 검토 요청'
+              : '호스트 진행 불가 취소 검토 요청',
+            message: reviewType === 'minimum_participants_unmet'
+              ? `'${expTitle}' 예약에 대해 고객이 최소 진행 인원 미달 사유로 운영팀 검토를 요청했습니다.`
+              : `'${expTitle}' 예약에 대해 고객이 운영팀 검토를 요청했습니다.`,
             link: '/host/dashboard',
             is_read: false,
           });
@@ -151,15 +170,21 @@ export async function POST(request: Request) {
       }
 
       await insertAdminAlerts({
-        title: '호스트 진행 불가 취소 검토 요청',
-        message: `[${String(booking.order_id || booking.id).slice(0, 8)}] ${expTitle} 예약에 고객이 호스트 진행 불가 사유로 취소 검토를 요청했습니다.`,
+        title: reviewType === 'minimum_participants_unmet'
+          ? '최소 진행 인원 미달 취소 검토 요청'
+          : '호스트 진행 불가 취소 검토 요청',
+        message: reviewType === 'minimum_participants_unmet'
+          ? `[${String(booking.order_id || booking.id).slice(0, 8)}] ${expTitle} 예약에 고객이 최소 진행 인원 미달 사유로 취소 검토를 요청했습니다.`
+          : `[${String(booking.order_id || booking.id).slice(0, 8)}] ${expTitle} 예약에 고객이 호스트 진행 불가 사유로 취소 검토를 요청했습니다.`,
         link: '/admin/dashboard?tab=LEDGER',
       });
 
       return NextResponse.json({
         success: true,
         reviewPending: true,
-        message: '운영팀 검토 요청이 접수되었습니다.',
+        message: reviewType === 'minimum_participants_unmet'
+          ? '최소 진행 인원 미달 취소 요청이 접수되었습니다.'
+          : '운영팀 검토 요청이 접수되었습니다.',
       });
     }
 

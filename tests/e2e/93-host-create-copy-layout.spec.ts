@@ -298,6 +298,16 @@ test('host create shows structured primary language guidance and refund policy c
       /당일 환불 불가|No refund on the day|当日返金不可|当天不可退款/
     )
   ).toBeVisible();
+  await expect(
+    page.getByText(
+      /게스트가 예약 전에 꼭 알아야 할 점을 적어주세요\.|Add anything guests should know before booking\.|予約前に必ず知っておいてほしいことを書いてください。|请写下游客在预订前一定要知道的内容。/
+    )
+  ).toBeVisible();
+  await page
+    .locator(
+      'textarea[placeholder^="예) 이 체험은 최소 2인부터 진행됩니다"], textarea[placeholder^="e.g. This experience runs from 2 guests"], textarea[placeholder^="例）この体験は2名から開催です"], textarea[placeholder^="例如：本体验需满2人才能进行"]'
+    )
+    .fill('This experience runs from 2 guests. If the group is too small, the schedule may be adjusted.');
 
   await page
     .locator(

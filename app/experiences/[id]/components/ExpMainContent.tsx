@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, Lightbulb, CheckCircle2, X, Clock3 } from 'lucide-react';
+import { Users, PersonStanding, CalendarX, Copy, ExternalLink, Backpack, Lightbulb, CheckCircle2, X, Clock3, Info } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ReviewSection from './ReviewSection';
@@ -47,6 +47,7 @@ export default function ExpMainContent({
   const exclusions = getLocalizedExperienceList(experience, 'exclusions', lang);
   const supplies = getLocalizedExperienceText(experience, 'supplies', lang);
   const rules = getLocalizedExperienceRules(experience, lang);
+  const hostNotice = (rules.host_notice || '').trim();
   const heroPhotos = Array.isArray(experience.photos) && experience.photos.length > 0
     ? experience.photos
     : [experience.image_url || "https://images.unsplash.com/photo-1540206395-688085723adb"];
@@ -251,6 +252,18 @@ export default function ExpMainContent({
               </p>
             </div>
           </div>
+
+          {hostNotice && (
+            <div className="flex gap-3">
+              <Info size={22} className="text-slate-700 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-[14px] md:text-[16px] font-semibold mb-1">{t('exp_host_notice_label')}</h4>
+                <p className="text-[12px] md:text-[14px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+                  {hostNotice}
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3">
             <CalendarX size={22} className="text-slate-700 shrink-0 mt-0.5" />

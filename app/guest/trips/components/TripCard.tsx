@@ -11,7 +11,7 @@ import { isCancelledBookingStatus } from '@/app/constants/bookingStatus';
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { getContent } from '@/app/utils/contentHelper';
 import { calculateGuestCancellationRefundRate } from '@/app/utils/bookingCancellationPolicy';
-import { isHostUnavailableReviewPending } from '@/app/utils/hostUnavailableReview';
+import { getBookingReviewType, isBookingReviewPending } from '@/app/utils/hostUnavailableReview';
 import type { GuestTripCancelReasonCode } from '@/app/utils/api/trips';
 
 export interface GuestTrip {
@@ -71,7 +71,8 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
       'meeting_point',
       lang
     ) || trip.location || 'SEOUL';
-  const isHostUnavailablePending = isHostUnavailableReviewPending(trip.cancelReason);
+  const bookingReviewType = getBookingReviewType(trip.cancelReason);
+  const isReviewPending = isBookingReviewPending(trip.cancelReason);
   const guestCount = Number(trip.guests || 1);
   const isPendingDeposit = (trip.status || '').toLowerCase() === 'pending';
 
@@ -173,7 +174,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
   const getStatusInfo = () => {
     const normalizedStatus = (trip.status || '').toLowerCase();
 
-    if (isHostUnavailablePending) {
+    if (isReviewPending) {
       return { label: t('trip_status_review_pending'), color: 'bg-orange-100 text-orange-600', icon: <AlertCircle size={12} /> };
     }
 
@@ -301,7 +302,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                       <button onClick={shareTrip} className="hidden md:flex w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-slate-50 text-slate-700 font-medium items-center gap-2"><Share2 className="w-3.5 h-3.5" />{t('trip_share')}</button>
                       <div className="h-px bg-slate-100 my-1"></div>
 
-                      {!isCancelledBookingStatus(trip.status || '') && !isHostUnavailablePending ? (
+                      {!isCancelledBookingStatus(trip.status || '') && !isReviewPending ? (
                         <button
                           onClick={handleCancelClick} // 🟢 클릭 시 환불 계산 후 모달 오픈
                           className="w-full text-left px-4 py-2.5 text-[13px] md:text-sm hover:bg-red-50 text-red-500 font-medium"
@@ -310,7 +311,7 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
                         </button>
                       ) : (
                         <button disabled className="w-full text-left px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed">
-                          {isHostUnavailablePending
+                          {isReviewPending
                             ? t('trip_status_review_pending')
                             : (trip.status || '').toLowerCase() === 'cancellation_requested'
                               ? t('status_cancel_requesting')
@@ -357,12 +358,12 @@ export default function TripCard({ trip, onRequestCancel, onOpenReceipt, isProce
               </div>
             )}
 
-            {isHostUnavailablePending && (
+            {isReviewPending && (
               <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50 px-3 py-2.5 text-[11px] leading-5 text-orange-700">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500" />
                   <div className="space-y-2">
-                    <p>{t('trip_review_pending_notice')}</p>
+                    <p>{bookingReviewType === 'minimum_participants_unmet' ? t('trip_review_pending_notice_minimum_participants') : t('trip_review_pending_notice')}</p>
                     <p className="text-[10px] md:text-[11px] text-orange-700/90">{t('trip_review_pending_eta')}</p>
                     <Link
                       href="/help"

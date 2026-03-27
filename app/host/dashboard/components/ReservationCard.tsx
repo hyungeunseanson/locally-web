@@ -16,8 +16,9 @@ import {
 } from '@/app/constants/bookingStatus';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 import {
-  getHostUnavailableReviewDetail,
-  isHostUnavailableReviewPending,
+  getBookingReviewDetail,
+  getBookingReviewType,
+  isBookingReviewPending,
 } from '@/app/utils/hostUnavailableReview';
 
 interface ReservationCardProps {
@@ -121,8 +122,9 @@ export default function ReservationCard({
   const orderDisplay = String(res.order_id || res.id);
   const guestCount = res.guests ?? 0;
   const expectedIncomeDisplay = `₩${getBookingHostPayout(res).toLocaleString()}`;
-  const hasHostUnavailableReview = isHostUnavailableReviewPending(res.cancel_reason);
-  const hostUnavailableDetail = getHostUnavailableReviewDetail(res.cancel_reason);
+  const bookingReviewType = getBookingReviewType(res.cancel_reason);
+  const hasBookingReview = isBookingReviewPending(res.cancel_reason);
+  const bookingReviewDetail = getBookingReviewDetail(res.cancel_reason);
 
   // 🟢 결제 시간 다국어 포맷팅
   const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
@@ -373,20 +375,24 @@ export default function ReservationCard({
       </div>
 
       {/* 호스트 취소 안내 문구 (확정된 예약) */}
-      {hasHostUnavailableReview && !isCancelledBookingStatus(res.status) && (
+      {hasBookingReview && !isCancelledBookingStatus(res.status) && (
         <div className="mx-4 md:mx-6 mb-4 bg-orange-50 border border-orange-100 rounded-lg p-2.5 flex items-start gap-2">
           <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={14} />
           <div className="text-[11px] leading-snug text-orange-700">
-            <p className="font-bold text-orange-900">고객이 &apos;호스트 진행 불가&apos; 사유로 운영 검토를 요청했습니다.</p>
+            <p className="font-bold text-orange-900">
+              {bookingReviewType === 'minimum_participants_unmet'
+                ? "고객이 '최소 진행 인원 미달' 사유로 운영 검토를 요청했습니다."
+                : "고객이 '호스트 진행 불가' 사유로 운영 검토를 요청했습니다."}
+            </p>
             <p className="mt-0.5">운영팀 확인 후 전액 환불 취소 또는 반려로 처리됩니다.</p>
-            {hostUnavailableDetail && (
-              <p className="mt-1 text-orange-800">고객 메모: {hostUnavailableDetail}</p>
+            {bookingReviewDetail && (
+              <p className="mt-1 text-orange-800">고객 메모: {bookingReviewDetail}</p>
             )}
           </div>
         </div>
       )}
 
-      {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && !hasHostUnavailableReview && (
+      {isConfirmed && !isPast && !isCancellationRequestedBookingStatus(res.status) && !hasBookingReview && (
         <div className="mx-4 md:mx-6 mb-4 rounded-lg border border-amber-200 bg-amber-50 p-2.5 flex items-start gap-2">
           <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={14} />
           <p className="text-[11px] leading-snug text-amber-900 font-medium">

@@ -29,12 +29,16 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
   if (!isOpen) return null;
 
   const isHostUnavailable = reasonCode === 'host_unavailable';
+  const isMinimumParticipantsUnmet = reasonCode === 'minimum_participants_unmet';
+  const isReviewReason = isHostUnavailable || isMinimumParticipantsUnmet;
   const isOtherReason = reasonCode === 'other';
-  const resolvedRefundInfo = isHostUnavailable
+  const resolvedRefundInfo = isReviewReason
     ? {
       percent: 100,
       amount: fullRefundAmount,
-      reason: t('modal_cancel_host_unavailable_refund'),
+      reason: isMinimumParticipantsUnmet
+        ? t('modal_cancel_minimum_participants_unmet_refund')
+        : t('modal_cancel_host_unavailable_refund'),
     }
     : refundInfo;
   const reasonRequired = isOtherReason;
@@ -87,11 +91,17 @@ export default function CancellationModal({ isOpen, onClose, onConfirm, isProces
               <option value="personal_change">{t('modal_cancel_reason_option_personal_change')}</option>
               <option value="schedule_issue">{t('modal_cancel_reason_option_schedule_issue')}</option>
               <option value="host_unavailable">{t('modal_cancel_reason_option_host_unavailable')}</option>
+              <option value="minimum_participants_unmet">{t('modal_cancel_reason_option_minimum_participants_unmet')}</option>
               <option value="other">{t('modal_cancel_reason_option_other')}</option>
             </select>
             {isHostUnavailable && (
               <p className="text-[11px] text-orange-600 leading-5">
                 {t('modal_cancel_host_unavailable_hint')}
+              </p>
+            )}
+            {isMinimumParticipantsUnmet && (
+              <p className="text-[11px] text-orange-600 leading-5">
+                {t('modal_cancel_minimum_participants_unmet_hint')}
               </p>
             )}
           </div>

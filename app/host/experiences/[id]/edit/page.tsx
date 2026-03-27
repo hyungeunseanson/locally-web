@@ -115,6 +115,7 @@ export default function EditExperiencePage() {
             age_limit: data.rules?.age_limit || '',
             activity_level: data.rules?.activity_level || '보통',
             refund_policy: FIXED_REFUND_POLICY,
+            host_notice: data.rules?.host_notice || '',
           },
         });
       } finally {
@@ -834,6 +835,16 @@ export default function EditExperiencePage() {
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{copy.refundPolicyLabel}</p>
                 <p className="text-sm font-semibold text-slate-800">{getLocalizedText(FIXED_REFUND_POLICY_LABELS, lang)}</p>
                 <p className="text-[11px] text-slate-500 mt-1">{copy.refundPolicyHelp}</p>
+              </div>
+              <div className="mt-4">
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">{copy.hostNoticeLabel}</label>
+                <p className="mb-2 text-[11px] leading-5 text-slate-500">{copy.hostNoticeHelp}</p>
+                <textarea
+                  className="w-full min-h-[96px] rounded-xl border p-3 text-sm leading-6 outline-none placeholder:text-slate-300"
+                  placeholder={copy.hostNoticePlaceholder}
+                  value={formData.rules?.host_notice || ''}
+                  onChange={(e) => setFormData({ ...formData, rules: { ...formData.rules, host_notice: e.target.value } })}
+                />
               </div>
             </div>
           </div>

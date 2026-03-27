@@ -85,6 +85,7 @@ type NormalizedExperienceWriteInput = {
     age_limit: string;
     activity_level: string;
     refund_policy: string;
+    host_notice: string;
   };
   price: number;
   isPrivateEnabled: boolean;
@@ -274,6 +275,7 @@ function normalizeExperienceWriteBody(body: ExperienceWriteBody): NormalizedExpe
   const rules = body.rules && typeof body.rules === 'object' ? body.rules as Record<string, unknown> : {};
   const ageLimit = asTrimmedString(rules.age_limit);
   const activityLevel = asTrimmedString(rules.activity_level);
+  const hostNotice = asTrimmedString(rules.host_notice);
   const price = asNumber(body.price);
   const isPrivateEnabled = Boolean(body.is_private_enabled);
   const privatePrice = isPrivateEnabled ? asNumber(body.private_price) : 0;
@@ -353,6 +355,7 @@ function normalizeExperienceWriteBody(body: ExperienceWriteBody): NormalizedExpe
         age_limit: ageLimit,
         activity_level: activityLevel || '보통',
         refund_policy: FIXED_REFUND_POLICY,
+        host_notice: hostNotice,
       },
     }),
     photos,
@@ -368,6 +371,7 @@ function normalizeExperienceWriteBody(body: ExperienceWriteBody): NormalizedExpe
       age_limit: ageLimit,
       activity_level: activityLevel || '보통',
       refund_policy: FIXED_REFUND_POLICY,
+      host_notice: hostNotice,
     },
     price,
     isPrivateEnabled,

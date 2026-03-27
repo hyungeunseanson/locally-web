@@ -37,6 +37,7 @@ export type ExperienceRulesTranslationInput = {
   age_limit: string;
   activity_level: string;
   refund_policy: string;
+  host_notice: string;
 };
 
 export type ExperienceSourceTranslationContent = {
@@ -129,6 +130,7 @@ function normalizeRules(value: unknown): ExperienceRulesTranslationInput {
     age_limit: asTrimmedString(raw.age_limit),
     activity_level: asTrimmedString(raw.activity_level),
     refund_policy: asTrimmedString(raw.refund_policy),
+    host_notice: asTrimmedString(raw.host_notice),
   };
 }
 
@@ -170,7 +172,7 @@ function buildLocalizedRulesMap(
   value: ExperienceRulesTranslationInput
 ): Partial<Record<ExperienceLocale, ExperienceRulesTranslationInput>> {
   const normalized = normalizeRules(value);
-  return normalized.age_limit || normalized.activity_level || normalized.refund_policy
+  return normalized.age_limit || normalized.activity_level || normalized.refund_policy || normalized.host_notice
     ? { [sourceLocale]: normalized }
     : {};
 }
@@ -457,8 +459,14 @@ export function getLocalizedExperienceRules(
   const targetLocale = isExperienceLocale(locale) ? locale : 'ko';
   const localized = normalizeRules(readLocalizedJsonValue(row, 'rules', targetLocale));
 
-  if (localized.age_limit || localized.activity_level || localized.refund_policy) {
-    return localized;
+  if (localized.age_limit || localized.activity_level || localized.refund_policy || localized.host_notice) {
+    const fallback = normalizeRules(row.rules);
+    return {
+      ...fallback,
+      ...Object.fromEntries(
+        Object.entries(localized).filter(([, value]) => typeof value === 'string' && value.trim())
+      ),
+    };
   }
 
   return normalizeRules(row.rules);
@@ -535,7 +543,8 @@ export function didSourceTranslationContentChange(
     || !areItineraryArraysEqual(left.itinerary, right.itinerary)
     || left.rules.age_limit !== right.rules.age_limit
     || left.rules.activity_level !== right.rules.activity_level
-    || left.rules.refund_policy !== right.rules.refund_policy;
+    || left.rules.refund_policy !== right.rules.refund_policy
+    || left.rules.host_notice !== right.rules.host_notice;
 }
 
 function areStringArraysEqual(left: string[], right: string[]) {
@@ -621,7 +630,7 @@ export function mergeLocalizedRulesValue(
   const next = getSafeJsonObject(existing);
   const normalized = normalizeRules(value);
 
-  if (!normalized.age_limit && !normalized.activity_level && !normalized.refund_policy) {
+  if (!normalized.age_limit && !normalized.activity_level && !normalized.refund_policy && !normalized.host_notice) {
     delete next[locale];
     return next as Partial<Record<ExperienceLocale, ExperienceRulesTranslationInput>>;
   }

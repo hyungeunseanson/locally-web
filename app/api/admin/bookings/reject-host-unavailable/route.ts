@@ -3,8 +3,9 @@ import { createClient as createServerClient } from '@/app/utils/supabase/server'
 import { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import {
-  clearHostUnavailableReviewMarker,
-  isHostUnavailableReviewPending,
+  clearBookingReviewMarker,
+  getBookingReviewType,
+  isBookingReviewPending,
 } from '@/app/utils/hostUnavailableReview';
 
 type RejectHostUnavailableBody = {
@@ -50,14 +51,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    if (!isHostUnavailableReviewPending(booking.cancel_reason)) {
-      return NextResponse.json({ success: false, error: '호스트 진행 불가 검토 요청이 아닙니다.' }, { status: 409 });
+    const reviewType = getBookingReviewType(booking.cancel_reason);
+
+    if (!isBookingReviewPending(booking.cancel_reason)) {
+      return NextResponse.json({ success: false, error: '운영 검토 요청이 아닙니다.' }, { status: 409 });
     }
 
     const { error: updateError } = await supabaseAdmin
       .from('bookings')
       .update({
-        cancel_reason: clearHostUnavailableReviewMarker(booking.cancel_reason),
+        cancel_reason: clearBookingReviewMarker(booking.cancel_reason),
       })
       .eq('id', bookingId);
 
@@ -76,7 +79,9 @@ export async function POST(request: Request) {
         notifications.push({
           user_id: booking.user_id,
           type: 'cancellation',
-          title: '호스트 진행 불가 취소 요청이 반려되었습니다.',
+          title: reviewType === 'minimum_participants_unmet'
+            ? '최소 진행 인원 미달 취소 요청이 반려되었습니다.'
+            : '호스트 진행 불가 취소 요청이 반려되었습니다.',
           message: `'${expTitle}' 예약은 유지되며, 필요 시 호스트와 직접 소통해주세요.`,
           link: '/guest/trips',
           is_read: false,
@@ -87,7 +92,9 @@ export async function POST(request: Request) {
         notifications.push({
           user_id: hostId,
           type: 'cancellation',
-          title: '호스트 진행 불가 취소 요청이 반려되었습니다.',
+          title: reviewType === 'minimum_participants_unmet'
+            ? '최소 진행 인원 미달 취소 요청이 반려되었습니다.'
+            : '호스트 진행 불가 취소 요청이 반려되었습니다.',
           message: `'${expTitle}' 예약은 유지됩니다. 고객과 직접 소통해주세요.`,
           link: '/host/dashboard',
           is_read: false,
@@ -104,7 +111,9 @@ export async function POST(request: Request) {
     await recordAuditLog({
       admin_id: user.id,
       admin_email: user.email,
-      action_type: 'ADMIN_REJECT_HOST_UNAVAILABLE_CANCEL',
+      action_type: reviewType === 'minimum_participants_unmet'
+        ? 'ADMIN_REJECT_MINIMUM_PARTICIPANTS_CANCEL'
+        : 'ADMIN_REJECT_HOST_UNAVAILABLE_CANCEL',
       target_type: 'booking',
       target_id: String(bookingId),
       details: {
@@ -119,4 +128,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-
