@@ -54,12 +54,16 @@ function InboxContent() {
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeMessageThreadRef = useRef<string | null>(null);
+  const hasPrimedThreadMessagesRef = useRef(false);
+  const previousMessageIdsRef = useRef<string[]>([]);
   const supabase = useMemo(() => createClient(), []);
 
   // 🟢 프로필 모달 상태
   const [modalUserId, setModalUserId] = useState<string | null>(null);
   const [hostBootstrapSummary, setHostBootstrapSummary] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [isBootstrappingHost, setIsBootstrappingHost] = useState(false);
+  const [animatedMessageIds, setAnimatedMessageIds] = useState<string[]>([]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -99,6 +103,41 @@ function InboxContent() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    const currentThreadId = selectedInquiry?.id ? String(selectedInquiry.id) : null;
+
+    if (!currentThreadId) {
+      activeMessageThreadRef.current = null;
+      hasPrimedThreadMessagesRef.current = false;
+      previousMessageIdsRef.current = [];
+      setAnimatedMessageIds([]);
+      return;
+    }
+
+    if (activeMessageThreadRef.current !== currentThreadId) {
+      activeMessageThreadRef.current = currentThreadId;
+      hasPrimedThreadMessagesRef.current = false;
+      previousMessageIdsRef.current = [];
+      setAnimatedMessageIds([]);
+    }
+
+    const currentMessageIds = messages.map((message) => String(message.id));
+    if (!hasPrimedThreadMessagesRef.current) {
+      previousMessageIdsRef.current = currentMessageIds;
+      if (currentMessageIds.length > 0) {
+        hasPrimedThreadMessagesRef.current = true;
+      }
+      return;
+    }
+
+    const previousMessageIds = previousMessageIdsRef.current;
+    const previousMessageIdSet = new Set(previousMessageIds);
+    const nextAnimatedMessageIds = currentMessageIds.filter((messageId) => !previousMessageIdSet.has(messageId));
+
+    previousMessageIdsRef.current = currentMessageIds;
+    setAnimatedMessageIds(nextAnimatedMessageIds);
+  }, [messages, selectedInquiry?.id]);
 
   useEffect(() => {
     setIsUrlProcessed(false);
@@ -470,8 +509,9 @@ function InboxContent() {
                 {messages.map((msg) => {
                   const isMe = String(msg.sender_id) === String(currentUser?.id);
                   const isDeletedMessage = isDeletedInquiryMessage(msg.type);
+                  const shouldAnimateMessage = animatedMessageIds.includes(String(msg.id));
                   return (
-                    <div key={msg.id} className={`flex w-full animate-in fade-in duration-300 ${isMe ? 'justify-end slide-in-from-right-2' : 'justify-start slide-in-from-left-2'}`}>
+                    <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${shouldAnimateMessage ? `animate-in fade-in duration-300 ${isMe ? 'slide-in-from-right-2' : 'slide-in-from-left-2'}` : ''}`}>
                       {!isMe && (
                         <div
                           className="flex flex-col items-center mr-1.5 cursor-pointer"

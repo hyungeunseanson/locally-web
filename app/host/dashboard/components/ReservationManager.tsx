@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { sendNotification } from '@/app/utils/notification';
 import Skeleton from '@/app/components/ui/Skeleton';
 import EmptyState from '@/app/components/EmptyState';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { useToast } from '@/app/context/ToastContext';
 import { useLanguage } from '@/app/context/LanguageContext'; // 🟢 1. import 추가
 import GuestReviewModal from './GuestReviewModal'; // 모달 추가
@@ -98,6 +99,7 @@ export default function ReservationManager() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<ReservationGuest | null>(null);
+  const [pendingRefundBooking, setPendingRefundBooking] = useState<ReservationRecord | null>(null);
 
   // ✅ [복구] 에러 메시지 상태
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -238,7 +240,6 @@ guest:profiles!bookings_user_id_fkey (
   };
 
   const handleApproveCancel = async (booking: ReservationRecord) => {
-    if (!confirm(`${t('res_refund_confirm_prefix')}${booking.guest?.full_name || booking.contact_name || ''}${t('res_refund_confirm_suffix')}`)) return; // 🟢 번역
     setProcessingId(booking.id);
 
     try {
@@ -260,6 +261,7 @@ guest:profiles!bookings_user_id_fkey (
 
       showToast(t('res_toast_approved'), 'success'); // 🟢 번역
       fetchReservations(true);
+      setPendingRefundBooking(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('res_error_refund_unknown');
       showToast(message, 'error');
@@ -438,7 +440,7 @@ guest:profiles!bookings_user_id_fkey (
                 res={res}
                 isNew={isNew(res.created_at, res.id)}
                 isProcessing={processingId === res.id}
-                onApproveCancel={() => handleApproveCancel(res)}
+                onApproveCancel={() => setPendingRefundBooking(res)}
                 onShowProfile={() => setSelectedGuest(res.guest || null)}
                 onCheck={() => markAsRead(res.id)}
                 onMessage={() => router.push(`/host/dashboard?tab=inquiries&guestId=${res.user_id}&expId=${res.experience_id || ''}`)}
@@ -476,6 +478,22 @@ guest:profiles!bookings_user_id_fkey (
           onSuccess={() => fetchReservations(true)} // 목록 갱신
         />
       )}
+      <ConfirmModal
+        isOpen={!!pendingRefundBooking}
+        onCancel={() => setPendingRefundBooking(null)}
+        onConfirm={() => {
+          if (!pendingRefundBooking) return;
+          void handleApproveCancel(pendingRefundBooking);
+        }}
+        title={t('res_approve_refund')}
+        description={pendingRefundBooking
+          ? `${t('res_refund_confirm_prefix')}${pendingRefundBooking.guest?.full_name || pendingRefundBooking.contact_name || ''}${t('res_refund_confirm_suffix')}`
+          : ''}
+        confirmLabel={t('res_approve_refund')}
+        cancelLabel={t('button_close')}
+        tone="red"
+        isProcessing={pendingRefundBooking ? processingId === pendingRefundBooking.id : false}
+      />
     </div>
   );
 }
