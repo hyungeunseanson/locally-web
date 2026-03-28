@@ -12,7 +12,11 @@ export default function PageTransition({ children }: { children: ReactNode }) {
         pathname?.startsWith('/become-a-host') ||
         pathname?.startsWith('/company') ||
         pathname?.startsWith('/site-map') ||
-        pathname?.startsWith('/community');
+        pathname?.startsWith('/community') ||
+        pathname?.startsWith('/experiences') ||
+        pathname?.startsWith('/search') ||
+        pathname?.startsWith('/guest') ||
+        pathname?.startsWith('/services');
 
     if (!shouldAnimate) {
         return <>{children}</>;

@@ -63,10 +63,6 @@ export function useAdminUsersData() {
   }, [fetchUsers, supabase]);
 
   const deleteItem = useCallback(async (table: string, id: string) => {
-    if (!confirm('정말 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-      return false;
-    }
-
     try {
       const response = await fetch('/api/admin/delete', {
         method: 'POST',

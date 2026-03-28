@@ -436,22 +436,14 @@ export default function MasterLedgerTab({
   };
 
   const handleConfirmPayment = async (bookingId: string) => {
-    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
-
-    if (isMobileScreen) {
-      setConfirmDialog({
-        kind: 'confirm-payment',
-        bookingId,
-        title: '입금 확인',
-        description: '입금이 확인되었습니까? 예약을 확정합니다.',
-        confirmLabel: '입금 확인',
-        tone: 'blue',
-      });
-      return;
-    }
-
-    if (!confirm('입금이 확인되었습니까? 예약을 확정합니다.')) return;
-    await performConfirmPayment(bookingId);
+    setConfirmDialog({
+      kind: 'confirm-payment',
+      bookingId,
+      title: '입금 확인',
+      description: '입금이 확인되었습니까? 예약을 확정합니다.',
+      confirmLabel: '입금 확인',
+      tone: 'blue',
+    });
   };
 
   const performForceCancel = async (
@@ -512,70 +504,40 @@ export default function MasterLedgerTab({
   };
 
   const handleForceCancel = async (bookingId: string) => {
-    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
-
-    if (isMobileScreen) {
-      setConfirmDialog({
-        kind: 'force-cancel',
-        bookingId,
-        title: '강제 취소',
-        description: '정말로 강제 취소(전액 환불)하시겠습니까?',
-        confirmLabel: '강제 취소',
-        tone: 'red',
-      });
-      return;
-    }
-
-    if (!confirm('⚠️ 정말로 강제 취소(전액 환불)하시겠습니까?')) return;
-    await performForceCancel(bookingId);
+    setConfirmDialog({
+      kind: 'force-cancel',
+      bookingId,
+      title: '강제 취소',
+      description: '정말로 강제 취소(전액 환불)하시겠습니까?',
+      confirmLabel: '강제 취소',
+      tone: 'red',
+    });
   };
 
   const handleApproveHostUnavailable = async (bookingId: string) => {
     const reviewType = getBookingReviewType(selectedBooking?.cancel_reason);
-    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
-
-    if (isMobileScreen) {
-      setConfirmDialog({
-        kind: 'approve-host-unavailable',
-        bookingId,
-        title: getReviewTitle(reviewType),
-        description: getReviewDescription(reviewType),
-        confirmLabel: '전액 환불 취소',
-        tone: 'red',
-      });
-      return;
-    }
-
-    if (!confirm(getReviewDescription(reviewType))) return;
-    await performForceCancel(bookingId, {
-      source: 'host_fault_request',
-      reason: getReviewApproveReason(reviewType),
-      successMessage: reviewType === 'minimum_participants_unmet'
-        ? '최소 진행 인원 미달 전액 환불 취소가 처리되었습니다.'
-        : '호스트 진행 불가 전액 환불 취소가 처리되었습니다.',
+    setConfirmDialog({
+      kind: 'approve-host-unavailable',
+      bookingId,
+      title: getReviewTitle(reviewType),
+      description: getReviewDescription(reviewType),
+      confirmLabel: '전액 환불 취소',
+      tone: 'red',
     });
   };
 
   const handleRejectHostUnavailable = async (bookingId: string) => {
     const reviewType = getBookingReviewType(selectedBooking?.cancel_reason);
-    const isMobileScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
-
-    if (isMobileScreen) {
-      setConfirmDialog({
-        kind: 'reject-host-unavailable',
-        bookingId,
-        title: '검토 반려',
-        description: reviewType === 'minimum_participants_unmet'
-          ? '최소 진행 인원 미달 검토 요청을 반려하시겠습니까?'
-          : '호스트 진행 불가 검토 요청을 반려하시겠습니까?',
-        confirmLabel: '검토 반려',
-        tone: 'blue',
-      });
-      return;
-    }
-
-    if (!confirm(reviewType === 'minimum_participants_unmet' ? '최소 진행 인원 미달 검토 요청을 반려하시겠습니까?' : '호스트 진행 불가 검토 요청을 반려하시겠습니까?')) return;
-    await performRejectHostUnavailable(bookingId);
+    setConfirmDialog({
+      kind: 'reject-host-unavailable',
+      bookingId,
+      title: '검토 반려',
+      description: reviewType === 'minimum_participants_unmet'
+        ? '최소 진행 인원 미달 검토 요청을 반려하시겠습니까?'
+        : '호스트 진행 불가 검토 요청을 반려하시겠습니까?',
+      confirmLabel: '검토 반려',
+      tone: 'blue',
+    });
   };
 
   const handleCopy = (text?: string | null) => {

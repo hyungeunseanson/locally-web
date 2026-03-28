@@ -8,6 +8,7 @@ import 'react-date-range/dist/theme/default.css';
 import { Range } from 'react-date-range';
 import { differenceInCalendarDays, format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { settleHostPayout } from '@/app/actions/admin';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingHostPayout, getBookingPaidAmount, getBookingPlatformRevenue } from '@/app/utils/bookingFinance';
@@ -107,6 +108,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
   const datePickerRef = useRef<HTMLDivElement>(null);
   const settlementSectionRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const salesStartAt = dateRange[0].startDate ? startOfDay(dateRange[0].startDate).toISOString() : '';
   const salesEndAt = dateRange[0].endDate ? endOfDay(dateRange[0].endDate).toISOString() : '';
 
@@ -299,27 +301,32 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
     settlementSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleSettlePayout = async (hostId: string, bookingIds: string[]) => {
-    if (!confirm(`이 호스트의 ${bookingIds.length}건 정산을 완료 처리하시겠습니까?`)) return;
-
-    setIsProcessing(true);
-    try {
-      const res = await settleHostPayout(bookingIds);
-      if (res.success) {
-        showToast('성공적으로 정산 처리되었습니다.', 'success');
-        await Promise.all([
-          fetchSalesBookings(),
-          Promise.resolve(onRefresh?.()),
-        ]);
-      } else {
-        throw new Error(res.error || 'Server error');
+  const handleSettlePayout = (hostId: string, bookingIds: string[]) => {
+    requestConfirm({
+      title: '정산 완료 처리',
+      description: `이 호스트의 ${bookingIds.length}건 정산을 완료 처리하시겠습니까?`,
+      confirmLabel: '정산 완료',
+      tone: 'default',
+    }, async () => {
+      setIsProcessing(true);
+      try {
+        const res = await settleHostPayout(bookingIds);
+        if (res.success) {
+          showToast('성공적으로 정산 처리되었습니다.', 'success');
+          await Promise.all([
+            fetchSalesBookings(),
+            Promise.resolve(onRefresh?.()),
+          ]);
+        } else {
+          throw new Error(res.error || 'Server error');
+        }
+      } catch (err: any) {
+        console.error(err);
+        showToast('정산 처리 실패: ' + err.message, 'error');
+      } finally {
+        setIsProcessing(false);
       }
-    } catch (err: any) {
-      console.error(err);
-      showToast('정산 처리 실패: ' + err.message, 'error');
-    } finally {
-      setIsProcessing(false);
-    }
+    });
   };
 
   const handleDownloadCSV = (item: any) => {
@@ -699,6 +706,7 @@ export default function SalesTab({ onRefresh }: { onRefresh?: () => void }) {
           </table>
         </div>
       </div>
+      {ConfirmDialogElement}
     </div>
   );
 }

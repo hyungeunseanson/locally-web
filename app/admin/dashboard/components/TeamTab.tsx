@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AdminTask, AdminComment } from '@/app/types/admin';
 import { useToast } from '@/app/context/ToastContext';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { useTeamWorkspaceAdminSession } from '@/app/admin/dashboard/hooks/useTeamWorkspaceAdminSession';
 import { ensureAdminTeamLastViewed, markAdminTeamViewed } from '@/app/utils/adminBadgeState';
 
@@ -40,6 +41,7 @@ type TeamWorkspaceBootstrapResponse = {
 
 export default function TeamTab({ initialInnerTab, initialProxyRequestId }: TeamTabProps) {
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const sessionState = useTeamWorkspaceAdminSession();
   const realtimeReady = sessionState.status === 'ready';
   const [tasks, setTasks] = useState<AdminTask[]>([]);
@@ -435,9 +437,13 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
     }
   };
 
-  const deleteTask = async (table: string, id: string) => {
-    if (!confirm('삭제하시겠습니까?')) return;
-    try {
+  const deleteTask = (table: string, id: string) => {
+    requestConfirm({
+      title: '삭제',
+      description: '삭제하시겠습니까?',
+      confirmLabel: '삭제',
+      tone: 'red',
+    }, async () => {
       const endpoint =
         table === 'admin_tasks'
           ? `/api/admin/team/tasks/${id}`
@@ -452,9 +458,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
       await requestTeamApi(endpoint, { method: 'DELETE' });
       await fetchTeamWorkspaceState();
       showToast('삭제 완료', 'success');
-    } catch (error: any) {
-      showToast('삭제 실패: ' + error.message, 'error');
-    }
+    });
   };
 
   const addTodo = async () => {
@@ -1079,6 +1083,7 @@ export default function TeamTab({ initialInnerTab, initialProxyRequestId }: Team
           document.body
         )
       }
+      {ConfirmDialogElement}
     </div >
   );
 }

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { sendNotification } from '@/app/utils/notification';
 import { useToast } from '@/app/context/ToastContext';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import type { AdminUserActivityBooking, AdminUserTimelineItem, AdminUserDashboardRow, OnlineUser } from '@/app/types/admin';
 import type { Profile } from '@/app/types';
 
@@ -66,6 +67,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
   deleteItem: (table: string, id: string) => void;
 }) {
   const { showToast } = useToast(); // 🟢 추가
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminUserDashboardRow | null>(null);
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
@@ -710,7 +712,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
               영구 삭제는 상세 패널에서만 가능합니다.
             </p>
             <button
-              onClick={() => { if (confirm('정말 계정을 영구 삭제하시겠습니까?')) deleteItem('profiles', selectedUser.id); }}
+              onClick={() => requestConfirm({ title: '계정 영구 삭제', description: '정말 계정을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', confirmLabel: '영구 삭제', tone: 'red' }, () => deleteItem('profiles', selectedUser.id))}
               className="w-full bg-slate-900 hover:bg-red-600 text-white font-bold py-2.5 md:py-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 md:gap-2 text-xs md:text-sm"
             >
               <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /> 이 회원 계정 영구 삭제
@@ -741,6 +743,7 @@ export default function UsersTab({ users, onlineUsers, deleteItem }: {
           </div>
         </div>
       )}
+      {ConfirmDialogElement}
     </div>
   );
 }

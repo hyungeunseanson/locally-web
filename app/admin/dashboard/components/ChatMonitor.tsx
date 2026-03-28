@@ -7,6 +7,7 @@ import { MessageCircle, User, Send, RefreshCw, Loader2, AlertTriangle, Eye, Shie
 import { useAdminChatQuery } from '../hooks/useAdminChatQuery';
 import { isAdminSupportInquiry, isDeletedInquiryMessage } from '@/app/utils/inquiry';
 import { useToast } from '@/app/context/ToastContext';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import ChatParticipantProfileModal, { type ChatParticipantProfile } from './ChatParticipantProfileModal';
 
 type CSStatus = 'open' | 'in_progress' | 'resolved';
@@ -74,6 +75,7 @@ export default function ChatMonitor() {
   } = useAdminChatQuery();
 
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [activeTab, setActiveTab] = useState<'monitor' | 'admin'>('admin');
   const [csStatusFilter, setCsStatusFilter] = useState<CSStatusFilter>('ALL');
   const [replyText, setReplyText] = useState('');
@@ -150,11 +152,15 @@ export default function ChatMonitor() {
     }
   };
 
-  const handleSoftDeleteMessage = async (messageId: number | string) => {
+  const handleSoftDeleteMessage = (messageId: number | string) => {
     if (!selectedInquiry) return;
-    if (!confirm('이 메시지를 운영 정책 위반으로 삭제하시겠습니까?')) return;
-
-    try {
+    requestConfirm({
+      title: '메시지 삭제',
+      description: '이 메시지를 운영 정책 위반으로 삭제하시겠습니까?',
+      confirmLabel: '삭제',
+      tone: 'red',
+    }, async () => {
+      try {
       const response = await fetch(`/api/admin/inquiries/messages/${messageId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -172,11 +178,12 @@ export default function ChatMonitor() {
       await refresh(false);
       await loadMessages(selectedInquiry.id);
       showToast('메시지가 운영 정책 기준으로 삭제되었습니다.', 'success');
-    } catch (error) {
-      console.error('[ChatMonitor] soft delete failed:', error);
-      const message = error instanceof Error ? error.message : '메시지 삭제 실패';
-      showToast(message, 'error');
-    }
+      } catch (error) {
+        console.error('[ChatMonitor] soft delete failed:', error);
+        const message = error instanceof Error ? error.message : '메시지 삭제 실패';
+        showToast(message, 'error');
+      }
+    });
   };
 
   const getGuestName = (guest?: MonitorGuest) => {
@@ -586,6 +593,7 @@ export default function ChatMonitor() {
       </div>
 
       <ChatParticipantProfileModal participant={profileModal} onClose={() => setProfileModal(null)} />
+      {ConfirmDialogElement}
     </div>
   );
 }

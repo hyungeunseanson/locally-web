@@ -330,7 +330,7 @@ export default function InquiryChat() {
 	                const isMe = String(msg.sender_id) === String(currentUser?.id);
 	                const isDeletedMessage = isDeletedInquiryMessage(msg.type);
 	                return (
-                  <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
+                  <div key={msg.id} className={`flex w-full animate-in fade-in duration-300 ${isMe ? 'justify-end slide-in-from-right-2' : 'justify-start slide-in-from-left-2'}`}>
                     {!isMe && (
                       <div
                         className="flex flex-col items-center mr-1.5 cursor-pointer"

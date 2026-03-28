@@ -4,6 +4,7 @@ import Image from 'next/image';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Star, Trash2, Search, RefreshCw } from 'lucide-react';
 import { useToast } from '@/app/context/ToastContext';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 
 interface AdminReview {
   id: number;
@@ -20,6 +21,7 @@ interface AdminReview {
 
 export default function ReviewsTab() {
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
 
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,28 +52,34 @@ export default function ReviewsTab() {
     void fetchReviews();
   }, [fetchReviews]);
 
-  const handleDelete = async (reviewId: number) => {
-    if (!confirm('이 후기를 삭제하시겠습니까? 취소할 수 없습니다.')) return;
-    setDeletingId(reviewId);
-    try {
-      const response = await fetch(`/api/admin/reviews/${reviewId}`, {
-        method: 'DELETE',
-      });
-      const result = await response.json();
+  const handleDelete = (reviewId: number) => {
+    requestConfirm({
+      title: '후기 삭제',
+      description: '이 후기를 삭제하시겠습니까? 취소할 수 없습니다.',
+      confirmLabel: '삭제',
+      tone: 'red',
+    }, async () => {
+      setDeletingId(reviewId);
+      try {
+        const response = await fetch(`/api/admin/reviews/${reviewId}`, {
+          method: 'DELETE',
+        });
+        const result = await response.json();
 
-      if (!response.ok || result?.success === false) {
-        throw new Error(result?.error || '삭제 실패');
+        if (!response.ok || result?.success === false) {
+          throw new Error(result?.error || '삭제 실패');
+        }
+
+        setReviews(prev => prev.filter(r => r.id !== reviewId));
+        showToast('후기가 삭제되었습니다.', 'success');
+      } catch (err) {
+        console.error(err);
+        const message = err instanceof Error ? err.message : '삭제 실패';
+        showToast(message, 'error');
+      } finally {
+        setDeletingId(null);
       }
-
-      setReviews(prev => prev.filter(r => r.id !== reviewId));
-      showToast('후기가 삭제되었습니다.', 'success');
-    } catch (err) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : '삭제 실패';
-      showToast(message, 'error');
-    } finally {
-      setDeletingId(null);
-    }
+    });
   };
 
   const filtered = reviews.filter(r => {
@@ -229,6 +237,7 @@ export default function ReviewsTab() {
           ))}
         </div>
       )}
+      {ConfirmDialogElement}
     </div>
   );
 }

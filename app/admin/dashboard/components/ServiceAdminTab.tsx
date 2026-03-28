@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/app/context/ToastContext';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 import { useServiceAdminData } from '../hooks/useServiceAdminData';
 import { AdminServiceBooking } from '@/app/types/admin';
 
@@ -167,33 +168,40 @@ function ForceCancelModal({
   onSuccess: () => void;
 }) {
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const isFullRefund = booking.status === 'PAID' && (booking.service_request?.status === 'open' || booking.service_request?.status === 'pending_payment');
   const [refundAmt, setRefundAmt] = useState(booking.amount);
   const [reason, setReason] = useState('관리자 강제 취소');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!confirm(`₩${refundAmt.toLocaleString()} 환불로 강제 취소하시겠습니까?`)) return;
-    setIsProcessing(true);
-    try {
-      const res = await fetch('/api/admin/service-cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: booking.order_id, refund_amount: refundAmt, cancel_reason: reason }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        showToast(data.error || '취소 실패', 'error');
-        return;
+  const handleSubmit = () => {
+    requestConfirm({
+      title: '강제 취소',
+      description: `₩${refundAmt.toLocaleString()} 환불로 강제 취소하시겠습니까?`,
+      confirmLabel: '강제 취소',
+      tone: 'red',
+    }, async () => {
+      setIsProcessing(true);
+      try {
+        const res = await fetch('/api/admin/service-cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: booking.order_id, refund_amount: refundAmt, cancel_reason: reason }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showToast(data.error || '취소 실패', 'error');
+          return;
+        }
+        showToast('강제 취소 완료', 'success');
+        onSuccess();
+        onClose();
+      } catch {
+        showToast('서버 오류', 'error');
+      } finally {
+        setIsProcessing(false);
       }
-      showToast('강제 취소 완료', 'success');
-      onSuccess();
-      onClose();
-    } catch {
-      showToast('서버 오류', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
+    });
   };
 
   return (
@@ -266,6 +274,7 @@ function ForceCancelModal({
           </button>
         </div>
       </div>
+      {ConfirmDialogElement}
     </div>
   );
 }
@@ -275,6 +284,7 @@ type AllFilter = 'ALL' | 'CANCEL_REQ';
 
 function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[]; onRefresh: () => void }) {
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [cancelTarget, setCancelTarget] = useState<AdminServiceBooking | null>(null);
   const [editTarget, setEditTarget] = useState<AdminServiceBooking | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -289,27 +299,33 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
     ? bookings.filter(b => b.status === 'cancellation_requested')
     : bookings;
 
-  const handleConfirmPayment = async (orderId: string) => {
-    if (!confirm('입금이 확인되었습니까? 의뢰를 공개하고 호스트 모집을 시작합니다.')) return;
-    setIsProcessing(true);
-    try {
-      const res = await fetch('/api/admin/service-confirm-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        showToast(data.error || '처리 실패', 'error');
-        return;
+  const handleConfirmPayment = (orderId: string) => {
+    requestConfirm({
+      title: '입금 확인',
+      description: '입금이 확인되었습니까? 의뢰를 공개하고 호스트 모집을 시작합니다.',
+      confirmLabel: '입금 확인',
+      tone: 'default',
+    }, async () => {
+      setIsProcessing(true);
+      try {
+        const res = await fetch('/api/admin/service-confirm-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showToast(data.error || '처리 실패', 'error');
+          return;
+        }
+        showToast('입금 확인 완료. 의뢰가 공개되었습니다.', 'success');
+        onRefresh();
+      } catch {
+        showToast('서버 오류가 발생했습니다.', 'error');
+      } finally {
+        setIsProcessing(false);
       }
-      showToast('입금 확인 완료. 의뢰가 공개되었습니다.', 'success');
-      onRefresh();
-    } catch {
-      showToast('서버 오류가 발생했습니다.', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
+    });
   };
 
   return (
@@ -491,6 +507,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
           </table>
         </div>
       </div>
+      {ConfirmDialogElement}
     </div>
   );
 }
@@ -498,6 +515,7 @@ function AllRequestsTab({ bookings, onRefresh }: { bookings: AdminServiceBooking
 // ── 서브탭 2: 정산 대기 ─────────────────────────────────────────────────────
 function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[]; onRefresh: () => void }) {
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -557,29 +575,34 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
     URL.revokeObjectURL(url);
   };
 
-  const markAsPaid = async (bookingIds: string[]) => {
-    if (!confirm(`총 ${bookingIds.length}건 이체를 완료하셨습니까?\n확인 시 '정산 완료' 처리됩니다.`)) return;
+  const markAsPaid = (bookingIds: string[]) => {
+    requestConfirm({
+      title: '정산 완료 처리',
+      description: `총 ${bookingIds.length}건 이체를 완료하셨습니까?\n확인 시 '정산 완료' 처리됩니다.`,
+      confirmLabel: '정산 완료',
+      tone: 'default',
+    }, async () => {
+      setIsProcessing(true);
+      try {
+        const response = await fetch('/api/admin/service-payouts/mark-paid', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bookingIds }),
+        });
+        const result = await response.json();
 
-    setIsProcessing(true);
-    try {
-      const response = await fetch('/api/admin/service-payouts/mark-paid', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingIds }),
-      });
-      const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || '정산 완료 처리에 실패했습니다.');
+        }
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || '정산 완료 처리에 실패했습니다.');
+        showToast('정산 완료 처리되었습니다.', 'success');
+        onRefresh();
+      } catch (err: unknown) {
+        showToast('처리 오류: ' + (err instanceof Error ? err.message : ''), 'error');
+      } finally {
+        setIsProcessing(false);
       }
-
-      showToast('정산 완료 처리되었습니다.', 'success');
-      onRefresh();
-    } catch (err: unknown) {
-      showToast('처리 오류: ' + (err instanceof Error ? err.message : ''), 'error');
-    } finally {
-      setIsProcessing(false);
-    }
+    });
   };
 
   return (
@@ -694,6 +717,7 @@ function SettlementTab({ bookings, onRefresh }: { bookings: AdminServiceBooking[
           </div>
         ))
       )}
+      {ConfirmDialogElement}
     </div>
   );
 }

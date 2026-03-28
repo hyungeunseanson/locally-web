@@ -7,10 +7,12 @@ import { useToast } from '@/app/context/ToastContext';
 import { isCancelledOnlyBookingStatus, isCompletedBookingStatus } from '@/app/constants/bookingStatus';
 import { getBookingHostPayout } from '@/app/utils/bookingFinance';
 import { settleHostPayout } from '@/app/actions/admin';
+import { useConfirmDialog } from '@/app/hooks/useConfirmDialog';
 
 export default function SettlementTab() {
   const supabase = createClient();
   const { showToast } = useToast();
+  const { requestConfirm, ConfirmDialogElement } = useConfirmDialog();
   const [settlements, setSettlements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedHost, setExpandedHost] = useState<string | null>(null);
@@ -101,18 +103,23 @@ export default function SettlementTab() {
 
   // 정산 완료 처리: settleHostPayout Server Action 사용 (감사로그 + 이중 정산 방지 내장)
   const markAsPaid = async (hostId: string, itemIds: string[]) => {
-    if (!confirm(`총 ${itemIds.length}건에 대해 이체를 완료하셨습니까?\n확인 시 '지급 완료' 상태로 변경되며 목록에서 사라집니다.`)) return;
+    requestConfirm({
+      title: '정산 완료 처리',
+      description: `총 ${itemIds.length}건에 대해 이체를 완료하셨습니까?\n확인 시 '지급 완료' 상태로 변경되며 목록에서 사라집니다.`,
+      confirmLabel: '정산 완료',
+      tone: 'default',
+    }, async () => {
+      try {
+        const result = await settleHostPayout(itemIds);
+        if (!result.success) throw new Error(result.error || 'Server error');
 
-    try {
-      const result = await settleHostPayout(itemIds);
-      if (!result.success) throw new Error(result.error || 'Server error');
-
-      showToast('정산 완료 처리되었습니다.', 'success');
-      fetchSettlements();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '처리 중 오류가 발생했습니다.';
-      showToast(msg, 'error');
-    }
+        showToast('정산 완료 처리되었습니다.', 'success');
+        fetchSettlements();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : '처리 중 오류가 발생했습니다.';
+        showToast(msg, 'error');
+      }
+    });
   };
 
   if (isLoading) return <div className="p-12 text-center text-slate-400">정산 데이터를 불러오는 중...</div>;
@@ -239,6 +246,7 @@ export default function SettlementTab() {
           ))
         )}
       </div>
+      {ConfirmDialogElement}
     </div>
   );
 }

@@ -5,6 +5,16 @@
 
 ---
 
+## v3.39.89 — [Interaction Polish Phase 4] 채팅 애니메이션·PageTransition 확장·admin confirm() 제거
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 채팅 메시지 등장 애니메이션 | `InquiryChat.tsx`, `guest/inbox/page.tsx` — 메시지 래퍼에 `fade-in` + 방향별 `slide-in-from-left/right-2` 300ms |
+| 🟢 PageTransition 라우트 확장 | `PageTransition.tsx` — `/experiences`, `/search`, `/guest`, `/services` 추가. 핵심 사용자 여정에 페이지 전환 효과 적용 |
+| 🟢 useConfirmDialog 훅 신규 | `hooks/useConfirmDialog.tsx` — `requestConfirm(config, onConfirm)` + `ConfirmDialogElement` 패턴. ConfirmModal 기반 비동기 확인 다이얼로그 |
+| 🟢 admin confirm() 전면 제거 | `SettlementTab`, `ChatMonitor`, `ReviewsTab`, `UsersTab`, `TeamTab`, `ServiceAdminTab`(3곳), `SalesTab`, `useAdminUsersData` — 총 9개 파일 12개 인스턴스의 브라우저 confirm()을 useConfirmDialog/ConfirmModal로 교체 |
+| 🟡 MasterLedgerTab 모바일/데스크탑 통합 | 기존 모바일→내장 confirmDialog / 데스크탑→confirm() 분기를 내장 confirmDialog로 통일 |
+
 ## v3.39.88 — [Interaction Polish Phase 3] ConfirmModal·카드 스태거·결제 축하
 
 | 항목 | 내용 |
