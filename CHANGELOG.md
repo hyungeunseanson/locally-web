@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-03-28 — Performance Phase 1E: Admin Users Summary Projection Trim
+
+### Users Summary Payload
+- **Profiles projection trim**: `/api/admin/users-summary`가 `profiles.select('*')` 대신 UsersTab 리스트/상세 패널/검색에 실제 필요한 기본 필드만 조회하도록 축소
+- **Role merge kept**: `users` 테이블의 `role` 병합과 응답 배열 구조는 유지하여 admin users UI 동작 회귀 없이 payload만 경량화
+
+### Admin Data Hook
+- **Typed dashboard rows**: `useAdminUsersData`가 admin users summary 응답을 `AdminUserDashboardRow[]`로 직접 다루도록 정리하여 실제 소비 필드와 데이터 계약을 일치시킴
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `app/api/admin/users-summary/route.ts` | wide `profiles.select('*')` 제거, UsersTab 소비 필드 기준 projection 축소 |
+| `app/admin/dashboard/hooks/useAdminUsersData.ts` | users state를 `AdminUserDashboardRow[]`로 정리 |
+
+---
 ## 2026-03-28 — Performance Phase 1D: ReservationManager Payload & Realtime Trim
 
 ### Reservation Payload

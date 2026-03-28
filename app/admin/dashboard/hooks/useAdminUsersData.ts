@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/app/utils/supabase/client';
 import { useToast } from '@/app/context/ToastContext';
-import type { Profile } from '@/app/types';
+import type { AdminUserDashboardRow } from '@/app/types/admin';
 
 type OnlineUser = {
   user_id: string;
@@ -18,7 +18,7 @@ export function useAdminUsersData() {
   const supabase = useMemo(() => createClient(), []);
   const { showToast } = useToast();
 
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<AdminUserDashboardRow[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -32,7 +32,7 @@ export function useAdminUsersData() {
         throw new Error(result?.error || '회원 로딩 실패');
       }
 
-      setUsers(Array.isArray(result?.data) ? result.data : []);
+      setUsers(Array.isArray(result?.data) ? result.data as AdminUserDashboardRow[] : []);
     } catch (error) {
       console.error('[useAdminUsersData] fetch error:', error);
       showToast('회원 데이터를 불러오지 못했습니다.', 'error');
