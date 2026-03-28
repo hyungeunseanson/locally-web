@@ -437,7 +437,7 @@ export default function AccountPage() {
       <div className="md:hidden pb-28">
         {/* ── 헤더: "프로필" 타이틀 + 알림 벨 ── */}
         <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-2.5">
-          <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">프로필</h1>
+          <h1 className="text-[20px] font-extrabold tracking-tight text-gray-900">{t('nav_profile')}</h1>
           <div className="flex items-center gap-2">
             <MobileLanguageSwitcher />
             <button
@@ -515,7 +515,7 @@ export default function AccountPage() {
             <p className="text-[10px] text-gray-400 mt-0.5">
               {profile.nationality
                 ? countries.find(c => c.code === profile.nationality)?.name?.split(' (')[0] || profile.nationality
-                : '로컬리 회원'}
+                : t('locally_member')}
             </p>
           </div>
 
@@ -525,24 +525,24 @@ export default function AccountPage() {
           {/* 우측: 통계 3개 */}
           <div className="flex-1 flex flex-col gap-1.5">
             <div>
-              <p className="text-[8px] text-gray-400 leading-none mb-0.5">Locally를 통한 여행</p>
-              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[9px] font-semibold">회</span></p>
+              <p className="text-[10px] text-gray-400 leading-none mb-0.5">{t('trips_with_locally')}</p>
+              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.tripCount} <span className="text-[10px] font-semibold">{t('unit_times')}</span></p>
             </div>
             <div className="border-t border-gray-100" />
             <div>
-              <p className="text-[8px] text-gray-400 leading-none mb-0.5">후기</p>
-              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[9px] font-semibold">개</span></p>
+              <p className="text-[10px] text-gray-400 leading-none mb-0.5">{t('reviews_received')}</p>
+              <p className="text-[12px] font-bold text-gray-900 leading-tight">{stats.reviewCount} <span className="text-[10px] font-semibold">{t('unit_items')}</span></p>
             </div>
             <div className="border-t border-gray-100" />
             <div>
-              <p className="text-[8px] text-gray-400 leading-none mb-0.5">로컬리와 함께한 시간</p>
+              <p className="text-[10px] text-gray-400 leading-none mb-0.5">{t('time_with_locally')}</p>
               <p className="text-[12px] font-bold text-gray-900 leading-tight">
                 {(() => {
                   const y = Math.floor(stats.joinMonths / 12);
                   const m = stats.joinMonths % 12;
-                  if (y === 0) return <>{stats.joinMonths} <span className="text-[9px] font-semibold">개월</span></>;
-                  if (m === 0) return <>{y} <span className="text-[9px] font-semibold">년</span></>;
-                  return <>{y} <span className="text-[9px] font-semibold">년</span> {m} <span className="text-[9px] font-semibold">개월</span></>;
+                  if (y === 0) return <>{stats.joinMonths} <span className="text-[10px] font-semibold">{t('unit_months')}</span></>;
+                  if (m === 0) return <>{y} <span className="text-[10px] font-semibold">{t('unit_years')}</span></>;
+                  return <>{y} <span className="text-[10px] font-semibold">{t('unit_years')}</span> {m} <span className="text-[10px] font-semibold">{t('unit_months')}</span></>;
                 })()}
               </p>
             </div>

@@ -227,8 +227,8 @@ export default function ExperienceClient({
 
       {/* 📱 모바일 전용 상단 헤더 */}
       <div
-        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-white/95 backdrop-blur-sm h-[52px] flex items-center justify-between px-4"
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-white/95 backdrop-blur-sm flex items-center justify-between px-4"
+        style={{ height: 'calc(52px + env(safe-area-inset-top, 0px))', paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={18} className="text-slate-900" />
@@ -244,7 +244,7 @@ export default function ExperienceClient({
         </div>
       </div>
 
-      <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-[58px] md:pt-8 pb-8 md:py-8">
+      <main className="max-w-[1120px] mx-auto px-4 md:px-6 pt-[calc(58px+env(safe-area-inset-top,0px))] md:pt-8 pb-8 md:py-8">
         {/* 데스크탑 사진 그리드 */}
         <section className="hidden md:block relative rounded-2xl overflow-hidden h-[480px] mb-12 bg-slate-100 group border border-slate-200 shadow-sm select-none">
           {photos.length === 1 && (

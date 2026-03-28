@@ -272,7 +272,7 @@ function DashboardContent() {
           onPrimaryAction={handleApprovalWelcomePrimaryAction}
         />
       )}
-      <div className="max-w-7xl mx-auto px-3 py-4 md:px-6 md:py-8 flex flex-col md:flex-row gap-0 md:gap-8">
+      <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-8 flex flex-col md:flex-row gap-0 md:gap-8">
 
       {/* 데스크탑 사이드바 */}
       <aside className="w-64 hidden md:block shrink-0">

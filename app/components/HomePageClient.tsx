@@ -240,9 +240,9 @@ export default function HomePageClient() {
                   ].filter(s => s.data.length > 0);
 
                   const SectionArrow = () => (
-                    <button className="w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0"
+                    <button className="w-[36px] h-[36px] rounded-full flex items-center justify-center shrink-0"
                       style={{ border: '0.5px solid #B0B0B0' }}>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#222" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                     </button>
                   );
 

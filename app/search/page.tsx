@@ -262,7 +262,7 @@ function SearchResults() {
           <div className="mt-3 flex items-center justify-center gap-2">
             <button
               onClick={() => setActiveSheet('type')}
-              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
+              className={`h-8 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
                 selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >
@@ -271,7 +271,7 @@ function SearchResults() {
             </button>
             <button
               onClick={() => setActiveSheet('time')}
-              className={`h-7 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
+              className={`h-8 px-3.5 rounded-full border flex items-center gap-1 text-[11px] font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.95] ${
                 selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >

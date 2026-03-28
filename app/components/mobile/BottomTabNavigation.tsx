@@ -232,7 +232,7 @@ export default function BottomTabNavigation() {
                                 className="flex min-w-[50px] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 transition-all duration-150 active:scale-[0.96] active:bg-slate-50"
                             >
                                 {tab.icon(false)}
-                                <span className="text-[10px] font-medium text-gray-400">
+                                <span className="text-[11px] font-medium text-gray-400">
                                     {tab.name}
                                 </span>
                             </button>
@@ -255,7 +255,7 @@ export default function BottomTabNavigation() {
                                 ? <Loader2 size={20} className="animate-spin text-slate-500" />
                                 : tab.icon(isActive)
                             }
-                            <span className={`text-[10px] font-medium ${isPending || isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                            <span className={`text-[11px] font-medium ${isPending || isActive ? 'text-gray-900' : 'text-gray-400'}`}>
                                 {tab.name}
                             </span>
                         </button>
