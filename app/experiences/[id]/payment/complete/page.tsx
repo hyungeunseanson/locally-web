@@ -193,7 +193,7 @@ function PaymentCompleteContent() {
             </>
           ) : (
             <>
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-green-600 shadow-sm">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-green-600 shadow-sm animate-in zoom-in-50 duration-700" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
                 <CheckCircle className="w-7 h-7 md:w-10 md:h-10" strokeWidth={3} />
               </div>
               <h1 className="text-[26px] md:text-4xl font-black text-slate-900 mb-2 md:mb-3 tracking-tight">{t('pay_complete_confirmed_title')}</h1>
@@ -203,7 +203,7 @@ function PaymentCompleteContent() {
         </div>
 
         {/* 2. 예약 정보 카드 */}
-        <div className="bg-slate-50 rounded-2xl md:rounded-3xl p-4 md:p-10 border border-slate-100 shadow-sm text-left mb-8 md:mb-10 max-w-2xl mx-auto">
+        <div className="bg-slate-50 rounded-2xl md:rounded-3xl p-4 md:p-10 border border-slate-100 shadow-sm text-left mb-8 md:mb-10 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '300ms', animationFillMode: 'both' }}>
           <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
             {/* 이미지 */}
             <div className="w-full md:w-32 h-28 md:h-32 bg-slate-200 rounded-xl md:rounded-2xl relative overflow-hidden shrink-0 shadow-inner">
@@ -242,7 +242,7 @@ function PaymentCompleteContent() {
         </div>
 
         {/* 3. 액션 버튼들 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 max-w-2xl mx-auto mb-3 md:mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 max-w-2xl mx-auto mb-3 md:mb-4 animate-in fade-in duration-500" style={{ animationDelay: '500ms', animationFillMode: 'both' }}>
           <Link href="/guest/trips" className="flex items-center justify-center gap-2 py-3 md:py-4 px-4 md:px-6 bg-slate-900 text-white hover:bg-black hover:shadow-lg rounded-xl md:rounded-2xl transition-all font-bold text-[13px] md:text-base">
             <ArrowRight className="w-4 h-4 md:w-[18px] md:h-[18px]" /> {t('pay_complete_view_detail')}
           </Link>

@@ -5,6 +5,17 @@
 
 ---
 
+## v3.39.88 — [Interaction Polish Phase 3] ConfirmModal·카드 스태거·결제 축하
+
+| 항목 | 내용 |
+| --- | --- |
+| 🟢 ConfirmModal 컴포넌트 신규 | `app/components/ui/ConfirmModal.tsx` — tone(red/default), isProcessing 스피너, Escape 키, 닫힘 애니메이션 내장. 브라우저 confirm() 대체용 |
+| 🟢 체험 삭제 confirm() → ConfirmModal | `MyExperiences.tsx`, `host/experiences/[id]/page.tsx` — 브라우저 기본 다이얼로그 → 앱 톤에 맞는 커스텀 확인 모달로 교체 |
+| 🟢 게스트 취소 이중 confirm 제거 | `useGuestTrips.ts` — CancellationModal에서 이미 확인하므로 중복 confirm() 제거 |
+| 🟢 홈/검색 카드 스태거 애니메이션 | `HomePageClient.tsx`, `search/page.tsx` — 데스크탑 그리드 카드가 60ms 간격으로 순차 fade-in (최대 600ms) |
+| 🟢 결제 완료 페이지 축하 연출 보강 | `experiences/[id]/payment/complete/page.tsx` — 성공 아이콘 zoom-in-50 바운스 + 정보카드/버튼 지연 slide-up fade-in |
+| 🟡 host/experiences/[id] alert() → showToast | 삭제 성공/실패 시 `alert()` → `showToast()` 전환, `useToast` import 추가 |
+
 ## v3.39.87 — [Interaction Polish Phase 2] 모달 닫힘·하트 팝·스켈레톤 로딩
 
 | 항목 | 내용 |

@@ -267,8 +267,10 @@ export default function HomePageClient() {
 
               {/* 🖥️ 데스크탑: 기존 그리드 */}
               <div className="hidden md:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-6 gap-y-10">
-                {(filteredExperiences as HomeExperience[]).map((item) => (
-                  <HomeExperienceCard key={item.id} data={item} />
+                {(filteredExperiences as HomeExperience[]).map((item, index) => (
+                  <div key={item.id} className="animate-in fade-in duration-500" style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}>
+                    <HomeExperienceCard data={item} />
+                  </div>
                 ))}
               </div>
             </>

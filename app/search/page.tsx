@@ -418,8 +418,10 @@ function SearchResults() {
                   <p className="mt-1 text-xs leading-relaxed text-slate-600">{t('search_flow_hint_desc')}</p>
                 </div>
                 <div className={`grid gap-6 ${showMap ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'}`}>
-                  {experiences.map((item) => (
-                    <ExperienceCard key={item.id} data={item} />
+                  {experiences.map((item, index) => (
+                    <div key={item.id} className="animate-in fade-in duration-500" style={{ animationDelay: `${Math.min(index * 60, 600)}ms`, animationFillMode: 'both' }}>
+                      <ExperienceCard data={item} />
+                    </div>
                   ))}
                 </div>
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { useRouter, useParams } from 'next/navigation';
@@ -8,6 +9,7 @@ import { MapPin, Star, Calendar, Edit, ChevronLeft, Trash2 } from 'lucide-react'
 import Spinner from '@/app/components/ui/Spinner';
 import Link from 'next/link';
 import { useLanguage } from '@/app/context/LanguageContext';
+import { useToast } from '@/app/context/ToastContext';
 
 type HostExperienceDetail = {
   id: number;
@@ -32,6 +34,7 @@ export default function HostExperienceDetailPage() {
   const [experience, setExperience] = useState<HostExperienceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
+  const { showToast } = useToast();
 
   useEffect(() => {
     const fetchExperience = async () => {
@@ -57,9 +60,12 @@ export default function HostExperienceDetailPage() {
     fetchExperience();
   }, [params.id, router, supabase]);
 
-  const handleDelete = async () => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteConfirm = async () => {
     if (!experience) return;
-    if (!confirm(t('exp_del_confirm') as string)) return;
+    setIsDeleting(true);
 
     try {
       const response = await fetch(`/api/host/experiences/${experience.id}`, {
@@ -71,11 +77,13 @@ export default function HostExperienceDetailPage() {
         throw new Error(result?.error || t('exp_del_fail'));
       }
 
-      alert(t('exp_del_success'));
+      setShowDeleteConfirm(false);
       router.push('/host/dashboard?tab=experiences');
     } catch (error) {
       const message = error instanceof Error ? error.message : t('exp_del_fail');
-      alert(message);
+      showToast(message, 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -119,8 +127,8 @@ export default function HostExperienceDetailPage() {
                 <Edit size={16} /> 수정
               </button>
             </Link>
-            <button onClick={handleDelete} className="px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 flex items-center gap-2">
-              <Trash2 size={16} /> 삭제
+            <button onClick={() => setShowDeleteConfirm(true)} className="px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-bold hover:bg-red-50 flex items-center gap-2">
+              <Trash2 size={16} /> {t('exp_delete')}
             </button>
           </div>
         </div>
@@ -177,6 +185,18 @@ export default function HostExperienceDetailPage() {
           </div>
         </div>
       </main>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setShowDeleteConfirm(false)}
+        title={t('exp_delete')}
+        description={t('exp_del_confirm')}
+        confirmLabel={t('exp_delete')}
+        cancelLabel={t('button_close')}
+        tone="red"
+        isProcessing={isDeleting}
+      />
     </div>
   );
 }

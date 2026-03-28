@@ -6,6 +6,7 @@ import { Calendar, Edit, Trash2, MapPin, Clock, AlertCircle, Users } from 'lucid
 import { createClient } from '@/app/utils/supabase/client';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { useToast } from '@/app/context/ToastContext';
+import ConfirmModal from '@/app/components/ui/ConfirmModal';
 
 interface ExperienceBookingCount {
   count?: number | null;
@@ -76,11 +77,14 @@ export default function MyExperiences() {
     };
   }, [loadExperiences]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm(t('exp_delete_confirm'))) return;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTargetId) return;
+    setIsDeleting(true);
     try {
-      const response = await fetch(`/api/host/experiences/${id}`, {
+      const response = await fetch(`/api/host/experiences/${deleteTargetId}`, {
         method: 'DELETE',
       });
       const result = await response.json();
@@ -90,10 +94,13 @@ export default function MyExperiences() {
       }
 
       showToast(t('exp_toast_deleted'), 'success');
+      setDeleteTargetId(null);
       await refreshMyExperiences();
     } catch (error) {
       const message = error instanceof Error ? error.message : t('exp_del_fail');
       showToast(message, 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -248,7 +255,7 @@ export default function MyExperiences() {
                   <span>{t('exp_edit')}</span>
                 </Link>
                 <button
-                  onClick={() => handleDelete(exp.id)}
+                  onClick={() => setDeleteTargetId(exp.id)}
                   className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 text-[12px] md:text-sm font-semibold text-red-600 transition-colors hover:border-red-200 hover:bg-red-100"
                   title={t('exp_delete')}
                 >
@@ -311,7 +318,7 @@ export default function MyExperiences() {
                   <span>{t('exp_edit')}</span>
                 </Link>
                 <button
-                  onClick={() => handleDelete(exp.id)}
+                  onClick={() => setDeleteTargetId(exp.id)}
                   className="inline-flex items-center justify-center rounded-xl border border-slate-200 p-2.5 text-slate-400 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500"
                   title={t('exp_delete')}
                 >
@@ -322,6 +329,18 @@ export default function MyExperiences() {
           </div>
         </div>
       ))}
+
+      <ConfirmModal
+        isOpen={!!deleteTargetId}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTargetId(null)}
+        title={t('exp_delete')}
+        description={t('exp_delete_confirm')}
+        confirmLabel={t('exp_delete')}
+        cancelLabel={t('button_close')}
+        tone="red"
+        isProcessing={isDeleting}
+      />
     </div>
   );
 }

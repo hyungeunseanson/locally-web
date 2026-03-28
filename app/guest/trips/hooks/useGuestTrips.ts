@@ -75,13 +75,6 @@ export function useGuestTrips() {
 
   // 🟢 3. 기존 UI 컴포넌트와 연결되는 함수 (기존 구조 100% 유지)
   const requestCancel = async (bookingId: number, reasonCode: GuestTripCancelReasonCode, reason?: string) => {
-    const confirmMessage = reasonCode === 'host_unavailable'
-      ? t('msg_cancel_review_confirm')
-      : reasonCode === 'minimum_participants_unmet'
-      ? t('msg_cancel_review_confirm_minimum_participants')
-      : t('msg_cancel_confirm');
-    if (!confirm(confirmMessage)) return false;
-    
     try {
       await cancelMutation.mutateAsync({ bookingId, reasonCode, reason });
       return true;
