@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-03-28 — Mobile UX Phase 3: Host Dashboard & Modals Polish
+
+### Host Dashboard
+- **ServiceJobsTab**: 모바일 화면에서 카드 내의 위치/날짜/시간 정보의 `gap` 속성을 확장하여 (`gap-x-3 gap-y-0.5` → `gap-x-3 gap-y-1.5`) 시각적 안정성 및 가독성 개선
+- **Host Dashboard Header**: 모바일 뒤로가기 버튼의 `aria-label` 하드코딩 문구 제거 및 i18n(`t('button_back') || 'Back'`) 처리 
+- **ReservationCard**: 호스트 취소 안내 박스의 운영 검토 요청 사유 하드코딩 문구 제거 및 다국어 지원 (`res_review_req_min_participants`, `res_review_req_host_unavailable` 등)
+- **GuestProfileModal**: 모바일 화면 스크롤 영역 하단에 Safe Area 설정(`pb-[calc(1.5rem+env(safe-area-inset-bottom))]`)을 추가하여 콘텐츠 잘림 방지
+
+### Modals / Bottom Sheets
+- **LoginModal**: 모바일 UI 대응으로 로그인 모드의 콘텐츠에도 `max-h-[76dvh] md:max-h-[80vh] overflow-y-auto` 스크롤 기능 추가하여 작은 기기(작은 폰, 키보드 노출 상태)에서 화면 하단이 넘치는 문제(overflow) 개선, safe-area 여백 활용
+- **LoginModal**: 회원가입 시 "6자 이상 입력해주세요" 하드코딩을 i18n (`password_min_hint`) 처리
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `LanguageContext.tsx` | 예약 카드 문구 및 비밀번호 힌트 i18n 키 6개 맵핑 |
+| `ServiceJobsTab.tsx` | 모바일 flex gap 속성 여백 추가 |
+| `GuestProfileModal.tsx` | 본문 스크롤 컨테이너 안전 영역(safe-area) padding bottom 보강 |
+| `page.tsx` (호스트 대시보드) | 모바일 뒤로가기 버튼 aria-label i18n 연동 |
+| `ReservationCard.tsx` | 취소 검토 안내 다국어 i18n 연동 |
+| `LoginModal.tsx` | 모바일 max height 대응 및 안전 영역 padding bottom 보강, 비밀번호 안내 i18n 연동 |
+
+---
 ## 2026-03-28 — Mobile UX Phase 2: i18n & Modal Polish
 
 ### i18n — MobileSearchModal (전체 UI 라벨)

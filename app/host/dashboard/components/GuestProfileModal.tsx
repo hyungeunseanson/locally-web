@@ -188,7 +188,10 @@ export default function GuestProfileModal({ guest, onClose }: Props) {
         </div>
 
         {/* 스크롤 본문 */}
-        <div className="overflow-y-auto px-3 py-4 md:px-6 md:py-6 custom-scrollbar flex-1">
+        <div 
+          className="overflow-y-auto px-4 pt-4 pb-6 md:px-6 md:py-6 custom-scrollbar flex-1" 
+          style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
 
           {/* 속성 그리드 */}
           {gridItems.length > 0 && (

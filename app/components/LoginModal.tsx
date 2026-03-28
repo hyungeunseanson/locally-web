@@ -263,7 +263,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
           <div className="w-8"></div>
         </div>
 
-        <div className={`p-4 md:p-6 ${mode === 'SIGNUP' ? 'max-h-[76dvh] md:max-h-[80vh] overflow-y-auto' : ''}`}>
+        <div className={`p-4 md:p-6 max-h-[76dvh] md:max-h-[80vh] overflow-y-auto`} style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}>
 
           <div className="mb-5 md:mb-6">
             <h3 className="text-[18px] md:text-xl font-bold text-gray-900 mb-1">
@@ -300,7 +300,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, redirectPa
               />
 
               {mode === 'SIGNUP' && (
-                <p className="px-4 py-1.5 text-[11px] md:text-xs text-gray-400 border-t border-gray-300 bg-gray-50">6자 이상 입력해주세요</p>
+                <p className="px-4 py-1.5 text-[11px] md:text-xs text-gray-400 border-t border-gray-300 bg-gray-50">{t('password_min_hint')}</p>
               )}
 
               {mode === 'SIGNUP' && (

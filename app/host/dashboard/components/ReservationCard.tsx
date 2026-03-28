@@ -381,12 +381,12 @@ export default function ReservationCard({
           <div className="text-[11px] leading-snug text-orange-700">
             <p className="font-bold text-orange-900">
               {bookingReviewType === 'minimum_participants_unmet'
-                ? "고객이 '최소 진행 인원 미달' 사유로 운영 검토를 요청했습니다."
-                : "고객이 '호스트 진행 불가' 사유로 운영 검토를 요청했습니다."}
+                ? t('res_review_req_min_participants')
+                : t('res_review_req_host_unavailable')}
             </p>
-            <p className="mt-0.5">운영팀 확인 후 전액 환불 취소 또는 반려로 처리됩니다.</p>
+            <p className="mt-0.5">{t('res_review_admin_process')}</p>
             {bookingReviewDetail && (
-              <p className="mt-1 text-orange-800">고객 메모: {bookingReviewDetail}</p>
+              <p className="mt-1 text-orange-800">{t('res_review_guest_memo')} {bookingReviewDetail}</p>
             )}
           </div>
         </div>

@@ -122,11 +122,11 @@ export default function ServiceJobsTab() {
                         <h3 className="font-bold text-[13px] md:text-[14px] text-slate-900 line-clamp-2 flex-1">{req.title}</h3>
                         <ChevronRight size={15} className="text-slate-300 shrink-0 group-hover:text-slate-500" />
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] md:text-[12px] text-slate-500 mb-2">
-                        <span className="flex items-center gap-1"><MapPin size={10} />{req.city}</span>
-                        <span className="flex items-center gap-1"><Calendar size={10} />{req.service_date}</span>
-                        <span className="flex items-center gap-1"><Clock size={10} />{req.duration_hours}h</span>
-                        <span className="flex items-center gap-1"><Users size={10} />{req.guest_count}명</span>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] md:text-[12px] text-slate-500 mb-2">
+                        <span className="flex items-center gap-1.5"><MapPin size={11} />{req.city}</span>
+                        <span className="flex items-center gap-1.5"><Calendar size={11} />{req.service_date}</span>
+                        <span className="flex items-center gap-1.5"><Clock size={11} />{req.duration_hours}h</span>
+                        <span className="flex items-center gap-1.5"><Users size={11} />{req.guest_count}명</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] md:text-[10px] text-slate-400">{new Date(req.created_at).toLocaleDateString('ko-KR')}</span>
@@ -161,10 +161,10 @@ export default function ServiceJobsTab() {
                           </span>
                         </div>
                         {req && (
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] md:text-[12px] text-slate-500 mb-1.5">
-                            <span className="flex items-center gap-1"><MapPin size={10} />{req.city}</span>
-                            <span className="flex items-center gap-1"><Calendar size={10} />{req.service_date}</span>
-                            <span className="flex items-center gap-1"><Clock size={10} />{req.duration_hours}h</span>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] md:text-[12px] text-slate-500 mb-2.5">
+                            <span className="flex items-center gap-1.5"><MapPin size={11} />{req.city}</span>
+                            <span className="flex items-center gap-1.5"><Calendar size={11} />{req.service_date}</span>
+                            <span className="flex items-center gap-1.5"><Clock size={11} />{req.duration_hours}h</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between">
