@@ -16,10 +16,8 @@ import { getContent } from '@/app/utils/contentHelper'; // 🟢 추가
 import { getLocalizedExperienceText } from '@/app/utils/experienceTranslation';
 import { sendAnalyticsEvent } from '@/app/utils/analytics/client';
 import {
-  ExperienceCalendarDayStatus,
   ExperienceAvailabilitySummary,
   ExperienceDetail,
-  ExperienceSlotSummary,
   HostProfileDetail,
 } from './types';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
@@ -34,20 +32,14 @@ type Props = {
   initialUser: AuthUser;
   initialExperience: ExperienceDetail;
   initialHostProfile: HostProfileDetail;
-  initialAvailableDates: string[];
-  initialDateToTimeMap: Record<string, string[]>;
-  initialCalendarDayStatusMap: Record<string, ExperienceCalendarDayStatus>;
-  initialSlotSummaryMap: Record<string, ExperienceSlotSummary>;
+  initialAvailabilitySummary: ExperienceAvailabilitySummary;
 };
 
 export default function ExperienceClient({
   initialUser,
   initialExperience,
   initialHostProfile,
-  initialAvailableDates,
-  initialDateToTimeMap,
-  initialCalendarDayStatusMap,
-  initialSlotSummaryMap
+  initialAvailabilitySummary,
 }: Props) {
   const [isCopySuccess, setIsCopySuccess] = useState(false);
   const { showToast } = useToast();
@@ -62,14 +54,16 @@ export default function ExperienceClient({
   const [user] = useState(initialUser);
   const [experience] = useState(initialExperience);
   const [hostProfile] = useState(initialHostProfile);
-
-  const [availableDates, setAvailableDates] = useState<string[]>(initialAvailableDates);
-  const [dateToTimeMap, setDateToTimeMap] = useState<Record<string, string[]>>(initialDateToTimeMap);
-  const [calendarDayStatusMap, setCalendarDayStatusMap] = useState<Record<string, ExperienceCalendarDayStatus>>(initialCalendarDayStatusMap);
-  const [slotSummaryMap, setSlotSummaryMap] = useState<Record<string, ExperienceSlotSummary>>(initialSlotSummaryMap);
+  const [availabilitySummary, setAvailabilitySummary] = useState<ExperienceAvailabilitySummary>(initialAvailabilitySummary);
 
   const [inquiryText, setInquiryText] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const {
+    availableDates,
+    dateToTimeMap,
+    calendarDayStatusMap,
+    slotSummaryMap,
+  } = availabilitySummary;
 
   // 🟢 [핵심] 제목을 언어에 맞춰서 변환!
   const translatedTitle = getContent(experience, 'title', lang);
@@ -113,10 +107,12 @@ export default function ExperienceClient({
       }
 
       const summary = (await response.json()) as ExperienceAvailabilitySummary;
-      setAvailableDates(Array.isArray(summary.availableDates) ? summary.availableDates : []);
-      setDateToTimeMap(summary.dateToTimeMap || {});
-      setCalendarDayStatusMap(summary.calendarDayStatusMap || {});
-      setSlotSummaryMap(summary.slotSummaryMap || {});
+      setAvailabilitySummary({
+        availableDates: Array.isArray(summary.availableDates) ? summary.availableDates : [],
+        dateToTimeMap: summary.dateToTimeMap || {},
+        calendarDayStatusMap: summary.calendarDayStatusMap || {},
+        slotSummaryMap: summary.slotSummaryMap || {},
+      });
     } catch (error) {
       console.error('Experience availability refresh error:', error);
     }
@@ -128,10 +124,6 @@ export default function ExperienceClient({
       sendAnalyticsEvent('view', String(experience.id));
     }
   }, [experience?.id]);
-
-  useEffect(() => {
-    void refreshAvailability();
-  }, [refreshAvailability]);
 
   useEffect(() => {
     const handlePageShow = () => {

@@ -19,6 +19,98 @@ type Props = {
 
 export const dynamic = 'force-dynamic';
 
+const EXPERIENCE_METADATA_SELECT = [
+  'id',
+  'title',
+  'description',
+  'title_ko',
+  'description_ko',
+  'title_en',
+  'description_en',
+  'title_ja',
+  'description_ja',
+  'title_zh',
+  'description_zh',
+  'photos',
+  'image_url',
+  'status',
+  'is_active',
+].join(', ');
+
+const EXPERIENCE_DETAIL_SELECT = [
+  'id',
+  'host_id',
+  'title',
+  'description',
+  'title_ko',
+  'description_ko',
+  'title_en',
+  'description_en',
+  'title_ja',
+  'description_ja',
+  'title_zh',
+  'description_zh',
+  'city',
+  'subCity',
+  'country',
+  'category',
+  'category_en',
+  'category_ja',
+  'category_zh',
+  'languages',
+  'language_levels',
+  'meeting_point',
+  'meeting_point_i18n',
+  'location',
+  'rating',
+  'review_count',
+  'price',
+  'private_price',
+  'is_private_enabled',
+  'photos',
+  'image_url',
+  'max_guests',
+  'duration',
+  'supplies',
+  'supplies_i18n',
+  'inclusions',
+  'inclusions_i18n',
+  'exclusions',
+  'exclusions_i18n',
+  'itinerary',
+  'itinerary_i18n',
+  'rules',
+  'rules_i18n',
+  'status',
+  'is_active',
+].join(', ');
+
+const HOST_PROFILE_SELECT = [
+  'id',
+  'created_at',
+  'avatar_url',
+  'full_name',
+  'introduction',
+  'languages',
+  'job',
+  'dream_destination',
+  'favorite_song',
+  'nationality',
+  'host_nationality',
+].join(', ');
+
+const PUBLIC_HOST_APPLICATION_SELECT = [
+  'user_id',
+  'name',
+  'profile_photo',
+  'self_intro',
+  'languages',
+  'profession',
+  'dream_destination',
+  'favorite_song',
+  'host_nationality',
+].join(', ');
+
 // 🟢 메타데이터 생성 (SEO & 다국어)
 export async function generateMetadata(
   { params }: Props
@@ -30,7 +122,7 @@ export async function generateMetadata(
   // 모든 다국어 컬럼 조회
   const { data: experience } = await supabase
     .from('experiences')
-    .select('*')
+    .select(EXPERIENCE_METADATA_SELECT)
     .eq('id', id)
     .maybeSingle();
 
@@ -93,7 +185,7 @@ export default async function Page({ params }: Props) {
 
   // 1. 병렬 데이터 페칭 (속도 최적화)
   const [expResult, userResult] = await Promise.all([
-    supabase.from('experiences').select('*').eq('id', id).maybeSingle(),
+    supabase.from('experiences').select(EXPERIENCE_DETAIL_SELECT).eq('id', id).maybeSingle(),
     supabase.auth.getUser()
   ]);
 
@@ -105,46 +197,56 @@ export default async function Page({ params }: Props) {
 
   // 2. 호스트 프로필 데이터 가져오기
   let hostProfile: HostProfileDetail = null;
-  if (experience.host_id) {
-    const [{ data: profile }, { data: app }, { data: reviewRows }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', experience.host_id).maybeSingle(),
-      supabase.from('public_host_applications').select('*').eq('user_id', experience.host_id).limit(1).maybeSingle(),
-      supabase
-        .from('reviews')
-        .select('rating, experiences!inner(host_id)')
-        .eq('experiences.host_id', experience.host_id),
-    ]);
+  const [availabilitySummary, hostProfileResult] = await Promise.all([
+    fetchExperienceAvailabilitySummary(
+      createAdminClient(),
+      id,
+      Number(experience.max_guests || 10)
+    ),
+    (async (): Promise<HostProfileDetail> => {
+      if (!experience.host_id) {
+        return null;
+      }
 
-    const joinedYear = profile?.created_at
-      ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
-      : null;
-    const hostReviewCount = reviewRows?.length || 0;
-    const hostAverageRating = hostReviewCount > 0
-      ? Number(((reviewRows || []).reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
-      : null;
-    const publicHostProfile = getHostPublicProfile(profile, app, 'Locally Host');
+      const [{ data: profile }, { data: app }, { data: reviewRows }] = await Promise.all([
+        supabase.from('profiles').select(HOST_PROFILE_SELECT).eq('id', experience.host_id).maybeSingle(),
+        supabase
+          .from('public_host_applications')
+          .select(PUBLIC_HOST_APPLICATION_SELECT)
+          .eq('user_id', experience.host_id)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('reviews')
+          .select('rating, experiences!inner(host_id)')
+          .eq('experiences.host_id', experience.host_id),
+      ]);
 
-    hostProfile = {
-      id: experience.host_id,
-      name: publicHostProfile.name,
-      avatar_url: publicHostProfile.avatarUrl || undefined,
-      languages: publicHostProfile.languages,
-      introduction: publicHostProfile.bio || '안녕하세요! 로컬리 호스트입니다.',
-      job: publicHostProfile.job || undefined,
-      dream_destination: publicHostProfile.dreamDestination || undefined,
-      favorite_song: publicHostProfile.favoriteSong || undefined,
-      joined_year: joinedYear,
-      review_count: hostReviewCount,
-      rating: hostAverageRating,
-    };
-  }
+      const joinedYear = profile?.created_at
+        ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
+        : null;
+      const hostReviewCount = reviewRows?.length || 0;
+      const hostAverageRating = hostReviewCount > 0
+        ? Number(((reviewRows || []).reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
+        : null;
+      const publicHostProfile = getHostPublicProfile(profile, app, 'Locally Host');
 
-  // 3. 예약 가능 날짜 및 슬롯 요약 계산
-  const availabilitySummary = await fetchExperienceAvailabilitySummary(
-    createAdminClient(),
-    id,
-    Number(experience.max_guests || 10)
-  );
+      return {
+        id: experience.host_id,
+        name: publicHostProfile.name,
+        avatar_url: publicHostProfile.avatarUrl || undefined,
+        languages: publicHostProfile.languages,
+        introduction: publicHostProfile.bio || '안녕하세요! 로컬리 호스트입니다.',
+        job: publicHostProfile.job || undefined,
+        dream_destination: publicHostProfile.dreamDestination || undefined,
+        favorite_song: publicHostProfile.favoriteSong || undefined,
+        joined_year: joinedYear,
+        review_count: hostReviewCount,
+        rating: hostAverageRating,
+      };
+    })(),
+  ]);
+  hostProfile = hostProfileResult;
 
   // 4. Client Component로 데이터 전달
   const isPublicExperience = experience.status === 'active' && experience.is_active !== false;
@@ -189,10 +291,7 @@ export default async function Page({ params }: Props) {
         initialUser={userResult.data.user}
         initialExperience={experience}
         initialHostProfile={hostProfile}
-        initialAvailableDates={availabilitySummary.availableDates}
-        initialDateToTimeMap={availabilitySummary.dateToTimeMap}
-        initialCalendarDayStatusMap={availabilitySummary.calendarDayStatusMap}
-        initialSlotSummaryMap={availabilitySummary.slotSummaryMap}
+        initialAvailabilitySummary={availabilitySummary}
       />
     </>
   );

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-03-28 — Performance Phase 1B: Experience Detail Hot Path
+
+### Experience Detail Server Fetch
+- **Metadata projection trim**: `generateMetadata`가 체험 상세 SEO 출력에 필요한 다국어 제목/설명, 대표 이미지, 공개 여부 필드만 조회하도록 `select('*')` 제거
+- **Page body projection trim**: 체험 상세 렌더/예약 카드/JSON-LD에 실제 필요한 필드만 조회하도록 상세 페이지 body projection 축소
+- **Host profile projection trim**: 호스트 카드/모달에 필요한 프로필 및 공개 호스트 신청서 필드만 조회하도록 projection 축소
+- **Parallel detail hydration**: 체험 availability summary와 호스트 프로필 조립을 병렬 실행하여 첫 진입 server fetch 대기 시간 축소
+
+### Availability Refresh
+- **Initial summary reuse**: 서버에서 계산한 availability summary 전체를 client initial state로 재사용
+- **Duplicate fetch removal**: 체험 상세 첫 진입 직후 실행되던 클라이언트 `no-store` availability 재요청 제거
+- **BFCache refresh kept**: `pageshow` 기반 availability refresh는 유지하여 BFCache 복귀 시 최신 슬롯 상태 갱신
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `app/experiences/[id]/page.tsx` | metadata/page body/host profile projection 축소, availability summary 병렬화 |
+| `app/experiences/[id]/ExperienceClient.tsx` | 서버 availability summary를 초기 상태로 재사용, 초기 중복 fetch 제거 |
+
+---
 ## 2026-03-28 — Performance Phase 1A: Search Hot Path
 
 ### Search API
