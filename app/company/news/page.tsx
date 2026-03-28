@@ -4,6 +4,7 @@ import React from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { ArrowUpRight, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 const NEWS_ITEMS = [
   {
@@ -34,6 +35,7 @@ const NEWS_ITEMS = [
 
 export default function NewsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   const handleMobileBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -52,7 +54,7 @@ export default function NewsPage() {
           <button
             onClick={handleMobileBack}
             className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
-            aria-label="뒤로가기"
+            aria-label={t('button_back')}
           >
             <ArrowLeft size={16} />
           </button>

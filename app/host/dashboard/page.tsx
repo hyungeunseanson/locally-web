@@ -333,7 +333,7 @@ function DashboardContent() {
             <button
               onClick={handleMobileBack}
               className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
-              aria-label={t('button_back') || 'Back'}
+              aria-label={t('button_back')}
             >
               <ArrowLeft size={16} />
             </button>

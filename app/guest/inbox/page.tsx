@@ -359,7 +359,7 @@ function InboxContent() {
             <button
               onClick={handleMobileBack}
               className="h-8 w-8 md:h-9 md:w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
-              aria-label="뒤로가기"
+              aria-label={t('button_back')}
             >
               <ArrowLeft className="w-[14px] h-[14px] md:w-4 md:h-4" />
             </button>
@@ -476,6 +476,7 @@ function InboxContent() {
               <div className="px-2.5 md:px-5 py-2 md:py-3.5 border-b border-gray-100 flex items-center gap-2 md:gap-3 bg-white shrink-0">
                 <button
                   className="md:hidden p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+                  aria-label={t('button_back')}
                   onClick={(e) => {
                     e.stopPropagation();
                     clearSelected();

@@ -3,10 +3,12 @@
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 /** 뒤로가기 버튼 — 클릭 시 로딩 스피너로 시각 피드백 */
 export default function BackButton({ href = '/community?category=all' }: { href?: string }) {
     const router = useRouter();
+    const { t } = useLanguage();
     const [isPending, startTransition] = useTransition();
 
     const handleBack = () => {
@@ -19,7 +21,7 @@ export default function BackButton({ href = '/community?category=all' }: { href?
         <button
             onClick={handleBack}
             className="text-slate-600 hover:text-slate-900 transition-colors p-1 -m-1 rounded-lg hover:bg-slate-100 active:scale-95"
-            aria-label="뒤로가기"
+            aria-label={t('button_back')}
         >
             {isPending
                 ? <Loader2 size={24} className="animate-spin text-slate-400" />

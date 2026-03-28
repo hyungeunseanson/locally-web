@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-03-28 — Mobile UX P0 Follow-up: Search i18n & Back Labels
+
+### Search i18n cleanup
+- **MobileSearchModal**: 추천 여행지/최근 검색/언어 표시/날짜 요약의 남은 하드코딩 문구를 정리하고, 모바일 close/back 접근성 라벨을 i18n 처리
+- **Search Page (mobile)**: 모바일 검색 헤더/섹션 외에 검색 실패 토스트, 로딩 fallback, 필터 시트 close 라벨까지 i18n 정리
+
+### Accessibility / small fixes
+- **Mobile Back Buttons**: `button_back` 키를 실제로 추가하고, 남아 있던 모바일 back `aria-label` 하드코딩을 커뮤니티 포함 공통 i18n으로 교체
+- **ReservationCard**: 한국어 `res_card_today` 값을 `"Today"`에서 `"오늘"`로 수정
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `LanguageContext.tsx` | `button_back`, 모바일 검색 표시용 키, `search_results_load_error` 추가 및 `res_card_today` ko 값 수정 |
+| `MobileSearchModal.tsx` | 모바일 검색 모달 하드코딩 문구 제거, locale-aware 날짜 포맷, close/back aria-label i18n 처리 |
+| `search/page.tsx` | 모바일 검색 헤더/섹션/언어 라벨 정리, 검색 실패/로딩/시트 close 라벨 i18n 처리 |
+| `BackButton.tsx` | 커뮤니티 모바일 back aria-label i18n 처리 |
+| `PostEditor.tsx` | 커뮤니티 글쓰기 모바일 back aria-label i18n 처리 |
+
+---
 ## 2026-03-28 — Mobile UX Phase 3: Host Dashboard & Modals Polish
 
 ### Host Dashboard

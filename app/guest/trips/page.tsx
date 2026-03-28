@@ -179,7 +179,7 @@ export default function GuestTripsPage() {
           <button
             onClick={handleMobileBack}
             className="h-8 w-8 md:h-9 md:w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
-            aria-label="뒤로가기"
+            aria-label={t('button_back')}
           >
             <ArrowLeft className="w-[14px] h-[14px] md:w-4 md:h-4" />
           </button>

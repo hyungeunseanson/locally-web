@@ -33,6 +33,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { getContent } from '@/app/utils/contentHelper';
 import { formatLocalizedExperienceLocation } from '@/app/utils/locationLocalization';
 import { getExperienceLanguageBadges, getExperiencePriceParts } from '@/app/utils/experienceCardDisplay';
+import { normalizeProfileLanguageValue } from '@/app/utils/profile';
 import type {
   SearchExperience,
   SearchExperiencesResponse,
@@ -54,11 +55,43 @@ const TYPE_OPTION_IDS: Array<{ id: SearchTypeId; icon: typeof Utensils }> = [
   { id: 'one_day_class', icon: Palette },
 ] as const;
 
-function formatShortDate(iso: string | null, t: (key: string) => string) {
+const SEARCH_LOCALE_MAP: Record<string, string> = {
+  ko: 'ko-KR',
+  en: 'en-US',
+  ja: 'ja-JP',
+  zh: 'zh-CN',
+};
+
+function formatShortDate(iso: string | null, lang: string) {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return `${date.getMonth() + 1}${t('date_month')} ${date.getDate()}${t('day_0') === '일' ? '일' : ''}`.trim();
+  return new Intl.DateTimeFormat(SEARCH_LOCALE_MAP[lang] || 'en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+}
+
+function getSearchLanguageLabel(value: string, t: (key: string) => string) {
+  if (!value || value === 'all') return '';
+
+  const normalized = normalizeProfileLanguageValue(value);
+  if (normalized === 'Korean') return t('lang_ko');
+  if (normalized === 'English') return t('lang_en');
+  if (normalized === 'Japanese') return t('lang_ja');
+  if (normalized === 'Chinese') return t('lang_zh');
+  return value;
+}
+
+function getSearchLocationLabel(value: string, t: (key: string, vars?: Record<string, string | number>) => string) {
+  if (!value) return '';
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '도쿄' || normalized === 'tokyo') return t('search_place_tokyo');
+  if (normalized === '오사카' || normalized === 'osaka') return t('search_place_osaka');
+  if (normalized === '이자카야' || normalized === 'izakaya') return t('search_place_izakaya');
+  if (normalized === '서울' || normalized === 'seoul') return t('search_place_seoul');
+  return value;
 }
 
 function SearchResults() {
@@ -80,11 +113,14 @@ function SearchResults() {
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
 
-  const headerTitle = location ? `${location}의 체험` : '체험 검색';
+  const displayLocation = getSearchLocationLabel(location, t);
+  const headerTitle = location
+    ? t('search_mobile_header_title_with_location', { location: displayLocation })
+    : t('search_mobile_header_title');
   const headerSub = [
-    startDate ? formatShortDate(startDate, t) : '',
-    endDate ? formatShortDate(endDate, t) : '',
-    language && language !== 'all' ? language : '',
+    startDate ? formatShortDate(startDate, lang) : '',
+    endDate ? formatShortDate(endDate, lang) : '',
+    getSearchLanguageLabel(language, t),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -117,7 +153,7 @@ function SearchResults() {
         const payload = await response.json();
 
         if (!response.ok) {
-          throw new Error(payload.error || '검색 결과를 불러오는데 실패했습니다.');
+          throw new Error(payload.error || t('search_results_load_error'));
         }
 
         const nextData = ((payload as SearchExperiencesResponse).data ?? []) as SearchExperience[];
@@ -127,7 +163,7 @@ function SearchResults() {
       } catch (error) {
         console.error('Search error:', error);
         if (requestId === requestSeqRef.current) {
-          showToast('검색 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.', 'error');
+          showToast(t('search_results_load_error'), 'error');
         }
       } finally {
         if (requestId === requestSeqRef.current) {
@@ -140,15 +176,15 @@ function SearchResults() {
   }, [location, language, startDate, endDate, selectedTimesKey, selectedTypesKey, showToast, searchSignature]);
 
   const mobileSections = useMemo(() => {
-    const cityName = location || '도쿄';
+    const cityName = displayLocation || t('search_place_tokyo');
     const sectionBase = experiences;
 
     return [
-      { id: 'izakaya', title: `${cityName} 이자카야 투어`, items: sectionBase.slice(0, 12) },
-      { id: 'alley', title: `${cityName} 로컬 골목 체험`, items: [...sectionBase.slice(2), ...sectionBase].slice(0, 12) },
-      { id: 'japanese', title: `${cityName} 일본어 투어`, items: [...sectionBase.slice(5), ...sectionBase].slice(0, 12) },
+      { id: 'izakaya', title: t('search_mobile_section_izakaya', { city: cityName }), items: sectionBase.slice(0, 12) },
+      { id: 'alley', title: t('search_mobile_section_alley', { city: cityName }), items: [...sectionBase.slice(2), ...sectionBase].slice(0, 12) },
+      { id: 'japanese', title: t('search_mobile_section_japanese', { city: cityName }), items: [...sectionBase.slice(5), ...sectionBase].slice(0, 12) },
     ];
-  }, [experiences, location]);
+  }, [displayLocation, experiences, t]);
 
   const toggleTime = (id: SearchTimeId) => {
     setSelectedTimes((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
@@ -235,7 +271,7 @@ function SearchResults() {
       <div className="md:hidden min-h-screen bg-[#F7F7F7] pb-[88px]">
         <div className="sticky top-0 z-40 bg-[#F7F7F7] px-4 pt-[calc(env(safe-area-inset-top,0px)+8px)] pb-2">
           <div className="flex items-center gap-2">
-            <button onClick={() => window.history.back()} className="w-9 h-9 flex items-center justify-center text-[#222]">
+            <button onClick={() => window.history.back()} className="w-9 h-9 flex items-center justify-center text-[#222]" aria-label={t('button_back')}>
               <ArrowLeft size={20} />
             </button>
 
@@ -435,7 +471,7 @@ function SearchResults() {
 
       {activeSheet && (
         <div className="fixed inset-0 z-[190] md:hidden">
-          <button className="absolute inset-0 bg-black/35 animate-in fade-in duration-200" onClick={() => setActiveSheet(null)} aria-label="close-overlay" />
+          <button className="absolute inset-0 bg-black/35 animate-in fade-in duration-200" onClick={() => setActiveSheet(null)} aria-label={t('button_close')} />
 
           <div
             className={`absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] shadow-[0_-12px_32px_rgba(0,0,0,0.16)] flex flex-col animate-in slide-in-from-bottom-8 duration-300 ${
@@ -446,7 +482,7 @@ function SearchResults() {
               <h3 className="text-[20px] font-bold text-[#1F1F1F] leading-tight">
                 {activeSheet === 'time' ? t('search_filter_time_slot') : activeSheet === 'type' ? t('search_filter_experience_type') : t('filter')}
               </h3>
-              <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]">
+              <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]" aria-label={t('button_close')}>
                 <X size={20} />
               </button>
             </div>
@@ -563,12 +599,14 @@ function SearchResults() {
 }
 
 export default function SearchPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <div className="hidden md:block">
         <SiteHeader />
       </div>
-      <Suspense fallback={<div className="pt-32 text-center">검색 중...</div>}>
+      <Suspense fallback={<div className="pt-32 text-center">{t('loading')}</div>}>
         <SearchResults />
       </Suspense>
     </div>

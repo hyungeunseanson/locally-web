@@ -334,6 +334,7 @@ export default function InquiryChat() {
               {/* 뒤로가기 */}
               <button
                 className="md:hidden p-1.5 -ml-0.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+                aria-label={t('button_back')}
                 onClick={() => {
                   clearSelected();
                   if (guestIdFromUrl || inquiryIdFromUrl) {

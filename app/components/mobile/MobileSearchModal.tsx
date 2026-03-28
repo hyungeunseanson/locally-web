@@ -24,7 +24,7 @@ export default function MobileSearchModal({
     dateRange, setDateRange,
     selectedLanguage, setSelectedLanguage,
 }: MobileSearchModalProps) {
-    const { t } = useLanguage();
+    const { t, lang } = useLanguage();
     const router = useRouter();
     const [activePanel, setActivePanel] = useState<'location' | 'date' | 'language' | null>('location');
     const [isVisible, setIsVisible] = useState(false);
@@ -44,6 +44,25 @@ export default function MobileSearchModal({
         htmlOverflow: '',
         htmlOverscrollBehavior: '',
     });
+    const localeMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
+    const displayLocale = localeMap[lang] || 'en-US';
+    const englishLanguageNames =
+        typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined'
+            ? new Intl.DisplayNames(['en'], { type: 'language' })
+            : null;
+    const languages = [
+        { label: t('lang_all'), value: 'all', sub: t('lang_all'), code: '' },
+        { label: t('lang_ko'), value: '한국어', sub: englishLanguageNames?.of('ko') || 'Korean', code: 'kr' },
+        { label: t('lang_en'), value: '영어', sub: englishLanguageNames?.of('en') || 'English', code: 'us' },
+        { label: t('lang_ja'), value: '일본어', sub: englishLanguageNames?.of('ja') || 'Japanese', code: 'jp' },
+        { label: t('lang_zh'), value: '중국어', sub: englishLanguageNames?.of('zh') || 'Chinese', code: 'cn' },
+    ];
+    const recommendedPlaces = [
+        { id: 'tokyo', queryValue: '도쿄', name: t('search_place_tokyo'), desc: t('search_place_tokyo_desc') },
+        { id: 'osaka', queryValue: '오사카', name: t('search_place_osaka'), desc: t('search_place_osaka_desc') },
+        { id: 'izakaya', queryValue: '이자카야', name: t('search_place_izakaya'), desc: t('search_place_izakaya_desc') },
+        { id: 'seoul', queryValue: '서울', name: t('search_place_seoul'), desc: t('search_place_seoul_desc') },
+    ];
 
     const normalizeText = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, '').trim();
     const inferPlaceType = (name: unknown): string => {
@@ -171,21 +190,6 @@ export default function MobileSearchModal({
     }, [isOpen, isSearchExpanded]);
 
     if (!isOpen || typeof document === 'undefined') return null;
-
-    const languages = [
-        { label: '전체', value: 'all', sub: 'All', code: '' },
-        { label: '한국어', value: '한국어', sub: 'Korean', code: 'kr' },
-        { label: '영어', value: '영어', sub: 'English', code: 'us' },
-        { label: '일본어', value: '일본어', sub: 'Japanese', code: 'jp' },
-        { label: '중국어', value: '중국어', sub: 'Chinese', code: 'cn' },
-    ];
-
-    const recommendedPlaces = [
-        { id: 'tokyo', name: '도쿄', desc: '도쿄 타워가 빛나는 곳' },
-        { id: 'osaka', name: '오사카', desc: '미식과 야경이 살아있는 곳' },
-        { id: 'izakaya', name: '이자카야', desc: '현지 밤문화를 맛보는 곳' },
-        { id: 'seoul', name: '서울', desc: '감성이 스며든 곳' },
-    ];
 
     const saveRecentSearch = (name: string) => {
         if (!name) return;
@@ -363,11 +367,18 @@ export default function MobileSearchModal({
         setSelectedLanguage('all');
     };
 
+    const formatDateLabel = (date: Date) => {
+        return new Intl.DateTimeFormat(displayLocale, {
+            month: 'short',
+            day: 'numeric',
+        }).format(date);
+    };
+
     const formatDateRange = () => {
         if (dateRange.start && dateRange.end) {
-            return `${dateRange.start.getMonth() + 1}${t('date_month')} ${dateRange.start.getDate()}${t('day_0') === '일' ? '일' : ''} - ${dateRange.end.getMonth() + 1}${t('date_month')} ${dateRange.end.getDate()}${t('day_0') === '일' ? '일' : ''}`.trim();
+            return `${formatDateLabel(dateRange.start)} - ${formatDateLabel(dateRange.end)}`;
         }
-        if (dateRange.start) return `${dateRange.start.getMonth() + 1}${t('date_month')} ${dateRange.start.getDate()}${t('day_0') === '일' ? '일' : ''}`.trim();
+        if (dateRange.start) return formatDateLabel(dateRange.start);
         return '';
     };
 
@@ -376,13 +387,28 @@ export default function MobileSearchModal({
         return languages.find(l => l.value === selectedLanguage)?.label || '';
     };
 
+    const getLocalizedPlaceName = (value: string) => {
+        const matchedPlace = recommendedPlaces.find((place) => (
+            normalizeText(place.queryValue) === normalizeText(value) ||
+            normalizeText(place.name) === normalizeText(value)
+        ));
+        return matchedPlace?.name || value;
+    };
+
     const trimmedInput = locationInput.trim();
     const filteredRecommendedPlaces = recommendedPlaces.filter((place) => {
         if (!trimmedInput) return true;
         const normalizedInput = normalizeText(trimmedInput);
-        return normalizeText(place.name).includes(normalizedInput) || normalizeText(place.desc).includes(normalizedInput);
+        return (
+            normalizeText(place.queryValue).includes(normalizedInput) ||
+            normalizeText(place.name).includes(normalizedInput) ||
+            normalizeText(place.desc).includes(normalizedInput)
+        );
     });
-    const hasExactRecommendedMatch = !!trimmedInput && filteredRecommendedPlaces.some((place) => normalizeText(place.name) === normalizeText(trimmedInput));
+    const hasExactRecommendedMatch = !!trimmedInput && filteredRecommendedPlaces.some((place) => (
+        normalizeText(place.queryValue) === normalizeText(trimmedInput) ||
+        normalizeText(place.name) === normalizeText(trimmedInput)
+    ));
     const showCustomTypedOption = !!trimmedInput && !hasExactRecommendedMatch;
 
     // 접힌 패널
@@ -434,6 +460,7 @@ export default function MobileSearchModal({
                                     <button
                                         onClick={handleClose}
                                         className="w-[30px] h-[30px] rounded-full flex items-center justify-center bg-white shrink-0 active:scale-[0.9] transition-transform"
+                                        aria-label={t('button_close')}
                                         style={{ border: '1px solid #CFCFCF', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
                                     >
                                         <X size={12} className="text-[#222222]" strokeWidth={3} />
@@ -445,7 +472,7 @@ export default function MobileSearchModal({
                                     style={{ border: '1px solid #D7D7D7', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.6)' }}
                                 >
                                     <Search size={13} className="text-[#8E8E8E] shrink-0" strokeWidth={2} />
-                                    <span className="text-[12px] text-[#9B9B9B] font-normal">{locationInput || t('search_placeholder')}</span>
+                                    <span className="text-[12px] text-[#9B9B9B] font-normal">{locationInput || t('mobile_search_city_placeholder')}</span>
                                 </button>
 
                                 <div className="mt-4">
@@ -458,7 +485,7 @@ export default function MobileSearchModal({
                                         >
                                             <PlaceBadge type={inferPlaceType(item.name)} />
                                             <div>
-                                                <span className="text-[12px] font-semibold text-[#222222] block">{item.name}</span>
+                                                <span className="text-[12px] font-semibold text-[#222222] block">{getLocalizedPlaceName(item.name)}</span>
                                                 {item.desc && <span className="text-[10px] text-[#8B8B8B] font-normal">{item.desc}</span>}
                                             </div>
                                         </button>
@@ -470,7 +497,7 @@ export default function MobileSearchModal({
                                     {recommendedPlaces.map((place) => (
                                         <button
                                             key={place.id}
-                                            onClick={() => selectLocation(place.name)}
+                                            onClick={() => selectLocation(place.queryValue)}
                                             className="flex items-center gap-2.5 w-full py-[8px] text-left active:bg-[#F3F3F3] rounded-lg transition-colors"
                                         >
                                             <PlaceBadge type={place.id} />
@@ -486,11 +513,12 @@ export default function MobileSearchModal({
                     ) : (
                         <div className="mb-2 flex items-center gap-2.5">
                             <div className="flex-1">
-                                <CollapsedPanel label={t('label_destination')} value={locationInput} placeholder={t('mobile_add_destination')} panelKey="location" />
+                                <CollapsedPanel label={t('label_destination')} value={getLocalizedPlaceName(locationInput)} placeholder={t('mobile_add_destination')} panelKey="location" />
                             </div>
                             <button
                                 onClick={handleClose}
                                 className="w-[30px] h-[30px] rounded-full flex items-center justify-center bg-white shrink-0 active:scale-[0.9] transition-transform"
+                                aria-label={t('button_close')}
                                 style={{ border: '1px solid #CFCFCF', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
                             >
                                 <X size={12} className="text-[#222222]" strokeWidth={3} />
@@ -601,14 +629,14 @@ export default function MobileSearchModal({
                         className="bg-white mx-4 mt-[calc(env(safe-area-inset-top,0px)+12px)] rounded-full flex items-center gap-2.5 px-4 py-[11px]"
                         style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 2px 10px rgba(0,0,0,0.05)', border: '0.5px solid #E0E0E0' }}
                     >
-                        <button onClick={() => setIsSearchExpanded(false)} className="shrink-0">
+                        <button onClick={() => setIsSearchExpanded(false)} className="shrink-0" aria-label={t('button_back')}>
                             <ArrowLeft size={18} className="text-[#222222]" strokeWidth={2} />
                         </button>
                         <input
                             ref={expandedInputRef}
                             autoFocus
                             type="text"
-                            placeholder={t('search_placeholder')}
+                            placeholder={t('mobile_search_city_placeholder')}
                             value={locationInput}
                             onChange={(e) => setLocationInput(e.target.value)}
                             onKeyDown={(e) => {
@@ -640,7 +668,7 @@ export default function MobileSearchModal({
                                 >
                                     <PlaceBadge type={inferPlaceType(item.name)} />
                                     <div>
-                                        <span className="text-[13px] font-semibold text-[#222222] block">{item.name}</span>
+                                        <span className="text-[13px] font-semibold text-[#222222] block">{getLocalizedPlaceName(item.name)}</span>
                                         {item.desc && <span className="text-[11px] text-[#8B8B8B] font-normal">{item.desc}</span>}
                                     </div>
                                 </button>
@@ -664,7 +692,7 @@ export default function MobileSearchModal({
                             {filteredRecommendedPlaces.map((place, idx) => (
                                 <button
                                     key={idx}
-                                    onClick={() => selectLocation(place.name, true)}
+                                    onClick={() => selectLocation(place.queryValue, true)}
                                     className="flex items-center gap-3 w-full py-[10px] px-1 text-left active:bg-[#EDEDED] rounded-xl transition-colors"
                                 >
                                     <PlaceBadge type={place.id} />

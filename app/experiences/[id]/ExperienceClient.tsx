@@ -230,7 +230,7 @@ export default function ExperienceClient({
         className="md:hidden fixed top-0 left-0 right-0 z-[120] bg-white/95 backdrop-blur-sm flex items-center justify-between px-4"
         style={{ height: 'calc(52px + env(safe-area-inset-top, 0px))', paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
+        <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors" aria-label={t('button_back')}>
           <ArrowLeft size={18} className="text-slate-900" />
         </button>
         <p className="absolute left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500 truncate max-w-[58%]">{headerLabel}</p>

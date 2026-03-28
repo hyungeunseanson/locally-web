@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import SiteHeader from '@/app/components/SiteHeader';
 import { Plus, Minus, ArrowLeft } from 'lucide-react'; // 세련된 토글 아이콘
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 const NOTICES = [
   { 
@@ -32,6 +33,7 @@ const NOTICES = [
 export default function NoticesPage() {
   const [openId, setOpenId] = useState<number | null>(null);
   const router = useRouter();
+  const { t } = useLanguage();
 
   const handleMobileBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -50,7 +52,7 @@ export default function NoticesPage() {
           <button
             onClick={handleMobileBack}
             className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center active:scale-95 transition-transform"
-            aria-label="뒤로가기"
+            aria-label={t('button_back')}
           >
             <ArrowLeft size={16} />
           </button>

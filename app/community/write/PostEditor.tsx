@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/app/utils/supabase/client';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { useToast } from '@/app/context/ToastContext';
 import { compressImage, sanitizeFileName, validateImage, isHeicValidationResult } from '@/app/utils/image';
 import DatePicker from '@/app/components/DatePicker';
@@ -78,6 +79,7 @@ export default function PostEditor({
     canWriteLocallyContent,
 }: PostEditorProps) {
     const router = useRouter();
+    const { t } = useLanguage();
     const supabase = createClient();
     const { showToast, showHeicUnsupportedToast } = useToast();
     const availableFormats = useMemo(
@@ -313,7 +315,7 @@ export default function PostEditor({
                         type="button"
                         onClick={() => router.back()}
                         className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50"
-                        aria-label="뒤로가기"
+                        aria-label={t('button_back')}
                     >
                         <ArrowLeft size={20} />
                     </button>
