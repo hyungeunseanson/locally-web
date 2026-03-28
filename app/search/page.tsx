@@ -40,35 +40,25 @@ import type {
   SearchTypeId,
 } from './searchContract';
 
-const TIME_OPTIONS: Array<{ id: SearchTimeId; label: string; desc: string }> = [
-  { id: 'morning', label: '오전', desc: '낮 12시 이전' },
-  { id: 'afternoon', label: '오후', desc: '오후 12시~오후 5시' },
-  { id: 'evening', label: '저녁', desc: '오후 5시 이후' },
+const TYPE_OPTION_IDS: Array<{ id: SearchTypeId; icon: typeof Utensils }> = [
+  { id: 'food_tour', icon: Utensils },
+  { id: 'cafe_dessert', icon: Coffee },
+  { id: 'walking_healing', icon: TreePine },
+  { id: 'shopping', icon: ShoppingBag },
+  { id: 'culture', icon: Landmark },
+  { id: 'activity', icon: Dumbbell },
+  { id: 'nightlife', icon: MoonStar },
+  { id: 'architecture', icon: Building2 },
+  { id: 'show_sports', icon: Ticket },
+  { id: 'landmark', icon: Flag },
+  { id: 'one_day_class', icon: Palette },
 ] as const;
 
-const TYPE_OPTIONS: Array<{
-  id: SearchTypeId;
-  label: string;
-  icon: typeof Utensils;
-}> = [
-  { id: 'food_tour', label: '맛집 탐방', icon: Utensils },
-  { id: 'cafe_dessert', label: '카페/디저트', icon: Coffee },
-  { id: 'walking_healing', label: '산책/힐링', icon: TreePine },
-  { id: 'shopping', label: '쇼핑', icon: ShoppingBag },
-  { id: 'culture', label: '문화 체험', icon: Landmark },
-  { id: 'activity', label: '액티비티', icon: Dumbbell },
-  { id: 'nightlife', label: '나이트라이프', icon: MoonStar },
-  { id: 'architecture', label: '건축', icon: Building2 },
-  { id: 'show_sports', label: '공연/경기', icon: Ticket },
-  { id: 'landmark', label: '랜드마크', icon: Flag },
-  { id: 'one_day_class', label: '원데이 클래스', icon: Palette },
-] as const;
-
-function formatShortDate(iso: string | null) {
+function formatShortDate(iso: string | null, t: (key: string) => string) {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+  return `${date.getMonth() + 1}${t('date_month')} ${date.getDate()}${t('day_0') === '일' ? '일' : ''}`.trim();
 }
 
 function SearchResults() {
@@ -92,8 +82,8 @@ function SearchResults() {
 
   const headerTitle = location ? `${location}의 체험` : '체험 검색';
   const headerSub = [
-    startDate ? formatShortDate(startDate) : '',
-    endDate ? formatShortDate(endDate) : '',
+    startDate ? formatShortDate(startDate, t) : '',
+    endDate ? formatShortDate(endDate, t) : '',
     language && language !== 'all' ? language : '',
   ]
     .filter(Boolean)
@@ -266,7 +256,7 @@ function SearchResults() {
                 selectedTypes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >
-              유형
+              {t('search_filter_type')}
               <ChevronDown size={12} />
             </button>
             <button
@@ -275,7 +265,7 @@ function SearchResults() {
                 selectedTimes.length > 0 ? 'bg-white border-[#222] text-[#222]' : 'bg-white border-[#D8D8D8] text-[#444]'
               }`}
             >
-              시간대
+              {t('search_filter_time_slot')}
               <ChevronDown size={12} />
             </button>
           </div>
@@ -454,7 +444,7 @@ function SearchResults() {
           >
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
               <h3 className="text-[20px] font-bold text-[#1F1F1F] leading-tight">
-                {activeSheet === 'time' ? '시간대' : activeSheet === 'type' ? '체험 유형' : '필터'}
+                {activeSheet === 'time' ? t('search_filter_time_slot') : activeSheet === 'type' ? t('search_filter_experience_type') : t('filter')}
               </h3>
               <button onClick={() => setActiveSheet(null)} className="p-1 text-[#444]">
                 <X size={20} />
@@ -464,11 +454,11 @@ function SearchResults() {
             <div className="px-6 overflow-y-auto">
               {activeSheet === 'time' && (
                 <div className="pt-1 space-y-3">
-                  {TIME_OPTIONS.map((option) => (
+                  {([{id:'morning' as SearchTimeId,lk:'search_time_morning',dk:'search_time_morning_desc'},{id:'afternoon' as SearchTimeId,lk:'search_time_afternoon',dk:'search_time_afternoon_desc'},{id:'evening' as SearchTimeId,lk:'search_time_evening',dk:'search_time_evening_desc'}]).map((option) => (
                     <button key={option.id} onClick={() => toggleTime(option.id)} className="w-full flex items-center justify-between text-left">
                       <div>
-                        <p className="text-[15px] font-semibold text-[#222] leading-tight">{option.label}</p>
-                        <p className="mt-1 text-[11px] text-[#8A8A8A] leading-tight">{option.desc}</p>
+                        <p className="text-[15px] font-semibold text-[#222] leading-tight">{t(option.lk)}</p>
+                        <p className="mt-1 text-[11px] text-[#8A8A8A] leading-tight">{t(option.dk)}</p>
                       </div>
                       <div
                         className={`w-[24px] h-[24px] rounded-[7px] border-2 flex items-center justify-center ${
@@ -484,9 +474,10 @@ function SearchResults() {
 
               {activeSheet === 'type' && (
                 <div className="pt-2 flex flex-wrap gap-3 pb-3">
-                  {TYPE_OPTIONS.map((option) => {
+                  {TYPE_OPTION_IDS.map((option) => {
                     const Icon = option.icon;
                     const selected = selectedTypes.includes(option.id);
+                    const labelKey = `search_type_${option.id === 'cafe_dessert' ? 'cafe' : option.id === 'walking_healing' ? 'walking' : option.id}`;
                     return (
                       <button
                         key={option.id}
@@ -496,7 +487,7 @@ function SearchResults() {
                         }`}
                       >
                         <Icon size={13} strokeWidth={1.8} />
-                        {option.label}
+                        {t(labelKey)}
                       </button>
                     );
                   })}
@@ -505,11 +496,12 @@ function SearchResults() {
 
               {activeSheet === 'filter' && (
                 <div className="pt-1 pb-4">
-                  <h4 className="text-[15px] font-semibold text-[#1F1F1F] mb-3">체험 유형</h4>
+                  <h4 className="text-[15px] font-semibold text-[#1F1F1F] mb-3">{t('search_filter_experience_type')}</h4>
                   <div className="flex flex-wrap gap-3 pb-5">
-                    {TYPE_OPTIONS.map((option) => {
+                    {TYPE_OPTION_IDS.map((option) => {
                       const Icon = option.icon;
                       const selected = selectedTypes.includes(option.id);
+                      const labelKey = `search_type_${option.id === 'cafe_dessert' ? 'cafe' : option.id === 'walking_healing' ? 'walking' : option.id}`;
                       return (
                         <button
                           key={option.id}
@@ -519,7 +511,7 @@ function SearchResults() {
                           }`}
                         >
                           <Icon size={13} strokeWidth={1.8} />
-                          {option.label}
+                          {t(labelKey)}
                         </button>
                       );
                     })}
@@ -527,9 +519,9 @@ function SearchResults() {
 
                   <div className="border-t border-[#ECECEC] my-1" />
 
-                  <h4 className="text-[15px] font-semibold text-[#1F1F1F] mt-5 mb-3">시간대</h4>
+                  <h4 className="text-[15px] font-semibold text-[#1F1F1F] mt-5 mb-3">{t('search_filter_time_slot')}</h4>
                   <div className="flex flex-wrap gap-3 pb-2">
-                    {TIME_OPTIONS.map((option) => {
+                    {([{id:'morning' as SearchTimeId,lk:'search_time_morning'},{id:'afternoon' as SearchTimeId,lk:'search_time_afternoon'},{id:'evening' as SearchTimeId,lk:'search_time_evening'}]).map((option) => {
                       const selected = selectedTimes.includes(option.id);
                       return (
                         <button
@@ -539,7 +531,7 @@ function SearchResults() {
                             selected ? 'border-[#222] bg-[#F8F8F8] text-[#222]' : 'border-[#D8D8D8] text-[#454545]'
                           }`}
                         >
-                          {option.label}
+                          {t(option.lk)}
                         </button>
                       );
                     })}
@@ -554,13 +546,13 @@ function SearchResults() {
                 disabled={!hasSheetSelection}
                 className={`text-[14px] font-semibold ${hasSheetSelection ? 'text-[#333]' : 'text-[#D2D2D2]'}`}
               >
-                전체 해제
+                {t('search_filter_clear_all')}
               </button>
               <button
                 onClick={() => setActiveSheet(null)}
                 className="h-[44px] px-6 rounded-[10px] bg-[#222429] text-white text-[14px] font-semibold transition-all duration-150 active:scale-[0.97]"
               >
-                결과 보기
+                {t('search_filter_show_results')}
               </button>
             </div>
           </div>

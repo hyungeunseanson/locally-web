@@ -365,9 +365,9 @@ export default function MobileSearchModal({
 
     const formatDateRange = () => {
         if (dateRange.start && dateRange.end) {
-            return `${dateRange.start.getMonth() + 1}월 ${dateRange.start.getDate()}일 - ${dateRange.end.getMonth() + 1}월 ${dateRange.end.getDate()}일`;
+            return `${dateRange.start.getMonth() + 1}${t('date_month')} ${dateRange.start.getDate()}${t('day_0') === '일' ? '일' : ''} - ${dateRange.end.getMonth() + 1}${t('date_month')} ${dateRange.end.getDate()}${t('day_0') === '일' ? '일' : ''}`.trim();
         }
-        if (dateRange.start) return `${dateRange.start.getMonth() + 1}월 ${dateRange.start.getDate()}일`;
+        if (dateRange.start) return `${dateRange.start.getMonth() + 1}${t('date_month')} ${dateRange.start.getDate()}${t('day_0') === '일' ? '일' : ''}`.trim();
         return '';
     };
 
@@ -430,7 +430,7 @@ export default function MobileSearchModal({
                         >
                             <div className="p-5 pb-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-[16px] font-extrabold text-[#222222] tracking-[-0.02em]">위치</h3>
+                                    <h3 className="text-[16px] font-extrabold text-[#222222] tracking-[-0.02em]">{t('label_destination')}</h3>
                                     <button
                                         onClick={handleClose}
                                         className="w-[30px] h-[30px] rounded-full flex items-center justify-center bg-white shrink-0 active:scale-[0.9] transition-transform"
@@ -445,11 +445,11 @@ export default function MobileSearchModal({
                                     style={{ border: '1px solid #D7D7D7', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.6)' }}
                                 >
                                     <Search size={13} className="text-[#8E8E8E] shrink-0" strokeWidth={2} />
-                                    <span className="text-[12px] text-[#9B9B9B] font-normal">{locationInput || '여행지 검색'}</span>
+                                    <span className="text-[12px] text-[#9B9B9B] font-normal">{locationInput || t('search_placeholder')}</span>
                                 </button>
 
                                 <div className="mt-4">
-                                    <p className="text-[9px] font-semibold text-[#7A7A7A] mb-2 tracking-[0.04em]">최근 검색</p>
+                                    <p className="text-[10px] font-semibold text-[#7A7A7A] mb-2 tracking-[0.04em]">{t('mobile_recent_searches')}</p>
                                     {recentSearches.slice(0, 1).map((item, idx) => (
                                         <button
                                             key={`${item.name}-${idx}`}
@@ -466,7 +466,7 @@ export default function MobileSearchModal({
                                 </div>
 
                                 <div className="mt-4">
-                                    <p className="text-[9px] font-semibold text-[#7A7A7A] mb-2 tracking-[0.04em]">추천 여행지</p>
+                                    <p className="text-[10px] font-semibold text-[#7A7A7A] mb-2 tracking-[0.04em]">{t('mobile_recommended_places')}</p>
                                     {recommendedPlaces.map((place) => (
                                         <button
                                             key={place.id}
@@ -486,7 +486,7 @@ export default function MobileSearchModal({
                     ) : (
                         <div className="mb-2 flex items-center gap-2.5">
                             <div className="flex-1">
-                                <CollapsedPanel label="위치" value={locationInput} placeholder="여행지 추가" panelKey="location" />
+                                <CollapsedPanel label={t('label_destination')} value={locationInput} placeholder={t('mobile_add_destination')} panelKey="location" />
                             </div>
                             <button
                                 onClick={handleClose}
@@ -505,7 +505,7 @@ export default function MobileSearchModal({
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
                             <div className="p-5">
-                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">날짜</h3>
+                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">{t('label_date')}</h3>
                                 <DatePicker
                                     selectedRange={dateRange}
                                     onChange={(range) => {
@@ -518,7 +518,7 @@ export default function MobileSearchModal({
                         </div>
                     ) : (
                         <div className="mb-2">
-                    <CollapsedPanel label="날짜" value={formatDateRange()} placeholder="날짜 추가" panelKey="date" />
+                    <CollapsedPanel label={t('label_date')} value={formatDateRange()} placeholder={t('add_dates')} panelKey="date" />
                         </div>
                     )}
 
@@ -529,7 +529,7 @@ export default function MobileSearchModal({
                             style={{ borderRadius: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.05), 0 8px 18px rgba(0,0,0,0.06)', border: '0.5px solid #E6E6E6' }}
                         >
                             <div className="p-5">
-                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">진행 언어</h3>
+                                <h3 className="text-[16px] font-extrabold text-[#222222] mb-3 tracking-[-0.02em]">{t('label_progress_language')}</h3>
                                 <div className="space-y-0.5">
                                     {languages.map((lang) => (
                                         <button
@@ -567,7 +567,7 @@ export default function MobileSearchModal({
                         </div>
                     ) : (
                         <div className="mb-2">
-                    <CollapsedPanel label="언어" value={getLanguageLabel()} placeholder="언어 선택" panelKey="language" />
+                    <CollapsedPanel label={t('label_language')} value={getLanguageLabel()} placeholder={t('mobile_language_select')} panelKey="language" />
                         </div>
                     )}
                 </div>
@@ -608,7 +608,7 @@ export default function MobileSearchModal({
                             ref={expandedInputRef}
                             autoFocus
                             type="text"
-                            placeholder="여행지 검색"
+                            placeholder={t('search_placeholder')}
                             value={locationInput}
                             onChange={(e) => setLocationInput(e.target.value)}
                             onKeyDown={(e) => {
@@ -624,14 +624,14 @@ export default function MobileSearchModal({
                                 onClick={() => submitTypedLocation(true)}
                                 className="shrink-0 text-[12px] font-semibold text-[#222222]"
                             >
-                                선택
+                                {t('mobile_search_select')}
                             </button>
                         )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-24">
                         <div className="mb-5">
-                            <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">최근 검색</p>
+                            <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">{t('mobile_recent_searches')}</p>
                             {recentSearches.slice(0, 1).map((item, idx) => (
                                 <button
                                     key={`${item.name}-${idx}`}
@@ -648,7 +648,7 @@ export default function MobileSearchModal({
                         </div>
 
                         <div>
-                            <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">추천 여행지</p>
+                            <p className="text-[10px] font-semibold text-[#717171] mb-2 px-1 tracking-[0.04em]">{t('mobile_recommended_places')}</p>
                             {showCustomTypedOption && (
                                 <button
                                     onClick={() => submitTypedLocation(true)}
@@ -657,7 +657,7 @@ export default function MobileSearchModal({
                                     <PlaceBadge type="custom" />
                                     <div>
                                         <span className="text-[13px] font-semibold text-[#222222] block">{trimmedInput}</span>
-                                        <span className="text-[11px] text-[#7A7A7A] font-normal">직접 입력한 위치/체험 검색어</span>
+                                        <span className="text-[11px] text-[#7A7A7A] font-normal">{t('mobile_search_custom_input')}</span>
                                     </div>
                                 </button>
                             )}
@@ -675,7 +675,7 @@ export default function MobileSearchModal({
                                 </button>
                             ))}
                             {filteredRecommendedPlaces.length === 0 && !showCustomTypedOption && (
-                                <div className="px-1 py-2 text-[11px] text-[#8B8B8B]">일치하는 추천 항목이 없어요.</div>
+                                <div className="px-1 py-2 text-[11px] text-[#8B8B8B]">{t('mobile_search_no_match')}</div>
                             )}
                         </div>
                     </div>
