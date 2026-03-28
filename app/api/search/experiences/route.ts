@@ -72,6 +72,28 @@ function parseSearchDate(iso: string | null) {
   return parsed;
 }
 
+function toIsoDateString(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getTodayIsoDate() {
+  return toIsoDateString(new Date());
+}
+
+function getAvailabilityLowerBound(startDate: string | null) {
+  const today = getTodayIsoDate();
+  const parsedStart = parseSearchDate(startDate);
+  if (!parsedStart) return today;
+
+  const normalizedStart = toIsoDateString(parsedStart);
+  return normalizedStart > today ? normalizedStart : today;
+}
+
+function getAvailabilityUpperBound(endDate: string | null) {
+  const parsedEnd = parseSearchDate(endDate);
+  return parsedEnd ? toIsoDateString(parsedEnd) : null;
+}
+
 function getExperienceDates(item: SearchExperience) {
   const record = item as Record<string, unknown>;
   const candidates = [record.available_dates, record.availableDates];
@@ -229,11 +251,19 @@ export async function GET(request: NextRequest) {
     let availabilityMap = new Map<number, { dates: string[]; times: string[] }>();
 
     if (needsAvailability && experienceIds.length > 0) {
-      const { data: availabilityRows, error: availabilityError } = await supabase
+      let availabilityQuery = supabase
         .from('experience_availability')
         .select('experience_id, date, start_time')
         .in('experience_id', experienceIds)
-        .eq('is_booked', false);
+        .eq('is_booked', false)
+        .gte('date', getAvailabilityLowerBound(startDate));
+
+      const availabilityUpperBound = getAvailabilityUpperBound(endDate);
+      if (availabilityUpperBound) {
+        availabilityQuery = availabilityQuery.lte('date', availabilityUpperBound);
+      }
+
+      const { data: availabilityRows, error: availabilityError } = await availabilityQuery;
 
       if (availabilityError) throw availabilityError;
 

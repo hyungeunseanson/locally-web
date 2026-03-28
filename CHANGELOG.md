@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-03-28 — Performance Phase 2A: Search Availability Narrowing & Detail Host Aggregate
+
+### Search Hot Path
+- **Availability date narrowing**: 검색 API가 `experience_availability` 조회 시 항상 `today` 이상만 읽고, `startDate`가 있으면 `max(today, startDate)`를 lower bound로, `endDate`가 있으면 upper bound로 적용해 public search hot path row read를 추가로 축소
+- **Contract preserved**: search params, 결과 shape, `available_dates` / `available_times` consumer contract는 그대로 유지
+
+### Experience Detail Host Aggregate
+- **Cached profile aggregate first**: 체험 상세 호스트 카드가 `profiles.average_rating` / `profiles.total_review_count`를 우선 사용하고, 둘 중 하나라도 비어 있거나 불완전할 때만 기존 `reviews` row-scan fallback을 유지
+- **Host profile shape kept**: `HostProfileDetail` 출력 구조와 detail UI/SEO/booking flow는 유지한 채 상세 진입 시 불필요한 host review row 읽기를 줄임
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `app/api/search/experiences/route.ts` | availability query에 today/startDate/endDate 범위 narrowing 추가 |
+| `app/experiences/[id]/page.tsx` | host profile select에 cached aggregate 필드 추가, cached aggregate 우선 사용 + fallback 유지 |
+
 ## 2026-03-28 — Performance Follow-up: Search SubCity, Reservation Safety, BFCache Guard
 
 ### Search / Experience Detail

@@ -97,6 +97,8 @@ const HOST_PROFILE_SELECT = [
   'favorite_song',
   'nationality',
   'host_nationality',
+  'average_rating',
+  'total_review_count',
 ].join(', ');
 
 const PUBLIC_HOST_APPLICATION_SELECT = [
@@ -110,6 +112,19 @@ const PUBLIC_HOST_APPLICATION_SELECT = [
   'favorite_song',
   'host_nationality',
 ].join(', ');
+
+function parseProfileNumber(value: unknown) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
 
 // 🟢 메타데이터 생성 (SEO & 다국어)
 export async function generateMetadata(
@@ -208,7 +223,7 @@ export default async function Page({ params }: Props) {
         return null;
       }
 
-      const [{ data: profile }, { data: app }, { data: reviewRows }] = await Promise.all([
+      const [{ data: profile }, { data: app }] = await Promise.all([
         supabase.from('profiles').select(HOST_PROFILE_SELECT).eq('id', experience.host_id).maybeSingle(),
         supabase
           .from('public_host_applications')
@@ -216,19 +231,36 @@ export default async function Page({ params }: Props) {
           .eq('user_id', experience.host_id)
           .limit(1)
           .maybeSingle(),
-        supabase
-          .from('reviews')
-          .select('rating, experiences!inner(host_id)')
-          .eq('experiences.host_id', experience.host_id),
       ]);
 
       const joinedYear = profile?.created_at
         ? Math.max(1, new Date().getFullYear() - new Date(profile.created_at).getFullYear())
         : null;
-      const hostReviewCount = reviewRows?.length || 0;
-      const hostAverageRating = hostReviewCount > 0
-        ? Number(((reviewRows || []).reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
+
+      const cachedReviewCount = parseProfileNumber(profile?.total_review_count);
+      const cachedAverageRating = parseProfileNumber(profile?.average_rating);
+      const hasValidCachedReviewAggregate =
+        cachedReviewCount !== null &&
+        cachedReviewCount >= 0 &&
+        cachedAverageRating !== null;
+
+      let hostReviewCount = hasValidCachedReviewAggregate ? cachedReviewCount : 0;
+      let hostAverageRating = hasValidCachedReviewAggregate
+        ? Number(cachedAverageRating.toFixed(2))
         : null;
+
+      if (!hasValidCachedReviewAggregate) {
+        const { data: reviewRows } = await supabase
+          .from('reviews')
+          .select('rating, experiences!inner(host_id)')
+          .eq('experiences.host_id', experience.host_id);
+
+        hostReviewCount = reviewRows?.length || 0;
+        hostAverageRating = hostReviewCount > 0
+          ? Number(((reviewRows || []).reduce((sum, row) => sum + Number(row.rating || 0), 0) / hostReviewCount).toFixed(2))
+          : null;
+      }
+
       const publicHostProfile = getHostPublicProfile(profile, app, 'Locally Host');
 
       return {
