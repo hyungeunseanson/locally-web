@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-03-29 — Regression Hotfix: Search / Experience Detail `subCity` Query Rollback
+
+### Emergency Recovery
+- **Search recovery**: `search` projection에서 현재 runtime 스키마 근거가 없는 `subCity` select를 제거해 `/api/search/experiences` query failure로 인한 빈 결과 회귀 복구
+- **Experience detail recovery**: 체험 상세 projection에서 `subCity` select를 제거해 홈/검색/위시리스트/트립 등에서 상세 진입 시 `notFound()`로 떨어지던 404 회귀 복구
+- **Detail error visibility**: 체험 상세 page body query 실패 시 server log에 Supabase error 정보를 남겨 silent 404 진단 손실을 줄임
+
+### Scope
+- **Minimal rollback only**: `subCity` 타입/consumer/UI는 유지하고, runtime query select만 최소 범위로 복구
+- **No extra performance work**: search/detail 최적화의 다른 부분, booking/payment flow, SEO, public API contract는 건드리지 않음
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `app/search/searchContract.ts` | search runtime projection에서 `subCity` 제거 |
+| `app/experiences/[id]/page.tsx` | detail runtime projection에서 `subCity` 제거, query error logging 추가 |
+
 ## 2026-03-28 — Performance Phase 2A: Search Availability Narrowing & Detail Host Aggregate
 
 ### Search Hot Path

@@ -51,7 +51,6 @@ const EXPERIENCE_DETAIL_SELECT = [
   'title_zh',
   'description_zh',
   'city',
-  'subCity',
   'country',
   'category',
   'category_en',
@@ -203,6 +202,16 @@ export default async function Page({ params }: Props) {
     supabase.from('experiences').select(EXPERIENCE_DETAIL_SELECT).eq('id', id).maybeSingle(),
     supabase.auth.getUser()
   ]);
+
+  if (expResult.error) {
+    console.error('[Experience detail] Failed to load experience:', {
+      id,
+      message: expResult.error.message,
+      details: expResult.error.details,
+      hint: expResult.error.hint,
+      code: expResult.error.code,
+    });
+  }
 
   const experience = expResult.data as ExperienceDetail | null;
 
