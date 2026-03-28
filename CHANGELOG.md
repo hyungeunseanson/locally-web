@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-03-29 — Become a Host FAQ Localization
+
+### FAQ Copy Localization
+- **Locale-specific FAQ copy**: `become-a-host` 하단 FAQ를 한국어 하드코딩에서 분리하고 `ko/en/ja/zh` locale별 copy module을 연결해 비한국어 페이지에서도 FAQ 전체가 해당 언어로 렌더되도록 수정
+- **Airbnb-style editorial tone**: 영어, 일본어, 중국어 FAQ를 운영 매뉴얼식 번역이 아니라 랜딩 페이지에 맞는 따뜻하고 신뢰감 있는 브랜드 카피 톤으로 정리
+
+### Scope
+- **FAQ only**: FAQ 섹션 제목, 그룹 제목, 질문, 답변만 locale별로 분기
+- **No structural change**: 이미지 로딩, header/action bar, metadata, locale 판별 방식, 아코디언 구조는 그대로 유지
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `app/become-a-host2/hostLandingFaq.ts` | `ko/en/ja/zh` FAQ copy module 추가 |
+| `app/become-a-host2/BecomeHostLandingContent.tsx` | 하드코딩 FAQ 제거 후 locale별 FAQ copy 연결 |
+
 ## 2026-03-29 — Regression Hotfix: Search / Experience Detail `subCity` Query Rollback
 
 ### Emergency Recovery
