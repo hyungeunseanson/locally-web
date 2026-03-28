@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { enforcePublicWriteGuard } from '@/app/utils/security/publicWriteGuard';
 
 const COMMUNITY_VIEW_COOKIE_PREFIX = 'community_viewed_';
 const COMMUNITY_VIEW_COOKIE_MAX_AGE = 60 * 60 * 6;
@@ -23,6 +24,36 @@ export async function POST(request: NextRequest) {
 
     const cookieName = buildViewCookieName(postId);
     const alreadyCounted = request.cookies.get(cookieName)?.value === '1';
+
+    if (!alreadyCounted) {
+      const guardResult = enforcePublicWriteGuard(request, {
+        bucket: 'community_views',
+        scopeKey: postId,
+        limit: 5,
+        windowMs: 10 * 60 * 1000,
+      });
+
+      if (guardResult.blockedByOrigin) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (!guardResult.allowed) {
+        return NextResponse.json(
+          {
+            success: true,
+            counted: false,
+            rateLimited: true,
+          },
+          {
+            status: 202,
+            headers: guardResult.retryAfterSeconds
+              ? { 'Retry-After': String(guardResult.retryAfterSeconds) }
+              : undefined,
+          }
+        );
+      }
+    }
+
     const supabaseAdmin = createAdminClient();
 
     const { data: post, error: postError } = await supabaseAdmin

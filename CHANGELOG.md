@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-03-29 — Security P1: Availability Summary Trim & Public Write Abuse Guard
+
+### Availability Summary Exposure
+- **Public slot summary trim**: 체험 상세 공개 availability summary에서 실제 예약 UI/결제 플로우에 쓰지 않는 `confirmedGuestCount`, `hasConfirmedPrivateBooking`를 제거해 슬롯별 수요 추정에 직접 연결되는 집계 노출을 축소
+- **Public contract preserved**: `remainingSeats`, `isBookable`, `soldOutReason`, `soloGuaranteeEligible`, `availableDates`, `dateToTimeMap`, `calendarDayStatusMap`은 유지해 예약/결제 UX는 그대로 동작하도록 유지
+
+### Public Write Abuse Guard
+- **Best-effort browser guard**: 공개 write API에 cross-site browser request 차단과 in-memory burst rate limit을 추가해 무인증 write abuse를 최소 범위에서 완화
+- **UX-safe handling**: analytics routes는 rate limit 시 `success` 응답으로 조용히 skip하고, community view tracking은 `counted: false`로 처리해 사용자 흐름과 화면 동작을 유지
+
+### Scope
+- **P1 only**: `availability-summary`, `community/views`, `analytics/events`, `analytics/search`만 조정
+- **No auth redesign**: 공개 구조 변경, schema migration, external rate-limit infra 도입은 보류
+
 ## 2026-03-29 — Community Security P0: Anonymous Identifier & Author Profile Trim
 
 ### Anonymous Identifier Exposure

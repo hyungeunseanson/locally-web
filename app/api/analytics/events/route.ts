@@ -6,6 +6,7 @@ import {
   insertAnalyticsEvent,
   normalizeRequiredText,
 } from '@/app/utils/analytics/server';
+import { enforcePublicWriteGuard } from '@/app/utils/security/publicWriteGuard';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
 const ALLOWED_EVENT_TYPES = new Set(['view', 'click', 'payment_init', 'booking_confirmed']);
@@ -33,6 +34,29 @@ export async function POST(request: Request) {
 
     const targetId = normalizeRequiredText(body.target_id, 200) || null;
     const tracking = extractAnalyticsTrackingMetadata(body);
+
+    const guardResult = enforcePublicWriteGuard(request, {
+      bucket: 'analytics_events',
+      identifier: tracking.session_id,
+      limit: 60,
+      windowMs: 60 * 1000,
+    });
+
+    if (guardResult.blockedByOrigin) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (!guardResult.allowed) {
+      return NextResponse.json(
+        { success: true, skipped: 'rate_limited' },
+        {
+          status: 202,
+          headers: guardResult.retryAfterSeconds
+            ? { 'Retry-After': String(guardResult.retryAfterSeconds) }
+            : undefined,
+        }
+      );
+    }
 
     const supabaseServer = await createServerClient();
     const {

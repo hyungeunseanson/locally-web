@@ -104,8 +104,6 @@ export function buildExperienceAvailabilitySummary({
 
     slotSummaryMap[slotKey] = {
       remainingSeats,
-      confirmedGuestCount: aggregate.confirmedGuestCount,
-      hasConfirmedPrivateBooking: aggregate.hasConfirmedPrivateBooking,
       isBookable,
       soldOutReason,
       soloGuaranteeEligible: isBookable && aggregate.confirmedGuestCount === 0,

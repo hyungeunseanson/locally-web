@@ -68,8 +68,6 @@ export type HostProfileDetail = {
 
 export type ExperienceSlotSummary = {
   remainingSeats: number;
-  confirmedGuestCount: number;
-  hasConfirmedPrivateBooking: boolean;
   isBookable: boolean;
   soldOutReason?: ExperienceSlotSoldOutReason;
   soloGuaranteeEligible: boolean;
