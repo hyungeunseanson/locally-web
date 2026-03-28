@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-03-28 — Performance Phase 1A: Search Hot Path
+
+### Search API
+- **Projection split**: 검색 결과 카드 렌더에 필요한 필드와 텍스트 검색/유형 필터에만 필요한 필드를 분리하여, 위치/언어 기반 기본 검색에서는 더 작은 projection으로 조회
+- **Conditional availability query**: 날짜/시간 필터가 없는 경우 `experience_availability` 조회를 생략하고, 텍스트/유형 필터를 먼저 적용한 뒤 필요한 경험 ID에 대해서만 availability를 조회하도록 순서 조정
+
+### Search Result Cards
+- **Mobile search cards**: 모바일 검색 결과 카드 이미지를 raw `<img>`에서 `next/image`로 교체하여 hot path 이미지 최적화 적용
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `searchContract.ts` | 카드용 projection과 텍스트 필터용 projection 분리 |
+| `app/api/search/experiences/route.ts` | conditional availability query, availability 이전의 텍스트/유형 필터 적용 |
+| `app/search/page.tsx` | 모바일 검색 결과 카드 이미지 `next/image` 전환 |
+
+---
 ## 2026-03-28 — Mobile UX P0 Follow-up: Search i18n & Back Labels
 
 ### Search i18n cleanup

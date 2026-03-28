@@ -2,6 +2,7 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import SiteHeader from '@/app/components/SiteHeader';
 import SiteFooter from '@/app/components/SiteFooter';
@@ -235,7 +236,13 @@ function SearchResults() {
     return (
       <Link key={item.id} href={`/experiences/${item.id}`} className="w-[168px] shrink-0">
         <div className="relative w-full aspect-[0.95] rounded-[16px] overflow-hidden bg-slate-200">
-          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+          <Image
+            src={imageUrl}
+            alt={title}
+            fill
+            sizes="168px"
+            className="object-cover"
+          />
           <button
             className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/20 backdrop-blur-[1px] border border-white/70 flex items-center justify-center"
             aria-label={t('exp_card_wishlist_toggle')}

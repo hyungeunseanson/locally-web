@@ -5,6 +5,7 @@ export interface SearchExperience {
   category?: string;
   city?: string;
   country?: string;
+  location?: string;
   languages?: string[];
   image_url?: string;
   photos?: string[];
@@ -13,6 +14,17 @@ export interface SearchExperience {
   review_count?: number | null;
   available_dates?: string[];
   available_times?: string[];
+  title_ko?: string;
+  description_ko?: string;
+  title_en?: string;
+  description_en?: string;
+  category_en?: string;
+  title_ja?: string;
+  description_ja?: string;
+  category_ja?: string;
+  title_zh?: string;
+  description_zh?: string;
+  category_zh?: string;
   [key: string]: unknown;
 }
 
@@ -54,23 +66,18 @@ export const SEARCH_TYPE_KEYWORDS: Record<SearchTypeId, string[]> = {
   one_day_class: ['원데이 클래스', '클래스', 'class'],
 };
 
-export const SEARCH_EXPERIENCE_SELECT = [
+export const SEARCH_EXPERIENCE_CARD_SELECT_FIELDS = [
   'id',
   'title',
-  'description',
   'city',
   'country',
   'category',
   'title_ko',
-  'description_ko',
   'title_en',
-  'description_en',
   'category_en',
   'title_ja',
-  'description_ja',
   'category_ja',
   'title_zh',
-  'description_zh',
   'category_zh',
   'languages',
   'image_url',
@@ -79,4 +86,18 @@ export const SEARCH_EXPERIENCE_SELECT = [
   'review_count',
   'price',
   'location',
+] as const;
+
+export const SEARCH_EXPERIENCE_TEXT_FILTER_FIELDS = [
+  'description',
+  'description_ko',
+  'description_en',
+  'description_ja',
+  'description_zh',
+] as const;
+
+export const SEARCH_EXPERIENCE_CARD_SELECT = SEARCH_EXPERIENCE_CARD_SELECT_FIELDS.join(', ');
+export const SEARCH_EXPERIENCE_SELECT = [
+  ...SEARCH_EXPERIENCE_CARD_SELECT_FIELDS,
+  ...SEARCH_EXPERIENCE_TEXT_FILTER_FIELDS,
 ].join(', ');

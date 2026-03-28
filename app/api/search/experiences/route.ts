@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { createClient } from '@/app/utils/supabase/server';
 import {
+  SEARCH_EXPERIENCE_CARD_SELECT,
   SEARCH_EXPERIENCE_SELECT,
   SEARCH_TIME_RANGES,
   SEARCH_TYPE_KEYWORDS,
@@ -167,13 +168,15 @@ export async function GET(request: NextRequest) {
       'landmark',
       'one_day_class',
     ]);
+    const searchTerms = tokenizeSearchInput(location);
+    const needsAvailability = Boolean(startDate || endDate || selectedTimes.length > 0);
+    const needsTextFilterFields = searchTerms.length > 0 || selectedTypes.length > 0;
 
     let query = supabase
       .from('experiences')
-      .select(SEARCH_EXPERIENCE_SELECT)
+      .select(needsTextFilterFields ? SEARCH_EXPERIENCE_SELECT : SEARCH_EXPERIENCE_CARD_SELECT)
       .eq('status', 'active');
 
-    const searchTerms = tokenizeSearchInput(location);
     if (searchTerms.length > 0) {
       const searchFields = [
         'title',
@@ -208,14 +211,24 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
 
-    const experiences = (data ?? []) as unknown as SearchExperience[];
-    const experienceIds = experiences
+    let filtered = (data ?? []) as unknown as SearchExperience[];
+
+    if (searchTerms.length > 0) {
+      filtered = filtered.filter((item) => {
+        const haystack = buildSearchHaystack(item);
+        return searchTerms.every((term) => haystack.includes(term));
+      });
+    }
+
+    filtered = filtered.filter((item) => matchesTypeSelection(item, selectedTypes));
+
+    const experienceIds = filtered
       .map((item) => Number(item.id))
       .filter((value) => Number.isFinite(value));
 
     let availabilityMap = new Map<number, { dates: string[]; times: string[] }>();
 
-    if (experienceIds.length > 0) {
+    if (needsAvailability && experienceIds.length > 0) {
       const { data: availabilityRows, error: availabilityError } = await supabase
         .from('experience_availability')
         .select('experience_id, date, start_time')
@@ -241,7 +254,7 @@ export async function GET(request: NextRequest) {
       }, new Map<number, { dates: string[]; times: string[] }>());
     }
 
-    let filtered = experiences.map((item) => {
+    filtered = filtered.map((item) => {
       const availability = availabilityMap.get(Number(item.id));
       return {
         ...item,
@@ -250,15 +263,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    if (searchTerms.length > 0) {
-      filtered = filtered.filter((item) => {
-        const haystack = buildSearchHaystack(item);
-        return searchTerms.every((term) => haystack.includes(term));
-      });
-    }
-
     filtered = filtered.filter((item) => matchesDateRange(item, startDate, endDate));
-    filtered = filtered.filter((item) => matchesTypeSelection(item, selectedTypes));
     filtered = filtered.filter((item) => matchesTimeSelection(item, selectedTimes));
 
     const response: SearchExperiencesResponse = {
