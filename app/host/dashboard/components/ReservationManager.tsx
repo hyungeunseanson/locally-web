@@ -79,6 +79,44 @@ type BookingRealtimePayload = {
   };
 };
 
+const RESERVATION_SELECT = `
+  id,
+  order_id,
+  user_id,
+  experience_id,
+  created_at,
+  date,
+  time,
+  guests,
+  amount,
+  total_price,
+  total_experience_price,
+  status,
+  contact_name,
+  cancel_reason,
+  refund_amount,
+  host_payout_amount,
+  experiences!inner (
+    title
+  ),
+  guest:profiles!bookings_user_id_fkey (
+    id,
+    full_name,
+    avatar_url,
+    phone,
+    created_at,
+    introduction,
+    bio,
+    job,
+    languages,
+    nationality,
+    gender,
+    mbti
+  )
+`;
+
+const REALTIME_REFRESH_DEBOUNCE_MS = 350;
+
 export default function ReservationManager() {
   const { t } = useLanguage(); // 🟢 2. t 함수 추가
   const router = useRouter();
@@ -88,6 +126,8 @@ export default function ReservationManager() {
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<ReservationRecord | null>(null);
   const [reviewedBookingIds, setReviewedBookingIds] = useState<number[]>([]); // 작성 완료된 예약 ID 목록
   const hostExperienceIdsRef = useRef<Set<string>>(new Set());
+  const hostUserIdRef = useRef<string | null>(null);
+  const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
@@ -133,44 +173,64 @@ export default function ReservationManager() {
     return (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60) < 24;
   };
 
+  const getHostUserId = useCallback(async () => {
+    if (hostUserIdRef.current) {
+      return hostUserIdRef.current;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    hostUserIdRef.current = user?.id ?? null;
+    return hostUserIdRef.current;
+  }, [supabase]);
+
+  const clearRealtimeRefresh = useCallback(() => {
+    if (realtimeRefreshTimeoutRef.current) {
+      clearTimeout(realtimeRefreshTimeoutRef.current);
+      realtimeRefreshTimeoutRef.current = null;
+    }
+  }, []);
+
   const fetchReservations = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
       setErrorMsg(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const hostUserId = await getHostUserId();
+      if (!hostUserId) return;
 
       const { data: hostExperiences } = await supabase
         .from('experiences')
         .select('id')
-        .eq('host_id', user.id);
+        .eq('host_id', hostUserId);
       const hostExperienceRows = (hostExperiences as HostExperienceRef[] | null) || [];
       hostExperienceIdsRef.current = new Set(hostExperienceRows.map((item) => String(item.id)));
 
       const { data, error } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          experiences!inner ( id, title, photos ), 
-guest:profiles!bookings_user_id_fkey ( 
-            id, full_name, avatar_url, email, phone, created_at,
-            kakao_id, introduction, bio, job, languages, nationality,
-            gender, mbti 
-          )
-        `)
-        .eq('experiences.host_id', user.id);
+        .select(RESERVATION_SELECT)
+        .eq('experiences.host_id', hostUserId);
 
       if (error) throw error;
-      setReservations(data || []);
-      // 🟢 [추가] 이미 후기를 작성한 예약 ID 조회
-      const { data: reviews } = await supabase
-        .from('guest_reviews')
-        .select('booking_id')
-        .eq('host_id', user.id);
+      const nextReservations = (data as ReservationRecord[] | null) || [];
+      setReservations(nextReservations);
 
-      if (reviews) {
-        setReviewedBookingIds(reviews.map(r => r.booking_id));
+      // 🟢 [추가] 이미 후기를 작성한 예약 ID 조회
+      const bookingIds = nextReservations
+        .map((reservation) => Number(reservation.id))
+        .filter((reservationId) => Number.isFinite(reservationId));
+
+      if (bookingIds.length === 0) {
+        setReviewedBookingIds([]);
+      } else {
+        const { data: reviews } = await supabase
+          .from('guest_reviews')
+          .select('booking_id')
+          .eq('host_id', hostUserId)
+          .in('booking_id', bookingIds);
+
+        if (reviews) {
+          setReviewedBookingIds(reviews.map((review) => review.booking_id));
+        }
       }
 
     } catch (error) {
@@ -181,7 +241,15 @@ guest:profiles!bookings_user_id_fkey (
     } finally {
       if (!isBackground) setLoading(false);
     }
-  }, [supabase, showToast, t]);
+  }, [getHostUserId, showToast, supabase, t]);
+
+  const scheduleRealtimeRefresh = useCallback(() => {
+    clearRealtimeRefresh();
+    realtimeRefreshTimeoutRef.current = setTimeout(() => {
+      realtimeRefreshTimeoutRef.current = null;
+      void fetchReservations(true);
+    }, REALTIME_REFRESH_DEBOUNCE_MS);
+  }, [clearRealtimeRefresh, fetchReservations]);
 
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
 
@@ -194,15 +262,15 @@ guest:profiles!bookings_user_id_fkey (
           const changedExperienceId = String(eventPayload.new?.experience_id || eventPayload.old?.experience_id || '');
           if (!changedExperienceId || !hostExperienceIdsRef.current.has(changedExperienceId)) return;
 
-          fetchReservations(true);
+          scheduleRealtimeRefresh();
 
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
+          const hostUserId = await getHostUserId();
+          if (!hostUserId) return;
 
           if (eventPayload.eventType === 'INSERT') {
             showToast(t('res_toast_new'), 'success'); // 🟢 번역
             await sendNotification({
-              recipient_id: user.id,
+              recipient_id: hostUserId,
               type: 'new_booking',
               title: t('res_notif_new_title'),
               content: t('res_notif_new_content'),
@@ -212,7 +280,7 @@ guest:profiles!bookings_user_id_fkey (
           else if (eventPayload.eventType === 'UPDATE' && eventPayload.new?.status && isCancellationRequestedBookingStatus(eventPayload.new.status)) {
             showToast(t('res_toast_cancel'), 'error'); // 🟢 번역
             await sendNotification({
-              recipient_id: user.id,
+              recipient_id: hostUserId,
               type: 'booking_cancel_request',
               title: t('res_notif_cancel_title'),
               content: t('res_notif_cancel_content'),
@@ -222,8 +290,11 @@ guest:profiles!bookings_user_id_fkey (
         }
       ).subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchReservations, supabase, showToast, t]);
+    return () => {
+      clearRealtimeRefresh();
+      supabase.removeChannel(channel);
+    };
+  }, [clearRealtimeRefresh, getHostUserId, scheduleRealtimeRefresh, supabase, showToast, t]);
 
   const addToGoogleCalendar = (res: ReservationRecord) => {
     const guestDisplayName = res.guest?.full_name || res.contact_name || t('res_gcal_none');

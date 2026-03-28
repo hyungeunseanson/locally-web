@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-03-28 — Performance Phase 1D: ReservationManager Payload & Realtime Trim
+
+### Reservation Payload
+- **Bookings projection trim**: `ReservationManager`가 예약 카드/게스트 프로필/환불 처리에 실제 필요한 booking, guest, experience 필드만 조회하도록 `bookings` select 축소
+- **Guest review scope trim**: `guest_reviews` 조회를 호스트 전체 후기 기준이 아니라, 현재 로드된 reservation booking ID 집합으로 제한
+
+### Realtime Refresh
+- **Debounced refresh**: booking realtime burst 시 즉시 목록 전체를 다시 읽지 않고 debounce 후 background refresh 하도록 조정
+- **Cached host user lookup**: `auth.getUser()` 결과를 ref에 캐시하여 realtime 이벤트마다 반복적으로 auth 경로를 타지 않도록 조정
+
+### 변경 파일
+| 파일 | 변경 내용 |
+|------|----------|
+| `app/host/dashboard/components/ReservationManager.tsx` | booking/guest projection 축소, guest review 조회 범위 축소, realtime refresh debounce 및 host user lookup 캐시 |
+
+---
 ## 2026-03-28 — Performance Phase 1B: Experience Detail Hot Path
 
 ### Experience Detail Server Fetch
